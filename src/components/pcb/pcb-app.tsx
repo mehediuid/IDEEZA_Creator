@@ -7,10 +7,12 @@
 // framed containers here and are populated in Phase 2.
 
 import { BottomBar } from "@/components/pcb/bottom-bar";
+import { Breadcrumb } from "@/components/pcb/breadcrumb";
 import { CanvasArea } from "@/components/pcb/canvas-area";
 import { ContextMenu } from "@/components/pcb/context-menu";
-import { Cover } from "@/components/pcb/cover";
-import { EditorShell, Raw } from "@/components/pcb/editor-shell";
+import { DeviceManager } from "@/components/pcb/device-manager";
+import { EditorShell } from "@/components/pcb/editor-shell";
+import { FootprintManager } from "@/components/pcb/footprint-manager";
 import { LeftPanel } from "@/components/pcb/left-panel";
 import { LeftRail } from "@/components/pcb/left-rail";
 import { MenuBar } from "@/components/pcb/menu-bar";
@@ -19,7 +21,6 @@ import { RightPanel } from "@/components/pcb/right-panel";
 import { SettingsOverlay } from "@/components/pcb/settings-overlay";
 import { Toolbar } from "@/components/pcb/toolbar";
 import { TopBar } from "@/components/pcb/top-bar";
-import { BREADCRUMB_HTML } from "@/lib/pcb/markup";
 import { PcbProvider, usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 function EditorBody() {
@@ -36,7 +37,7 @@ function EditorBody() {
       <TopBar />
 
       {/* BREADCRUMB */}
-      <Raw html={BREADCRUMB_HTML} />
+      <Breadcrumb />
 
       {/* MENU BAR */}
       <MenuBar />
@@ -70,11 +71,12 @@ function EditorBody() {
       {/* SETTINGS overlay */}
       <SettingsOverlay />
 
-      {/* MODALS (delete / array / find-replace / table / design rules / annotate) */}
-      <Modals />
+      {/* TOOLS manager overlays (Device / Footprint Manager) */}
+      <DeviceManager />
+      <FootprintManager />
 
-      {/* COVER (on top until launched) */}
-      {state.showCover && <Cover />}
+      {/* MODALS (delete / array / find-replace / table / design rules / annotate / import / export) */}
+      <Modals />
     </EditorShell>
   );
 }

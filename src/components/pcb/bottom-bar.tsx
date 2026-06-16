@@ -121,10 +121,34 @@ export function BottomBar() {
           </div>
         ))}
 
+        {/* Status indicator: current tool · grid · unit · zoom */}
+        <div
+          style={{
+            marginLeft: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-5)",
+            fontSize: "var(--font-size-xs)",
+            color: "var(--color-text-tertiary)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <span>
+            Tool:{" "}
+            <span style={{ color: "var(--color-text-brand)", fontWeight: 600 }}>{state.tool}</span>
+          </span>
+          <span>
+            Grid: <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>{state.gridSize} {state.unit}</span>
+          </span>
+          <span>
+            Zoom: <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>{Math.round(state.zoom * 100)}%</span>
+          </span>
+        </div>
+
         <div
           className="ix-tool"
           onClick={actions.toggleBottom}
-          style={{ marginLeft: "auto", width: 28, height: 26, borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ marginLeft: "var(--spacing-5)", width: 28, height: 26, borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <span
             style={{

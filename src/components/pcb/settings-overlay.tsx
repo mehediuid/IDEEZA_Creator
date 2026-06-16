@@ -10,6 +10,13 @@ import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { buildSettingsNav, settingsTitle } from "@/lib/pcb/data";
 import type { SettingsPage } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { useTheme } from "@/components/theme-provider";
+
+const THEME_OPTIONS = [
+  { label: "Light", value: "light" },
+  { label: "Dark", value: "dark" },
+  { label: "System", value: "system" },
+];
 
 const CLOSE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -62,32 +69,43 @@ function SettingsBody({ page }: { page: SettingsPage }) {
   // Per-page toggle state (interactive); selects are single-value triggers.
   const [toggles, setToggles] = React.useState<Record<string, boolean>>({});
   const isOn = (f: Extract<Field, { kind: "toggle" }>) => toggles[f.label] ?? f.on;
+  const { theme, setTheme } = useTheme();
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4) var(--spacing-12) var(--spacing-12)" }}>
-      {fields.map((f) => (
-        <div
-          key={f.label}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "var(--spacing-6) var(--spacing-0)",
-            borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-          }}
-        >
-          <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)" }}>{f.label}</span>
-          {f.kind === "toggle" ? (
-            <Toggle
-              aria-label={f.label}
-              checked={isOn(f)}
-              onChange={() => setToggles((t) => ({ ...t, [f.label]: !isOn(f) }))}
-            />
-          ) : (
-            <Select value={f.value} options={[{ label: f.value, value: f.value }]} minWidth={160} />
-          )}
-        </div>
-      ))}
+      {fields.map((f) => {
+        const isTheme = page === "system" && f.label === "Theme";
+        return (
+          <div
+            key={f.label}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "var(--spacing-6) var(--spacing-0)",
+              borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+            }}
+          >
+            <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)" }}>{f.label}</span>
+            {isTheme ? (
+              <Select
+                value={theme}
+                options={THEME_OPTIONS}
+                minWidth={160}
+                onChange={(v) => setTheme(v as "light" | "dark" | "system")}
+              />
+            ) : f.kind === "toggle" ? (
+              <Toggle
+                aria-label={f.label}
+                checked={isOn(f)}
+                onChange={() => setToggles((t) => ({ ...t, [f.label]: !isOn(f) }))}
+              />
+            ) : (
+              <Select value={f.value} options={[{ label: f.value, value: f.value }]} minWidth={160} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

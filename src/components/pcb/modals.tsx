@@ -441,9 +441,161 @@ function ImportDfxModal() {
 const REFRESH_DD =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
 
+// ── Notice / confirm modal (EDA-format Export + Import flows) ─────────────────
+function ConvertConfirmModal() {
+  const actions = usePcbActions();
+  return (
+    <Overlay>
+      <Card width={460}>
+        <div style={{ padding: "var(--spacing-10)" }}>
+          <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-6)" }}>
+            Convert Schematic to PCB?
+          </div>
+          <div style={{ fontSize: "var(--font-size-md)", color: "var(--color-text-secondary)", marginBottom: "var(--spacing-10)", lineHeight: 1.5 }}>
+            This will switch the canvas to PCB layout mode and place the current schematic components onto a board. You can switch back to the Schematic tab at any time.
+          </div>
+          <div style={{ display: "flex", gap: "var(--spacing-5)", justifyContent: "flex-end" }}>
+            <Button hierarchy="secondary" size="lg" onClick={actions.closeModal}>Cancel</Button>
+            <Button hierarchy="primary" size="lg" onClick={() => { actions.closeModal(); actions.setMode("pcb"); }}>Convert</Button>
+          </div>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+function NoticeModal({ title, body, cta }: { title: string; body: string; cta: string }) {
+  const actions = usePcbActions();
+  const [agreed, setAgreed] = React.useState(false);
+  return (
+    <Overlay>
+      <Card width={460}>
+        <Header title={title} onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-10)" }}>
+          <p style={{ fontSize: "var(--font-size-sm)", lineHeight: 1.6, color: "var(--color-text-secondary)", margin: 0 }}>{body}</p>
+          <div onClick={() => setAgreed((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", marginTop: "var(--spacing-8)", cursor: "pointer" }}>
+            <DsCheckbox checked={agreed} size="md" />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>I have read and agreed, continue.</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" disabled={!agreed} onClick={actions.closeModal}>{cta}</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+const NOTICE: Record<string, { title: string; body: string; cta: string }> = {
+  exportAltium: { title: "Notice", body: "Because the different file format and logic design, the format translation will lose some different, please check carefully at Altium Designer after exported. The exported file is for design reference only.", cta: "Export Altium Designer" },
+  exportKicad: { title: "Notice", body: "Because the different file format and logic design, the format translation will lose some different, please check carefully at KiCad after exported. The exported file is for design reference only.", cta: "Export Kicad Designer" },
+  exportEagle: { title: "Notice", body: "Because the different file format and logic design, the format translation will lose some different, please check carefully at Eagle after exported. The exported file is for design reference only.", cta: "Export Eagle Designer" },
+  importAltium: { title: "Notice", body: "Importing an Altium project will translate the schematic and footprints. Some properties may not map exactly — please review the imported design carefully.", cta: "Import Altium" },
+  importKicad: { title: "Notice", body: "Importing a KiCad project will translate the schematic and footprints. Some properties may not map exactly — please review the imported design carefully.", cta: "Import Kicad" },
+  jlcpcb: { title: "JLCPCB Layout Service", body: "Send your board to JLCPCB for professional layout and assembly. We'll route your design and prepare it for manufacturing.", cta: "Request Layout" },
+  genBlock: { title: "Generate / Update Block Symbol", body: "Generate a reusable block symbol from the current sheet, or update an existing symbol to reflect schematic changes.", cta: "Generate" },
+  boolOp: { title: "Boolean Operation", body: "Select two or more overlapping polygon areas on the canvas, then apply the operation (Preserve / Merge / Subtract / Exclude / Split).", cta: "OK" },
+  distribute: { title: "Distribute Selection", body: "Select 3 or more objects on the canvas to distribute their spacing evenly along the chosen axis.", cta: "OK" },
+};
+
+// ── Text (double-click designator → edit) ──────────────────────────────────
+function TextModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const labelStyle: React.CSSProperties = { width: 92, flex: "0 0 auto", fontSize: "var(--font-size-md)", color: "var(--color-text-secondary)" };
+  const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: "var(--spacing-8)" };
+  const inputStyle: React.CSSProperties = {
+    flex: 1,
+    padding: "var(--spacing-4) var(--spacing-6)",
+    border: "var(--border-width-1) solid var(--color-border-default)",
+    borderRadius: "var(--radius-md)",
+    fontSize: "var(--font-size-md)",
+    fontFamily: "var(--font-family-body)",
+    color: "var(--color-text-primary)",
+    background: "var(--color-bg-surface)",
+    outline: "none",
+  };
+  const styleBtn = (k: "b" | "i" | "u", label: string, css: React.CSSProperties) => (
+    <button
+      onClick={() => actions.toggleTextStyle(k)}
+      style={{
+        flex: 1,
+        padding: "var(--spacing-3) var(--spacing-0)",
+        border: "none",
+        borderRight: k !== "u" ? "var(--border-width-1) solid var(--color-border-default)" : "none",
+        background: state.textStyle[k] ? "var(--color-bg-brand-subtle)" : "transparent",
+        color: state.textStyle[k] ? "var(--color-violet-600)" : "var(--color-text-primary)",
+        fontSize: "var(--font-size-md)",
+        cursor: "pointer",
+        ...css,
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <Overlay>
+      <Card width={440}>
+        <Header title="Text" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ padding: "var(--spacing-10) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
+          <div>
+            <textarea
+              value={state.editText}
+              onChange={(e) => actions.setEditText(e.target.value)}
+              rows={2}
+              style={{ ...inputStyle, width: "100%", resize: "none", boxSizing: "border-box" }}
+            />
+            <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", marginTop: "var(--spacing-2)" }}>Ctrl/shift/Alt+ enter for line</div>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Font Color</span>
+            <span style={{ width: 30, height: 24, borderRadius: "var(--radius-sm)", background: "#1E1E1E", flex: "0 0 auto" }} />
+            <div style={{ ...inputStyle, flex: 1 }}>1E1E1E</div>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Transparency</span>
+            <div style={{ flex: 1 }}><Dropdown label="100%" /></div>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Font Family</span>
+            <div style={{ flex: 1 }}><Dropdown label="Arial" /></div>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Font size</span>
+            <div style={{ ...inputStyle, flex: 1 }}>0.1 inch</div>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>Style</span>
+            <div style={{ display: "flex", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", overflow: "hidden", width: 120 }}>
+              {styleBtn("b", "B", { fontWeight: 800 })}
+              {styleBtn("i", "I", { fontStyle: "italic" })}
+              {styleBtn("u", "U", { textDecoration: "underline" })}
+            </div>
+          </div>
+          <div style={{ ...rowStyle, alignItems: "flex-start" }}>
+            <span style={labelStyle}>Origin</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,16px)", gridTemplateRows: "repeat(3,16px)", gap: "var(--spacing-2)" }}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <span key={i} style={{ width: 16, height: 16, borderRadius: "var(--radius-xs)", background: i === 6 ? "var(--color-violet-600)" : "var(--color-bg-subtle)", border: "var(--border-width-1) solid var(--color-border-default)" }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-7) var(--spacing-12) var(--spacing-10)" }}>
+          <Pill onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-14)" }}>Cancel</Pill>
+          <PrimaryBtn onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-16)" }}>Place</PrimaryBtn>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 export function Modals() {
   const state = usePcbState();
   switch (state.modal) {
+    case "textEdit":
+      return <TextModal />;
     case "deleteObjects":
       return <DeleteObjectsModal />;
     case "array":
@@ -458,6 +610,18 @@ export function Modals() {
       return <AnnotateModal />;
     case "importDfx":
       return <ImportDfxModal />;
+    case "exportAltium":
+    case "exportKicad":
+    case "exportEagle":
+    case "importAltium":
+    case "importKicad":
+    case "jlcpcb":
+    case "genBlock":
+    case "boolOp":
+    case "distribute":
+      return <NoticeModal {...NOTICE[state.modal]} />;
+    case "convertConfirm":
+      return <ConvertConfirmModal />;
     default:
       return null;
   }

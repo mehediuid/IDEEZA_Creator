@@ -4,19 +4,21 @@
 // The editor sections are all anchored (top/bottom/left/right), so instead of
 // scaling a fixed artboard we let the root fill the whole viewport: fixed-size
 // chrome (bars, side panels) with a fluid canvas in the middle — like a real
-// desktop app. data-theme="light" keeps the editor light (still token-themeable).
+// desktop app. Theme follows the global ThemeProvider via the resolved theme.
 
 import * as React from "react";
+import { useTheme } from "@/components/theme-provider";
 
 export function EditorShell({ children }: { children: React.ReactNode }) {
+  const { resolvedTheme } = useTheme();
   return (
     <div
       className="pcb-app"
-      data-theme="light"
+      data-theme={resolvedTheme}
       style={{
         position: "fixed",
         inset: 0,
-        background: "var(--color-bg-surface)",
+        background: "var(--color-bg-page)",
         color: "var(--color-text-primary)",
         overflow: "hidden",
         userSelect: "none",

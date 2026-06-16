@@ -39,7 +39,7 @@ export function NumberInput({ value, onChange, step = 1, min, max, size = "md", 
     onChange?.(String(next));
   };
 
-  const StepBtn = ({ dir, glyph }: { dir: 1 | -1; glyph: string }) => (
+  const stepBtn = (dir: 1 | -1, glyph: string) => (
     <button
       type="button"
       tabIndex={-1}
@@ -63,7 +63,7 @@ export function NumberInput({ value, onChange, step = 1, min, max, size = "md", 
       )}
       style={{ height: s.h }}
     >
-      <StepBtn dir={-1} glyph="M6 12h12" />
+      {stepBtn(-1, "M6 12h12")}
       <input
         inputMode="decimal"
         value={value}
@@ -75,7 +75,7 @@ export function NumberInput({ value, onChange, step = 1, min, max, size = "md", 
           s.text,
         )}
       />
-      <StepBtn dir={1} glyph="M12 6v12M6 12h12" />
+      {stepBtn(1, "M12 6v12M6 12h12")}
     </div>
   );
 }

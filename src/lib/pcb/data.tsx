@@ -12,7 +12,7 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
     const dv = { divider: true };
     const ck = (label, k) => ({ label, k, check: true });
     const data = {
-      edit: { label: 'Edit', key: 'E', items: [ mk('Undo','Ctrl+Z','undo'), mk('Redo','Ctrl+Y','redo'), mk('Repeat(F4)','F4','blank'), mk('Copy(C)','Ctrl+C','copy'), mk('Cut (X)','Ctrl+X','cut'), mk('Paste(P)','Ctrl+P','paste'), mk('Delete','','del',[{label:'Selected',k:'Delete'},{label:'Objects',k:'',action:'deleteObjects'},{label:'All',k:''}]), dv, mk('Snap','Alt+S','check'), mk('Select Objects','','blank',[{label:'All (A)',k:'Ctrl+A',ik:'blank'},{label:'Rectangle Inside (I)',k:'',ik:'rectIn'},{label:'Rectangle Outside (O)',k:'',ik:'rectOut'},{label:'Polygon Inside',k:'',ik:'polyIn'},{label:'Polygon Outside',k:'',ik:'polyOut'},{label:'Linde Touched (L)',k:'',ik:'lineT'},{divider:true},{label:'Toggle selection',k:'',ik:'toggleSel'}]), mk('Array Objects','','array'), mk('Find and Replace','Ctrl+F','find'), mk('Find Similar Objects (N)','Ctrl+Shift+F','findSim') ] },
+      edit: { label: 'Edit', key: 'E', items: [ mk('Undo','Ctrl+Z','undo'), mk('Redo','Ctrl+Y','redo'), mk('Repeat(F4)','F4','blank'), mk('Copy(C)','Ctrl+C','copy'), mk('Cut (X)','Ctrl+X','cut'), mk('Paste(P)','Ctrl+P','paste'), mk('Delete','','del',[{label:'Selected',k:'Delete',action:'deleteObjects'},{label:'Objects',k:'',action:'deleteObjects'},{label:'All',k:'',action:'deleteObjects'}]), dv, mk('Snap','Alt+S','check'), mk('Select Objects','','blank',[{label:'All (A)',k:'Ctrl+A',ik:'blank'},{label:'Rectangle Inside (I)',k:'',ik:'rectIn'},{label:'Rectangle Outside (O)',k:'',ik:'rectOut'},{label:'Polygon Inside',k:'',ik:'polyIn'},{label:'Polygon Outside',k:'',ik:'polyOut'},{label:'Linde Touched (L)',k:'',ik:'lineT'},{divider:true},{label:'Toggle selection',k:'',ik:'toggleSel'}]), mk('Array Objects','','array'), mk('Find and Replace','Ctrl+F','find'), mk('Find Similar Objects (N)','Ctrl+Shift+F','findSim') ] },
       view: { label: 'View', key: 'V', items: [
         mk('Zoom In (I)','','zoomin'), mk('Zoom Out (O)','','zoomout'),
         mk('Fit All in Window (F)','K','fit'), mk('Fit Selection View (E)','','fitsel'), mk('Fit Area Selection View (A)','','fitarea'),
@@ -43,9 +43,9 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
         mk('Reset Component Unique ID','','dReset'),
       ] },
       layout: { label: 'Layout', key: 'L', items: [ mk('Align Left','','fit'), mk('Align Center','','fit'), dv, mk('Distribute Horizontally','','array'), mk('Distribute Vertically','','array'), dv, mk('Bring to Front',']','layer'), mk('Send to Back','[','layer') ] },
-      tools: { label: 'Tools', key: 'T', items: [ mk('Design Rule Check','','rules'), mk('Electrical Rule Check','','rules'), dv, mk('Measure Distance','','measure'), mk('Cross Probe','','wire'), mk('Auto Router','','convert') ] },
-      export: { label: 'Export', key: 'R', items: [ mk('Export PDF','','pdf'), mk('Export Gerber','','gerber'), mk('Export BOM','','bom'), mk('Export Netlist','','bom'), mk('Export Image','','pdf') ] },
-      import: { label: 'Import', key: 'M', items: [ mk('Import Schematic','','imp'), mk('Import Netlist','','imp'), mk('Import Library','','imp'), mk('Import Footprint','','imp') ] },
+      tools: { label: 'Tools', key: 'T', items: [ mk('Design Rule Check','','rules'), mk('Electrical Rule Check','','rules'), dv, mk('Device Manager','','chip'), mk('Footprint Manager','','foot'), dv, mk('Measure Distance','','measure'), mk('Cross Probe','','wire'), mk('Auto Router','','convert') ] },
+      export: { label: 'Export', key: 'R', items: [ mk('Export PDF','','pdf'), mk('Export Gerber','','gerber'), mk('Export BOM','','bom'), mk('Export Netlist','','bom'), mk('Export Image','','pdf'), dv, mk('Export Altium Designer','','imp'), mk('Export Kicad Designer','','imp'), mk('Export Eagle Designer','','imp') ] },
+      import: { label: 'Import', key: 'M', items: [ mk('Import DXF','','imp'), mk('Import Schematic','','imp'), mk('Import Netlist','','imp'), mk('Import Library','','imp'), mk('Import Footprint','','imp'), dv, mk('Import Altium','','imp'), mk('Import Kicad','','imp') ] },
       setting: { label: 'Setting', key: 'I', items: [ mk('System Setting','','sys'), mk('Drawing Setting','','draw'), mk('Hotkey Setting','','key'), mk('Property Setting','','prop'), mk('Save Setting','','save') ] },
       help: { label: 'Help', key: 'H', items: [ mk('Documentation','','doc'), mk('Keyboard Shortcuts','','key'), mk('Community','','doc'), mk('About IDEEZA','','doc') ] },
     };
@@ -63,7 +63,22 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
         return {
           label: it.label, k: it.k, submenu: it.submenu, hasSub: !!it.sub, icon: (it.ik || ''),
           sub: (it.sub || []).map(su => su.divider ? { divider: true } : ({ label: su.label, k: su.k, fg: su.disabled ? 'var(--color-text-disabled)' : 'var(--color-text-primary)', icon: (su.ik || ''), onClick: () => su.action ? actions.openModal(su.action) : actions.closeAll() })),
-          onClick: () => { if (it.sub) return; if (id === 'setting' && settingMap[it.label]) actions.openSettings(settingMap[it.label]); else if (id === 'import') actions.openModal('importDfx'); else if (it.label === 'Array Objects') actions.openModal('array'); else if (it.label === 'Find and Replace') actions.openModal('findReplace'); else if (it.label === 'Table') actions.openModal('tableProps'); else if (it.label === 'Design Rule') actions.openModal('designRules'); else if (it.label === 'Annotate Designator') actions.openModal('annotate'); else if (it.label === 'Update/Conver Schematic to PCB') actions.setMode('pcb'); else if (it.label === 'Check DRC' || it.label === 'Design Rule Check' || it.label === 'Electrical Rule Check') actions.clickBottomTab('drc'); else actions.closeAll(); },
+          onClick: () => { if (it.sub) return;
+            if (id === 'setting' && settingMap[it.label]) actions.openSettings(settingMap[it.label]);
+            else if (id === 'import') { if (it.label === 'Import Altium') actions.openModal('importAltium'); else if (it.label === 'Import Kicad') actions.openModal('importKicad'); else actions.openModal('importDfx'); }
+            else if (it.label === 'Device Manager') actions.openManager('device');
+            else if (it.label === 'Footprint Manager') actions.openManager('footprint');
+            else if (it.label === 'Export Altium Designer') actions.openModal('exportAltium');
+            else if (it.label === 'Export Kicad Designer') actions.openModal('exportKicad');
+            else if (it.label === 'Export Eagle Designer') actions.openModal('exportEagle');
+            else if (it.label === 'Array Objects') actions.openModal('array');
+            else if (it.label === 'Find and Replace') actions.openModal('findReplace');
+            else if (it.label === 'Table') actions.openModal('tableProps');
+            else if (it.label === 'Design Rule') actions.openModal('designRules');
+            else if (it.label === 'Annotate Designator') actions.openModal('annotate');
+            else if (it.label === 'Update/Conver Schematic to PCB') actions.setMode('pcb');
+            else if (it.label === 'Check DRC' || it.label === 'Design Rule Check' || it.label === 'Electrical Rule Check') actions.clickBottomTab('drc');
+            else actions.closeAll(); },
         };
       }),
     }));
@@ -117,17 +132,45 @@ const NET_TREE = [
     ]],
   ]],
 ];
-const COMP_TREE = [
+// The component list rendered identically across all Component sub-tabs — the
+// only difference between Designator/Name/Device/Footprint is the grouping row
+// the rows sit under (per Figma 433:237781/239485/241199/242918).
+const HDR_ROWS = [
+  [HDR, "chip", {}, [[HDR, "chip", {}], [HDR, "chip", {}]]],
+  [HDR, "chip", {}, [["H1 (HDR-M__2.54_2x, 1,p1.Schetict", "chip", {}]]],
+  [HDR, "chip", {}], [HDR, "chip", {}], [HDR, "chip", {}], [HDR, "chip", {}], [HDR, "chip", {}],
+];
+// Designator: rows sit directly under "Schematic- 1" (no grouping row).
+const COMP_TREE_DESIGNATOR = [
   ["Testing", "page", { weight: "600", iconColor: C.body }, [
     ["Board1", "board", { weight: "600", iconColor: C.body }, [
-      ["Schematic- 1", "sch", {}, [
-        [HDR, "chip", {}, [[HDR, "chip", {}], [HDR, "chip", {}]]],
-        [HDR, "chip", {}, [["H1 (HDR-M__2.54_2x, 1,p1.Schetict", "chip", {}]]],
-        [HDR, "chip", {}], [HDR, "chip", {}], [HDR, "chip", {}], [HDR, "chip", {}], [HDR, "chip", {}],
-      ]],
+      ["Schematic- 1", "sch", {}, HDR_ROWS],
     ]],
   ]],
 ];
+// Name / Device: rows grouped under a "None (10)" node inside "Schematic- 1".
+const COMP_TREE_NAME = [
+  ["Testing", "page", { weight: "600", iconColor: C.body }, [
+    ["Board1", "board", { weight: "600", iconColor: C.body }, [
+      ["Schematic- 1", "sch", {}, [["None (10)", "chip", { weight: "600" }, HDR_ROWS]]],
+    ]],
+  ]],
+];
+const COMP_TREE_DEVICE = COMP_TREE_NAME;
+// Footprint: grouping row replaces the schematic node with "Schematic- (12)".
+const COMP_TREE_FOOTPRINT = [
+  ["Testing", "page", { weight: "600", iconColor: C.body }, [
+    ["Board1", "board", { weight: "600", iconColor: C.body }, [
+      ["Schematic- (12)", "sch", {}, HDR_ROWS],
+    ]],
+  ]],
+];
+const COMP_TREES = {
+  designator: COMP_TREE_DESIGNATOR,
+  name: COMP_TREE_NAME,
+  device: COMP_TREE_DEVICE,
+  footprint: COMP_TREE_FOOTPRINT,
+};
 const OBJECT_TREE = [
   ["Testing", "page", { weight: "600", iconColor: C.body }, [
     ["Board1", "board", { weight: "600", iconColor: C.body }, [
@@ -145,8 +188,8 @@ const OBJECT_TREE = [
 
 export function buildTree(state: PcbState, actions: PcbActions) {
   const tree =
-    state.leftSub === "net" ? NET_TREE :
-    state.leftSub === "component" ? COMP_TREE :
+    state.leftSub === "net" ? (state.netSub === "component" ? COMP_TREE_DESIGNATOR : NET_TREE) :
+    state.leftSub === "component" ? (COMP_TREES[state.compSub] || COMP_TREE_DESIGNATOR) :
     state.leftSub === "object" ? OBJECT_TREE : PAGE_TREE;
   return walkTree(tree, state, actions);
 }
@@ -214,7 +257,11 @@ export function buildLeftTabs(state: PcbState, actions: PcbActions) {
 }
 
 export function buildSubTabs(state: PcbState, actions: PcbActions) {
-  return ([['page', 'Page'], ['net', 'Net'], ['component', 'Component'], ['object', 'Object']] as const).map(([k, l]) => ({
+  // 2D / 3D modes collapse the left panel to just the Page tree (Figma 433:251073/252704).
+  const defs = state.mode === '2d' || state.mode === '3d'
+    ? ([['page', 'Page']] as const)
+    : ([['page', 'Page'], ['net', 'Net'], ['component', 'Component'], ['object', 'Object']] as const);
+  return defs.map(([k, l]) => ({
     label: l,
     fg: state.leftSub === k ? C.text : 'var(--color-text-tertiary)',
     weight: state.leftSub === k ? '700' : '500',
@@ -236,7 +283,11 @@ export function buildModeTabs(state: PcbState, actions: PcbActions) {
 }
 
 export function buildRightTabs(state: PcbState, actions: PcbActions) {
-  return ([['properties', 'Properties'], ['filter', 'Filter'], ['layer', 'Layer']] as const).map(([k, l]) => ({
+  // Schematic right panel exposes only Properties | Filter; Layer is a PCB-mode tab.
+  const tabs = state.mode === 'schematic'
+    ? ([['properties', 'Properties'], ['filter', 'Filter']] as const)
+    : ([['properties', 'Properties'], ['filter', 'Filter'], ['layer', 'Layer']] as const);
+  return tabs.map(([k, l]) => ({
     label: l,
     fg: state.rightTab === k ? C.text : 'var(--color-text-tertiary)',
     weight: state.rightTab === k ? '700' : '500',

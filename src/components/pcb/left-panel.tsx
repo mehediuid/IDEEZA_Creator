@@ -7,8 +7,8 @@
 import * as React from "react";
 import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { SearchInput } from "@/components/ideeza";
+import { AllLibraryFlyout, LibraryPanel } from "@/components/pcb/library-panel";
 import { buildCompPills, buildLeftTabs, buildNetPills, buildSubTabs, buildTree } from "@/lib/pcb/data";
-import { buildLibrary } from "@/lib/pcb/content";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const CARET_SVG =
@@ -197,7 +197,10 @@ export function LeftPanel() {
       )}
 
       {state.leftMain === "library" && (
-        <div style={{ flex: 1, overflowY: "auto" }} dangerouslySetInnerHTML={{ __html: buildLibrary() }} />
+        <>
+          <LibraryPanel />
+          {state.libView === "all" && <AllLibraryFlyout />}
+        </>
       )}
     </div>
   );
