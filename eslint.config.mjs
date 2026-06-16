@@ -13,6 +13,17 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    // Verbatim ports of the prototype's display-only HTML string builders.
+    // They use `@ts-nocheck` + loose typing on purpose to mirror the source.
+    files: ["src/lib/pcb/content.ts", "src/lib/pcb/data.tsx"],
+    rules: {
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "prefer-const": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

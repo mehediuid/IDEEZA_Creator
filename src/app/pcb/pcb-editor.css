@@ -1,0 +1,74 @@
+/* IDEEZA PCB Software — editor interaction styles.
+ * Ported from the prototype's <style> block. Hover/active states and keyframes
+ * for the editor chrome. The brand purple maps to the --color-violet-600 token.
+ * Scoped under .pcb-app so they never leak into the rest of the site. */
+
+.pcb-app *,
+.pcb-app *::before,
+.pcb-app *::after {
+  box-sizing: border-box;
+}
+
+.pcb-app ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.pcb-app ::-webkit-scrollbar-thumb {
+  background: #d9d2e0;
+  border-radius: var(--radius-lg);
+}
+.pcb-app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes ideeza-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ideeza-pop {
+  from { transform: translateY(-7px) scale(0.97); }
+  to { transform: translateY(0) scale(1); }
+}
+@keyframes ideeza-ctx {
+  from { transform: scale(0.95); }
+  to { transform: scale(1); }
+}
+@keyframes ideeza-rise {
+  from { transform: translateY(16px); }
+  to { transform: translateY(0); }
+}
+@keyframes ideeza-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ideeza-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes ideeza-sheen {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(220%); }
+}
+
+.pcb-app .ix-ico svg { display: block; }
+.pcb-app .ix-tool { transition: background 0.14s ease, transform 0.1s ease, box-shadow 0.14s ease; }
+.pcb-app .ix-tool:hover { background: var(--color-bg-brand-subtle) !important; }
+.pcb-app .ix-tool:active { transform: scale(0.9); }
+.pcb-app .ix-menu:hover { background: var(--color-bg-brand-subtle) !important; color: var(--color-violet-600) !important; }
+.pcb-app .ix-row:hover { background: var(--color-bg-subtle) !important; }
+.pcb-app .ix-nav { transition: transform 0.15s ease; }
+.pcb-app .ix-nav:hover { transform: translateX(2px); }
+.pcb-app .ix-btn { transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease; }
+.pcb-app .ix-btn:hover { filter: brightness(1.06); box-shadow: 0 4px 14px rgba(124, 45, 185, 0.28); }
+.pcb-app .ix-btn:active { transform: translateY(1px) scale(0.985); }
+.pcb-app .ix-pill { transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+.pcb-app .ix-pill:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); }
+.pcb-app .ix-mi:hover { background: var(--color-bg-brand-subtle) !important; }
+.pcb-app .ix-mi:hover > .ix-submenu { display: block !important; }
+.pcb-app .ix-arr-input:focus { border-color: var(--color-violet-600) !important; box-shadow: 0 0 0 3px rgba(124, 45, 185, 0.12); }
+.pcb-app .ix-arr-input::-webkit-outer-spin-button,
+.pcb-app .ix-arr-input::-webkit-inner-spin-button { opacity: 1; }
+.pcb-app .ix-mi:hover .ix-mi-k { color: var(--color-violet-600) !important; }
+.pcb-app .ix-tab { transition: color 0.15s ease, background 0.15s ease; }
+.pcb-app .ix-seg { transition: all 0.18s var(--motion-easing-standard); }
+.pcb-app .ix-cover-enter { transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
+.pcb-app .ix-cover-enter:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(124, 45, 185, 0.45); }

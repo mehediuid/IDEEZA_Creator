@@ -1,0 +1,5 @@
+/* IDEEZA PCB Software — editor typeface.
+ * The design system's --font-family-body token resolves to "Manrope", so the
+ * editor loads Manrope (weights 200–800) and references the token everywhere
+ * via var(--font-family-body). */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap");
