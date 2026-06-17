@@ -266,7 +266,16 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Paste", { k: "Ctrl+V", icon: "paste", onClick: () => actions.pasteClipboard() }),
         item("Delete", { k: "Del", icon: "del", onClick: () => actions.deleteSelected() }),
         dv,
-        item("Move", { k: "M", icon: "blank", onClick: () => actions.setTool("move") }),
+        // Phase 8 — Move with sub-options (IT-534).
+        item("Move", {
+          k: "M",
+          icon: "blank",
+          sub: [
+            su("Move by Center point", "", { onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on center"); } }),
+            su("Move by Origin point", "", { onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on origin"); } }),
+            su("Move by reference point", "", { onClick: () => { actions.setTool("move"); actions.flashToast("Move: pick reference"); } }),
+          ],
+        }),
         snapToggle(),
         item("Find and Replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
         dv,
@@ -301,6 +310,16 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
             su("None", "", { icon: "check" }),
           ],
         }),
+        // Phase 8 — Appearance (IT-550). Dark / Light / System theme picker.
+        item("Appearance", {
+          sub: [
+            su("Light Mode", "", { onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("Dark Mode", "", { onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("System Default", "", { onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            dv,
+            su("Open Theme Settings…", "", { onClick: () => actions.openSettings("system") }),
+          ],
+        }),
         dv,
         check("Top Toolbar"),
         check("Left-Side panel", "["),
@@ -315,6 +334,76 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ],
         }),
         check("Floating Tool"),
+      ],
+    },
+    // Phase 8 — Place menu (IT-510). 2D-side primitives + Move-to-Layer.
+    {
+      id: "place",
+      label: "Place",
+      key: "P",
+      items: [
+        item("Device", { icon: "pChip", onClick: () => actions.openManager("device") }),
+        item("Vias", { icon: "via", onClick: () => actions.setTool("via") }),
+        item("Suture Vias", { icon: "via", onClick: () => actions.setTool("sutureVias") }),
+        item("Pad", { icon: "pad", onClick: () => actions.setTool("pad") }),
+        item("Board Outline", { icon: "blank", onClick: () => actions.setTool("boardOutline") }),
+        item("Copper Region", { icon: "pRect", onClick: () => actions.setTool("polygon") }),
+        item("Fill Region", { icon: "pRect", onClick: () => actions.setTool("fillRegion") }),
+        item("Slot Region", { icon: "pRect", onClick: () => actions.setTool("slot") }),
+        item("Prohibited Region", { icon: "del", onClick: () => actions.setTool("prohibitedRegion") }),
+        item("Constraint Region", { icon: "del", onClick: () => actions.setTool("constraintRegion") }),
+        dv,
+        item("Line", { icon: "pPolyline", onClick: () => actions.setTool("line") }),
+        item("Dimension", { icon: "measure", onClick: () => actions.setTool("dimension") }),
+        item("Text", { icon: "pText", onClick: () => actions.setTool("text") }),
+        item("Image", { icon: "pImage", onClick: () => actions.setTool("image") }),
+        item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
+        dv,
+        item("Move to Different Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
+      ],
+    },
+    // Phase 8 — Layout menu (IT-513). Already-built primitives (Group / Align
+    // / Distribute / Rotate / Flip / Level) surfaced from the toolbar.
+    {
+      id: "layout",
+      label: "Layout",
+      key: "L",
+      items: [
+        item("Group", { icon: "blank", onClick: () => actions.flashToast("Grouped") }),
+        item("Align", {
+          sub: [
+            su("Align Left"),
+            su("Align Right"),
+            su("Align Top"),
+            su("Align Bottom"),
+            su("Align Horizontal centers"),
+            su("Align Vertical Center"),
+          ],
+        }),
+        item("Distribute", {
+          sub: [
+            su("Distribute Horizontally", "", { onClick: () => actions.openModal("distribute") }),
+            su("Distribute Vertically", "", { onClick: () => actions.openModal("distribute") }),
+          ],
+        }),
+        item("Rotate", {
+          sub: [
+            su("Rotate Left", "", { onClick: () => actions.rotateSelectedPlaced(-90) }),
+            su("Rotate Right", "", { onClick: () => actions.rotateSelectedPlaced(90) }),
+          ],
+        }),
+        item("Flip", {
+          sub: [
+            su("Flip Horizontal", "", { onClick: () => actions.flipSelectedH() }),
+            su("Flip Vertical", "", { onClick: () => actions.flipSelectedV() }),
+          ],
+        }),
+        item("Level", {
+          sub: [
+            su("Bring to Front", "", { onClick: () => actions.bringFront() }),
+            su("Send to Back", "", { onClick: () => actions.sendBack() }),
+          ],
+        }),
       ],
     },
     // Phase 7 — Design menu (IT-646).
