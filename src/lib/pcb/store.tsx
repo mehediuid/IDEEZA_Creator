@@ -225,6 +225,9 @@ export interface PcbActions {
   addPcbLayer: () => void;
   removePcbLayer: (id: string) => void;
   movePcbLayer: (id: string, dir: -1 | 1) => void;
+  // Phase 5 — IT-692 / IT-569 toolbar additions
+  flashToast: (msg: string) => void;
+  alignSelectedToGrid: () => void;
 }
 
 const StateCtx = React.createContext<PcbState | null>(null);
@@ -1111,6 +1114,35 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           const next = s.pcbLayers.slice();
           [next[idx], next[ni]] = [next[ni], next[idx]];
           return { pcbLayers: next };
+        }),
+      // ── Phase 5 — IT-692 / IT-569 toolbar additions ────────────────────
+      flashToast: (msg) => {
+        merge({ toast: msg });
+        setTimeout(() => {
+          if (stateRef.current.toast === msg) merge({ toast: null });
+        }, 2200);
+      },
+      alignSelectedToGrid: () =>
+        mergeWithHistory((s) => {
+          if (s.selectedIds.length === 0) return {};
+          const sel = new Set(s.selectedIds);
+          // Treat gridSize as a unit-aware step; round x/y to nearest 10px so
+          // placement is visually quantized. (Real-unit conversion is owned
+          // by the canvas mapper — this is a coarse, undo-able snap.)
+          const step = 10;
+          return {
+            objects: s.objects.map((o) =>
+              sel.has(o.id)
+                ? {
+                    ...o,
+                    x: Math.round(o.x / step) * step,
+                    y: Math.round(o.y / step) * step,
+                    endX: o.endX != null ? Math.round(o.endX / step) * step : undefined,
+                    endY: o.endY != null ? Math.round(o.endY / step) * step : undefined,
+                  }
+                : o,
+            ),
+          };
         }),
     };
   }, [merge, mergeWithHistory]);

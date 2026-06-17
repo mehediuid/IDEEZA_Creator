@@ -442,6 +442,56 @@ function ImportDfxModal() {
 const REFRESH_DD =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
 
+// ── Reannotate (Phase 5 — IT-575) ──────────────────────────────────────────
+// Re-runs designator annotation across the schematic with the chosen scope
+// and starting index. Visually a slim variant of AnnotateModal — same atoms,
+// reduced field set per the Jira ticket.
+function ReannotateModal() {
+  const actions = usePcbActions();
+  const [scope, setScope] = React.useState<"all" | "selected" | "page">("all");
+  const [start, setStart] = React.useState("1");
+  const [keepHidden, setKeepHidden] = React.useState(true);
+  return (
+    <Overlay>
+      <Card width={460}>
+        <Header title="Reannotate Designators" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
+            Renumber component designators (R?, C?, U?, …) across the chosen scope. Existing locked designators are preserved.
+          </div>
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Scope</div>
+            {[
+              ["all", "Entire schematic"],
+              ["page", "Current page"],
+              ["selected", "Selected components"],
+            ].map(([v, label]) => (
+              <div key={v} onClick={() => setScope(v as typeof scope)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) 0", cursor: "pointer" }}>
+                <Radio on={scope === v} />
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={{ width: 140, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Start Number</span>
+            <div style={{ flex: 1 }}>
+              <NumberInput value={start} onChange={setStart} min={1} />
+            </div>
+          </div>
+          <div onClick={() => setKeepHidden((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+            <DsCheckbox checked={keepHidden} size="md" />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Keep hidden designators unchanged</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Reannotated"); actions.closeModal(); }}>Reannotate</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 // ── Notice / confirm modal (EDA-format Export + Import flows) ─────────────────
 function ConvertConfirmModal() {
   const actions = usePcbActions();
@@ -749,6 +799,8 @@ export function Modals() {
       return <Export3DModal shell />;
     case "convertConfirm":
       return <ConvertConfirmModal />;
+    case "reannotate":
+      return <ReannotateModal />;
     case "layerManager":
     case "netClass":
     case "diffPair":

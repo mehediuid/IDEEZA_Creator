@@ -48,6 +48,8 @@ export type ModalId =
   | "tearDrop"
   | "removeUnusedPad"
   | "pcbDrc"
+  // Phase 5 — IT-569 Reannotate
+  | "reannotate"
   | null;
 
 // Tools-menu manager overlays.
@@ -358,6 +360,8 @@ export interface PcbState {
   pcbTearDrop: TearDropSettings;
   pcbDrcRules: DrcRule[];
   removeUnusedPadOpts: { topLayer: boolean; bottomLayer: boolean; innerLayer: boolean; keepConnected: boolean };
+  // Phase 5 — toolbar toast
+  toast: string | null;
 }
 
 // Hotkey row — `id` is a stable sort handle, `key` is the displayed combo.
@@ -855,9 +859,12 @@ export interface ToolbarCustomization {
   panel: string[];
 }
 
+// Phase 5 (IT-692) — widened schematic default to expose the newly added
+// drawing tools (bezier / image / table / component). The toolbar itself
+// drops items whose tool id isn't in this set.
 export const DEFAULT_TOOLBAR_CUSTOMIZATION: ToolbarCustomization = {
   scope: "schematic",
-  schematic: TOOLBAR_CATALOGS.schematic.slice(0, 32).map((t) => t.id),
+  schematic: TOOLBAR_CATALOGS.schematic.slice(0, 40).map((t) => t.id),
   symbol: TOOLBAR_CATALOGS.symbol.slice(0, 14).map((t) => t.id),
   pcb: TOOLBAR_CATALOGS.pcb.slice(0, 24).map((t) => t.id),
   panel: TOOLBAR_CATALOGS.panel.slice(0, 12).map((t) => t.id),
@@ -1200,4 +1207,5 @@ export const initialState: PcbState = {
   pcbTearDrop: DEFAULT_TEAR_DROP,
   pcbDrcRules: DEFAULT_DRC_RULES,
   removeUnusedPadOpts: { topLayer: true, bottomLayer: true, innerLayer: false, keepConnected: true },
+  toast: null,
 };

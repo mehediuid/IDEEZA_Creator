@@ -77,7 +77,38 @@ function EditorBody() {
 
       {/* MODALS (delete / array / find-replace / table / design rules / annotate / import / export) */}
       <Modals />
+
+      {/* TOAST (Phase 5 — quick feedback for toolbar Save / Open / etc.) */}
+      <Toast />
     </EditorShell>
+  );
+}
+
+function Toast() {
+  const state = usePcbState();
+  if (!state.toast) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: "absolute",
+        bottom: 36,
+        left: "50%",
+        transform: "translateX(-50%)",
+        padding: "var(--spacing-4) var(--spacing-8)",
+        background: "var(--color-bg-inverse, #1E1E1E)",
+        color: "var(--color-text-on-brand, #FFFFFF)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--elevation-4)",
+        fontSize: "var(--font-size-sm)",
+        fontWeight: 500,
+        zIndex: 90,
+        animation: "ideeza-rise .18s cubic-bezier(.2,.9,.3,1.1)",
+      }}
+    >
+      {state.toast}
+    </div>
   );
 }
 

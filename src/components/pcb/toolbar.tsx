@@ -32,7 +32,16 @@ type ToolbarAction =
   | "flipH"
   | "bringFront"
   | "sendBack"
-  | "toggleBottom";
+  | "toggleBottom"
+  // Phase 5 — IT-692 schematic toolbar fillers
+  | "openProject"
+  | "save"
+  | "saveAll"
+  | "openFindSim"
+  | "openTable"
+  | "convert2D"
+  | "alignGrid"
+  | "openReannotate";
 
 // `modes` constrains which editor modes accept the tool. Omitted → all modes.
 // Items not for the current mode render greyed out and ignore clicks.
@@ -63,9 +72,14 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tSelectVisible", tool: "select", label: "Select (V)" },
   { kind: "icon", key: "tHand", tool: "hand", label: "Hand — pan canvas (H or hold Space)" },
   { kind: "icon", key: "tViewDetails", tool: "selectVisible", label: "Select Visible Parts" },
+  /* file (Phase 5 — IT-693/694/695) */
+  { kind: "icon", key: "imp", action: "openProject", label: "Open Project" },
+  { kind: "icon", key: "save", action: "save", label: "Save (Ctrl+S)" },
+  { kind: "icon", key: "tSaveAll", action: "saveAll", label: "Save All" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
   { kind: "icon", key: "board", action: "toggleBottom", label: "Dashboard" },
+  { kind: "icon", key: "findSim", action: "openFindSim", label: "Find Similar Object" },
   { kind: "icon", key: "tFitArea", tool: "viewDetails", label: "View details" },
   { kind: "div" },
   /* zoom / view */
@@ -94,9 +108,17 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tPort", tool: "port", label: "Port Out", modes: SCH },
   { kind: "icon", key: "tNoConn", tool: "noConnect", label: "No Connect", modes: SCH },
   { kind: "icon", key: "tText", tool: "text", label: "Text" },
+  /* Phase 5 — schematic drawing additions (IT-706/707/708/703) */
+  { kind: "icon", key: "pBezier", tool: "bezier", label: "Bezier", modes: SCH },
+  { kind: "icon", key: "pImage", tool: "image", label: "Image" },
+  { kind: "icon", key: "pTable", action: "openTable", label: "Table" },
+  { kind: "icon", key: "pChip", action: "openDeviceMgr", label: "Component — open Device Manager", modes: SCH },
   { kind: "div" },
   /* schematic ↔ PCB actions */
   { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert Schematic to PCB", modes: SCH },
+  { kind: "icon", key: "dConvert", action: "convert2D", label: "Convert Schematic to 2D", modes: SCH },
+  { kind: "icon", key: "tAlignGrid", action: "alignGrid", label: "Align Grid — snap selected to grid" },
+  { kind: "icon", key: "dAnnotate", action: "openReannotate", label: "Reannotate Designators", modes: SCH },
   { kind: "icon", key: "tJlcpcb", action: "openJlcpcb", label: "JLCPCB Layout Service" },
   { kind: "icon", key: "tGenBlock", action: "openGenBlock", label: "Generate / Update Block Symbol", modes: SCH },
   { kind: "icon", key: "tPgnd", tool: "pgnd", label: "PGND", modes: SCH },
@@ -364,6 +386,15 @@ export function Toolbar() {
     bringFront: () => actions.bringFront(),
     sendBack: () => actions.sendBack(),
     toggleBottom: () => actions.toggleBottom(),
+    // Phase 5 — IT-692 / IT-569 leftovers.
+    openProject: () => actions.flashToast("Open Project — pick a file"),
+    save: () => actions.flashToast("Saved"),
+    saveAll: () => actions.flashToast("All projects saved"),
+    openFindSim: () => actions.openModal("findReplace"),
+    openTable: () => actions.openModal("tableProps"),
+    convert2D: () => actions.setMode("2d"),
+    alignGrid: () => actions.alignSelectedToGrid(),
+    openReannotate: () => actions.openModal("reannotate"),
   };
 
   return (
