@@ -231,6 +231,10 @@ export interface PcbActions {
   // Phase 6 — 2D File / Edit / Export menu helpers
   toggleSnap: () => void;
   setCornerOp: (patch: Partial<PcbState["cornerOp"]>) => void;
+  // Phase 7 — Route options
+  setRoutingMode: (m: PcbState["routingMode"]) => void;
+  setRoutingCorner: (c: PcbState["routingCorner"]) => void;
+  setRoutingWidth: (w: number) => void;
 }
 
 const StateCtx = React.createContext<PcbState | null>(null);
@@ -1128,6 +1132,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       toggleSnap: () => merge((s) => ({ snapEnabled: !s.snapEnabled })),
       setCornerOp: (patch) =>
         mergeWithHistory((s) => ({ cornerOp: { ...s.cornerOp, ...patch } })),
+      setRoutingMode: (m) => merge({ routingMode: m }),
+      setRoutingCorner: (c) => merge({ routingCorner: c }),
+      setRoutingWidth: (w) => mergeWithHistory({ routingWidth: w }),
       alignSelectedToGrid: () =>
         mergeWithHistory((s) => {
           if (s.selectedIds.length === 0) return {};

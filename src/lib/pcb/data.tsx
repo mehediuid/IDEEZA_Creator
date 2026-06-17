@@ -317,6 +317,61 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         check("Floating Tool"),
       ],
     },
+    // Phase 7 — Design menu (IT-646).
+    {
+      id: "design",
+      label: "Design",
+      key: "D",
+      items: [
+        item("Update PCB to Schematic", { k: "Alt+I", icon: "dConvert", onClick: () => actions.setMode("schematic") }),
+        item("Design Rule", { icon: "dRule", onClick: () => actions.openModal("pcbDrc") }),
+        item("Check DRC", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
+        item("Differential Pair Manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
+        dv,
+        item("Add Mounting Hole", { icon: "pTestPoint", onClick: () => actions.setTool("mountingHole") }),
+        item("Manage Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
+        dv,
+        item("Polygon Pour", { icon: "pRect", onClick: () => actions.setTool("polygon") }),
+        item("Fill all Plane", { icon: "pRect", onClick: () => actions.flashToast("Filled all planes") }),
+        dv,
+        item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+      ],
+    },
+    // Phase 7 — Route menu (IT-658).
+    {
+      id: "route",
+      label: "Route",
+      key: "U",
+      items: [
+        item("Single Routing", { k: "T", icon: "pWire", onClick: () => actions.setTool("track") }),
+        item("Differential Routing", { k: "D", icon: "diffPair", onClick: () => actions.setTool("diffPair") }),
+        item("Stretch Track", { icon: "pWire", onClick: () => actions.setTool("stretchTrack") }),
+        item("Gloss Selected Track", { icon: "wire", onClick: () => actions.flashToast("Glossed selected tracks") }),
+        dv,
+        item("Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),
+        item("Differential Pair Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),
+        dv,
+        item("Auto Routing", { icon: "convert", onClick: () => actions.openModal("autoRoute") }),
+        item("Routing Mode", {
+          sub: [
+            su("45° Diagonal", "", { icon: state.routingMode === "45deg" ? "check" : "blank", onClick: () => actions.setRoutingMode("45deg") }),
+            su("90° Orthogonal", "", { icon: state.routingMode === "90deg" ? "check" : "blank", onClick: () => actions.setRoutingMode("90deg") }),
+            su("Curved", "", { icon: state.routingMode === "curved" ? "check" : "blank", onClick: () => actions.setRoutingMode("curved") }),
+          ],
+        }),
+        item("Routing Corner", {
+          sub: [
+            su("Miter", "", { icon: state.routingCorner === "miter" ? "check" : "blank", onClick: () => actions.setRoutingCorner("miter") }),
+            su("Round", "", { icon: state.routingCorner === "round" ? "check" : "blank", onClick: () => actions.setRoutingCorner("round") }),
+            su("Chamfer", "", { icon: state.routingCorner === "chamfer" ? "check" : "blank", onClick: () => actions.setRoutingCorner("chamfer") }),
+          ],
+        }),
+        item("Routing Width…", { icon: "wire", onClick: () => actions.openModal("routingWidth") }),
+        dv,
+        item("Unroute", { icon: "del", onClick: () => actions.flashToast("Unrouted") }),
+        item("Remove Loop", { icon: "del", onClick: () => actions.flashToast("Loop removed") }),
+      ],
+    },
     // Phase 6 — Export menu (IT-656).
     {
       id: "export",

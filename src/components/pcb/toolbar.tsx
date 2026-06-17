@@ -41,7 +41,15 @@ type ToolbarAction =
   | "openTable"
   | "convert2D"
   | "alignGrid"
-  | "openReannotate";
+  | "openReannotate"
+  // Phase 7 — 2D Main Toolbar (IT-718) extras
+  | "openArray"
+  | "view2D"
+  | "view3D"
+  | "flipBoard"
+  | "openDrc"
+  | "openGerber"
+  | "openPickPlace";
 
 // `modes` constrains which editor modes accept the tool. Omitted → all modes.
 // Items not for the current mode render greyed out and ignore clicks.
@@ -167,22 +175,61 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label", modes: SCH },
 ];
 
-// 2D editor toolbar — a reduced 11-icon strip (no inline dropdowns), faithful to
-// the Figma "2D section" frame. Select / Undo / Redo / Dashboard / Search, then a
-// divider, then the zoom & view controls.
+// 2D editor toolbar — Phase 7 (IT-718) expansion from the reduced strip.
+// Covers File / Edit / View / Place / Route / Design / Transform / Export groups.
 const ITEMS_2D: Item[] = [
+  /* select + file */
   { kind: "icon", key: "tSelectVisible", tool: "select", label: "Select (V)" },
+  { kind: "icon", key: "imp", action: "openProject", label: "Open Project" },
+  { kind: "icon", key: "save", action: "save", label: "Save (Ctrl+S)" },
+  { kind: "icon", key: "tSaveAll", action: "saveAll", label: "Save All" },
+  { kind: "div" },
+  /* edit */
+  { kind: "icon", key: "copy", action: "openDistribute", label: "Copy" },
+  { kind: "icon", key: "paste", action: "openDistribute", label: "Paste" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
-  { kind: "icon", key: "board", action: "toggleBottom", label: "Dashboard" },
-  { kind: "icon", key: "find", action: "openDeviceMgr", label: "Search Parts" },
+  { kind: "icon", key: "array", action: "openArray", label: "Array" },
+  { kind: "icon", key: "findSim", action: "openFindSim", label: "Find Similar Object" },
   { kind: "div" },
+  /* view */
   { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
   { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit All in Window" },
-  { kind: "icon", key: "findSim", action: "fitArea", label: "Zoom Area" },
-  { kind: "icon", key: "tFitArea", action: "fitArea", label: "Zoom Selection" },
   { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Toggle Grid" },
+  { kind: "icon", key: "board", action: "view2D", label: "2D View" },
+  { kind: "icon", key: "cube", action: "view3D", label: "3D View" },
+  { kind: "icon", key: "convert", action: "flipBoard", label: "Flip Board" },
+  { kind: "div" },
+  /* unit (existing dropdown) */
+  { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
+  { kind: "div" },
+  /* place / PCB tools */
+  { kind: "icon", key: "find", action: "openDeviceMgr", label: "Search Parts / Component" },
+  { kind: "icon", key: "tPolygon", tool: "polygon", label: "Polygon Pour (already built)" },
+  { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Fill Region (already built)" },
+  { kind: "icon", key: "tSlot", tool: "slot", label: "Slot Region (already built)" },
+  { kind: "icon", key: "tBoardOutline", tool: "boardOutline", label: "Board Outline (already built)" },
+  { kind: "icon", key: "del", tool: "prohibitedRegion", label: "Prohibited Region" },
+  { kind: "icon", key: "pText", tool: "text", label: "Text" },
+  { kind: "icon", key: "tDimension", tool: "dimension", label: "Dimension (already built)" },
+  { kind: "div" },
+  /* route */
+  { kind: "icon", key: "tTrack", tool: "track", label: "Single Route (already built)" },
+  { kind: "icon", key: "pWire", tool: "stretchTrack", label: "Stretch Track" },
+  { kind: "icon", key: "wire", action: "openDistribute", label: "Routing Corner (set)" },
+  { kind: "div" },
+  /* design / DRC */
+  { kind: "icon", key: "dCheck", action: "openDrc", label: "Design Rule Check" },
+  { kind: "div" },
+  /* transform */
+  { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
+  { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
+  { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute" },
+  { kind: "div" },
+  /* export */
+  { kind: "icon", key: "gerber", action: "openGerber", label: "Gerber" },
+  { kind: "icon", key: "bom", action: "openPickPlace", label: "Pick and Place" },
 ];
 
 function Divider() {
@@ -395,6 +442,14 @@ export function Toolbar() {
     convert2D: () => actions.setMode("2d"),
     alignGrid: () => actions.alignSelectedToGrid(),
     openReannotate: () => actions.openModal("reannotate"),
+    // Phase 7 — IT-718 toolbar additions
+    openArray: () => actions.openModal("array"),
+    view2D: () => actions.setMode("2d"),
+    view3D: () => actions.setMode("3d"),
+    flipBoard: () => actions.flashToast("Board flipped (Top ↔ Bottom)"),
+    openDrc: () => actions.openModal("pcbDrc"),
+    openGerber: () => actions.openModal("exportGerber2D"),
+    openPickPlace: () => actions.openModal("exportPickPlace"),
   };
 
   return (

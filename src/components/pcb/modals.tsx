@@ -881,6 +881,113 @@ function ChamferFilletModal() {
   );
 }
 
+// Phase 7 — Auto Routing options + start button (IT-665).
+function AutoRouteModal() {
+  const actions = usePcbActions();
+  const [scope, setScope] = React.useState<"all" | "selected" | "unrouted">("unrouted");
+  const [strategy, setStrategy] = React.useState<"fast" | "balanced" | "high">("balanced");
+  const [respectClass, setRespectClass] = React.useState(true);
+  const [smoothCorners, setSmoothCorners] = React.useState(true);
+  return (
+    <Overlay>
+      <Card width={500}>
+        <Header title="Auto Routing" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Scope</div>
+            {[
+              ["unrouted", "Unrouted nets only"],
+              ["selected", "Selected nets"],
+              ["all", "All nets (re-route)"],
+            ].map(([v, label]) => (
+              <div key={v} onClick={() => setScope(v as typeof scope)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) 0", cursor: "pointer" }}>
+                <Radio on={scope === v} />
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Strategy</div>
+            <div style={{ display: "flex", gap: "var(--spacing-8)" }}>
+              {[
+                ["fast", "Fast"],
+                ["balanced", "Balanced"],
+                ["high", "High quality"],
+              ].map(([v, label]) => (
+                <div key={v} onClick={() => setStrategy(v as typeof strategy)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                  <Radio on={strategy === v} />
+                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div onClick={() => setRespectClass(!respectClass)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+            <Check on={respectClass} />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Respect Net Class widths and clearances</span>
+          </div>
+          <div onClick={() => setSmoothCorners(!smoothCorners)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+            <Check on={smoothCorners} />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Smooth corners after routing</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Auto routing started…"); actions.closeModal(); }}>Start Routing</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// Phase 7 — Routing Width (IT-668): pick a class or custom width in mil.
+function RoutingWidthModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const presets = [4, 6, 8, 10, 12, 15, 20, 25, 30];
+  return (
+    <Overlay>
+      <Card width={420}>
+        <Header title="Routing Width" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Common widths (mil)</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-3)" }}>
+              {presets.map((w) => (
+                <button
+                  key={w}
+                  onClick={() => actions.setRoutingWidth(w)}
+                  style={{
+                    padding: "var(--spacing-3) var(--spacing-6)",
+                    border: state.routingWidth === w ? "var(--border-width-1-5) solid var(--color-border-brand)" : "var(--border-width-1) solid var(--color-border-default)",
+                    borderRadius: "var(--radius-md)",
+                    background: state.routingWidth === w ? "var(--color-bg-brand-subtle)" : "var(--color-bg-surface)",
+                    color: state.routingWidth === w ? "var(--color-violet-600)" : "var(--color-text-primary)",
+                    fontWeight: state.routingWidth === w ? 700 : 500,
+                    fontSize: "var(--font-size-sm)",
+                    cursor: "pointer",
+                  }}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
+            <span style={{ width: 130, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Custom (mil)</span>
+            <div style={{ flex: 1 }}>
+              <NumberInput value={String(state.routingWidth)} onChange={(v) => actions.setRoutingWidth(parseFloat(v) || 0)} min={0} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`Routing width set to ${state.routingWidth} mil`); actions.closeModal(); }}>Apply</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 // Lightweight info + confirm dialog (Edit Outline, Cutout).
 function SimpleConfirmModal({ title, body, cta, onConfirm }: { title: string; body: string; cta: string; onConfirm: () => void }) {
   const actions = usePcbActions();
@@ -954,6 +1061,10 @@ export function Modals() {
       return <SimpleConfirmModal title="Edit Board Outline" body="Click vertices on the board outline to move them, or drag edges to add new points. Click outside the outline to commit changes." cta="Enter Edit Mode" onConfirm={() => actions.setTool("editOutline")} />;
     case "cutout":
       return <SimpleConfirmModal title="Cutout" body="Draw a rectangle, polygon, or circle on the board to define a cutout region. The selected area will be removed from the board." cta="Start Cutout" onConfirm={() => actions.setTool("cutout")} />;
+    case "autoRoute":
+      return <AutoRouteModal />;
+    case "routingWidth":
+      return <RoutingWidthModal />;
     case "layerManager":
     case "netClass":
     case "diffPair":

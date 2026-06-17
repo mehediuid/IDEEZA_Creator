@@ -59,6 +59,9 @@ export type ModalId =
   | "chamferFillet"
   | "editOutline"
   | "cutout"
+  // Phase 7 — Route + Design extras
+  | "autoRoute"
+  | "routingWidth"
   | null;
 
 // Tools-menu manager overlays.
@@ -374,6 +377,10 @@ export interface PcbState {
   // Phase 6 — 2D snap + chamfer/fillet
   snapEnabled: boolean;
   cornerOp: { mode: "chamfer" | "fillet"; radius: number };
+  // Phase 7 — Route options
+  routingMode: "45deg" | "90deg" | "curved";
+  routingCorner: "miter" | "round" | "chamfer";
+  routingWidth: number;
 }
 
 // Hotkey row — `id` is a stable sort handle, `key` is the displayed combo.
@@ -1222,4 +1229,7 @@ export const initialState: PcbState = {
   toast: null,
   snapEnabled: true,
   cornerOp: { mode: "fillet", radius: 5 },
+  routingMode: "45deg",
+  routingCorner: "miter",
+  routingWidth: 10,
 };
