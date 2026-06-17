@@ -216,7 +216,68 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     su("Grid Range setting (Po..."),
   ];
 
+  // Snap toggle reflects current `snapEnabled` flag (Phase 6, IT-604).
+  const snapToggle = () => {
+    const on = state.snapEnabled !== false;
+    return {
+      label: "Snap",
+      k: "Alt+S",
+      submenu: false,
+      hasSub: false,
+      icon: on ? "check" : "blank",
+      sub: [],
+      onClick: () => actions.toggleSnap(),
+    };
+  };
+
   const data = [
+    // Phase 6 — File menu (IT-590).
+    {
+      id: "file",
+      label: "File",
+      key: "F",
+      items: [
+        item("New", { k: "Ctrl+N", icon: "blank", onClick: () => actions.flashToast("New project") }),
+        item("Open Project", { k: "Ctrl+O", icon: "imp", onClick: () => actions.flashToast("Open Project — pick a file") }),
+        item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
+        item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
+        dv,
+        item("Import", {
+          icon: "imp",
+          sub: [
+            su("DXF", "", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
+            su("Altium", "", { icon: "imp", onClick: () => actions.openModal("importAltium") }),
+            su("Kicad", "", { icon: "imp", onClick: () => actions.openModal("importKicad") }),
+          ],
+        }),
+      ],
+    },
+    // Phase 6 — Edit menu (IT-596).
+    {
+      id: "edit",
+      label: "Edit",
+      key: "E",
+      items: [
+        item("Undo", { k: "Ctrl+Z", icon: "undo", onClick: () => actions.undo() }),
+        item("Redo", { k: "Ctrl+Y", icon: "redo", onClick: () => actions.redo() }),
+        dv,
+        item("Copy", { k: "Ctrl+C", icon: "copy", onClick: () => actions.copySelection() }),
+        item("Cut", { k: "Ctrl+X", icon: "cut", onClick: () => actions.cutSelection() }),
+        item("Paste", { k: "Ctrl+V", icon: "paste", onClick: () => actions.pasteClipboard() }),
+        item("Delete", { k: "Del", icon: "del", onClick: () => actions.deleteSelected() }),
+        dv,
+        item("Move", { k: "M", icon: "blank", onClick: () => actions.setTool("move") }),
+        snapToggle(),
+        item("Find and Replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
+        dv,
+        item("Edit Outline", { icon: "draw", onClick: () => actions.openModal("editOutline") }),
+        item("Cutout", { icon: "del", onClick: () => actions.openModal("cutout") }),
+        item("Array Object", { icon: "array", onClick: () => actions.openModal("array") }),
+        dv,
+        item("Add Chamfer", { icon: "blank", onClick: () => { actions.setCornerOp({ mode: "chamfer" }); actions.openModal("chamferFillet"); } }),
+        item("Add Fillet", { icon: "blank", onClick: () => { actions.setCornerOp({ mode: "fillet" }); actions.openModal("chamferFillet"); } }),
+      ],
+    },
     {
       id: "view",
       label: "View",
@@ -256,12 +317,19 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         check("Floating Tool"),
       ],
     },
+    // Phase 6 — Export menu (IT-656).
     {
       id: "export",
       label: "Export",
       key: "R",
       items: [
-        item("Export"),
+        item("BOM (Bill of Materials)", { icon: "bom", onClick: () => actions.openModal("exportBom") }),
+        item("DXF", { icon: "imp", onClick: () => actions.openModal("exportDxf2D") }),
+        item("PDF", { icon: "pdf", onClick: () => actions.openModal("exportPdf2D") }),
+        item("Gerber", { icon: "gerber", onClick: () => actions.openModal("exportGerber2D") }),
+        item("Pick and Place", { icon: "bom", onClick: () => actions.openModal("exportPickPlace") }),
+        item("3D", { icon: "cube", onClick: () => actions.openModal("export3dFile") }),
+        dv,
         item("Altium Desinger", { onClick: () => actions.openModal("exportAltium") }),
         item("Kicad Desinger", { onClick: () => actions.openModal("exportKicad") }),
         item("Eagle Designer", { onClick: () => actions.openModal("exportEagle") }),

@@ -764,8 +764,145 @@ function Export3DModal({ shell }: { shell?: boolean }) {
   );
 }
 
+// ── Phase 6 — 2D side modals ─────────────────────────────────────────────────
+
+// Generic export form: file name input, format radio, options checkboxes,
+// Cancel / Export footer. Used by DXF / PDF / Gerber / Pick & Place / BOM.
+function ExportFormatModal({
+  title,
+  defaultName,
+  formats,
+  extraOpts,
+}: {
+  title: string;
+  defaultName: string;
+  formats: string[];
+  extraOpts: string[];
+}) {
+  const actions = usePcbActions();
+  const [fileName, setFileName] = React.useState(defaultName);
+  const [format, setFormat] = React.useState(formats[0]);
+  const [opts, setOpts] = React.useState<Record<string, boolean>>(() =>
+    Object.fromEntries(extraOpts.map((o, i) => [o, i < 2])),
+  );
+  const labelCss: React.CSSProperties = { fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const groupCss: React.CSSProperties = { ...labelCss, marginBottom: "var(--spacing-4)", fontWeight: 600, color: "var(--color-text-primary)" };
+  return (
+    <Overlay>
+      <Card width={460}>
+        <Header title={title} onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={{ ...labelCss, width: 84, flex: "0 0 auto" }}>File Name</span>
+            <input
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              style={{
+                flex: 1,
+                padding: "var(--spacing-3) var(--spacing-5)",
+                border: "var(--border-width-1) solid var(--color-border-default)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-primary)",
+                fontSize: "var(--font-size-sm)",
+                outline: "none",
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+          <div>
+            <div style={groupCss}>Format</div>
+            <div style={{ display: "flex", gap: "var(--spacing-8)", flexWrap: "wrap" }}>
+              {formats.map((f) => (
+                <div key={f} onClick={() => setFormat(f)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                  <Radio on={format === f} />
+                  <span style={labelCss}>{f}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {extraOpts.length > 0 && (
+            <div>
+              <div style={groupCss}>Options</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4) var(--spacing-6)" }}>
+                {extraOpts.map((o) => (
+                  <div key={o} onClick={() => setOpts((s) => ({ ...s, [o]: !s[o] }))} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                    <Check on={!!opts[o]} />
+                    <span style={labelCss}>{o}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// Chamfer / Fillet (IT-609 / IT-610) — single corner-radius input, mode read
+// from store so the menu sets it before opening.
+function ChamferFilletModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const op = state.cornerOp;
+  const isChamfer = op.mode === "chamfer";
+  return (
+    <Overlay>
+      <Card width={420}>
+        <Header title={isChamfer ? "Add Chamfer" : "Add Fillet"} onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
+            {isChamfer
+              ? "Replaces sharp corners on selected polygons or outlines with bevel cuts of the chosen size."
+              : "Replaces sharp corners on selected polygons or outlines with rounded arcs of the chosen radius."}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
+            <span style={{ width: 140, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+              {isChamfer ? "Chamfer size (mil)" : "Fillet radius (mil)"}
+            </span>
+            <div style={{ flex: 1 }}>
+              <NumberInput value={String(op.radius)} onChange={(v) => actions.setCornerOp({ radius: parseFloat(v) || 0 })} min={0} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`${isChamfer ? "Chamfer" : "Fillet"} applied`); actions.closeModal(); }}>
+            Apply
+          </Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// Lightweight info + confirm dialog (Edit Outline, Cutout).
+function SimpleConfirmModal({ title, body, cta, onConfirm }: { title: string; body: string; cta: string; onConfirm: () => void }) {
+  const actions = usePcbActions();
+  return (
+    <Overlay>
+      <Card width={460}>
+        <Header title={title} onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{body}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { onConfirm(); actions.closeModal(); }}>{cta}</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 export function Modals() {
   const state = usePcbState();
+  const actions = usePcbActions();
   switch (state.modal) {
     case "textEdit":
       return <TextModal />;
@@ -801,6 +938,22 @@ export function Modals() {
       return <ConvertConfirmModal />;
     case "reannotate":
       return <ReannotateModal />;
+    case "exportDxf2D":
+      return <ExportFormatModal title="Export DXF" defaultName="board.dxf" formats={["AutoCAD 2018", "AutoCAD 2013", "AutoCAD 2010"]} extraOpts={["Top layer", "Bottom layer", "Silkscreen", "Drill"]} />;
+    case "exportPdf2D":
+      return <ExportFormatModal title="Export PDF" defaultName="board.pdf" formats={["A4", "A3", "Letter", "Tabloid"]} extraOpts={["Color print", "Mirror", "Outline only"]} />;
+    case "exportGerber2D":
+      return <ExportFormatModal title="Export Gerber" defaultName="board.gbr" formats={["RS-274X (Extended)", "RS-274D"]} extraOpts={["Generate drill file", "Include silk", "Include solder mask", "Compress as ZIP"]} />;
+    case "exportPickPlace":
+      return <ExportFormatModal title="Export Pick and Place" defaultName="board-pnp.csv" formats={["CSV", "TXT", "JSON"]} extraOpts={["Include top side", "Include bottom side", "Use metric units"]} />;
+    case "exportBom":
+      return <ExportFormatModal title="Export BOM (Bill of Materials)" defaultName="bom.csv" formats={["CSV", "XLSX", "HTML"]} extraOpts={["Group by reference", "Group by value", "Include supplier"]} />;
+    case "chamferFillet":
+      return <ChamferFilletModal />;
+    case "editOutline":
+      return <SimpleConfirmModal title="Edit Board Outline" body="Click vertices on the board outline to move them, or drag edges to add new points. Click outside the outline to commit changes." cta="Enter Edit Mode" onConfirm={() => actions.setTool("editOutline")} />;
+    case "cutout":
+      return <SimpleConfirmModal title="Cutout" body="Draw a rectangle, polygon, or circle on the board to define a cutout region. The selected area will be removed from the board." cta="Start Cutout" onConfirm={() => actions.setTool("cutout")} />;
     case "layerManager":
     case "netClass":
     case "diffPair":

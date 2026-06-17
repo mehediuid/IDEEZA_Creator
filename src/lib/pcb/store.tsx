@@ -228,6 +228,9 @@ export interface PcbActions {
   // Phase 5 — IT-692 / IT-569 toolbar additions
   flashToast: (msg: string) => void;
   alignSelectedToGrid: () => void;
+  // Phase 6 — 2D File / Edit / Export menu helpers
+  toggleSnap: () => void;
+  setCornerOp: (patch: Partial<PcbState["cornerOp"]>) => void;
 }
 
 const StateCtx = React.createContext<PcbState | null>(null);
@@ -1122,6 +1125,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           if (stateRef.current.toast === msg) merge({ toast: null });
         }, 2200);
       },
+      toggleSnap: () => merge((s) => ({ snapEnabled: !s.snapEnabled })),
+      setCornerOp: (patch) =>
+        mergeWithHistory((s) => ({ cornerOp: { ...s.cornerOp, ...patch } })),
       alignSelectedToGrid: () =>
         mergeWithHistory((s) => {
           if (s.selectedIds.length === 0) return {};

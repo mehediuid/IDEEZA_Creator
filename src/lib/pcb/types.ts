@@ -50,6 +50,15 @@ export type ModalId =
   | "pcbDrc"
   // Phase 5 — IT-569 Reannotate
   | "reannotate"
+  // Phase 6 — 2D File / Edit / Export menus
+  | "exportDxf2D"
+  | "exportPdf2D"
+  | "exportGerber2D"
+  | "exportPickPlace"
+  | "exportBom"
+  | "chamferFillet"
+  | "editOutline"
+  | "cutout"
   | null;
 
 // Tools-menu manager overlays.
@@ -362,6 +371,9 @@ export interface PcbState {
   removeUnusedPadOpts: { topLayer: boolean; bottomLayer: boolean; innerLayer: boolean; keepConnected: boolean };
   // Phase 5 — toolbar toast
   toast: string | null;
+  // Phase 6 — 2D snap + chamfer/fillet
+  snapEnabled: boolean;
+  cornerOp: { mode: "chamfer" | "fillet"; radius: number };
 }
 
 // Hotkey row — `id` is a stable sort handle, `key` is the displayed combo.
@@ -1208,4 +1220,6 @@ export const initialState: PcbState = {
   pcbDrcRules: DEFAULT_DRC_RULES,
   removeUnusedPadOpts: { topLayer: true, bottomLayer: true, innerLayer: false, keepConnected: true },
   toast: null,
+  snapEnabled: true,
+  cornerOp: { mode: "fillet", radius: 5 },
 };
