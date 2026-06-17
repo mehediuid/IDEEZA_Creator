@@ -8,12 +8,17 @@
 import * as React from "react";
 import {
   DEL_OBJ_NAMES,
+  TOOLBAR_CATALOGS,
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
   initialState,
   type BottomTab,
   type CanvasObject,
+  type Copper,
+  type DiffPair,
+  type DrcRule,
+  type EqualLengthGroup,
   type LeftMain,
   type LeftSub,
   type LibCommonTab,
@@ -24,9 +29,12 @@ import {
   type MenuId,
   type ModalId,
   type Mode,
+  type NetClass,
+  type PadPairGroup,
   type PcbState,
   type RightTab,
   type SettingsPage,
+  type TearDropSettings,
 } from "./types";
 
 const clampZoom = (z: number) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -108,7 +116,7 @@ export interface PcbActions {
   redo: () => void;
   // Canvas object placement (tools acting on canvas)
   placeObject: (kind: string, x: number, y: number) => void;
-  startWire: (kind: "wire" | "bus", x: number, y: number) => void;
+  startWire: (kind: string, x: number, y: number) => void;
   finishWire: (x: number, y: number) => void;
   cancelDraft: () => void;
   selectPlaced: (id: string | null, additive?: boolean) => void;
@@ -128,6 +136,24 @@ export interface PcbActions {
   updateRubberBand: (x: number, y: number) => void;
   commitRubberBand: (additive: boolean) => void;
   cancelRubberBand: () => void;
+  // PCB layer stack management
+  setActivePcbLayer: (id: string) => void;
+  togglePcbLayerVis: (id: string) => void;
+  togglePcbLayerLock: (id: string) => void;
+  setPcbLayerColor: (id: string, color: string) => void;
+  setPcbLayerTransparency: (id: string, transparency: number) => void;
+  setPcbLayerName: (id: string, name: string) => void;
+  setPcbBoard: (patch: Partial<PcbState["pcbBoard"]>) => void;
+  // PCB nets (Phase 2)
+  addPcbNet: (name: string, color?: string, cls?: string) => void;
+  setPcbNetColor: (name: string, color: string) => void;
+  setPcbNetClass: (name: string, cls: string) => void;
+  removePcbNet: (name: string) => void;
+  setPcbDefaults: (patch: Partial<PcbState["pcbDefaults"]>) => void;
+  // 2D editor board properties (drive the 2D canvas render)
+  setTwoD: (patch: Partial<PcbState["twoD"]>) => void;
+  // 3D editor board properties (drive the 3D canvas render)
+  setThreeD: (patch: Partial<PcbState["threeD"]>) => void;
   // Schematic right-panel properties
   setSchemBasic: (patch: Partial<PcbState["schemBasic"]>) => void;
   setSchemBorder: (patch: Partial<PcbState["schemBorder"]>) => void;
@@ -135,6 +161,70 @@ export interface PcbActions {
   toggleSchemTitleField: (key: string, which: "on" | "valueOn") => void;
   setSchemTitleFieldValue: (key: string, value: string) => void;
   toggleSchemSection: (key: keyof PcbState["schemSectionOpen"]) => void;
+  // Settings — Phase B
+  setHotkey: (id: number, key: string) => void;
+  resetHotkeys: () => void;
+  toggleDrawingSelected: (id: string) => void;
+  setSelectedFont: (font: string) => void;
+  setSaveSettings: (patch: Partial<PcbState["saveSettings"]>) => void;
+  // System Settings — Phase C
+  setSystemSubPage: (sub: PcbState["systemSettings"]["subPage"]) => void;
+  setSystemSettings: (patch: Partial<PcbState["systemSettings"]>) => void;
+  toggleSystemCategory: (id: string) => void;
+  // Property Settings — Phase C
+  addPropertyRow: () => void;
+  removePropertyRow: (id: string) => void;
+  setPropertyRow: (id: string, patch: Partial<PcbState["propertySettings"]["rows"][number]>) => void;
+  selectPropertyRow: (id: string | null) => void;
+  movePropertyRow: (id: string, dir: -1 | 1) => void;
+  // Phase D — deep settings pages
+  setSchemSymSubPage: (sub: PcbState["schemSymbolSettings"]["subPage"]) => void;
+  setSchemSymGeneral: (patch: Partial<PcbState["schemSymbolSettings"]["general"]>) => void;
+  setSchemSymThemeColor: (id: string, color: string) => void;
+  setPcbFpSubPage: (sub: PcbState["pcbFootprintSettings"]["subPage"]) => void;
+  setPcbFpGeneral: (patch: Partial<PcbState["pcbFootprintSettings"]["general"]>) => void;
+  setPcbFpThemeColor: (id: string, color: string) => void;
+  setPcbFpGridCart: (patch: Partial<PcbState["pcbFootprintSettings"]["gridCart"]>) => void;
+  setPcbFpGridPolar: (patch: Partial<PcbState["pcbFootprintSettings"]["gridPolar"]>) => void;
+  setPcbFpTrackWidths: (widths: number[]) => void;
+  setPcbFpSnap: (patch: Partial<PcbState["pcbFootprintSettings"]["snap"]>) => void;
+  setPanelLibSubPage: (sub: PcbState["panelLibSettings"]["subPage"]) => void;
+  setPanelLibGeneral: (patch: Partial<PcbState["panelLibSettings"]["general"]>) => void;
+  setPanelLibThemeColor: (id: string, color: string) => void;
+  setPanelLibLineStyle: (id: string, style: "Solid" | "Dashed" | "Dotted" | "Dash-Dot") => void;
+  setPanelLibStrokeWidth: (id: string, width: number) => void;
+  // Phase E — Top toolbar customization
+  setToolbarScope: (scope: PcbState["toolbarCustomization"]["scope"]) => void;
+  toggleToolbarItem: (scope: PcbState["toolbarCustomization"]["scope"], id: string) => void;
+  selectAllToolbarItems: (scope: PcbState["toolbarCustomization"]["scope"]) => void;
+  clearAllToolbarItems: (scope: PcbState["toolbarCustomization"]["scope"]) => void;
+  resetToolbarCustomization: () => void;
+  // Phase F — settings export / import + per-page reset
+  exportSettingsJson: () => string;
+  importSettingsJson: (json: string) => boolean;
+  resetSettingsPage: (page: SettingsPage) => void;
+  // Phase 3 — PCB Tools manager actions
+  addNetClass: () => void;
+  removeNetClass: (id: string) => void;
+  setNetClassField: (id: string, patch: Partial<NetClass>) => void;
+  addDiffPair: () => void;
+  removeDiffPair: (id: string) => void;
+  setDiffPairField: (id: string, patch: Partial<DiffPair>) => void;
+  addEqualLengthGroup: () => void;
+  removeEqualLengthGroup: (id: string) => void;
+  setEqualLengthField: (id: string, patch: Partial<EqualLengthGroup>) => void;
+  addPadPair: () => void;
+  removePadPair: (id: string) => void;
+  setPadPairField: (id: string, patch: Partial<PadPairGroup>) => void;
+  addCopper: () => void;
+  removeCopper: (id: string) => void;
+  setCopperField: (id: string, patch: Partial<Copper>) => void;
+  setTearDrop: (patch: Partial<TearDropSettings>) => void;
+  setDrcRuleSeverity: (id: string, severity: DrcRule["severity"]) => void;
+  setRemoveUnusedPadOpts: (patch: Partial<PcbState["removeUnusedPadOpts"]>) => void;
+  addPcbLayer: () => void;
+  removePcbLayer: (id: string) => void;
+  movePcbLayer: (id: string, dir: -1 | 1) => void;
 }
 
 const StateCtx = React.createContext<PcbState | null>(null);
@@ -406,6 +496,266 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge((s) => ({
           schemSectionOpen: { ...s.schemSectionOpen, [key]: !s.schemSectionOpen[key] },
         })),
+      setHotkey: (id, key) =>
+        mergeWithHistory((s) => ({
+          hotkeys: s.hotkeys.map((h) => (h.id === id ? { ...h, key } : h)),
+        })),
+      resetHotkeys: () =>
+        // Defensive: import the default snapshot via initialState so the source
+        // of truth remains DEFAULT_HOTKEYS in types.ts.
+        mergeWithHistory(() => ({ hotkeys: initialState.hotkeys.map((h) => ({ ...h })) })),
+      toggleDrawingSelected: (id) =>
+        mergeWithHistory((s) => ({
+          drawings: s.drawings.map((d) => (d.id === id ? { ...d, selected: !d.selected } : d)),
+        })),
+      setSelectedFont: (font) =>
+        mergeWithHistory((s) => ({ fonts: { ...s.fonts, selected: font } })),
+      setSaveSettings: (patch) =>
+        mergeWithHistory((s) => ({ saveSettings: { ...s.saveSettings, ...patch } })),
+      setSystemSubPage: (sub) =>
+        merge((s) => ({ systemSettings: { ...s.systemSettings, subPage: sub } })),
+      setSystemSettings: (patch) =>
+        mergeWithHistory((s) => ({ systemSettings: { ...s.systemSettings, ...patch } })),
+      toggleSystemCategory: (id) =>
+        mergeWithHistory((s) => ({
+          systemSettings: {
+            ...s.systemSettings,
+            categories: s.systemSettings.categories.map((c) =>
+              c.id === id ? { ...c, on: !c.on } : c,
+            ),
+          },
+        })),
+      addPropertyRow: () =>
+        mergeWithHistory((s) => {
+          const id = `p_${Date.now().toString(36)}`;
+          const row = { id, property: "New property", object: "Schematic Default", displayInCanvas: "Show" };
+          return {
+            propertySettings: {
+              rows: [...s.propertySettings.rows, row],
+              selectedId: id,
+            },
+          };
+        }),
+      removePropertyRow: (id) =>
+        mergeWithHistory((s) => ({
+          propertySettings: {
+            rows: s.propertySettings.rows.filter((r) => r.id !== id),
+            selectedId: null,
+          },
+        })),
+      setPropertyRow: (id, patch) =>
+        mergeWithHistory((s) => ({
+          propertySettings: {
+            ...s.propertySettings,
+            rows: s.propertySettings.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+          },
+        })),
+      selectPropertyRow: (id) =>
+        merge((s) => ({ propertySettings: { ...s.propertySettings, selectedId: id } })),
+      movePropertyRow: (id, dir) =>
+        mergeWithHistory((s) => {
+          const rows = [...s.propertySettings.rows];
+          const i = rows.findIndex((r) => r.id === id);
+          if (i < 0) return {};
+          const j = i + dir;
+          if (j < 0 || j >= rows.length) return {};
+          [rows[i], rows[j]] = [rows[j], rows[i]];
+          return { propertySettings: { ...s.propertySettings, rows } };
+        }),
+      // ── Phase D — Schematic / Symbol settings ────────────────────────────────
+      setSchemSymSubPage: (sub) =>
+        merge((s) => ({ schemSymbolSettings: { ...s.schemSymbolSettings, subPage: sub } })),
+      setSchemSymGeneral: (patch) =>
+        mergeWithHistory((s) => ({
+          schemSymbolSettings: {
+            ...s.schemSymbolSettings,
+            general: { ...s.schemSymbolSettings.general, ...patch },
+          },
+        })),
+      setSchemSymThemeColor: (id, color) =>
+        mergeWithHistory((s) => ({
+          schemSymbolSettings: {
+            ...s.schemSymbolSettings,
+            theme: s.schemSymbolSettings.theme.map((t) =>
+              t.id === id ? { ...t, color } : t,
+            ),
+          },
+        })),
+      // ── Phase D — PCB / Footprint settings ───────────────────────────────────
+      setPcbFpSubPage: (sub) =>
+        merge((s) => ({ pcbFootprintSettings: { ...s.pcbFootprintSettings, subPage: sub } })),
+      setPcbFpGeneral: (patch) =>
+        mergeWithHistory((s) => ({
+          pcbFootprintSettings: {
+            ...s.pcbFootprintSettings,
+            general: { ...s.pcbFootprintSettings.general, ...patch },
+          },
+        })),
+      setPcbFpThemeColor: (id, color) =>
+        mergeWithHistory((s) => ({
+          pcbFootprintSettings: {
+            ...s.pcbFootprintSettings,
+            theme: s.pcbFootprintSettings.theme.map((t) =>
+              t.id === id ? { ...t, color } : t,
+            ),
+          },
+        })),
+      setPcbFpGridCart: (patch) =>
+        mergeWithHistory((s) => ({
+          pcbFootprintSettings: {
+            ...s.pcbFootprintSettings,
+            gridCart: { ...s.pcbFootprintSettings.gridCart, ...patch },
+          },
+        })),
+      setPcbFpGridPolar: (patch) =>
+        mergeWithHistory((s) => ({
+          pcbFootprintSettings: {
+            ...s.pcbFootprintSettings,
+            gridPolar: { ...s.pcbFootprintSettings.gridPolar, ...patch },
+          },
+        })),
+      setPcbFpTrackWidths: (widths) =>
+        mergeWithHistory((s) => ({
+          pcbFootprintSettings: { ...s.pcbFootprintSettings, trackWidths: widths },
+        })),
+      setPcbFpSnap: (patch) =>
+        mergeWithHistory((s) => ({
+          pcbFootprintSettings: {
+            ...s.pcbFootprintSettings,
+            snap: { ...s.pcbFootprintSettings.snap, ...patch },
+          },
+        })),
+      // ── Phase D — Panel / Panel Lib settings ─────────────────────────────────
+      setPanelLibSubPage: (sub) =>
+        merge((s) => ({ panelLibSettings: { ...s.panelLibSettings, subPage: sub } })),
+      setPanelLibGeneral: (patch) =>
+        mergeWithHistory((s) => ({
+          panelLibSettings: {
+            ...s.panelLibSettings,
+            general: { ...s.panelLibSettings.general, ...patch },
+          },
+        })),
+      setPanelLibThemeColor: (id, color) =>
+        mergeWithHistory((s) => ({
+          panelLibSettings: {
+            ...s.panelLibSettings,
+            theme: s.panelLibSettings.theme.map((t) => (t.id === id ? { ...t, color } : t)),
+          },
+        })),
+      setPanelLibLineStyle: (id, style) =>
+        mergeWithHistory((s) => ({
+          panelLibSettings: {
+            ...s.panelLibSettings,
+            lineStyles: s.panelLibSettings.lineStyles.map((l) =>
+              l.id === id ? { ...l, style } : l,
+            ),
+          },
+        })),
+      setPanelLibStrokeWidth: (id, width) =>
+        mergeWithHistory((s) => ({
+          panelLibSettings: {
+            ...s.panelLibSettings,
+            strokeWidths: s.panelLibSettings.strokeWidths.map((w) =>
+              w.id === id ? { ...w, width } : w,
+            ),
+          },
+        })),
+      // ── Phase E — Top toolbar customization ──────────────────────────────────
+      setToolbarScope: (scope) =>
+        merge((s) => ({ toolbarCustomization: { ...s.toolbarCustomization, scope } })),
+      toggleToolbarItem: (scope, id) =>
+        mergeWithHistory((s) => {
+          const current = s.toolbarCustomization[scope];
+          const next = current.includes(id)
+            ? current.filter((x) => x !== id)
+            : [...current, id];
+          return {
+            toolbarCustomization: { ...s.toolbarCustomization, [scope]: next },
+          };
+        }),
+      selectAllToolbarItems: (scope) =>
+        mergeWithHistory((s) => ({
+          toolbarCustomization: {
+            ...s.toolbarCustomization,
+            [scope]: TOOLBAR_CATALOGS[scope].map((it) => it.id),
+          },
+        })),
+      clearAllToolbarItems: (scope) =>
+        mergeWithHistory((s) => ({
+          toolbarCustomization: { ...s.toolbarCustomization, [scope]: [] },
+        })),
+      resetToolbarCustomization: () =>
+        mergeWithHistory(() => ({ toolbarCustomization: initialState.toolbarCustomization })),
+      // ── Phase F — Export / Import / per-page reset ───────────────────────────
+      exportSettingsJson: () => {
+        const s = stateRef.current;
+        const payload = {
+          version: 1,
+          exportedAt: "snapshot",
+          systemSettings: s.systemSettings,
+          propertySettings: s.propertySettings,
+          schemSymbolSettings: s.schemSymbolSettings,
+          pcbFootprintSettings: s.pcbFootprintSettings,
+          panelLibSettings: s.panelLibSettings,
+          toolbarCustomization: s.toolbarCustomization,
+          hotkeys: s.hotkeys,
+          drawings: s.drawings,
+          fonts: s.fonts,
+          saveSettings: s.saveSettings,
+          pcbLayers: s.pcbLayers,
+          pcbNets: s.pcbNets,
+        };
+        return JSON.stringify(payload, null, 2);
+      },
+      importSettingsJson: (json) => {
+        try {
+          const parsed = JSON.parse(json);
+          if (typeof parsed !== "object" || parsed === null) return false;
+          // Allow-list of fields we accept from an imported config — guards
+          // against unrelated state being clobbered if the file is malformed.
+          const patch: Partial<PcbState> = {};
+          const keys: (keyof PcbState)[] = [
+            "systemSettings",
+            "propertySettings",
+            "schemSymbolSettings",
+            "pcbFootprintSettings",
+            "panelLibSettings",
+            "toolbarCustomization",
+            "hotkeys",
+            "drawings",
+            "fonts",
+            "saveSettings",
+            "pcbLayers",
+            "pcbNets",
+          ];
+          for (const k of keys) {
+            if (k in parsed) {
+              (patch as Record<keyof PcbState, unknown>)[k] = parsed[k];
+            }
+          }
+          mergeWithHistory(patch);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      resetSettingsPage: (page) =>
+        mergeWithHistory(() => {
+          const init = initialState;
+          switch (page) {
+            case "system":    return { systemSettings: init.systemSettings };
+            case "property":  return { propertySettings: init.propertySettings };
+            case "save":      return { saveSettings: init.saveSettings };
+            case "font":      return { fonts: init.fonts };
+            case "hotkey":    return { hotkeys: init.hotkeys };
+            case "drawing":   return { drawings: init.drawings };
+            case "symbol":    return { schemSymbolSettings: init.schemSymbolSettings };
+            case "footprint": return { pcbFootprintSettings: init.pcbFootprintSettings };
+            case "panel":     return { panelLibSettings: init.panelLibSettings };
+            case "toptools":  return { toolbarCustomization: init.toolbarCustomization };
+            default:          return {};
+          }
+        }),
       setGridSize: (v) => mergeWithHistory({ gridSize: v }),
       setUnit: (v) => mergeWithHistory({ unit: v }),
       toggleGridVisible: () => merge((s) => ({ gridVisible: !s.gridVisible })),
@@ -445,15 +795,30 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           diode: "D?",
           inductor: "L?",
         };
-        const obj: CanvasObject = {
-          id,
-          kind,
-          x,
-          y,
-          text: defaultText[kind],
-          rotation: 0,
-        };
-        mergeWithHistory((s) => ({ objects: [...s.objects, obj], selectedIds: [id] }));
+        mergeWithHistory((s) => {
+          const inPcb = s.mode === "pcb";
+          const d = s.pcbDefaults;
+          // Stamp PCB defaults onto pad / via so the property panel reads them.
+          const pcbExtras: Partial<CanvasObject> =
+            inPcb && kind === "pad"
+              ? { width: d.padWidth, height: d.padHeight, drill: d.padDrill, padShape: d.padShape, padType: "tht" }
+              : inPcb && kind === "via"
+              ? { width: d.viaSize, drill: d.viaDrill, startLayer: "top", endLayer: "bottom" }
+              : inPcb && kind === "component"
+              ? { footprint: "Generic-SO8", comment: "Component", side: "top" }
+              : {};
+          const obj: CanvasObject = {
+            id,
+            kind,
+            x,
+            y,
+            text: defaultText[kind],
+            rotation: 0,
+            layer: inPcb ? s.activePcbLayer : undefined,
+            ...pcbExtras,
+          };
+          return { objects: [...s.objects, obj], selectedIds: [id] };
+        });
       },
       startWire: (kind, x, y) =>
         merge({ draftWire: { startX: x, startY: y, kind } }),
@@ -461,6 +826,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         mergeWithHistory((s) => {
           if (!s.draftWire) return {};
           const id = `obj_${objIdCounter.current++}`;
+          const isTrack = s.draftWire.kind === "track";
           const obj: CanvasObject = {
             id,
             kind: s.draftWire.kind,
@@ -468,6 +834,11 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             y: s.draftWire.startY,
             endX: x,
             endY: y,
+            // Tracks always live on the active PCB layer; wires/buses
+            // (schematic) leave layer undefined.
+            layer: isTrack ? s.activePcbLayer : undefined,
+            // Track width from PCB defaults; nets attach via the property panel.
+            width: isTrack ? s.pcbDefaults.trackWidth : undefined,
           };
           return { objects: [...s.objects, obj], draftWire: null, selectedIds: [id] };
         }),
@@ -596,6 +967,151 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           };
         }),
       cancelRubberBand: () => merge({ rubberBand: null }),
+      setActivePcbLayer: (id) => merge({ activePcbLayer: id }),
+      togglePcbLayerVis: (id) =>
+        merge((s) => ({
+          pcbLayers: s.pcbLayers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
+        })),
+      togglePcbLayerLock: (id) =>
+        merge((s) => ({
+          pcbLayers: s.pcbLayers.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l)),
+        })),
+      setPcbLayerColor: (id, color) =>
+        mergeWithHistory((s) => ({
+          pcbLayers: s.pcbLayers.map((l) => (l.id === id ? { ...l, color } : l)),
+        })),
+      setPcbLayerTransparency: (id, transparency) =>
+        mergeWithHistory((s) => ({
+          pcbLayers: s.pcbLayers.map((l) =>
+            l.id === id ? { ...l, transparency: Math.max(0, Math.min(100, transparency)) } : l,
+          ),
+        })),
+      setPcbLayerName: (id, name) =>
+        mergeWithHistory((s) => ({
+          pcbLayers: s.pcbLayers.map((l) => (l.id === id ? { ...l, name } : l)),
+        })),
+      setPcbBoard: (patch) =>
+        mergeWithHistory((s) => ({ pcbBoard: { ...s.pcbBoard, ...patch } })),
+      addPcbNet: (name, color, cls) =>
+        mergeWithHistory((s) => {
+          if (s.pcbNets.some((n) => n.name === name)) return {};
+          return {
+            pcbNets: [...s.pcbNets, { name, color: color ?? "#7C2DB9", cls }],
+          };
+        }),
+      setPcbNetColor: (name, color) =>
+        mergeWithHistory((s) => ({
+          pcbNets: s.pcbNets.map((n) => (n.name === name ? { ...n, color } : n)),
+        })),
+      setPcbNetClass: (name, cls) =>
+        mergeWithHistory((s) => ({
+          pcbNets: s.pcbNets.map((n) => (n.name === name ? { ...n, cls } : n)),
+        })),
+      removePcbNet: (name) =>
+        mergeWithHistory((s) => ({ pcbNets: s.pcbNets.filter((n) => n.name !== name) })),
+      setPcbDefaults: (patch) =>
+        mergeWithHistory((s) => ({ pcbDefaults: { ...s.pcbDefaults, ...patch } })),
+      setTwoD: (patch) => merge((s) => ({ twoD: { ...s.twoD, ...patch } })),
+      setThreeD: (patch) => merge((s) => ({ threeD: { ...s.threeD, ...patch } })),
+      // ── Phase 3 — PCB Tools manager actions ─────────────────────────────
+      addNetClass: () =>
+        mergeWithHistory((s) => ({
+          pcbNetClasses: [
+            ...s.pcbNetClasses,
+            { id: `nc${s.pcbNetClasses.length + 1}_${objIdCounter.current++}`, name: `Class ${s.pcbNetClasses.length + 1}`, trackWidth: 8, clearance: 6, viaSize: 24, viaDrill: 12, color: "#7C2DB9" },
+          ],
+        })),
+      removeNetClass: (id) =>
+        mergeWithHistory((s) => ({ pcbNetClasses: s.pcbNetClasses.filter((c) => c.id !== id) })),
+      setNetClassField: (id, patch) =>
+        mergeWithHistory((s) => ({
+          pcbNetClasses: s.pcbNetClasses.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        })),
+      addDiffPair: () =>
+        mergeWithHistory((s) => ({
+          pcbDiffPairs: [
+            ...s.pcbDiffPairs,
+            { id: `dp_${objIdCounter.current++}`, name: `Pair ${s.pcbDiffPairs.length + 1}`, netA: "", netB: "", gap: 6, width: 6 },
+          ],
+        })),
+      removeDiffPair: (id) =>
+        mergeWithHistory((s) => ({ pcbDiffPairs: s.pcbDiffPairs.filter((p) => p.id !== id) })),
+      setDiffPairField: (id, patch) =>
+        mergeWithHistory((s) => ({
+          pcbDiffPairs: s.pcbDiffPairs.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })),
+      addEqualLengthGroup: () =>
+        mergeWithHistory((s) => ({
+          pcbEqualLength: [
+            ...s.pcbEqualLength,
+            { id: `el_${objIdCounter.current++}`, name: `Group ${s.pcbEqualLength.length + 1}`, nets: [], target: 1000, tolerance: 50 },
+          ],
+        })),
+      removeEqualLengthGroup: (id) =>
+        mergeWithHistory((s) => ({ pcbEqualLength: s.pcbEqualLength.filter((g) => g.id !== id) })),
+      setEqualLengthField: (id, patch) =>
+        mergeWithHistory((s) => ({
+          pcbEqualLength: s.pcbEqualLength.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+        })),
+      addPadPair: () =>
+        mergeWithHistory((s) => ({
+          pcbPadPairs: [
+            ...s.pcbPadPairs,
+            { id: `pp_${objIdCounter.current++}`, name: `Pair ${s.pcbPadPairs.length + 1}`, pads: "", spacing: 100 },
+          ],
+        })),
+      removePadPair: (id) =>
+        mergeWithHistory((s) => ({ pcbPadPairs: s.pcbPadPairs.filter((p) => p.id !== id) })),
+      setPadPairField: (id, patch) =>
+        mergeWithHistory((s) => ({
+          pcbPadPairs: s.pcbPadPairs.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })),
+      addCopper: () =>
+        mergeWithHistory((s) => ({
+          pcbCoppers: [
+            ...s.pcbCoppers,
+            { id: `cu_${objIdCounter.current++}`, name: `Copper ${s.pcbCoppers.length + 1}`, layer: s.activePcbLayer, net: "GND", clearance: 8, thermal: true, hatched: false },
+          ],
+        })),
+      removeCopper: (id) =>
+        mergeWithHistory((s) => ({ pcbCoppers: s.pcbCoppers.filter((c) => c.id !== id) })),
+      setCopperField: (id, patch) =>
+        mergeWithHistory((s) => ({
+          pcbCoppers: s.pcbCoppers.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        })),
+      setTearDrop: (patch) =>
+        mergeWithHistory((s) => ({ pcbTearDrop: { ...s.pcbTearDrop, ...patch } })),
+      setDrcRuleSeverity: (id, severity) =>
+        mergeWithHistory((s) => ({
+          pcbDrcRules: s.pcbDrcRules.map((r) => (r.id === id ? { ...r, severity } : r)),
+        })),
+      setRemoveUnusedPadOpts: (patch) =>
+        merge((s) => ({ removeUnusedPadOpts: { ...s.removeUnusedPadOpts, ...patch } })),
+      addPcbLayer: () =>
+        mergeWithHistory((s) => {
+          const id = `layer_${objIdCounter.current++}`;
+          return {
+            pcbLayers: [
+              ...s.pcbLayers,
+              { id, name: `Layer ${s.pcbLayers.length + 1}`, color: "#7C2DB9", type: "signal", visible: true, locked: false, transparency: 0 },
+            ],
+          };
+        }),
+      removePcbLayer: (id) =>
+        mergeWithHistory((s) => ({
+          pcbLayers: s.pcbLayers.filter((l) => l.id !== id),
+          activePcbLayer: s.activePcbLayer === id && s.pcbLayers.length > 1 ? s.pcbLayers[0].id : s.activePcbLayer,
+        })),
+      movePcbLayer: (id, dir) =>
+        mergeWithHistory((s) => {
+          const idx = s.pcbLayers.findIndex((l) => l.id === id);
+          if (idx < 0) return {};
+          const ni = idx + dir;
+          if (ni < 0 || ni >= s.pcbLayers.length) return {};
+          const next = s.pcbLayers.slice();
+          [next[idx], next[ni]] = [next[ni], next[idx]];
+          return { pcbLayers: next };
+        }),
     };
   }, [merge, mergeWithHistory]);
 

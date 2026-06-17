@@ -106,9 +106,38 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="M-10 -6h18l4 6-4 6h-18z" />
     </g>
   ),
+  polygon: (
+    <g stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" fill="none">
+      <path d="M-14 -2l8-12 16 4 4 14-12 10-16-4z" />
+    </g>
+  ),
+  fillRegion: (
+    <g stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" fill="currentColor" fillOpacity={0.35}>
+      <path d="M-14 -2l8-12 16 4 4 14-12 10-16-4z" />
+    </g>
+  ),
+  slot: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none">
+      <rect x={-16} y={-6} width={32} height={12} rx={6} />
+      <circle cx={-8} cy={0} r={2} fill="currentColor" stroke="none" />
+      <circle cx={8} cy={0} r={2} fill="currentColor" stroke="none" />
+    </g>
+  ),
+  component: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none">
+      <rect x={-14} y={-10} width={28} height={20} rx={1.5} />
+      <path d="M-14 -5h-4M-14 0h-4M-14 5h-4M14 -5h4M14 0h4M14 5h4" strokeLinecap="round" />
+      <text x={0} y={2} textAnchor="middle" fontSize={8} stroke="none" fill="currentColor">U?</text>
+    </g>
+  ),
+  boardOutline: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none" strokeDasharray="3 3">
+      <rect x={-18} y={-14} width={36} height={28} rx={2} />
+    </g>
+  ),
 };
 
-const WIRE_KINDS = new Set(["wire", "bus"]);
+const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune"]);
 
 export function PlacedObjects() {
   const state = usePcbState();
@@ -116,6 +145,37 @@ export function PlacedObjects() {
   const SELECTED = "var(--color-violet-600)";
   const NORMAL = "var(--color-text-primary)";
   const selectedSet = React.useMemo(() => new Set(state.selectedIds), [state.selectedIds]);
+
+  // PCB mode: look up layer color + visibility per object. Schematic mode
+  // ignores `obj.layer` entirely.
+  const layerMap = React.useMemo(() => {
+    const m = new Map<string, { color: string; visible: boolean; transparency: number }>();
+    state.pcbLayers.forEach((l) => m.set(l.id, { color: l.color, visible: l.visible, transparency: l.transparency }));
+    return m;
+  }, [state.pcbLayers]);
+  // Net → color map (Phase 2). Net color, when assigned, overrides layer color.
+  const netMap = React.useMemo(() => {
+    const m = new Map<string, string>();
+    state.pcbNets.forEach((n) => m.set(n.name, n.color));
+    return m;
+  }, [state.pcbNets]);
+
+  const isVisible = (obj: { layer?: string }) => {
+    if (state.mode !== "pcb" || !obj.layer) return true;
+    return layerMap.get(obj.layer)?.visible ?? true;
+  };
+  const colorFor = (obj: { layer?: string; color?: string; net?: string }) => {
+    if (obj.color) return obj.color;
+    if (state.mode === "pcb" && obj.net) {
+      const nc = netMap.get(obj.net);
+      if (nc) return nc;
+    }
+    if (state.mode === "pcb" && obj.layer) {
+      const l = layerMap.get(obj.layer);
+      if (l) return l.color;
+    }
+    return NORMAL;
+  };
 
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const W = 5000;
@@ -136,10 +196,12 @@ export function PlacedObjects() {
         }}
       >
         <g transform={`translate(${OX} ${OX})`}>
-          {state.objects.filter((o) => WIRE_KINDS.has(o.kind)).map((o) => {
+          {state.objects.filter((o) => WIRE_KINDS.has(o.kind) && isVisible(o)).map((o) => {
             const sel = selectedSet.has(o.id);
             const isBus = o.kind === "bus";
-            const stroke = sel ? SELECTED : o.color || NORMAL;
+            const isTrack = o.kind === "track";
+            const stroke = sel ? SELECTED : colorFor(o);
+            const w = isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : sel ? 2.6 : 1.7;
             return (
               <line
                 key={o.id}
@@ -149,7 +211,7 @@ export function PlacedObjects() {
                 x2={o.endX ?? o.x}
                 y2={o.endY ?? o.y}
                 stroke={stroke}
-                strokeWidth={isBus ? (sel ? 4 : 3) : sel ? 2.6 : 1.7}
+                strokeWidth={w}
                 strokeLinecap="round"
                 style={{ pointerEvents: "stroke", cursor: "move" }}
                 onClick={(e) => {
@@ -176,12 +238,17 @@ export function PlacedObjects() {
         </g>
       </svg>
 
-      {state.objects.filter((o) => !WIRE_KINDS.has(o.kind)).map((o) => (
+      {state.objects.filter((o) => !WIRE_KINDS.has(o.kind) && isVisible(o)).map((o) => (
         <PlacedGlyph
           key={o.id}
           obj={o}
           selected={selectedSet.has(o.id)}
           editing={editingId === o.id}
+          layerColor={
+            state.mode === "pcb"
+              ? (o.net ? netMap.get(o.net) : undefined) ?? (o.layer ? layerMap.get(o.layer)?.color : undefined)
+              : undefined
+          }
           onSelect={(additive) => actions.selectPlaced(o.id, additive)}
           onEditStart={() => setEditingId(o.id)}
           onEditEnd={() => setEditingId(null)}
@@ -229,6 +296,7 @@ function PlacedGlyph({
   obj,
   selected,
   editing,
+  layerColor,
   onSelect,
   onEditStart,
   onEditEnd,
@@ -237,13 +305,15 @@ function PlacedGlyph({
   obj: CanvasObject;
   selected: boolean;
   editing: boolean;
+  layerColor?: string;
   onSelect: (additive: boolean) => void;
   onEditStart: () => void;
   onEditEnd: () => void;
   onTextChange: (t: string) => void;
 }) {
   const rotation = obj.rotation ?? 0;
-  const normalColor = obj.color || "var(--color-text-primary)";
+  // Priority: explicit per-object color → PCB layer color (when on a layer) → theme.
+  const normalColor = obj.color || layerColor || "var(--color-text-primary)";
   if (obj.kind === "text") {
     return (
       <div

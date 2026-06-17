@@ -10,6 +10,7 @@ import { Select, Checkbox } from "@/components/ideeza";
 import { ColorPicker } from "@/components/pcb/color-picker";
 import { SchematicProperties } from "@/components/pcb/schem-properties";
 import { PlacedProperties } from "@/components/pcb/placed-properties";
+import { PcbDefaultProperties, TwoDProperties, ThreeDProperties } from "@/components/pcb/pcb-properties";
 import { buildRightTabs } from "@/lib/pcb/data";
 import { buildRight } from "@/lib/pcb/content";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
@@ -72,6 +73,12 @@ export function RightPanel() {
           <PinProps />
         ) : state.mode === "schematic" ? (
           <SchematicProperties />
+        ) : state.mode === "pcb" ? (
+          <PcbDefaultProperties />
+        ) : state.mode === "2d" ? (
+          <TwoDProperties />
+        ) : state.mode === "3d" ? (
+          <ThreeDProperties />
         ) : (
           <div dangerouslySetInnerHTML={{ __html: buildRight(state.mode, state.rightTab) }} />
         )}
@@ -337,41 +344,275 @@ const EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" str
 const LOCK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
 const LOCK_OPEN = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>';
 
-const LAYER_DEFS_2D: [string, string][] = [
-  ["Top Layer", "#e34c4c"], ["Middle Layer 1", "#3bb56f"], ["Middle Layer 2", "#2f7ad6"],
-  ["Bottom Layer", "#e3b23b"], ["Top Silkscreen", "var(--color-text-primary)"], ["Bottom Silkscreen", "var(--color-text-tertiary)"],
-  ["Top Paste", "#c060c0"], ["Bottom Paste", "#3bb5b5"], ["Drill Layer", "#555"], ["Board Outline", "var(--color-violet-600)"],
+// Layer-type → which Figma group it sits under in the expanded view.
+const LAYER_GROUPS: { id: string; label: string; types: string[] }[] = [
+  { id: "topSide",   label: "Top Side",   types: ["signal-top", "topSilk", "topPaste", "topMask"] },
+  { id: "bottomSide",label: "Bottom Side",types: ["signal-bottom", "bottomSilk", "bottomPaste", "bottomMask"] },
+  { id: "inner",     label: "Inner",      types: ["signal-inner", "plane"] },
+  { id: "other",     label: "Other",      types: ["drill", "mechanical"] },
 ];
-const LAYER_DEFS_3D: [string, string][] = [
-  ["Top Layer", "#e34c4c"], ["Middle Layer 1", "#3bb56f"], ["Middle Layer 2", "#2f7ad6"],
-  ["Bottom Layer", "#e3b23b"], ["Top Silkscreen", "var(--color-text-primary)"], ["Bottom Silkscreen", "var(--color-violet-600)"],
-];
+
+// Maps a layer to its group id. Signal layers split by "top" / "bottom" / inner.
+function groupOf(layer: { id: string; type: string }): string {
+  if (layer.type === "signal") {
+    if (layer.id === "top") return "topSide";
+    if (layer.id === "bottom") return "bottomSide";
+    return "inner";
+  }
+  if (layer.id.startsWith("top")) return "topSide";
+  if (layer.id.startsWith("bottom")) return "bottomSide";
+  return "other";
+}
+
+const FILTERS = ["All", "Copper", "Non Copper"] as const;
+type LayerFilter = (typeof FILTERS)[number];
+const PRESETS = ["Common (Default)", "All visible", "Signal only", "Outline only"];
 
 function LayerTab() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const layers = state.mode === "3d" ? LAYER_DEFS_3D : LAYER_DEFS_2D;
+  const [filter, setFilter] = React.useState<LayerFilter>("All");
+  const [preset, setPreset] = React.useState(PRESETS[0]);
+  const [openGroups, setOpenGroups] = React.useState<Record<string, boolean>>({
+    topSide: true,
+    bottomSide: true,
+    inner: true,
+    other: true,
+  });
+
+  const applyPreset = (p: string) => {
+    setPreset(p);
+    if (p === "All visible") state.pcbLayers.forEach((l) => !l.visible && actions.togglePcbLayerVis(l.id));
+    else if (p === "Signal only")
+      state.pcbLayers.forEach((l) => {
+        const want = l.type === "signal";
+        if (l.visible !== want) actions.togglePcbLayerVis(l.id);
+      });
+    else if (p === "Outline only")
+      state.pcbLayers.forEach((l) => {
+        const want = l.id === "outline";
+        if (l.visible !== want) actions.togglePcbLayerVis(l.id);
+      });
+  };
+
+  const reset = () => {
+    setFilter("All");
+    setPreset(PRESETS[0]);
+    state.pcbLayers.forEach((l) => {
+      if (!l.visible) actions.togglePcbLayerVis(l.id);
+      if (l.locked) actions.togglePcbLayerLock(l.id);
+    });
+  };
+
+  const filterFn = (l: { type: string }) => {
+    if (filter === "Copper") return l.type === "signal" || l.type === "plane";
+    if (filter === "Non Copper") return l.type !== "signal" && l.type !== "plane";
+    return true;
+  };
+
   return (
     <div style={{ padding: "var(--spacing-3) 0" }}>
-      {layers.map(([name, color]) => {
-        const on = state.layerVis[name] !== false;
-        const locked = !!state.layerLock[name];
+      {/* Preset row + Reset */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--spacing-3)",
+          padding: "var(--spacing-2) var(--spacing-8) var(--spacing-4)",
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <Select
+            value={preset}
+            options={PRESETS.map((v) => ({ label: v, value: v }))}
+            onChange={applyPreset}
+            minWidth={160}
+          />
+        </div>
+        <button
+          onClick={reset}
+          style={{
+            padding: "var(--spacing-2) var(--spacing-4)",
+            border: "var(--border-width-1) solid var(--color-border-default)",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-bg-surface)",
+            color: "var(--color-text-secondary)",
+            cursor: "pointer",
+            fontSize: "var(--font-size-xs)",
+            fontWeight: 600,
+          }}
+        >
+          Reset
+        </button>
+      </div>
+
+      {/* All / Copper / Non-Copper filter */}
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          padding: "var(--spacing-0) var(--spacing-8) var(--spacing-4)",
+        }}
+      >
+        {FILTERS.map((f) => {
+          const isOn = filter === f;
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              style={{
+                flex: 1,
+                padding: "var(--spacing-3) var(--spacing-2)",
+                border: "var(--border-width-1) solid var(--color-border-default)",
+                background: isOn ? "var(--color-bg-brand-subtle)" : "var(--color-bg-surface)",
+                color: isOn ? "var(--color-text-brand)" : "var(--color-text-secondary)",
+                fontWeight: 600,
+                fontSize: "var(--font-size-xs)",
+                cursor: "pointer",
+              }}
+            >
+              {f}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Groups */}
+      {LAYER_GROUPS.map((g) => {
+        const groupLayers = state.pcbLayers.filter(
+          (l) => groupOf(l) === g.id && filterFn(l),
+        );
+        if (groupLayers.length === 0) return null;
+        const isOpen = openGroups[g.id];
         return (
-          <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-8)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-            <span style={{ width: 16, height: 16, borderRadius: "var(--radius-sm)", background: color, flex: "0 0 auto", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.12)" }} />
-            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", opacity: on ? 1 : 0.45 }}>{name}</span>
-            <span onClick={() => actions.toggleLayerVis(name)} style={{ color: on ? "var(--color-violet-600)" : "var(--color-border-strong)", display: "inline-flex", cursor: "pointer" }}>
-              <Icon html={on ? EYE : EYE_OFF} />
-            </span>
-            <span onClick={() => actions.toggleLayerLock(name)} style={{ color: locked ? "var(--color-violet-600)" : "var(--color-border-strong)", display: "inline-flex", cursor: "pointer" }}>
-              <Icon html={locked ? LOCK : LOCK_OPEN} />
-            </span>
+          <div key={g.id}>
+            <div
+              onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !s[g.id] }))}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--spacing-3)",
+                padding: "var(--spacing-3) var(--spacing-8)",
+                cursor: "pointer",
+                background: "var(--color-bg-subtle)",
+                borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
+                userSelect: "none",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  width: 12,
+                  height: 12,
+                  color: "var(--color-violet-600)",
+                  transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                  transition: "transform .15s ease",
+                }}
+              >
+                <Icon html={CHEV_DOWN_SVG} />
+              </span>
+              <span
+                style={{
+                  fontSize: "var(--font-size-sm)",
+                  fontWeight: 700,
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                {g.label}
+              </span>
+              <span style={{ marginLeft: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                {groupLayers.length}
+              </span>
+            </div>
+            {isOpen &&
+              groupLayers.map((l) => {
+                const on = l.visible;
+                const isActive = state.activePcbLayer === l.id && state.mode === "pcb";
+                return (
+                  <div
+                    key={l.id}
+                    onClick={() => actions.setActivePcbLayer(l.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--spacing-5)",
+                      padding: "var(--spacing-3) var(--spacing-8) var(--spacing-3) calc(var(--spacing-8) + 18px)",
+                      borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+                      cursor: "pointer",
+                      background: isActive ? "var(--color-bg-brand-subtle)" : "transparent",
+                    }}
+                  >
+                    <label
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        position: "relative",
+                        width: 16,
+                        height: 16,
+                        borderRadius: "var(--radius-sm)",
+                        background: l.color,
+                        flex: "0 0 auto",
+                        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.12)",
+                        cursor: "pointer",
+                        overflow: "hidden",
+                      }}
+                      title="Pick a color"
+                    >
+                      <input
+                        type="color"
+                        value={l.color}
+                        onChange={(e) => actions.setPcbLayerColor(l.id, e.target.value)}
+                        style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", border: "none", padding: 0 }}
+                      />
+                    </label>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: "var(--font-size-sm)",
+                        color: "var(--color-text-primary)",
+                        opacity: on ? 1 : 0.45,
+                        fontWeight: isActive ? 700 : 500,
+                      }}
+                    >
+                      {l.name}
+                    </span>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.togglePcbLayerVis(l.id);
+                      }}
+                      style={{
+                        color: on ? "var(--color-violet-600)" : "var(--color-border-strong)",
+                        display: "inline-flex",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Icon html={on ? EYE : EYE_OFF} />
+                    </span>
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.togglePcbLayerLock(l.id);
+                      }}
+                      style={{
+                        color: l.locked ? "var(--color-violet-600)" : "var(--color-border-strong)",
+                        display: "inline-flex",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Icon html={l.locked ? LOCK : LOCK_OPEN} />
+                    </span>
+                  </div>
+                );
+              })}
           </div>
         );
       })}
     </div>
   );
 }
+
+const CHEV_DOWN_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>';
 
 function CoordReadout() {
   const cell = (a: string, b: string) => (

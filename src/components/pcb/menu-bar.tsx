@@ -6,7 +6,7 @@
 // hover via the .ix-submenu CSS rule).
 
 import { DsIcon } from "@/lib/pcb/icons";
-import { buildMenus } from "@/lib/pcb/data";
+import { buildMenus, buildMenus2D, buildMenus3D } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 type MenuSub = {
@@ -37,7 +37,12 @@ const chevron = (
 export function MenuBar() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const menus = buildMenus(state, actions);
+  const menus =
+    state.mode === "3d"
+      ? buildMenus3D(state, actions)
+      : state.mode === "2d"
+      ? buildMenus2D(state, actions)
+      : buildMenus(state, actions);
 
   return (
     <div

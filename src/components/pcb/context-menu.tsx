@@ -7,13 +7,13 @@ import { DsIcon } from "@/lib/pcb/icons";
 import { buildCtxItems } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
-type CtxItem = { divider?: boolean; label?: string; k?: string; icon?: string };
+type CtxItem = { divider?: boolean; label?: string; k?: string; icon?: string; onClick?: () => void };
 
 export function ContextMenu() {
   const state = usePcbState();
   const actions = usePcbActions();
   if (!state.ctx) return null;
-  const items = buildCtxItems() as CtxItem[];
+  const items = buildCtxItems(state, actions) as CtxItem[];
 
   return (
     <div
@@ -39,7 +39,7 @@ export function ContextMenu() {
           <div
             key={i}
             className="ix-mi"
-            onClick={actions.closeAll}
+            onClick={ci.onClick ?? actions.closeAll}
             style={{
               display: "flex",
               alignItems: "center",

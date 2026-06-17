@@ -18,6 +18,7 @@ import { Icon } from "@/lib/pcb/icons";
 import { buildDesignRules, buildFindReplace } from "@/lib/pcb/content";
 import { DEL_OBJ_NAMES } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
 
 const PRIMARY = "var(--color-violet-600)";
 const CLOSE_SVG =
@@ -464,7 +465,17 @@ function ConvertConfirmModal() {
   );
 }
 
-function NoticeModal({ title, body, cta }: { title: string; body: string; cta: string }) {
+function NoticeModal({
+  title,
+  body,
+  cta,
+  checkboxLabel,
+}: {
+  title: string;
+  body: React.ReactNode;
+  cta: string;
+  checkboxLabel?: string;
+}) {
   const actions = usePcbActions();
   const [agreed, setAgreed] = React.useState(false);
   return (
@@ -472,10 +483,10 @@ function NoticeModal({ title, body, cta }: { title: string; body: string; cta: s
       <Card width={460}>
         <Header title={title} onClose={actions.closeModal} padding="18px 22px" />
         <div style={{ padding: "var(--spacing-9) var(--spacing-10)" }}>
-          <p style={{ fontSize: "var(--font-size-sm)", lineHeight: 1.6, color: "var(--color-text-secondary)", margin: 0 }}>{body}</p>
+          <div style={{ fontSize: "var(--font-size-sm)", lineHeight: 1.6, color: "var(--color-text-secondary)" }}>{body}</div>
           <div onClick={() => setAgreed((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", marginTop: "var(--spacing-8)", cursor: "pointer" }}>
             <DsCheckbox checked={agreed} size="md" />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>I have read and agreed, continue.</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{checkboxLabel ?? "I have read and agreed, continue."}</span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
@@ -487,10 +498,30 @@ function NoticeModal({ title, body, cta }: { title: string; body: string; cta: s
   );
 }
 
-const NOTICE: Record<string, { title: string; body: string; cta: string }> = {
-  exportAltium: { title: "Notice", body: "Because the different file format and logic design, the format translation will lose some different, please check carefully at Altium Designer after exported. The exported file is for design reference only.", cta: "Export Altium Designer" },
-  exportKicad: { title: "Notice", body: "Because the different file format and logic design, the format translation will lose some different, please check carefully at KiCad after exported. The exported file is for design reference only.", cta: "Export Kicad Designer" },
-  exportEagle: { title: "Notice", body: "Because the different file format and logic design, the format translation will lose some different, please check carefully at Eagle after exported. The exported file is for design reference only.", cta: "Export Eagle Designer" },
+// EDA-export disclaimer, faithful to the Figma "2D section" export modals.
+// `tool` is the target designer name; source typos ("has some different",
+// "contiune") are preserved deliberately.
+function exportNoticeBody(tool: string): React.ReactNode {
+  return (
+    <>
+      1.Because the different file format and object design, the format translation will has some different, please check carefully at {tool} after exported.
+      <br />
+      2.Please be sure to read the notice before exporting :{" "}
+      <span style={{ color: "var(--color-violet-600)", textDecoration: "underline" }}>Export {tool}/PADS Notice and Disclaimer</span>
+      <br />
+      3.Please export Gerber file instead of exporting {tool} if you are going to do PCB manufacturing. All PCB factories support the Gerber file.
+      <br />
+      4.EasyEDA are not responsible for any loss of fabrication due to export differences.
+    </>
+  );
+}
+
+const EXPORT_CHECKBOX = "I have learned and agreed, contiune to export";
+
+const NOTICE: Record<string, { title: string; body: React.ReactNode; cta: string; checkboxLabel?: string }> = {
+  exportAltium: { title: "Notice", body: exportNoticeBody("Altium Designer"), cta: "Export Altium Designer", checkboxLabel: EXPORT_CHECKBOX },
+  exportKicad: { title: "Notice", body: exportNoticeBody("Kicad Designer"), cta: "Export Kicad Designer", checkboxLabel: EXPORT_CHECKBOX },
+  exportEagle: { title: "Notice", body: exportNoticeBody("Eagle Designer"), cta: "Export Eagle Designer", checkboxLabel: EXPORT_CHECKBOX },
   importAltium: { title: "Notice", body: "Importing an Altium project will translate the schematic and footprints. Some properties may not map exactly — please review the imported design carefully.", cta: "Import Altium" },
   importKicad: { title: "Notice", body: "Importing a KiCad project will translate the schematic and footprints. Some properties may not map exactly — please review the imported design carefully.", cta: "Import Kicad" },
   jlcpcb: { title: "JLCPCB Layout Service", body: "Send your board to JLCPCB for professional layout and assembly. We'll route your design and prepare it for manufacturing.", cta: "Request Layout" },
@@ -591,6 +622,98 @@ function TextModal() {
   );
 }
 
+// ── 3D export (Export ▸ 3D File / 3D Shell File) ─────────────────────────────
+// Faithful UI to the Figma "3D Section" export modals; controls are interactive
+// (local state) but Export/Cancel just close — no real file generation.
+function Export3DModal({ shell }: { shell?: boolean }) {
+  const actions = usePcbActions();
+  const [fileName, setFileName] = React.useState("3D shell_PCB1");
+  const [type, setType] = React.useState<"STL" | "STEP" | "OBJ">("STL");
+  const [opt, setOpt] = React.useState(true);
+  const [obj, setObj] = React.useState<Record<string, boolean>>({
+    PCB: true,
+    "Silk screen": true,
+    "Component Model": true,
+    "Component Via": false,
+    "Signal layer circuits": true,
+    "Signal Via": false,
+  });
+  const toggle = (k: string) => setObj((s) => ({ ...s, [k]: !s[k] }));
+
+  const labelCss: React.CSSProperties = { fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const groupCss: React.CSSProperties = { ...labelCss, marginBottom: "var(--spacing-4)", fontWeight: 600, color: "var(--color-text-primary)" };
+
+  return (
+    <Overlay>
+      <Card width={460}>
+        <Header title={shell ? "Export 3D Shell File" : "Export 3D File"} onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
+          {/* File name */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={{ ...labelCss, width: 84, flex: "0 0 auto" }}>File Name</span>
+            <input
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              style={{
+                flex: 1,
+                padding: "var(--spacing-3) var(--spacing-5)",
+                border: "var(--border-width-1) solid var(--color-border-default)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-primary)",
+                fontSize: "var(--font-size-sm)",
+                outline: "none",
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+
+          {/* Export 3D Type */}
+          <div>
+            <div style={groupCss}>Export 3D Type</div>
+            <div style={{ display: "flex", gap: "var(--spacing-12)" }}>
+              {(["STL", "STEP", "OBJ"] as const).map((t) => (
+                <div key={t} onClick={() => setType(t)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                  <Radio on={type === t} />
+                  <span style={labelCss}>{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Export Object (full file export only) */}
+          {!shell && (
+            <div>
+              <div style={groupCss}>Export Object</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4) var(--spacing-6)" }}>
+                {Object.keys(obj).map((k) => (
+                  <div key={k} onClick={() => toggle(k)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                    <Check on={obj[k]} />
+                    <span style={labelCss}>{k}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Export option note */}
+          <div onClick={() => setOpt((o) => !o)} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-3)", cursor: "pointer" }}>
+            <Check on={opt} />
+            <span style={{ ...labelCss, lineHeight: 1.5 }}>
+              For Components Whiteout bound 3D models, 3D models will be automatically generated (based on the height, property.
+            </span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Order 3D shell</Button>
+          <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Export</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 export function Modals() {
   const state = usePcbState();
   switch (state.modal) {
@@ -620,8 +743,22 @@ export function Modals() {
     case "boolOp":
     case "distribute":
       return <NoticeModal {...NOTICE[state.modal]} />;
+    case "export3dFile":
+      return <Export3DModal />;
+    case "export3dShell":
+      return <Export3DModal shell />;
     case "convertConfirm":
       return <ConvertConfirmModal />;
+    case "layerManager":
+    case "netClass":
+    case "diffPair":
+    case "equalLength":
+    case "padPair":
+    case "copper":
+    case "tearDrop":
+    case "removeUnusedPad":
+    case "pcbDrc":
+      return <PcbManagerModals />;
     default:
       return null;
   }

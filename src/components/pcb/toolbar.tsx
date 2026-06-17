@@ -34,79 +34,133 @@ type ToolbarAction =
   | "sendBack"
   | "toggleBottom";
 
+// `modes` constrains which editor modes accept the tool. Omitted → all modes.
+// Items not for the current mode render greyed out and ignore clicks.
+type Mode = "schematic" | "pcb" | "2d" | "3d";
 type Item =
-  | { kind: "icon"; key: string; tool?: string; action?: ToolbarAction; label?: string }
+  | {
+      kind: "icon";
+      key: string;
+      tool?: string;
+      action?: ToolbarAction;
+      label?: string;
+      modes?: Mode[];
+    }
   | { kind: "div" }
   | { kind: "dd"; field: "gridSize" | "unit"; options: string[]; label?: string };
 
 const GRID_SIZES = ["0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1"];
 const UNITS = ["Inch", "Mil", "mm"];
 
-// Order matches Figma exact data-name sequence (52 items).
+// Toolbar layout follows the Figma source order but every item is tagged with
+// `modes` so the active editor mode (`schematic` / `pcb`) disables tools that
+// don't apply. PCB-only tools added at the end (Polygon / Region / Slot / …).
+const SCH: Mode[] = ["schematic"];
+const PCB: Mode[] = ["pcb"];
+
 const ITEMS: Item[] = [
-  /*  1 */ { kind: "icon", key: "tSelectVisible", tool: "select", label: "Select (V)" },
-  /*  1b*/ { kind: "icon", key: "tHand", tool: "hand", label: "Hand — pan canvas (H or hold Space)" },
-  /*  2 */ { kind: "icon", key: "tViewDetails", tool: "selectVisible", label: "Select Visible Parts" },
-  /*  3 */ { kind: "icon", key: "undo", action: "undo", label: "Undo" },
-  /*  4 */ { kind: "icon", key: "redo", action: "redo", label: "Redo" },
-  /*  5 */ { kind: "icon", key: "board", action: "toggleBottom", label: "Dashboard" },
-  /*  6 */ { kind: "icon", key: "tFitArea", tool: "viewDetails", label: "View details" },
+  /* shared selection / nav */
+  { kind: "icon", key: "tSelectVisible", tool: "select", label: "Select (V)" },
+  { kind: "icon", key: "tHand", tool: "hand", label: "Hand — pan canvas (H or hold Space)" },
+  { kind: "icon", key: "tViewDetails", tool: "selectVisible", label: "Select Visible Parts" },
+  { kind: "icon", key: "undo", action: "undo", label: "Undo" },
+  { kind: "icon", key: "redo", action: "redo", label: "Redo" },
+  { kind: "icon", key: "board", action: "toggleBottom", label: "Dashboard" },
+  { kind: "icon", key: "tFitArea", tool: "viewDetails", label: "View details" },
   { kind: "div" },
-  /*  7 */ { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
-  /*  8 */ { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
-  /*  9 */ { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit all in window" },
-  /* 10 */ { kind: "icon", key: "tFitSection", action: "fitSection", label: "Fit section" },
-  /* 11 */ { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit Area Selection view" },
-  /* 12 */ { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid options" },
+  /* zoom / view */
+  { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
+  { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
+  { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit all in window" },
+  { kind: "icon", key: "tFitSection", action: "fitSection", label: "Fit section" },
+  { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit Area Selection view" },
+  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid options" },
   { kind: "div" },
-  /* 13 */ { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
-  /* 14 */ { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
+  { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
+  { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
   { kind: "div" },
-  /* 15 */ { kind: "icon", key: "tDevReuse", action: "openDeviceMgr", label: "Device / Reuse block" },
-  /* 16 */ { kind: "icon", key: "tWire", tool: "wire", label: "Wire" },
-  /* 17 */ { kind: "icon", key: "tBus", tool: "bus", label: "Bus" },
-  /* 18 */ { kind: "icon", key: "tDiode", tool: "diode", label: "Diode" },
-  /* 19 */ { kind: "icon", key: "tResistor", tool: "resistor", label: "Resistor" },
-  /* 20 */ { kind: "icon", key: "tInductor", tool: "inductor", label: "Inductor" },
-  /* 21 */ { kind: "icon", key: "tCapacitor", tool: "capacitor", label: "Capacitor" },
-  /* 22 */ { kind: "icon", key: "tNetFlag", tool: "netFlag", label: "Net flag" },
-  /* 23 */ { kind: "icon", key: "tVcc5v", tool: "vcc5v", label: "+5V" },
-  /* 24 */ { kind: "icon", key: "tShortFlag", tool: "shortFlag", label: "Short Flag" },
-  /* 25 */ { kind: "icon", key: "tPort", tool: "port", label: "Port Out" },
-  /* 26 */ { kind: "icon", key: "tNoConn", tool: "noConnect", label: "No Connect" },
-  /* 27 */ { kind: "icon", key: "tText", tool: "text", label: "Text" },
+  /* shared place */
+  { kind: "icon", key: "tDevReuse", action: "openDeviceMgr", label: "Device / Reuse block" },
+  /* schematic-only place tools */
+  { kind: "icon", key: "tWire", tool: "wire", label: "Wire", modes: SCH },
+  { kind: "icon", key: "tBus", tool: "bus", label: "Bus", modes: SCH },
+  { kind: "icon", key: "tDiode", tool: "diode", label: "Diode", modes: SCH },
+  { kind: "icon", key: "tResistor", tool: "resistor", label: "Resistor", modes: SCH },
+  { kind: "icon", key: "tInductor", tool: "inductor", label: "Inductor", modes: SCH },
+  { kind: "icon", key: "tCapacitor", tool: "capacitor", label: "Capacitor", modes: SCH },
+  { kind: "icon", key: "tNetFlag", tool: "netFlag", label: "Net flag", modes: SCH },
+  { kind: "icon", key: "tVcc5v", tool: "vcc5v", label: "+5V", modes: SCH },
+  { kind: "icon", key: "tShortFlag", tool: "shortFlag", label: "Short Flag", modes: SCH },
+  { kind: "icon", key: "tPort", tool: "port", label: "Port Out", modes: SCH },
+  { kind: "icon", key: "tNoConn", tool: "noConnect", label: "No Connect", modes: SCH },
+  { kind: "icon", key: "tText", tool: "text", label: "Text" },
   { kind: "div" },
-  /* 28 */ { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert Schematic to PCB" },
-  /* 29 */ { kind: "icon", key: "tJlcpcb", action: "openJlcpcb", label: "JLCPCB Layout Service" },
-  /* 30 */ { kind: "icon", key: "tGenBlock", action: "openGenBlock", label: "Generate / Update Block Symbol" },
-  /* 31 */ { kind: "icon", key: "tPgnd", tool: "pgnd", label: "PGND" },
-  /* 32 */ { kind: "icon", key: "tAgnd", tool: "agnd", label: "AGND" },
+  /* schematic ↔ PCB actions */
+  { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert Schematic to PCB", modes: SCH },
+  { kind: "icon", key: "tJlcpcb", action: "openJlcpcb", label: "JLCPCB Layout Service" },
+  { kind: "icon", key: "tGenBlock", action: "openGenBlock", label: "Generate / Update Block Symbol", modes: SCH },
+  { kind: "icon", key: "tPgnd", tool: "pgnd", label: "PGND", modes: SCH },
+  { kind: "icon", key: "tAgnd", tool: "agnd", label: "AGND", modes: SCH },
   { kind: "div" },
-  /* 33 */ { kind: "icon", key: "tBringFront", action: "bringFront", label: "Bring to Front" },
-  /* 34 */ { kind: "icon", key: "tSendBack", action: "sendBack", label: "Send to Back" },
-  /* 35 */ { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
-  /* 36 */ { kind: "icon", key: "tFlipV", action: "flipV", label: "Flip Up and Down" },
-  /* 37 */ { kind: "icon", key: "tFlipH", action: "flipH", label: "Flip Up and Left" },
-  /* 38 */ { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
+  /* shared transforms */
+  { kind: "icon", key: "tBringFront", action: "bringFront", label: "Bring to Front" },
+  { kind: "icon", key: "tSendBack", action: "sendBack", label: "Send to Back" },
+  { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
+  { kind: "icon", key: "tFlipV", action: "flipV", label: "Flip Up and Down" },
+  { kind: "icon", key: "tFlipH", action: "flipH", label: "Flip Up and Left" },
+  { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
   { kind: "div" },
-  /* 39 */ { kind: "icon", key: "tFootMgr", action: "openFootMgr", label: "Footprint Manager" },
-  /* 40 */ { kind: "icon", key: "tDevMgr", action: "openDeviceMgr", label: "Device Manager" },
+  /* shared managers */
+  { kind: "icon", key: "tFootMgr", action: "openFootMgr", label: "Footprint Manager" },
+  { kind: "icon", key: "tDevMgr", action: "openDeviceMgr", label: "Device Manager" },
   { kind: "div" },
-  /* 41 */ { kind: "icon", key: "tBoolPreserve", action: "openBoolOp", label: "Preserve Overlapping Areas" },
-  /* 42 */ { kind: "icon", key: "tBoolMerge", action: "openBoolOp", label: "Merge Areas" },
-  /* 43 */ { kind: "icon", key: "tBoolSubtract", action: "openBoolOp", label: "Subtract Top Area" },
-  /* 44 */ { kind: "icon", key: "tBoolExclude", action: "openBoolOp", label: "Exclude Overlapping Areas" },
-  /* 45 */ { kind: "icon", key: "tBoolSplit", action: "openBoolOp", label: "Split Area With Holes" },
+  /* boolean ops — useful in both for polygons */
+  { kind: "icon", key: "tBoolPreserve", action: "openBoolOp", label: "Preserve Overlapping Areas" },
+  { kind: "icon", key: "tBoolMerge", action: "openBoolOp", label: "Merge Areas" },
+  { kind: "icon", key: "tBoolSubtract", action: "openBoolOp", label: "Subtract Top Area" },
+  { kind: "icon", key: "tBoolExclude", action: "openBoolOp", label: "Exclude Overlapping Areas" },
+  { kind: "icon", key: "tBoolSplit", action: "openBoolOp", label: "Split Area With Holes" },
   { kind: "div" },
-  /* 46 */ { kind: "icon", key: "tVia", tool: "via", label: "Via" },
-  /* 47 */ { kind: "icon", key: "tSutureVias", tool: "sutureVias", label: "Suture vias" },
-  /* 48 */ { kind: "icon", key: "tPad", tool: "pad", label: "Pad" },
+  /* PCB-only place tools */
+  { kind: "icon", key: "tTrack", tool: "track", label: "Track — PCB route", modes: PCB },
+  { kind: "icon", key: "tPad", tool: "pad", label: "Pad", modes: PCB },
+  { kind: "icon", key: "tVia", tool: "via", label: "Via", modes: PCB },
+  { kind: "icon", key: "tSutureVias", tool: "sutureVias", label: "Suture vias", modes: PCB },
+  { kind: "icon", key: "tPolygon", tool: "polygon", label: "Copper Pour Polygon", modes: PCB },
+  { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Filled Region", modes: PCB },
+  { kind: "icon", key: "tSlot", tool: "slot", label: "Slot", modes: PCB },
+  { kind: "icon", key: "tBoardOutline", tool: "boardOutline", label: "Board Outline", modes: PCB },
+  { kind: "icon", key: "tComponent", tool: "component", label: "Component / Footprint", modes: PCB },
+  { kind: "icon", key: "tDimension", tool: "dimension", label: "Dimension", modes: PCB },
+  /* PCB-only routing helpers */
+  { kind: "icon", key: "tDiffPair", tool: "diffPair", label: "Differential Pair Route", modes: PCB },
+  { kind: "icon", key: "tLengthTune", tool: "lengthTune", label: "Length Tuning", modes: PCB },
+  { kind: "icon", key: "tAutoRoute", action: "openBoolOp", label: "Auto Route (coming)", modes: PCB },
   { kind: "div" },
-  /* 49 */ { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute Horizontally" },
-  /* 50 */ { kind: "icon", key: "tDistV", action: "openDistribute", label: "Distribute Vertically" },
+  /* shared distribute / labels */
+  { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute Horizontally" },
+  { kind: "icon", key: "tDistV", action: "openDistribute", label: "Distribute Vertically" },
   { kind: "div" },
-  /* 51 */ { kind: "icon", key: "tSettings", action: "openSettings", label: "Settings" },
-  /* 52 */ { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label" },
+  { kind: "icon", key: "tSettings", action: "openSettings", label: "Settings" },
+  { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label", modes: SCH },
+];
+
+// 2D editor toolbar — a reduced 11-icon strip (no inline dropdowns), faithful to
+// the Figma "2D section" frame. Select / Undo / Redo / Dashboard / Search, then a
+// divider, then the zoom & view controls.
+const ITEMS_2D: Item[] = [
+  { kind: "icon", key: "tSelectVisible", tool: "select", label: "Select (V)" },
+  { kind: "icon", key: "undo", action: "undo", label: "Undo" },
+  { kind: "icon", key: "redo", action: "redo", label: "Redo" },
+  { kind: "icon", key: "board", action: "toggleBottom", label: "Dashboard" },
+  { kind: "icon", key: "find", action: "openDeviceMgr", label: "Search Parts" },
+  { kind: "div" },
+  { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
+  { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
+  { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit All in Window" },
+  { kind: "icon", key: "findSim", action: "fitArea", label: "Zoom Area" },
+  { kind: "icon", key: "tFitArea", action: "fitArea", label: "Zoom Selection" },
+  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Toggle Grid" },
 ];
 
 function Divider() {
@@ -216,6 +270,31 @@ function Dropdown({
   );
 }
 
+// Drop items whose `modes` don't include the current mode, then collapse
+// consecutive / leading / trailing dividers so the toolbar reads cleanly.
+// `customAllow` is an optional whitelist of `tool` ids — when provided, an
+// icon item with a `tool` field is dropped unless its tool is in the set
+// (action-only and divider items are unaffected). This is how the Top Tools
+// Bar settings page actually customizes the toolbar.
+function filterItems(items: Item[], mode: Mode, customAllow: Set<string> | null): Item[] {
+  const kept = items.filter((it) => {
+    if (it.kind !== "icon") return true;
+    if (it.modes && !it.modes.includes(mode)) return false;
+    if (customAllow && it.tool && !customAllow.has(it.tool)) return false;
+    return true;
+  });
+  const out: Item[] = [];
+  for (const it of kept) {
+    if (it.kind === "div") {
+      const last = out[out.length - 1];
+      if (!last || last.kind === "div") continue; // skip leading + consecutive dividers
+    }
+    out.push(it);
+  }
+  while (out.length && out[out.length - 1].kind === "div") out.pop(); // trim trailing
+  return out;
+}
+
 function ToolIcon({
   iconKey,
   active,
@@ -305,7 +384,17 @@ export function Toolbar() {
         alignItems: "center",
       }}
     >
-      {ITEMS.map((it, i) => {
+      {filterItems(
+        state.mode === "2d" || state.mode === "3d" ? ITEMS_2D : ITEMS,
+        state.mode as Mode,
+        // Schematic/PCB modes use the Top Tools Bar Settings page's
+        // per-scope selection to whitelist tool ids. Other modes opt out.
+        state.mode === "schematic"
+          ? new Set(state.toolbarCustomization.schematic)
+          : state.mode === "pcb"
+          ? new Set(state.toolbarCustomization.pcb)
+          : null,
+      ).map((it, i) => {
         if (it.kind === "div") return <Divider key={i} />;
         if (it.kind === "dd") {
           const v = it.field === "gridSize" ? state.gridSize : state.unit;

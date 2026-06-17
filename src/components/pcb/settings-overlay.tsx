@@ -11,6 +11,20 @@ import { buildSettingsNav, settingsTitle } from "@/lib/pcb/data";
 import type { SettingsPage } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useTheme } from "@/components/theme-provider";
+import {
+  SaveSettingsPage,
+  FontsSettingsPage,
+  DrawingSettingsPage,
+  HotkeySettingsPage,
+  SystemSettingsPage,
+  PropertySettingsPage,
+} from "@/components/pcb/settings-pages";
+import {
+  SchematicSymbolSettingsPage,
+  PcbFootprintSettingsPage,
+  PanelLibSettingsPage,
+  TopToolsBarSettingsPage,
+} from "@/components/pcb/settings-pages-deep";
 
 const THEME_OPTIONS = [
   { label: "Light", value: "light" },
@@ -65,8 +79,27 @@ const SETTINGS: Record<string, Field[]> = {
 };
 
 function SettingsBody({ page }: { page: SettingsPage }) {
+  // Phase B — simple pages.
+  if (page === "save") return <SaveSettingsPage />;
+  if (page === "font") return <FontsSettingsPage />;
+  if (page === "drawing") return <DrawingSettingsPage />;
+  if (page === "hotkey") return <HotkeySettingsPage />;
+  // Phase C — System + Property.
+  if (page === "system") return <SystemSettingsPage />;
+  if (page === "property") return <PropertySettingsPage />;
+  // Phase D — deep tabbed pages.
+  if (page === "symbol") return <SchematicSymbolSettingsPage />;
+  if (page === "footprint") return <PcbFootprintSettingsPage />;
+  if (page === "panel") return <PanelLibSettingsPage />;
+  // Phase E — Top Toolbar customization.
+  if (page === "toptools") return <TopToolsBarSettingsPage />;
+  return <LegacyFlatFields page={page} />;
+}
+
+// Legacy flat-field rendering for pages still on the SETTINGS map
+// (system / property — get replaced in Phase C).
+function LegacyFlatFields({ page }: { page: SettingsPage }) {
   const fields = SETTINGS[page] ?? SETTINGS.system;
-  // Per-page toggle state (interactive); selects are single-value triggers.
   const [toggles, setToggles] = React.useState<Record<string, boolean>>({});
   const isOn = (f: Extract<Field, { kind: "toggle" }>) => toggles[f.label] ?? f.on;
   const { theme, setTheme } = useTheme();
@@ -106,6 +139,96 @@ function SettingsBody({ page }: { page: SettingsPage }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Phase F — footer footer with wired Export / Import / Restore Default / Apply / Confirm.
+function SettingsFooter() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [feedback, setFeedback] = React.useState<string | null>(null);
+
+  const flash = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(null), 2500);
+  };
+
+  const handleExport = () => {
+    const json = actions.exportSettingsJson();
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ideeza-settings.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    flash("Settings exported");
+  };
+
+  const handleImport = () => fileInputRef.current?.click();
+
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const ok = actions.importSettingsJson(String(reader.result ?? ""));
+      flash(ok ? "Settings imported" : "Invalid settings file");
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // allow re-selecting the same file
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--spacing-5)",
+        padding: "var(--spacing-8) var(--spacing-12)",
+        borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
+      }}
+    >
+      <Button hierarchy="secondary" size="lg" onClick={actions.closeSettings}>
+        Cancel
+      </Button>
+      <Button hierarchy="ghost" size="md" onClick={handleExport}>
+        Export config
+      </Button>
+      <Button hierarchy="ghost" size="md" onClick={handleImport}>
+        Import Config
+      </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        onChange={onFile}
+        style={{ display: "none" }}
+      />
+      {feedback && (
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+          {feedback}
+        </span>
+      )}
+      <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-3)" }}>
+        <Button
+          hierarchy="secondary"
+          size="md"
+          onClick={() => actions.resetSettingsPage(state.settingsPage)}
+        >
+          Restore Default
+        </Button>
+        <Button hierarchy="secondary" size="md" onClick={actions.closeSettings}>
+          Apply
+        </Button>
+        <Button hierarchy="primary" size="md" onClick={actions.closeSettings}>
+          Confirm
+        </Button>
+      </div>
     </div>
   );
 }
@@ -192,18 +315,7 @@ export function SettingsOverlay() {
 
           <SettingsBody page={state.settingsPage} />
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: "var(--spacing-5)",
-              padding: "var(--spacing-8) var(--spacing-12)",
-              borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-            }}
-          >
-            <Button hierarchy="secondary" size="lg" onClick={actions.closeSettings}>Cancel</Button>
-            <Button hierarchy="primary" size="lg" onClick={actions.closeSettings}>Save Changes</Button>
-          </div>
+          <SettingsFooter />
         </div>
       </div>
     </div>

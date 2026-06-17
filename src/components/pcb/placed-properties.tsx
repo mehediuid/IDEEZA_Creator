@@ -31,7 +31,31 @@ const KIND_LABELS: Record<string, string> = {
   sutureVias: "Suture Vias",
   wire: "Wire",
   bus: "Bus",
+  track: "Track",
+  component: "Component",
+  polygon: "Copper Pour",
+  fillRegion: "Filled Region",
+  slot: "Slot",
+  boardOutline: "Board Outline",
+  dimension: "Dimension",
+  diffPair: "Differential Pair",
+  lengthTune: "Length Tune",
 };
+
+const PAD_SHAPES = [
+  { label: "Round", value: "round" },
+  { label: "Rectangle", value: "rect" },
+  { label: "Oval", value: "oval" },
+];
+const PAD_TYPES = [
+  { label: "SMD", value: "smd" },
+  { label: "THT (Through-hole)", value: "tht" },
+  { label: "Test Point", value: "test" },
+];
+const SIDES = [
+  { label: "Top", value: "top" },
+  { label: "Bottom", value: "bottom" },
+];
 
 const CHEV_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>';
@@ -264,9 +288,14 @@ const miniBtnStyle: React.CSSProperties = {
   fontWeight: 500,
 };
 
+// All wire-like kinds (use endX/endY). Track is a PCB-mode wire.
+const WIRE_LIKE = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune"]);
+
 function SingleObjectProps({ obj }: { obj: CanvasObject }) {
+  const state = usePcbState();
   const actions = usePcbActions();
-  const isWire = obj.kind === "wire" || obj.kind === "bus";
+  const isWire = WIRE_LIKE.has(obj.kind);
+  const inPcb = state.mode === "pcb";
   const kindLabel = KIND_LABELS[obj.kind] ?? obj.kind;
 
   return (
@@ -307,6 +336,8 @@ function SingleObjectProps({ obj }: { obj: CanvasObject }) {
           </button>
         )}
       </Row>
+
+      {inPcb && <PcbKindSection obj={obj} />}
 
       <SectionHeader title="Geometry" />
       <Row label="X">
@@ -357,4 +388,201 @@ function SingleObjectProps({ obj }: { obj: CanvasObject }) {
       </Row>
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PCB-aware section — varies per object kind. Keeps cross-mode panels lean by
+// only mounting when state.mode === "pcb" (gated by SingleObjectProps).
+// ─────────────────────────────────────────────────────────────────────────────
+function PcbKindSection({ obj }: { obj: CanvasObject }) {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const layerOptions = state.pcbLayers.map((l) => ({ label: l.name, value: l.id }));
+  const netOptions = state.pcbNets.map((n) => ({ label: n.name, value: n.name }));
+  // "(no net)" sentinel so the Select component always has a row to render.
+  const netSelectValue = obj.net || "—";
+
+  // Live "Length" for tracks — Euclidean distance, mil.
+  const trackLength =
+    obj.kind === "track" && obj.endX != null && obj.endY != null
+      ? Math.round(Math.hypot(obj.endX - obj.x, obj.endY - obj.y))
+      : null;
+
+  const layerRow = (
+    <Row label="Layer">
+      <Select
+        value={obj.layer || ""}
+        options={layerOptions}
+        onChange={(v) => actions.setObjectField(obj.id, { layer: v })}
+        minWidth={140}
+      />
+    </Row>
+  );
+
+  const netRow = (
+    <Row label="Net">
+      <Select
+        value={netSelectValue}
+        options={[{ label: "— (none)", value: "—" }, ...netOptions]}
+        onChange={(v) => actions.setObjectField(obj.id, { net: v === "—" ? undefined : v })}
+        minWidth={140}
+      />
+    </Row>
+  );
+
+  // Component (footprint) — Designator/Comment/Footprint/Side/Locked.
+  if (obj.kind === "component") {
+    return (
+      <>
+        <SectionHeader title="Component" />
+        <Row label="Comment">
+          <TextInput
+            value={obj.comment ?? ""}
+            onChange={(v) => actions.setObjectField(obj.id, { comment: v })}
+          />
+        </Row>
+        <Row label="Footprint">
+          <TextInput
+            value={obj.footprint ?? ""}
+            onChange={(v) => actions.setObjectField(obj.id, { footprint: v })}
+          />
+        </Row>
+        <Row label="Side">
+          <Select
+            value={obj.side ?? "top"}
+            options={SIDES}
+            onChange={(v) => actions.setObjectField(obj.id, { side: v as "top" | "bottom" })}
+            minWidth={120}
+          />
+        </Row>
+        {layerRow}
+        <Row label="Locked">
+          <input
+            type="checkbox"
+            checked={!!obj.locked}
+            onChange={(e) => actions.setObjectField(obj.id, { locked: e.target.checked })}
+          />
+        </Row>
+      </>
+    );
+  }
+
+  // Pad — geometry + drill + net + pad type.
+  if (obj.kind === "pad") {
+    return (
+      <>
+        <SectionHeader title="Pad" />
+        <Row label="Shape">
+          <Select
+            value={obj.padShape ?? "round"}
+            options={PAD_SHAPES}
+            onChange={(v) => actions.setObjectField(obj.id, { padShape: v as "round" | "rect" | "oval" })}
+            minWidth={130}
+          />
+        </Row>
+        <Row label="Width (mil)">
+          <NumberCell
+            value={obj.width}
+            onChange={(v) => actions.setObjectField(obj.id, { width: v })}
+          />
+        </Row>
+        <Row label="Height (mil)">
+          <NumberCell
+            value={obj.height}
+            onChange={(v) => actions.setObjectField(obj.id, { height: v })}
+          />
+        </Row>
+        <Row label="Drill (mil)">
+          <NumberCell
+            value={obj.drill}
+            onChange={(v) => actions.setObjectField(obj.id, { drill: v })}
+          />
+        </Row>
+        <Row label="Pad Type">
+          <Select
+            value={obj.padType ?? "tht"}
+            options={PAD_TYPES}
+            onChange={(v) => actions.setObjectField(obj.id, { padType: v as "smd" | "tht" | "test" })}
+            minWidth={150}
+          />
+        </Row>
+        {netRow}
+        {layerRow}
+      </>
+    );
+  }
+
+  // Track — net + width + layer + computed length.
+  if (obj.kind === "track") {
+    return (
+      <>
+        <SectionHeader title="Track" />
+        {netRow}
+        <Row label="Width (mil)">
+          <NumberCell
+            value={obj.width}
+            onChange={(v) => actions.setObjectField(obj.id, { width: v })}
+          />
+        </Row>
+        {layerRow}
+        {trackLength != null && (
+          <Row label="Length">
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontFamily: "var(--font-family-mono), monospace" }}>
+              {trackLength} mil
+            </span>
+          </Row>
+        )}
+      </>
+    );
+  }
+
+  // Via — diameter + drill + net + layer stack.
+  if (obj.kind === "via") {
+    return (
+      <>
+        <SectionHeader title="Via" />
+        <Row label="Diameter (mil)">
+          <NumberCell
+            value={obj.width}
+            onChange={(v) => actions.setObjectField(obj.id, { width: v })}
+          />
+        </Row>
+        <Row label="Drill (mil)">
+          <NumberCell
+            value={obj.drill}
+            onChange={(v) => actions.setObjectField(obj.id, { drill: v })}
+          />
+        </Row>
+        {netRow}
+        <Row label="Start Layer">
+          <Select
+            value={obj.startLayer || "top"}
+            options={layerOptions}
+            onChange={(v) => actions.setObjectField(obj.id, { startLayer: v })}
+            minWidth={140}
+          />
+        </Row>
+        <Row label="End Layer">
+          <Select
+            value={obj.endLayer || "bottom"}
+            options={layerOptions}
+            onChange={(v) => actions.setObjectField(obj.id, { endLayer: v })}
+            minWidth={140}
+          />
+        </Row>
+      </>
+    );
+  }
+
+  // Generic PCB section — every other PCB-placed object gets at least a Layer
+  // dropdown so the user can move it between copper / silkscreen layers.
+  if (obj.layer != null) {
+    return (
+      <>
+        <SectionHeader title="PCB" />
+        {layerRow}
+      </>
+    );
+  }
+  return null;
 }

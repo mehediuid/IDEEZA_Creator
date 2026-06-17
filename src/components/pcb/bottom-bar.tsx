@@ -19,6 +19,48 @@ const CLOSE_SVG =
 const CHEV_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
 
+function ActiveLayerChip() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const active = state.pcbLayers.find((l) => l.id === state.activePcbLayer);
+  if (!active) return null;
+  return (
+    <span
+      style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+      title="Switch active PCB layer"
+    >
+      Layer:
+      <select
+        value={state.activePcbLayer}
+        onChange={(e) => actions.setActivePcbLayer(e.target.value)}
+        style={{
+          background: "transparent",
+          color: "var(--color-text-secondary)",
+          border: "none",
+          outline: "none",
+          fontWeight: 600,
+          fontSize: "var(--font-size-xs)",
+          cursor: "pointer",
+        }}
+      >
+        {state.pcbLayers.map((l) => (
+          <option key={l.id} value={l.id}>{l.name}</option>
+        ))}
+      </select>
+      <span
+        style={{
+          width: 9,
+          height: 9,
+          borderRadius: 2,
+          background: active.color,
+          border: "1px solid rgba(0,0,0,.2)",
+          display: "inline-block",
+        }}
+      />
+    </span>
+  );
+}
+
 export function BottomBar() {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -121,7 +163,7 @@ export function BottomBar() {
           </div>
         ))}
 
-        {/* Status indicator: current tool · grid · unit · zoom */}
+        {/* Status indicator: current tool · grid · unit · zoom · active PCB layer */}
         <div
           style={{
             marginLeft: "auto",
@@ -143,6 +185,7 @@ export function BottomBar() {
           <span>
             Zoom: <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>{Math.round(state.zoom * 100)}%</span>
           </span>
+          {state.mode === "pcb" && <ActiveLayerChip />}
         </div>
 
         <div

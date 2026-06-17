@@ -25,7 +25,31 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
         mk('Window Arrangement (W)','','blank',[{label:'Default',k:''},{label:'Horizontal Split',k:''},{label:'Vertical Split',k:''},{label:'Grid View',k:''}]),
         ck('Floating Tool',''),
       ] },
-      place: { label: 'Place', key: 'P', items: [
+      place: { label: 'Place', key: 'P', items: (state.mode === 'pcb' ? [
+        // PCB-mode Place menu — PCB primitives (track/via/pad/etc).
+        mk('Component / Footprint (C)','Alt+C','pChip'),
+        mk('Track (T)','Alt+T','pWire'),
+        mk('Differential Pair (D)','Alt+D','diffPair'),
+        mk('Via (V)','Alt+V','via'),
+        mk('Suture Vias','','via'),
+        mk('Pad (P)','Alt+P','pad'),
+        dv,
+        mk('Copper Pour Polygon (G)','Alt+G','pRect'),
+        mk('Filled Region','','pRect'),
+        mk('Board Outline','','blank'),
+        mk('Slot','','blank'),
+        mk('Cut-out','','blank'),
+        dv,
+        mk('Dimension','','measure'),
+        mk('Ruler','','measure'),
+        mk('Text (X)','Alt+X','pText'),
+        mk('Image','','pImage'),
+        mk('Table','','pTable'),
+        dv,
+        mk('Length Tune','','wire'),
+        mk('Auto Route','','convert'),
+        mk('Interactive Route','','convert'),
+      ] : [
         mk('Device/ Reuse Block (P)','Shift+F','pChip'),
         mk('Shortcut Device (F)','','pChip',[{label:'Resistor',k:''},{label:'Capacitor',k:''},{label:'Inductor',k:''},{label:'Diode',k:''},{label:'Transistor',k:''}]),
         mk('Wire (W)','Alt+W','pWire'), mk('Bus (B)','Alt+B','pBus'), mk('Net Label (N)','Alt+N','pNetLabel'), mk('Short Flag (D)','','pShortFlag'),
@@ -33,7 +57,7 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
         mk('Net Port (I)','','pPort',[{label:'Input',k:''},{label:'Output',k:''},{label:'Bidirectional',k:''},{label:'Passive',k:''}]),
         mk('No Connect Flag (C)','','pNoConnect'), mk('Test Point (T)','','pTestPoint'), mk('Component Mask','','blank'), mk('Reuse Block (S)','','pChip'), dv,
         mk('Polyline (L)','Alt+L','pPolyline'), mk('Arc (A)','Alt+A','pArc'), mk('Bezier (Z)','Alt+Z','pBezier'), mk('Circle (U)','Alt+C','pCircle'), mk('Elipse (E)','Alt+E','pEllipse'), mk('Rectangle (R)','Alt+R','pRect'), mk('Text (T)','Alt+T','pText'), mk('Image (G)','','pImage'), mk('Table','','pTable'),
-      ] },
+      ]) },
       design: { label: 'Design', key: 'D', items: [
         mk('Update/Conver Schematic to PCB','Alt+I','dConvert'),
         mk('JLCPCB Layout Service','','dLayout',[{label:'Auto Layout',k:''},{label:'Manual Layout',k:''},{label:'Order PCB Now',k:''}]),
@@ -43,7 +67,33 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
         mk('Reset Component Unique ID','','dReset'),
       ] },
       layout: { label: 'Layout', key: 'L', items: [ mk('Align Left','','fit'), mk('Align Center','','fit'), dv, mk('Distribute Horizontally','','array'), mk('Distribute Vertically','','array'), dv, mk('Bring to Front',']','layer'), mk('Send to Back','[','layer') ] },
-      tools: { label: 'Tools', key: 'T', items: [ mk('Design Rule Check','','rules'), mk('Electrical Rule Check','','rules'), dv, mk('Device Manager','','chip'), mk('Footprint Manager','','foot'), dv, mk('Measure Distance','','measure'), mk('Cross Probe','','wire'), mk('Auto Router','','convert') ] },
+      tools: { label: 'Tools', key: 'T', items: (state.mode === 'pcb' ? [
+        // PCB-mode Tools — Phase 3 manager modals.
+        mk('Layer Manager','','layer'),
+        mk('Net Class Manager','','wire'),
+        mk('Differential Pair Manager','','diffPair'),
+        mk('Equal Length Group Manager','','measure'),
+        mk('Pad Pair Group Manager','','chip'),
+        mk('Copper Manager','','foot'),
+        mk('Tear Drop','','del'),
+        mk('IPC / DAC-2552 (PCB DRC)','','rules'),
+        mk('Remove Unused Pad','','del'),
+        dv,
+        mk('Device Manager','','chip'),
+        mk('Footprint Manager','','foot'),
+        mk('Measure Distance','','measure'),
+        mk('Auto Router','','convert'),
+      ] : [
+        mk('Design Rule Check','','rules'),
+        mk('Electrical Rule Check','','rules'),
+        dv,
+        mk('Device Manager','','chip'),
+        mk('Footprint Manager','','foot'),
+        dv,
+        mk('Measure Distance','','measure'),
+        mk('Cross Probe','','wire'),
+        mk('Auto Router','','convert'),
+      ]) },
       export: { label: 'Export', key: 'R', items: [ mk('Export PDF','','pdf'), mk('Export Gerber','','gerber'), mk('Export BOM','','bom'), mk('Export Netlist','','bom'), mk('Export Image','','pdf'), dv, mk('Export Altium Designer','','imp'), mk('Export Kicad Designer','','imp'), mk('Export Eagle Designer','','imp') ] },
       import: { label: 'Import', key: 'M', items: [ mk('Import DXF','','imp'), mk('Import Schematic','','imp'), mk('Import Netlist','','imp'), mk('Import Library','','imp'), mk('Import Footprint','','imp'), dv, mk('Import Altium','','imp'), mk('Import Kicad','','imp') ] },
       setting: { label: 'Setting', key: 'I', items: [ mk('System Setting','','sys'), mk('Drawing Setting','','draw'), mk('Hotkey Setting','','key'), mk('Property Setting','','prop'), mk('Save Setting','','save') ] },
@@ -76,12 +126,313 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
             else if (it.label === 'Table') actions.openModal('tableProps');
             else if (it.label === 'Design Rule') actions.openModal('designRules');
             else if (it.label === 'Annotate Designator') actions.openModal('annotate');
+            else if (id === 'place' && state.mode === 'pcb') {
+              const placeToolMap = {
+                'Component / Footprint (C)': 'component',
+                'Track (T)': 'track',
+                'Differential Pair (D)': 'diffPair',
+                'Via (V)': 'via',
+                'Suture Vias': 'sutureVias',
+                'Pad (P)': 'pad',
+                'Copper Pour Polygon (G)': 'polygon',
+                'Filled Region': 'fillRegion',
+                'Board Outline': 'boardOutline',
+                'Slot': 'slot',
+                'Dimension': 'dimension',
+                'Length Tune': 'lengthTune',
+                'Text (X)': 'text',
+              };
+              if (placeToolMap[it.label]) actions.setTool(placeToolMap[it.label]);
+              else actions.closeAll();
+            }
             else if (it.label === 'Update/Conver Schematic to PCB') actions.setMode('pcb');
-            else if (it.label === 'Check DRC' || it.label === 'Design Rule Check' || it.label === 'Electrical Rule Check') actions.clickBottomTab('drc');
+            else if (it.label === 'Check DRC' || it.label === 'Electrical Rule Check') actions.clickBottomTab('drc');
+            // Phase 3 — PCB-mode Tools menu → modals
+            else if (it.label === 'Layer Manager') actions.openModal('layerManager');
+            else if (it.label === 'Net Class Manager') actions.openModal('netClass');
+            else if (it.label === 'Differential Pair Manager') actions.openModal('diffPair');
+            else if (it.label === 'Equal Length Group Manager') actions.openModal('equalLength');
+            else if (it.label === 'Pad Pair Group Manager') actions.openModal('padPair');
+            else if (it.label === 'Copper Manager') actions.openModal('copper');
+            else if (it.label === 'Tear Drop') actions.openModal('tearDrop');
+            else if (it.label === 'IPC / DAC-2552 (PCB DRC)' || it.label === 'Design Rule Check') actions.openModal('pcbDrc');
+            else if (it.label === 'Remove Unused Pad') actions.openModal('removeUnusedPad');
             else actions.closeAll(); },
         };
       }),
     }));
+}
+
+// 2D editor menu bar — reduced 4-menu set (View / Export / Setting / Help).
+// Faithful to Figma "2D section" board (node 198:190620). Returns the same shape
+// MenuBar consumes from buildMenus, so no render changes are needed. Verbatim
+// source typos are preserved intentionally ("Marge All", "Desinger", "About..").
+export function buildMenus2D(state: PcbState, actions: PcbActions) {
+  const close = () => actions.closeAll();
+  const noop = () => {};
+  const dv = { divider: true };
+  // submenu leaf
+  const su = (label, k = "", o = {}) => ({
+    label,
+    k,
+    fg: o.disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)",
+    icon: o.icon || "blank",
+    onClick: o.onClick || close,
+  });
+  // top-level item; pass `sub` for a hover flyout
+  const item = (label, o = {}) => ({
+    label,
+    k: o.k || "",
+    submenu: !!o.sub,
+    hasSub: !!o.sub,
+    icon: o.icon || "blank",
+    sub: o.sub || [],
+    onClick: o.sub ? noop : o.onClick || close,
+  });
+  // view toggle (checkmark reflects current panel visibility)
+  const check = (label, k = "", isBottom = false) => {
+    const on = isBottom ? state.bottomOpen : state.viewTog[label] !== false;
+    return {
+      label,
+      k,
+      submenu: false,
+      hasSub: false,
+      icon: on ? "check" : "blank",
+      sub: [],
+      onClick: () => (isBottom ? actions.toggleBottom() : actions.toggleView(label)),
+    };
+  };
+
+  // Grid Size and Snap Size share an identical flyout in the source.
+  const gridFlyout = [
+    su("0.015,0.051mm | 2.0,2,mil"),
+    su("0.015,0.051mm | 2.0,2,mil"),
+    su("0.015,0.051mm | 2.0,2,mil"),
+    su("0.015,0.051mm | 2.0,2,mil"),
+    su("0.015,0.051mm | 2.0,2,mil", "", { icon: "check" }),
+    dv,
+    su("Grid/Snap keep Ratio", "", { icon: "check" }),
+    su("Common Grid/Snap setting"),
+    su("Grid Range setting (Po..."),
+  ];
+
+  const data = [
+    {
+      id: "view",
+      label: "View",
+      key: "V",
+      items: [
+        item("Zoom In (I)", { icon: "zoomin", onClick: () => actions.zoomIn() }),
+        item("Zoom Out (O)", { icon: "zoomout", onClick: () => actions.zoomOut() }),
+        item("Fit All in Window (F)", { k: "K", icon: "fit", onClick: () => actions.zoomFit() }),
+        item("Full Screen", { k: "F11", icon: "fullscreen" }),
+        dv,
+        item("Flip Board", { k: "Alt+F" }),
+        item("Grid Size (G)", { sub: gridFlyout }),
+        item("Snap Size", { sub: gridFlyout }),
+        item("Grid Type", {
+          sub: [
+            su("Cartesian Coordinate System", "", { icon: "check" }),
+            su("Polar Coordinate System"),
+            dv,
+            su("Grid dot"),
+            su("Grid"),
+            su("None", "", { icon: "check" }),
+          ],
+        }),
+        dv,
+        check("Top Toolbar"),
+        check("Left-Side panel", "["),
+        check("Right-Side Panel", "]"),
+        check("Bottom-Side Panel", "/", true),
+        item("Window Arrangement (W)", {
+          sub: [
+            su("Tile Horizontally (H)"),
+            su("Tile Vertically (V)"),
+            su("Tile Vertically (V)"),
+            su("Marge All (M)"),
+          ],
+        }),
+        check("Floating Tool"),
+      ],
+    },
+    {
+      id: "export",
+      label: "Export",
+      key: "R",
+      items: [
+        item("Export"),
+        item("Altium Desinger", { onClick: () => actions.openModal("exportAltium") }),
+        item("Kicad Desinger", { onClick: () => actions.openModal("exportKicad") }),
+        item("Eagle Designer", { onClick: () => actions.openModal("exportEagle") }),
+      ],
+    },
+    {
+      id: "setting",
+      label: "Setting",
+      key: "I",
+      items: [
+        item("System", { icon: "sys", sub: [su("General"), su("Common"), su("Common Library")] }),
+        item("Schematic/Symbol", { sub: [su("General"), su("Theme")] }),
+        item("PCB/Footprint", {
+          sub: [
+            su("General"),
+            su("Theme"),
+            su("Common Grid/Snap Sie setting"),
+            su("Common Track Width Setting"),
+            su("Common Via Size Setting"),
+            su("Snap"),
+          ],
+        }),
+        item("Panel/Panel Lib", { sub: [su("General"), su("Theme")] }),
+        item("Common Font Family"),
+        item("Drawing", { onClick: () => actions.openSettings("drawing") }),
+        item("Property", { onClick: () => actions.openSettings("property") }),
+        item("Hotkey", { onClick: () => actions.openSettings("hotkey") }),
+        item("Top toolbar"),
+        item("Save", { onClick: () => actions.openSettings("save") }),
+      ],
+    },
+    {
+      id: "help",
+      label: "Help",
+      key: "H",
+      items: [
+        item("community"),
+        item("Tutorials", { k: "F1" }),
+        item("Contact"),
+        item("Online chat"),
+        item("About..", { icon: "doc" }),
+        dv,
+        item("Video Capture..."),
+        item("Performance Diagnostic..."),
+      ],
+    },
+  ];
+
+  return data.map((m) => ({
+    ...m,
+    open: state.openMenu === m.id,
+    toggle: () => actions.toggleMenu(m.id),
+  }));
+}
+
+// 3D editor menu bar — reduced 4-menu set (View / Export / Setting / Help).
+// Faithful to Figma "3D Section" board (node 190:257520). Differs from the 2D
+// menus only in View (canvas-geometry items dropped) and Export (3D file types).
+export function buildMenus3D(state: PcbState, actions: PcbActions) {
+  const close = () => actions.closeAll();
+  const noop = () => {};
+  const dv = { divider: true };
+  const su = (label, k = "", o = {}) => ({
+    label,
+    k,
+    fg: o.disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)",
+    icon: o.icon || "blank",
+    onClick: o.onClick || close,
+  });
+  const item = (label, o = {}) => ({
+    label,
+    k: o.k || "",
+    submenu: !!o.sub,
+    hasSub: !!o.sub,
+    icon: o.icon || "blank",
+    sub: o.sub || [],
+    onClick: o.sub ? noop : o.onClick || close,
+  });
+  const check = (label, k = "", isBottom = false) => {
+    const on = isBottom ? state.bottomOpen : state.viewTog[label] !== false;
+    return {
+      label,
+      k,
+      submenu: false,
+      hasSub: false,
+      icon: on ? "check" : "blank",
+      sub: [],
+      onClick: () => (isBottom ? actions.toggleBottom() : actions.toggleView(label)),
+    };
+  };
+
+  const data = [
+    {
+      id: "view",
+      label: "View",
+      key: "V",
+      items: [
+        item("Full Screen", { k: "F11", icon: "fullscreen" }),
+        check("Top Toolbar"),
+        check("Left-Side panel", "["),
+        check("Right-Side Panel", "]"),
+        check("Bottom-Side Panel", "/", true),
+        item("Window Arrangement", {
+          sub: [
+            su("Tile Horizontally (H)"),
+            su("Tile Vertically (V)"),
+            su("Tile Vertically (V)"),
+            su("Marge All (M)"),
+          ],
+        }),
+        check("Floating Tool"),
+      ],
+    },
+    {
+      id: "export",
+      label: "Export",
+      key: "R",
+      items: [
+        item("3D File", { onClick: () => actions.openModal("export3dFile") }),
+        item("3D Shell File", { onClick: () => actions.openModal("export3dShell") }),
+        item("PNG"),
+      ],
+    },
+    {
+      id: "setting",
+      label: "Setting",
+      key: "I",
+      items: [
+        item("System", { icon: "sys", sub: [su("General"), su("Common"), su("Common Library")] }),
+        item("Schematic/Symbol", { sub: [su("General"), su("Theme")] }),
+        item("PCB/Footprint", {
+          sub: [
+            su("General"),
+            su("Theme"),
+            su("Common Grid/Snap Sie setting"),
+            su("Common Track Width Setting"),
+            su("Common Via Size Setting"),
+            su("Snap"),
+          ],
+        }),
+        item("Panel/Panel Lib", { sub: [su("General"), su("Theme")] }),
+        item("Common Font Family"),
+        item("Drawing", { onClick: () => actions.openSettings("drawing") }),
+        item("Property", { onClick: () => actions.openSettings("property") }),
+        item("Hotkey", { onClick: () => actions.openSettings("hotkey") }),
+        item("Top toolbar"),
+        item("Save", { onClick: () => actions.openSettings("save") }),
+      ],
+    },
+    {
+      id: "help",
+      label: "Help",
+      key: "H",
+      items: [
+        item("community"),
+        item("Tutorials", { k: "F1" }),
+        item("Contact"),
+        item("Online chat"),
+        item("About..", { icon: "doc" }),
+        dv,
+        item("Video Capture..."),
+        item("Performance Diagnostic..."),
+      ],
+    },
+  ];
+
+  return data.map((m) => ({
+    ...m,
+    open: state.openMenu === m.id,
+    toggle: () => actions.toggleMenu(m.id),
+  }));
 }
 
 // Nested tree node: [label, icon, { weight?, iconColor?, leaf? }, children?]
@@ -210,19 +561,75 @@ export function buildCompPills(state: PcbState, actions: PcbActions) {
   }));
 }
 
-export function buildCtxItems() {
-  return [
-      { label: 'Cut', k: 'Ctrl+X', icon: 'cut' },
-      { label: 'Copy', k: 'Ctrl+C', icon: 'copy' },
-      { label: 'Paste', k: 'Ctrl+V', icon: 'paste' },
-      { divider: true },
-      { label: 'Duplicate', k: 'Ctrl+D', icon: 'dup' },
-      { label: 'Rotate 90°', k: 'Space', icon: 'rot' },
-      { label: 'Find Similar', k: '', icon: 'find' },
-      { divider: true },
-      { label: 'Properties', k: '', icon: 'prop' },
-      { label: 'Delete', k: 'Del', icon: 'del' },
-    ].map(i => i.divider ? i : ({ ...i, icon: (i.icon) }));
+// Kind-aware context menu — Phase 4b.
+// Inspects the current selection and emits items + onClick handlers.
+// When there is no selection, only paste/select-all/zoom-fit show; with
+// selection, all transform/clipboard/delete items + kind-specific extras show.
+export function buildCtxItems(state: PcbState, actions: PcbActions) {
+  const dv = { divider: true };
+  const hasSel = (state.selectedIds || []).length > 0;
+  const hasClip = (state.clipboardObjects || []).length > 0;
+  const selObj = hasSel ? state.objects.find((o) => o.id === state.selectedIds[0]) : null;
+  const selKind = selObj?.kind;
+  const inPcb = state.mode === 'pcb';
+  const items: any[] = [];
+
+  if (hasSel) {
+    items.push({ label: 'Cut', k: 'Ctrl+X', icon: 'cut', onClick: () => { actions.cutSelection(); actions.closeAll(); } });
+    items.push({ label: 'Copy', k: 'Ctrl+C', icon: 'copy', onClick: () => { actions.copySelection(); actions.closeAll(); } });
+  }
+  if (hasClip) {
+    items.push({ label: 'Paste', k: 'Ctrl+V', icon: 'paste', onClick: () => { actions.pasteClipboard(); actions.closeAll(); } });
+  }
+  if (hasSel || hasClip) items.push(dv);
+
+  if (hasSel) {
+    items.push({ label: 'Duplicate', k: 'Ctrl+D', icon: 'dup', onClick: () => { actions.copySelection(); actions.pasteClipboard(); actions.closeAll(); } });
+    items.push({ label: 'Rotate 90°', k: 'Space', icon: 'rot', onClick: () => { actions.rotateSelectedPlaced(90); actions.closeAll(); } });
+    items.push({ label: 'Flip Horizontal', k: '', icon: 'rot', onClick: () => { actions.flipSelectedH(); actions.closeAll(); } });
+    items.push({ label: 'Flip Vertical', k: '', icon: 'rot', onClick: () => { actions.flipSelectedV(); actions.closeAll(); } });
+    items.push(dv);
+    items.push({ label: 'Bring to Front', k: ']', icon: 'layer', onClick: () => { actions.bringFront(); actions.closeAll(); } });
+    items.push({ label: 'Send to Back', k: '[', icon: 'layer', onClick: () => { actions.sendBack(); actions.closeAll(); } });
+    items.push(dv);
+
+    // ── PCB kind-specific items ─────────────────────────────────────────
+    if (inPcb && selKind === 'track') {
+      items.push({ label: 'Add Tear Drop', k: '', icon: 'wire', onClick: () => actions.openModal('tearDrop') });
+      items.push({ label: 'Assign to Net Class…', k: '', icon: 'wire', onClick: () => actions.openModal('netClass') });
+      items.push(dv);
+    }
+    if (inPcb && (selKind === 'via' || selKind === 'pad')) {
+      items.push({ label: 'Add Tear Drop', k: '', icon: 'wire', onClick: () => actions.openModal('tearDrop') });
+      items.push({ label: 'Remove Unused Pad…', k: '', icon: 'del', onClick: () => actions.openModal('removeUnusedPad') });
+      items.push(dv);
+    }
+    if (inPcb && (selKind === 'polygon' || selKind === 'fillRegion')) {
+      items.push({ label: 'Edit Copper…', k: '', icon: 'foot', onClick: () => actions.openModal('copper') });
+      items.push(dv);
+    }
+    if (inPcb && selKind === 'component') {
+      items.push({ label: 'Footprint Manager…', k: '', icon: 'foot', onClick: () => actions.openManager('footprint') });
+      items.push({ label: 'Annotate Designator…', k: '', icon: 'prop', onClick: () => actions.openModal('annotate') });
+      items.push(dv);
+    }
+    if (!inPcb && (selKind === 'wire' || selKind === 'bus')) {
+      items.push({ label: 'Place Net Label', k: 'N', icon: 'pNetLabel', onClick: () => { actions.setTool('netLabel'); actions.closeAll(); } });
+      items.push(dv);
+    }
+
+    items.push({ label: 'Find Similar', k: '', icon: 'find', onClick: () => { actions.openModal('findReplace'); } });
+    items.push({ label: 'Properties', k: '', icon: 'prop', onClick: () => { actions.setRightTab('properties'); actions.closeAll(); } });
+    items.push({ label: 'Delete', k: 'Del', icon: 'del', onClick: () => { actions.deleteSelected(); actions.closeAll(); } });
+  } else {
+    // No selection: defaults
+    items.push({ label: 'Select All', k: 'Ctrl+A', icon: 'blank', onClick: () => { actions.selectAll(); actions.closeAll(); } });
+    items.push({ label: 'Zoom Fit', k: 'Ctrl+0', icon: 'fit', onClick: () => { actions.zoomFit(); actions.closeAll(); } });
+    items.push(dv);
+    items.push({ label: 'Settings…', k: '', icon: 'sys', onClick: () => actions.openSettings() });
+  }
+
+  return items;
 }
 
 // ── Rail + tab builders (from the prototype's renderVals) ──────────────────

@@ -12,6 +12,7 @@ import { buildCanvas } from "@/lib/pcb/content";
 import { buildModeTabs } from "@/lib/pcb/data";
 import { AXIS_SVG, FLOAT_SVGS, NEXT_SVG, PLANE_SVG } from "@/lib/pcb/markup";
 import { SchematicCanvas } from "@/components/pcb/schem-canvas";
+import { PcbCanvas } from "@/components/pcb/pcb-canvas";
 import { PlacedObjects } from "@/components/pcb/placed-objects";
 import { PLACE_TOOLS, DRAFT_TOOLS } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
@@ -150,10 +151,11 @@ export function CanvasArea() {
     // Decide intent.
     const intentPan =
       e.button === 1 || (isLeft && handMode);
+    const interactiveMode = state.mode === "schematic" || state.mode === "pcb";
     const intentMoveObject =
-      isLeft && !handMode && state.tool === "select" && clickedObjectId != null && state.mode === "schematic";
+      isLeft && !handMode && state.tool === "select" && clickedObjectId != null && interactiveMode;
     const intentRubber =
-      isLeft && !handMode && state.tool === "select" && !clickedObjectId && state.mode === "schematic" && canvasStart != null;
+      isLeft && !handMode && state.tool === "select" && !clickedObjectId && interactiveMode && canvasStart != null;
 
     let mode: "idle" | "pan" | "rubber" | "moveObj" = "idle";
     let movePivot = { ...start };
@@ -321,13 +323,14 @@ export function CanvasArea() {
           const cx = (e.clientX - rect.left - state.pan.x) / state.zoom;
           const cy = (e.clientY - rect.top - state.pan.y) / state.zoom;
           if (handMode) return; // hand tool never places or selects
-          if (state.mode === "schematic" && PLACE_TOOLS.includes(state.tool)) {
+          const interactiveMode = state.mode === "schematic" || state.mode === "pcb";
+          if (interactiveMode && PLACE_TOOLS.includes(state.tool)) {
             actions.placeObject(state.tool, cx, cy);
             return;
           }
-          if (state.mode === "schematic" && DRAFT_TOOLS.includes(state.tool)) {
+          if (interactiveMode && DRAFT_TOOLS.includes(state.tool)) {
             if (!state.draftWire) {
-              actions.startWire(state.tool as "wire" | "bus", cx, cy);
+              actions.startWire(state.tool, cx, cy);
             } else {
               actions.finishWire(cx, cy);
             }
@@ -346,6 +349,13 @@ export function CanvasArea() {
           right: 0,
           bottom: 0,
           overflow: "hidden",
+          // 2D/3D editor: the Background Color property paints the whole canvas.
+          background:
+            state.mode === "2d"
+              ? state.twoD.bgColor
+              : state.mode === "3d"
+              ? state.threeD.bgColor
+              : undefined,
           cursor: isPanning
             ? "grabbing"
             : handMode
@@ -368,11 +378,17 @@ export function CanvasArea() {
         >
           {state.mode === "schematic" ? (
             <SchematicCanvas />
+          ) : state.mode === "pcb" ? (
+            <PcbCanvas />
+          ) : state.mode === "2d" ? (
+            <TwoDBoard />
+          ) : state.mode === "3d" ? (
+            <ThreeDBoard />
           ) : (
             <div dangerouslySetInnerHTML={{ __html: buildCanvas(state.mode) }} />
           )}
           {state.mode === "schematic" && <CanvasObjects />}
-          {state.mode === "schematic" && <PlacedObjects />}
+          {(state.mode === "schematic" || state.mode === "pcb") && <PlacedObjects />}
         </div>
       </div>
 
@@ -437,6 +453,24 @@ export function CanvasArea() {
         </div>
       )}
 
+      {/* floating tools (2D editor · View ▸ Floating Tool) — Drawing / Wiring / Preview */}
+      {state.mode === "2d" && v["Floating Tool"] !== false && (
+        <>
+          <Tool2DPanel title="Drawing Tools" initial={{ x: 70, y: 60 }} />
+          <Tool2DPanel title="Drawing Tools" startCollapsed initial={{ x: 268, y: 60 }} />
+          <Tool2DPanel title="Wiring Tools" initial={{ x: 120, y: 248 }} />
+          <Preview2DPanel initial={{ x: 660, y: 70 }} />
+        </>
+      )}
+
+      {/* floating tools (3D editor · View ▸ Floating Tool) */}
+      {state.mode === "3d" && v["Floating Tool"] !== false && (
+        <>
+          <Tool2DPanel title="Floating Tools" initial={{ x: 70, y: 60 }} />
+          <Tool2DPanel title="Floating Tools" initial={{ x: 268, y: 60 }} />
+        </>
+      )}
+
       {/* Zoom indicator */}
       <ZoomBadge zoom={state.zoom} />
 
@@ -482,6 +516,362 @@ export function CanvasArea() {
       >
         <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>Next</span>
         <Icon html={NEXT_SVG} size={16} />
+      </div>
+    </div>
+  );
+}
+
+// Placeholder tool glyph (gear + slider) — the Figma 2D tool panels use an
+// identical stand-in icon in every cell, so we mirror that rather than inventing
+// per-tool meanings.
+const TOOL2D_PLACEHOLDER =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="12" r="2.6"/><path d="M8 3.5v2M8 18.5v2M11 12h9" stroke-linecap="round"/></svg>';
+
+// Drag a floating panel by its header. Position is screen-space (the panels live
+// outside the zoom transform), so the pointer delta maps 1:1.
+function usePanelDrag(initial: { x: number; y: number }) {
+  const [pos, setPos] = React.useState(initial);
+  const onDragStart = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const ox = pos.x;
+    const oy = pos.y;
+    const move = (ev: MouseEvent) =>
+      setPos({ x: Math.max(0, ox + ev.clientX - sx), y: Math.max(0, oy + ev.clientY - sy) });
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+    };
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+  };
+  return { pos, onDragStart };
+}
+
+// Shared draggable title bar: the bar is the drag handle; the "—" dash is a
+// collapse toggle (when onToggle is given) and stops the drag from starting.
+function PanelHeader({
+  title,
+  open,
+  onDragStart,
+  onToggle,
+}: {
+  title: string;
+  open: boolean;
+  onDragStart: (e: React.MouseEvent) => void;
+  onToggle?: () => void;
+}) {
+  return (
+    <div
+      onMouseDown={onDragStart}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "var(--spacing-3) var(--spacing-5)",
+        borderBottom: open ? "var(--border-width-1) solid var(--color-border-subtle)" : "none",
+        cursor: "move",
+        userSelect: "none",
+      }}
+    >
+      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", fontWeight: 600 }}>{title}</span>
+      <button
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={onToggle}
+        aria-label={open ? "Collapse" : "Expand"}
+        style={{ display: "inline-flex", border: "none", background: "transparent", padding: 0, cursor: "pointer", color: "var(--color-text-tertiary)" }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <path d={open ? "M6 12h12" : "M12 6v12M6 12h12"} />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// One floating 2D tool panel: a draggable title bar with a collapse dash and
+// (when open) a 2×7 grid of placeholder tool cells.
+function Tool2DPanel({
+  title,
+  startCollapsed = false,
+  initial,
+}: {
+  title: string;
+  startCollapsed?: boolean;
+  initial: { x: number; y: number };
+}) {
+  const [open, setOpen] = React.useState(!startCollapsed);
+  const { pos, onDragStart } = usePanelDrag(initial);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: pos.y,
+        left: pos.x,
+        zIndex: 13,
+        width: 180,
+        background: "var(--color-bg-surface)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--elevation-4)",
+      }}
+    >
+      <PanelHeader title={title} open={open} onDragStart={onDragStart} onToggle={() => setOpen((o) => !o)} />
+      {open && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "var(--spacing-1)", padding: "var(--spacing-3)" }}>
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div
+              key={i}
+              className="ix-tool"
+              style={{
+                height: 24,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "var(--radius-md)",
+                color: "var(--color-text-tertiary)",
+                cursor: "pointer",
+              }}
+            >
+              <Icon html={TOOL2D_PLACEHOLDER} size={14} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Floating "Preview" panel — draggable title bar + empty thumbnail box.
+function Preview2DPanel({ initial }: { initial: { x: number; y: number } }) {
+  const { pos, onDragStart } = usePanelDrag(initial);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: pos.y,
+        left: pos.x,
+        zIndex: 13,
+        width: 196,
+        background: "var(--color-bg-surface)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--elevation-4)",
+      }}
+    >
+      <PanelHeader title="Preview" open onDragStart={onDragStart} />
+      <div style={{ padding: "var(--spacing-4)" }}>
+        <div style={{ width: "100%", height: 150, background: "var(--color-bg-subtle)", borderRadius: "var(--radius-md)" }} />
+      </div>
+    </div>
+  );
+}
+
+// Named board / pad colors → hex, so the Properties selects map onto the canvas.
+const BOARD_COLOR_HEX: Record<string, string> = {
+  Green: "#1f7a47",
+  Blue: "#1c4e80",
+  Red: "#9b2b2b",
+  Black: "#1a1a1a",
+  White: "#e8e8e8",
+  Yellow: "#c8a93a",
+  Purple: "#5a2d82",
+};
+const PAD_COLOR_HEX: Record<string, string> = {
+  Goldsmith: "#d9a441",
+  HASL: "#c7ccd1",
+  ENIG: "#e8c66a",
+  OSP: "#b06b3a",
+};
+
+// State-driven 2D board — every control in the right Properties panel
+// (board color, pad plating color, silkscreen visibility, board side, material)
+// drives this render live.
+function TwoDBoard() {
+  const state = usePcbState();
+  const d = state.twoD;
+  const boardHex = BOARD_COLOR_HEX[d.boardColor] ?? "#1c4e80";
+  const padHex = PAD_COLOR_HEX[d.padColor] ?? "#d9a441";
+  const silk = d.silkscreen === "Visible";
+  const silkColor = d.boardColor === "White" ? "#1a1a1a" : "#f4f4f5";
+  const isBottom = d.side === "Bottom Side";
+
+  const pads: Array<[number, number]> = [
+    [140, 120],
+    [520, 140],
+    [300, 300],
+    [560, 360],
+  ];
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 760,
+        height: 520,
+        margin: "160px auto",
+        background: boardHex,
+        border: `var(--border-width-2) solid rgba(0,0,0,.35)`,
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--elevation-3)",
+        overflow: "hidden",
+        // Bottom side mirrors the board horizontally.
+        transform: isBottom ? "scaleX(-1)" : undefined,
+      }}
+    >
+      {/* copper grid texture */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+          backgroundSize: "20px 20px",
+        }}
+      />
+      {/* board outline (silkscreen) */}
+      {silk && (
+        <div style={{ position: "absolute", inset: 40, border: `var(--border-width-1-5) solid ${silkColor}`, borderRadius: "var(--radius-sm)" }} />
+      )}
+      {/* pads */}
+      {pads.map(([x, y], i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            left: x,
+            top: y,
+            width: 80,
+            height: 50,
+            background: "transparent",
+            border: `var(--border-width-2) solid ${padHex}`,
+            borderRadius: "var(--radius-xs)",
+            boxShadow: `inset 0 0 0 2px ${padHex}33`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {/* corner pads */}
+          {[0, 1, 2, 3].map((j) => (
+            <span
+              key={j}
+              style={{
+                position: "absolute",
+                left: j % 2 ? "auto" : -5,
+                right: j % 2 ? -5 : "auto",
+                top: j < 2 ? -5 : "auto",
+                bottom: j < 2 ? "auto" : -5,
+                width: 10,
+                height: 10,
+                borderRadius: "var(--radius-full)",
+                background: padHex,
+              }}
+            />
+          ))}
+          {silk && (
+            <span style={{ fontSize: "var(--font-size-xs)", color: silkColor, fontFamily: "var(--font-family-mono), monospace" }}>
+              U{i + 1}
+            </span>
+          )}
+        </div>
+      ))}
+      {/* footer label — reflects material + side */}
+      {silk && (
+        <div
+          style={{
+            position: "absolute",
+            left: 40,
+            bottom: 14,
+            fontSize: "var(--font-size-sm)",
+            color: silkColor,
+            fontWeight: 600,
+            transform: isBottom ? "scaleX(-1)" : undefined,
+          }}
+        >
+          Board Outline · {d.material} · 80mm × 60mm · {d.side}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// State-driven 3D board preview — Board Color tints the board, Pad Plating Color
+// the components, Background Color paints the canvas, Board Thickness drives the
+// extruded edge depth, and Material shows in the footer label.
+function ThreeDBoard() {
+  const state = usePcbState();
+  const d = state.threeD;
+  const boardHex = BOARD_COLOR_HEX[d.boardColor] ?? "#1c4e80";
+  const padHex = PAD_COLOR_HEX[d.padColor] ?? "#d9a441";
+  const mm = parseFloat(d.boardThickness) || 1.2;
+  const depth = Math.max(6, Math.min(46, mm * 14));
+  const chips: Array<[number, number]> = [
+    [60, 50],
+    [260, 70],
+    [150, 150],
+    [300, 180],
+  ];
+
+  return (
+    <div style={{ width: 760, height: 560, margin: "120px auto", display: "flex", alignItems: "center", justifyContent: "center", perspective: 1200 }}>
+      <div style={{ transform: "rotateX(58deg) rotateZ(-32deg)", transformStyle: "preserve-3d" }}>
+        <div
+          style={{
+            position: "relative",
+            width: 420,
+            height: 300,
+            background: `linear-gradient(135deg, rgba(255,255,255,.18), rgba(0,0,0,.18)), ${boardHex}`,
+            borderRadius: "var(--radius-lg)",
+            // the solid offset shadow is the board's extruded thickness edge
+            boxShadow: `0 ${depth}px 0 0 rgba(0,0,0,.45), 0 40px 60px rgba(0,0,0,.5), 0 0 0 2px rgba(255,255,255,.12)`,
+          }}
+        >
+          {/* copper grid texture */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "var(--radius-lg)",
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+              backgroundSize: "22px 22px",
+            }}
+          />
+          {/* board outline */}
+          <div style={{ position: "absolute", inset: 18, border: "var(--border-width-1-5) solid rgba(255,255,255,.4)", borderRadius: "var(--radius-sm)" }} />
+          {/* components (plated by Pad Plating Color), raised off the board */}
+          {chips.map(([x, y], i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                left: x,
+                top: y,
+                width: i % 2 ? 44 : 60,
+                height: 26,
+                background: padHex,
+                borderRadius: "var(--radius-xs)",
+                boxShadow: "0 8px 12px rgba(0,0,0,.4)",
+                transform: "translateZ(16px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 9,
+                color: "#1a1a1a",
+                fontFamily: "var(--font-family-mono), monospace",
+              }}
+            >
+              U{i + 1}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", color: "#cdbbe6", fontSize: "var(--font-size-sm)", fontWeight: 500 }}>
+        3D Module Preview · {d.material} · {d.boardThickness} · drag to orbit
       </div>
     </div>
   );
