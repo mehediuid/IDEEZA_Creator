@@ -72,9 +72,16 @@ function ShapeMesh({
   registerMesh: (id: string, mesh: THREE.Mesh | null) => void;
 }) {
   const meshRef = React.useRef<THREE.Mesh | null>(null);
-  // Force a re-render once the mesh has actually mounted so TransformControls
-  // can be attached to a real object — `object={null}` throws inside drei.
-  const [, setTick] = React.useState(0);
+  // Single post-mount flip so the gizmo can latch onto a populated ref —
+  // running this in a callback ref would loop because React reattaches the
+  // ref every render with a fresh function identity.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+    registerMesh(shape.id, meshRef.current);
+    return () => registerMesh(shape.id, null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shape.id]);
   const params = MAT_PARAMS[material];
 
   const get = (id: string) => effects.find((e) => e.id === id)?.value ?? 40;
@@ -111,7 +118,7 @@ function ShapeMesh({
 
   if (shape.hidden) return null;
 
-  const showGizmo = selected && transformMode !== "none" && !shape.locked && !!meshRef.current;
+  const showGizmo = mounted && selected && transformMode !== "none" && !shape.locked && !!meshRef.current;
 
   const handleTransformChange = () => {
     const mesh = meshRef.current;
@@ -131,12 +138,7 @@ function ShapeMesh({
   return (
     <>
       <mesh
-        ref={(el: THREE.Mesh | null) => {
-          meshRef.current = el;
-          registerMesh(shape.id, el);
-          // Trigger one re-render once mounted so the gizmo can latch on.
-          if (el) setTick((t) => t + 1);
-        }}
+        ref={meshRef}
         position={shape.position}
         rotation={shape.rotation}
         scale={shape.scale}
