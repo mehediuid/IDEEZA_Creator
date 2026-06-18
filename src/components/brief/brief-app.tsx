@@ -21,6 +21,7 @@ import { C } from "@/lib/pcb/colors";
 export type Intent = "sell" | "give" | "save";
 export type MediaType = "ai" | "ar" | "skip";
 export type Quality = "low" | "high";
+export type VideoLength = 10 | 30;
 export type Network = "ethereum" | "polygon" | "solana";
 
 export type Scene = {
@@ -33,15 +34,28 @@ export type Scene = {
   speech: string;
 };
 
+export const PROJECTS: { id: string; name: string }[] = [
+  { id: "discord-bot",  name: "Discord Bot" },
+  { id: "esp32-board",  name: "ESP32 Sensor Board" },
+  { id: "ai-pet-feeder", name: "AI Pet Feeder" },
+  { id: "open-hardware", name: "Open Hardware Toolkit" },
+];
+
 export type BriefState = {
   // Step 1
+  projectId: string;
   productName: string;
   productDescription: string;
   intent: Intent | null;
   // Step 2
   mediaType: MediaType;
-  scenes: Scene[];
+  videoPrompt: string;
+  audioPrompt: string;
+  audioAutoGenerate: boolean;
   quality: Quality;
+  length: VideoLength;
+  scenes: Scene[];          // populated only after Generate
+  mediaGenerated: boolean;  // true once storyboard exists
   // Step 3 — common
   network: Network;
   collection: string;
@@ -61,37 +75,19 @@ export type BriefState = {
 
 const DRAFT_KEY = "ideeza:brief:draft";
 
-const DEFAULT_SCENES: Scene[] = [
-  {
-    id: "s1", label: "Scene 1", timeRange: "0–3s",
-    visual: "Aerial crane shot descending over a neon-lit Tokyo street at dusk. Rain-slicked pavement reflects violet storefronts.",
-    bgAudio: "Ambient city rain ambience, distant traffic hum",
-    musicCue: "Lo-fi jazz, soft brush drums",
-    speech: "",
-  },
-  {
-    id: "s2", label: "Scene 2", timeRange: "3–6s",
-    visual: "Close-up of fingers typing on a backlit mechanical keyboard. The screen reflects on the user's face.",
-    bgAudio: "Mechanical keyboard taps, quiet room tone",
-    musicCue: "Lo-fi jazz, brighter loop",
-    speech: "",
-  },
-  {
-    id: "s3", label: "Scene 3", timeRange: "6–10s",
-    visual: "Slow pull-out from a product shot. Logo lands in the middle with a subtle violet glow.",
-    bgAudio: "Smooth synth riser",
-    musicCue: "Lo-fi jazz outro, fade",
-    speech: "Built with IDEEZA.",
-  },
-];
-
 const DEFAULT_STATE: BriefState = {
+  projectId: "",
   productName: "",
   productDescription: "",
   intent: null,
   mediaType: "ai",
-  scenes: DEFAULT_SCENES,
+  videoPrompt: "",
+  audioPrompt: "",
+  audioAutoGenerate: true,
   quality: "low",
+  length: 10,
+  scenes: [],
+  mediaGenerated: false,
   network: "ethereum",
   collection: "",
   price: "",
@@ -139,23 +135,45 @@ export function BriefApp() {
 
   const patch = (next: Partial<BriefState>) => setState((s) => ({ ...s, ...next }));
 
-  // Step 1 → 2: start auto-generation immediately so by the time the user
-  // lands on step 2 the video is half-drafted.
-  const goToStep2 = () => {
-    setStep(2);
-    if (state.mediaType === "ai") {
-      setGenerating(true);
-      window.setTimeout(() => setGenerating(false), 1600);
-    }
+  const goToStep2 = () => setStep(2);
+
+  // Generate storyboard from the prompt the user typed. Produces 3 scenes
+  // seeded with the prompt — the user can then edit each scene's fields.
+  const generateStoryboard = () => {
+    setGenerating(true);
+    window.setTimeout(() => {
+      setGenerating(false);
+      const baseScenes: Scene[] = [
+        {
+          id: "s1", label: "Scene 1", timeRange: state.length === 30 ? "0–10s" : "0–3s",
+          visual: state.videoPrompt ? `${state.videoPrompt.slice(0, 80)} — opening shot.` : "Opening establishing shot, cinematic framing.",
+          bgAudio: state.audioPrompt ? state.audioPrompt.slice(0, 60) : "Ambient room tone",
+          musicCue: state.audioAutoGenerate ? "Lo-fi jazz, soft brush drums" : "(custom from audio prompt)",
+          speech: "",
+        },
+        {
+          id: "s2", label: "Scene 2", timeRange: state.length === 30 ? "10–20s" : "3–6s",
+          visual: state.videoPrompt ? `${state.videoPrompt.slice(0, 80)} — close-up detail.` : "Close-up on the subject, soft focus.",
+          bgAudio: state.audioPrompt ? state.audioPrompt.slice(0, 60) : "Subtle motion ambience",
+          musicCue: state.audioAutoGenerate ? "Lo-fi jazz, brighter loop" : "(custom from audio prompt)",
+          speech: "",
+        },
+        {
+          id: "s3", label: "Scene 3", timeRange: state.length === 30 ? "20–30s" : "6–10s",
+          visual: state.videoPrompt ? `${state.videoPrompt.slice(0, 80)} — final reveal with logo.` : "Pull-out shot, logo lands with a glow.",
+          bgAudio: state.audioPrompt ? state.audioPrompt.slice(0, 60) : "Smooth synth riser",
+          musicCue: state.audioAutoGenerate ? "Lo-fi jazz outro, fade" : "(custom from audio prompt)",
+          speech: `Built with ${state.productName || "IDEEZA"}.`,
+        },
+      ];
+      setState((s) => ({ ...s, scenes: baseScenes, mediaGenerated: true }));
+    }, 1500);
   };
 
-  const regenerate = () => {
-    setGenerating(true);
-    window.setTimeout(() => setGenerating(false), 1400);
-  };
+  const regenerate = () => generateStoryboard();
 
   const skipMedia = () => {
-    patch({ mediaType: "skip" });
+    patch({ mediaType: "skip", scenes: [], mediaGenerated: false });
     setStep(3);
   };
 
@@ -202,6 +220,7 @@ export function BriefApp() {
           <Crossfade keyName={`step-${step}`}>
             {step === 1 && (
               <Step1Idea
+                projectId={state.projectId}
                 productName={state.productName}
                 productDescription={state.productDescription}
                 intent={state.intent}
@@ -211,12 +230,12 @@ export function BriefApp() {
             )}
             {step === 2 && (
               <Step2Video
-                scenes={state.scenes}
-                quality={state.quality}
+                state={state}
                 generating={generating}
+                onChange={patch}
                 onSceneChange={updateScene}
+                onGenerate={generateStoryboard}
                 onRegenerate={regenerate}
-                onQualityChange={(q) => patch({ quality: q })}
                 onContinue={() => setStep(3)}
                 onSkip={skipMedia}
                 onBack={() => setStep(1)}

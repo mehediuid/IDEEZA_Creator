@@ -6,7 +6,7 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import type { BriefState, Intent } from "./brief-app";
+import { PROJECTS, type BriefState, type Intent } from "./brief-app";
 
 const NETWORKS: { id: BriefState["network"]; label: string; sub: string }[] = [
   { id: "ethereum", label: "Ethereum", sub: "ETH" },
@@ -104,6 +104,9 @@ export function Step3Mint({
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: C.primary, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>
+            {PROJECTS.find((p) => p.id === state.projectId)?.name || "No project"}
+          </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {state.productName || "Untitled"}
           </div>

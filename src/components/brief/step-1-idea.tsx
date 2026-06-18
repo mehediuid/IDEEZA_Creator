@@ -6,7 +6,7 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import type { Intent } from "./brief-app";
+import { PROJECTS, type Intent } from "./brief-app";
 
 const MAX_DESC = 140;
 
@@ -48,19 +48,25 @@ const INTENTS: { id: Intent; label: string; sub: string; icon: React.ReactNode }
 ];
 
 export function Step1Idea({
+  projectId,
   productName,
   productDescription,
   intent,
   onChange,
   onContinue,
 }: {
+  projectId: string;
   productName: string;
   productDescription: string;
   intent: Intent | null;
-  onChange: (patch: { productName?: string; productDescription?: string; intent?: Intent }) => void;
+  onChange: (patch: { projectId?: string; productName?: string; productDescription?: string; intent?: Intent }) => void;
   onContinue: () => void;
 }) {
-  const canContinue = productName.trim().length > 0 && productDescription.trim().length > 0 && !!intent;
+  const canContinue =
+    !!projectId &&
+    productName.trim().length > 0 &&
+    productDescription.trim().length > 0 &&
+    !!intent;
 
   return (
     <div style={{ width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 32 }}>
@@ -74,6 +80,30 @@ export function Step1Idea({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <FieldLabel label="Project">
+          <select
+            value={projectId}
+            onChange={(e) => onChange({ projectId: e.target.value })}
+            style={{
+              ...inputStyle,
+              appearance: "none",
+              backgroundImage:
+                "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.4'><path d='M6 9l6 6 6-6'/></svg>\")",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 16px center",
+              paddingRight: 40,
+              color: projectId ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+            }}
+          >
+            <option value="" disabled>Choose a project</option>
+            {PROJECTS.map((p) => (
+              <option key={p.id} value={p.id} style={{ color: "var(--color-text-primary)" }}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </FieldLabel>
+
         <FieldLabel label="Product name">
           <input
             value={productName}
