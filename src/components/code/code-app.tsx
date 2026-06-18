@@ -11,11 +11,9 @@ import { Breadcrumb } from "@/components/pcb/breadcrumb";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { CodeRail } from "@/components/code/code-rail";
+import { C } from "@/lib/pcb/colors";
 
 type CodeMode = "blockly" | "develop";
-
-const PINK = "#fe2ad4";
-const PINK_BORDER = "#fbd5f3";
 
 function Pill({
   children,
@@ -23,13 +21,16 @@ function Pill({
   onClick,
   trailing,
   leading,
+  tone = "neutral",
 }: {
   children: React.ReactNode;
   selected?: boolean;
   onClick?: () => void;
   trailing?: React.ReactNode;
   leading?: React.ReactNode;
+  tone?: "neutral" | "brand";
 }) {
+  const isBrand = tone === "brand" || selected;
   return (
     <div
       className="ix-btn"
@@ -39,13 +40,13 @@ function Pill({
         alignItems: "center",
         gap: "var(--spacing-3)",
         padding: "var(--spacing-3) var(--spacing-8)",
-        background: "var(--color-bg-surface)",
-        border: `var(--border-width-1-5) solid ${PINK_BORDER}`,
+        background: selected ? "var(--color-bg-brand-subtle)" : "var(--color-bg-surface)",
+        border: `var(--border-width-1-5) solid ${isBrand ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
         borderRadius: "var(--radius-3xl)",
         cursor: "pointer",
-        boxShadow: selected ? "0 4px 12px rgba(254,42,212,.18)" : "0 1px 4px rgba(0,0,0,.04)",
-        color: selected ? PINK : "var(--color-text-secondary)",
-        fontWeight: selected ? 600 : 500,
+        boxShadow: selected ? "var(--elevation-2)" : "var(--elevation-1)",
+        color: isBrand ? C.primary : C.body,
+        fontWeight: 600,
         fontSize: "var(--font-size-md)",
       }}
     >
@@ -59,7 +60,7 @@ function Pill({
 function Caret({ dir }: { dir: "left" | "right" }) {
   const d = dir === "right" ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6";
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PINK} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d={d} />
     </svg>
   );
@@ -85,9 +86,9 @@ function PriceStrip() {
         zIndex: 15,
       }}
     >
-      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+      <span style={{ fontSize: "var(--font-size-sm)", color: C.body }}>
         Price For Premium Parts:{" "}
-        <span style={{ color: PINK, fontWeight: 700 }}>$0.00</span>
+        <span style={{ color: C.primary, fontWeight: 700 }}>$0.00</span>
       </span>
     </div>
   );
@@ -120,7 +121,7 @@ export function CodeApp() {
           gap: "var(--spacing-5)",
         }}
       >
-        <div style={{ fontSize: "var(--font-size-lg)", color: "var(--color-text-primary)", fontWeight: 500 }}>
+        <div style={{ fontSize: "var(--font-size-lg)", color: C.text, fontWeight: 500 }}>
           Choose One to continue
         </div>
         <div style={{ display: "flex", gap: "var(--spacing-4)" }}>
@@ -144,11 +145,11 @@ export function CodeApp() {
           zIndex: 18,
         }}
       >
-        <Pill leading={<Caret dir="left" />} onClick={() => router.push("/pcb")}>
-          <span style={{ color: PINK, fontWeight: 600 }}>Previous</span>
+        <Pill tone="brand" leading={<Caret dir="left" />} onClick={() => router.push("/pcb")}>
+          Previous
         </Pill>
-        <Pill trailing={<Caret dir="right" />}>
-          <span style={{ color: PINK, fontWeight: 600 }}>Next</span>
+        <Pill tone="brand" trailing={<Caret dir="right" />}>
+          Next
         </Pill>
       </div>
     </EditorShell>
