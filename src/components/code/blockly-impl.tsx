@@ -247,19 +247,33 @@ function LibTabs({ value, onChange }: { value: LibTab; onChange: (v: LibTab) => 
   );
 }
 
-function BlockTile({ tile, hue, onClick, faded }: { tile: TileDef; hue: string; onClick: () => void; faded?: boolean }) {
+function BlockTile({
+  tile,
+  hue,
+  onClick,
+  onDragStart,
+  faded,
+}: {
+  tile: TileDef;
+  hue: string;
+  onClick: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  faded?: boolean;
+}) {
   const c = HUE_HEX[hue] || { bg: "#5b80a5", border: "#476a8d", bgDim: "#a4b9d0" };
   return (
     <button
       onClick={onClick}
-      title={`Add ${tile.label}`}
+      draggable
+      onDragStart={onDragStart}
+      title={`Click to add or drag onto the workspace: ${tile.label}`}
       style={{
         position: "relative",
         height: 44,
         background: faded ? c.bgDim : c.bg,
         border: `1.5px solid ${c.border}`,
         borderRadius: 6,
-        cursor: "pointer",
+        cursor: "grab",
         padding: "4px 8px",
         textAlign: "left",
         color: "#fff",
@@ -565,9 +579,14 @@ export function BlocklyImpl() {
       renderer: "thrasos",
       grid: { spacing: 20, length: 2, colour: "#e2e8f0", snap: true },
       zoom: { controls: false, wheel: true, startScale: 1, maxScale: 3, minScale: 0.3, scaleSpeed: 1.2 },
+      move: { scrollbars: true, drag: true, wheel: false },
       trashcan: false,
       sounds: false,
     });
+    // Layout race fix — the parent div may not have its final size at the
+    // moment of inject; svgResize after a frame ensures the workspace fills
+    // its container and accepts pointer events for drag.
+    requestAnimationFrame(() => Blockly.svgResize(newWs));
     wsRef.current = newWs;
     setWs(newWs);
 
@@ -713,20 +732,50 @@ export function BlocklyImpl() {
     return () => window.removeEventListener(CODE_EVENT, handler as EventListener);
   }, []);
 
-  const addBlock = (type: string) => {
-    if (!wsRef.current) return;
+  const addBlock = (type: string, dropClientPos?: { x: number; y: number }) => {
+    const cur = wsRef.current;
+    if (!cur || !wsHostRef.current) return;
     try {
-      const block = wsRef.current.newBlock(type);
+      const block = cur.newBlock(type);
       block.initSvg();
       block.render();
-      const m = wsRef.current.getMetrics();
-      const x = m.viewLeft + Math.max(80, m.viewWidth / 2 - 60);
-      const y = m.viewTop + Math.max(60, m.viewHeight / 2 - 40);
+      const m = cur.getMetrics();
+      let x: number;
+      let y: number;
+      if (dropClientPos) {
+        // Map the drop point (client coords) into workspace coords.
+        const rect = wsHostRef.current.getBoundingClientRect();
+        const scale = cur.getScale();
+        x = m.viewLeft + (dropClientPos.x - rect.left) / scale;
+        y = m.viewTop + (dropClientPos.y - rect.top) / scale;
+      } else {
+        x = m.viewLeft + Math.max(80, m.viewWidth / 2 - 60);
+        y = m.viewTop + Math.max(60, m.viewHeight / 2 - 40);
+      }
       block.moveBy(x, y);
-      block.select?.();
+      (block as unknown as { select?: () => void }).select?.();
     } catch (err) {
       console.warn("addBlock failed", type, err);
     }
+  };
+
+  const onTileDragStart = (type: string) => (e: React.DragEvent) => {
+    e.dataTransfer.setData("application/ideeza-block-type", type);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const onWorkspaceDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("application/ideeza-block-type")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const onWorkspaceDrop = (e: React.DragEvent) => {
+    const type = e.dataTransfer.getData("application/ideeza-block-type");
+    if (!type) return;
+    e.preventDefault();
+    addBlock(type, { x: e.clientX, y: e.clientY });
   };
 
   const cats: CatDef[] = libTab === "raspberry" ? CATS_RASPBERRY : libTab === "arduino" ? CATS_ARDUINO : CATS_COMMON;
@@ -779,7 +828,13 @@ export function BlocklyImpl() {
                     )}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-2)" }}>
                       {matchedTiles.map((tile) => (
-                        <BlockTile key={tile.type + tile.label} tile={tile} hue={cat.hue} onClick={() => addBlock(tile.type)} />
+                        <BlockTile
+                          key={tile.type + tile.label}
+                          tile={tile}
+                          hue={cat.hue}
+                          onClick={() => addBlock(tile.type)}
+                          onDragStart={onTileDragStart(tile.type)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -821,6 +876,8 @@ export function BlocklyImpl() {
       <div style={{ flex: 1, position: "relative", margin: "var(--spacing-4) var(--spacing-4) var(--spacing-4) 0", borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
         <div
           ref={wsHostRef}
+          onDragOver={onWorkspaceDragOver}
+          onDrop={onWorkspaceDrop}
           style={{
             position: "absolute",
             inset: 0,
