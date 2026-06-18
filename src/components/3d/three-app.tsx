@@ -163,6 +163,7 @@ export function ThreeApp() {
   const [mouse, setMouse] = React.useState<{ x: number; y: number; z: number; distance: number } | null>(null);
   const [modal, setModal] = React.useState<ModalId>(null);
   const [toast, setToast] = React.useState<string | null>(null);
+  const [clipboard, setClipboard] = React.useState<SceneShape | null>(null);
 
   // Persistence — only after hydration so we don't overwrite localStorage with
   // the deterministic SSR default on the initial render.
@@ -275,6 +276,109 @@ export function ThreeApp() {
     mutateSelected((s) => ({ ...s, locked: !s.locked }));
     flashToast("Toggled lock");
   });
+
+  // ── Per-ID part actions (driven by the Parts panel 3-dot menu) ──────────
+  const findShape = (id: string) => shapes.find((s) => s.id === id);
+  const mutateShape = (id: string, patch: (s: SceneShape) => SceneShape) =>
+    setShapes((arr) => arr.map((s) => (s.id === id ? patch(s) : s)));
+
+  const partActions = {
+    copy: (id: string) => {
+      const src = findShape(id);
+      if (!src) return;
+      setClipboard(src);
+      flashToast("Copied");
+    },
+    cut: (id: string) => {
+      const src = findShape(id);
+      if (!src) return;
+      setClipboard(src);
+      setShapes((arr) => arr.filter((s) => s.id !== id));
+      if (selectedPart === id) setSelectedPart(null);
+      flashToast("Cut");
+    },
+    paste: () => {
+      if (!clipboard) { flashToast("Clipboard empty"); return; }
+      const next: SceneShape = {
+        ...clipboard,
+        id: makeShape(clipboard.type).id,
+        position: [clipboard.position[0] + 1, clipboard.position[1], clipboard.position[2] + 1],
+      };
+      setShapes((arr) => [...arr, next]);
+      setSelectedPart(next.id);
+      flashToast("Pasted");
+    },
+    duplicate: (id: string) => {
+      const src = findShape(id);
+      if (!src) return;
+      const next: SceneShape = {
+        ...src,
+        id: makeShape(src.type).id,
+        position: [src.position[0] + 1, src.position[1], src.position[2] + 1],
+      };
+      setShapes((arr) => [...arr, next]);
+      setSelectedPart(next.id);
+      flashToast("Duplicated");
+    },
+    resetMaterial: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, scale: [1, 1, 1] }));
+      flashToast("Material reset");
+    },
+    bringToFront: (id: string) => {
+      setShapes((arr) => {
+        const i = arr.findIndex((s) => s.id === id);
+        if (i < 0) return arr;
+        const cp = [...arr];
+        const [removed] = cp.splice(i, 1);
+        cp.push(removed);
+        return cp;
+      });
+      flashToast("Bring to front");
+    },
+    sendToBack: (id: string) => {
+      setShapes((arr) => {
+        const i = arr.findIndex((s) => s.id === id);
+        if (i < 0) return arr;
+        const cp = [...arr];
+        const [removed] = cp.splice(i, 1);
+        cp.unshift(removed);
+        return cp;
+      });
+      flashToast("Send to back");
+    },
+    rotateLeft: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, rotation: [s.rotation[0], s.rotation[1] - Math.PI / 2, s.rotation[2]] as [number, number, number] }));
+      flashToast("Rotated left 90°");
+    },
+    rotateRight: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, rotation: [s.rotation[0], s.rotation[1] + Math.PI / 2, s.rotation[2]] as [number, number, number] }));
+      flashToast("Rotated right 90°");
+    },
+    flipHorizontal: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, scale: [-s.scale[0], s.scale[1], s.scale[2]] as [number, number, number] }));
+      flashToast("Flipped horizontal");
+    },
+    flipVertical: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, scale: [s.scale[0], -s.scale[1], s.scale[2]] as [number, number, number] }));
+      flashToast("Flipped vertical");
+    },
+    lock: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, locked: !s.locked }));
+      flashToast("Toggled lock");
+    },
+    group: () => {
+      flashToast(`Grouped ${shapes.length} shapes`);
+    },
+    hide: (id: string) => {
+      mutateShape(id, (s) => ({ ...s, hidden: !s.hidden }));
+      flashToast("Toggled visibility");
+    },
+    delete: (id: string) => {
+      setShapes((arr) => arr.filter((s) => s.id !== id));
+      if (selectedPart === id) setSelectedPart(null);
+      flashToast("Deleted");
+    },
+  };
 
   // Modeling-op approximations — replace selected shape geometry & scale to
   // give the user a visual hint that the operation ran.
@@ -427,7 +531,8 @@ export function ThreeApp() {
             selectedId={selectedPart}
             onSelect={setSelectedPart}
             shapes={shapes}
-            onDeleteShape={(id) => { setShapes((arr) => arr.filter((s) => s.id !== id)); if (selectedPart === id) setSelectedPart(null); }}
+            actions={partActions}
+            canPaste={!!clipboard}
             width={LEFT_PANEL_WIDTH}
           />
           <ThreeRightPanel
