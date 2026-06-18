@@ -1,21 +1,15 @@
 "use client";
 
-// 3D Module — left panel (Figma 33552:188795).
-// Tabs: Project File (active) / Library. Below the tabs:
-//   - "Default Geometry" — a single expandable folder.
-//   - "Parts" — section header followed by a nested tree of part groups.
-// The Library tab renders a flat catalogue of base shapes that can be dragged
-// or clicked into the viewport (analogous to the Blockly library on /code).
+// 3D Module — left panel.
+// Project File tab is now data-driven: it lists Default Geometry + every real
+// shape in the scene, with click-to-select sync, inline delete, and a hidden
+// indicator. Library tab still dispatches shape:* actions to create new
+// shapes.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
-
-export type Part = {
-  id: string;
-  name: string;
-  children?: Part[];
-};
+import type { SceneShape } from "./three-canvas";
 
 type LeftTab = "project" | "library";
 
@@ -35,132 +29,119 @@ function Chevron({ open }: { open?: boolean }) {
   );
 }
 
-function PartIcon({ leaf }: { leaf?: boolean }) {
+function ShapeIcon({ type }: { type?: SceneShape["type"] }) {
+  let path = "M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7"; // box
+  if (type === "sphere") path = "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18";
+  else if (type === "cylinder") path = "M5 6a7 2 0 1 0 14 0 7 2 0 1 0-14 0z M5 6v12a7 2 0 0 0 14 0V6";
+  else if (type === "cone") path = "M12 3l8 16H4z";
+  else if (type === "torus") path = "M3 12c0-3 4-6 9-6s9 3 9 6-4 6-9 6-9-3-9-6z";
+  else if (type === "plane") path = "M3 18l6-12h12L15 18z";
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }}>
-      {leaf ? (
-        <>
-          <path d="M3 7l9-4 9 4-9 4-9-4z" />
-          <path d="M3 7v10l9 4 9-4V7" />
-        </>
-      ) : (
-        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      )}
+      <path d={path} />
     </svg>
   );
 }
 
-function PartRow({
-  part,
-  depth,
-  selectedId,
-  openIds,
-  onToggle,
-  onSelect,
-}: {
-  part: Part;
-  depth: number;
-  selectedId: string | null;
-  openIds: Set<string>;
-  onToggle: (id: string) => void;
-  onSelect: (id: string) => void;
-}) {
-  const open = openIds.has(part.id);
-  const selected = selectedId === part.id;
-  const hasChildren = !!part.children?.length;
+function FolderIcon() {
   return (
-    <>
-      <div
-        onClick={() => { onSelect(part.id); if (hasChildren) onToggle(part.id); }}
-        className="ix-nav"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--spacing-2)",
-          padding: `var(--spacing-2) var(--spacing-3) var(--spacing-2) ${8 + depth * 14}px`,
-          cursor: "pointer",
-          fontSize: "var(--font-size-sm)",
-          fontWeight: selected ? 700 : 500,
-          color: selected ? C.primary : C.text,
-          background: selected ? "var(--color-bg-brand-subtle)" : "transparent",
-          borderRadius: "var(--radius-sm)",
-        }}
-      >
-        {hasChildren ? <Chevron open={open} /> : <span style={{ width: 10 }} />}
-        <PartIcon leaf={!hasChildren} />
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{part.name}</span>
-      </div>
-      {open && part.children?.map((c) => (
-        <PartRow
-          key={c.id}
-          part={c}
-          depth={depth + 1}
-          selectedId={selectedId}
-          openIds={openIds}
-          onToggle={onToggle}
-          onSelect={onSelect}
-        />
-      ))}
-    </>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
   );
 }
 
-const DEFAULT_PARTS: Part[] = [
-  {
-    id: "parts-root", name: "Parts",
-    children: [
-      { id: "g1", name: "Group Name", children: [
-        { id: "g1-a", name: "Group element" },
-        { id: "g1-b", name: "Group element" },
-        { id: "g1-c", name: "Group element" },
-      ]},
-      { id: "g2", name: "Group Name", children: [
-        { id: "g2-a", name: "Group element" },
-        { id: "g2-b", name: "Group element" },
-      ]},
-      { id: "g3", name: "Group Name", children: [
-        { id: "g3-a", name: "Group element" },
-        { id: "g3-b", name: "Group element" },
-        { id: "g3-c", name: "Group element" },
-      ]},
-      { id: "g4", name: "Group Name" },
-      { id: "g5", name: "Group Name" },
-    ],
-  },
-];
+function EyeIcon({ off }: { off?: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={off ? "var(--color-text-tertiary)" : "currentColor"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <path d="M1 1l22 22" />}
+    </svg>
+  );
+}
 
-const LIBRARY_SHAPES: { id: ThreeAction; label: string }[] = [
-  { id: "shape:box", label: "Box" },
-  { id: "shape:sphere", label: "Sphere" },
-  { id: "shape:cylinder", label: "Cylinder" },
-  { id: "shape:cone", label: "Cone" },
-  { id: "shape:torus", label: "Torus" },
-  { id: "shape:plane", label: "Plane" },
-  { id: "shape:spline", label: "Spline" },
+function ShapeRow({
+  shape,
+  selected,
+  onSelect,
+  onDelete,
+}: {
+  shape: SceneShape;
+  selected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      className="ix-nav"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--spacing-2)",
+        padding: "var(--spacing-2) var(--spacing-3) var(--spacing-2) 22px",
+        cursor: "pointer",
+        fontSize: "var(--font-size-sm)",
+        fontWeight: selected ? 700 : 500,
+        color: selected ? C.primary : shape.hidden ? "var(--color-text-tertiary)" : C.text,
+        background: selected ? "var(--color-bg-brand-subtle)" : "transparent",
+        borderRadius: "var(--radius-sm)",
+      }}
+    >
+      <ShapeIcon type={shape.type} />
+      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {shape.type} · {shape.id.split("-").pop()?.slice(0, 5)}
+      </span>
+      {shape.hidden && <EyeIcon off />}
+      {shape.locked && (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.7" strokeLinecap="round">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        title="Delete"
+        style={{ background: "transparent", border: "none", color: "var(--color-text-tertiary)", cursor: "pointer", padding: 0, lineHeight: 1, fontSize: 14 }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+const LIBRARY_SHAPES: { id: ThreeAction; label: string; path: string }[] = [
+  { id: "shape:box",      label: "Box",      path: "M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7" },
+  { id: "shape:sphere",   label: "Sphere",   path: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18" },
+  { id: "shape:cylinder", label: "Cylinder", path: "M5 6a7 2 0 1 0 14 0 7 2 0 1 0-14 0z M5 6v12a7 2 0 0 0 14 0V6" },
+  { id: "shape:cone",     label: "Cone",     path: "M12 3l8 16H4z" },
+  { id: "shape:torus",    label: "Torus",    path: "M3 12c0-3 4-6 9-6s9 3 9 6-4 6-9 6-9-3-9-6z" },
+  { id: "shape:plane",    label: "Plane",    path: "M3 18l6-12h12L15 18z" },
+  { id: "shape:spline",   label: "Spline",   path: "M3 17c4-8 14-2 18-10" },
 ];
 
 export function ThreeLeftPanel({
   topOffset = 132,
   selectedId,
   onSelect,
+  shapes,
+  onDeleteShape,
   width = 250,
 }: {
   topOffset?: number;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  shapes: SceneShape[];
+  onDeleteShape: (id: string) => void;
   width?: number;
 }) {
   const [tab, setTab] = React.useState<LeftTab>("project");
-  const [openIds, setOpenIds] = React.useState<Set<string>>(() => new Set(["parts-root", "g1"]));
   const [defaultGeoOpen, setDefaultGeoOpen] = React.useState(true);
+  const [partsOpen, setPartsOpen] = React.useState(true);
+  const [search, setSearch] = React.useState("");
 
-  const toggle = (id: string) =>
-    setOpenIds((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const filtered = shapes.filter((s) => !search || s.type.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div
@@ -177,7 +158,6 @@ export function ThreeLeftPanel({
         zIndex: 14,
       }}
     >
-      {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", padding: "0 var(--spacing-4)" }}>
         {(["project", "library"] as LeftTab[]).map((t) => {
           const active = tab === t;
@@ -203,7 +183,6 @@ export function ThreeLeftPanel({
         })}
       </div>
 
-      {/* Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-3) var(--spacing-2)" }}>
         {tab === "project" && (
           <>
@@ -223,28 +202,70 @@ export function ThreeLeftPanel({
               }}
             >
               <Chevron open={defaultGeoOpen} />
-              <PartIcon />
+              <FolderIcon />
               <span>Default Geometry</span>
             </div>
             {defaultGeoOpen && (
-              <div style={{ paddingLeft: 24, paddingTop: 4, paddingBottom: 4, fontSize: "var(--font-size-xs)", color: C.body }}>
+              <div style={{ paddingLeft: 30, paddingTop: 4, paddingBottom: 4, fontSize: "var(--font-size-xs)", color: C.body }}>
                 Origin · Front · Top · Right
               </div>
             )}
 
             <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-3)" }} />
 
-            {DEFAULT_PARTS.map((p) => (
-              <PartRow
-                key={p.id}
-                part={p}
-                depth={0}
-                selectedId={selectedId}
-                openIds={openIds}
-                onToggle={toggle}
-                onSelect={onSelect}
-              />
-            ))}
+            <div
+              onClick={() => setPartsOpen((v) => !v)}
+              className="ix-nav"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--spacing-2)",
+                padding: "var(--spacing-2) var(--spacing-3)",
+                fontSize: "var(--font-size-sm)",
+                fontWeight: 600,
+                color: C.text,
+                cursor: "pointer",
+                borderRadius: "var(--radius-sm)",
+              }}
+            >
+              <Chevron open={partsOpen} />
+              <FolderIcon />
+              <span>Parts ({shapes.length})</span>
+            </div>
+            {partsOpen && (
+              <>
+                <div style={{ padding: "var(--spacing-2) var(--spacing-3)" }}>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search shapes…"
+                    style={{
+                      width: "100%",
+                      padding: "var(--spacing-2)",
+                      background: "var(--color-bg-page)",
+                      border: "var(--border-width-1) solid var(--color-border-subtle)",
+                      borderRadius: "var(--radius-md)",
+                      fontSize: "var(--font-size-xs)",
+                      color: C.text,
+                    }}
+                  />
+                </div>
+                {filtered.map((s) => (
+                  <ShapeRow
+                    key={s.id}
+                    shape={s}
+                    selected={selectedId === s.id}
+                    onSelect={() => onSelect(s.id)}
+                    onDelete={() => onDeleteShape(s.id)}
+                  />
+                ))}
+                {filtered.length === 0 && (
+                  <div style={{ padding: "var(--spacing-3) var(--spacing-4)", fontSize: "var(--font-size-xs)", color: C.body }}>
+                    No parts. Add one from the Library tab.
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
 
@@ -271,7 +292,7 @@ export function ThreeLeftPanel({
                 }}
               >
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="1.5">
-                  <path d="M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7" />
+                  <path d={s.path} />
                 </svg>
                 {s.label}
               </button>

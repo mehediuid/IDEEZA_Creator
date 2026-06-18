@@ -226,11 +226,17 @@ export function ThreeRightPanel({
   width = 292,
   state,
   onChange,
+  mouseInfo,
+  transformMode = "none",
+  onTransformMode,
 }: {
   topOffset?: number;
   width?: number;
   state: RightPanelState;
   onChange: (next: Partial<RightPanelState>) => void;
+  mouseInfo?: { x: number; y: number; z: number; distance: number } | null;
+  transformMode?: "none" | "translate" | "rotate" | "scale";
+  onTransformMode?: (m: "none" | "translate" | "rotate" | "scale") => void;
 }) {
   const [open, setOpen] = React.useState({ canvas: true, scene: true, materials: false, effects: true });
   const toggle = (k: keyof typeof open) => setOpen((s) => ({ ...s, [k]: !s[k] }));
@@ -281,12 +287,44 @@ export function ThreeRightPanel({
           <div style={{ marginTop: "var(--spacing-3)" }}>
             <div style={{ fontSize: "var(--font-size-xs)", color: C.body, fontWeight: 500, marginBottom: 4 }}>Mouse Information</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
-              <NumberInput value={state.mouseInfo.d}  onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, d: v } })} />
-              <NumberInput value={state.mouseInfo.xa} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, xa: v } })} />
-              <NumberInput value={state.mouseInfo.xb} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, xb: v } })} />
-              <NumberInput value={state.mouseInfo.xc} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, xc: v } })} />
+              <NumberInput value={mouseInfo ? mouseInfo.distance.toFixed(1) : state.mouseInfo.d} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, d: v } })} />
+              <NumberInput value={mouseInfo ? mouseInfo.x.toFixed(1) : state.mouseInfo.xa} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, xa: v } })} />
+              <NumberInput value={mouseInfo ? mouseInfo.y.toFixed(1) : state.mouseInfo.xb} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, xb: v } })} />
+              <NumberInput value={mouseInfo ? mouseInfo.z.toFixed(1) : state.mouseInfo.xc} onChange={(v) => onChange({ mouseInfo: { ...state.mouseInfo, xc: v } })} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4, marginTop: 2, fontSize: "10px", color: "var(--color-text-tertiary)", textAlign: "center" }}>
+              <span>Distance</span><span>X</span><span>Y</span><span>Z</span>
             </div>
           </div>
+          {onTransformMode && (
+            <div style={{ marginTop: "var(--spacing-4)" }}>
+              <div style={{ fontSize: "var(--font-size-xs)", color: C.body, fontWeight: 500, marginBottom: 4 }}>Transform</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+                {(["none", "translate", "rotate", "scale"] as const).map((m) => {
+                  const sel = transformMode === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => onTransformMode(m)}
+                      style={{
+                        padding: "var(--spacing-2) 0",
+                        background: sel ? "var(--color-bg-brand-subtle)" : "var(--color-bg-page)",
+                        border: `var(--border-width-1) solid ${sel ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
+                        color: sel ? C.primary : C.text,
+                        fontSize: "var(--font-size-xs)",
+                        fontWeight: 600,
+                        borderRadius: "var(--radius-md)",
+                        cursor: "pointer",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {m === "none" ? "Off" : m}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div style={{ marginTop: "var(--spacing-4)" }}>
             <div style={{ fontSize: "var(--font-size-xs)", color: C.body, fontWeight: 500, marginBottom: 4 }}>Snap</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
