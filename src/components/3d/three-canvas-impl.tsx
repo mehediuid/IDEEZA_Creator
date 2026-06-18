@@ -352,11 +352,37 @@ function DeselectOverlay({ onSelect }: { onSelect: (id: string | null) => void }
 }
 
 export function ThreeViewportImpl(props: ViewportProps) {
+  // Hook the WebGL context loss / restore events so we can recover gracefully
+  // instead of vanishing the cube. Chrome occasionally drops the context
+  // (especially when the page is composited next to a heavy SVG layer like
+  // sketch mode), and the default browser behaviour is to never recover.
+  const onCreated = React.useCallback((state: { gl: THREE.WebGLRenderer }) => {
+    const canvas = state.gl.domElement;
+    const onLost = (e: Event) => {
+      e.preventDefault(); // tells the browser we'll try to restore
+      console.warn("[ideeza] WebGL context lost — will attempt restore");
+    };
+    const onRestored = () => {
+      console.info("[ideeza] WebGL context restored");
+      // Re-render once by invalidating the frame loop.
+      state.gl.setAnimationLoop(() => state.gl.render(state.gl.getRenderTarget() as never, null as never));
+    };
+    canvas.addEventListener("webglcontextlost", onLost as EventListener);
+    canvas.addEventListener("webglcontextrestored", onRestored);
+  }, []);
+
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={[1, 1.5] /* cap DPR so we don't blow GPU memory on Retina */}
       camera={{ position: [6, 5, 7], fov: 45 }}
-      gl={{ alpha: props.background === "Transparent", antialias: true }}
+      gl={{
+        alpha: props.background === "Transparent",
+        antialias: true,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: false,
+        failIfMajorPerformanceCaveat: false,
+      }}
+      onCreated={onCreated}
       style={{ position: "absolute", inset: 0, display: "block" }}
     >
       <SceneContents {...props} />

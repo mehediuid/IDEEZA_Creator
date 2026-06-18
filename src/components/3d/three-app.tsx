@@ -463,8 +463,13 @@ export function ThreeApp() {
         />
       )}
 
-      {/* Canvas is ALWAYS mounted — hiding it during sketch keeps the WebGL
-          context alive instead of churning a new one on every mode switch. */}
+      {/* Canvas is ALWAYS mounted and stays in the layout — sketch mode just
+          renders its UI at a higher z-index over the top, and we drop
+          interactivity via pointer-events: none. display:none would let the
+          browser dispose the WebGL context (visible as the cube vanishing
+          mid-session), and visibility:hidden has the same effect in Chrome
+          when paired with a Canvas. So we keep the canvas live and overlay
+          on top instead. */}
       <div
         style={{
           position: "absolute",
@@ -474,8 +479,8 @@ export function ThreeApp() {
           right: viewportRight,
           background: "var(--color-bg-page)",
           overflow: "hidden",
-          display: mode === "sketch" ? "none" : "block",
-          zIndex: 10,
+          zIndex: mode === "sketch" ? 5 : 10,
+          pointerEvents: mode === "sketch" || mode === "preview" ? "none" : "auto",
         }}
       >
         <ThreeViewport

@@ -48,7 +48,7 @@ export const DEFAULT_RIGHT_STATE: RightPanelState = {
   snap: { x: true, y: true, z: false },
   gridSize: "IDEEZA-100",
   resolution: Array(9).fill("Auto"),
-  environment: "Studio",
+  environment: "Plain",
   background: "Texture",
   surface: "Antimony",
   material: "antimony",
