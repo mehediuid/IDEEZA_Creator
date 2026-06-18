@@ -162,7 +162,7 @@ export function CodeApp() {
         >
           Previous
         </Pill>
-        <Pill tone="brand" trailing={<Caret dir="right" />}>
+        <Pill tone="brand" trailing={<Caret dir="right" />} onClick={() => router.push("/3d")}>
           Next
         </Pill>
       </div>

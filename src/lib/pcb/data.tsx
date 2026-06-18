@@ -865,7 +865,7 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
       fg: active ? C.primary : (r.faded ? 'var(--color-border-strong)' : C.body),
       opacity: r.faded ? 'var(--opacity-muted)' : '1',
       cursor: r.faded ? 'default' : 'pointer',
-      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : null,
+      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : r.key === '3d' ? '/3d' : null,
     };
   });
 }
