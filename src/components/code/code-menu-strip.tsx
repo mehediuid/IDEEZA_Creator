@@ -208,7 +208,8 @@ export function CodeMenuStrip() {
           alignItems: "center",
           padding: "0 var(--spacing-10)",
           gap: "var(--spacing-7)",
-          zIndex: 15,
+          // Above row 2 (z=15) so its dropdowns float on top of the tool icons.
+          zIndex: 25,
         }}
       >
         {Object.keys(MENUS).map((l) => (

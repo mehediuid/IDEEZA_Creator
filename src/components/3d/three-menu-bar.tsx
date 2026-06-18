@@ -180,7 +180,9 @@ export function ThreeMenuBar() {
         alignItems: "center",
         padding: "0 var(--spacing-10)",
         gap: "var(--spacing-7)",
-        zIndex: 15,
+        // Above the toolbar (z=15), the rail (z=16), and the side panels (z=14)
+        // so dropdowns float on top of every chrome layer.
+        zIndex: 25,
       }}
     >
       {Object.keys(MENUS).map((l) => (
