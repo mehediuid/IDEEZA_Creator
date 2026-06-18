@@ -352,20 +352,21 @@ function DeselectOverlay({ onSelect }: { onSelect: (id: string | null) => void }
 }
 
 export function ThreeViewportImpl(props: ViewportProps) {
-  // Hook the WebGL context loss / restore events so we can recover gracefully
-  // instead of vanishing the cube. Chrome occasionally drops the context
-  // (especially when the page is composited next to a heavy SVG layer like
-  // sketch mode), and the default browser behaviour is to never recover.
-  const onCreated = React.useCallback((state: { gl: THREE.WebGLRenderer }) => {
+  // WebGL context lost is signalled with preventDefault so Chrome attempts a
+  // restore. R3F handles re-creating GL resources internally on restore — do
+  // NOT call gl.setAnimationLoop here; that overwrites R3F's own render loop
+  // and leaves the canvas permanently blank.
+  const onCreated = React.useCallback((state: { gl: THREE.WebGLRenderer; invalidate: () => void }) => {
     const canvas = state.gl.domElement;
     const onLost = (e: Event) => {
-      e.preventDefault(); // tells the browser we'll try to restore
-      console.warn("[ideeza] WebGL context lost — will attempt restore");
+      e.preventDefault();
+      console.warn("[ideeza] WebGL context lost — awaiting restore");
     };
     const onRestored = () => {
       console.info("[ideeza] WebGL context restored");
-      // Re-render once by invalidating the frame loop.
-      state.gl.setAnimationLoop(() => state.gl.render(state.gl.getRenderTarget() as never, null as never));
+      // Nudge R3F to render a frame now that resources are back. With the
+      // default `frameloop="always"`, this is just a safety net.
+      state.invalidate?.();
     };
     canvas.addEventListener("webglcontextlost", onLost as EventListener);
     canvas.addEventListener("webglcontextrestored", onRestored);
