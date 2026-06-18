@@ -50,6 +50,10 @@ function ShapeMesh({
   shape,
   selected,
   onSelect,
+  onTransform,
+  transformMode,
+  snap,
+  gridStep,
   material,
   effects,
   segments,
@@ -58,11 +62,19 @@ function ShapeMesh({
   shape: SceneShape;
   selected: boolean;
   onSelect: (id: string) => void;
+  onTransform: (id: string, patch: Partial<Pick<SceneShape, "position" | "rotation" | "scale">>) => void;
+  transformMode: "none" | "translate" | "rotate" | "scale";
+  snap: { x: boolean; y: boolean; z: boolean };
+  gridStep: number;
   material: "antimony" | "tin" | "iron";
   effects: { id: string; value: number }[];
   segments: number;
   registerMesh: (id: string, mesh: THREE.Mesh | null) => void;
 }) {
+  const meshRef = React.useRef<THREE.Mesh | null>(null);
+  // Force a re-render once the mesh has actually mounted so TransformControls
+  // can be attached to a real object — `object={null}` throws inside drei.
+  const [, setTick] = React.useState(0);
   const params = MAT_PARAMS[material];
 
   const get = (id: string) => effects.find((e) => e.id === id)?.value ?? 40;
@@ -99,26 +111,59 @@ function ShapeMesh({
 
   if (shape.hidden) return null;
 
+  const showGizmo = selected && transformMode !== "none" && !shape.locked && !!meshRef.current;
+
+  const handleTransformChange = () => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const snapAxis = (v: number, enabled: boolean) => enabled ? Math.round(v / gridStep) * gridStep : v;
+    onTransform(shape.id, {
+      position: [
+        snapAxis(mesh.position.x, snap.x),
+        snapAxis(mesh.position.y, snap.y),
+        snapAxis(mesh.position.z, snap.z),
+      ],
+      rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],
+      scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z],
+    });
+  };
+
   return (
-    <mesh
-      ref={(el: THREE.Mesh | null) => registerMesh(shape.id, el)}
-      position={shape.position}
-      rotation={shape.rotation}
-      scale={shape.scale}
-      onClick={onPointer}
-    >
-      {geometry}
-      <meshStandardMaterial
-        color={tinted}
-        metalness={Math.min(1, params.metalness + glamorous * 0.4 + mineral * 0.2)}
-        roughness={Math.max(0.02, params.roughness * (1 - fitting * 0.6))}
-        emissive={tinted}
-        emissiveIntensity={vivid * 0.35 + striking * 0.15}
-        opacity={shape.locked ? 0.85 : 1}
-        transparent={shape.locked}
-      />
-      {selected && <Outlines thickness={3} color="#7c2db9" />}
-    </mesh>
+    <>
+      <mesh
+        ref={(el: THREE.Mesh | null) => {
+          meshRef.current = el;
+          registerMesh(shape.id, el);
+          // Trigger one re-render once mounted so the gizmo can latch on.
+          if (el) setTick((t) => t + 1);
+        }}
+        position={shape.position}
+        rotation={shape.rotation}
+        scale={shape.scale}
+        onClick={onPointer}
+      >
+        {geometry}
+        <meshStandardMaterial
+          color={tinted}
+          metalness={Math.min(1, params.metalness + glamorous * 0.4 + mineral * 0.2)}
+          roughness={Math.max(0.02, params.roughness * (1 - fitting * 0.6))}
+          emissive={tinted}
+          emissiveIntensity={vivid * 0.35 + striking * 0.15}
+          opacity={shape.locked ? 0.85 : 1}
+          transparent={shape.locked}
+        />
+        {selected && <Outlines thickness={3} color="#7c2db9" />}
+      </mesh>
+      {showGizmo && (
+        <TransformControls
+          object={meshRef.current as THREE.Object3D}
+          mode={transformMode}
+          translationSnap={snap.x || snap.z ? gridStep : null}
+          rotationSnap={Math.PI / 12}
+          onObjectChange={handleTransformChange}
+        />
+      )}
+    </>
   );
 }
 
@@ -192,24 +237,6 @@ function SceneContents(props: ViewportProps) {
   const gridStep = getGridStep(gridSize);
   const meshRefs = React.useRef<Record<string, THREE.Mesh | null>>({});
 
-  // Snap-during-drag: when a transform completes we round the position to the
-  // grid step on whichever axes have snap enabled.
-  const onTcChange = () => {
-    const id = selectedId;
-    if (!id) return;
-    const mesh = meshRefs.current[id];
-    if (!mesh) return;
-    const snapAxis = (v: number, enabled: boolean) => enabled ? Math.round(v / gridStep) * gridStep : v;
-    const pos: [number, number, number] = [
-      snapAxis(mesh.position.x, snap.x),
-      snapAxis(mesh.position.y, snap.y),
-      snapAxis(mesh.position.z, snap.z),
-    ];
-    const rot: [number, number, number] = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
-    const scl: [number, number, number] = [mesh.scale.x, mesh.scale.y, mesh.scale.z];
-    onTransform(id, { position: pos, rotation: rot, scale: scl });
-  };
-
   // Resolve a background colour for non-Texture choices.
   const bg =
     props.background === "Solid"       ? "#ffffff" :
@@ -258,24 +285,16 @@ function SceneContents(props: ViewportProps) {
           shape={s}
           selected={selectedId === s.id}
           onSelect={onSelect}
+          onTransform={onTransform}
+          transformMode={transformMode}
+          snap={snap}
+          gridStep={gridStep}
           material={material}
           effects={effects}
           segments={segments}
           registerMesh={(id, mesh) => { meshRefs.current[id] = mesh; }}
         />
       ))}
-
-      {/* Transform gizmo — only when a shape is selected, unlocked, and the
-          user picked Move/Rotate/Scale from the toolbar/menu. */}
-      {selectedId && transformMode !== "none" && meshRefs.current[selectedId] && !shapes.find(s => s.id === selectedId)?.locked && (
-        <TransformControls
-          object={meshRefs.current[selectedId] as THREE.Object3D}
-          mode={transformMode}
-          translationSnap={snap.x || snap.z ? gridStep : null}
-          rotationSnap={Math.PI / 12}
-          onObjectChange={onTcChange}
-        />
-      )}
 
       {envPreset && (
         <React.Suspense fallback={null}>

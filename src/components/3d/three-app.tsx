@@ -16,7 +16,7 @@ import { ThreeLeftPanel } from "@/components/3d/three-left-panel";
 import { ThreeRightPanel, DEFAULT_RIGHT_STATE, type RightPanelState } from "@/components/3d/three-right-panel";
 import { ThreeViewport, type SceneShape, type ShapeType, type TransformMode, makeShape } from "@/components/3d/three-canvas";
 import { ThreeFloatingTools } from "@/components/3d/three-floating-tools";
-import { SketchMode } from "@/components/3d/sketch-mode";
+import { SketchMode, type Sketch } from "@/components/3d/sketch-mode";
 import { ThreeModals } from "@/components/3d/three-modals";
 import { C } from "@/lib/pcb/colors";
 
@@ -60,6 +60,48 @@ function Caret({ dir }: { dir: "left" | "right" }) {
       <path d={d} />
     </svg>
   );
+}
+
+// Convert 2D sketches drawn on the SVG plane into 3D primitives so the user
+// sees their sketch work appear in the demo viewport. Open sketches (lines,
+// arcs, splines, dimensions, points) are skipped — we only extrude closed
+// shapes that have a defined area.
+function sketchesToShapes(sketches: Sketch[], existingCount: number): SceneShape[] {
+  const PIX_TO_WORLD = 0.012; // SVG pixels → world units
+  const MIN_SCALE = 0.4;
+  const out: SceneShape[] = [];
+  sketches.forEach((s, i) => {
+    const offset = (existingCount + i + 1) * 1.5;
+    if (s.kind === "rect") {
+      const w = Math.max(MIN_SCALE, Math.abs(s.w) * PIX_TO_WORLD);
+      const h = Math.max(MIN_SCALE, Math.abs(s.h) * PIX_TO_WORLD);
+      const shape = makeShape("box", [offset, 0, 0]);
+      shape.scale = [w / 2, 1, h / 2];
+      out.push(shape);
+    } else if (s.kind === "circle") {
+      const r = Math.max(MIN_SCALE, s.r * PIX_TO_WORLD);
+      const shape = makeShape("cylinder", [offset, 0, 0]);
+      shape.scale = [r, 1, r];
+      out.push(shape);
+    } else if (s.kind === "ellipse") {
+      const rx = Math.max(MIN_SCALE, s.rx * PIX_TO_WORLD);
+      const ry = Math.max(MIN_SCALE, s.ry * PIX_TO_WORLD);
+      const shape = makeShape("cylinder", [offset, 0, 0]);
+      shape.scale = [rx, 1, ry];
+      out.push(shape);
+    } else if (s.kind === "polygon") {
+      // Approximate as a cone whose base radius matches the polygon bounds.
+      const xs = s.points.map((p) => p.x);
+      const ys = s.points.map((p) => p.y);
+      const w = (Math.max(...xs) - Math.min(...xs)) * PIX_TO_WORLD;
+      const h = (Math.max(...ys) - Math.min(...ys)) * PIX_TO_WORLD;
+      const r = Math.max(MIN_SCALE, Math.max(w, h) / 2);
+      const shape = makeShape("cone", [offset, 0, 0]);
+      shape.scale = [r, 1, r];
+      out.push(shape);
+    }
+  });
+  return out;
 }
 
 const SHAPE_FROM_ACTION: Partial<Record<ThreeAction, ShapeType>> = {
@@ -117,7 +159,7 @@ export function ThreeApp() {
   }, []);
   const [resetTick, setResetTick] = React.useState(0);
   const [fitTick, setFitTick] = React.useState(0);
-  const [transformMode, setTransformMode] = React.useState<TransformMode>("none");
+  const [transformMode, setTransformMode] = React.useState<TransformMode>("translate");
   const [mouse, setMouse] = React.useState<{ x: number; y: number; z: number; distance: number } | null>(null);
   const [modal, setModal] = React.useState<ModalId>(null);
   const [toast, setToast] = React.useState<string | null>(null);
@@ -162,6 +204,8 @@ export function ThreeApp() {
     const s = { ...makeShape(type, [offset, 0, offset]) };
     setShapes((arr) => [...arr, s]);
     setSelectedPart(s.id);
+    // Auto-enable translate so the gizmo immediately appears on the new shape.
+    if (transformMode === "none") setTransformMode("translate");
     flashToast(`Added ${type}`);
   };
 
@@ -402,7 +446,20 @@ export function ThreeApp() {
         <SketchMode
           topOffset={TOP}
           onExit={() => setMode("demo")}
-          onSave={() => { flashToast("Sketch saved"); setMode("demo"); }}
+          onSave={(sketches) => {
+            const newShapes = sketchesToShapes(sketches, shapes.length);
+            if (newShapes.length > 0) {
+              setShapes((arr) => [...arr, ...newShapes]);
+              setSelectedPart(newShapes[newShapes.length - 1].id);
+              flashToast(`Extruded ${newShapes.length} sketch${newShapes.length === 1 ? "" : "es"} to 3D`);
+            } else {
+              flashToast("No extrudable sketches");
+            }
+            // Clear sketches from storage so we don't re-extrude on next open.
+            try { window.localStorage.removeItem("ideeza:3d:sketches"); } catch {}
+            setMode("demo");
+            setTransformMode("translate");
+          }}
         />
       )}
 
@@ -423,7 +480,12 @@ export function ThreeApp() {
               key={resetTick}
               shapes={shapes}
               selectedId={selectedPart}
-              onSelect={setSelectedPart}
+              onSelect={(id) => {
+                setSelectedPart(id);
+                // Selecting a fresh shape with the gizmo off → flip to translate
+                // so the user sees the arrows right away.
+                if (id && transformMode === "none") setTransformMode("translate");
+              }}
               onTransform={onTransform}
               onMouse={setMouse}
               transformMode={preview ? "none" : transformMode}

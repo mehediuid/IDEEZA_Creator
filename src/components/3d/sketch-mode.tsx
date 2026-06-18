@@ -15,7 +15,7 @@ type SketchTool =
   | "spline" | "rect" | "polygon" | "slot" | "fillet2d" | "chamfer2d"
   | "trim" | "extend" | "mirror2d" | "offset" | "dim";
 
-type Sketch =
+export type Sketch =
   | { kind: "point"; x: number; y: number; id: string }
   | { kind: "line"; x1: number; y1: number; x2: number; y2: number; id: string }
   | { kind: "polyline"; points: { x: number; y: number }[]; id: string }
@@ -416,7 +416,7 @@ function SettingsStrip({ topOffset, width, snap, setSnap }: { topOffset: number;
   );
 }
 
-export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, rightWidth = 250 }: { topOffset?: number; onExit: () => void; onSave: () => void; leftWidth?: number; rightWidth?: number }) {
+export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, rightWidth = 250 }: { topOffset?: number; onExit: () => void; onSave: (sketches: Sketch[]) => void; leftWidth?: number; rightWidth?: number }) {
   const [tool, setTool] = React.useState<SketchTool>("line");
   const [sketches, setSketches] = React.useState<Sketch[]>([]);
   const [selectedSketch, setSelectedSketch] = React.useState<string | null>(null);
@@ -458,7 +458,7 @@ export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, r
         }}
       >
         <button
-          onClick={onSave}
+          onClick={() => onSave(sketches)}
           style={{
             padding: "var(--spacing-2) var(--spacing-5)",
             background: "var(--color-bg-surface)",
@@ -470,7 +470,7 @@ export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, r
             fontWeight: 700,
           }}
         >
-          Save Changes
+          Save Changes ({sketches.length})
         </button>
         <span style={{ color: C.body, fontSize: "var(--font-size-sm)" }}>|</span>
         <button
