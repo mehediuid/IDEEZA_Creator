@@ -847,7 +847,7 @@ export function buildCtxItems(state: PcbState, actions: PcbActions) {
 // ── Rail + tab builders (from the prototype's renderVals) ──────────────────
 // `iconEl(x)` reduced to the raw SVG string `x` (rendered via <Icon html=.../>).
 
-export function buildRail(state: PcbState) {
+export function buildRail(_state: PcbState | null = null, activeKey: string = 'pcb') {
   const railDefs = [
     { key: 'pcb', label: 'PCB Design', icon: 'pcb' },
     { key: 'code', label: 'Code', icon: 'code' },
@@ -855,15 +855,19 @@ export function buildRail(state: PcbState) {
     { key: 'preview', label: 'Product Preview', icon: 'preview' },
     { key: 'brief', label: 'Add Brief', icon: 'brief', faded: true },
   ];
-  return railDefs.map((r, i) => ({
-    key: r.key,
-    label: r.label,
-    icon: r.icon,
-    bg: i === 0 ? C.weak : 'transparent',
-    fg: i === 0 ? C.primary : (r.faded ? 'var(--color-border-strong)' : C.body),
-    opacity: r.faded ? 'var(--opacity-muted)' : '1',
-    cursor: r.faded ? 'default' : 'pointer',
-  }));
+  return railDefs.map((r) => {
+    const active = r.key === activeKey;
+    return {
+      key: r.key,
+      label: r.label,
+      icon: r.icon,
+      bg: active ? C.weak : 'transparent',
+      fg: active ? C.primary : (r.faded ? 'var(--color-border-strong)' : C.body),
+      opacity: r.faded ? 'var(--opacity-muted)' : '1',
+      cursor: r.faded ? 'default' : 'pointer',
+      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : null,
+    };
+  });
 }
 
 export function buildLeftTabs(state: PcbState, actions: PcbActions) {

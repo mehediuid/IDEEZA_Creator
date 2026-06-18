@@ -1,22 +1,22 @@
 "use client";
 
-// IDEEZA PCB Software — left icon rail (PCB Design / Code / 3D Module / …).
+// Code page left icon rail — same five items as the PCB rail (PCB Design /
+// Code / 3D Module / Product Preview / Add Brief), but standalone (no PcbProvider).
+// Clicking "PCB Design" navigates to /pcb; clicking "Code" is a no-op.
 
 import { useRouter } from "next/navigation";
 import { DsIcon } from "@/lib/pcb/icons";
 import { buildRail } from "@/lib/pcb/data";
-import { usePcbState } from "@/lib/pcb/store";
 
-export function LeftRail() {
-  const state = usePcbState();
-  const items = buildRail(state, "pcb");
+export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
+  const items = buildRail(null, "code");
   const router = useRouter();
 
   return (
     <div
       style={{
         position: "absolute",
-        top: state.viewTog["Top Toolbar"] !== false ? 225 : 142,
+        top: topOffset,
         bottom: 36,
         left: 0,
         width: 74,
@@ -34,7 +34,7 @@ export function LeftRail() {
           key={r.key}
           className="ix-nav"
           onClick={() => {
-            if (r.href && r.key !== "pcb") router.push(r.href);
+            if (r.href && r.key !== "code") router.push(r.href);
           }}
           style={{
             display: "flex",

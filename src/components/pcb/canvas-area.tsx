@@ -7,6 +7,7 @@
 // zooms in/out at the cursor; middle-mouse or space-drag pans the viewport.
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/lib/pcb/icons";
 import { buildCanvas } from "@/lib/pcb/content";
 import { buildModeTabs } from "@/lib/pcb/data";
@@ -43,6 +44,7 @@ function GridPattern() {
 export function CanvasArea() {
   const state = usePcbState();
   const actions = usePcbActions();
+  const router = useRouter();
   const modeTabs = buildModeTabs(state, actions);
   const v = state.viewTog;
   const top = v["Top Toolbar"] !== false ? 225 : 142;
@@ -496,9 +498,10 @@ export function CanvasArea() {
         <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>XY Plane</span>
       </div>
 
-      {/* Next pill */}
+      {/* Next pill — navigates to the Code section landing page. */}
       <div
         className="ix-btn"
+        onClick={() => router.push("/code")}
         style={{
           position: "absolute",
           bottom: 24,
