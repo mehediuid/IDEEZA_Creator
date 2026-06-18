@@ -49,8 +49,7 @@ const TOOLS: { id: SketchTool; title: string; path: string }[] = [
 
 const SKETCH_KEY = "ideeza:3d:sketches";
 
-function loadSketches(): Sketch[] {
-  if (typeof window === "undefined") return [];
+function readSketchesFromStorage(): Sketch[] {
   try {
     const raw = window.localStorage.getItem(SKETCH_KEY);
     if (raw) return JSON.parse(raw) as Sketch[];
@@ -419,15 +418,19 @@ function SettingsStrip({ topOffset, width, snap, setSnap }: { topOffset: number;
 
 export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, rightWidth = 250 }: { topOffset?: number; onExit: () => void; onSave: () => void; leftWidth?: number; rightWidth?: number }) {
   const [tool, setTool] = React.useState<SketchTool>("line");
-  const [sketches, setSketches] = React.useState<Sketch[]>(() => loadSketches());
+  const [sketches, setSketches] = React.useState<Sketch[]>([]);
   const [selectedSketch, setSelectedSketch] = React.useState<string | null>(null);
   const [stages, setStages] = React.useState(1);
   const [selectedConstraint, setSelectedConstraint] = React.useState<string | null>(null);
   const [snap, setSnap] = React.useState(false);
+  const [hydrated, setHydrated] = React.useState(false);
 
+  // Hydrate from localStorage after mount to keep SSR/CSR in sync.
+  React.useEffect(() => { setSketches(readSketchesFromStorage()); setHydrated(true); }, []);
   React.useEffect(() => {
+    if (!hydrated) return;
     try { window.localStorage.setItem(SKETCH_KEY, JSON.stringify(sketches)); } catch {}
-  }, [sketches]);
+  }, [sketches, hydrated]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -74,8 +74,9 @@ const SHAPE_FROM_ACTION: Partial<Record<ThreeAction, ShapeType>> = {
 const SHAPES_KEY = "ideeza:3d:shapes";
 const RIGHT_KEY = "ideeza:3d:right";
 
-function loadShapes(): SceneShape[] {
-  if (typeof window === "undefined") return [{ ...makeShape("box"), id: "default-cube" }];
+const DEFAULT_SHAPES: SceneShape[] = [{ ...makeShape("box", [0, 0, 0]), id: "default-cube" }];
+
+function readShapesFromStorage(): SceneShape[] {
   try {
     const raw = window.localStorage.getItem(SHAPES_KEY);
     if (raw) {
@@ -83,11 +84,10 @@ function loadShapes(): SceneShape[] {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
-  return [{ ...makeShape("box"), id: "default-cube" }];
+  return DEFAULT_SHAPES;
 }
 
-function loadRight(): RightPanelState {
-  if (typeof window === "undefined") return DEFAULT_RIGHT_STATE;
+function readRightFromStorage(): RightPanelState {
   try {
     const raw = window.localStorage.getItem(RIGHT_KEY);
     if (raw) {
@@ -104,8 +104,17 @@ export function ThreeApp() {
   const router = useRouter();
   const [mode, setMode] = React.useState<ThreeMode>("demo");
   const [selectedPart, setSelectedPart] = React.useState<string | null>(null);
-  const [shapes, setShapes] = React.useState<SceneShape[]>(() => loadShapes());
-  const [right, setRight] = React.useState<RightPanelState>(() => loadRight());
+  // Initial render must match SSR — start with the deterministic default and
+  // hydrate from localStorage in an effect after mount.
+  const [shapes, setShapes] = React.useState<SceneShape[]>(DEFAULT_SHAPES);
+  const [right, setRight] = React.useState<RightPanelState>(DEFAULT_RIGHT_STATE);
+  const [hydrated, setHydrated] = React.useState(false);
+
+  React.useEffect(() => {
+    setShapes(readShapesFromStorage());
+    setRight(readRightFromStorage());
+    setHydrated(true);
+  }, []);
   const [resetTick, setResetTick] = React.useState(0);
   const [fitTick, setFitTick] = React.useState(0);
   const [transformMode, setTransformMode] = React.useState<TransformMode>("none");
@@ -113,13 +122,16 @@ export function ThreeApp() {
   const [modal, setModal] = React.useState<ModalId>(null);
   const [toast, setToast] = React.useState<string | null>(null);
 
-  // Persistence
+  // Persistence — only after hydration so we don't overwrite localStorage with
+  // the deterministic SSR default on the initial render.
   React.useEffect(() => {
+    if (!hydrated) return;
     try { window.localStorage.setItem(SHAPES_KEY, JSON.stringify(shapes)); } catch {}
-  }, [shapes]);
+  }, [shapes, hydrated]);
   React.useEffect(() => {
+    if (!hydrated) return;
     try { window.localStorage.setItem(RIGHT_KEY, JSON.stringify(right)); } catch {}
-  }, [right]);
+  }, [right, hydrated]);
 
   const flashToast = (msg: string) => {
     setToast(msg);
