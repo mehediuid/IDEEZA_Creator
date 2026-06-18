@@ -106,8 +106,6 @@ function ShapeMesh({
       rotation={shape.rotation}
       scale={shape.scale}
       onClick={onPointer}
-      castShadow
-      receiveShadow
     >
       {geometry}
       <meshStandardMaterial
@@ -228,9 +226,10 @@ function SceneContents(props: ViewportProps) {
   return (
     <>
       {props.background !== "Transparent" && <color attach="background" args={[bg]} />}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[8, 12, 6]} intensity={1.1} castShadow />
-      <directionalLight position={[-6, 4, -4]} intensity={0.4} />
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[8, 12, 6]} intensity={1.2} />
+      <directionalLight position={[-6, 4, -4]} intensity={0.5} />
+      <directionalLight position={[0, -5, -6]} intensity={0.25} />
 
       <Grid
         args={[40, 40]}
@@ -278,7 +277,11 @@ function SceneContents(props: ViewportProps) {
         />
       )}
 
-      {envPreset && <Environment preset={envPreset} />}
+      {envPreset && (
+        <React.Suspense fallback={null}>
+          <Environment preset={envPreset} />
+        </React.Suspense>
+      )}
 
       <OrbitControls makeDefault dampingFactor={0.12} minDistance={3} maxDistance={50} enableDamping />
 
@@ -317,9 +320,8 @@ export function ThreeViewportImpl(props: ViewportProps) {
     <Canvas
       dpr={[1, 2]}
       camera={{ position: [6, 5, 7], fov: 45 }}
-      shadows
-      gl={{ alpha: props.background === "Transparent" }}
-      style={{ position: "absolute", inset: 0 }}
+      gl={{ alpha: props.background === "Transparent", antialias: true }}
+      style={{ position: "absolute", inset: 0, display: "block" }}
     >
       <SceneContents {...props} />
       <DeselectOverlay onSelect={props.onSelect} />

@@ -326,6 +326,16 @@ export function ThreeApp() {
         case "settings:snap":        setModal("snap"); return;
         case "settings:theme":       flashToast("Theme follows IDEEZA system"); return;
         case "settings:resetView":   setResetTick((t) => t + 1); setTransformMode("none"); return;
+        case "settings:resetScene": {
+          try { window.localStorage.removeItem(SHAPES_KEY); window.localStorage.removeItem(RIGHT_KEY); window.localStorage.removeItem("ideeza:3d:sketches"); } catch {}
+          setShapes(DEFAULT_SHAPES);
+          setRight(DEFAULT_RIGHT_STATE);
+          setSelectedPart(null);
+          setTransformMode("none");
+          setResetTick((t) => t + 1);
+          flashToast("Scene reset");
+          return;
+        }
         // Help
         case "help:docs":            setModal("docs"); return;
         case "help:shortcuts":       setModal("shortcuts"); return;
