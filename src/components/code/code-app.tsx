@@ -131,6 +131,8 @@ export function CodeApp() {
 
       {mode === "blockly" ? <CodeMenuStrip /> : <PriceStrip />}
 
+      {mode !== null && <ModeSwitcher mode={mode} onPick={requestMode} />}
+
       <CodeRail topOffset={railTop} />
 
       {mode === null && (
@@ -186,36 +188,84 @@ export function CodeApp() {
           onCancel={cancelSwitch}
         />
       )}
+    </EditorShell>
+  );
+}
 
-      {/* Quick mode-switch helper while landing has both pills visible: when
-          a Blockly/Develop view is active, render a tiny floating action that
-          opens the other side via the confirmation modal. */}
-      {mode !== null && (
+function ModeSwitcher({ mode, onPick }: { mode: CodeMode; onPick: (m: CodeMode) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const label = mode === "blockly" ? "Blockly Development" : "Code Development";
+  const other: CodeMode = mode === "blockly" ? "develop" : "blockly";
+  const otherLabel = other === "blockly" ? "Blockly Development" : "Code Development";
+
+  React.useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [open]);
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: "absolute",
+        top: 110,
+        right: 280,
+        zIndex: 20,
+      }}
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "var(--spacing-3)",
+          padding: "var(--spacing-2) var(--spacing-4)",
+          background: "var(--color-bg-brand-subtle)",
+          border: "var(--border-width-1) solid var(--color-border-brand)",
+          borderRadius: "var(--radius-3xl)",
+          fontSize: "var(--font-size-xs)",
+          fontWeight: 600,
+          color: C.primary,
+          cursor: "pointer",
+        }}
+      >
+        Mode: {label}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
         <div
           style={{
             position: "absolute",
-            left: 90,
-            bottom: 56,
-            display: "flex",
-            gap: "var(--spacing-2)",
-            zIndex: 18,
+            top: "100%",
+            right: 0,
+            marginTop: 4,
+            minWidth: 200,
+            background: "var(--color-bg-surface)",
+            border: "var(--border-width-1) solid var(--color-border-default)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--elevation-3)",
+            padding: "var(--spacing-2) 0",
           }}
         >
-          <Pill
-            selected={mode === "blockly"}
-            onClick={() => requestMode("blockly")}
+          <div
+            onClick={() => { setOpen(false); onPick(other); }}
+            className="ix-menu"
+            style={{
+              padding: "var(--spacing-2) var(--spacing-4)",
+              fontSize: "var(--font-size-sm)",
+              cursor: "pointer",
+              color: C.text,
+            }}
           >
-            Blockly development
-          </Pill>
-          <Pill
-            selected={mode === "develop"}
-            onClick={() => requestMode("develop")}
-          >
-            Code Development
-          </Pill>
+            Switch to {otherLabel}
+          </div>
         </div>
       )}
-    </EditorShell>
+    </div>
   );
 }
 
