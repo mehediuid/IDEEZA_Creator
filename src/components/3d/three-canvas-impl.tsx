@@ -214,7 +214,6 @@ function FitCamera({ shapes, tick }: { shapes: SceneShape[]; tick: number }) {
   const { camera } = useThree();
   React.useEffect(() => {
     if (tick === 0) return;
-    // Fit the camera so all visible shapes are framed.
     if (!shapes.length) return;
     const box = new THREE.Box3();
     shapes.forEach((s) => {
@@ -228,6 +227,21 @@ function FitCamera({ shapes, tick }: { shapes: SceneShape[]; tick: number }) {
     const center = box.getCenter(new THREE.Vector3());
     camera.position.set(center.x + size, center.y + size * 0.6, center.z + size);
     camera.lookAt(center);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+  return null;
+}
+
+// Resets the camera + OrbitControls to the initial framing in-place — no
+// Canvas remount required, so the WebGL context survives.
+function ResetCamera({ tick }: { tick: number }) {
+  const { camera, controls } = useThree();
+  React.useEffect(() => {
+    if (tick === 0) return;
+    camera.position.set(6, 5, 7);
+    camera.lookAt(0, 0, 0);
+    const c = controls as unknown as { reset?: () => void } | null;
+    if (c && typeof c.reset === "function") c.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
   return null;
@@ -317,6 +331,7 @@ function SceneContents(props: ViewportProps) {
 
       <MouseReporter onMouse={onMouse} />
       <FitCamera shapes={shapes} tick={fitTick} />
+      <ResetCamera tick={props.resetTick} />
     </>
   );
 }

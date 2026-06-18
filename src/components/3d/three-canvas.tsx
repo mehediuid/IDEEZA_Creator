@@ -47,6 +47,7 @@ export type ViewportProps = {
   snap: { x: boolean; y: boolean; z: boolean };
   gridSize: string;            // IDEEZA-100/50/25/10 → 1.0/0.5/0.25/0.1 spacing
   resolution: string;          // first resolution dropdown — controls mesh segments
+  resetTick: number;           // bumping resets the camera in-place (no remount)
   fitTick: number;             // bumping triggers fit-to-shapes
 };
 

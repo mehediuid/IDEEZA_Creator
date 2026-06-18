@@ -463,42 +463,45 @@ export function ThreeApp() {
         />
       )}
 
+      {/* Canvas is ALWAYS mounted — hiding it during sketch keeps the WebGL
+          context alive instead of churning a new one on every mode switch. */}
+      <div
+        style={{
+          position: "absolute",
+          top: viewportTop,
+          bottom: 36,
+          left: viewportLeft,
+          right: viewportRight,
+          background: "var(--color-bg-page)",
+          overflow: "hidden",
+          display: mode === "sketch" ? "none" : "block",
+          zIndex: 10,
+        }}
+      >
+        <ThreeViewport
+          shapes={shapes}
+          selectedId={selectedPart}
+          onSelect={(id) => {
+            setSelectedPart(id);
+            if (id && transformMode === "none") setTransformMode("translate");
+          }}
+          onTransform={onTransform}
+          onMouse={setMouse}
+          transformMode={preview ? "none" : transformMode}
+          material={right.material}
+          background={right.background}
+          environment={right.environment}
+          effects={right.effects}
+          snap={right.snap}
+          gridSize={right.gridSize}
+          resolution={right.resolution[0]}
+          resetTick={resetTick}
+          fitTick={fitTick}
+        />
+      </div>
+
       {(mode === "demo" || mode === "fullview" || mode === "preview") && (
         <>
-          <div
-            style={{
-              position: "absolute",
-              top: viewportTop,
-              bottom: 36,
-              left: viewportLeft,
-              right: viewportRight,
-              background: "var(--color-bg-page)",
-              overflow: "hidden",
-            }}
-          >
-            <ThreeViewport
-              key={resetTick}
-              shapes={shapes}
-              selectedId={selectedPart}
-              onSelect={(id) => {
-                setSelectedPart(id);
-                // Selecting a fresh shape with the gizmo off → flip to translate
-                // so the user sees the arrows right away.
-                if (id && transformMode === "none") setTransformMode("translate");
-              }}
-              onTransform={onTransform}
-              onMouse={setMouse}
-              transformMode={preview ? "none" : transformMode}
-              material={right.material}
-              background={right.background}
-              environment={right.environment}
-              effects={right.effects}
-              snap={right.snap}
-              gridSize={right.gridSize}
-              resolution={right.resolution[0]}
-              fitTick={fitTick}
-            />
-          </div>
 
           {!preview && (
             <ThreeFloatingTools
