@@ -153,6 +153,7 @@ function ShapeMesh({
           emissiveIntensity={vivid * 0.35 + striking * 0.15}
           opacity={shape.locked ? 0.85 : 1}
           transparent={shape.locked}
+          side={THREE.DoubleSide}
         />
         {selected && <Outlines thickness={3} color="#7c2db9" />}
       </mesh>
@@ -374,8 +375,9 @@ export function ThreeViewportImpl(props: ViewportProps) {
 
   return (
     <Canvas
-      dpr={[1, 1.5] /* cap DPR so we don't blow GPU memory on Retina */}
+      dpr={1 /* hard cap; Retina 2x doubles GPU memory for no perceptual win in CAD */}
       camera={{ position: [6, 5, 7], fov: 45 }}
+      frameloop="always"
       gl={{
         alpha: props.background === "Transparent",
         antialias: true,

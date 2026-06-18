@@ -52,9 +52,25 @@ export type ViewportProps = {
 };
 
 export function ThreeViewport(props: ViewportProps) {
+  // Auto-remount the Canvas if the WebGL context is lost and never restored.
+  // Some browsers / GPU drivers permanently kill a context (driver crash, tab
+  // throttling) — without a remount the user is stuck with a blank scene.
+  const [remountKey, setRemountKey] = React.useState(0);
+
+  React.useEffect(() => {
+    const onLost = () => {
+      // Wait 1.2s for natural restoration; if still lost, force a remount.
+      const t = window.setTimeout(() => setRemountKey((k) => k + 1), 1200);
+      const onRestored = () => window.clearTimeout(t);
+      window.addEventListener("webglcontextrestored", onRestored, { once: true, capture: true });
+    };
+    window.addEventListener("webglcontextlost", onLost, true);
+    return () => window.removeEventListener("webglcontextlost", onLost, true);
+  }, []);
+
   return (
     <div style={{ position: "absolute", inset: 0 }}>
-      <ThreeViewportImpl {...props} />
+      <ThreeViewportImpl key={remountKey} {...props} />
     </div>
   );
 }
