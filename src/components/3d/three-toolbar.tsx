@@ -73,7 +73,9 @@ export function ThreeToolbar({ onSketchClick }: { onSketchClick?: () => void }) 
     <div
       style={{
         position: "absolute",
-        top: 94,
+        // ThreeMenuBar removed (32px above us is now empty); toolbar moves
+        // up to sit directly under the TopBar.
+        top: 62,
         left: 0,
         right: 0,
         height: 38,

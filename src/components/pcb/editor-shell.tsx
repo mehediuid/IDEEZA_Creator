@@ -12,7 +12,14 @@ import { useTheme } from "@/components/theme-provider";
 export function EditorShell({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
   return (
+    // suppressHydrationWarning: the server can't know the client's
+    // prefers-color-scheme so it always emits data-theme="light"; the
+    // client resolves the real value (light/dark) during the first render
+    // and then the global ThemeProvider effect mirrors it onto <html>.
+    // The attribute is intentionally different between server and client,
+    // matching the Next.js docs guidance for theme switchers.
     <div
+      suppressHydrationWarning
       className="pcb-app"
       data-theme={resolvedTheme}
       style={{

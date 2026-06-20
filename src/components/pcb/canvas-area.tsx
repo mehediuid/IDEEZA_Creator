@@ -47,7 +47,10 @@ export function CanvasArea() {
   const router = useRouter();
   const modeTabs = buildModeTabs(state, actions);
   const v = state.viewTog;
-  const top = v["Top Toolbar"] !== false ? 225 : 142;
+  // Breadcrumb + old MenuBar strips removed; everything that used to sit at
+  // 225/142 now starts at 145/62 (just below the TopBar, optionally below the
+  // toolbar). Same 80px delta as left-panel / left-rail / right-panel.
+  const top = v["Top Toolbar"] !== false ? 145 : 62;
   const left = v["Left-Side panel"] !== false ? 366 : 74;
   const right = v["Right-Side Panel"] !== false ? 292 : 0;
 
@@ -498,7 +501,8 @@ export function CanvasArea() {
         <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>XY Plane</span>
       </div>
 
-      {/* Next pill — navigates to the Code section landing page. */}
+      {/* Continue pill — explicit destination label so the user always knows
+          which step comes next (we no longer rely on a separate stepper CTA). */}
       <div
         className="ix-btn"
         onClick={() => router.push("/code")}
@@ -517,7 +521,7 @@ export function CanvasArea() {
           boxShadow: "0 4px 12px rgba(254,42,212,.12)",
         }}
       >
-        <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>Next</span>
+        <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>Continue to Code</span>
         <Icon html={NEXT_SVG} size={16} />
       </div>
     </div>

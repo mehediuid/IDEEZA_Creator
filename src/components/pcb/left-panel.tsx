@@ -45,7 +45,7 @@ export function LeftPanel() {
     <div
       style={{
         position: "absolute",
-        top: state.viewTog["Top Toolbar"] !== false ? 225 : 142,
+        top: state.viewTog["Top Toolbar"] !== false ? 145 : 62,
         bottom: 36,
         left: 74,
         width: 292,
@@ -56,8 +56,13 @@ export function LeftPanel() {
         zIndex: 15,
       }}
     >
+      {/* Header — Product name (primary) + Project name (secondary) +
+          refresh action. Replaces the old top-bar breadcrumb so the user
+          always sees what they're editing in context with the tree below. */}
+      <ProductHeader />
+
       {/* tab row + add button */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-7) var(--spacing-7) var(--spacing-5)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-7) var(--spacing-5)" }}>
         <div style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-lg)", padding: "var(--spacing-1)", flex: 1 }}>
           {leftTabs.map((t) => (
             <div
@@ -202,6 +207,155 @@ export function LeftPanel() {
           {state.libView === "all" && <AllLibraryFlyout />}
         </>
       )}
+    </div>
+  );
+}
+
+// ProductHeader — title block above the Project Design / Library tabs.
+// Visual hierarchy: Product (large, primary) > Project (small, secondary) >
+// tabs (medium) > content. The refresh action (previously in the top
+// breadcrumb) moves here so the user has one place to re-sync. The collapse
+// chevron toggles the whole left panel via the same View ▸ Left-Side panel
+// view-toggle the menu bar already drives, so panel state stays consistent.
+function ProductHeader() {
+  const actions = usePcbActions();
+  return (
+    <div
+      style={{
+        padding: "var(--spacing-7) var(--spacing-7) var(--spacing-4)",
+        borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--spacing-3)",
+        }}
+      >
+        <span
+          style={{
+            width: 18,
+            height: 18,
+            color: "var(--color-violet-600)",
+            display: "inline-flex",
+            flex: "0 0 18px",
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          </svg>
+        </span>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+              letterSpacing: -0.1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            [Product Name]
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: "var(--color-text-secondary)",
+              marginTop: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Project Name
+          </div>
+        </div>
+        <button
+          className="ix-tool"
+          aria-label="Sync"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "var(--radius-md)",
+            background: "transparent",
+            border: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "var(--color-text-success)",
+            flex: "0 0 28px",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+        </button>
+        <button
+          className="ix-tool"
+          aria-label="Collapse left panel"
+          onClick={() => actions.toggleView("Left-Side panel")}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "var(--radius-md)",
+            background: "transparent",
+            border: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "var(--color-text-secondary)",
+            flex: "0 0 28px",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

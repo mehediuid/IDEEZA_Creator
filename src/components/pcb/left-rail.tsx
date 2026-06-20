@@ -16,7 +16,7 @@ export function LeftRail() {
     <div
       style={{
         position: "absolute",
-        top: state.viewTog["Top Toolbar"] !== false ? 225 : 142,
+        top: state.viewTog["Top Toolbar"] !== false ? 145 : 62,
         bottom: 36,
         left: 0,
         width: 74,

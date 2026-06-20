@@ -24,7 +24,7 @@ export function RightPanel() {
     <div
       style={{
         position: "absolute",
-        top: state.viewTog["Top Toolbar"] !== false ? 225 : 142,
+        top: state.viewTog["Top Toolbar"] !== false ? 145 : 62,
         bottom: 36,
         right: 0,
         width: 292,
@@ -37,6 +37,38 @@ export function RightPanel() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", padding: "var(--spacing-7) var(--spacing-8) var(--spacing-0)" }}>
+        <button
+          className="ix-tool"
+          aria-label="Collapse right panel"
+          onClick={() => actions.toggleView("Right-Side Panel")}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "var(--radius-md)",
+            background: "transparent",
+            border: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "var(--color-text-secondary)",
+            flex: "0 0 24px",
+            marginBottom: "var(--spacing-4)",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
         {rightTabs.map((rt) => (
           <div
             key={rt.label}

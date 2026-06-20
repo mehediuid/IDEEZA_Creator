@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { ThreeRail } from "@/components/3d/three-rail";
-import { ThreeMenuBar, THREE_EVENT, type ThreeAction } from "@/components/3d/three-menu-bar";
+import { THREE_EVENT, type ThreeAction } from "@/components/3d/three-menu-bar";
 import { ThreeToolbar } from "@/components/3d/three-toolbar";
 import { ThreeLeftPanel } from "@/components/3d/three-left-panel";
 import { ThreeRightPanel, DEFAULT_RIGHT_STATE, type RightPanelState } from "@/components/3d/three-right-panel";
@@ -189,7 +189,9 @@ export function ThreeApp() {
   const LEFT_PANEL_WIDTH = 250;
   const RIGHT_PANEL_WIDTH = 292;
   const RAIL_WIDTH = 74;
-  const TOP = 132;
+  // ThreeMenuBar (32px) moved to TopBar; toolbar shifts to top:62 height:38.
+  // Content/rail/panel TOP = 62 + 38 = 100.
+  const TOP = 100;
 
   const fullView = mode === "fullview";
   const preview  = mode === "preview";
@@ -521,7 +523,9 @@ export function ThreeApp() {
   return (
     <EditorShell>
       <TopBar />
-      {showChrome && <ThreeMenuBar />}
+      {/* ThreeMenuBar moved to TopBar (see <ThreeMenu/> via TopBar's pickMenu);
+          dispatch still goes through the same dispatchThreeAction window
+          event so the editor's keyboard handlers are unaffected. */}
       {showChrome && <ThreeToolbar onSketchClick={() => setMode("sketch")} />}
       <ThreeRail topOffset={fullView || preview ? 62 : TOP} />
       {showPanels && (
@@ -720,11 +724,11 @@ export function ThreeApp() {
           >
             {mode === "demo" && (
               <Pill leading={<Caret dir="left" />} onClick={() => router.push("/code")}>
-                Previous
+                Back to Code
               </Pill>
             )}
-            <Pill trailing={<Caret dir="right" />} onClick={() => preview ? router.push("/preview") : router.push("/preview")}>
-              Next
+            <Pill trailing={<Caret dir="right" />} onClick={() => router.push("/preview")}>
+              Continue to Preview
             </Pill>
           </div>
         </>

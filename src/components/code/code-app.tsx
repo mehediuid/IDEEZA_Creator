@@ -71,42 +71,16 @@ function Caret({ dir }: { dir: "left" | "right" }) {
   );
 }
 
-function PriceStrip() {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top: 104,
-        left: 0,
-        right: 0,
-        height: 48,
-        borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-        background: "var(--color-bg-surface)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        padding: "0 var(--spacing-10)",
-        zIndex: 15,
-      }}
-    >
-      <span style={{ fontSize: "var(--font-size-sm)", color: C.body }}>
-        Price For Premium Parts:{" "}
-        <span style={{ color: C.primary, fontWeight: 700 }}>$0.00</span>
-      </span>
-    </div>
-  );
-}
-
 export function CodeApp() {
   const router = useRouter();
   const [mode, setMode] = React.useState<CodeMode | null>(null);
   const [pendingMode, setPendingMode] = React.useState<CodeMode | null>(null);
 
   // Layout offsets driven by mode:
-  //   - landing: chrome ends at 152 (price strip)
-  //   - blockly: chrome ends at 172 (menu strip + tool row)
-  //   - develop: chrome ends at 152 (price strip only; IDE renders inside)
-  const railTop = mode === "blockly" ? 172 : 152;
+  //   - landing: chrome ends at 104 (TopBar + breadcrumb only — price strip gone)
+  //   - blockly: chrome ends at 140 (tool icons row; menus moved to TopBar)
+  //   - develop: chrome ends at 104 (no price strip; IDE renders inside)
+  const railTop = mode === "blockly" ? 140 : 104;
   const contentTop = railTop;
 
   const requestMode = (next: CodeMode) => {
@@ -129,7 +103,7 @@ export function CodeApp() {
       <TopBar />
       <Breadcrumb />
 
-      {mode === "blockly" ? <CodeMenuStrip /> : <PriceStrip />}
+      {mode === "blockly" && <CodeMenuStrip />}
 
       {mode !== null && <ModeSwitcher mode={mode} onPick={requestMode} />}
 
@@ -144,7 +118,10 @@ export function CodeApp() {
       {mode === "blockly" && <BlocklyEditor topOffset={contentTop} />}
       {mode === "develop" && <DevEditor topOffset={contentTop} />}
 
-      {/* Previous / Next pills — fixed bottom-right */}
+      {/* Back / Continue pills — bottom-right. Labels are destination-explicit
+          ("Back to PCB" / "Continue to 3D") so the user can read the whole
+          flow off the buttons. While inside a sub-editor (blockly/dev), the
+          Back pill returns to the landing picker instead of jumping to PCB. */}
       <div
         style={{
           position: "absolute",
@@ -160,10 +137,10 @@ export function CodeApp() {
           leading={<Caret dir="left" />}
           onClick={() => (mode === null ? router.push("/pcb") : setMode(null))}
         >
-          Previous
+          {mode === null ? "Back to PCB" : "Back to picker"}
         </Pill>
         <Pill tone="brand" trailing={<Caret dir="right" />} onClick={() => router.push("/3d")}>
-          Next
+          Continue to 3D
         </Pill>
       </div>
 

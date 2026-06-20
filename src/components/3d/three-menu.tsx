@@ -1,34 +1,20 @@
 "use client";
 
-// 3D Module — top menu bar (Figma frames 33552:188795 and friends).
-// Five labels: Shape Creation / Modeling Operation / Transformation & Utilities
-// / Settings / Help. Each opens a dropdown with related operations. A Price
-// strip on the right mirrors the chrome we use on /code and /pcb.
+// ThreeMenu — 3D Module menu bar, inline. Same MENUS + dispatchThreeAction
+// from three-menu-bar.tsx so every existing Shape Creation / Modeling
+// Operation / Transformation & Utilities / Settings / Help item continues to
+// fire the same window event that ThreeApp listens for.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
+import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
 
-export const THREE_EVENT = "ideeza:three-action";
-
-export type ThreeAction =
-  // Shape Creation
-  | "shape:box" | "shape:sphere" | "shape:cylinder" | "shape:cone" | "shape:torus" | "shape:plane" | "shape:spline" | "shape:sketch" | "shape:import"
-  // Modeling Operation
-  | "model:extrude" | "model:revolve" | "model:sweep" | "model:loft" | "model:fillet" | "model:chamfer" | "model:shell" | "model:union" | "model:subtract" | "model:intersect" | "model:mirror" | "model:pattern"
-  // Transformation & Utilities
-  | "xform:move" | "xform:rotate" | "xform:scale" | "xform:copy" | "xform:align" | "xform:group" | "xform:measure" | "xform:section" | "xform:hide" | "xform:lock"
-  // Settings
-  | "settings:preferences" | "settings:units" | "settings:grid" | "settings:snap" | "settings:theme" | "settings:resetView" | "settings:resetScene"
-  // Help
-  | "help:docs" | "help:shortcuts" | "help:about";
-
-export function dispatchThreeAction(action: ThreeAction) {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(THREE_EVENT, { detail: { action } }));
-  }
-}
-
-type MenuItem = { label: string; action?: ThreeAction; shortcut?: string; divider?: boolean };
+type MenuItem = {
+  label: string;
+  action?: ThreeAction;
+  shortcut?: string;
+  divider?: boolean;
+};
 
 const MENUS: Record<string, MenuItem[]> = {
   "Shape Creation": [
@@ -87,54 +73,144 @@ const MENUS: Record<string, MenuItem[]> = {
   ],
   Help: [
     { label: "Documentation", action: "help:docs" },
-    { label: "Keyboard Shortcuts", action: "help:shortcuts", shortcut: "⌘K ⌘S" },
+    {
+      label: "Keyboard Shortcuts",
+      action: "help:shortcuts",
+      shortcut: "⌘K ⌘S",
+    },
     { label: "About 3D Module", action: "help:about" },
   ],
 };
 
-function MenuLabel({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+export function ThreeMenu() {
+  const [open, setOpen] = React.useState<string | null>(null);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      role="menubar"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--spacing-7)",
+        marginLeft: "var(--spacing-12)",
+      }}
+    >
+      {Object.keys(MENUS).map((label) => (
+        <MenuLabel
+          key={label}
+          label={label}
+          items={MENUS[label]}
+          open={open === label}
+          onToggle={() => setOpen(open === label ? null : label)}
+          onSelect={() => setOpen(null)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MenuLabel({
+  label,
+  items,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  label: string;
+  items: MenuItem[];
+  open: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+}) {
   return (
     <div style={{ position: "relative" }}>
-      <span
+      <button
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="ix-menu"
         onClick={onToggle}
+        onMouseEnter={(e) => {
+          if (open) return;
+          (e.currentTarget as HTMLButtonElement).style.background =
+            "var(--color-bg-surface-raised)";
+        }}
+        onMouseLeave={(e) => {
+          if (open) return;
+          (e.currentTarget as HTMLButtonElement).style.background =
+            "transparent";
+        }}
         style={{
-          fontSize: "var(--font-size-sm)",
+          fontSize: 13,
           fontWeight: 500,
           color: open ? C.primary : C.text,
           cursor: "pointer",
-          padding: "var(--spacing-1) var(--spacing-3)",
-          borderRadius: "var(--radius-sm)",
+          padding: "8px 12px",
+          borderRadius: "var(--radius-md)",
           background: open ? "var(--color-bg-brand-subtle)" : "transparent",
+          border: "none",
+          fontFamily: "inherit",
           whiteSpace: "nowrap",
+          transition: "background .14s, color .14s",
         }}
       >
         {label}
-      </span>
+      </button>
       {open && (
         <div
+          role="menu"
           style={{
             position: "absolute",
-            top: "100%",
+            top: "calc(100% + 4px)",
             left: 0,
-            marginTop: 4,
             minWidth: 240,
             background: "var(--color-bg-surface)",
             border: "var(--border-width-1) solid var(--color-border-default)",
             borderRadius: "var(--radius-md)",
-            boxShadow: "var(--elevation-3)",
-            zIndex: 40,
+            boxShadow: "var(--elevation-3, 0 16px 40px -8px rgba(0,0,0,.22))",
+            zIndex: 60,
             padding: "var(--spacing-2) 0",
           }}
         >
-          {MENUS[label].map((it, i) =>
+          {items.map((it, i) =>
             it.divider ? (
-              <div key={`d-${i}`} style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-3)" }} />
+              <div
+                key={`d-${i}`}
+                style={{
+                  height: 1,
+                  background: "var(--color-border-subtle)",
+                  margin: "var(--spacing-2) var(--spacing-3)",
+                }}
+              />
             ) : (
               <div
                 key={it.label}
+                role="menuitem"
                 className="ix-menu"
-                onClick={() => { if (it.action) dispatchThreeAction(it.action); }}
+                onClick={() => {
+                  if (it.action) dispatchThreeAction(it.action);
+                  onSelect();
+                }}
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
@@ -145,54 +221,21 @@ function MenuLabel({ label, open, onToggle }: { label: string; open: boolean; on
                 }}
               >
                 <span>{it.label}</span>
-                {it.shortcut && <span style={{ color: "var(--color-text-tertiary)", fontSize: "var(--font-size-xs)" }}>{it.shortcut}</span>}
+                {it.shortcut && (
+                  <span
+                    style={{
+                      color: "var(--color-text-tertiary)",
+                      fontSize: "var(--font-size-xs)",
+                    }}
+                  >
+                    {it.shortcut}
+                  </span>
+                )}
               </div>
-            )
+            ),
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-export function ThreeMenuBar() {
-  const [open, setOpen] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
-
-  return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        position: "absolute",
-        top: 62,
-        left: 0,
-        right: 0,
-        height: 32,
-        background: "var(--color-bg-surface)",
-        borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 var(--spacing-10)",
-        gap: "var(--spacing-7)",
-        // Above the toolbar (z=15), the rail (z=16), and the side panels (z=14)
-        // so dropdowns float on top of every chrome layer.
-        zIndex: 25,
-      }}
-    >
-      {Object.keys(MENUS).map((l) => (
-        <MenuLabel
-          key={l}
-          label={l}
-          open={open === l}
-          onToggle={() => setOpen(open === l ? null : l)}
-        />
-      ))}
     </div>
   );
 }

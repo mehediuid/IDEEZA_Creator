@@ -456,7 +456,9 @@ export function Toolbar() {
     <div
       style={{
         position: "absolute",
-        top: 142,
+        // Sits directly under the TopBar now that the Breadcrumb + old
+        // MenuBar strips have been removed (80px of vertical chrome freed).
+        top: 62,
         left: 0,
         right: 0,
         background: "var(--color-bg-surface)",

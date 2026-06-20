@@ -23,6 +23,7 @@ import { Step3Mint } from "./step-3-mint";
 import { Step4Success } from "./step-4-success";
 import { C } from "@/lib/pcb/colors";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { useProductFlow } from "@/components/product-flow/product-flow-provider";
 
 export type Intent = "sell" | "give" | "save";
 export type MediaType = "ai" | "ar" | "skip";
@@ -191,6 +192,7 @@ function applyRegen(s: BriefState, regen: RegenRequest): BriefState {
 export function BriefApp() {
   const router = useRouter();
   const { createJob, markMinted } = useVideoJobs();
+  const { markCompleted: markFlowStep } = useProductFlow();
   const [state, setState] = React.useState<BriefState>(DEFAULT_STATE);
   const [step, setStep] = React.useState(1);
   const [hydrated, setHydrated] = React.useState(false);
@@ -357,6 +359,10 @@ export function BriefApp() {
     setMinting(true);
     window.setTimeout(() => {
       if (state.videoJobId) markMinted(state.videoJobId);
+      // Brief is the last step in the product flow — closing it out marks the
+      // whole product as complete so the home page can offer "Start fresh"
+      // instead of "Continue".
+      markFlowStep("brief");
       setState((s) => ({ ...s, mintedAt: Date.now() }));
       setMinting(false);
       setStep(4);

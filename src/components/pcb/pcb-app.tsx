@@ -7,7 +7,6 @@
 // framed containers here and are populated in Phase 2.
 
 import { BottomBar } from "@/components/pcb/bottom-bar";
-import { Breadcrumb } from "@/components/pcb/breadcrumb";
 import { CanvasArea } from "@/components/pcb/canvas-area";
 import { ContextMenu } from "@/components/pcb/context-menu";
 import { DeviceManager } from "@/components/pcb/device-manager";
@@ -15,13 +14,12 @@ import { EditorShell } from "@/components/pcb/editor-shell";
 import { FootprintManager } from "@/components/pcb/footprint-manager";
 import { LeftPanel } from "@/components/pcb/left-panel";
 import { LeftRail } from "@/components/pcb/left-rail";
-import { MenuBar } from "@/components/pcb/menu-bar";
 import { Modals } from "@/components/pcb/modals";
 import { RightPanel } from "@/components/pcb/right-panel";
 import { SettingsOverlay } from "@/components/pcb/settings-overlay";
 import { Toolbar } from "@/components/pcb/toolbar";
 import { TopBar } from "@/components/pcb/top-bar";
-import { PcbProvider, usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 function EditorBody() {
   const state = usePcbState();
@@ -33,14 +31,12 @@ function EditorBody() {
 
   return (
     <EditorShell>
-      {/* TOP BAR */}
+      {/* TOP BAR — hosts the unified AppMenuBar (Edit/View/…/Help) for every
+          flow page, and the relocated Earn IDZ + Connect Wallet actions live
+          inside the profile dropdown. The separate Breadcrumb + MenuBar
+          strips that used to sit beneath the TopBar are gone — the same info
+          now appears as the LeftPanel header (product/project names). */}
       <TopBar />
-
-      {/* BREADCRUMB */}
-      <Breadcrumb />
-
-      {/* MENU BAR */}
-      <MenuBar />
 
       {/* TOOLBAR (View ▸ Top Toolbar) */}
       {toolbarOn && <Toolbar />}
@@ -52,16 +48,35 @@ function EditorBody() {
       <CanvasArea />
 
       {/* LEFT PANEL (View ▸ Left-Side panel) */}
-      {leftOn && <LeftPanel />}
+      {leftOn ? (
+        <LeftPanel />
+      ) : (
+        <ExpandTab
+          side="left"
+          onClick={() => actions.toggleView("Left-Side panel")}
+        />
+      )}
 
       {/* RIGHT PANEL (View ▸ Right-Side Panel) */}
-      {rightOn && <RightPanel />}
+      {rightOn ? (
+        <RightPanel />
+      ) : (
+        <ExpandTab
+          side="right"
+          onClick={() => actions.toggleView("Right-Side Panel")}
+        />
+      )}
 
       {/* BOTTOM BAR + collapsible panel */}
       <BottomBar />
 
-      {/* click-catcher closes open menus / context menu */}
-      {(state.openMenu || state.ctx) && (
+      {/* click-catcher closes the right-click context menu. The app menu
+          bar (Edit / View / …) is no longer dismissed here — MenuBar lives
+          inside TopBar (zIndex 30) now, but this catcher was at zIndex 40,
+          which would sit OVER TopBar and swallow every dropdown-item click.
+          MenuBar self-handles its dismiss via a document mousedown listener,
+          so we only render the catcher for ctx menus here. */}
+      {state.ctx && (
         <div onClick={actions.closeAll} style={{ position: "absolute", inset: 0, zIndex: 40 }} />
       )}
 
@@ -81,6 +96,75 @@ function EditorBody() {
       {/* TOAST (Phase 5 — quick feedback for toolbar Save / Open / etc.) */}
       <Toast />
     </EditorShell>
+  );
+}
+
+// ExpandTab — small chevron tab that sticks out from the canvas edge when a
+// side panel is collapsed. Clicking it toggles the same view flag the panel's
+// own collapse chevron and the View menu both drive, so panel state stays a
+// single source of truth.
+function ExpandTab({
+  side,
+  onClick,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  const isLeft = side === "left";
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`Expand ${side} panel`}
+      title={`Expand ${side} panel`}
+      style={{
+        position: "absolute",
+        top: "50%",
+        transform: "translateY(-50%)",
+        // Sit flush against the canvas edge the panel used to occupy.
+        ...(isLeft ? { left: 74 } : { right: 0 }),
+        width: 18,
+        height: 56,
+        background: "var(--color-bg-surface)",
+        border: "var(--border-width-1) solid var(--color-border-subtle)",
+        ...(isLeft
+          ? { borderLeft: "none", borderRadius: "0 8px 8px 0" }
+          : { borderRight: "none", borderRadius: "8px 0 0 8px" }),
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--color-text-secondary)",
+        zIndex: 17,
+        boxShadow: "0 2px 8px -2px rgba(0,0,0,.15)",
+        padding: 0,
+        transition: "background .14s, color .14s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background =
+          "var(--color-bg-surface-raised)";
+        (e.currentTarget as HTMLButtonElement).style.color =
+          "var(--color-violet-600)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background =
+          "var(--color-bg-surface)";
+        (e.currentTarget as HTMLButtonElement).style.color =
+          "var(--color-text-secondary)";
+      }}
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {isLeft ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}
+      </svg>
+    </button>
   );
 }
 
@@ -113,9 +197,6 @@ function Toast() {
 }
 
 export function PcbApp() {
-  return (
-    <PcbProvider>
-      <EditorBody />
-    </PcbProvider>
-  );
+  // PcbProvider lives at the root layout — see src/app/layout.tsx.
+  return <EditorBody />;
 }

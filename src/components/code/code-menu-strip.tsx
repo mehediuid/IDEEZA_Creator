@@ -182,72 +182,42 @@ function MenuLabel({ label, open, onToggle }: { label: string; open: boolean; on
 }
 
 export function CodeMenuStrip() {
-  const [open, setOpen] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
-
+  // Menus moved into the TopBar (see CodeMenu). This component now only
+  // renders the tool-icons row (Copy / Paste / Cut / Delete / Zoom Fit /
+  // Zoom In / Zoom Out / Fullscreen) — same icons, same dispatch behavior.
+  // The labels row is gone since duplicating menus would be confusing.
   return (
-    <>
-      {/* Row 1 — Edit / Settings / Help labels + Price */}
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: "absolute",
+        top: 104,
+        left: 0,
+        right: 0,
+        height: 36,
+        background: "var(--color-bg-surface)",
+        borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 var(--spacing-8)",
+        gap: "var(--spacing-1)",
+        zIndex: 15,
+      }}
+    >
+      {ICONS.map((i) => (
+        <ToolIcon key={i.id} icon={i} />
+      ))}
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          position: "absolute",
-          top: 104,
-          left: 0,
-          right: 0,
-          height: 32,
-          background: "var(--color-bg-surface)",
-          borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-          display: "flex",
-          alignItems: "center",
-          padding: "0 var(--spacing-10)",
-          gap: "var(--spacing-7)",
-          // Above row 2 (z=15) so its dropdowns float on top of the tool icons.
-          zIndex: 25,
+          width: 1,
+          height: 18,
+          background: "var(--color-border-subtle)",
+          margin: "0 var(--spacing-4)",
         }}
-      >
-        {Object.keys(MENUS).map((l) => (
-          <MenuLabel
-            key={l}
-            label={l}
-            open={open === l}
-            onToggle={() => setOpen(open === l ? null : l)}
-          />
-        ))}
-        <span style={{ marginLeft: "auto", fontSize: "var(--font-size-sm)", color: C.body }}>
-          Price For Premium Parts:{" "}
-          <span style={{ color: C.primary, fontWeight: 700 }}>$0.00</span>
-        </span>
-      </div>
-
-      {/* Row 2 — tool icons */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: "absolute",
-          top: 136,
-          left: 0,
-          right: 0,
-          height: 36,
-          background: "var(--color-bg-surface)",
-          borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-          display: "flex",
-          alignItems: "center",
-          padding: "0 var(--spacing-8)",
-          gap: "var(--spacing-1)",
-          zIndex: 15,
-        }}
-      >
-        {ICONS.map((i) => <ToolIcon key={i.id} icon={i} />)}
-        <div style={{ width: 1, height: 18, background: "var(--color-border-subtle)", margin: "0 var(--spacing-4)" }} />
-        {ZOOMS.map((z) => <ToolIcon key={z.id} icon={z} />)}
-      </div>
-    </>
+      />
+      {ZOOMS.map((z) => (
+        <ToolIcon key={z.id} icon={z} />
+      ))}
+    </div>
   );
 }
