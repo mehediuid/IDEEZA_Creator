@@ -1,23 +1,38 @@
 "use client";
 
 // IDEEZA PCB Software — left icon rail (PCB Design / Code / 3D Module / …).
+//
+// Default offsets + active key match the PCB module (so existing call sites
+// keep working with no args). Other modules (e.g. /preview) pass their own
+// topOffset + activeKey so the rail sits below their custom chrome and the
+// active item highlight points to the right route.
 
-import { useRouter } from "next/navigation";
 import { DsIcon } from "@/lib/pcb/icons";
 import { buildRail } from "@/lib/pcb/data";
 import { usePcbState } from "@/lib/pcb/store";
+import { useStepNav, RAIL_KEY_TO_STEP } from "@/components/manual/use-step-nav";
 
-export function LeftRail() {
+export function LeftRail({
+  topOffset,
+  bottomOffset = 36,
+  activeKey = "pcb",
+}: {
+  topOffset?: number;
+  bottomOffset?: number;
+  activeKey?: string;
+} = {}) {
   const state = usePcbState();
-  const items = buildRail(state, "pcb");
-  const router = useRouter();
+  const items = buildRail(state, activeKey);
+  const { go: goStep, activeProject } = useStepNav();
+  const resolvedTop =
+    topOffset ?? (state.viewTog["Top Toolbar"] !== false ? 145 : 62);
 
   return (
     <div
       style={{
         position: "absolute",
-        top: state.viewTog["Top Toolbar"] !== false ? 145 : 62,
-        bottom: 36,
+        top: resolvedTop,
+        bottom: bottomOffset,
         left: 0,
         width: 74,
         background: "var(--color-bg-surface)",
@@ -34,7 +49,10 @@ export function LeftRail() {
           key={r.key}
           className="ix-nav"
           onClick={() => {
-            if (r.href && r.key !== "pcb") router.push(r.href);
+            // Skip the active item (already here) and unknown keys. Navigation
+            // is project-scoped through the active project.
+            const step = RAIL_KEY_TO_STEP[r.key];
+            if (step && r.key !== activeKey && activeProject) goStep(step);
           }}
           style={{
             display: "flex",

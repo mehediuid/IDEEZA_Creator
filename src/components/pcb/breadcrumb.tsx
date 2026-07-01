@@ -5,6 +5,7 @@
 // glyph, a page-switch caret and a refresh action. Replaces BREADCRUMB_HTML.
 
 import { Link } from "@/components/ideeza";
+import { useManualProjects, productLabel } from "@/lib/manual/projects";
 
 const Caret = ({ color, size = 14 }: { color: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={size > 13 ? 2 : 2.4}>
@@ -13,6 +14,10 @@ const Caret = ({ color, size = 14 }: { color: string; size?: number }) => (
 );
 
 export function Breadcrumb() {
+  const { activeProject } = useManualProjects();
+  const projectName = activeProject?.name || "Untitled project";
+  const productName = activeProject ? productLabel(activeProject) : "Untitled product";
+
   return (
     <div
       style={{
@@ -35,10 +40,10 @@ export function Breadcrumb() {
           <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </svg>
       </span>
-      <Link color="neutral" size="md" className="no-underline">Project Name</Link>
+      <Link color="neutral" size="md" className="no-underline" title={projectName}>{projectName}</Link>
       <Caret color="var(--color-text-disabled)" />
-      <Link color="brand" size="md" className="font-[var(--font-weight-semibold)] no-underline" iconTrailing={<Caret color="var(--color-violet-600)" size={13} />}>
-        [Product Name]
+      <Link color="brand" size="md" className="font-[var(--font-weight-semibold)] no-underline" title={productName}>
+        {productName}
       </Link>
       <div
         className="ix-tool"

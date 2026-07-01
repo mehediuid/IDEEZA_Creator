@@ -7,7 +7,7 @@
 // modes after having made progress.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useStepNav } from "@/components/manual/use-step-nav";
 import { Breadcrumb } from "@/components/pcb/breadcrumb";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
@@ -72,7 +72,7 @@ function Caret({ dir }: { dir: "left" | "right" }) {
 }
 
 export function CodeApp() {
-  const router = useRouter();
+  const { go: goStep } = useStepNav();
   const [mode, setMode] = React.useState<CodeMode | null>(null);
   const [pendingMode, setPendingMode] = React.useState<CodeMode | null>(null);
 
@@ -135,11 +135,11 @@ export function CodeApp() {
         <Pill
           tone="brand"
           leading={<Caret dir="left" />}
-          onClick={() => (mode === null ? router.push("/pcb") : setMode(null))}
+          onClick={() => (mode === null ? goStep("pcb") : setMode(null))}
         >
           {mode === null ? "Back to PCB" : "Back to picker"}
         </Pill>
-        <Pill tone="brand" trailing={<Caret dir="right" />} onClick={() => router.push("/3d")}>
+        <Pill tone="brand" trailing={<Caret dir="right" />} onClick={() => goStep("three")}>
           Continue to 3D
         </Pill>
       </div>

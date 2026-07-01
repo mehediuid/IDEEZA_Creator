@@ -11,6 +11,8 @@ import { C } from "@/lib/pcb/colors";
 export const THREE_EVENT = "ideeza:three-action";
 
 export type ThreeAction =
+  // AI
+  | "ai:generate"
   // Shape Creation
   | "shape:box" | "shape:sphere" | "shape:cylinder" | "shape:cone" | "shape:torus" | "shape:plane" | "shape:spline" | "shape:sketch" | "shape:import"
   // Modeling Operation

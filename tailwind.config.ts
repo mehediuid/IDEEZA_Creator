@@ -42,6 +42,12 @@ export default {
         input: "var(--color-border-default)",
         ring: "var(--color-border-focus)",
       },
+      // Tailwind's preflight applies `border: 0 solid <theme.borderColor.DEFAULT>`
+      // to every element. Without this override the default border color falls
+      // back to Tailwind's hardcoded #e5e7eb instead of the DS token.
+      borderColor: {
+        DEFAULT: "var(--color-border-default)",
+      },
     },
   },
   plugins: [tailwindcssAnimate],

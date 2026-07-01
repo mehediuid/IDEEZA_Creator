@@ -1,50 +1,48 @@
 "use client";
 
 // ProductFlowProvider — single source of truth for the end-to-end product
-// creation wizard: PCB → Code → 3D → Preview → Brief. Each step is a route;
-// the provider just tracks which steps are completed so the FlowStepper and
-// FlowContinueButton can render correctly and the user can be sent to the
-// right place from the home page ("Continue where you left off").
+// creation wizard: PCB → Code → 3D → Preview → Brief.
 //
-// The current step is derived from the URL — never stored here — so back/
-// forward navigation behaves correctly and is reliable across reloads.
+// Per the latest spec (per-project flow state), this provider is now a
+// thin VIEW over the active ManualProject's flowState — the actual
+// storage lives in `useManualProjects()`. Calling `markCompleted` here
+// updates the active project's state in the manual-projects store, so
+// switching projects naturally swaps the progress users see.
+//
+// If there is no active project (e.g. user landed before selecting one
+// — which the RequireActiveProject gate prevents anyway), `state` is
+// the empty default and mutations are no-ops.
 
 import * as React from "react";
+import {
+  EMPTY_FLOW_STATE,
+  FLOW_STEPS,
+  SEGMENT_TO_STEP,
+  STEP_LABELS,
+  firstIncompleteStep,
+  useManualProjects,
+  type ManualFlowState,
+} from "@/lib/manual/projects";
 
-export type FlowStep = "pcb" | "code" | "three" | "preview" | "brief";
+export type FlowStep = keyof ManualFlowState;
 
-export const FLOW_ORDER: FlowStep[] = [
-  "pcb",
-  "code",
-  "three",
-  "preview",
-  "brief",
-];
-
+export const FLOW_ORDER: FlowStep[] = FLOW_STEPS;
 export const FLOW_LABELS: Record<FlowStep, string> = {
-  pcb: "PCB",
-  code: "Code",
+  pcb: STEP_LABELS.pcb.replace(" Design", ""), // back-compat short labels
+  code: STEP_LABELS.code,
   three: "3D",
   preview: "Preview",
   brief: "Brief",
 };
-
-export const FLOW_HREFS: Record<FlowStep, string> = {
-  pcb: "/pcb",
-  code: "/code",
-  three: "/3d",
-  preview: "/preview",
-  brief: "/brief",
-};
-
 // Inverse lookup: given a pathname, return the matching FlowStep or null.
+// Handles both the project-scoped route (/project/<slug>/<segment>) and the
+// legacy flat routes (/pcb, /code, /3d, /preview, /brief) that still redirect.
 export function stepFromPath(pathname: string | null): FlowStep | null {
   if (!pathname) return null;
-  for (const step of FLOW_ORDER) {
-    if (pathname === FLOW_HREFS[step] || pathname.startsWith(FLOW_HREFS[step] + "/")) {
-      return step;
-    }
-  }
+  const scoped = pathname.match(/^\/project\/[^/]+\/([^/]+)/);
+  if (scoped) return SEGMENT_TO_STEP[scoped[1]] ?? null;
+  const legacy = pathname.match(/^\/(pcb|code|3d|preview|brief)(?:\/|$)/);
+  if (legacy) return SEGMENT_TO_STEP[legacy[1]] ?? null;
   return null;
 }
 
@@ -60,36 +58,12 @@ export function prevStep(step: FlowStep): FlowStep | null {
   return FLOW_ORDER[idx - 1];
 }
 
-export type FlowState = {
-  pcb: boolean;
-  code: boolean;
-  three: boolean;
-  preview: boolean;
-  brief: boolean;
-  startedAt: number | null;
-};
+export type FlowState = ManualFlowState & { startedAt: number | null };
 
-const DEFAULT_STATE: FlowState = {
-  pcb: false,
-  code: false,
-  three: false,
-  preview: false,
-  brief: false,
+const DEFAULT_VIEW_STATE: FlowState = {
+  ...EMPTY_FLOW_STATE,
   startedAt: null,
 };
-
-const STORAGE_KEY = "ideeza:product:flow";
-
-function loadState(): FlowState {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_STATE;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_STATE, ...(parsed || {}) };
-  } catch {
-    return DEFAULT_STATE;
-  }
-}
 
 type Ctx = {
   state: FlowState;
@@ -107,46 +81,44 @@ export function ProductFlowProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [state, setState] = React.useState<FlowState>(DEFAULT_STATE);
-  const [hydrated, setHydrated] = React.useState(false);
+  const {
+    hydrated,
+    activeProject,
+    activeProjectId,
+    markStepCompleted,
+    updateProject,
+  } = useManualProjects();
 
-  React.useEffect(() => {
-    setState(loadState());
-    setHydrated(true);
-  }, []);
+  const state: FlowState = React.useMemo(() => {
+    if (!activeProject) return DEFAULT_VIEW_STATE;
+    return {
+      ...activeProject.flowState,
+      startedAt: activeProject.createdAt,
+    };
+  }, [activeProject]);
 
-  React.useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {}
-  }, [state, hydrated]);
-
-  const markCompleted = React.useCallback((step: FlowStep) => {
-    setState((s) => ({
-      ...s,
-      [step]: true,
-      startedAt: s.startedAt ?? Date.now(),
-    }));
-  }, []);
-
-  const resetFlow = React.useCallback(() => {
-    setState(DEFAULT_STATE);
-  }, []);
-
-  const isAnyStarted = React.useCallback(
-    () =>
-      FLOW_ORDER.some((step) => state[step as keyof FlowState] === true) ||
-      state.startedAt !== null,
-    [state],
+  const markCompleted = React.useCallback(
+    (step: FlowStep) => {
+      if (!activeProjectId) return;
+      markStepCompleted(activeProjectId, step);
+    },
+    [activeProjectId, markStepCompleted],
   );
 
+  const resetFlow = React.useCallback(() => {
+    if (!activeProjectId) return;
+    updateProject(activeProjectId, { flowState: { ...EMPTY_FLOW_STATE } });
+  }, [activeProjectId, updateProject]);
+
+  const isAnyStarted = React.useCallback(() => {
+    if (!activeProject) return false;
+    return FLOW_ORDER.some((s) => activeProject.flowState[s]);
+  }, [activeProject]);
+
   const firstIncomplete = React.useCallback((): FlowStep => {
-    for (const step of FLOW_ORDER) {
-      if (!state[step as keyof FlowState]) return step;
-    }
-    return "brief";
-  }, [state]);
+    if (!activeProject) return "pcb";
+    return firstIncompleteStep(activeProject);
+  }, [activeProject]);
 
   const value: Ctx = React.useMemo(
     () => ({

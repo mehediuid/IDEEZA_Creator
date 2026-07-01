@@ -323,8 +323,8 @@ export function DrawingSettingsPage() {
   return (
     <PageScroll>
       <Row
-        label="Default Drawing Templates"
-        hint="Templates loaded automatically when you open a new project."
+        label="Default Drawing Browse Project"
+        hint="Browse Project loaded automatically when you open a new project."
       >
         <Button hierarchy="primary" size="md" onClick={() => setPickerOpen(true)}>
           Select Drawing
@@ -405,7 +405,7 @@ function SelectDrawingModal({
         }}
       >
         <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-6)" }}>
-          Select Drawing Templates
+          Select Drawing Browse Project
         </div>
         <div style={{ marginBottom: "var(--spacing-8)" }}>
           {drawings.map((d) => (
@@ -467,8 +467,8 @@ export function HotkeySettingsPage() {
       if (e.altKey) parts.push("Alt");
       const main =
         e.key === " " ? "Space" :
-        e.key === "Escape" ? "Esc" :
-        e.key.length === 1 ? e.key.toUpperCase() : e.key;
+          e.key === "Escape" ? "Esc" :
+            e.key.length === 1 ? e.key.toUpperCase() : e.key;
       if (!["Control", "Shift", "Alt", "Meta"].includes(e.key)) parts.push(main);
       if (parts.length === 0) return;
       actions.setHotkey(editingId, parts.join("+"));
@@ -627,10 +627,10 @@ export function ThemeRow() {
 // ── System Setting (Phase C) ─────────────────────────────────────────────────
 
 const SYSTEM_TABS: { id: "general" | "category" | "libDevice" | "libPanel"; label: string }[] = [
-  { id: "general",   label: "General" },
-  { id: "category",  label: "Category" },
+  { id: "general", label: "General" },
+  { id: "category", label: "Category" },
   { id: "libDevice", label: "Common Library Device" },
-  { id: "libPanel",  label: "Common Library Panel" },
+  { id: "libPanel", label: "Common Library Panel" },
 ];
 
 function TabBar<T extends string>({
@@ -818,7 +818,7 @@ export function SystemSettingsPage() {
                 { label: "Cloud only", value: "Cloud only" },
                 { label: "Cloud + Local", value: "Cloud + Local" },
               ]}
-              onChange={() => {}}
+              onChange={() => { }}
               minWidth={170}
             />
           </Row>
@@ -838,7 +838,7 @@ export function SystemSettingsPage() {
                 { label: "KiCad Panel", value: "KiCad Panel" },
                 { label: "Altium PCB Panel", value: "Altium PCB Panel" },
               ]}
-              onChange={() => {}}
+              onChange={() => { }}
               minWidth={170}
             />
           </Row>
@@ -852,9 +852,9 @@ export function SystemSettingsPage() {
 
 const PROPERTY_OBJECT_OPTIONS = [
   { label: "Schematic Default", value: "Schematic Default" },
-  { label: "PCB Default",       value: "PCB Default"       },
-  { label: "Footprint",         value: "Footprint"         },
-  { label: "Panel Lib",         value: "Panel Lib"         },
+  { label: "PCB Default", value: "PCB Default" },
+  { label: "Footprint", value: "Footprint" },
+  { label: "Panel Lib", value: "Panel Lib" },
 ];
 const PROPERTY_DISPLAY_OPTIONS = [
   { label: "Show", value: "Show" },

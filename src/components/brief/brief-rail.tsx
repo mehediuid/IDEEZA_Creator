@@ -1,12 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { DsIcon } from "@/lib/pcb/icons";
 import { buildRail } from "@/lib/pcb/data";
+import { useStepNav, RAIL_KEY_TO_STEP } from "@/components/manual/use-step-nav";
 
 export function BriefRail({ topOffset = 62 }: { topOffset?: number } = {}) {
   const items = buildRail(null, "brief");
-  const router = useRouter();
+  const { go: goStep, activeProject } = useStepNav();
   return (
     <div
       style={{
@@ -28,7 +28,10 @@ export function BriefRail({ topOffset = 62 }: { topOffset?: number } = {}) {
         <div
           key={r.key}
           className="ix-nav"
-          onClick={() => { if (r.href && r.key !== "brief") router.push(r.href); }}
+          onClick={() => {
+            const step = RAIL_KEY_TO_STEP[r.key];
+            if (step && r.key !== "brief" && activeProject) goStep(step);
+          }}
           style={{
             display: "flex",
             flexDirection: "column",

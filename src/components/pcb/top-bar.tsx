@@ -26,6 +26,9 @@ import { MenuBar } from "@/components/pcb/menu-bar";
 import { CodeMenu } from "@/components/code/code-menu";
 import { ThreeMenu } from "@/components/3d/three-menu";
 import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
+import { useManualProjects } from "@/lib/manual/projects";
+import { IdeezaLogo } from "@/components/brand/ideeza-logo";
+import { ProductNameField } from "@/components/manual/product-name-field";
 
 const VIOLET = "var(--color-violet-600)";
 
@@ -75,6 +78,7 @@ export function TopBar() {
   const currentStep = stepFromPath(pathname);
   const onFlowPage = currentStep !== null;
   const menu = pickMenu(currentStep);
+  const { activeProject } = useManualProjects();
 
   return (
     <div
@@ -94,25 +98,56 @@ export function TopBar() {
     >
       {/* logo + caret */}
       <div className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", paddingRight: "var(--spacing-5)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
-          <span style={{ display: "inline-block", width: 30, height: 30, borderRadius: "50%", background: VIOLET, position: "relative" }}>
-            <span
-              style={{
-                position: "absolute",
-                top: 8,
-                left: 11,
-                width: 0,
-                height: 0,
-                borderLeft: "10px solid var(--color-text-on-brand)",
-                borderTop: "7px solid transparent",
-                borderBottom: "7px solid transparent",
-              }}
-            />
-          </span>
-          <span style={{ fontWeight: 800, fontSize: "var(--font-size-2xl)", letterSpacing: ".5px", color: "var(--color-text-primary)" }}>IDEEZA</span>
-        </div>
+        <IdeezaLogo height={26} />
         <HugeiconsIcon icon={ArrowDown01Icon} size={14} color={VIOLET} strokeWidth={2.5} />
       </div>
+
+      {/* Active project — shown on every editor page so the workspace always
+          says which project you're in. Dynamic from the manual-projects store. */}
+      {onFlowPage && activeProject && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--spacing-3)",
+            minWidth: 0,
+            marginLeft: "var(--spacing-6)",
+            paddingLeft: "var(--spacing-6)",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          </svg>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              lineHeight: 1.12,
+            }}
+          >
+            <ProductNameField
+              fontSize="var(--font-size-md)"
+              fontWeight={600}
+              maxWidth={220}
+            />
+            <span
+              title={activeProject.name}
+              style={{
+                fontSize: "var(--font-size-2xs)",
+                fontWeight: 500,
+                color: "var(--color-text-tertiary)",
+                maxWidth: 220,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {activeProject.name}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Middle slot. On flow routes the app menu lives here (Earn IDZ +
           Connect Wallet relocate into the profile dropdown). On home / other

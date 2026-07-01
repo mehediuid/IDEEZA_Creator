@@ -24,6 +24,7 @@ import { Step4Success } from "./step-4-success";
 import { C } from "@/lib/pcb/colors";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProductFlow } from "@/components/product-flow/product-flow-provider";
+import { useManualProjects } from "@/lib/manual/projects";
 
 export type Intent = "sell" | "give" | "save";
 export type MediaType = "ai" | "ar" | "skip";
@@ -55,13 +56,6 @@ export type Scene = {
   musicCue: string;
   speech: string;
 };
-
-export const PROJECTS: { id: string; name: string }[] = [
-  { id: "discord-bot", name: "Discord Bot" },
-  { id: "esp32-board", name: "ESP32 Sensor Board" },
-  { id: "ai-pet-feeder", name: "AI Pet Feeder" },
-  { id: "open-hardware", name: "Open Hardware Toolkit" },
-];
 
 export type BriefState = {
   // Step 1
@@ -102,7 +96,13 @@ export type BriefState = {
   videoJobId: string | null;
 };
 
-const DRAFT_KEY = "ideeza:brief:draft";
+// Brief drafts are scoped PER PROJECT so finishing one project's brief never
+// leaks its Step 4 state into another. The bare key below is the pre-scoping
+// global draft — read once for cleanup, then removed.
+const LEGACY_DRAFT_KEY = "ideeza:brief:draft";
+function draftKey(projectId: string): string {
+  return `ideeza:brief:draft:${projectId}`;
+}
 // Cross-page handoff slot written by the GlobalRenderIndicator when the user
 // picks "Regenerate" on a finished video job. Brief reads it on mount AND on
 // the `ideeza:brief-regenerate` window event, restores the old prompt/quality
@@ -138,9 +138,9 @@ const DEFAULT_STATE: BriefState = {
   videoJobId: null,
 };
 
-function readFromStorage(): { state: BriefState; step: number } {
+function readFromStorage(projectId: string): { state: BriefState; step: number } {
   try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
+    const raw = window.localStorage.getItem(draftKey(projectId));
     if (raw) {
       const parsed = JSON.parse(raw) as { state?: BriefState; step?: number };
       return {
@@ -193,17 +193,26 @@ export function BriefApp() {
   const router = useRouter();
   const { createJob, markMinted } = useVideoJobs();
   const { markCompleted: markFlowStep } = useProductFlow();
+  const { activeProject, activeProjectId, setStatus, updateProject } =
+    useManualProjects();
   const [state, setState] = React.useState<BriefState>(DEFAULT_STATE);
   const [step, setStep] = React.useState(1);
   const [hydrated, setHydrated] = React.useState(false);
   const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
 
-  // Hydration + cross-page regenerate handoff. If the indicator wrote a regen
-  // request, we override Step 2 fields and snap the user back to Step 2 so
-  // they re-enter prompt → storyboard → render from scratch.
+  // Hydration is PER PROJECT: load THIS project's brief draft (or a fresh Step
+  // 1 if it has none). The cross-page regenerate handoff still applies on top.
+  // Keyed by activeProjectId so a different project never inherits another's
+  // draft — this is what makes a new project start a brand-new brief.
   React.useEffect(() => {
-    const { state: loaded, step: loadedStep } = readFromStorage();
+    if (!activeProjectId) return;
+    // One-time cleanup of the pre-scoping global draft so a stale Step 4 from
+    // an earlier build can't leak into a fresh project.
+    try {
+      window.localStorage.removeItem(LEGACY_DRAFT_KEY);
+    } catch {}
+    const { state: loaded, step: loadedStep } = readFromStorage(activeProjectId);
     let normalized: BriefState = loaded;
     let nextStep = loadedStep;
     const regen = readRegenRequest();
@@ -214,7 +223,7 @@ export function BriefApp() {
     setState(normalized);
     setStep(nextStep);
     setHydrated(true);
-  }, []);
+  }, [activeProjectId]);
 
   // Same-page regenerate handoff: the page doesn't re-mount when the indicator
   // navigates to /brief from /brief, so we also listen for the event.
@@ -230,17 +239,54 @@ export function BriefApp() {
   }, []);
 
   React.useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !activeProjectId) return;
+    // Don't persist until the loaded state belongs to this project — guards a
+    // transient cross-write while the active project changes mid-flight.
+    if (state.projectId && state.projectId !== activeProjectId) return;
     try {
       window.localStorage.setItem(
-        DRAFT_KEY,
+        draftKey(activeProjectId),
         JSON.stringify({ state, step }),
       );
     } catch {}
-  }, [state, step, hydrated]);
+  }, [state, step, hydrated, activeProjectId]);
+
+  // Adopt the active project's identity + product name ONCE per project (keyed
+  // on the project id). Typing the name in Step 1 writes the other way (via
+  // handleStep1Change) — this effect must NOT re-run on those edits, or the
+  // synced value would fight the user mid-type (the cursor jumps / reverts).
+  React.useEffect(() => {
+    if (!hydrated || !activeProject) return;
+    setState((s) =>
+      s.projectId === activeProject.id &&
+      s.productName === activeProject.productName
+        ? s
+        : {
+            ...s,
+            projectId: activeProject.id,
+            productName: activeProject.productName,
+          },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, activeProject?.id]);
 
   const patch = (next: Partial<BriefState>) =>
     setState((s) => ({ ...s, ...next }));
+
+  // Step 1 edits the product name into local state (smooth, controlled input)
+  // AND writes it straight through to the project so the editor chrome shows
+  // the same name on every step. Written on change — no reactive round-trip,
+  // so the input never fights itself.
+  const handleStep1Change = (next: {
+    productName?: string;
+    productDescription?: string;
+    intent?: Intent;
+  }) => {
+    patch(next);
+    if (next.productName !== undefined && activeProjectId) {
+      updateProject(activeProjectId, { productName: next.productName });
+    }
+  };
 
   const goToStep2 = () => {
     // Sell / Give require AI media — snap mediaType to AI when arriving here.
@@ -363,18 +409,13 @@ export function BriefApp() {
       // whole product as complete so the home page can offer "Start fresh"
       // instead of "Continue".
       markFlowStep("brief");
+      // Terminal step done → flip the project Draft → Completed so it reads as
+      // Completed in My Projects.
+      if (activeProjectId) setStatus(activeProjectId, "completed");
       setState((s) => ({ ...s, mintedAt: Date.now() }));
       setMinting(false);
       setStep(4);
     }, 1400);
-  };
-
-  const createAnother = () => {
-    setState(DEFAULT_STATE);
-    setStep(1);
-    try {
-      window.localStorage.removeItem(DRAFT_KEY);
-    } catch {}
   };
 
   const updateScene = (id: string, p: Partial<Scene>) =>
@@ -410,11 +451,11 @@ export function BriefApp() {
           <Crossfade keyName={`step-${step}`}>
             {step === 1 && (
               <Step1Idea
-                projectId={state.projectId}
+                activeProjectName={activeProject?.name ?? ""}
                 productName={state.productName}
                 productDescription={state.productDescription}
                 intent={state.intent}
-                onChange={patch}
+                onChange={handleStep1Change}
                 onContinue={goToStep2}
               />
             )}
@@ -440,13 +481,14 @@ export function BriefApp() {
                 }
                 onMint={mint}
                 minting={minting}
+                projectName={activeProject?.name ?? ""}
               />
             )}
             {step === 4 && (
               <Step4Success
                 state={state}
-                onCreateAnother={createAnother}
                 onBrowse={(href) => router.push(href)}
+                projectName={activeProject?.name ?? ""}
               />
             )}
           </Crossfade>

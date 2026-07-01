@@ -1,383 +1,353 @@
 "use client";
 
-// Preview — the 4th step in the product creation flow (PCB → Code → 3D →
-// Preview → Brief). Final-merge view that lets the creator see all three
-// modules stitched together before they write the brief.
+// Preview — the 4th step in the product creation flow. CAD-style composite
+// preview modelled on Onshape's part-studio layout: PreviewToolbar (top),
+// InstancesPanel (left tree), live ThreeViewport (center), PreviewRightPanel
+// (right). Flow chrome lives on top: the global TopBar carries the IDEEZA
+// menu bar + profile + premium parts chip.
 //
-// This page is intentionally a stub for now — the real merge view (canvas
-// preview, code repl, 3D viewer composited) is a larger build. The page still
-// exists so the FlowStepper has the full 5-step structure and "Continue to
-// Brief" lives in its rightful place.
+// Wires every piece to a shared PreviewContext so the toolbar, tree,
+// view-cube and side icons all act on the same scene state. Shapes are read
+// from (and persisted to) the SAME localStorage slot the /3d module owns,
+// so the preview is a true viewer of what the user built upstream.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
-import { C } from "@/lib/pcb/colors";
-import { useProductFlow } from "@/components/product-flow/product-flow-provider";
+import { LeftRail } from "@/components/pcb/left-rail";
+import {
+  PreviewProvider,
+  usePreview,
+  type FitVerdict,
+} from "./preview-context";
+import { PreviewToolbar } from "./preview-toolbar";
+import { InstancesPanel } from "./preview-instances";
+import { PreviewViewport } from "./preview-viewport";
+import { PreviewRightPanel } from "./preview-right-panel";
+import { PreviewContextMenu } from "./preview-context-menu";
+
+const TOP_BAR_H = 62;
+const PREVIEW_TOOLBAR_H = 40;
+const LEFT_RAIL_W = 74;
+const LEFT_PANEL_W = 256;
+// Right side: full panel matching the PCB / 3D module pattern (292px) with
+// content + a vertical tab strip on its inner-right edge.
+const RIGHT_PANEL_W = 292;
+
+// Total vertical chrome above the viewport.
+const VIEWPORT_TOP = TOP_BAR_H + PREVIEW_TOOLBAR_H;
 
 export function PreviewApp() {
-  const router = useRouter();
-  const { state, hydrated } = useProductFlow();
+  return (
+    <PreviewProvider>
+      <PreviewBody />
+    </PreviewProvider>
+  );
+}
 
-  const upstreamPieces: { key: string; label: string; done: boolean }[] = [
-    { key: "pcb", label: "PCB", done: state.pcb },
-    { key: "code", label: "Code", done: state.code },
-    { key: "three", label: "3D model", done: state.three },
-  ];
-  const upstreamReady = upstreamPieces.every((p) => p.done);
+function PreviewBody() {
+  const { go: goStep } = useStepNav();
+  const { showInstancesPanel, toast } = usePreview();
+
+  // Reflow viewport + flow pills when the instances panel is collapsed via
+  // the side-icon toggle.
+  const leftPanelOffset = showInstancesPanel ? LEFT_PANEL_W : 0;
+  const viewportLeft = LEFT_RAIL_W + leftPanelOffset;
 
   return (
     <EditorShell>
       <TopBar />
+      <PreviewToolbar />
 
-      <div
-        style={{
-          position: "absolute",
-          top: 62,
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: "var(--color-bg-page)",
-          overflowY: "auto",
-        }}
-      >
-        <div
-          style={{
-            minHeight: "100%",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "64px 32px 120px",
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 720,
-              display: "flex",
-              flexDirection: "column",
-              gap: 28,
-            }}
-          >
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 32,
-                  background: "var(--color-bg-brand-subtle)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 16,
-                }}
-              >
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--color-violet-600)"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </div>
-              <h1
-                style={{
-                  fontSize: 32,
-                  fontWeight: 700,
-                  color: C.text,
-                  margin: 0,
-                  letterSpacing: -0.5,
-                }}
-              >
-                Product preview
-              </h1>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: C.body,
-                  marginTop: 6,
-                  maxWidth: 460,
-                  marginInline: "auto",
-                  lineHeight: 1.5,
-                }}
-              >
-                See your PCB, code, and 3D model composited together before you
-                write the brief. The merged view is on its way — for now, jump
-                straight to the brief.
-              </p>
-            </div>
+      {/* Shared module-switcher rail (PCB Design / Code / 3D Module /
+          Product Preview / Add Brief). */}
+      <LeftRail
+        topOffset={VIEWPORT_TOP}
+        bottomOffset={0}
+        activeKey="preview"
+      />
 
-            {/* Upstream-step recap card */}
-            <div
-              style={{
-                background: "var(--color-bg-surface)",
-                border:
-                  "var(--border-width-1) solid var(--color-border-subtle)",
-                borderRadius: "var(--radius-lg)",
-                padding: 18,
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "var(--color-text-secondary)",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Pieces you&rsquo;ve made
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 10,
-                }}
-              >
-                {upstreamPieces.map((p) => (
-                  <UpstreamTile
-                    key={p.key}
-                    label={p.label}
-                    done={hydrated ? p.done : false}
-                  />
-                ))}
-              </div>
-              {hydrated && !upstreamReady && (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: C.body,
-                    background: "var(--color-bg-page)",
-                    border:
-                      "var(--border-width-1) solid var(--color-border-subtle)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "10px 12px",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Some upstream steps aren&rsquo;t marked complete yet —
-                  you can still continue to brief, or hop back via the
-                  stepper above to finish them first.
-                </div>
-              )}
-            </div>
+      {showInstancesPanel && <InstancesPanel topOffset={VIEWPORT_TOP} />}
 
-            {/* Placeholder canvas */}
-            <div
-              style={{
-                aspectRatio: "16 / 9",
-                background:
-                  "linear-gradient(135deg, #1e1b4b 0%, #4c1d95 38%, #831843 76%, #fb923c 100%)",
-                borderRadius: "var(--radius-lg)",
-                position: "relative",
-                overflow: "hidden",
-                boxShadow: "0 12px 40px -10px rgba(124, 45, 185, .35)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  color: "rgba(255,255,255,0.95)",
-                  textAlign: "center",
-                  padding: 24,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    textTransform: "uppercase",
-                    padding: "4px 10px",
-                    background: "rgba(0,0,0,.35)",
-                    borderRadius: 999,
-                  }}
-                >
-                  Coming soon
-                </span>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>
-                  Composited product preview
-                </div>
-                <div style={{ fontSize: 13, opacity: 0.85, maxWidth: 360 }}>
-                  Live merge of your PCB layout, code behavior, and 3D enclosure
-                  — playable, rotatable, embeddable.
-                </div>
-              </div>
-            </div>
+      <PreviewViewport
+        topOffset={VIEWPORT_TOP}
+        leftOffset={viewportLeft}
+        rightOffset={RIGHT_PANEL_W}
+      />
+      <PreviewRightPanel topOffset={VIEWPORT_TOP} />
+      <FitStatusBadge
+        topOffset={VIEWPORT_TOP + 16}
+        leftOffset={viewportLeft + 16}
+      />
 
-            {/* Forward + back actions. Mirrors the canvas pill pattern used
-                by the PCB / Code / 3D modules — destination-labeled, sat at
-                the bottom-right of the page. Preview's stub doesn't have a
-                canvas of its own yet, so we render them as page content. */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
-                marginTop: 8,
-              }}
-            >
-              <button
-                onClick={() => router.push("/3d")}
-                style={{
-                  padding: "14px 22px",
-                  background: "var(--color-bg-surface)",
-                  color: "var(--color-text-primary)",
-                  border:
-                    "var(--border-width-1) solid var(--color-border-default)",
-                  borderRadius: "var(--radius-3xl)",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M15 6l-6 6 6 6" />
-                </svg>
-                Back to 3D
-              </button>
-              <button
-                onClick={() => router.push("/brief")}
-                style={{
-                  padding: "14px 26px",
-                  background: "var(--color-violet-600)",
-                  color: "var(--color-text-on-brand)",
-                  border: "none",
-                  borderRadius: "var(--radius-3xl)",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  boxShadow: "0 8px 26px -8px rgba(124, 45, 185, .4)",
-                }}
-              >
-                Continue to Brief
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 6l6 6-6 6" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Back to 3D — bottom-LEFT inside the viewport area. */}
+      <FlowPill
+        kind="back"
+        label="Back to 3D"
+        onClick={() => goStep("three")}
+        style={{ left: viewportLeft + 20, bottom: 20 }}
+      />
+
+      {/* Continue to Brief — bottom-RIGHT inside the viewport area. */}
+      <FlowPill
+        kind="forward"
+        label="Continue to Brief"
+        onClick={() => goStep("brief")}
+        style={{ right: RIGHT_PANEL_W + 20, bottom: 20 }}
+      />
+
+      {toast && <PreviewToast text={toast} />}
+      <PreviewContextMenu />
     </EditorShell>
   );
 }
 
-function UpstreamTile({ label, done }: { label: string; done: boolean }) {
+// FitStatusBadge — top-left pill showing whether the PCB fits inside the
+// enclosure. The underlying canvas computes the verdict from real Box3
+// math, so this badge is a true reflection of the merged scene.
+function FitStatusBadge({
+  topOffset,
+  leftOffset,
+}: {
+  topOffset: number;
+  leftOffset: number;
+}) {
+  const { fitVerdict, showPcb, showEnclosure } = usePreview();
+  if (!showPcb || !showEnclosure) return null;
+
+  const { tone, icon, title, sub } = describeVerdict(fitVerdict);
+
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
-        padding: "12px 14px",
-        background: done
-          ? "var(--color-bg-brand-subtle)"
-          : "var(--color-bg-page)",
-        border: `var(--border-width-1) solid ${
-          done ? "var(--color-border-brand)" : "var(--color-border-subtle)"
-        }`,
-        borderRadius: "var(--radius-md)",
-        display: "flex",
+        position: "absolute",
+        top: topOffset,
+        left: leftOffset,
+        zIndex: 20,
+        padding: "10px 14px 10px 12px",
+        background: "var(--color-bg-surface)",
+        border: `var(--border-width-1-5) solid ${toneBorder(tone)}`,
+        borderRadius: 999,
+        boxShadow: "0 8px 26px -8px rgba(0,0,0,.18)",
+        display: "inline-flex",
         alignItems: "center",
         gap: 10,
-        transition: "background .14s, border-color .14s",
+        maxWidth: 360,
       }}
     >
       <span
+        aria-hidden="true"
         style={{
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          background: done
-            ? "var(--color-violet-600)"
-            : "var(--color-bg-surface-raised)",
-          color: done
-            ? "var(--color-text-on-brand)"
-            : "var(--color-text-tertiary)",
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          background: toneBg(tone),
+          color: toneFg(tone),
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          flex: "0 0 22px",
+          flex: "0 0 28px",
         }}
       >
-        {done ? (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        {icon}
+      </span>
+      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {title}
+        </span>
+        {sub && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--color-text-secondary)",
+              marginTop: 1,
+            }}
           >
-            <path d="M5 13l4 4 10-10" />
-          </svg>
-        ) : (
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="9" />
-          </svg>
+            {sub}
+          </span>
         )}
       </span>
-      <span
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: done
-            ? "var(--color-violet-600)"
-            : "var(--color-text-primary)",
-        }}
-      >
-        {label}
-      </span>
     </div>
+  );
+}
+
+type Tone = "ok" | "warn" | "neutral";
+
+function describeVerdict(v: FitVerdict): {
+  tone: Tone;
+  icon: React.ReactNode;
+  title: string;
+  sub?: string;
+} {
+  if (v.kind === "fits") {
+    const smallest = Math.min(...v.headroom);
+    return {
+      tone: "ok",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 13l4 4 10-10" />
+        </svg>
+      ),
+      title: "PCB fits inside enclosure",
+      sub: `Tightest clearance ${smallest.toFixed(2)} u`,
+    };
+  }
+  if (v.kind === "overflow") {
+    const axes = ["X", "Y", "Z"];
+    const worstIdx = v.overflow.indexOf(Math.max(...v.overflow));
+    return {
+      tone: "warn",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l10 18H2z" />
+          <path d="M12 10v5" />
+          <path d="M12 18h.01" />
+        </svg>
+      ),
+      title: "PCB exceeds enclosure",
+      sub: `Worst overflow ${v.overflow[worstIdx].toFixed(2)} u on ${axes[worstIdx]} axis`,
+    };
+  }
+  if (v.kind === "enclosure-missing") {
+    return {
+      tone: "neutral",
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 7l8-4 8 4-8 4z" />
+          <path d="M4 7v10l8 4 8-4V7" />
+        </svg>
+      ),
+      title: "No enclosure to check against",
+      sub: "Design one in the 3D module or add a part here.",
+    };
+  }
+  return {
+    tone: "neutral",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="6" width="18" height="12" rx="1" />
+        <path d="M7 6v12M17 6v12" />
+      </svg>
+    ),
+    title: "No PCB to check",
+    sub: "Place components in the PCB module.",
+  };
+}
+
+function toneBg(t: Tone) {
+  if (t === "ok") return "var(--color-green-100)";
+  if (t === "warn")
+    return "var(--color-orange-100, var(--color-bg-brand-subtle))";
+  return "var(--color-bg-surface-raised)";
+}
+function toneFg(t: Tone) {
+  if (t === "ok") return "var(--color-green-700)";
+  if (t === "warn")
+    return "var(--color-orange-600, var(--color-text-error))";
+  return "var(--color-text-secondary)";
+}
+function toneBorder(t: Tone) {
+  if (t === "ok") return "var(--color-green-500)";
+  if (t === "warn")
+    return "var(--color-orange-500, var(--color-border-strong))";
+  return "var(--color-border-subtle)";
+}
+
+function PreviewToast({ text }: { text: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: "absolute",
+        bottom: 80,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 90,
+        padding: "10px 18px",
+        background: "var(--color-bg-inverse, #1E1E1E)",
+        color: "var(--color-text-on-brand, #FFFFFF)",
+        borderRadius: 999,
+        boxShadow: "0 12px 32px -8px rgba(0,0,0,.3)",
+        fontSize: 13,
+        fontWeight: 500,
+        animation: "ix-preview-toast .18s ease-out",
+      }}
+    >
+      {text}
+      <style>{`
+        @keyframes ix-preview-toast {
+          from { opacity: 0; transform: translate(-50%, 8px); }
+          to   { opacity: 1; transform: translate(-50%, 0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function FlowPill({
+  kind,
+  label,
+  onClick,
+  style,
+}: {
+  kind: "back" | "forward";
+  label: string;
+  onClick: () => void;
+  style: React.CSSProperties;
+}) {
+  const isForward = kind === "forward";
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        position: "absolute",
+        zIndex: 20,
+        padding: "10px 18px",
+        background: isForward
+          ? "var(--color-violet-600)"
+          : "var(--color-bg-surface)",
+        color: isForward
+          ? "var(--color-text-on-brand)"
+          : "var(--color-text-primary)",
+        border: isForward
+          ? "none"
+          : "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-3xl)",
+        fontSize: 13,
+        fontWeight: isForward ? 700 : 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        boxShadow: isForward
+          ? "0 8px 26px -8px rgba(124, 45, 185, .42)"
+          : "0 4px 12px -4px rgba(0,0,0,.18)",
+        fontFamily: "inherit",
+        ...style,
+      }}
+    >
+      {!isForward && (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 6l-6 6 6 6" />
+        </svg>
+      )}
+      {label}
+      {isForward && (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      )}
+    </button>
   );
 }

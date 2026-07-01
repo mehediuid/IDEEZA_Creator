@@ -10,6 +10,8 @@ import { SearchInput } from "@/components/ideeza";
 import { AllLibraryFlyout, LibraryPanel } from "@/components/pcb/library-panel";
 import { buildCompPills, buildLeftTabs, buildNetPills, buildSubTabs, buildTree } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { useManualProjects } from "@/lib/manual/projects";
+import { ProductNameField } from "@/components/manual/product-name-field";
 
 const CARET_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>';
@@ -219,6 +221,8 @@ export function LeftPanel() {
 // view-toggle the menu bar already drives, so panel state stays consistent.
 function ProductHeader() {
   const actions = usePcbActions();
+  const { activeProject } = useManualProjects();
+  const projectName = activeProject?.name || "Untitled project";
   return (
     <div
       style={{
@@ -266,19 +270,7 @@ function ProductHeader() {
             minWidth: 0,
           }}
         >
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: "var(--color-text-primary)",
-              letterSpacing: -0.1,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            [Product Name]
-          </div>
+          <ProductNameField fontSize={15} fontWeight={700} />
           <div
             style={{
               fontSize: 11,
@@ -289,8 +281,9 @@ function ProductHeader() {
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}
+            title={projectName}
           >
-            Project Name
+            {projectName}
           </div>
         </div>
         <button

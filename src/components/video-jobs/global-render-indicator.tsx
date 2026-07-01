@@ -21,6 +21,7 @@ import {
 import { ReviewModal } from "@/components/brief/review-modal";
 import { RegenerateConfirm } from "@/components/brief/regenerate-confirm";
 import { RegenerateFlow } from "./regenerate-flow";
+import { useManualProjects, stepHref } from "@/lib/manual/projects";
 
 // Cross-page handoff: when the user picks "Regenerate" from the indicator, we
 // stash a snapshot of the old job's prompt/quality/title here and send the user
@@ -46,6 +47,7 @@ export function GlobalRenderIndicator() {
     dismiss,
   } = useVideoJobs();
   const router = useRouter();
+  const { activeProject } = useManualProjects();
   const [expanded, setExpanded] = React.useState(false);
   const [reviewingId, setReviewingId] = React.useState<string | null>(null);
   const [regenConfirmFor, setRegenConfirmFor] = React.useState<string | null>(
@@ -86,7 +88,7 @@ export function GlobalRenderIndicator() {
     try {
       window.dispatchEvent(new CustomEvent(REGEN_EVENT));
     } catch {}
-    router.push("/brief");
+    router.push(activeProject ? stepHref(activeProject, "brief") : "/brief");
   };
 
 

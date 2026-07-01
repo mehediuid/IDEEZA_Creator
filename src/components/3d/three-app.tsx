@@ -6,7 +6,7 @@
 // shapes + right-panel state so a refresh keeps your work.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { ThreeRail } from "@/components/3d/three-rail";
@@ -18,6 +18,7 @@ import { ThreeViewport, type SceneShape, type ShapeType, type TransformMode, mak
 import { ThreeFloatingTools } from "@/components/3d/three-floating-tools";
 import { SketchMode, type Sketch } from "@/components/3d/sketch-mode";
 import { ThreeModals } from "@/components/3d/three-modals";
+import { AiGenerateModal } from "@/components/3d/ai-generate-modal";
 import { C } from "@/lib/pcb/colors";
 
 type ThreeMode = "demo" | "sketch" | "fullview" | "preview";
@@ -143,7 +144,7 @@ function readRightFromStorage(): RightPanelState {
 }
 
 export function ThreeApp() {
-  const router = useRouter();
+  const { go: goStep, activeProject } = useStepNav();
   const [mode, setMode] = React.useState<ThreeMode>("demo");
   const [selectedPart, setSelectedPart] = React.useState<string | null>(null);
   // Initial render must match SSR — start with the deterministic default and
@@ -164,6 +165,7 @@ export function ThreeApp() {
   const [modal, setModal] = React.useState<ModalId>(null);
   const [toast, setToast] = React.useState<string | null>(null);
   const [clipboard, setClipboard] = React.useState<SceneShape | null>(null);
+  const [aiOpen, setAiOpen] = React.useState(false);
 
   // Persistence — only after hydration so we don't overwrite localStorage with
   // the deterministic SSR default on the initial render.
@@ -441,6 +443,8 @@ export function ThreeApp() {
       const shape = SHAPE_FROM_ACTION[action];
       if (shape) { addShape(shape); return; }
       switch (action) {
+        // AI
+        case "ai:generate":      setAiOpen(true); return;
         // shapes & misc
         case "shape:sketch":     setMode("sketch"); return;
         case "shape:spline":     flashToast("Add spline (sketch mode)"); setMode("sketch"); return;
@@ -723,11 +727,11 @@ export function ThreeApp() {
             }}
           >
             {mode === "demo" && (
-              <Pill leading={<Caret dir="left" />} onClick={() => router.push("/code")}>
+              <Pill leading={<Caret dir="left" />} onClick={() => goStep("code")}>
                 Back to Code
               </Pill>
             )}
-            <Pill trailing={<Caret dir="right" />} onClick={() => router.push("/preview")}>
+            <Pill trailing={<Caret dir="right" />} onClick={() => goStep("preview")}>
               Continue to Preview
             </Pill>
           </div>
@@ -746,6 +750,15 @@ export function ThreeApp() {
         onClose={() => setModal(null)}
         onPatternApply={(n) => { patternSelected(n); setModal(null); }}
         onAlignApply={(axis) => { mutateSelected((s) => ({ ...s, position: axis === "x" ? [0, s.position[1], s.position[2]] : axis === "y" ? [s.position[0], 0, s.position[2]] : [s.position[0], s.position[1], 0] })); flashToast(`Aligned to ${axis.toUpperCase()}`); setModal(null); }}
+      />
+
+      <AiGenerateModal
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        projectId={activeProject?.id}
+        defaultPrompt={
+          activeProject?.productName?.trim() || activeProject?.name?.trim() || ""
+        }
       />
 
       {toast && (

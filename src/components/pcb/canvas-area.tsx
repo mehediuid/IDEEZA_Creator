@@ -7,7 +7,7 @@
 // zooms in/out at the cursor; middle-mouse or space-drag pans the viewport.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useStepNav } from "@/components/manual/use-step-nav";
 import { Icon } from "@/lib/pcb/icons";
 import { buildCanvas } from "@/lib/pcb/content";
 import { buildModeTabs } from "@/lib/pcb/data";
@@ -44,7 +44,7 @@ function GridPattern() {
 export function CanvasArea() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const router = useRouter();
+  const { go: goStep } = useStepNav();
   const modeTabs = buildModeTabs(state, actions);
   const v = state.viewTog;
   // Breadcrumb + old MenuBar strips removed; everything that used to sit at
@@ -505,7 +505,7 @@ export function CanvasArea() {
           which step comes next (we no longer rely on a separate stepper CTA). */}
       <div
         className="ix-btn"
-        onClick={() => router.push("/code")}
+        onClick={() => goStep("code")}
         style={{
           position: "absolute",
           bottom: 24,

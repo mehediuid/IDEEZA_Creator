@@ -3,13 +3,13 @@
 // 3D Module left icon rail — same five items as the PCB/Code rails, with
 // "3D Module" highlighted. Click another item to navigate cross-section.
 
-import { useRouter } from "next/navigation";
 import { DsIcon } from "@/lib/pcb/icons";
 import { buildRail } from "@/lib/pcb/data";
+import { useStepNav, RAIL_KEY_TO_STEP } from "@/components/manual/use-step-nav";
 
 export function ThreeRail({ topOffset = 132 }: { topOffset?: number } = {}) {
   const items = buildRail(null, "3d");
-  const router = useRouter();
+  const { go: goStep, activeProject } = useStepNav();
 
   return (
     <div
@@ -33,7 +33,8 @@ export function ThreeRail({ topOffset = 132 }: { topOffset?: number } = {}) {
           key={r.key}
           className="ix-nav"
           onClick={() => {
-            if (r.href && r.key !== "3d") router.push(r.href);
+            const step = RAIL_KEY_TO_STEP[r.key];
+            if (step && r.key !== "3d" && activeProject) goStep(step);
           }}
           style={{
             display: "flex",

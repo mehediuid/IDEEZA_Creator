@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import "../pcb/fonts.css";
-import "../pcb/pcb-editor.css";
-import { CodeApp } from "@/components/code/code-app";
+import { LegacyStepRedirect } from "@/components/manual/legacy-step-redirect";
 
 export const metadata: Metadata = {
   title: "IDEEZA — Code",
@@ -9,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function CodePage() {
-  return <CodeApp />;
+  return <LegacyStepRedirect step="code" />;
 }

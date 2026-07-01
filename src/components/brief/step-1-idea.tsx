@@ -6,7 +6,7 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import { PROJECTS, type Intent } from "./brief-app";
+import { type Intent } from "./brief-app";
 
 const MAX_DESC = 140;
 
@@ -48,22 +48,21 @@ const INTENTS: { id: Intent; label: string; sub: string; icon: React.ReactNode }
 ];
 
 export function Step1Idea({
-  projectId,
+  activeProjectName,
   productName,
   productDescription,
   intent,
   onChange,
   onContinue,
 }: {
-  projectId: string;
+  activeProjectName: string;
   productName: string;
   productDescription: string;
   intent: Intent | null;
-  onChange: (patch: { projectId?: string; productName?: string; productDescription?: string; intent?: Intent }) => void;
+  onChange: (patch: { productName?: string; productDescription?: string; intent?: Intent }) => void;
   onContinue: () => void;
 }) {
   const canContinue =
-    !!projectId &&
     productName.trim().length > 0 &&
     productDescription.trim().length > 0 &&
     !!intent;
@@ -81,27 +80,46 @@ export function Step1Idea({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <FieldLabel label="Project">
-          <select
-            value={projectId}
-            onChange={(e) => onChange({ projectId: e.target.value })}
-            style={{
-              ...inputStyle,
-              appearance: "none",
-              backgroundImage:
-                "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.4'><path d='M6 9l6 6 6-6'/></svg>\")",
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: "right 16px center",
-              paddingRight: 40,
-              color: projectId ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
-            }}
-          >
-            <option value="" disabled>Choose a project</option>
-            {PROJECTS.map((p) => (
-              <option key={p.id} value={p.id} style={{ color: "var(--color-text-primary)" }}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <>
+            <div
+              style={{
+                height: 48,
+                width: "100%",
+                padding: "0 16px",
+                background: "var(--color-bg-surface-raised)",
+                border: "var(--border-width-1) solid var(--color-border-subtle)",
+                borderRadius: "var(--radius-lg)",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {activeProjectName || "Active project"}
+              </span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="5" y="11" width="14" height="9" rx="2" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+              </svg>
+            </div>
+            <span style={{ fontSize: 12, color: C.body }}>
+              This brief belongs to your active project.
+            </span>
+          </>
         </FieldLabel>
 
         <FieldLabel label="Product name">

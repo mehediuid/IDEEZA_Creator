@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import "../pcb/fonts.css";
-import "../pcb/pcb-editor.css";
-import { PreviewApp } from "@/components/preview/preview-app";
+import { LegacyStepRedirect } from "@/components/manual/legacy-step-redirect";
 
 export const metadata: Metadata = {
   title: "IDEEZA — Product Preview",
@@ -9,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function PreviewPage() {
-  return <PreviewApp />;
+  return <LegacyStepRedirect step="preview" />;
 }

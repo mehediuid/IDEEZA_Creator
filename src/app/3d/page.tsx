@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import "../pcb/fonts.css";
-import "../pcb/pcb-editor.css";
-import { ThreeApp } from "@/components/3d/three-app";
+import { LegacyStepRedirect } from "@/components/manual/legacy-step-redirect";
 
 export const metadata: Metadata = {
   title: "IDEEZA — 3D Module",
@@ -9,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function ThreeDPage() {
-  return <ThreeApp />;
+  return <LegacyStepRedirect step="three" />;
 }

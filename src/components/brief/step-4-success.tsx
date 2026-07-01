@@ -11,7 +11,7 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import { PROJECTS, type BriefState, type Intent } from "./brief-app";
+import { type BriefState, type Intent } from "./brief-app";
 import {
   useVideoJobs,
   progressOf,
@@ -38,12 +38,12 @@ const SUBLINE_PENDING_BY_INTENT: Record<Intent, string> = {
 
 export function Step4Success({
   state,
-  onCreateAnother,
   onBrowse,
+  projectName,
 }: {
   state: BriefState;
-  onCreateAnother: () => void;
   onBrowse: (href: string) => void;
+  projectName: string;
 }) {
   const { jobs } = useVideoJobs();
   const intent = (state.intent || "sell") as Intent;
@@ -169,8 +169,7 @@ export function Step4Success({
                   marginBottom: 2,
                 }}
               >
-                {PROJECTS.find((p) => p.id === state.projectId)?.name ||
-                  "Listing"}
+                {projectName || "Listing"}
               </div>
               <div
                 style={{
@@ -301,7 +300,7 @@ export function Step4Success({
         }}
       >
         <button
-          onClick={onCreateAnother}
+          onClick={() => onBrowse("/projects")}
           style={{
             padding: "14px 24px",
             background: "var(--color-violet-600)",
@@ -323,32 +322,24 @@ export function Step4Success({
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.4"
+            strokeWidth="1.9"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M12 5v14 M5 12h14" />
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           </svg>
-          Create another brief
+          Go to My Projects
         </button>
 
         <div
           style={{
             display: "flex",
-            gap: 8,
             justifyContent: "center",
             alignItems: "center",
           }}
         >
-          <span style={{ fontSize: 12, color: C.body }}>or jump to</span>
-          <a onClick={() => onBrowse("/pcb")} style={linkButton}>
-            PCB
-          </a>
-          <a onClick={() => onBrowse("/code")} style={linkButton}>
-            Code
-          </a>
-          <a onClick={() => onBrowse("/3d")} style={linkButton}>
-            3D
+          <a onClick={() => onBrowse("/")} style={linkButton}>
+            Back to home
           </a>
         </div>
       </div>

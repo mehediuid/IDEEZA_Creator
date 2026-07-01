@@ -10,7 +10,6 @@
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import {
-  PROJECTS,
   LISTING_TYPES,
   TOKENS_BY_NETWORK,
   type BriefState,
@@ -46,12 +45,14 @@ export function Step3Mint({
   onBack,
   onMint,
   minting,
+  projectName,
 }: {
   state: BriefState;
   onChange: (patch: Partial<BriefState>) => void;
   onBack: () => void;
   onMint: () => void;
   minting: boolean;
+  projectName: string;
 }) {
   const { jobs } = useVideoJobs();
   const intent = state.intent || "sell";
@@ -198,8 +199,7 @@ export function Step3Mint({
               marginBottom: 2,
             }}
           >
-            {PROJECTS.find((p) => p.id === state.projectId)?.name ||
-              "No project"}
+            {projectName || "No project"}
           </div>
           <div
             style={{
@@ -252,7 +252,7 @@ export function Step3Mint({
           onChange={(v) => onChange({ confirmOwnership: v })}
         />
         <Check
-          label="Share to Newsfeed"
+          label="Share to Innovations"
           checked={state.shareToNewsfeed}
           onChange={(v) => onChange({ shareToNewsfeed: v })}
         />

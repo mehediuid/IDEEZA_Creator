@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import "../pcb/fonts.css";
-import "../pcb/pcb-editor.css";
-import { BriefApp } from "@/components/brief/brief-app";
+import { LegacyStepRedirect } from "@/components/manual/legacy-step-redirect";
 
 export const metadata: Metadata = {
   title: "IDEEZA — Add Brief",
@@ -9,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function BriefPage() {
-  return <BriefApp />;
+  return <LegacyStepRedirect step="brief" />;
 }

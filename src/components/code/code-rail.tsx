@@ -4,13 +4,13 @@
 // Code / 3D Module / Product Preview / Add Brief), but standalone (no PcbProvider).
 // Clicking "PCB Design" navigates to /pcb; clicking "Code" is a no-op.
 
-import { useRouter } from "next/navigation";
 import { DsIcon } from "@/lib/pcb/icons";
 import { buildRail } from "@/lib/pcb/data";
+import { useStepNav, RAIL_KEY_TO_STEP } from "@/components/manual/use-step-nav";
 
 export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
   const items = buildRail(null, "code");
-  const router = useRouter();
+  const { go: goStep, activeProject } = useStepNav();
 
   return (
     <div
@@ -34,7 +34,8 @@ export function CodeRail({ topOffset = 152 }: { topOffset?: number } = {}) {
           key={r.key}
           className="ix-nav"
           onClick={() => {
-            if (r.href && r.key !== "code") router.push(r.href);
+            const step = RAIL_KEY_TO_STEP[r.key];
+            if (step && r.key !== "code" && activeProject) goStep(step);
           }}
           style={{
             display: "flex",
