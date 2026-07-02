@@ -20,6 +20,7 @@ export const RAIL_KEY_TO_STEP: Partial<
   code: "code",
   "3d": "three",
   preview: "preview",
+  wiring: "wiring",
   brief: "brief",
 };
 

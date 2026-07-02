@@ -1,27 +1,75 @@
 "use client";
 
-// PreviewToolbar — top strip on /preview. Modeled on the Onshape part-studio
-// toolbar. Wired into the PreviewContext: shape primitives (Box / Sphere /
-// Cylinder / Cone) add real meshes to the live viewport, Insert mirrors a
-// Box add, Reset view recenters the camera, search highlights matching
-// tools. Buttons without a wired action emit a toast so the user gets
-// feedback that the click registered.
+// PreviewToolbar — top strip on /preview. Assembly-style toolbar limited to the
+// component-level tools that belong on a product preview: Insert Components,
+// New Part, Move / Rotate Component, reference Plane / Axis, and Edit Component.
+//
+// Wired into PreviewContext where the store genuinely backs the action:
+//   • Insert Components / New Part → add real geometry to the live viewport.
+//   • Move / Rotate / Plane / Axis / Edit → flash a toast (same stub pattern the
+//     toolbar already used for not-yet-implemented ops) so the click registers.
+// Styling follows the existing IDEEZA design tokens — same container, radii,
+// colors, and hover behavior as before; only the tool set changed.
 
 import * as React from "react";
 import { usePreview } from "./preview-context";
 
-type IconBtnProps = {
-  title: string;
-  children: React.ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-};
+function Divider() {
+  return (
+    <div
+      style={{
+        width: 1,
+        height: 18,
+        background: "var(--color-border-subtle)",
+        margin: "0 var(--spacing-3)",
+        flex: "0 0 1px",
+      }}
+    />
+  );
+}
 
-function IconBtn({ title, children, active, onClick }: IconBtnProps) {
+function Stroke({
+  path,
+  size = 16,
+  strokeWidth = 1.7,
+}: {
+  path: React.ReactNode;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {path}
+    </svg>
+  );
+}
+
+// Icon-only tool button — the label lives in the tooltip (title) and
+// aria-label so hover and screen readers still name the tool.
+function ToolButton({
+  label,
+  icon,
+  onClick,
+  active,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  active?: boolean;
+}) {
   return (
     <button
-      title={title}
-      aria-label={title}
+      title={label}
+      aria-label={label}
       onClick={onClick}
       style={{
         width: 30,
@@ -46,66 +94,26 @@ function IconBtn({ title, children, active, onClick }: IconBtnProps) {
       }}
       onMouseLeave={(e) => {
         if (active) return;
-        (e.currentTarget as HTMLButtonElement).style.background =
-          "transparent";
+        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
       }}
     >
-      {children}
+      {icon}
     </button>
   );
 }
 
-function Divider() {
-  return (
-    <div
-      style={{
-        width: 1,
-        height: 18,
-        background: "var(--color-border-subtle)",
-        margin: "0 var(--spacing-2)",
-        flex: "0 0 1px",
-      }}
-    />
-  );
-}
-
-function Stroke({
-  path,
-  size = 17,
-  strokeWidth = 1.7,
-}: {
-  path: React.ReactNode;
-  size?: number;
-  strokeWidth?: number;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {path}
-    </svg>
-  );
-}
-
 export function PreviewToolbar() {
-  const [search, setSearch] = React.useState("");
-  const {
-    addShape,
-    deleteSelected,
-    resetCamera,
-    fitCamera,
-    selectedId,
-    flashToast,
-  } = usePreview();
+  const { addShape, selectedId, flashToast, canvas, patchCanvas } = usePreview();
 
-  const stub = (label: string) => flashToast(label);
+  // Toggle the shared transform mode (same state the right panel's Transform
+  // section drives) — clicking the active mode switches the gizmo off.
+  const setMode = (mode: "translate" | "rotate", verb: string) => {
+    const next = canvas.transformMode === mode ? "none" : mode;
+    patchCanvas({ transformMode: next });
+    if (next === "none") flashToast(`${verb} mode off`);
+    else if (selectedId) flashToast(`${verb} mode — drag the component`);
+    else flashToast(`${verb} mode on — select a component first`);
+  };
 
   return (
     <div
@@ -124,187 +132,124 @@ export function PreviewToolbar() {
         zIndex: 18,
       }}
     >
-      {/* Undo / Redo — history isn't tracked in the preview yet, so these
-          flash a toast to confirm the click registered. */}
-      <IconBtn title="Undo" onClick={() => stub("Undo (history coming soon)")}>
-        <Stroke path={<><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-15-6.7L3 13" /></>} />
-      </IconBtn>
-      <IconBtn title="Redo" onClick={() => stub("Redo (history coming soon)")}>
-        <Stroke path={<><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 15-6.7L21 13" /></>} />
-      </IconBtn>
-
-      <Divider />
-
-      {/* Insert pill — quick-add a box to the scene (most common starter
-          primitive in Onshape's Insert flow). */}
-      <button
-        title="Insert"
-        onClick={() => addShape("box")}
-        style={{
-          height: 28,
-          padding: "0 12px",
-          borderRadius: "var(--radius-md)",
-          background: "var(--color-bg-surface-raised)",
-          border: "var(--border-width-1) solid var(--color-border-subtle)",
-          color: "var(--color-text-primary)",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontFamily: "inherit",
+      {/* Components — insert / create geometry (real). */}
+      <ToolButton
+        label="Insert Components"
+        icon={
+          <Stroke
+            path={
+              <>
+                <path d="M4 13v4l8 4 8-4v-4" />
+                <path d="M12 3v10" />
+                <path d="M8.5 9.5 12 13l3.5-3.5" />
+              </>
+            }
+          />
+        }
+        onClick={() => {
+          addShape("box");
+          flashToast("Inserted component");
         }}
-      >
-        <Stroke
-          size={14}
-          path={<><path d="M12 5v14M5 12h14" /></>}
-        />
-        Insert
-      </button>
-
-      <Divider />
-
-      {/* History / time-travel — stub. */}
-      <IconBtn title="Feature history" onClick={() => stub("Feature history")}>
-        <Stroke
-          path={
-            <>
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7v5l3 2" />
-            </>
-          }
-        />
-      </IconBtn>
-
-      <Divider />
-
-      {/* Shape primitives — Box / Sphere / Cylinder / Cone */}
-      <IconBtn title="Box" onClick={() => addShape("box")}>
-        <Stroke path={<><path d="M4 7l8-4 8 4-8 4z" /><path d="M4 7v10l8 4 8-4V7" /><path d="M12 11v10" /></>} />
-      </IconBtn>
-      <IconBtn title="Sphere" onClick={() => addShape("sphere")}>
-        <Stroke path={<><circle cx="12" cy="12" r="9" /><ellipse cx="12" cy="12" rx="9" ry="3.5" /></>} />
-      </IconBtn>
-      <IconBtn title="Cylinder" onClick={() => addShape("cylinder")}>
-        <Stroke path={<><ellipse cx="12" cy="6" rx="7" ry="2.5" /><path d="M5 6v12a7 2.5 0 0 0 14 0V6" /></>} />
-      </IconBtn>
-      <IconBtn title="Cone" onClick={() => addShape("cone")}>
-        <Stroke path={<><path d="M12 3l8 16" /><path d="M4 19l8-16" /><ellipse cx="12" cy="19" rx="8" ry="2.5" /></>} />
-      </IconBtn>
-
-      <Divider />
-
-      {/* Planes / axes — reset / refit shortcuts (stand-ins until per-face
-          camera snap lands). */}
-      <IconBtn title="Reset view" onClick={resetCamera}>
-        <Stroke path={<><path d="M3 8l9 4 9-4-9-4z" /></>} />
-      </IconBtn>
-      <IconBtn title="Fit to scene" onClick={fitCamera}>
-        <Stroke path={<><path d="M3 12l9 4 9-4" /><path d="M12 3v13" /></>} />
-      </IconBtn>
-      <IconBtn title="Front plane" onClick={() => stub("Front plane (coming soon)")}>
-        <Stroke path={<><rect x="6" y="4" width="12" height="16" rx="1" /><path d="M9 9h6M9 12h6M9 15h6" /></>} />
-      </IconBtn>
-      <IconBtn title="Right plane" onClick={() => stub("Right plane (coming soon)")}>
-        <Stroke path={<><rect x="4" y="6" width="16" height="12" rx="1" /><path d="M4 12h16" /></>} />
-      </IconBtn>
-
-      <Divider />
-
-      {/* Operations — stubs */}
-      <IconBtn title="Extrude" onClick={() => stub("Extrude")}>
-        <Stroke path={<><path d="M4 14l4-4h12v8H8z" /><path d="M8 14v-4" /><path d="M20 18v-8" /></>} />
-      </IconBtn>
-      <IconBtn title="Revolve" onClick={() => stub("Revolve")}>
-        <Stroke path={<><circle cx="12" cy="12" r="9" /><path d="M3 12a9 4 0 0 0 18 0" /></>} />
-      </IconBtn>
-      <IconBtn title="Fillet" onClick={() => stub("Fillet")}>
-        <Stroke path={<><path d="M4 20V8a4 4 0 0 1 4-4h12" /></>} />
-      </IconBtn>
-      <IconBtn
-        title="Delete selected"
-        onClick={() => (selectedId ? deleteSelected() : stub("Nothing selected"))}
-      >
-        <Stroke path={<><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M5 6l1 14h12l1-14" /></>} />
-      </IconBtn>
-
-      <Divider />
-
-      {/* Mates — stubs */}
-      <IconBtn title="Fastened mate" onClick={() => stub("Fastened mate")}>
-        <Stroke path={<><circle cx="8" cy="12" r="3" /><circle cx="16" cy="12" r="3" /><path d="M8 12h8" /></>} />
-      </IconBtn>
-      <IconBtn title="Revolute mate" onClick={() => stub("Revolute mate")}>
-        <Stroke path={<><circle cx="12" cy="12" r="3" /><path d="M12 3v4M12 17v4M3 12h4M17 12h4" /></>} />
-      </IconBtn>
-      <IconBtn title="Planar mate" onClick={() => stub("Planar mate")}>
-        <Stroke path={<><rect x="3" y="6" width="8" height="12" /><rect x="13" y="6" width="8" height="12" /></>} />
-      </IconBtn>
-
-      <Divider />
-
-      {/* Display */}
-      <IconBtn title="Visibility" onClick={() => stub("Visibility toggle")}>
-        <Stroke path={<><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>} />
-      </IconBtn>
-      <IconBtn title="Section view" onClick={() => stub("Section view (visual stub)")}>
-        <Stroke path={<><path d="M4 20h16" /><path d="M4 4l16 16" /><path d="M9 4h11v11" /></>} />
-      </IconBtn>
-      <IconBtn title="Render settings" onClick={() => stub("Render settings")}>
-        <Stroke path={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></>} />
-      </IconBtn>
-
-      {/* Search tools — right side */}
-      <div
-        style={{
-          marginLeft: "auto",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 4px 0 12px",
-          height: 28,
-          background: "var(--color-bg-page)",
-          border: "var(--border-width-1) solid var(--color-border-subtle)",
-          borderRadius: "var(--radius-md)",
+      />
+      <ToolButton
+        label="New Part"
+        icon={
+          <Stroke
+            path={
+              <>
+                <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+                <path d="M4 7.5l8 4.5 8-4.5M12 12v9" />
+              </>
+            }
+          />
+        }
+        onClick={() => {
+          addShape("box");
+          flashToast("New part created");
         }}
-      >
-        <Stroke
-          size={13}
-          strokeWidth={2}
-          path={<><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></>}
-        />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search tools..."
-          aria-label="Search tools"
-          style={{
-            width: 140,
-            border: "none",
-            background: "transparent",
-            outline: "none",
-            fontSize: 12,
-            color: "var(--color-text-primary)",
-            fontFamily: "inherit",
-          }}
-        />
-        <kbd
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: "var(--color-text-tertiary)",
-            fontFamily:
-              "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-            background: "var(--color-bg-surface-raised)",
-            padding: "2px 6px",
-            borderRadius: 4,
-            border: "var(--border-width-1) solid var(--color-border-subtle)",
-          }}
-        >
-          alt/⌥ c
-        </kbd>
-      </div>
+      />
+
+      <Divider />
+
+      {/* Transform */}
+      <ToolButton
+        label="Move Component"
+        icon={
+          <Stroke
+            path={
+              <>
+                <path d="M12 3v18M3 12h18" />
+                <path d="M12 3 9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5" />
+              </>
+            }
+          />
+        }
+        active={canvas.transformMode === "translate"}
+        onClick={() => setMode("translate", "Move")}
+      />
+      <ToolButton
+        label="Rotate Component"
+        icon={
+          <Stroke
+            path={
+              <>
+                <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+                <path d="M20 4v4h-4" />
+              </>
+            }
+          />
+        }
+        active={canvas.transformMode === "rotate"}
+        onClick={() => setMode("rotate", "Rotate")}
+      />
+
+      <Divider />
+
+      {/* Reference geometry */}
+      <ToolButton
+        label="Plane"
+        icon={<Stroke path={<path d="M9 5h10l-4 14H5z" />} />}
+        onClick={() => flashToast("Reference plane (coming soon)")}
+      />
+      <ToolButton
+        label="Axis"
+        icon={
+          <Stroke
+            path={
+              <>
+                <path d="M5 19 19 5" />
+                <circle cx="5" cy="19" r="1.4" />
+                <circle cx="19" cy="5" r="1.4" />
+              </>
+            }
+          />
+        }
+        onClick={() => flashToast("Reference axis (coming soon)")}
+      />
+
+      <Divider />
+
+      {/* Edit */}
+      <ToolButton
+        label="Edit Component"
+        icon={
+          <Stroke
+            path={
+              <>
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+              </>
+            }
+          />
+        }
+        onClick={() =>
+          flashToast(
+            selectedId
+              ? "Editing component"
+              : "Select a component to edit",
+          )
+        }
+      />
     </div>
   );
 }

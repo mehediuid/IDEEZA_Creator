@@ -38,17 +38,23 @@ const RIGHT_PANEL_W = 292;
 // Total vertical chrome above the viewport.
 const VIEWPORT_TOP = TOP_BAR_H + PREVIEW_TOOLBAR_H;
 
-export function PreviewApp() {
+// The Wiring step reuses the whole Preview workspace for now (same scene,
+// panels and toolbar) — only the rail highlight and the flow pills differ.
+// When wiring gets its own tools this becomes its own module.
+export type PreviewVariant = "preview" | "wiring";
+
+export function PreviewApp({ variant = "preview" }: { variant?: PreviewVariant }) {
   return (
     <PreviewProvider>
-      <PreviewBody />
+      <PreviewBody variant={variant} />
     </PreviewProvider>
   );
 }
 
-function PreviewBody() {
+function PreviewBody({ variant }: { variant: PreviewVariant }) {
   const { go: goStep } = useStepNav();
   const { showInstancesPanel, toast } = usePreview();
+  const isWiring = variant === "wiring";
 
   // Reflow viewport + flow pills when the instances panel is collapsed via
   // the side-icon toggle.
@@ -65,7 +71,7 @@ function PreviewBody() {
       <LeftRail
         topOffset={VIEWPORT_TOP}
         bottomOffset={0}
-        activeKey="preview"
+        activeKey={isWiring ? "wiring" : "preview"}
       />
 
       {showInstancesPanel && <InstancesPanel topOffset={VIEWPORT_TOP} />}
@@ -81,19 +87,19 @@ function PreviewBody() {
         leftOffset={viewportLeft + 16}
       />
 
-      {/* Back to 3D — bottom-LEFT inside the viewport area. */}
+      {/* Back — bottom-LEFT inside the viewport area. */}
       <FlowPill
         kind="back"
-        label="Back to 3D"
-        onClick={() => goStep("three")}
+        label={isWiring ? "Back to Preview" : "Back to 3D"}
+        onClick={() => goStep(isWiring ? "preview" : "three")}
         style={{ left: viewportLeft + 20, bottom: 20 }}
       />
 
-      {/* Continue to Brief — bottom-RIGHT inside the viewport area. */}
+      {/* Continue — bottom-RIGHT inside the viewport area. */}
       <FlowPill
         kind="forward"
-        label="Continue to Brief"
-        onClick={() => goStep("brief")}
+        label={isWiring ? "Continue to Brief" : "Continue to Wiring"}
+        onClick={() => goStep(isWiring ? "brief" : "wiring")}
         style={{ right: RIGHT_PANEL_W + 20, bottom: 20 }}
       />
 

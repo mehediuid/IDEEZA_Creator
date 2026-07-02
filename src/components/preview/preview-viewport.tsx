@@ -7,9 +7,12 @@
 // inside the 3D enclosure.
 
 import * as React from "react";
-import { applyIsolate } from "./preview-context";
+import {
+  usePreview,
+  previewGridStep,
+  previewResolutionSegments,
+} from "./preview-context";
 import { PreviewCanvas } from "./preview-three-canvas";
-import { usePreview } from "./preview-context";
 
 export function PreviewViewport({
   topOffset,
@@ -23,8 +26,8 @@ export function PreviewViewport({
   const {
     pcb,
     enclosureShapes,
+    canvas,
     selectedId,
-    isolate,
     showPcb,
     showEnclosure,
     enclosureOpacity,
@@ -32,17 +35,26 @@ export function PreviewViewport({
     fitTick,
     fitSelectedTick,
     selectShape,
+    updateShape,
+    deleteSelected,
     setFitVerdict,
     openContextMenu,
   } = usePreview();
 
-  // Apply isolate to the enclosure list (hide non-selected shapes when
-  // isolate is on AND something on the enclosure side is selected). PCB
-  // group is shown/hidden as a whole via showPcb.
-  const filtered = React.useMemo(
-    () => applyIsolate(enclosureShapes, selectedId, isolate),
-    [enclosureShapes, selectedId, isolate],
-  );
+  // Delete / Backspace removes the selected enclosure shape (ignored while
+  // typing in a field — the panel has text inputs).
+  React.useEffect(() => {
+    if (!selectedId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      deleteSelected();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId, deleteSelected]);
 
   return (
     <div
@@ -60,7 +72,7 @@ export function PreviewViewport({
     >
       <PreviewCanvas
         pcb={pcb}
-        enclosureShapes={filtered}
+        enclosureShapes={enclosureShapes}
         selectedId={selectedId}
         onSelect={selectShape}
         onContextMenu={(id, x, y) => openContextMenu({ targetId: id, x, y })}
@@ -71,6 +83,11 @@ export function PreviewViewport({
         fitTick={fitTick}
         fitSelectedTick={fitSelectedTick}
         onFitChange={setFitVerdict}
+        transformMode={canvas.transformMode}
+        snap={canvas.snap}
+        gridStep={previewGridStep(canvas.gridSize)}
+        segments={previewResolutionSegments(canvas.resolution[0])}
+        onTransform={updateShape}
       />
     </div>
   );

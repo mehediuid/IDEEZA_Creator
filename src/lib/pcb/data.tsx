@@ -853,6 +853,7 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
     { key: 'code', label: 'Code', icon: 'code' },
     { key: '3d', label: '3D Module', icon: 'cube' },
     { key: 'preview', label: 'Product Preview', icon: 'preview' },
+    { key: 'wiring', label: 'Wiring', icon: 'wire' },
     { key: 'brief', label: 'Add Brief', icon: 'brief' },
   ];
   return railDefs.map((r) => {
@@ -865,7 +866,7 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
       fg: active ? C.primary : (r.faded ? 'var(--color-border-strong)' : C.body),
       opacity: r.faded ? 'var(--opacity-muted)' : '1',
       cursor: r.faded ? 'default' : 'pointer',
-      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : r.key === '3d' ? '/3d' : r.key === 'preview' ? '/preview' : r.key === 'brief' ? '/brief' : null,
+      href: r.key === 'pcb' ? '/pcb' : r.key === 'code' ? '/code' : r.key === '3d' ? '/3d' : r.key === 'preview' ? '/preview' : r.key === 'wiring' ? '/wiring' : r.key === 'brief' ? '/brief' : null,
     };
   });
 }

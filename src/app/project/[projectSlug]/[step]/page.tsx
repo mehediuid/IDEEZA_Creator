@@ -10,6 +10,7 @@ const SEGMENT_TO_STEP: Record<string, keyof ManualFlowState> = {
   code: "code",
   "3d": "three",
   preview: "preview",
+  wiring: "wiring",
   brief: "brief",
 };
 
@@ -18,6 +19,7 @@ const TITLES: Record<string, string> = {
   code: "Code",
   "3d": "3D Module",
   preview: "Product Preview",
+  wiring: "Wiring",
   brief: "Add Brief",
 };
 

@@ -11,7 +11,8 @@
 // today; they'll grow as the preview adds more dimensions.
 
 import * as React from "react";
-import { usePreview } from "./preview-context";
+import { usePreview, type PreviewTransformMode } from "./preview-context";
+import { GRID_OPTIONS, RES_OPTIONS } from "@/components/3d/grid-settings";
 import type { SceneShape } from "@/components/3d/three-canvas";
 import type {
   PreviewPcbBoard,
@@ -22,13 +23,13 @@ const PANEL_WIDTH = 292;
 const TAB_STRIP_WIDTH = 44;
 const CONTENT_WIDTH = PANEL_WIDTH - TAB_STRIP_WIDTH;
 
-type TabId =
-  | "properties"
-  | "parts"
-  | "copies"
-  | "selection"
-  | "materials"
-  | "variables";
+// Canvas controls (Mouse Information, Transform, Snap, Grid Size, Resolution)
+// live in PreviewContext so the viewport reacts to them; the panel just drives
+// them. Option lists come from the shared grid-settings module (same lists the
+// 3D module shows).
+const TRANSFORM_MODES: PreviewTransformMode[] = ["none", "translate", "rotate"];
+
+type TabId = "properties" | "parts";
 
 type TabDef = {
   id: TabId;
@@ -55,49 +56,6 @@ const TABS: TabDef[] = [
         <path d="M4 7l8-4 8 4-8 4z" />
         <path d="M4 7v10l8 4 8-4V7" />
         <path d="M12 11v10" />
-      </>
-    ),
-  },
-  {
-    id: "copies",
-    title: "Copies",
-    icon: (
-      <>
-        <rect x="9" y="9" width="11" height="11" rx="2" />
-        <path d="M5 15V5a2 2 0 0 1 2-2h10" />
-      </>
-    ),
-  },
-  {
-    id: "selection",
-    title: "Selection",
-    icon: (
-      <>
-        <path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M4 16v3a1 1 0 0 0 1 1h3M16 20h3a1 1 0 0 0 1-1v-3" />
-        <circle cx="12" cy="12" r="2.5" />
-      </>
-    ),
-  },
-  {
-    id: "materials",
-    title: "Materials",
-    icon: (
-      <>
-        <path d="M4 7l8-4 8 4-8 4z" />
-        <path d="M4 7v10l8 4 8-4V7" />
-        <circle cx="17" cy="17" r="3" />
-        <path d="M15.5 17a1.5 1.5 0 0 1 3 0v1.5a1.5 1.5 0 0 1-3 0z" />
-      </>
-    ),
-  },
-  {
-    id: "variables",
-    title: "Variables",
-    icon: (
-      <>
-        <path d="M9 6c-3 0-3 12 0 12" />
-        <path d="M15 6c3 0 3 12 0 12" />
-        <path d="M11 9l2 6M13 9l-2 6" />
       </>
     ),
   },
@@ -223,29 +181,21 @@ function TabButton({
 // ── Tab bodies ───────────────────────────────────────────────────────
 
 function TabBody({ tab }: { tab: TabId }) {
-  if (tab === "properties") return <PropertiesBody />;
   if (tab === "parts") return <PartsBody />;
-  if (tab === "copies") return <PlaceholderBody title="Copies" sub="Linked copies and pattern instances will appear here." />;
-  if (tab === "selection") return <SelectionBody />;
-  if (tab === "materials") return <MaterialsBody />;
-  if (tab === "variables") return <VariablesBody />;
-  return null;
+  return <PropertiesBody />;
 }
 
 function PropertiesBody() {
   const {
     pcb,
     enclosureShapes,
+    canvas,
+    patchCanvas,
     selectedId,
     showPcb,
     showEnclosure,
-    xray,
-    isolate,
     togglePcb,
     toggleEnclosure,
-    toggleXray,
-    toggleIsolate,
-    fitVerdict,
   } = usePreview();
 
   const selection = React.useMemo(() => {
@@ -257,6 +207,26 @@ function PropertiesBody() {
     if (s) return { kind: "enclosure" as const, shape: s };
     return null;
   }, [selectedId, pcb, enclosureShapes]);
+
+  // Live cursor readout — the viewport dispatches a lightweight window event on
+  // pointer move (so only this panel re-renders, never the canvas). Read-only:
+  // shows "—" when the pointer isn't over the scene.
+  const [liveMouse, setLiveMouse] = React.useState<{
+    d: number;
+    x: number;
+    y: number;
+    z: number;
+  } | null>(null);
+  React.useEffect(() => {
+    const h = (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { d: number; x: number; y: number; z: number }
+        | null;
+      setLiveMouse(detail);
+    };
+    window.addEventListener("ideeza:preview-mouse", h);
+    return () => window.removeEventListener("ideeza:preview-mouse", h);
+  }, []);
 
   return (
     <div
@@ -319,18 +289,109 @@ function PropertiesBody() {
           on={showEnclosure}
           onChange={toggleEnclosure}
         />
-        <ToggleRow
-          label="X-ray"
-          sub="See through the enclosure"
-          on={xray}
-          onChange={toggleXray}
+      </Section>
+
+      {/* Mouse Information */}
+      <Section title="Mouse Information">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr 1fr",
+            gap: 4,
+          }}
+        >
+          <ReadoutCell value={liveMouse ? liveMouse.d.toFixed(1) : "—"} />
+          <ReadoutCell value={liveMouse ? liveMouse.x.toFixed(1) : "—"} />
+          <ReadoutCell value={liveMouse ? liveMouse.y.toFixed(1) : "—"} />
+          <ReadoutCell value={liveMouse ? liveMouse.z.toFixed(1) : "—"} />
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr 1fr",
+            gap: 4,
+            fontSize: 10,
+            color: "var(--color-text-tertiary)",
+            textAlign: "center",
+          }}
+        >
+          <span>Distance</span>
+          <span>X</span>
+          <span>Y</span>
+          <span>Z</span>
+        </div>
+      </Section>
+
+      {/* Transform */}
+      <Section title="Transform">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 4,
+          }}
+        >
+          {TRANSFORM_MODES.map((m) => (
+            <SegButton
+              key={m}
+              label={m === "none" ? "Off" : cap(m)}
+              selected={canvas.transformMode === m}
+              onClick={() => patchCanvas({ transformMode: m })}
+            />
+          ))}
+        </div>
+      </Section>
+
+      {/* Snap */}
+      <Section title="Snap">
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}
+        >
+          <SnapToggle
+            label="X"
+            on={canvas.snap.x}
+            onChange={(v) => patchCanvas({ snap: { ...canvas.snap, x: v } })}
+          />
+          <SnapToggle
+            label="Y"
+            on={canvas.snap.y}
+            onChange={(v) => patchCanvas({ snap: { ...canvas.snap, y: v } })}
+          />
+          <SnapToggle
+            label="Z"
+            on={canvas.snap.z}
+            onChange={(v) => patchCanvas({ snap: { ...canvas.snap, z: v } })}
+          />
+        </div>
+      </Section>
+
+      {/* Grid Size */}
+      <Section title="Grid Size">
+        <MiniSelect
+          value={canvas.gridSize}
+          onChange={(v) => patchCanvas({ gridSize: v })}
+          options={GRID_OPTIONS}
         />
-        <ToggleRow
-          label="Isolate selected"
-          sub="Hide other enclosure parts"
-          on={isolate}
-          onChange={toggleIsolate}
-        />
+      </Section>
+
+      {/* Resolution */}
+      <Section title="Resolution">
+        <div
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}
+        >
+          {canvas.resolution.map((r, i) => (
+            <MiniSelect
+              key={i}
+              value={r}
+              onChange={(v) =>
+                patchCanvas({
+                  resolution: canvas.resolution.map((x, j) => (j === i ? v : x)),
+                })
+              }
+              options={RES_OPTIONS}
+            />
+          ))}
+        </div>
       </Section>
 
       {/* Selection-specific props */}
@@ -341,7 +402,6 @@ function PropertiesBody() {
       {selection?.kind === "enclosure" && (
         <ShapeProps shape={selection.shape} />
       )}
-      {!selection && <FitSummary verdict={fitVerdict} />}
     </div>
   );
 }
@@ -433,46 +493,6 @@ function ShapeProps({ shape }: { shape: SceneShape }) {
   );
 }
 
-function FitSummary({
-  verdict,
-}: {
-  verdict: ReturnType<typeof usePreview>["fitVerdict"];
-}) {
-  return (
-    <Section title="Fit summary">
-      {verdict.kind === "fits" && (
-        <>
-          <Row label="Status" value="✓ PCB fits inside enclosure" />
-          <Row
-            label="Headroom"
-            value={`X ${verdict.headroom[0].toFixed(2)} · Y ${verdict.headroom[1].toFixed(2)} · Z ${verdict.headroom[2].toFixed(2)}`}
-          />
-        </>
-      )}
-      {verdict.kind === "overflow" && (
-        <>
-          <Row label="Status" value="⚠ PCB exceeds enclosure" />
-          <Row
-            label="Overflow"
-            value={`X ${verdict.overflow[0].toFixed(2)} · Y ${verdict.overflow[1].toFixed(2)} · Z ${verdict.overflow[2].toFixed(2)}`}
-          />
-        </>
-      )}
-      {verdict.kind === "pcb-missing" && (
-        <Note>
-          No PCB in the scene yet. Open the PCB module to place a board.
-        </Note>
-      )}
-      {verdict.kind === "enclosure-missing" && (
-        <Note>
-          No enclosure parts yet. Add one from the toolbar or from the +
-          button in the Instances panel.
-        </Note>
-      )}
-    </Section>
-  );
-}
-
 function PartsBody() {
   const { pcb, enclosureShapes } = usePreview();
   return (
@@ -498,115 +518,6 @@ function PartsBody() {
             sub={s.hidden ? "Hidden" : "Visible"}
           />
         ))}
-      </Section>
-    </div>
-  );
-}
-
-function SelectionBody() {
-  const { selectedId, pcb, enclosureShapes, selectShape, flashToast } =
-    usePreview();
-  return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
-      <Section title="Current selection">
-        {selectedId ? (
-          <>
-            <SimpleRow label="ID" sub={selectedId} />
-            <button
-              onClick={() => selectShape(null)}
-              style={smallBtn}
-            >
-              Clear selection
-            </button>
-          </>
-        ) : (
-          <Note>Nothing selected. Click a part in the viewport or tree.</Note>
-        )}
-      </Section>
-      <Section title="Quick select">
-        <button
-          onClick={() => selectShape("pcb-board")}
-          style={smallBtn}
-        >
-          Select PCB board
-        </button>
-        {pcb.components[0] && (
-          <button
-            onClick={() => selectShape(pcb.components[0].id)}
-            style={smallBtn}
-          >
-            Select first component
-          </button>
-        )}
-        {enclosureShapes[0] && (
-          <button
-            onClick={() => selectShape(enclosureShapes[0].id)}
-            style={smallBtn}
-          >
-            Select first enclosure part
-          </button>
-        )}
-        {!pcb.components[0] && !enclosureShapes[0] && (
-          <Note>Nothing to quick-select yet.</Note>
-        )}
-      </Section>
-      {selectedId && (
-        <Section title="Actions">
-          <button
-            onClick={() => flashToast("Frame action — coming soon")}
-            style={smallBtn}
-          >
-            Frame selection
-          </button>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function MaterialsBody() {
-  const { pcb } = usePreview();
-  return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
-      <Section title="Board material">
-        <Row label="Substrate" value="FR4" />
-        <Row label="Color" value={pcb.board.color} />
-        <Row label="Finish" value="HASL · lead-free" />
-      </Section>
-      <Section title="Enclosure material">
-        <Row label="Type" value="ABS plastic" />
-        <Row label="Opacity" value="Translucent (X-ray ready)" />
-      </Section>
-      <Note>Material editing lands when manufacturing options ship.</Note>
-    </div>
-  );
-}
-
-function VariablesBody() {
-  const { pcb, enclosureShapes } = usePreview();
-  return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
-      <Section title="Computed">
-        <Row
-          label="PCB area"
-          value={`${(pcb.board.width * pcb.board.depth).toFixed(2)} u²`}
-        />
-        <Row label="Component count" value={String(pcb.components.length)} />
-        <Row label="Enclosure parts" value={String(enclosureShapes.length)} />
-      </Section>
-      <Note>
-        Expression variables (#width, #depth, …) for parametric design will
-        live here.
-      </Note>
-    </div>
-  );
-}
-
-function PlaceholderBody({ title, sub }: { title: string; sub: string }) {
-  return (
-    <div style={{ flex: 1, overflowY: "auto" }}>
-      <Section title={title}>
-        <Note>{sub}</Note>
       </Section>
     </div>
   );
@@ -805,6 +716,161 @@ function ToggleRow({
   );
 }
 
+// Read-only cursor readout cell — the values come from the viewport's pointer,
+// so there is nothing meaningful for the user to type here.
+function ReadoutCell({ value }: { value: string }) {
+  return (
+    <div
+      style={{
+        padding: "6px 4px",
+        background: "var(--color-bg-page)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-md)",
+        fontSize: 12,
+        color: "var(--color-text-primary)",
+        textAlign: "center",
+        width: "100%",
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {value}
+    </div>
+  );
+}
+
+function MiniSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        appearance: "none",
+        width: "100%",
+        padding: "7px 24px 7px 10px",
+        background: "var(--color-bg-page)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-md)",
+        fontSize: 12,
+        color: "var(--color-text-primary)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        backgroundImage:
+          "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.4'><path d='M6 9l6 6 6-6'/></svg>\")",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 7px center",
+      }}
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SegButton({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "7px 0",
+        background: selected
+          ? "var(--color-bg-brand-subtle)"
+          : "var(--color-bg-page)",
+        border: `var(--border-width-1) solid ${selected ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
+        color: selected
+          ? "var(--color-violet-600)"
+          : "var(--color-text-primary)",
+        fontSize: 12,
+        fontWeight: 600,
+        borderRadius: "var(--radius-md)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SnapToggle({
+  label,
+  on,
+  onChange,
+}: {
+  label: string;
+  on: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      aria-pressed={on}
+      aria-label={`Snap ${label}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "6px 8px",
+        background: "var(--color-bg-page)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-md)",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 600,
+        color: "var(--color-text-primary)",
+        fontFamily: "inherit",
+      }}
+    >
+      <span>{label}</span>
+      <span
+        style={{
+          width: 26,
+          height: 14,
+          borderRadius: 7,
+          background: on
+            ? "var(--color-violet-600)"
+            : "var(--color-bg-surface-raised)",
+          position: "relative",
+          flex: "0 0 26px",
+          transition: "background .12s",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: on ? 14 : 2,
+            width: 10,
+            height: 10,
+            background: "var(--color-bg-surface)",
+            borderRadius: "50%",
+            transition: "left .12s",
+            boxShadow: "0 1px 2px rgba(0,0,0,.2)",
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
 function Note({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -818,20 +884,6 @@ function Note({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-const smallBtn: React.CSSProperties = {
-  padding: "6px 10px",
-  fontSize: 12,
-  fontWeight: 600,
-  background: "var(--color-bg-page)",
-  border: "var(--border-width-1) solid var(--color-border-subtle)",
-  borderRadius: "var(--radius-md)",
-  color: "var(--color-text-primary)",
-  cursor: "pointer",
-  textAlign: "left",
-  fontFamily: "inherit",
-  width: "100%",
-};
 
 function cap(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);

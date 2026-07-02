@@ -11,7 +11,6 @@
 import * as React from "react";
 import { usePreview } from "./preview-context";
 import type { SceneShape, ShapeType } from "@/components/3d/three-canvas";
-import type { PreviewPcbComponent } from "./preview-context";
 
 export function InstancesPanel({ topOffset }: { topOffset: number }) {
   const {

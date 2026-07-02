@@ -6,7 +6,7 @@
 // item activation.
 //
 // Sections (top → bottom) match the Onshape part-studio menu:
-//   1. Visibility       — Hide / Hide others / Hide all / Isolate / Make transparent
+//   1. Visibility       — Hide / Hide others / Hide all / Make transparent
 //   2. Geometry tools   — Section view / Fix / Tessellation
 //   3. Mates            — Show / Hide
 //   4. Object actions   — Copy «name» «#» / Create Drawing(s) / Export
@@ -33,8 +33,9 @@ export function PreviewContextMenu() {
     hideInstance,
     hideOtherInstances,
     hideAllInGroup,
-    isolateInstance,
     duplicateInstance,
+    deleteInstance,
+    resetCamera,
     switchToGroup,
     flashInstance,
     selectShape,
@@ -49,12 +50,12 @@ export function PreviewContextMenu() {
     top: number;
   } | null>(null);
 
-  // Place + auto-flip the menu so it always stays on-screen.
+  // Place + auto-flip the menu so it always stays on-screen. No reset on
+  // close: the component renders null without contextMenu, and a stale
+  // position from the previous open is re-measured here (layout effects run
+  // before paint) so the reopened menu never flashes at the old spot.
   React.useLayoutEffect(() => {
-    if (!contextMenu) {
-      setPosition(null);
-      return;
-    }
+    if (!contextMenu) return;
     const node = ref.current;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -149,10 +150,6 @@ export function PreviewContextMenu() {
           onClick={run(() => hideAllInGroup(info.group))}
         />
         <MenuItem
-          label="Isolate…"
-          onClick={run(() => isolateInstance(info.id))}
-        />
-        <MenuItem
           label="Make transparent…"
           onClick={tbd("Make transparent")}
         />
@@ -203,6 +200,7 @@ export function PreviewContextMenu() {
           onClick={tbd("Create Drawing")}
         />
         <MenuItem label="Export…" onClick={tbd("Export")} />
+        <MenuItem label="Delete" onClick={run(() => deleteInstance(info.id))} />
       </Section>
 
       {/* 5. Navigation */}
@@ -265,6 +263,7 @@ export function PreviewContextMenu() {
           label="Zoom to selection"
           onClick={run(() => fitToSelection())}
         />
+        <MenuItem label="Reset view" onClick={run(() => resetCamera())} />
         <MenuItem label="View normal to" onClick={tbd("View normal to")} />
       </Section>
     </div>

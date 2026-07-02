@@ -49,6 +49,10 @@ const PreviewApp = dynamic(
   () => import("@/components/preview/preview-app").then((m) => m.PreviewApp),
   { ssr: false, loading },
 );
+const WiringApp = dynamic(
+  () => import("@/components/wiring/wiring-app").then((m) => m.WiringApp),
+  { ssr: false, loading },
+);
 const BriefApp = dynamic(
   () => import("@/components/brief/brief-app").then((m) => m.BriefApp),
   { ssr: false, loading },
@@ -59,6 +63,7 @@ const APP_BY_STEP: Record<keyof ManualFlowState, React.ComponentType> = {
   code: CodeApp,
   three: ThreeApp,
   preview: PreviewApp,
+  wiring: WiringApp,
   brief: BriefApp,
 };
 

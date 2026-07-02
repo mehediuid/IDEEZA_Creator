@@ -24,6 +24,7 @@ import {
   GizmoViewcube,
   Environment,
   Outlines,
+  TransformControls,
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { SceneShape } from "@/components/3d/three-canvas";
@@ -31,7 +32,12 @@ import type {
   PreviewPcbComponent,
   PreviewPcbBoard,
   FitVerdict,
+  PreviewTransformMode,
 } from "./preview-context";
+
+type ShapeTransform = Partial<
+  Pick<SceneShape, "position" | "rotation" | "scale">
+>;
 
 export type PreviewCanvasProps = {
   pcb: { board: PreviewPcbBoard; components: PreviewPcbComponent[] };
@@ -46,6 +52,12 @@ export type PreviewCanvasProps = {
   fitTick: number;
   fitSelectedTick: number;
   onFitChange: (v: FitVerdict) => void;
+  // Canvas controls
+  transformMode: PreviewTransformMode;
+  snap: { x: boolean; y: boolean; z: boolean };
+  gridStep: number;
+  segments: number;
+  onTransform: (id: string, patch: ShapeTransform) => void;
 };
 
 const PCB_GREEN = "#0a6b3b";
@@ -81,6 +93,11 @@ function SceneContents({
   fitTick,
   fitSelectedTick,
   onFitChange,
+  transformMode,
+  snap,
+  gridStep,
+  segments,
+  onTransform,
 }: PreviewCanvasProps) {
   const controls = React.useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const { camera, scene } = useThree();
@@ -182,10 +199,10 @@ function SceneContents({
 
       <Grid
         args={[40, 40]}
-        cellSize={0.5}
+        cellSize={gridStep}
         cellThickness={0.6}
         cellColor="#6b7280"
-        sectionSize={2}
+        sectionSize={gridStep * 5}
         sectionThickness={1.2}
         sectionColor="#7c2db9"
         fadeDistance={28}
@@ -195,8 +212,11 @@ function SceneContents({
         position={[0, -0.001, 0]}
       />
 
+      <MouseReporter />
+
       <OrbitControls
         ref={controls}
+        makeDefault
         enableDamping
         dampingFactor={0.08}
         minDistance={1.2}
@@ -242,7 +262,12 @@ function SceneContents({
                 shape={s}
                 opacity={enclosureOpacity}
                 selected={selectedId === s.id}
+                segments={segments}
+                transformMode={transformMode}
+                snap={snap}
+                gridStep={gridStep}
                 onSelect={() => onSelect(s.id)}
+                onTransform={onTransform}
                 onContextMenu={(x, y) => onContextMenu(s.id, x, y)}
               />
             ))}
@@ -368,51 +393,165 @@ function EnclosureShapeMesh({
   shape,
   opacity,
   selected,
+  segments,
+  transformMode,
+  snap,
+  gridStep,
   onSelect,
+  onTransform,
   onContextMenu,
 }: {
   shape: SceneShape;
   opacity: number;
   selected: boolean;
+  segments: number;
+  transformMode: PreviewTransformMode;
+  snap: { x: boolean; y: boolean; z: boolean };
+  gridStep: number;
   onSelect: () => void;
+  onTransform: (id: string, patch: ShapeTransform) => void;
   onContextMenu: (x: number, y: number) => void;
 }) {
+  // Callback-ref state (not a ref) so the gizmo mounts reactively once the
+  // mesh exists — reading a ref during render is unreliable and a lint error.
+  const [meshObj, setMeshObj] = React.useState<THREE.Mesh | null>(null);
+
+  // On every gizmo change, write back ONLY what the active mode edits:
+  // translating must not touch rotation, and rotating must never snap the
+  // position (that would teleport off-grid shapes to the grid mid-rotate).
+  const handleTransformChange = () => {
+    if (!meshObj) return;
+    if (transformMode === "translate") {
+      const snapAxis = (v: number, on: boolean) =>
+        on ? Math.round(v / gridStep) * gridStep : v;
+      onTransform(shape.id, {
+        position: [
+          snapAxis(meshObj.position.x, snap.x),
+          snapAxis(meshObj.position.y, snap.y),
+          snapAxis(meshObj.position.z, snap.z),
+        ],
+      });
+    } else if (transformMode === "rotate") {
+      onTransform(shape.id, {
+        rotation: [meshObj.rotation.x, meshObj.rotation.y, meshObj.rotation.z],
+      });
+    }
+  };
+
+  const showGizmo = selected && transformMode !== "none" && meshObj !== null;
+  const ringSeg = Math.max(8, Math.round(segments / 2));
+
   return (
-    <mesh
-      castShadow
-      receiveShadow
-      position={shape.position}
-      rotation={shape.rotation}
-      scale={shape.scale}
-      userData={{ previewId: shape.id }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect();
-      }}
-      onContextMenu={(e) => {
-        e.stopPropagation();
-        e.nativeEvent.preventDefault();
-        onContextMenu(e.nativeEvent.clientX, e.nativeEvent.clientY);
-      }}
-    >
-      {shape.type === "box" && <boxGeometry args={[1, 1, 1]} />}
-      {shape.type === "sphere" && <sphereGeometry args={[0.5, 32, 16]} />}
-      {shape.type === "cylinder" && <cylinderGeometry args={[0.5, 0.5, 1, 32]} />}
-      {shape.type === "cone" && <coneGeometry args={[0.5, 1, 32]} />}
-      {shape.type === "torus" && <torusGeometry args={[0.5, 0.2, 16, 32]} />}
-      {shape.type === "plane" && <planeGeometry args={[1, 1]} />}
-      <meshStandardMaterial
-        color={selected ? HIGHLIGHT : ENCLOSURE_COLOR}
-        transparent={opacity < 0.99}
-        opacity={Math.min(1, Math.max(0.05, opacity))}
-        roughness={0.35}
-        metalness={0.25}
-        side={THREE.DoubleSide}
-        depthWrite={opacity > 0.95}
-      />
-      {selected && <Outlines thickness={3} color={HIGHLIGHT} />}
-    </mesh>
+    <>
+      <mesh
+        ref={setMeshObj}
+        castShadow
+        receiveShadow
+        position={shape.position}
+        rotation={shape.rotation}
+        scale={shape.scale}
+        userData={{ previewId: shape.id }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          e.nativeEvent.preventDefault();
+          onContextMenu(e.nativeEvent.clientX, e.nativeEvent.clientY);
+        }}
+      >
+        {shape.type === "box" && <boxGeometry args={[1, 1, 1]} />}
+        {shape.type === "sphere" && <sphereGeometry args={[0.5, segments, ringSeg]} />}
+        {shape.type === "cylinder" && <cylinderGeometry args={[0.5, 0.5, 1, segments]} />}
+        {shape.type === "cone" && <coneGeometry args={[0.5, 1, segments]} />}
+        {shape.type === "torus" && <torusGeometry args={[0.5, 0.2, ringSeg, segments]} />}
+        {shape.type === "plane" && <planeGeometry args={[1, 1]} />}
+        <meshStandardMaterial
+          color={selected ? HIGHLIGHT : ENCLOSURE_COLOR}
+          transparent={opacity < 0.99}
+          opacity={Math.min(1, Math.max(0.05, opacity))}
+          roughness={0.35}
+          metalness={0.25}
+          side={THREE.DoubleSide}
+          depthWrite={opacity > 0.95}
+        />
+        {selected && <Outlines thickness={3} color={HIGHLIGHT} />}
+      </mesh>
+      {showGizmo && (
+        <TransformControls
+          object={meshObj as THREE.Object3D}
+          mode={transformMode}
+          // Gizmo-level snap is all-axes-only, so it's used only when every
+          // axis is on; mixed X/Y/Z snapping happens per-axis in the
+          // write-back (handleTransformChange) instead.
+          translationSnap={snap.x && snap.y && snap.z ? gridStep : null}
+          rotationSnap={Math.PI / 12}
+          onObjectChange={handleTransformChange}
+        />
+      )}
+    </>
   );
+}
+
+// Reports the cursor's ground-plane position + camera distance to the right
+// panel via a lightweight window event (so only the panel re-renders, never
+// this canvas).
+function MouseReporter() {
+  const { camera, gl } = useThree();
+  React.useEffect(() => {
+    const el = gl.domElement;
+    const raycaster = new THREE.Raycaster();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const point = new THREE.Vector3();
+    const ndc = new THREE.Vector2();
+    // Coalesce raw mousemove to one dispatch per frame — the listening panel
+    // re-renders on every event, so unthrottled dispatch burns CPU while the
+    // canvas is busiest.
+    let raf = 0;
+    let pending: MouseEvent | null = null;
+    const flush = () => {
+      raf = 0;
+      const e = pending;
+      pending = null;
+      if (!e) return;
+      const rect = el.getBoundingClientRect();
+      ndc.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(ndc, camera);
+      // A miss (camera looking above the horizon) clears the readout instead
+      // of leaving stale coordinates frozen in the panel.
+      const detail = raycaster.ray.intersectPlane(plane, point)
+        ? {
+            d: camera.position.distanceTo(point),
+            x: point.x,
+            y: point.y,
+            z: point.z,
+          }
+        : null;
+      window.dispatchEvent(new CustomEvent("ideeza:preview-mouse", { detail }));
+    };
+    const move = (e: MouseEvent) => {
+      pending = e;
+      if (!raf) raf = window.requestAnimationFrame(flush);
+    };
+    const leave = () => {
+      pending = null;
+      window.dispatchEvent(
+        new CustomEvent("ideeza:preview-mouse", { detail: null }),
+      );
+    };
+    el.addEventListener("mousemove", move);
+    el.addEventListener("mouseleave", leave);
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      el.removeEventListener("mousemove", move);
+      el.removeEventListener("mouseleave", leave);
+    };
+  }, [camera, gl]);
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────

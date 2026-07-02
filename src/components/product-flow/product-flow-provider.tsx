@@ -32,6 +32,7 @@ export const FLOW_LABELS: Record<FlowStep, string> = {
   code: STEP_LABELS.code,
   three: "3D",
   preview: "Preview",
+  wiring: "Wiring",
   brief: "Brief",
 };
 // Inverse lookup: given a pathname, return the matching FlowStep or null.
@@ -41,7 +42,7 @@ export function stepFromPath(pathname: string | null): FlowStep | null {
   if (!pathname) return null;
   const scoped = pathname.match(/^\/project\/[^/]+\/([^/]+)/);
   if (scoped) return SEGMENT_TO_STEP[scoped[1]] ?? null;
-  const legacy = pathname.match(/^\/(pcb|code|3d|preview|brief)(?:\/|$)/);
+  const legacy = pathname.match(/^\/(pcb|code|3d|preview|wiring|brief)(?:\/|$)/);
   if (legacy) return SEGMENT_TO_STEP[legacy[1]] ?? null;
   return null;
 }

@@ -27,6 +27,7 @@ export type ManualFlowState = {
   code: boolean;
   three: boolean;
   preview: boolean;
+  wiring: boolean;
   brief: boolean;
 };
 
@@ -35,6 +36,7 @@ export const EMPTY_FLOW_STATE: ManualFlowState = {
   code: false,
   three: false,
   preview: false,
+  wiring: false,
   brief: false,
 };
 
@@ -303,6 +305,7 @@ export const FLOW_STEPS: Array<keyof ManualFlowState> = [
   "code",
   "three",
   "preview",
+  "wiring",
   "brief",
 ];
 
@@ -313,6 +316,7 @@ export const STEP_URL_SEGMENT: Record<keyof ManualFlowState, string> = {
   code: "code",
   three: "3d",
   preview: "preview",
+  wiring: "wiring",
   brief: "brief",
 };
 
@@ -322,6 +326,7 @@ export const SEGMENT_TO_STEP: Record<string, keyof ManualFlowState> = {
   code: "code",
   "3d": "three",
   preview: "preview",
+  wiring: "wiring",
   brief: "brief",
 };
 
@@ -340,6 +345,7 @@ export const STEP_LABELS: Record<keyof ManualFlowState, string> = {
   code: "Code",
   three: "3D Module",
   preview: "Product Preview",
+  wiring: "Wiring",
   brief: "Brief",
 };
 

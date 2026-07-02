@@ -18,7 +18,8 @@ import {
   TransformControls,
 } from "@react-three/drei";
 import * as THREE from "three";
-import type { ViewportProps, SceneShape, TransformMode } from "./three-canvas";
+import type { ViewportProps, SceneShape } from "./three-canvas";
+import { getGridStep, getResolutionSegments } from "./grid-settings";
 
 const MAT_PARAMS: Record<"antimony" | "tin" | "iron", {
   color: string; metalness: number; roughness: number;
@@ -27,24 +28,6 @@ const MAT_PARAMS: Record<"antimony" | "tin" | "iron", {
   tin:      { color: "#e2e8f0", metalness: 0.7, roughness: 0.25 },
   iron:     { color: "#475569", metalness: 0.85, roughness: 0.3 },
 };
-
-function getResolutionSegments(res: string): number {
-  switch (res) {
-    case "Low":    return 8;
-    case "Medium": return 16;
-    case "High":   return 48;
-    case "Ultra":  return 96;
-    case "Auto":
-    default:       return 32;
-  }
-}
-
-function getGridStep(label: string): number {
-  if (label === "IDEEZA-50") return 0.5;
-  if (label === "IDEEZA-25") return 0.25;
-  if (label === "IDEEZA-10") return 0.1;
-  return 1.0;
-}
 
 function ShapeMesh({
   shape,
@@ -57,7 +40,6 @@ function ShapeMesh({
   material,
   effects,
   segments,
-  registerMesh,
 }: {
   shape: SceneShape;
   selected: boolean;
@@ -69,19 +51,10 @@ function ShapeMesh({
   material: "antimony" | "tin" | "iron";
   effects: { id: string; value: number }[];
   segments: number;
-  registerMesh: (id: string, mesh: THREE.Mesh | null) => void;
 }) {
-  const meshRef = React.useRef<THREE.Mesh | null>(null);
-  // Single post-mount flip so the gizmo can latch onto a populated ref —
-  // running this in a callback ref would loop because React reattaches the
-  // ref every render with a fresh function identity.
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-    registerMesh(shape.id, meshRef.current);
-    return () => registerMesh(shape.id, null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shape.id]);
+  // Callback-ref state (not a ref) so the gizmo mounts reactively once the
+  // mesh exists — reading a ref during render is unreliable and a lint error.
+  const [meshObj, setMeshObj] = React.useState<THREE.Mesh | null>(null);
   const params = MAT_PARAMS[material];
 
   const get = (id: string) => effects.find((e) => e.id === id)?.value ?? 40;
@@ -118,27 +91,37 @@ function ShapeMesh({
 
   if (shape.hidden) return null;
 
-  const showGizmo = mounted && selected && transformMode !== "none" && !shape.locked && !!meshRef.current;
+  const showGizmo = selected && transformMode !== "none" && !shape.locked && meshObj !== null;
 
+  // On every gizmo change, write back ONLY what the active mode edits:
+  // translating must not touch rotation, and rotating must never snap the
+  // position (that would teleport off-grid shapes to the grid mid-rotate).
   const handleTransformChange = () => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const snapAxis = (v: number, enabled: boolean) => enabled ? Math.round(v / gridStep) * gridStep : v;
-    onTransform(shape.id, {
-      position: [
-        snapAxis(mesh.position.x, snap.x),
-        snapAxis(mesh.position.y, snap.y),
-        snapAxis(mesh.position.z, snap.z),
-      ],
-      rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],
-      scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z],
-    });
+    if (!meshObj) return;
+    if (transformMode === "translate") {
+      const snapAxis = (v: number, enabled: boolean) => enabled ? Math.round(v / gridStep) * gridStep : v;
+      onTransform(shape.id, {
+        position: [
+          snapAxis(meshObj.position.x, snap.x),
+          snapAxis(meshObj.position.y, snap.y),
+          snapAxis(meshObj.position.z, snap.z),
+        ],
+      });
+    } else if (transformMode === "rotate") {
+      onTransform(shape.id, {
+        rotation: [meshObj.rotation.x, meshObj.rotation.y, meshObj.rotation.z],
+      });
+    } else if (transformMode === "scale") {
+      onTransform(shape.id, {
+        scale: [meshObj.scale.x, meshObj.scale.y, meshObj.scale.z],
+      });
+    }
   };
 
   return (
     <>
       <mesh
-        ref={meshRef}
+        ref={setMeshObj}
         position={shape.position}
         rotation={shape.rotation}
         scale={shape.scale}
@@ -159,9 +142,12 @@ function ShapeMesh({
       </mesh>
       {showGizmo && (
         <TransformControls
-          object={meshRef.current as THREE.Object3D}
+          object={meshObj as THREE.Object3D}
           mode={transformMode}
-          translationSnap={snap.x || snap.z ? gridStep : null}
+          // Gizmo-level snap is all-axes-only, so it's used only when every
+          // axis is on; mixed X/Y/Z snapping happens per-axis in the
+          // write-back (handleTransformChange) instead.
+          translationSnap={snap.x && snap.y && snap.z ? gridStep : null}
           rotationSnap={Math.PI / 12}
           onObjectChange={handleTransformChange}
         />
@@ -252,7 +238,6 @@ function SceneContents(props: ViewportProps) {
   const { shapes, selectedId, onSelect, material, effects, snap, gridSize, resolution, transformMode, onTransform, onMouse, fitTick } = props;
   const segments = getResolutionSegments(resolution);
   const gridStep = getGridStep(gridSize);
-  const meshRefs = React.useRef<Record<string, THREE.Mesh | null>>({});
 
   // Resolve a background colour for non-Texture choices.
   const bg =
@@ -309,7 +294,6 @@ function SceneContents(props: ViewportProps) {
           material={material}
           effects={effects}
           segments={segments}
-          registerMesh={(id, mesh) => { meshRefs.current[id] = mesh; }}
         />
       ))}
 

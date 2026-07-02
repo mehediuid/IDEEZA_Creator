@@ -10,8 +10,8 @@
 //                  localStorage slot the /3d page reads/writes). Editable
 //                  from the preview toolbar/Insert dropdown.
 //
-// Plus UI flags (showInstancesPanel / showPcb / showEnclosure / xray /
-// isolate), camera ticks (resetTick / fitTick), a toast channel, and the
+// Plus UI flags (showInstancesPanel / showPcb / showEnclosure),
+// camera ticks (resetTick / fitTick), a toast channel, and the
 // computed fit verdict (PCB inside enclosure?).
 
 import * as React from "react";
@@ -41,6 +41,60 @@ export type InstanceInfo = {
 };
 
 const SHAPES_KEY = "ideeza:3d:shapes";
+const CANVAS_KEY = "ideeza:preview:canvas";
+
+// Canvas controls shared by the right panel and the viewport.
+export type PreviewTransformMode = "none" | "translate" | "rotate" | "scale";
+
+export type PreviewCanvasState = {
+  transformMode: PreviewTransformMode;
+  snap: { x: boolean; y: boolean; z: boolean };
+  gridSize: string;
+  resolution: string[]; // length 9 (3×3)
+};
+
+export const DEFAULT_PREVIEW_CANVAS: PreviewCanvasState = {
+  transformMode: "translate",
+  snap: { x: true, y: true, z: false },
+  gridSize: "IDEEZA-100",
+  resolution: Array(9).fill("Auto"),
+};
+
+// Label → value mappings live in the 3D module's shared grid-settings so the
+// two editors can't drift; re-exported under the preview names for callers.
+export {
+  getGridStep as previewGridStep,
+  getResolutionSegments as previewResolutionSegments,
+} from "@/components/3d/grid-settings";
+
+// Rebuild a safe canvas state from whatever was persisted — stale or hand-
+// edited storage must never be able to crash the panel (e.g. a non-array
+// `resolution` would blow up `.map` in render).
+function sanitizeCanvasState(raw: unknown): PreviewCanvasState {
+  const d = DEFAULT_PREVIEW_CANVAS;
+  if (typeof raw !== "object" || raw === null) return d;
+  const r = raw as Record<string, unknown>;
+  const mode = r.transformMode;
+  const snap = (typeof r.snap === "object" && r.snap !== null ? r.snap : {}) as Record<string, unknown>;
+  const rawRes = r.resolution;
+  const resolution = Array.isArray(rawRes)
+    ? d.resolution.map((def, i) => (typeof rawRes[i] === "string" ? (rawRes[i] as string) : def))
+    : d.resolution;
+  return {
+    // Scale was removed from the Transform controls — don't restore it.
+    transformMode:
+      mode === "none" || mode === "translate" || mode === "rotate"
+        ? mode
+        : d.transformMode,
+    snap: {
+      x: typeof snap.x === "boolean" ? snap.x : d.snap.x,
+      y: typeof snap.y === "boolean" ? snap.y : d.snap.y,
+      z: typeof snap.z === "boolean" ? snap.z : d.snap.z,
+    },
+    gridSize: typeof r.gridSize === "string" ? r.gridSize : d.gridSize,
+    resolution,
+  };
+}
 
 // Default board when the PCB store has no real dimensions yet — keeps the
 // preview useful before the user has done any PCB work.
@@ -99,13 +153,12 @@ export type FitVerdict =
 type State = {
   pcb: { board: PreviewPcbBoard; components: PreviewPcbComponent[] };
   enclosureShapes: SceneShape[];
+  canvas: PreviewCanvasState;
   selectedId: string | null;
   hydrated: boolean;
   showInstancesPanel: boolean;
   showPcb: boolean;
   showEnclosure: boolean;
-  xray: boolean;
-  isolate: boolean;
   sectionView: boolean;
   enclosureOpacity: number;
   resetTick: number;
@@ -120,13 +173,17 @@ type State = {
 type Ctx = State & {
   addShape: (type: ShapeType) => void;
   deleteSelected: () => void;
+  deleteInstance: (id: string) => void;
   toggleHidden: (id: string) => void;
+  updateShape: (
+    id: string,
+    patch: Partial<Pick<SceneShape, "position" | "rotation" | "scale">>,
+  ) => void;
+  patchCanvas: (p: Partial<PreviewCanvasState>) => void;
   selectShape: (id: string | null) => void;
   togglePcb: () => void;
   toggleEnclosure: () => void;
-  toggleXray: () => void;
   toggleInstancesPanel: () => void;
-  toggleIsolate: () => void;
   toggleSectionView: () => void;
   resetCamera: () => void;
   fitCamera: () => void;
@@ -141,7 +198,6 @@ type Ctx = State & {
   hideInstance: (id: string) => void;
   hideOtherInstances: (id: string) => void;
   hideAllInGroup: (group: "pcb" | "enclosure") => void;
-  isolateInstance: (id: string) => void;
   duplicateInstance: (id: string) => void;
   switchToGroup: (group: "pcb" | "enclosure") => void;
   flashInstance: (id: string) => void;
@@ -152,6 +208,9 @@ const PreviewContext = React.createContext<Ctx | null>(null);
 export function PreviewProvider({ children }: { children: React.ReactNode }) {
   // ── Enclosure (3D module's shapes) ──────────────────────────────────
   const [enclosureShapes, setEnclosureShapes] = React.useState<SceneShape[]>([]);
+  const [canvas, setCanvas] = React.useState<PreviewCanvasState>(
+    DEFAULT_PREVIEW_CANVAS,
+  );
   const [hydrated, setHydrated] = React.useState(false);
   React.useEffect(() => {
     try {
@@ -161,14 +220,34 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed)) setEnclosureShapes(parsed);
       }
     } catch {}
+    try {
+      const rawC = window.localStorage.getItem(CANVAS_KEY);
+      if (rawC) setCanvas(sanitizeCanvasState(JSON.parse(rawC)));
+    } catch {}
     setHydrated(true);
   }, []);
   React.useEffect(() => {
     if (!hydrated) return;
-    try {
-      window.localStorage.setItem(SHAPES_KEY, JSON.stringify(enclosureShapes));
-    } catch {}
+    // Debounced: the transform gizmo updates shapes on every drag frame, and
+    // serializing the whole list to localStorage at 60Hz stutters the drag.
+    const t = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(SHAPES_KEY, JSON.stringify(enclosureShapes));
+      } catch {}
+    }, 200);
+    return () => window.clearTimeout(t);
   }, [enclosureShapes, hydrated]);
+  React.useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(CANVAS_KEY, JSON.stringify(canvas));
+    } catch {}
+  }, [canvas, hydrated]);
+
+  const patchCanvas = React.useCallback(
+    (p: Partial<PreviewCanvasState>) => setCanvas((c) => ({ ...c, ...p })),
+    [],
+  );
 
   // ── PCB (read-only from the PCB store) ───────────────────────────────
   const pcbState = usePcbState();
@@ -213,8 +292,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const [showInstancesPanel, setShowInstancesPanel] = React.useState(true);
   const [showPcb, setShowPcb] = React.useState(true);
   const [showEnclosure, setShowEnclosure] = React.useState(true);
-  const [xray, setXray] = React.useState(false);
-  const [isolate, setIsolate] = React.useState(false);
   const [sectionView, setSectionView] = React.useState(false);
   const [resetTick, setResetTick] = React.useState(0);
   const [fitTick, setFitTick] = React.useState(0);
@@ -254,30 +331,52 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     flashToast(`Added ${type} to enclosure`);
   }, [flashToast]);
 
+  // Delete by id — used by the context menu (works whether or not the item is
+  // the current selection). Only enclosure shapes are editable; PCB items
+  // can't be deleted from here (they live in the PCB module).
+  const deleteInstance = React.useCallback(
+    (id: string) => {
+      if (id === "pcb-board" || id.startsWith("demo-")) {
+        flashToast("PCB items are edited in the PCB module");
+        return;
+      }
+      setEnclosureShapes((arr) => {
+        const target = arr.find((s) => s.id === id);
+        if (target) flashToast(`Deleted ${target.type}`);
+        return arr.filter((s) => s.id !== id);
+      });
+      setSelectedId((cur) => (cur === id ? null : cur));
+    },
+    [flashToast],
+  );
+
   const deleteSelected = React.useCallback(() => {
     if (!selectedId) {
       flashToast("Nothing selected");
       return;
     }
-    // Only enclosure shapes are editable; PCB items can't be deleted from
-    // here (they live in the PCB module).
-    if (selectedId === "pcb-board" || selectedId.startsWith("demo-")) {
-      flashToast("PCB items are edited in the PCB module");
-      return;
-    }
-    setEnclosureShapes((arr) => {
-      const target = arr.find((s) => s.id === selectedId);
-      if (target) flashToast(`Deleted ${target.type}`);
-      return arr.filter((s) => s.id !== selectedId);
-    });
-    setSelectedId(null);
-  }, [selectedId, flashToast]);
+    deleteInstance(selectedId);
+  }, [selectedId, deleteInstance, flashToast]);
 
   const toggleHidden = React.useCallback((id: string) => {
     setEnclosureShapes((arr) =>
       arr.map((s) => (s.id === id ? { ...s, hidden: !s.hidden } : s)),
     );
   }, []);
+
+  // Write a transform back to an enclosure shape (from the viewport gizmo).
+  // Only enclosure shapes are editable — PCB items are read-only here.
+  const updateShape = React.useCallback(
+    (
+      id: string,
+      patch: Partial<Pick<SceneShape, "position" | "rotation" | "scale">>,
+    ) => {
+      setEnclosureShapes((arr) =>
+        arr.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+      );
+    },
+    [],
+  );
 
   const selectShape = React.useCallback((id: string | null) => {
     setSelectedId(id);
@@ -298,23 +397,9 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, [flashToast]);
-  const toggleXray = React.useCallback(() => {
-    setXray((v) => {
-      const next = !v;
-      flashToast(next ? "X-ray on" : "X-ray off");
-      return next;
-    });
-  }, [flashToast]);
   const toggleInstancesPanel = React.useCallback(() => {
     setShowInstancesPanel((v) => !v);
   }, []);
-  const toggleIsolate = React.useCallback(() => {
-    setIsolate((v) => {
-      const next = !v;
-      flashToast(next ? "Isolate on" : "Isolate off");
-      return next;
-    });
-  }, [flashToast]);
   const toggleSectionView = React.useCallback(() => {
     setSectionView((v) => {
       const next = !v;
@@ -449,15 +534,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     [flashToast],
   );
 
-  const isolateInstance = React.useCallback(
-    (id: string) => {
-      setSelectedId(id);
-      setIsolate(true);
-      flashToast("Isolate on");
-    },
-    [flashToast],
-  );
-
   const duplicateInstance = React.useCallback(
     (id: string) => {
       const info = instanceTable.get(id);
@@ -497,7 +573,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
         setShowPcb(false);
         flashToast("Switched to Enclosure");
       }
-      setIsolate(false);
     },
     [flashToast],
   );
@@ -512,20 +587,18 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     [flashToast],
   );
 
-  // Derived opacity for the enclosure material: X-ray pushes it more
-  // transparent; isolate forces fully solid for whichever side is selected.
-  const enclosureOpacity = xray ? 0.18 : 0.42;
+  // Enclosure material opacity — translucent so the PCB inside stays visible.
+  const enclosureOpacity = 0.42;
 
   const value: Ctx = {
     pcb,
     enclosureShapes,
+    canvas,
     selectedId,
     hydrated,
     showInstancesPanel,
     showPcb,
     showEnclosure,
-    xray,
-    isolate,
     sectionView,
     enclosureOpacity,
     resetTick,
@@ -537,13 +610,14 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     flashInstanceId,
     addShape,
     deleteSelected,
+    deleteInstance,
     toggleHidden,
+    updateShape,
+    patchCanvas,
     selectShape,
     togglePcb,
     toggleEnclosure,
-    toggleXray,
     toggleInstancesPanel,
-    toggleIsolate,
     toggleSectionView,
     resetCamera,
     fitCamera,
@@ -556,7 +630,6 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     hideInstance,
     hideOtherInstances,
     hideAllInGroup,
-    isolateInstance,
     duplicateInstance,
     switchToGroup,
     flashInstance,
@@ -573,22 +646,6 @@ export function usePreview() {
   return ctx;
 }
 
-// Apply the isolate filter to the enclosure list: when isolate is on AND
-// the selection lives in the enclosure, hide every other enclosure shape.
-// Used by the viewport — the InstancesPanel keeps showing the full list so
-// the user can switch selection without breaking out of isolate manually.
-export function applyIsolate(
-  shapes: SceneShape[],
-  selectedId: string | null,
-  isolate: boolean,
-): SceneShape[] {
-  if (!isolate || !selectedId) return shapes;
-  const isEnclosurePick = shapes.some((s) => s.id === selectedId);
-  if (!isEnclosurePick) return shapes;
-  return shapes.map((s) =>
-    s.id === selectedId ? s : { ...s, hidden: true },
-  );
-}
 
 function capWord(s: string): string {
   if (!s) return s;
