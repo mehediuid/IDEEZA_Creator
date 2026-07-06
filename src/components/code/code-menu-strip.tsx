@@ -191,7 +191,7 @@ export function CodeMenuStrip() {
       onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
-        top: 104,
+        top: 62,
         left: 0,
         right: 0,
         height: 36,

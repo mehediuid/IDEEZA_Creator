@@ -16,13 +16,14 @@ import { useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { LeftRail } from "@/components/pcb/left-rail";
+import { LeftPanel } from "@/components/pcb/left-panel";
 import {
   PreviewProvider,
   usePreview,
   type FitVerdict,
 } from "./preview-context";
 import { PreviewToolbar } from "./preview-toolbar";
-import { InstancesPanel } from "./preview-instances";
+import { InstancesSection } from "./preview-instances";
 import { PreviewViewport } from "./preview-viewport";
 import { PreviewRightPanel } from "./preview-right-panel";
 import { PreviewContextMenu } from "./preview-context-menu";
@@ -30,7 +31,8 @@ import { PreviewContextMenu } from "./preview-context-menu";
 const TOP_BAR_H = 62;
 const PREVIEW_TOOLBAR_H = 40;
 const LEFT_RAIL_W = 74;
-const LEFT_PANEL_W = 256;
+// Shared project panel (Project Design | Library) — same width everywhere.
+const LEFT_PANEL_W = 292;
 // Right side: full panel matching the PCB / 3D module pattern (292px) with
 // content + a vertical tab strip on its inner-right edge.
 const RIGHT_PANEL_W = 292;
@@ -74,7 +76,15 @@ function PreviewBody({ variant }: { variant: PreviewVariant }) {
         activeKey={isWiring ? "wiring" : "preview"}
       />
 
-      {showInstancesPanel && <InstancesPanel topOffset={VIEWPORT_TOP} />}
+      {/* Shared project panel — preview's instances tree merges into the
+          same Project Design | Library navigator every tab has. */}
+      {showInstancesPanel && (
+        <LeftPanel
+          topOffset={VIEWPORT_TOP}
+          bottomOffset={0}
+          moduleSlot={<InstancesSection />}
+        />
+      )}
 
       <PreviewViewport
         topOffset={VIEWPORT_TOP}

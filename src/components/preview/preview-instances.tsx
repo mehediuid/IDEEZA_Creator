@@ -1,6 +1,7 @@
 "use client";
 
-// InstancesPanel — left tree on /preview. Two top-level groups:
+// InstancesSection — the preview module's tree, embedded in the shared
+// project panel (LeftPanel moduleSlot). Two top-level groups:
 //   • PCB        — board + every component placed in the PCB module (read-
 //                  only here; selecting a row highlights the matching mesh
 //                  in the viewport).
@@ -12,7 +13,7 @@ import * as React from "react";
 import { usePreview } from "./preview-context";
 import type { SceneShape, ShapeType } from "@/components/3d/three-canvas";
 
-export function InstancesPanel({ topOffset }: { topOffset: number }) {
+export function InstancesSection() {
   const {
     pcb,
     enclosureShapes,
@@ -76,20 +77,7 @@ export function InstancesPanel({ topOffset }: { topOffset: number }) {
   const totalCount = pcbRows.length + labeledEnc.length;
 
   return (
-    <aside
-      style={{
-        position: "absolute",
-        top: topOffset,
-        bottom: 0,
-        left: 74,
-        width: 256,
-        background: "var(--color-bg-surface)",
-        borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
-        display: "flex",
-        flexDirection: "column",
-        zIndex: 14,
-      }}
-    >
+    <div style={{ marginTop: "var(--spacing-3)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
       {/* Filter row */}
       <div
         style={{
@@ -141,12 +129,11 @@ export function InstancesPanel({ topOffset }: { topOffset: number }) {
         Instances ({totalCount})
       </div>
 
-      {/* Tree */}
+      {/* Tree — grows naturally; the shared panel's scroll area handles
+          overflow for the whole navigator. */}
       <div
         ref={treeRef}
         style={{
-          flex: 1,
-          overflowY: "auto",
           paddingBottom: 12,
         }}
       >
@@ -265,7 +252,7 @@ export function InstancesPanel({ topOffset }: { topOffset: number }) {
           Delete selection
         </button>
       </div>
-    </aside>
+    </div>
   );
 }
 

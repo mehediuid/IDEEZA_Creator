@@ -8,8 +8,8 @@
 
 import * as React from "react";
 import { useStepNav } from "@/components/manual/use-step-nav";
-import { Breadcrumb } from "@/components/pcb/breadcrumb";
 import { EditorShell } from "@/components/pcb/editor-shell";
+import { LeftPanel } from "@/components/pcb/left-panel";
 import { TopBar } from "@/components/pcb/top-bar";
 import { CodeRail } from "@/components/code/code-rail";
 import { CodeMenuStrip } from "@/components/code/code-menu-strip";
@@ -76,12 +76,15 @@ export function CodeApp() {
   const [mode, setMode] = React.useState<CodeMode | null>(null);
   const [pendingMode, setPendingMode] = React.useState<CodeMode | null>(null);
 
-  // Layout offsets driven by mode:
-  //   - landing: chrome ends at 104 (TopBar + breadcrumb only — price strip gone)
-  //   - blockly: chrome ends at 140 (tool icons row; menus moved to TopBar)
-  //   - develop: chrome ends at 104 (no price strip; IDE renders inside)
-  const railTop = mode === "blockly" ? 140 : 104;
+  // Layout offsets driven by mode (breadcrumb strip removed — chrome is just
+  // the 62px TopBar, plus the 36px tool-icons row in blockly mode):
+  //   - landing / develop: chrome ends at 62
+  //   - blockly: chrome ends at 98
+  const railTop = mode === "blockly" ? 98 : 62;
   const contentTop = railTop;
+  // Shared project panel (Project Design | Library) sits right of the rail on
+  // every module tab — content starts after it.
+  const contentLeft = 74 + 292;
 
   const requestMode = (next: CodeMode) => {
     if (mode === null) {
@@ -101,22 +104,25 @@ export function CodeApp() {
   return (
     <EditorShell>
       <TopBar />
-      <Breadcrumb />
 
       {mode === "blockly" && <CodeMenuStrip />}
 
-      {mode !== null && <ModeSwitcher mode={mode} onPick={requestMode} />}
+      {mode !== null && <ModeSwitcher mode={mode} onPick={requestMode} topOffset={railTop + 6} />}
 
       <CodeRail topOffset={railTop} />
+
+      {/* Shared project panel — same Project Design | Library system as PCB */}
+      <LeftPanel topOffset={railTop} />
 
       {mode === null && (
         <LandingCanvas
           contentTop={contentTop}
+          contentLeft={contentLeft}
           onPick={(m) => setMode(m)}
         />
       )}
-      {mode === "blockly" && <BlocklyEditor topOffset={contentTop} />}
-      {mode === "develop" && <DevEditor topOffset={contentTop} />}
+      {mode === "blockly" && <BlocklyEditor topOffset={contentTop} leftOffset={contentLeft} />}
+      {mode === "develop" && <DevEditor topOffset={contentTop} leftOffset={contentLeft} />}
 
       {/* Back / Continue pills — bottom-right. Labels are destination-explicit
           ("Back to PCB" / "Continue to 3D") so the user can read the whole
@@ -169,7 +175,7 @@ export function CodeApp() {
   );
 }
 
-function ModeSwitcher({ mode, onPick }: { mode: CodeMode; onPick: (m: CodeMode) => void }) {
+function ModeSwitcher({ mode, onPick, topOffset = 68 }: { mode: CodeMode; onPick: (m: CodeMode) => void; topOffset?: number }) {
   const [open, setOpen] = React.useState(false);
   const label = mode === "blockly" ? "Blockly Development" : "Code Development";
   const other: CodeMode = mode === "blockly" ? "develop" : "blockly";
@@ -187,7 +193,7 @@ function ModeSwitcher({ mode, onPick }: { mode: CodeMode; onPick: (m: CodeMode) 
       onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
-        top: 110,
+        top: topOffset,
         right: 280,
         zIndex: 20,
       }}
@@ -246,7 +252,7 @@ function ModeSwitcher({ mode, onPick }: { mode: CodeMode; onPick: (m: CodeMode) 
   );
 }
 
-function LandingCanvas({ contentTop, onPick }: { contentTop: number; onPick: (m: CodeMode) => void }) {
+function LandingCanvas({ contentTop, contentLeft, onPick }: { contentTop: number; contentLeft: number; onPick: (m: CodeMode) => void }) {
   const [hover, setHover] = React.useState<CodeMode | null>(null);
   return (
     <div
@@ -254,7 +260,7 @@ function LandingCanvas({ contentTop, onPick }: { contentTop: number; onPick: (m:
         position: "absolute",
         top: contentTop,
         bottom: 36,
-        left: 74,
+        left: contentLeft,
         right: 0,
         background: "var(--color-bg-page)",
         display: "flex",

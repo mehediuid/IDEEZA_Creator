@@ -1,18 +1,16 @@
 "use client";
 
-// 3D Module — left panel (Figma part-settings frames).
-// Project File tab: Default Geometry icon bar + Parts (Group Name [N]) tree
-// with per-row eye + 3-dot context menu (Copy / Cut / Duplicate / Reset
-// material / Paste / Bring to front / Send to back / Rotate Left / Rotate
-// Right / Flip Horizontal / Flip Vertical / Lock / Group / Delete).
-// Library tab: shape tiles that dispatch shape:* ThreeActions.
+// 3D Module — parts section for the shared project panel.
+// Default Geometry icon bar + Parts (Group Name [N]) tree with per-row eye +
+// 3-dot context menu (Copy / Cut / Duplicate / Reset material / Paste /
+// Bring to front / Send to back / Rotate Left / Rotate Right / Flip
+// Horizontal / Flip Vertical / Lock / Group / Delete) + Shapes tiles that
+// dispatch shape:* ThreeActions. Rendered inside LeftPanel's moduleSlot.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
 import type { SceneShape } from "./three-canvas";
-
-type LeftTab = "project" | "library";
 
 export type PartActions = {
   copy: (id: string) => void;
@@ -320,26 +318,27 @@ const LIBRARY_SHAPES: { id: ThreeAction; label: string; path: string }[] = [
   { id: "shape:spline",   label: "Spline",   path: "M3 17c4-8 14-2 18-10" },
 ];
 
-export function ThreeLeftPanel({
-  topOffset = 132,
+// ThreePartsSection — the 3D module's tree content, embeddable inside the
+// shared project panel (LeftPanel moduleSlot). Same Default Geometry bar,
+// Parts group (rows with eye + 3-dot context menu) and shape library tiles
+// the old standalone ThreeLeftPanel had — now merged into the ONE navigator
+// that every module tab shares.
+export function ThreePartsSection({
   selectedId,
   onSelect,
   shapes,
   actions,
   canPaste,
-  width = 250,
 }: {
-  topOffset?: number;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   shapes: SceneShape[];
   actions: PartActions;
   canPaste: boolean;
-  width?: number;
 }) {
-  const [tab, setTab] = React.useState<LeftTab>("project");
   const [partsOpen, setPartsOpen] = React.useState(true);
   const [groupOpen, setGroupOpen] = React.useState(true);
+  const [shapesOpen, setShapesOpen] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [openMenuFor, setOpenMenuFor] = React.useState<string | null>(null);
 
@@ -354,164 +353,143 @@ export function ThreeLeftPanel({
   const filtered = shapes.filter((s) => !search || s.type.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: topOffset,
-        bottom: 36,
-        left: 74,
-        width,
-        background: "var(--color-bg-surface)",
-        borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
-        display: "flex",
-        flexDirection: "column",
-        zIndex: 14,
-      }}
-    >
-      <div style={{ display: "flex", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", padding: "0 var(--spacing-4)" }}>
-        {(["project", "library"] as LeftTab[]).map((t) => {
-          const active = tab === t;
-          const label = t === "project" ? "Project File" : "Library";
-          return (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                padding: "var(--spacing-3) var(--spacing-4)",
-                background: "transparent",
-                border: "none",
-                borderBottom: `2px solid ${active ? C.primary : "transparent"}`,
-                fontSize: "var(--font-size-sm)",
-                fontWeight: active ? 700 : 500,
-                color: active ? C.text : "var(--color-text-tertiary)",
-                cursor: "pointer",
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
+    <div style={{ padding: "var(--spacing-3) var(--spacing-1) 0" }}>
+      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-2) var(--spacing-4)" }} />
+
+      <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: C.text, padding: "var(--spacing-1) var(--spacing-2)" }}>
+        Default Geometry
       </div>
+      <DefaultGeometryBar />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-3) var(--spacing-3)" }}>
-        {tab === "project" && (
-          <>
-            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: C.text, padding: "var(--spacing-1) var(--spacing-2)" }}>
-              Default Geometry
+      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-2)" }} />
+
+      <div
+        onClick={() => setPartsOpen((v) => !v)}
+        className="ix-nav"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--spacing-2)",
+          padding: "var(--spacing-2)",
+          fontSize: "var(--font-size-sm)",
+          fontWeight: 700,
+          color: C.text,
+          cursor: "pointer",
+          borderRadius: "var(--radius-sm)",
+        }}
+      >
+        <Chevron open={partsOpen} />
+        <span>Parts</span>
+      </div>
+      {partsOpen && (
+        <>
+          <div style={{ padding: "var(--spacing-2)" }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search shapes…"
+              style={{
+                width: "100%",
+                padding: "var(--spacing-2)",
+                background: "var(--color-bg-page)",
+                border: "var(--border-width-1) solid var(--color-border-subtle)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "var(--font-size-xs)",
+                color: C.text,
+              }}
+            />
+          </div>
+          <div
+            onClick={() => setGroupOpen((v) => !v)}
+            className="ix-nav"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--spacing-2)",
+              padding: "var(--spacing-2)",
+              fontSize: "var(--font-size-sm)",
+              fontWeight: 500,
+              color: C.text,
+              cursor: "pointer",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            <Chevron open={groupOpen} />
+            <span>Group Name</span>
+            <span style={{ color: "var(--color-text-tertiary)", fontWeight: 600, fontSize: "var(--font-size-xs)" }}>
+              [{String(filtered.length).padStart(2, "0")}]
+            </span>
+          </div>
+          {groupOpen && filtered.map((s) => (
+            <ShapeRow
+              key={s.id}
+              shape={s}
+              selected={selectedId === s.id}
+              onSelect={() => onSelect(s.id)}
+              actions={actions}
+              canPaste={canPaste}
+              openMenuFor={openMenuFor}
+              setOpenMenuFor={setOpenMenuFor}
+            />
+          ))}
+          {groupOpen && filtered.length === 0 && (
+            <div style={{ padding: "var(--spacing-3) var(--spacing-4)", fontSize: "var(--font-size-xs)", color: C.body }}>
+              No parts. Add one from the Shapes group below.
             </div>
-            <DefaultGeometryBar />
+          )}
+        </>
+      )}
 
-            <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-2)" }} />
+      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-2)" }} />
 
-            <div
-              onClick={() => setPartsOpen((v) => !v)}
-              className="ix-nav"
+      <div
+        onClick={() => setShapesOpen((v) => !v)}
+        className="ix-nav"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--spacing-2)",
+          padding: "var(--spacing-2)",
+          fontSize: "var(--font-size-sm)",
+          fontWeight: 700,
+          color: C.text,
+          cursor: "pointer",
+          borderRadius: "var(--radius-sm)",
+        }}
+      >
+        <Chevron open={shapesOpen} />
+        <span>Shapes</span>
+      </div>
+      {shapesOpen && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-2)", padding: "var(--spacing-2)" }}>
+          {LIBRARY_SHAPES.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => dispatchThreeAction(s.id)}
+              className="ix-tool"
               style={{
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 gap: "var(--spacing-2)",
-                padding: "var(--spacing-2)",
-                fontSize: "var(--font-size-sm)",
-                fontWeight: 700,
-                color: C.text,
+                padding: "var(--spacing-4)",
+                background: "var(--color-bg-page)",
+                border: "var(--border-width-1) solid var(--color-border-subtle)",
+                borderRadius: "var(--radius-md)",
                 cursor: "pointer",
-                borderRadius: "var(--radius-sm)",
+                color: C.text,
+                fontSize: "var(--font-size-xs)",
+                fontWeight: 600,
               }}
             >
-              <span>Parts</span>
-            </div>
-            {partsOpen && (
-              <>
-                <div style={{ padding: "var(--spacing-2)" }}>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search shapes…"
-                    style={{
-                      width: "100%",
-                      padding: "var(--spacing-2)",
-                      background: "var(--color-bg-page)",
-                      border: "var(--border-width-1) solid var(--color-border-subtle)",
-                      borderRadius: "var(--radius-md)",
-                      fontSize: "var(--font-size-xs)",
-                      color: C.text,
-                    }}
-                  />
-                </div>
-                <div
-                  onClick={() => setGroupOpen((v) => !v)}
-                  className="ix-nav"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--spacing-2)",
-                    padding: "var(--spacing-2)",
-                    fontSize: "var(--font-size-sm)",
-                    fontWeight: 500,
-                    color: C.text,
-                    cursor: "pointer",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <Chevron open={groupOpen} />
-                  <span>Group Name</span>
-                  <span style={{ color: "var(--color-text-tertiary)", fontWeight: 600, fontSize: "var(--font-size-xs)" }}>
-                    [{String(filtered.length).padStart(2, "0")}]
-                  </span>
-                </div>
-                {groupOpen && filtered.map((s) => (
-                  <ShapeRow
-                    key={s.id}
-                    shape={s}
-                    selected={selectedId === s.id}
-                    onSelect={() => onSelect(s.id)}
-                    actions={actions}
-                    canPaste={canPaste}
-                    openMenuFor={openMenuFor}
-                    setOpenMenuFor={setOpenMenuFor}
-                  />
-                ))}
-                {groupOpen && filtered.length === 0 && (
-                  <div style={{ padding: "var(--spacing-3) var(--spacing-4)", fontSize: "var(--font-size-xs)", color: C.body }}>
-                    No parts. Add one from the Library tab.
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {tab === "library" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-2)", padding: "var(--spacing-2)" }}>
-            {LIBRARY_SHAPES.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => dispatchThreeAction(s.id)}
-                className="ix-tool"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "var(--spacing-2)",
-                  padding: "var(--spacing-4)",
-                  background: "var(--color-bg-page)",
-                  border: "var(--border-width-1) solid var(--color-border-subtle)",
-                  borderRadius: "var(--radius-md)",
-                  cursor: "pointer",
-                  color: C.text,
-                  fontSize: "var(--font-size-xs)",
-                  fontWeight: 600,
-                }}
-              >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="1.5">
-                  <path d={s.path} />
-                </svg>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="1.5">
+                <path d={s.path} />
+              </svg>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

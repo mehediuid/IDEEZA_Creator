@@ -12,7 +12,8 @@ import { TopBar } from "@/components/pcb/top-bar";
 import { ThreeRail } from "@/components/3d/three-rail";
 import { THREE_EVENT, type ThreeAction } from "@/components/3d/three-menu-bar";
 import { ThreeToolbar } from "@/components/3d/three-toolbar";
-import { ThreeLeftPanel } from "@/components/3d/three-left-panel";
+import { ThreePartsSection } from "@/components/3d/three-left-panel";
+import { LeftPanel } from "@/components/pcb/left-panel";
 import { ThreeRightPanel, DEFAULT_RIGHT_STATE, type RightPanelState } from "@/components/3d/three-right-panel";
 import { ThreeViewport, type SceneShape, type ShapeType, type TransformMode, makeShape } from "@/components/3d/three-canvas";
 import { ThreeFloatingTools } from "@/components/3d/three-floating-tools";
@@ -188,7 +189,8 @@ export function ThreeApp() {
     if (next.viewOption === "Full View Mode") setMode("fullview");
   };
 
-  const LEFT_PANEL_WIDTH = 250;
+  // Shared project panel (Project Design | Library) — same width everywhere.
+  const LEFT_PANEL_WIDTH = 292;
   const RIGHT_PANEL_WIDTH = 292;
   const RAIL_WIDTH = 74;
   // ThreeMenuBar (32px) moved to TopBar; toolbar shifts to top:62 height:38.
@@ -534,14 +536,19 @@ export function ThreeApp() {
       <ThreeRail topOffset={fullView || preview ? 62 : TOP} />
       {showPanels && (
         <>
-          <ThreeLeftPanel
+          {/* Shared project panel — 3D parts tree + shape tiles merge into
+              the same Project Design | Library navigator every tab has. */}
+          <LeftPanel
             topOffset={TOP}
-            selectedId={selectedPart}
-            onSelect={setSelectedPart}
-            shapes={shapes}
-            actions={partActions}
-            canPaste={!!clipboard}
-            width={LEFT_PANEL_WIDTH}
+            moduleSlot={
+              <ThreePartsSection
+                selectedId={selectedPart}
+                onSelect={setSelectedPart}
+                shapes={shapes}
+                actions={partActions}
+                canPaste={!!clipboard}
+              />
+            }
           />
           <ThreeRightPanel
             topOffset={TOP}

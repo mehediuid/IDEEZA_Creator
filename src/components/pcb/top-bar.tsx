@@ -102,8 +102,8 @@ export function TopBar() {
         <HugeiconsIcon icon={ArrowDown01Icon} size={14} color={VIOLET} strokeWidth={2.5} />
       </div>
 
-      {/* Active project — shown on every editor page so the workspace always
-          says which project you're in. Dynamic from the manual-projects store. */}
+      {/* Active project — the ONLY place the product / project name chip
+          lives (removed from the left panel + breadcrumb everywhere else). */}
       {onFlowPage && activeProject && (
         <div
           style={{
