@@ -21,6 +21,11 @@ import {
   type ShapeType,
 } from "@/components/3d/three-canvas";
 import { usePcbState } from "@/lib/pcb/store";
+import {
+  derivePcb3D,
+  type Pcb3DBoard,
+  type Pcb3DComponent,
+} from "@/lib/pcb/pcb-3d";
 
 export type ContextMenuTarget = {
   x: number;
@@ -42,6 +47,72 @@ export type InstanceInfo = {
 
 const SHAPES_KEY = "ideeza:3d:shapes";
 const CANVAS_KEY = "ideeza:preview:canvas";
+const MATES_KEY = "ideeza:preview:mates";
+
+// ── Mate settings (SolidWorks-style, per selected instance) ────────────
+// Pure UI state for now: the panel records the designer's intent; actual
+// 3D constraint solving is a separate canvas-side feature.
+export type MateType =
+  | "coincident"
+  | "parallel"
+  | "perpendicular"
+  | "tangent"
+  | "concentric"
+  | "lock";
+
+export type MateAlignment = "aligned" | "anti-aligned";
+
+export type MateSettings = {
+  type: MateType;
+  distance: number; // mm
+  angle: number; // deg
+  alignment: MateAlignment;
+};
+
+export const DEFAULT_MATE: MateSettings = {
+  type: "coincident",
+  distance: 1,
+  angle: 30,
+  alignment: "aligned",
+};
+
+const MATE_TYPES: MateType[] = [
+  "coincident",
+  "parallel",
+  "perpendicular",
+  "tangent",
+  "concentric",
+  "lock",
+];
+
+// Rebuild a safe mate map from persisted storage — hand-edited or stale
+// values must never crash the panel.
+function sanitizeMates(raw: unknown): Record<string, MateSettings> {
+  if (typeof raw !== "object" || raw === null) return {};
+  const out: Record<string, MateSettings> = {};
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== "object" || v === null) continue;
+    const m = v as Record<string, unknown>;
+    out[id] = {
+      type: MATE_TYPES.includes(m.type as MateType)
+        ? (m.type as MateType)
+        : DEFAULT_MATE.type,
+      distance:
+        typeof m.distance === "number" && isFinite(m.distance)
+          ? Math.max(0, m.distance)
+          : DEFAULT_MATE.distance,
+      angle:
+        typeof m.angle === "number" && isFinite(m.angle)
+          ? Math.min(360, Math.max(0, m.angle))
+          : DEFAULT_MATE.angle,
+      alignment:
+        m.alignment === "aligned" || m.alignment === "anti-aligned"
+          ? m.alignment
+          : DEFAULT_MATE.alignment,
+    };
+  }
+  return out;
+}
 
 // Canvas controls shared by the right panel and the viewport.
 export type PreviewTransformMode = "none" | "translate" | "rotate" | "scale";
@@ -96,53 +167,11 @@ function sanitizeCanvasState(raw: unknown): PreviewCanvasState {
   };
 }
 
-// Default board when the PCB store has no real dimensions yet — keeps the
-// preview useful before the user has done any PCB work.
-const DEFAULT_BOARD: PreviewPcbBoard = {
-  width: 4,
-  depth: 3,
-  thickness: 0.08,
-  color: "#0a6b3b",
-};
-
-// A handful of placeholder components arranged in a grid — used when the
-// PCB store has no real placements yet so the preview still has something
-// to merge against the enclosure.
-function defaultComponents(board: PreviewPcbBoard): PreviewPcbComponent[] {
-  const out: PreviewPcbComponent[] = [];
-  const grid = [
-    { x: 0.4, y: 0.4, w: 0.6, d: 0.5, h: 0.18, kind: "ic", color: "#1f2937", id: "demo-mcu" },
-    { x: 1.2, y: 0.4, w: 0.35, d: 0.2, h: 0.12, kind: "resistor", color: "#8b5cf6", id: "demo-r1" },
-    { x: 1.7, y: 0.4, w: 0.35, d: 0.2, h: 0.12, kind: "resistor", color: "#8b5cf6", id: "demo-r2" },
-    { x: 0.4, y: 1.2, w: 0.3, d: 0.3, h: 0.4, kind: "capacitor", color: "#0ea5e9", id: "demo-c1" },
-    { x: 1.0, y: 1.2, w: 0.3, d: 0.3, h: 0.4, kind: "capacitor", color: "#0ea5e9", id: "demo-c2" },
-    { x: 2.6, y: 1.6, w: 0.7, d: 0.7, h: 0.22, kind: "ic", color: "#374151", id: "demo-flash" },
-    { x: 1.6, y: 2.2, w: 0.5, d: 0.18, h: 0.12, kind: "connector", color: "#f59e0b", id: "demo-conn" },
-  ];
-  grid.forEach((c) => {
-    if (c.x + c.w > board.width || c.y + c.d > board.depth) return;
-    out.push(c);
-  });
-  return out;
-}
-
-export type PreviewPcbBoard = {
-  width: number;
-  depth: number;
-  thickness: number;
-  color: string;
-};
-
-export type PreviewPcbComponent = {
-  id: string;
-  kind: string;
-  x: number;
-  y: number;
-  w?: number;
-  d?: number;
-  height?: number;
-  color?: string;
-};
+// Board/component derivation (incl. the demo-component fallback used before
+// the user places anything) lives in the shared pcb-3d lib — the PCB module's
+// 3D tab uses the exact same function, so the two views can't drift.
+export type PreviewPcbBoard = Pcb3DBoard;
+export type PreviewPcbComponent = Pcb3DComponent;
 
 export type FitVerdict =
   | { kind: "fits"; headroom: [number, number, number] }
@@ -154,6 +183,7 @@ type State = {
   pcb: { board: PreviewPcbBoard; components: PreviewPcbComponent[] };
   enclosureShapes: SceneShape[];
   canvas: PreviewCanvasState;
+  mates: Record<string, MateSettings>;
   selectedId: string | null;
   hydrated: boolean;
   showInstancesPanel: boolean;
@@ -180,6 +210,7 @@ type Ctx = State & {
     patch: Partial<Pick<SceneShape, "position" | "rotation" | "scale">>,
   ) => void;
   patchCanvas: (p: Partial<PreviewCanvasState>) => void;
+  setMate: (id: string, patch: Partial<MateSettings>) => void;
   selectShape: (id: string | null) => void;
   togglePcb: () => void;
   toggleEnclosure: () => void;
@@ -211,6 +242,9 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const [canvas, setCanvas] = React.useState<PreviewCanvasState>(
     DEFAULT_PREVIEW_CANVAS,
   );
+  // Mates (per-instance, persisted) — declared before the hydration effect
+  // that restores them.
+  const [mates, setMates] = React.useState<Record<string, MateSettings>>({});
   const [hydrated, setHydrated] = React.useState(false);
   React.useEffect(() => {
     try {
@@ -223,6 +257,10 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     try {
       const rawC = window.localStorage.getItem(CANVAS_KEY);
       if (rawC) setCanvas(sanitizeCanvasState(JSON.parse(rawC)));
+    } catch {}
+    try {
+      const rawM = window.localStorage.getItem(MATES_KEY);
+      if (rawM) setMates(sanitizeMates(JSON.parse(rawM)));
     } catch {}
     setHydrated(true);
   }, []);
@@ -249,43 +287,29 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  // ── Mates persistence ────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (!hydrated) return;
+    try {
+      window.localStorage.setItem(MATES_KEY, JSON.stringify(mates));
+    } catch {}
+  }, [mates, hydrated]);
+
+  const setMate = React.useCallback(
+    (id: string, patch: Partial<MateSettings>) => {
+      setMates((m) => ({ ...m, [id]: { ...DEFAULT_MATE, ...m[id], ...patch } }));
+    },
+    [],
+  );
+
   // ── PCB (read-only from the PCB store) ───────────────────────────────
   const pcbState = usePcbState();
-  const pcb = React.useMemo(() => {
-    // Read board dims from the store; fall back to default if missing.
-    const raw = pcbState.pcbBoard;
-    const w = raw?.width && raw.width > 0 ? raw.width : DEFAULT_BOARD.width;
-    const d = raw?.height && raw.height > 0 ? raw.height : DEFAULT_BOARD.depth;
-    const thickness = parseThickness(pcbState.threeD?.boardThickness)
-      ?? DEFAULT_BOARD.thickness;
-    const color = pcbState.threeD?.boardColor || DEFAULT_BOARD.color;
-    const board: PreviewPcbBoard = { width: w, depth: d, thickness, color };
-
-    // Components: anything placed with kind === 'component' becomes a small
-    // box on top of the board. Coordinates assume PCB-canvas units roughly
-    // match scene units (a real implementation would normalize via mil →
-    // inch → scene units, but for the demo it's close enough to convey
-    // "PCB fits / doesn't fit" intent).
-    const realComponents = (pcbState.objects ?? [])
-      .filter((o) => o.kind === "component")
-      .map<PreviewPcbComponent>((o) => ({
-        id: o.id,
-        kind: o.kind,
-        // Scale PCB canvas coords (mil-ish) down to the same unit space the
-        // board uses. Heuristic: divide by 100. Looks reasonable for demo.
-        x: (o.x ?? 0) / 100,
-        y: (o.y ?? 0) / 100,
-        w: ((o.width ?? 40)) / 100,
-        d: ((o.height ?? o.width ?? 40)) / 100,
-        height: 0.18,
-        color: o.color ?? "#1f2937",
-      }));
-
-    const components = realComponents.length
-      ? realComponents
-      : defaultComponents(board);
-    return { board, components };
-  }, [pcbState.pcbBoard, pcbState.threeD, pcbState.objects]);
+  const pcb = React.useMemo(
+    () => derivePcb3D(pcbState),
+    // Only these slices feed the derivation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pcbState.pcbBoard, pcbState.threeD, pcbState.objects],
+  );
 
   // ── Selection + UI flags ─────────────────────────────────────────────
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -594,6 +618,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     pcb,
     enclosureShapes,
     canvas,
+    mates,
     selectedId,
     hydrated,
     showInstancesPanel,
@@ -614,6 +639,7 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     toggleHidden,
     updateShape,
     patchCanvas,
+    setMate,
     selectShape,
     togglePcb,
     toggleEnclosure,
@@ -650,17 +676,4 @@ export function usePreview() {
 function capWord(s: string): string {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function parseThickness(raw: string | undefined | null): number | null {
-  if (!raw) return null;
-  const m = raw.match(/([0-9.]+)/);
-  if (!m) return null;
-  const v = Number(m[1]);
-  if (!isFinite(v) || v <= 0) return null;
-  // PCB store stores thickness in mm-ish strings ("1.6 mm"). Scale to scene
-  // units (assume 1 scene unit ≈ 25 mm so 1.6 mm ≈ 0.064). Bound to sensible
-  // visible thickness so the board doesn't disappear.
-  const scaled = v / 25;
-  return Math.max(0.04, Math.min(0.4, scaled));
 }

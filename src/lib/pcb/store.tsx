@@ -291,6 +291,69 @@ function snap(s: PcbState): Snapshot {
   return out;
 }
 
+// ── Document persistence ────────────────────────────────────────────────
+// The user's actual work (placed objects, board dims, 2D/3D settings) is a
+// "document" persisted to localStorage, scoped per active manual project so
+// each project keeps its own board. UI flags (menus, panels, zoom) are not
+// part of the document and reset per session.
+const PCB_DOC_PREFIX = "ideeza:pcb:doc:";
+const ACTIVE_PROJECT_KEY = "ideeza:manual:active";
+
+function pcbDocKey(): string {
+  let pid = "default";
+  try {
+    pid = window.localStorage.getItem(ACTIVE_PROJECT_KEY) || "default";
+  } catch {}
+  return PCB_DOC_PREFIX + pid;
+}
+
+type PcbDoc = Pick<
+  PcbState,
+  "objects" | "pcbBoard" | "twoD" | "threeD" | "gridSize" | "unit" | "snapEnabled"
+>;
+
+// Rebuild a safe document from persisted storage — stale or hand-edited data
+// must never crash the editor.
+function sanitizePcbDoc(raw: unknown): Partial<PcbDoc> | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const out: Partial<PcbDoc> = {};
+  if (Array.isArray(r.objects)) {
+    out.objects = r.objects.filter(
+      (o): o is PcbState["objects"][number] =>
+        typeof o === "object" &&
+        o !== null &&
+        typeof (o as { id?: unknown }).id === "string" &&
+        typeof (o as { kind?: unknown }).kind === "string" &&
+        typeof (o as { x?: unknown }).x === "number" &&
+        typeof (o as { y?: unknown }).y === "number",
+    );
+  }
+  const b = r.pcbBoard as { width?: unknown; height?: unknown } | undefined;
+  if (
+    typeof b === "object" &&
+    b !== null &&
+    typeof b.width === "number" &&
+    b.width > 0 &&
+    typeof b.height === "number" &&
+    b.height > 0
+  ) {
+    out.pcbBoard = { width: b.width, height: b.height };
+  }
+  // Settings objects: shallow-merge over defaults so missing/new fields keep
+  // their default values instead of becoming undefined.
+  if (typeof r.twoD === "object" && r.twoD !== null) {
+    out.twoD = { ...initialState.twoD, ...(r.twoD as Partial<PcbState["twoD"]>) };
+  }
+  if (typeof r.threeD === "object" && r.threeD !== null) {
+    out.threeD = { ...initialState.threeD, ...(r.threeD as Partial<PcbState["threeD"]>) };
+  }
+  if (typeof r.gridSize === "string") out.gridSize = r.gridSize;
+  if (typeof r.unit === "string") out.unit = r.unit;
+  if (typeof r.snapEnabled === "boolean") out.snapEnabled = r.snapEnabled;
+  return out;
+}
+
 export function PcbProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<PcbState>(initialState);
   const stateRef = React.useRef(state);
@@ -307,6 +370,59 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
   const MAX_HISTORY = 50;
   // Monotonic ID generator for placed canvas objects.
   const objIdCounter = React.useRef(1);
+
+  // Hydrate the persisted document once on mount (client only), then bump the
+  // id counter past any restored ids so new placements never collide.
+  const [docHydrated, setDocHydrated] = React.useState(false);
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(pcbDocKey());
+      if (raw) {
+        const doc = sanitizePcbDoc(JSON.parse(raw));
+        if (doc) {
+          setState((s) => ({ ...s, ...doc }));
+          let maxId = 0;
+          for (const o of doc.objects ?? []) {
+            const m = /^obj_(\d+)$/.exec(o.id);
+            if (m) maxId = Math.max(maxId, Number(m[1]));
+          }
+          objIdCounter.current = Math.max(objIdCounter.current, maxId + 1);
+        }
+      }
+    } catch {}
+    setDocHydrated(true);
+  }, []);
+
+  // Debounced save — placing/dragging mutates objects frequently; one write
+  // per pause keeps localStorage churn (and JSON serialization) off the
+  // interaction path.
+  React.useEffect(() => {
+    if (!docHydrated) return;
+    const t = window.setTimeout(() => {
+      try {
+        const doc: PcbDoc = {
+          objects: state.objects,
+          pcbBoard: state.pcbBoard,
+          twoD: state.twoD,
+          threeD: state.threeD,
+          gridSize: state.gridSize,
+          unit: state.unit,
+          snapEnabled: state.snapEnabled,
+        };
+        window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
+      } catch {}
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [
+    docHydrated,
+    state.objects,
+    state.pcbBoard,
+    state.twoD,
+    state.threeD,
+    state.gridSize,
+    state.unit,
+    state.snapEnabled,
+  ]);
 
   const merge = React.useCallback<Merge>((patch) => {
     setState((s) => ({ ...s, ...(typeof patch === "function" ? patch(s) : patch) }));

@@ -952,6 +952,8 @@ export interface NetClass {
   viaSize: number;         // mil
   viaDrill: number;        // mil
   color: string;
+  // Nets assigned to this class (Popup 6 transfer list).
+  nets?: string[];
 }
 
 export interface DiffPair {

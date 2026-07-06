@@ -12,6 +12,7 @@
 
 import * as React from "react";
 import { usePreview, type PreviewTransformMode } from "./preview-context";
+import { MateSection } from "./preview-mate-panel";
 import { GRID_OPTIONS, RES_OPTIONS } from "@/components/3d/grid-settings";
 import type { SceneShape } from "@/components/3d/three-canvas";
 import type {
@@ -274,6 +275,9 @@ function PropertiesBody() {
             : "Scene (nothing selected)"}
         </div>
       </div>
+
+      {/* Mate properties — only while something is selected */}
+      {selection && selectedId && <MateSection id={selectedId} />}
 
       {/* Visibility toggles */}
       <Section title="Visibility">

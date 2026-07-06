@@ -4,6 +4,7 @@
 // which components render via <Icon html={...} />. Handlers route through the store.
 import { ic } from "./icons";
 import { C } from "./colors";
+import { exportKicadPcb, exportGerberViaKicad } from "./kicad-export";
 import type { PcbState } from "./types";
 import type { PcbActions } from "./store";
 
@@ -12,42 +13,42 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
     const dv = { divider: true };
     const ck = (label, k) => ({ label, k, check: true });
     const data = {
-      edit: { label: 'Edit', key: 'E', items: [ mk('Undo','Ctrl+Z','undo'), mk('Redo','Ctrl+Y','redo'), mk('Repeat(F4)','F4','blank'), mk('Copy(C)','Ctrl+C','copy'), mk('Cut (X)','Ctrl+X','cut'), mk('Paste(P)','Ctrl+P','paste'), mk('Delete','','del',[{label:'Selected',k:'Delete',action:'deleteObjects'},{label:'Objects',k:'',action:'deleteObjects'},{label:'All',k:'',action:'deleteObjects'}]), dv, mk('Snap','Alt+S','check'), mk('Select Objects','','blank',[{label:'All (A)',k:'Ctrl+A',ik:'blank'},{label:'Rectangle Inside (I)',k:'',ik:'rectIn'},{label:'Rectangle Outside (O)',k:'',ik:'rectOut'},{label:'Polygon Inside',k:'',ik:'polyIn'},{label:'Polygon Outside',k:'',ik:'polyOut'},{label:'Linde Touched (L)',k:'',ik:'lineT'},{divider:true},{label:'Toggle selection',k:'',ik:'toggleSel'}]), mk('Array Objects','','array'), mk('Find and Replace','Ctrl+F','find'), mk('Find Similar Objects (N)','Ctrl+Shift+F','findSim') ] },
+      edit: { label: 'Edit', key: 'E', items: [ mk('Undo','Ctrl+Z','undo'), mk('Redo','Ctrl+Y','redo'), mk('Repeat(F4)','F4','repeat'), mk('Copy(C)','Ctrl+C','copy'), mk('Cut (X)','Ctrl+X','cut'), mk('Paste(P)','Ctrl+P','paste'), mk('Delete','','del',[{label:'Selected',k:'Delete',ik:'del',action:'deleteObjects'},{label:'Objects',k:'',ik:'del',action:'deleteObjects'},{label:'All',k:'',ik:'del',action:'deleteObjects'}]), dv, mk('Snap','Alt+S','check'), mk('Select Objects','','toggleSel',[{label:'All (A)',k:'Ctrl+A',ik:'toggleSel'},{label:'Rectangle Inside (I)',k:'',ik:'rectIn'},{label:'Rectangle Outside (O)',k:'',ik:'rectOut'},{label:'Polygon Inside',k:'',ik:'polyIn'},{label:'Polygon Outside',k:'',ik:'polyOut'},{label:'Linde Touched (L)',k:'',ik:'lineT'},{divider:true},{label:'Toggle selection',k:'',ik:'toggleSel'}]), mk('Array Objects','','array'), mk('Find and Replace','Ctrl+F','find'), mk('Find Similar Objects (N)','Ctrl+Shift+F','findSim') ] },
       view: { label: 'View', key: 'V', items: [
         mk('Zoom In (I)','','zoomin'), mk('Zoom Out (O)','','zoomout'),
         mk('Fit All in Window (F)','K','fit'), mk('Fit Selection View (E)','','fitsel'), mk('Fit Area Selection View (A)','','fitarea'),
         mk('Full Screen','F11','fullscreen'), dv,
-        mk('Unit','Q','blank',[{label:'mil',k:''},{label:'mm',k:''},{label:'inch',k:''}]),
-        mk('Grid Size (G)','','blank',[{label:'5 mil',k:''},{label:'10 mil',k:''},{label:'25 mil',k:''},{label:'50 mil',k:''},{label:'100 mil',k:''}]),
-        mk('Grid Type','','blank',[{label:'Grid',k:''},{label:'Dot',k:''},{label:'None',k:''}]), dv,
-        mk('Highlight Net','','blank',[{label:'Highlight Net',k:'Shift+H',disabled:true},{label:'Unhighlight Net',k:'Shift+H',disabled:true},{label:'Highlight Net while Hovering Wire',k:''}]),
+        mk('Unit','Q','ruler',[{label:'mil',k:''},{label:'mm',k:''},{label:'inch',k:''}]),
+        mk('Grid Size (G)','','grid',[{label:'5 mil',k:''},{label:'10 mil',k:''},{label:'25 mil',k:''},{label:'50 mil',k:''},{label:'100 mil',k:''}]),
+        mk('Grid Type','','tGridOptions',[{label:'Grid',k:''},{label:'Dot',k:''},{label:'None',k:''}]), dv,
+        mk('Highlight Net','','wire',[{label:'Highlight Net',k:'Shift+H',ik:'wire',disabled:true},{label:'Unhighlight Net',k:'Shift+H',ik:'wire',disabled:true},{label:'Highlight Net while Hovering Wire',k:'',ik:'wire'}]),
         ck('Top Toolbar',''), ck('Left-Side panel','['), ck('Right-Side Panel',']'), ck('Bottom-Side Panel','/'),
-        mk('Window Arrangement (W)','','blank',[{label:'Default',k:''},{label:'Horizontal Split',k:''},{label:'Vertical Split',k:''},{label:'Grid View',k:''}]),
+        mk('Window Arrangement (W)','','window',[{label:'Default',k:'',ik:'window'},{label:'Horizontal Split',k:'',ik:'window'},{label:'Vertical Split',k:'',ik:'window'},{label:'Grid View',k:'',ik:'window'}]),
         ck('Floating Tool',''),
       ] },
       place: { label: 'Place', key: 'P', items: (state.mode === 'pcb' ? [
         // PCB-mode Place menu — PCB primitives (track/via/pad/etc).
         mk('Component / Footprint (C)','Alt+C','pChip'),
-        mk('Track (T)','Alt+T','pWire'),
-        mk('Differential Pair (D)','Alt+D','diffPair'),
-        mk('Via (V)','Alt+V','via'),
-        mk('Suture Vias','','via'),
-        mk('Pad (P)','Alt+P','pad'),
+        mk('Track (T)','Alt+T','tTrack'),
+        mk('Differential Pair (D)','Alt+D','tDiffPair'),
+        mk('Via (V)','Alt+V','tVia'),
+        mk('Suture Vias','','tSutureVias'),
+        mk('Pad (P)','Alt+P','tPad'),
         dv,
-        mk('Copper Pour Polygon (G)','Alt+G','pRect'),
-        mk('Filled Region','','pRect'),
-        mk('Board Outline','','blank'),
-        mk('Slot','','blank'),
-        mk('Cut-out','','blank'),
+        mk('Copper Pour Polygon (G)','Alt+G','tPolygon'),
+        mk('Filled Region','','tFillRegion'),
+        mk('Board Outline','','tBoardOutline'),
+        mk('Slot','','tSlot'),
+        mk('Cut-out','','del'),
         dv,
-        mk('Dimension','','measure'),
-        mk('Ruler','','measure'),
+        mk('Dimension','','tDimension'),
+        mk('Ruler','','ruler'),
         mk('Text (X)','Alt+X','pText'),
         mk('Image','','pImage'),
         mk('Table','','pTable'),
         dv,
-        mk('Length Tune','','wire'),
-        mk('Auto Route','','convert'),
+        mk('Length Tune','','tLengthTune'),
+        mk('Auto Route','','tAutoRoute'),
         mk('Interactive Route','','convert'),
       ] : [
         mk('Device/ Reuse Block (P)','Shift+F','pChip'),
@@ -60,44 +61,44 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
       ]) },
       design: { label: 'Design', key: 'D', items: [
         mk('Update/Conver Schematic to PCB','Alt+I','dConvert'),
-        mk('JLCPCB Layout Service','','dLayout',[{label:'Auto Layout',k:''},{label:'Manual Layout',k:''},{label:'Order PCB Now',k:''}]),
+        mk('JLCPCB Layout Service','','dLayout',[{label:'Auto Layout',k:'',ik:'dLayout'},{label:'Manual Layout',k:'',ik:'dLayout'},{label:'Order PCB Now',k:'',ik:'dLayout'}]),
         mk('Import Changes from PCB','','dImport'), dv,
         mk('Design Rule','','dRule'), mk('Check DRC','','dCheck'), mk('Annotate Designator','','dAnnotate'), dv,
         mk('Cross Probe','Shift+P','dCross'), mk('Placement Transfer','Ctrl+Shift+P','dTransfer'), dv,
         mk('Reset Component Unique ID','','dReset'),
       ] },
-      layout: { label: 'Layout', key: 'L', items: [ mk('Align Left','','fit'), mk('Align Center','','fit'), dv, mk('Distribute Horizontally','','array'), mk('Distribute Vertically','','array'), dv, mk('Bring to Front',']','layer'), mk('Send to Back','[','layer') ] },
+      layout: { label: 'Layout', key: 'L', items: [ mk('Align Left','','alignLeft'), mk('Align Center','','alignHCenter'), dv, mk('Distribute Horizontally','','tDistH'), mk('Distribute Vertically','','tDistV'), dv, mk('Bring to Front',']','tBringFront'), mk('Send to Back','[','tSendBack') ] },
       tools: { label: 'Tools', key: 'T', items: (state.mode === 'pcb' ? [
         // PCB-mode Tools — Phase 3 manager modals.
         mk('Layer Manager','','layer'),
         mk('Net Class Manager','','wire'),
-        mk('Differential Pair Manager','','diffPair'),
-        mk('Equal Length Group Manager','','measure'),
-        mk('Pad Pair Group Manager','','chip'),
+        mk('Differential Pair Manager','','tDiffPair'),
+        mk('Equal Length Group Manager','','tLengthTune'),
+        mk('Pad Pair Group Manager','','tPad'),
         mk('Copper Manager','','foot'),
         mk('Tear Drop','','del'),
         mk('IPC / DAC-2552 (PCB DRC)','','rules'),
         mk('Remove Unused Pad','','del'),
         dv,
-        mk('Device Manager','','chip'),
-        mk('Footprint Manager','','foot'),
+        mk('Device Manager','','tDevMgr'),
+        mk('Footprint Manager','','tFootMgr'),
         mk('Measure Distance','','measure'),
-        mk('Auto Router','','convert'),
+        mk('Auto Router','','tAutoRoute'),
       ] : [
         mk('Design Rule Check','','rules'),
         mk('Electrical Rule Check','','rules'),
         dv,
-        mk('Device Manager','','chip'),
-        mk('Footprint Manager','','foot'),
+        mk('Device Manager','','tDevMgr'),
+        mk('Footprint Manager','','tFootMgr'),
         dv,
         mk('Measure Distance','','measure'),
         mk('Cross Probe','','wire'),
         mk('Auto Router','','convert'),
       ]) },
-      export: { label: 'Export', key: 'R', items: [ mk('Export PDF','','pdf'), mk('Export Gerber','','gerber'), mk('Export BOM','','bom'), mk('Export Netlist','','bom'), mk('Export Image','','pdf'), dv, mk('Export Altium Designer','','imp'), mk('Export Kicad Designer','','imp'), mk('Export Eagle Designer','','imp') ] },
+      export: { label: 'Export', key: 'R', items: [ mk('Export PDF','','pdf'), mk('Export Gerber','','gerber'), mk('Export BOM','','bom'), mk('Export Netlist','','bom'), mk('Export Image','','pImage'), dv, mk('Export Altium Designer','','exp'), mk('Export Kicad Designer','','exp'), mk('Export Eagle Designer','','exp') ] },
       import: { label: 'Import', key: 'M', items: [ mk('Import DXF','','imp'), mk('Import Schematic','','imp'), mk('Import Netlist','','imp'), mk('Import Library','','imp'), mk('Import Footprint','','imp'), dv, mk('Import Altium','','imp'), mk('Import Kicad','','imp') ] },
       setting: { label: 'Setting', key: 'I', items: [ mk('System Setting','','sys'), mk('Drawing Setting','','draw'), mk('Hotkey Setting','','key'), mk('Property Setting','','prop'), mk('Save Setting','','save') ] },
-      help: { label: 'Help', key: 'H', items: [ mk('Documentation','','doc'), mk('Keyboard Shortcuts','','key'), mk('Community','','doc'), mk('About IDEEZA','','doc') ] },
+      help: { label: 'Help', key: 'H', items: [ mk('Documentation','','doc'), mk('Keyboard Shortcuts','','key'), mk('Community','','community'), mk('About IDEEZA','','about') ] },
     };
     const settingMap = { 'System Setting':'system','Drawing Setting':'drawing','Hotkey Setting':'hotkey','Property Setting':'property','Save Setting':'save' };
     return Object.keys(data).map(id => ({
@@ -119,7 +120,10 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
             else if (it.label === 'Device Manager') actions.openManager('device');
             else if (it.label === 'Footprint Manager') actions.openManager('footprint');
             else if (it.label === 'Export Altium Designer') actions.openModal('exportAltium');
-            else if (it.label === 'Export Kicad Designer') actions.openModal('exportKicad');
+            // Real KiCad pipeline — generates an actual .kicad_pcb from the
+            // canvas document; Gerber goes through /api/kicad (kicad-cli).
+            else if (it.label === 'Export Kicad Designer') { exportKicadPcb(state, actions.flashToast); actions.closeAll(); }
+            else if (it.label === 'Export Gerber') { exportGerberViaKicad(state, actions.flashToast); actions.closeAll(); }
             else if (it.label === 'Export Eagle Designer') actions.openModal('exportEagle');
             else if (it.label === 'Array Objects') actions.openModal('array');
             else if (it.label === 'Find and Replace') actions.openModal('findReplace');
@@ -163,10 +167,328 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
     }));
 }
 
-// 2D editor menu bar — reduced 4-menu set (View / Export / Setting / Help).
-// Faithful to Figma "2D section" board (node 198:190620). Returns the same shape
-// MenuBar consumes from buildMenus, so no render changes are needed. Verbatim
-// source typos are preserved intentionally ("Marge All", "Desinger", "About..").
+// Schematic-side menu bar — per the "In Schematic Side" spec sheet.
+// Eight menus (File / Edit / View / Place / Design / Layout / Export / Setting);
+// items marked "Remove" on the sheet (Board Shape, Reannotate, Convert to New
+// Version, Insert BOM Table, Generate Data From Chatbot, Import Image) are
+// intentionally absent. PCB mode keeps buildMenus untouched.
+export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
+  const close = () => actions.closeAll();
+  const noop = () => {};
+  const dv = { divider: true };
+  const su = (label, k = "", o = {}) => ({
+    label,
+    k,
+    fg: o.disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)",
+    icon: o.icon || "blank",
+    onClick: o.onClick || close,
+  });
+  const item = (label, o = {}) => ({
+    label,
+    k: o.k || "",
+    submenu: !!o.sub,
+    hasSub: !!o.sub,
+    icon: o.icon || "blank",
+    sub: o.sub || [],
+    onClick: o.sub ? noop : o.onClick || close,
+  });
+  const check = (label, k = "", isBottom = false) => {
+    const on = isBottom ? state.bottomOpen : state.viewTog[label] !== false;
+    return {
+      label,
+      k,
+      submenu: false,
+      hasSub: false,
+      icon: on ? "check" : "blank",
+      sub: [],
+      onClick: () => (isBottom ? actions.toggleBottom() : actions.toggleView(label)),
+    };
+  };
+  const snapToggle = () => {
+    const on = state.snapEnabled !== false;
+    return {
+      label: "Snap",
+      k: "Alt+S",
+      submenu: false,
+      hasSub: false,
+      icon: on ? "check" : "blank",
+      sub: [],
+      onClick: () => actions.toggleSnap(),
+    };
+  };
+  const tool = (t) => () => actions.setTool(t);
+  const toastSu = (label, msg) => su(label, "", { onClick: () => actions.flashToast(msg ?? `${label.replace(/…$/, "")} — coming soon`) });
+
+  const data = [
+    {
+      id: "file",
+      label: "File",
+      key: "F",
+      items: [
+        // PDF Part 1: File ▸ New is a 17-item cascade on the schematic sheet.
+        item("New", {
+          k: "Ctrl+N",
+          icon: "page",
+          sub: [
+            "Project", "Board", "Schematic", "Page", "PCB", "Panel",
+            "Component…", "Footprint…", "3D Model…", "Sim Model…", "Drawing…",
+            "Net Flag…", "Net Port…", "Off Page Connector…",
+            "Non-Electronic Flag…", "Reuse Block…", "Panel Lib…",
+          ].map((n) => su(n, "", { icon: "page", onClick: () => actions.flashToast(`New ${n.replace(/…$/, "")} created`) })),
+        }),
+        item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.flashToast("Open Project — pick a file") }),
+        item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
+        item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
+        dv,
+        // PDF Part 1: per-format importer cascade.
+        item("Import", {
+          icon: "imp",
+          sub: [
+            su("DXF…", "", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
+            toastSu("Image…"),
+            toastSu("EasyEDA (Standard)…"),
+            toastSu("EasyEDA (Professional)…"),
+            su("Altium Designer…", "", { icon: "imp", onClick: () => actions.openModal("importAltium") }),
+            toastSu("Allegro/OrCad…"),
+            toastSu("EAGLE…"),
+            su("KiCad…", "", { icon: "imp", onClick: () => actions.openModal("importKicad") }),
+            toastSu("PADS/PADS Pro…"),
+            toastSu("Protel…"),
+            toastSu("LTspice…"),
+          ],
+        }),
+      ],
+    },
+    {
+      id: "edit",
+      label: "Edit",
+      key: "E",
+      items: [
+        item("Undo", { k: "Ctrl+Z", icon: "undo", onClick: () => actions.undo() }),
+        item("Redo", { k: "Ctrl+Y", icon: "redo", onClick: () => actions.redo() }),
+        dv,
+        item("Copy", { k: "Ctrl+C", icon: "copy", onClick: () => actions.copySelection() }),
+        item("Cut", { k: "Ctrl+X", icon: "cut", onClick: () => actions.cutSelection() }),
+        item("Paste", { k: "Ctrl+V", icon: "paste", onClick: () => actions.pasteClipboard() }),
+        // PDF Parts 1–2: Delete is a cascade — Selected · Objects… · All.
+        item("Delete", {
+          k: "Del",
+          icon: "del",
+          sub: [
+            su("Selected", "Del", { icon: "del", onClick: () => actions.deleteSelected() }),
+            su("Objects…", "", { icon: "del", onClick: () => actions.openModal("deleteObjects") }),
+            su("All", "", { icon: "del", onClick: () => { actions.merge({ objects: [] }); actions.flashToast("All objects deleted"); } }),
+          ],
+        }),
+        dv,
+        item("Move", {
+          k: "M",
+          icon: "move",
+          sub: [
+            su("Move by Center point", "", { icon: "move", onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on center"); } }),
+            su("Move by Origin point", "", { icon: "move", onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on origin"); } }),
+            su("Move by reference point", "", { icon: "move", onClick: () => { actions.setTool("move"); actions.flashToast("Move: pick reference"); } }),
+          ],
+        }),
+        snapToggle(),
+        item("Find and Replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
+        item("Array Object", { icon: "array", onClick: () => actions.openModal("array") }),
+      ],
+    },
+    {
+      id: "view",
+      label: "View",
+      key: "V",
+      items: [
+        item("Zoom In (I)", { icon: "zoomin", onClick: () => actions.zoomIn() }),
+        item("Zoom Out (O)", { icon: "zoomout", onClick: () => actions.zoomOut() }),
+        item("Fit All in Window (F)", { k: "K", icon: "fit", onClick: () => actions.zoomFit() }),
+        dv,
+        // PDF Part 1: schematic units are inch · mm; grid presets in inch.
+        item("Unit", {
+          icon: "ruler",
+          sub: ["Inch", "mm"].map((u) =>
+            su(u === "Inch" ? "inch" : u, "", { icon: state.unit === u ? "check" : "blank", onClick: () => actions.setUnit(u) }),
+          ),
+        }),
+        item("Grid Size (G)", {
+          icon: "grid",
+          sub: ["0.1", "0.05", "0.02", "0.01"].map((g) =>
+            su(`${g} inch`, "", { icon: state.gridSize === g ? "check" : "blank", onClick: () => actions.setGridSize(g) }),
+          ),
+        }),
+        item("Grid Type", {
+          icon: "tGridOptions",
+          sub: [
+            su("Grid Dot", "", { onClick: () => actions.flashToast("Grid type: Grid Dot") }),
+            su("Grid", "", { onClick: () => actions.flashToast("Grid type: Grid") }),
+            su("None", "", { onClick: () => actions.flashToast("Grid type: None") }),
+          ],
+        }),
+        item("Appearance", {
+          icon: "appearance",
+          sub: [
+            su("Light Mode", "", { icon: "sun", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("Dark Mode", "", { icon: "moon", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("System Default", "", { icon: "sys", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            dv,
+            su("Open Theme Settings…", "", { icon: "appearance", onClick: () => actions.openSettings("system") }),
+          ],
+        }),
+        dv,
+        check("Top Toolbar"),
+        check("Left-Side panel", "["),
+        check("Right-Side Panel", "]"),
+        check("Bottom-Side Panel", "/", true),
+      ],
+    },
+    {
+      id: "place",
+      label: "Place",
+      key: "P",
+      items: [
+        item("Device", { icon: "pChip", onClick: () => actions.openManager("device") }),
+        item("Wire", { k: "Alt+W", icon: "pWire", onClick: tool("wire") }),
+        item("Net", {
+          icon: "pNetFlag",
+          sub: [
+            su("VCC", "V", { icon: "power", onClick: tool("netFlag") }),
+            su("+5V", "", { icon: "power", onClick: tool("vcc5v") }),
+            su("-5V", "", { icon: "power", onClick: tool("netFlag") }),
+            su("GND", "", { icon: "power", onClick: tool("netFlag") }),
+            su("AGND", "", { icon: "power", onClick: tool("agnd") }),
+            su("PGND", "", { icon: "power", onClick: tool("pgnd") }),
+          ],
+        }),
+        item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),
+        item("No Connection Flag", { icon: "pNoConnect", onClick: tool("noConnect") }),
+        item("Junction", { icon: "pTestPoint", onClick: () => actions.flashToast("Junction — click a wire crossing") }),
+        item("Differential Pair", { icon: "tDiffPair", onClick: tool("diffPair") }),
+        dv,
+        item("Polyline", { k: "Alt+L", icon: "pPolyline", onClick: tool("polyline") }),
+        item("Arc", { k: "Alt+A", icon: "pArc", onClick: tool("arc") }),
+        item("Bezier", { k: "Alt+Z", icon: "pBezier", onClick: tool("bezier") }),
+        item("Circle", { k: "Alt+C", icon: "pCircle", onClick: tool("circle") }),
+        item("Rectangle", { k: "Alt+R", icon: "pRect", onClick: tool("rectangle") }),
+        item("Text", { k: "Alt+T", icon: "pText", onClick: tool("text") }),
+        item("Image", { icon: "pImage", onClick: tool("image") }),
+        item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
+        dv,
+        item("Net Label", { k: "Alt+N", icon: "pNetLabel", onClick: tool("netLabel") }),
+      ],
+    },
+    {
+      id: "design",
+      label: "Design",
+      key: "D",
+      items: [
+        item("Convert Schematic to PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.setMode("pcb") }),
+        dv,
+        item("Design Rule", { icon: "dRule", onClick: () => actions.openModal("designRules") }),
+        item("Check DRC", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
+        item("Differential Pair Manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
+        dv,
+        item("Import GLTF", { icon: "cube", onClick: () => actions.flashToast("Import GLTF — pick a file") }),
+        item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+      ],
+    },
+    {
+      id: "layout",
+      label: "Layout",
+      key: "L",
+      items: [
+        item("Group", { icon: "group", onClick: () => actions.flashToast("Grouped") }),
+        item("Align", {
+          icon: "align",
+          sub: [
+            su("Align Left", "", { icon: "alignLeft" }),
+            su("Align Right", "", { icon: "alignRight" }),
+            su("Align Top", "", { icon: "alignTop" }),
+            su("Align Bottom", "", { icon: "alignBottom" }),
+            su("Align Horizontal centers", "", { icon: "alignHCenter" }),
+            su("Align Vertical Center", "", { icon: "alignVCenter" }),
+          ],
+        }),
+        item("Distribute", {
+          icon: "distribute",
+          sub: [
+            su("Distribute Horizontally", "", { icon: "distribute", onClick: () => actions.openModal("distribute") }),
+            su("Distribute Vertically", "", { icon: "distributeV", onClick: () => actions.openModal("distribute") }),
+          ],
+        }),
+        item("Rotate", {
+          icon: "rot",
+          sub: [
+            su("Rotate Left", "", { icon: "tRotLeft", onClick: () => actions.rotateSelectedPlaced(-90) }),
+            su("Rotate Right", "", { icon: "tRotRight", onClick: () => actions.rotateSelectedPlaced(90) }),
+          ],
+        }),
+        item("Flip", {
+          icon: "flip",
+          sub: [
+            su("Flip Horizontal", "", { icon: "flip", onClick: () => actions.flipSelectedH() }),
+            su("Flip Vertical", "", { icon: "flipV", onClick: () => actions.flipSelectedV() }),
+          ],
+        }),
+        item("Level", {
+          icon: "layer",
+          sub: [
+            su("Bring to Front", "]", { icon: "tBringFront", onClick: () => actions.bringFront() }),
+            su("Send to Back", "[", { icon: "tSendBack", onClick: () => actions.sendBack() }),
+          ],
+        }),
+      ],
+    },
+    {
+      id: "export",
+      label: "Export",
+      key: "R",
+      items: [
+        item("BOM (Bill of Materials)", { icon: "bom", onClick: () => actions.openModal("exportBom") }),
+        item("DXF", { icon: "exp", onClick: () => actions.openModal("exportDxf2D") }),
+        item("PDF", { icon: "pdf", onClick: () => actions.openModal("exportPdf2D") }),
+      ],
+    },
+    {
+      id: "setting",
+      label: "Setting",
+      key: "I",
+      items: [
+        item("System", { icon: "sys", onClick: () => actions.openSettings("system") }),
+        item("Schematic/Symbol", { icon: "symbol", onClick: () => actions.openSettings("symbol") }),
+        item("PCB/Footprint", { icon: "foot", onClick: () => actions.openSettings("footprint") }),
+        item("Panel", { icon: "panel", onClick: () => actions.openSettings("panel") }),
+      ],
+    },
+    {
+      id: "help",
+      label: "Help",
+      key: "H",
+      items: [
+        item("community", { icon: "community" }),
+        item("Tutorials", { k: "F1", icon: "tutorial" }),
+        item("Contact", { icon: "contact" }),
+        item("Online chat", { icon: "chat" }),
+        item("About..", { icon: "about" }),
+        dv,
+        item("Video Capture...", { icon: "video" }),
+        item("Performance Diagnostic...", { icon: "diagnostic" }),
+      ],
+    },
+  ];
+
+  return data.map((m) => ({
+    ...m,
+    open: state.openMenu === m.id,
+    toggle: () => actions.toggleMenu(m.id),
+  }));
+}
+
+// 2D editor menu bar — per the "In 2D Side" spec sheets (File / Edit / View /
+// Place / Design / Route / Layout / Export / Setting / Help). Items marked
+// "Remove" on the detail sheet (Polygon Pour, Fill all Plane, per-item
+// Align/Rotate/Level entries under Design, Altium/Kicad/Eagle exports) are
+// intentionally absent.
 export function buildMenus2D(state: PcbState, actions: PcbActions) {
   const close = () => actions.closeAll();
   const noop = () => {};
@@ -212,8 +534,8 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     su("0.015,0.051mm | 2.0,2,mil", "", { icon: "check" }),
     dv,
     su("Grid/Snap keep Ratio", "", { icon: "check" }),
-    su("Common Grid/Snap setting"),
-    su("Grid Range setting (Po..."),
+    su("Common Grid/Snap setting", "", { icon: "grid" }),
+    su("Grid Range setting (Po...", "", { icon: "fitarea" }),
   ];
 
   // Snap toggle reflects current `snapEnabled` flag (Phase 6, IT-604).
@@ -237,17 +559,30 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "File",
       key: "F",
       items: [
-        item("New", { k: "Ctrl+N", icon: "blank", onClick: () => actions.flashToast("New project") }),
-        item("Open Project", { k: "Ctrl+O", icon: "imp", onClick: () => actions.flashToast("Open Project — pick a file") }),
+        // PDF Part 2: 2D File ▸ New cascade (board-scoped item set).
+        item("New", {
+          k: "Ctrl+N",
+          icon: "page",
+          sub: ["Board", "PCB", "Footprint", "Panel", "Component…"].map((n) =>
+            su(n, "", { icon: "page", onClick: () => actions.flashToast(`New ${n.replace(/…$/, "")} created`) }),
+          ),
+        }),
+        item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.flashToast("Open Project — pick a file") }),
         item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
         item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
         dv,
+        // PDF Part 2: per-format importer cascade (PCB formats).
         item("Import", {
           icon: "imp",
           sub: [
-            su("DXF", "", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
-            su("Altium", "", { icon: "imp", onClick: () => actions.openModal("importAltium") }),
-            su("Kicad", "", { icon: "imp", onClick: () => actions.openModal("importKicad") }),
+            su("DXF…", "", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
+            su("Image…", "", { onClick: () => actions.flashToast("Image — coming soon") }),
+            su("Altium…", "", { icon: "imp", onClick: () => actions.openModal("importAltium") }),
+            su("Allegro/OrCad…", "", { onClick: () => actions.flashToast("Allegro/OrCad — coming soon") }),
+            su("EAGLE…", "", { onClick: () => actions.flashToast("EAGLE — coming soon") }),
+            su("KiCad…", "", { icon: "imp", onClick: () => actions.openModal("importKicad") }),
+            su("PADS…", "", { onClick: () => actions.flashToast("PADS — coming soon") }),
+            su("Protel…", "", { onClick: () => actions.flashToast("Protel — coming soon") }),
           ],
         }),
       ],
@@ -264,16 +599,25 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Copy", { k: "Ctrl+C", icon: "copy", onClick: () => actions.copySelection() }),
         item("Cut", { k: "Ctrl+X", icon: "cut", onClick: () => actions.cutSelection() }),
         item("Paste", { k: "Ctrl+V", icon: "paste", onClick: () => actions.pasteClipboard() }),
-        item("Delete", { k: "Del", icon: "del", onClick: () => actions.deleteSelected() }),
+        // PDF Parts 1–2: Delete is a cascade — Selected · Objects… · All.
+        item("Delete", {
+          k: "Del",
+          icon: "del",
+          sub: [
+            su("Selected", "Del", { icon: "del", onClick: () => actions.deleteSelected() }),
+            su("Objects…", "", { icon: "del", onClick: () => actions.openModal("deleteObjects") }),
+            su("All", "", { icon: "del", onClick: () => { actions.merge({ objects: [] }); actions.flashToast("All objects deleted"); } }),
+          ],
+        }),
         dv,
         // Phase 8 — Move with sub-options (IT-534).
         item("Move", {
           k: "M",
-          icon: "blank",
+          icon: "move",
           sub: [
-            su("Move by Center point", "", { onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on center"); } }),
-            su("Move by Origin point", "", { onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on origin"); } }),
-            su("Move by reference point", "", { onClick: () => { actions.setTool("move"); actions.flashToast("Move: pick reference"); } }),
+            su("Move by Center point", "", { icon: "move", onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on center"); } }),
+            su("Move by Origin point", "", { icon: "move", onClick: () => { actions.setTool("move"); actions.flashToast("Move: anchor on origin"); } }),
+            su("Move by reference point", "", { icon: "move", onClick: () => { actions.setTool("move"); actions.flashToast("Move: pick reference"); } }),
           ],
         }),
         snapToggle(),
@@ -281,10 +625,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         dv,
         item("Edit Outline", { icon: "draw", onClick: () => actions.openModal("editOutline") }),
         item("Cutout", { icon: "del", onClick: () => actions.openModal("cutout") }),
-        item("Array Object", { icon: "array", onClick: () => actions.openModal("array") }),
         dv,
-        item("Add Chamfer", { icon: "blank", onClick: () => { actions.setCornerOp({ mode: "chamfer" }); actions.openModal("chamferFillet"); } }),
-        item("Add Fillet", { icon: "blank", onClick: () => { actions.setCornerOp({ mode: "fillet" }); actions.openModal("chamferFillet"); } }),
+        item("Add Chamfer", { icon: "pPolyline", onClick: () => { actions.setCornerOp({ mode: "chamfer" }); actions.openModal("chamferFillet"); } }),
+        item("Add Fillet", { icon: "pArc", onClick: () => { actions.setCornerOp({ mode: "fillet" }); actions.openModal("chamferFillet"); } }),
       ],
     },
     {
@@ -295,12 +638,18 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Zoom In (I)", { icon: "zoomin", onClick: () => actions.zoomIn() }),
         item("Zoom Out (O)", { icon: "zoomout", onClick: () => actions.zoomOut() }),
         item("Fit All in Window (F)", { k: "K", icon: "fit", onClick: () => actions.zoomFit() }),
-        item("Full Screen", { k: "F11", icon: "fullscreen" }),
         dv,
-        item("Flip Board", { k: "Alt+F" }),
-        item("Grid Size (G)", { sub: gridFlyout }),
-        item("Snap Size", { sub: gridFlyout }),
+        // PDF Part 2: PCB units are mil · mm.
+        item("Unit", {
+          icon: "ruler",
+          sub: ["Mil", "mm"].map((u) =>
+            su(u === "Mil" ? "mil" : u, "", { icon: state.unit === u ? "check" : "blank", onClick: () => actions.setUnit(u) }),
+          ),
+        }),
+        item("Grid Size (G)", { icon: "grid", sub: gridFlyout }),
+        item("Snap Size", { icon: "snap", sub: gridFlyout }),
         item("Grid Type", {
+          icon: "tGridOptions",
           sub: [
             su("Cartesian Coordinate System", "", { icon: "check" }),
             su("Polar Coordinate System"),
@@ -310,30 +659,29 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
             su("None", "", { icon: "check" }),
           ],
         }),
+        dv,
+        item("2D View", { icon: "board", onClick: () => actions.setMode("2d") }),
+        item("3D View", { icon: "cube", onClick: () => actions.setMode("3d") }),
+        item("Normal View", { icon: "preview", onClick: () => actions.flashToast("Normal view") }),
+        item("Outline View", { icon: "pRect", onClick: () => actions.flashToast("Outline view") }),
+        item("Flip Board", { k: "Alt+F", icon: "flipV" }),
+        item("Ratline", { icon: "wire", onClick: () => actions.flashToast("Ratline visibility toggled") }),
+        dv,
         // Phase 8 — Appearance (IT-550). Dark / Light / System theme picker.
         item("Appearance", {
+          icon: "appearance",
           sub: [
-            su("Light Mode", "", { onClick: () => actions.flashToast("Switch theme via Setting → System") }),
-            su("Dark Mode", "", { onClick: () => actions.flashToast("Switch theme via Setting → System") }),
-            su("System Default", "", { onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("Light Mode", "", { icon: "sun", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("Dark Mode", "", { icon: "moon", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            su("System Default", "", { icon: "sys", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
             dv,
-            su("Open Theme Settings…", "", { onClick: () => actions.openSettings("system") }),
+            su("Open Theme Settings…", "", { icon: "appearance", onClick: () => actions.openSettings("system") }),
           ],
         }),
-        dv,
         check("Top Toolbar"),
         check("Left-Side panel", "["),
         check("Right-Side Panel", "]"),
         check("Bottom-Side Panel", "/", true),
-        item("Window Arrangement (W)", {
-          sub: [
-            su("Tile Horizontally (H)"),
-            su("Tile Vertically (V)"),
-            su("Tile Vertically (V)"),
-            su("Marge All (M)"),
-          ],
-        }),
-        check("Floating Tool"),
       ],
     },
     // Phase 8 — Place menu (IT-510). 2D-side primitives + Move-to-Layer.
@@ -343,15 +691,15 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       key: "P",
       items: [
         item("Device", { icon: "pChip", onClick: () => actions.openManager("device") }),
-        item("Vias", { icon: "via", onClick: () => actions.setTool("via") }),
-        item("Suture Vias", { icon: "via", onClick: () => actions.setTool("sutureVias") }),
-        item("Pad", { icon: "pad", onClick: () => actions.setTool("pad") }),
-        item("Board Outline", { icon: "blank", onClick: () => actions.setTool("boardOutline") }),
-        item("Copper Region", { icon: "pRect", onClick: () => actions.setTool("polygon") }),
-        item("Fill Region", { icon: "pRect", onClick: () => actions.setTool("fillRegion") }),
-        item("Slot Region", { icon: "pRect", onClick: () => actions.setTool("slot") }),
-        item("Prohibited Region", { icon: "del", onClick: () => actions.setTool("prohibitedRegion") }),
-        item("Constraint Region", { icon: "del", onClick: () => actions.setTool("constraintRegion") }),
+        item("Vias", { icon: "tVia", onClick: () => actions.setTool("via") }),
+        item("Suture Vias", { icon: "tSutureVias", onClick: () => actions.setTool("sutureVias") }),
+        item("Pad", { icon: "tPad", onClick: () => actions.setTool("pad") }),
+        item("Board Outline", { icon: "tBoardOutline", onClick: () => actions.setTool("boardOutline") }),
+        item("Copper Region", { icon: "tPolygon", onClick: () => actions.setTool("polygon") }),
+        item("Fill Region", { icon: "tFillRegion", onClick: () => actions.setTool("fillRegion") }),
+        item("Slot Region", { icon: "tSlot", onClick: () => actions.setTool("slot") }),
+        item("Prohibited Region", { icon: "pNoConnect", onClick: () => actions.setTool("prohibitedRegion") }),
+        item("Constraint Region", { icon: "rectIn", onClick: () => actions.setTool("constraintRegion") }),
         dv,
         item("Line", { icon: "pPolyline", onClick: () => actions.setTool("line") }),
         item("Dimension", { icon: "measure", onClick: () => actions.setTool("dimension") }),
@@ -359,50 +707,12 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Image", { icon: "pImage", onClick: () => actions.setTool("image") }),
         item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
         dv,
-        item("Move to Different Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
-      ],
-    },
-    // Phase 8 — Layout menu (IT-513). Already-built primitives (Group / Align
-    // / Distribute / Rotate / Flip / Level) surfaced from the toolbar.
-    {
-      id: "layout",
-      label: "Layout",
-      key: "L",
-      items: [
-        item("Group", { icon: "blank", onClick: () => actions.flashToast("Grouped") }),
-        item("Align", {
-          sub: [
-            su("Align Left"),
-            su("Align Right"),
-            su("Align Top"),
-            su("Align Bottom"),
-            su("Align Horizontal centers"),
-            su("Align Vertical Center"),
-          ],
-        }),
-        item("Distribute", {
-          sub: [
-            su("Distribute Horizontally", "", { onClick: () => actions.openModal("distribute") }),
-            su("Distribute Vertically", "", { onClick: () => actions.openModal("distribute") }),
-          ],
-        }),
-        item("Rotate", {
-          sub: [
-            su("Rotate Left", "", { onClick: () => actions.rotateSelectedPlaced(-90) }),
-            su("Rotate Right", "", { onClick: () => actions.rotateSelectedPlaced(90) }),
-          ],
-        }),
-        item("Flip", {
-          sub: [
-            su("Flip Horizontal", "", { onClick: () => actions.flipSelectedH() }),
-            su("Flip Vertical", "", { onClick: () => actions.flipSelectedV() }),
-          ],
-        }),
-        item("Level", {
-          sub: [
-            su("Bring to Front", "", { onClick: () => actions.bringFront() }),
-            su("Send to Back", "", { onClick: () => actions.sendBack() }),
-          ],
+        // PDF Part 2: cascade of target layers.
+        item("Move to Different Layer", {
+          icon: "layer",
+          sub: (state.pcbLayers ?? []).map((l) =>
+            su(l.name, "", { icon: "layer", onClick: () => actions.flashToast(`Selection moved to ${l.name}`) }),
+          ),
         }),
       ],
     },
@@ -418,10 +728,14 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Differential Pair Manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Add Mounting Hole", { icon: "pTestPoint", onClick: () => actions.setTool("mountingHole") }),
+        item("Import DXF", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
+        item("Import Image", { icon: "pImage", onClick: () => actions.setTool("image") }),
         item("Manage Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
         dv,
-        item("Polygon Pour", { icon: "pRect", onClick: () => actions.setTool("polygon") }),
-        item("Fill all Plane", { icon: "pRect", onClick: () => actions.flashToast("Filled all planes") }),
+        // PDF Part 2 (Popup 6): grouping / length-matching managers.
+        item("Net Class Manager", { icon: "wire", onClick: () => actions.openModal("netClass") }),
+        item("Equal Length Group Manager", { icon: "tLengthTune", onClick: () => actions.openModal("equalLength") }),
+        item("Pad Pair Group Manager", { icon: "tPad", onClick: () => actions.openModal("padPair") }),
         dv,
         item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
       ],
@@ -432,16 +746,17 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Route",
       key: "U",
       items: [
-        item("Single Routing", { k: "T", icon: "pWire", onClick: () => actions.setTool("track") }),
-        item("Differential Routing", { k: "D", icon: "diffPair", onClick: () => actions.setTool("diffPair") }),
+        item("Single Routing", { k: "T", icon: "tTrack", onClick: () => actions.setTool("track") }),
+        item("Differential Routing", { k: "D", icon: "tDiffPair", onClick: () => actions.setTool("diffPair") }),
         item("Stretch Track", { icon: "pWire", onClick: () => actions.setTool("stretchTrack") }),
         item("Gloss Selected Track", { icon: "wire", onClick: () => actions.flashToast("Glossed selected tracks") }),
         dv,
         item("Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),
         item("Differential Pair Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),
         dv,
-        item("Auto Routing", { icon: "convert", onClick: () => actions.openModal("autoRoute") }),
+        item("Auto Routing", { icon: "tAutoRoute", onClick: () => actions.openModal("autoRoute") }),
         item("Routing Mode", {
+          icon: "route",
           sub: [
             su("45° Diagonal", "", { icon: state.routingMode === "45deg" ? "check" : "blank", onClick: () => actions.setRoutingMode("45deg") }),
             su("90° Orthogonal", "", { icon: state.routingMode === "90deg" ? "check" : "blank", onClick: () => actions.setRoutingMode("90deg") }),
@@ -449,6 +764,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ],
         }),
         item("Routing Corner", {
+          icon: "pArc",
           sub: [
             su("Miter", "", { icon: state.routingCorner === "miter" ? "check" : "blank", onClick: () => actions.setRoutingCorner("miter") }),
             su("Round", "", { icon: state.routingCorner === "round" ? "check" : "blank", onClick: () => actions.setRoutingCorner("round") }),
@@ -461,22 +777,67 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Remove Loop", { icon: "del", onClick: () => actions.flashToast("Loop removed") }),
       ],
     },
-    // Phase 6 — Export menu (IT-656).
+    // Phase 8 — Layout menu (IT-513). Already-built primitives (Group / Align
+    // / Distribute / Rotate / Flip / Level) surfaced from the toolbar.
+    {
+      id: "layout",
+      label: "Layout",
+      key: "L",
+      items: [
+        item("Group", { icon: "group", onClick: () => actions.flashToast("Grouped") }),
+        item("Align", {
+          icon: "align",
+          sub: [
+            su("Align Left", "", { icon: "alignLeft" }),
+            su("Align Right", "", { icon: "alignRight" }),
+            su("Align Top", "", { icon: "alignTop" }),
+            su("Align Bottom", "", { icon: "alignBottom" }),
+            su("Align Horizontal centers", "", { icon: "alignHCenter" }),
+            su("Align Vertical Center", "", { icon: "alignVCenter" }),
+          ],
+        }),
+        item("Distribute", {
+          icon: "distribute",
+          sub: [
+            su("Distribute Horizontally", "", { icon: "distribute", onClick: () => actions.openModal("distribute") }),
+            su("Distribute Vertically", "", { icon: "distributeV", onClick: () => actions.openModal("distribute") }),
+          ],
+        }),
+        item("Rotate", {
+          icon: "rot",
+          sub: [
+            su("Rotate Left", "", { icon: "tRotLeft", onClick: () => actions.rotateSelectedPlaced(-90) }),
+            su("Rotate Right", "", { icon: "tRotRight", onClick: () => actions.rotateSelectedPlaced(90) }),
+          ],
+        }),
+        item("Flip", {
+          icon: "flip",
+          sub: [
+            su("Flip Horizontal", "", { icon: "flip", onClick: () => actions.flipSelectedH() }),
+            su("Flip Vertical", "", { icon: "flipV", onClick: () => actions.flipSelectedV() }),
+          ],
+        }),
+        item("Level", {
+          icon: "layer",
+          sub: [
+            su("Bring to Front", "", { icon: "tBringFront", onClick: () => actions.bringFront() }),
+            su("Send to Back", "", { icon: "tSendBack", onClick: () => actions.sendBack() }),
+          ],
+        }),
+      ],
+    },
+    // Phase 6 — Export menu (IT-656), trimmed to the "In 2D Side" sheet set.
     {
       id: "export",
       label: "Export",
       key: "R",
       items: [
         item("BOM (Bill of Materials)", { icon: "bom", onClick: () => actions.openModal("exportBom") }),
-        item("DXF", { icon: "imp", onClick: () => actions.openModal("exportDxf2D") }),
+        item("DXF", { icon: "exp", onClick: () => actions.openModal("exportDxf2D") }),
         item("PDF", { icon: "pdf", onClick: () => actions.openModal("exportPdf2D") }),
         item("Gerber", { icon: "gerber", onClick: () => actions.openModal("exportGerber2D") }),
         item("Pick and Place", { icon: "bom", onClick: () => actions.openModal("exportPickPlace") }),
         item("3D", { icon: "cube", onClick: () => actions.openModal("export3dFile") }),
-        dv,
-        item("Altium Desinger", { onClick: () => actions.openModal("exportAltium") }),
-        item("Kicad Desinger", { onClick: () => actions.openModal("exportKicad") }),
-        item("Eagle Designer", { onClick: () => actions.openModal("exportEagle") }),
       ],
     },
     {
@@ -484,25 +845,10 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Setting",
       key: "I",
       items: [
-        item("System", { icon: "sys", sub: [su("General"), su("Common"), su("Common Library")] }),
-        item("Schematic/Symbol", { sub: [su("General"), su("Theme")] }),
-        item("PCB/Footprint", {
-          sub: [
-            su("General"),
-            su("Theme"),
-            su("Common Grid/Snap Sie setting"),
-            su("Common Track Width Setting"),
-            su("Common Via Size Setting"),
-            su("Snap"),
-          ],
-        }),
-        item("Panel/Panel Lib", { sub: [su("General"), su("Theme")] }),
-        item("Common Font Family"),
-        item("Drawing", { onClick: () => actions.openSettings("drawing") }),
-        item("Property", { onClick: () => actions.openSettings("property") }),
-        item("Hotkey", { onClick: () => actions.openSettings("hotkey") }),
-        item("Top toolbar"),
-        item("Save", { onClick: () => actions.openSettings("save") }),
+        item("System", { icon: "sys", onClick: () => actions.openSettings("system") }),
+        item("Schematic/Symbol", { icon: "symbol", onClick: () => actions.openSettings("symbol") }),
+        item("PCB/Footprint", { icon: "foot", onClick: () => actions.openSettings("footprint") }),
+        item("Panel", { icon: "panel", onClick: () => actions.openSettings("panel") }),
       ],
     },
     {
@@ -510,14 +856,14 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Help",
       key: "H",
       items: [
-        item("community"),
-        item("Tutorials", { k: "F1" }),
-        item("Contact"),
-        item("Online chat"),
-        item("About..", { icon: "doc" }),
+        item("community", { icon: "community" }),
+        item("Tutorials", { k: "F1", icon: "tutorial" }),
+        item("Contact", { icon: "contact" }),
+        item("Online chat", { icon: "chat" }),
+        item("About..", { icon: "about" }),
         dv,
-        item("Video Capture..."),
-        item("Performance Diagnostic..."),
+        item("Video Capture...", { icon: "video" }),
+        item("Performance Diagnostic...", { icon: "diagnostic" }),
       ],
     },
   ];
@@ -577,11 +923,12 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
         check("Right-Side Panel", "]"),
         check("Bottom-Side Panel", "/", true),
         item("Window Arrangement", {
+          icon: "window",
           sub: [
-            su("Tile Horizontally (H)"),
-            su("Tile Vertically (V)"),
-            su("Tile Vertically (V)"),
-            su("Marge All (M)"),
+            su("Tile Horizontally (H)", "", { icon: "window" }),
+            su("Tile Vertically (V)", "", { icon: "window" }),
+            su("Tile Vertically (V)", "", { icon: "window" }),
+            su("Marge All (M)", "", { icon: "window" }),
           ],
         }),
         check("Floating Tool"),
@@ -592,9 +939,9 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "Export",
       key: "R",
       items: [
-        item("3D File", { onClick: () => actions.openModal("export3dFile") }),
-        item("3D Shell File", { onClick: () => actions.openModal("export3dShell") }),
-        item("PNG"),
+        item("3D File", { icon: "cube", onClick: () => actions.openModal("export3dFile") }),
+        item("3D Shell File", { icon: "cube", onClick: () => actions.openModal("export3dShell") }),
+        item("PNG", { icon: "png" }),
       ],
     },
     {
@@ -602,25 +949,26 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "Setting",
       key: "I",
       items: [
-        item("System", { icon: "sys", sub: [su("General"), su("Common"), su("Common Library")] }),
-        item("Schematic/Symbol", { sub: [su("General"), su("Theme")] }),
+        item("System", { icon: "sys", sub: [su("General", "", { icon: "sys" }), su("Common", "", { icon: "prop" }), su("Common Library", "", { icon: "doc" })] }),
+        item("Schematic/Symbol", { icon: "symbol", sub: [su("General", "", { icon: "sys" }), su("Theme", "", { icon: "appearance" })] }),
         item("PCB/Footprint", {
+          icon: "foot",
           sub: [
-            su("General"),
-            su("Theme"),
-            su("Common Grid/Snap Sie setting"),
-            su("Common Track Width Setting"),
-            su("Common Via Size Setting"),
-            su("Snap"),
+            su("General", "", { icon: "sys" }),
+            su("Theme", "", { icon: "appearance" }),
+            su("Common Grid/Snap Sie setting", "", { icon: "grid" }),
+            su("Common Track Width Setting", "", { icon: "wire" }),
+            su("Common Via Size Setting", "", { icon: "tVia" }),
+            su("Snap", "", { icon: "snap" }),
           ],
         }),
-        item("Panel/Panel Lib", { sub: [su("General"), su("Theme")] }),
-        item("Common Font Family"),
-        item("Drawing", { onClick: () => actions.openSettings("drawing") }),
-        item("Property", { onClick: () => actions.openSettings("property") }),
-        item("Hotkey", { onClick: () => actions.openSettings("hotkey") }),
-        item("Top toolbar"),
-        item("Save", { onClick: () => actions.openSettings("save") }),
+        item("Panel/Panel Lib", { icon: "panel", sub: [su("General", "", { icon: "sys" }), su("Theme", "", { icon: "appearance" })] }),
+        item("Common Font Family", { icon: "font" }),
+        item("Drawing", { icon: "draw", onClick: () => actions.openSettings("drawing") }),
+        item("Property", { icon: "prop", onClick: () => actions.openSettings("property") }),
+        item("Hotkey", { icon: "key", onClick: () => actions.openSettings("hotkey") }),
+        item("Top toolbar", { icon: "grid" }),
+        item("Save", { icon: "save", onClick: () => actions.openSettings("save") }),
       ],
     },
     {
@@ -628,14 +976,14 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "Help",
       key: "H",
       items: [
-        item("community"),
-        item("Tutorials", { k: "F1" }),
-        item("Contact"),
-        item("Online chat"),
-        item("About..", { icon: "doc" }),
+        item("community", { icon: "community" }),
+        item("Tutorials", { k: "F1", icon: "tutorial" }),
+        item("Contact", { icon: "contact" }),
+        item("Online chat", { icon: "chat" }),
+        item("About..", { icon: "about" }),
         dv,
-        item("Video Capture..."),
-        item("Performance Diagnostic..."),
+        item("Video Capture...", { icon: "video" }),
+        item("Performance Diagnostic...", { icon: "diagnostic" }),
       ],
     },
   ];

@@ -14,7 +14,9 @@ import { buildModeTabs } from "@/lib/pcb/data";
 import { AXIS_SVG, FLOAT_SVGS, NEXT_SVG, PLANE_SVG } from "@/lib/pcb/markup";
 import { SchematicCanvas } from "@/components/pcb/schem-canvas";
 import { PcbCanvas } from "@/components/pcb/pcb-canvas";
+import { PcbThreeView } from "@/components/pcb/pcb-three-view";
 import { PlacedObjects } from "@/components/pcb/placed-objects";
+import { BOARD_COLOR_HEX, PAD_COLOR_HEX } from "@/lib/pcb/pcb-3d";
 import { PLACE_TOOLS, DRAFT_TOOLS } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
@@ -370,31 +372,35 @@ export function CanvasArea() {
             : "default",
         }}
       >
-        {state.gridVisible && <GridPattern />}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            transform: `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`,
-            transformOrigin: "0 0",
-            willChange: "transform",
-          }}
-        >
-          {state.mode === "schematic" ? (
-            <SchematicCanvas />
-          ) : state.mode === "pcb" ? (
-            <PcbCanvas />
-          ) : state.mode === "2d" ? (
-            <TwoDBoard />
-          ) : state.mode === "3d" ? (
-            <ThreeDBoard />
-          ) : (
-            <div dangerouslySetInnerHTML={{ __html: buildCanvas(state.mode) }} />
-          )}
-          {state.mode === "schematic" && <CanvasObjects />}
-          {(state.mode === "schematic" || state.mode === "pcb") && <PlacedObjects />}
-        </div>
+        {state.gridVisible && state.mode !== "3d" && <GridPattern />}
+        {state.mode === "3d" ? (
+          // Real three.js viewer — lives OUTSIDE the pan/zoom transform (its
+          // OrbitControls own the camera; CSS pan/zoom must not double-apply).
+          <PcbThreeView />
+        ) : (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              transform: `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`,
+              transformOrigin: "0 0",
+              willChange: "transform",
+            }}
+          >
+            {state.mode === "schematic" ? (
+              <SchematicCanvas />
+            ) : state.mode === "pcb" ? (
+              <PcbCanvas />
+            ) : state.mode === "2d" ? (
+              <TwoDBoard />
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: buildCanvas(state.mode) }} />
+            )}
+            {state.mode === "schematic" && <CanvasObjects />}
+            {(state.mode === "schematic" || state.mode === "pcb") && <PlacedObjects />}
+          </div>
+        )}
       </div>
 
       {/* floating tools (schematic only · View ▸ Floating Tool) */}
@@ -677,22 +683,8 @@ function Preview2DPanel({ initial }: { initial: { x: number; y: number } }) {
   );
 }
 
-// Named board / pad colors → hex, so the Properties selects map onto the canvas.
-const BOARD_COLOR_HEX: Record<string, string> = {
-  Green: "#1f7a47",
-  Blue: "#1c4e80",
-  Red: "#9b2b2b",
-  Black: "#1a1a1a",
-  White: "#e8e8e8",
-  Yellow: "#c8a93a",
-  Purple: "#5a2d82",
-};
-const PAD_COLOR_HEX: Record<string, string> = {
-  Goldsmith: "#d9a441",
-  HASL: "#c7ccd1",
-  ENIG: "#e8c66a",
-  OSP: "#b06b3a",
-};
+// Named board / pad colors → hex now live in the shared pcb-3d lib (the 3D
+// tab and the Product Preview resolve the same names).
 
 // State-driven 2D board — every control in the right Properties panel
 // (board color, pad plating color, silkscreen visibility, board side, material)
@@ -806,83 +798,9 @@ function TwoDBoard() {
   );
 }
 
-// State-driven 3D board preview — Board Color tints the board, Pad Plating Color
-// the components, Background Color paints the canvas, Board Thickness drives the
-// extruded edge depth, and Material shows in the footer label.
-function ThreeDBoard() {
-  const state = usePcbState();
-  const d = state.threeD;
-  const boardHex = BOARD_COLOR_HEX[d.boardColor] ?? "#1c4e80";
-  const padHex = PAD_COLOR_HEX[d.padColor] ?? "#d9a441";
-  const mm = parseFloat(d.boardThickness) || 1.2;
-  const depth = Math.max(6, Math.min(46, mm * 14));
-  const chips: Array<[number, number]> = [
-    [60, 50],
-    [260, 70],
-    [150, 150],
-    [300, 180],
-  ];
-
-  return (
-    <div style={{ width: 760, height: 560, margin: "120px auto", display: "flex", alignItems: "center", justifyContent: "center", perspective: 1200 }}>
-      <div style={{ transform: "rotateX(58deg) rotateZ(-32deg)", transformStyle: "preserve-3d" }}>
-        <div
-          style={{
-            position: "relative",
-            width: 420,
-            height: 300,
-            background: `linear-gradient(135deg, rgba(255,255,255,.18), rgba(0,0,0,.18)), ${boardHex}`,
-            borderRadius: "var(--radius-lg)",
-            // the solid offset shadow is the board's extruded thickness edge
-            boxShadow: `0 ${depth}px 0 0 rgba(0,0,0,.45), 0 40px 60px rgba(0,0,0,.5), 0 0 0 2px rgba(255,255,255,.12)`,
-          }}
-        >
-          {/* copper grid texture */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "var(--radius-lg)",
-              backgroundImage:
-                "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
-              backgroundSize: "22px 22px",
-            }}
-          />
-          {/* board outline */}
-          <div style={{ position: "absolute", inset: 18, border: "var(--border-width-1-5) solid rgba(255,255,255,.4)", borderRadius: "var(--radius-sm)" }} />
-          {/* components (plated by Pad Plating Color), raised off the board */}
-          {chips.map(([x, y], i) => (
-            <div
-              key={i}
-              style={{
-                position: "absolute",
-                left: x,
-                top: y,
-                width: i % 2 ? 44 : 60,
-                height: 26,
-                background: padHex,
-                borderRadius: "var(--radius-xs)",
-                boxShadow: "0 8px 12px rgba(0,0,0,.4)",
-                transform: "translateZ(16px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 9,
-                color: "#1a1a1a",
-                fontFamily: "var(--font-family-mono), monospace",
-              }}
-            >
-              U{i + 1}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)", color: "#cdbbe6", fontSize: "var(--font-size-sm)", fontWeight: 500 }}>
-        3D Module Preview · {d.material} · {d.boardThickness} · drag to orbit
-      </div>
-    </div>
-  );
-}
+// The 3D tab is a real three.js viewer now — see pcb-three-view.tsx. The old
+// CSS-transform ThreeDBoard mockup (fixed 420×300 slab, four hardcoded chips)
+// was removed in its favor.
 
 function Ruler({ axis, zoom, offset }: { axis: "x" | "y"; zoom: number; offset: number }) {
   // Tick spacing adapts to zoom: pick a "nice" interval in canvas units so that

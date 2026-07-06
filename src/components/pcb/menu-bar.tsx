@@ -16,7 +16,7 @@
 
 import * as React from "react";
 import { DsIcon } from "@/lib/pcb/icons";
-import { buildMenus, buildMenus2D, buildMenus3D } from "@/lib/pcb/data";
+import { buildMenus, buildMenus2D, buildMenus3D, buildMenusSchematic } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 type MenuSub = {
@@ -52,6 +52,8 @@ export function MenuBar() {
       ? buildMenus3D(state, actions)
       : state.mode === "2d"
       ? buildMenus2D(state, actions)
+      : state.mode === "schematic"
+      ? buildMenusSchematic(state, actions)
       : buildMenus(state, actions);
   const containerRef = React.useRef<HTMLDivElement>(null);
 

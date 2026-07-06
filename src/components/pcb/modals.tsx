@@ -15,18 +15,36 @@ import {
   NumberInput,
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
-import { buildDesignRules, buildFindReplace } from "@/lib/pcb/content";
+import { buildFindReplace } from "@/lib/pcb/content";
 import { DEL_OBJ_NAMES } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
+import {
+  ModalTabBar,
+  SeverityChip,
+  nextSeverity,
+  DirectionTiles,
+  ORDER_OPTIONS,
+} from "@/components/pcb/modal-kit";
+import {
+  SCH_NET_RULES,
+  SCH_COMPONENT_RULES,
+  SCH_REUSE_RULES,
+  PIN_TYPES,
+  defaultPinMatrix,
+  SEVERITY_COLOR,
+  SEVERITY_SHORT,
+  type RuleDef,
+  type Severity,
+} from "@/lib/pcb/design-rules-data";
 
 const PRIMARY = "var(--color-violet-600)";
 const CLOSE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const RESTORE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
-const ANNOT_PREVIEW_SVG =
-  '<svg viewBox="0 0 100 64" fill="none" stroke="var(--color-text-primary)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14h62L14 50h62"/><path d="M66 8l14 6-14 6" fill="var(--color-text-primary)" stroke="none"/><path d="M62 44l14 6-14 6" fill="var(--color-text-primary)" stroke="none"/></svg>';
+// (The old annotate-preview illustration was replaced by the PDF-spec
+// direction tiles in modal-kit's DirectionTiles.)
 
 function Overlay({ children }: { children: React.ReactNode }) {
   return (
@@ -288,86 +306,415 @@ function TableModal() {
 }
 
 // ── Design Rules ───────────────────────────────────────────────────────────
+// Popup 1 (PDF Part 3) — Schematic Design Rules. Four category tabs (Net 20 ·
+// Component 12 · Reuse Block 3 · Connection pin-matrix); rows = enable
+// checkbox + number + text + severity chip; enable-all per category; overflow
+// (…) holds Import/Export Config; Connection tab = master toggle + 11×11
+// lower-triangular pin-conflict matrix (click a cell to cycle severity).
+// Config survives reopen within the session via a module-level cache.
+type SchRuleState = { enabled: boolean; severity: Severity };
+type SchRulesConfig = {
+  Net: SchRuleState[];
+  Component: SchRuleState[];
+  "Reuse Block": SchRuleState[];
+  pinMatrix: Severity[][];
+  pinCheckEnabled: boolean;
+};
+
+const SCH_RULE_SETS: Record<"Net" | "Component" | "Reuse Block", RuleDef[]> = {
+  Net: SCH_NET_RULES,
+  Component: SCH_COMPONENT_RULES,
+  "Reuse Block": SCH_REUSE_RULES,
+};
+
+function defaultSchRulesConfig(): SchRulesConfig {
+  const mk = (defs: RuleDef[]) => defs.map((d) => ({ enabled: true, severity: d.severity }));
+  return {
+    Net: mk(SCH_NET_RULES),
+    Component: mk(SCH_COMPONENT_RULES),
+    "Reuse Block": mk(SCH_REUSE_RULES),
+    pinMatrix: defaultPinMatrix(),
+    pinCheckEnabled: true,
+  };
+}
+
+let savedSchRulesConfig: SchRulesConfig | null = null;
+
+const SCH_RULE_TABS = ["Net", "Component", "Reuse Block", "Connection"] as const;
+
 function DesignRulesModal() {
   const actions = usePcbActions();
+  const [tab, setTab] = React.useState<(typeof SCH_RULE_TABS)[number]>("Net");
+  const [cfg, setCfg] = React.useState<SchRulesConfig>(
+    () => savedSchRulesConfig ?? defaultSchRulesConfig(),
+  );
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const openImportPicker = React.useCallback(() => {
+    fileRef.current?.click();
+  }, []);
+
+  const catKey = tab === "Connection" ? null : tab;
+  const rows = catKey ? cfg[catKey] : [];
+  const allOn = catKey ? rows.every((r) => r.enabled) : cfg.pinCheckEnabled;
+
+  const setRow = (i: number, patch: Partial<SchRuleState>) => {
+    if (!catKey) return;
+    setCfg((c) => ({ ...c, [catKey]: c[catKey].map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
+  };
+  const setAll = (enabled: boolean) => {
+    if (catKey) setCfg((c) => ({ ...c, [catKey]: c[catKey].map((r) => ({ ...r, enabled })) }));
+    else setCfg((c) => ({ ...c, pinCheckEnabled: enabled }));
+  };
+
+  const save = () => {
+    savedSchRulesConfig = cfg;
+  };
+  const exportConfig = () => {
+    const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ideeza-schematic-design-rules.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+    actions.flashToast("Design rule config exported");
+  };
+  const importConfig = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as SchRulesConfig;
+        if (parsed && Array.isArray(parsed.Net)) {
+          setCfg({ ...defaultSchRulesConfig(), ...parsed });
+          actions.flashToast("Design rule config imported");
+          return;
+        }
+      } catch {}
+      actions.flashToast("Not a valid design-rule config file");
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <Overlay>
-      <Card width={980} maxHeight="86%" flexCol>
+      <Card width={980} maxHeight="88%" flexCol>
         <Header title="Design Rules" onClose={actions.closeModal} padding="18px 24px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-7) var(--spacing-12)" }} dangerouslySetInnerHTML={{ __html: buildDesignRules() }} />
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <Pill>Export</Pill>
-          <Pill>Import</Pill>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-3)", color: PRIMARY, fontSize: "var(--font-size-md)", fontWeight: 600, cursor: "pointer" }}>
+        <ModalTabBar
+          tabs={[...SCH_RULE_TABS]}
+          active={tab}
+          onChange={(t) => setTab(t as typeof tab)}
+          badges={{ Net: SCH_NET_RULES.length, Component: SCH_COMPONENT_RULES.length, "Reuse Block": SCH_REUSE_RULES.length }}
+        />
+
+        {/* Enable-all + overflow row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 24px 0", flex: "0 0 auto" }}>
+          <div onClick={() => setAll(!allOn)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", cursor: "pointer" }}>
+            <Check on={allOn} size={18} radius={5} checkSize={11} />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 600 }}>
+              {tab === "Connection" ? "Pin Conflicts Detection" : "Enable all rules in this category"}
+            </span>
+          </div>
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              aria-label="More options"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+              style={{ width: 30, height: 26, border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: "pointer", fontWeight: 700 }}
+            >
+              …
+            </button>
+            {menuOpen && (
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 40, minWidth: 160, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 12px 30px -6px rgba(0,0,0,.3))", padding: "var(--spacing-2)" }}>
+                <div className="ix-mi" onClick={() => { openImportPicker(); setMenuOpen(false); }} style={{ padding: "7px 10px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}>
+                  Import Config
+                </div>
+                <div className="ix-mi" onClick={() => { exportConfig(); setMenuOpen(false); }} style={{ padding: "7px 10px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}>
+                  Export Config
+                </div>
+              </div>
+            )}
+            <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f); e.target.value = ""; }} />
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 24px 16px" }}>
+          {catKey ? (
+            SCH_RULE_SETS[catKey].map((def, i) => {
+              const r = rows[i];
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "7px 4px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", opacity: r.enabled ? 1 : 0.55 }}>
+                  <span onClick={() => setRow(i, { enabled: !r.enabled })} style={{ display: "inline-flex", cursor: "pointer", flex: "0 0 auto" }}>
+                    <Check on={r.enabled} size={17} radius={4} checkSize={10} />
+                  </span>
+                  <span style={{ width: 24, flex: "0 0 auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{def.text}</span>
+                  <SeverityChip value={r.severity} onChange={(s) => setRow(i, { severity: s })} disabled={!r.enabled} />
+                </div>
+              );
+            })
+          ) : (
+            <PinConflictMatrix
+              matrix={cfg.pinMatrix}
+              enabled={cfg.pinCheckEnabled}
+              onCell={(r, c) =>
+                setCfg((cf) => ({
+                  ...cf,
+                  pinMatrix: cf.pinMatrix.map((row, ri) =>
+                    ri === r ? row.map((s, ci) => (ci === c ? nextSeverity(s) : s)) : row,
+                  ),
+                }))
+              }
+            />
+          )}
+        </div>
+
+        {/* Footer — exact spec button set */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
+          <Pill onClick={openImportPicker}>Import Config</Pill>
+          <Pill onClick={exportConfig}>Export Config</Pill>
+          <div onClick={() => { setCfg(defaultSchRulesConfig()); actions.flashToast("Design rules restored to defaults"); }} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", color: PRIMARY, fontSize: "var(--font-size-sm)", fontWeight: 600, cursor: "pointer" }}>
             <span>Restore Default</span>
             <Icon html={RESTORE_SVG} size={15} />
           </div>
-          <div className="ix-pill" style={{ padding: "var(--spacing-5) var(--spacing-10)", border: "var(--border-width-1-5) solid var(--color-border-brand)", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-md)", fontWeight: 600, color: PRIMARY, cursor: "pointer" }}>Verify Now</div>
-          <PrimaryBtn onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-16)" }}>Confirm</PrimaryBtn>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
+            <div className="ix-pill" onClick={() => { save(); actions.clickBottomTab("drc"); actions.flashToast("Verifying design rules…"); }} style={{ padding: "var(--spacing-4) var(--spacing-9)", border: "var(--border-width-1-5) solid var(--color-border-brand)", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-sm)", fontWeight: 600, color: PRIMARY, cursor: "pointer" }}>
+              Verify Now
+            </div>
+            <Pill onClick={actions.closeModal}>Cancel</Pill>
+            <PrimaryBtn onClick={() => { save(); actions.flashToast("Design rules saved"); actions.closeModal(); }} style={{ padding: "var(--spacing-4) var(--spacing-14)" }}>
+              Confirm
+            </PrimaryBtn>
+          </div>
         </div>
       </Card>
     </Overlay>
   );
 }
 
-// ── Annotate Designator ────────────────────────────────────────────────────
+// 11×11 lower-triangular pin-conflict grid — click a cell to cycle severity.
+function PinConflictMatrix({
+  matrix,
+  enabled,
+  onCell,
+}: {
+  matrix: Severity[][];
+  enabled: boolean;
+  onCell: (row: number, col: number) => void;
+}) {
+  return (
+    <div style={{ overflowX: "auto", opacity: enabled ? 1 : 0.45, pointerEvents: enabled ? "auto" : "none" }}>
+      <table style={{ borderCollapse: "collapse", fontVariantNumeric: "tabular-nums" }}>
+        <thead>
+          <tr>
+            <th style={{ position: "sticky", left: 0, background: "var(--color-bg-surface)" }} />
+            {PIN_TYPES.map((t) => (
+              <th key={t} style={{ padding: "4px 6px", fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap", maxWidth: 64, overflow: "hidden", textOverflow: "ellipsis" }} title={t}>
+                {t}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.map((row, r) => (
+            <tr key={r}>
+              <th style={{ padding: "4px 8px", fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", textAlign: "right", whiteSpace: "nowrap", position: "sticky", left: 0, background: "var(--color-bg-surface)" }}>
+                {PIN_TYPES[r]}
+              </th>
+              {row.map((s, c) => {
+                const col = SEVERITY_COLOR[s];
+                return (
+                  <td key={c} style={{ padding: 2 }}>
+                    <button
+                      type="button"
+                      onClick={() => onCell(r, c)}
+                      title={`${PIN_TYPES[r]} × ${PIN_TYPES[c]}: ${s} — click to change`}
+                      aria-label={`${PIN_TYPES[r]} versus ${PIN_TYPES[c]}: ${s}`}
+                      style={{ minWidth: 58, height: 26, borderRadius: "var(--radius-sm)", border: `var(--border-width-1) solid ${col.fg}`, background: col.bg, color: col.fg, fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      {SEVERITY_SHORT[s]}
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ marginTop: 8, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+        Click a cell to cycle its severity (Ignore → Note → Warning → Error → Fatal Error).
+      </div>
+    </div>
+  );
+}
+
+// ── Annotate Designator — Popups 2 (Schematic) & 5 (2D/PCB) ────────────────
+// Same dialog shape; Range + Hierarchical differ per sheet (verified live in
+// the PDF): schematic ranges are page-scoped with a hierarchical option, PCB
+// ranges are layer-scoped with no hierarchical and no page-number rule.
+const SCH_RANGES = [
+  "Current schematic",
+  "Current page",
+  "Selected components at current page",
+];
+const PCB_RANGES = [
+  "All components",
+  "Top Layer Components",
+  "Bottom Layer Components",
+  "Selected Components",
+];
+
+// Kinds that carry designators, with their prefix letters.
+const ANNOT_PREFIX: Record<string, string> = {
+  resistor: "R",
+  capacitor: "C",
+  inductor: "L",
+  diode: "D",
+  connector: "J",
+  ic: "U",
+  component: "U",
+};
+
 function AnnotateModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const a = state.annot;
+  const isPcbSheet = state.mode !== "schematic";
+  const ranges = isPcbSheet ? PCB_RANGES : SCH_RANGES;
+  const range = ranges.includes(a.range) ? a.range : ranges[0];
+  const order = ORDER_OPTIONS.some((o) => o.value === a.order) ? a.order : ORDER_OPTIONS[0].value;
+  const desRule = isPcbSheet
+    ? "Custom starting number"
+    : a.desRule === "Add page number" || a.desRule === "Custom starting number"
+      ? a.desRule
+      : "Custom starting number";
 
-  const radioRow = (label: string, on: boolean, onClick: () => void) => (
-    <div key={label} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-0)", cursor: "pointer" }}>
-      <Radio on={on} />
-      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
+  const radioRow = (label: string, on: boolean, onClick: () => void, sub?: string) => (
+    <div key={label} onClick={onClick} role="radio" aria-checked={on} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-5)", padding: "var(--spacing-3) 0", cursor: "pointer" }}>
+      <span style={{ marginTop: 1 }}><Radio on={on} /></span>
+      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
+        {label}
+        {sub && <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>{sub}</div>}
+      </span>
+    </div>
+  );
+
+  // Real annotation — sweep the placed components in the chosen order and
+  // write designators into their `text` field (or reset to "<prefix>?").
+  const run = () => {
+    const clearing = a.op === "Clear designators";
+    const dirs: Record<string, (o1: { x: number; y: number }, o2: { x: number; y: number }) => number> = {
+      "Across then down": (p, q) => p.y - q.y || p.x - q.x,
+      "Across then up": (p, q) => q.y - p.y || p.x - q.x,
+      "Down then across": (p, q) => p.x - q.x || p.y - q.y,
+      "Up then across": (p, q) => p.x - q.x || q.y - p.y,
+    };
+    const inRange = (o: (typeof state.objects)[number]) => {
+      if (!(o.kind in ANNOT_PREFIX)) return false;
+      if (range === "Selected components at current page" || range === "Selected Components") {
+        return state.selectedIds.includes(o.id);
+      }
+      if (range === "Top Layer Components") return (o.side ?? "top") === "top";
+      if (range === "Bottom Layer Components") return o.side === "bottom";
+      return true; // Current schematic / Current page / All components
+    };
+    const targets = state.objects.filter(inRange).sort(dirs[order] ?? dirs["Across then down"]);
+    let n = Math.max(0, parseInt(a.customStart, 10) || 1) || 1;
+    const counters: Record<string, number> = {};
+    const nextText = new Map<string, string>();
+    for (const o of targets) {
+      const prefix = ANNOT_PREFIX[o.kind];
+      const hasDesignator = !!o.text && !o.text.includes("?");
+      if (clearing) {
+        nextText.set(o.id, `${prefix}?`);
+        continue;
+      }
+      if (hasDesignator && !a.existing) continue; // keep existing unless re-processing
+      counters[prefix] = counters[prefix] ?? n;
+      const pagePrefix = !isPcbSheet && desRule === "Add page number" ? "1-" : "";
+      nextText.set(o.id, `${prefix}${pagePrefix}${counters[prefix]++}`);
+      n = Math.max(n, counters[prefix]);
+    }
+    if (nextText.size === 0) {
+      actions.flashToast("No components in the selected range");
+      return 0;
+    }
+    actions.merge({
+      objects: state.objects.map((o) => (nextText.has(o.id) ? { ...o, text: nextText.get(o.id)! } : o)),
+    });
+    actions.flashToast(clearing ? `Cleared ${nextText.size} designators` : `Annotated ${nextText.size} components`);
+    return nextText.size;
+  };
+
+  const section = (label: string, extra?: string) => (
+    <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.5, margin: "var(--spacing-7) 0 var(--spacing-3)" }}>
+      {label}
+      {extra && <span style={{ marginLeft: 8, textTransform: "none", fontWeight: 500, letterSpacing: 0, color: "var(--color-text-tertiary)" }}>{extra}</span>}
     </div>
   );
 
   return (
     <Overlay>
       <Card width={560} maxHeight="88%" flexCol>
-        <Header title="Annotate Designator" onClose={actions.closeModal} padding="18px 24px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-12)" }}>
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-5)" }}>Operation</div>
-          <div onClick={() => actions.setAnnot({ existing: !a.existing })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-0)", cursor: "pointer" }}>
+        <Header title="Annotate Designators" onClose={actions.closeModal} padding="18px 24px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--spacing-12) var(--spacing-8)" }}>
+          {/* OPERATION — radio pair + existing checkbox, one group */}
+          {section("Operation")}
+          {radioRow("Annotate designators", a.op !== "Clear designators", () => actions.setAnnot({ op: "Annotate designators" }))}
+          <div onClick={() => actions.setAnnot({ existing: !a.existing })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) 0 var(--spacing-3) 26px", cursor: "pointer", opacity: a.op === "Clear designators" ? 0.5 : 1 }}>
             <Check on={a.existing} size={18} radius={5} checkSize={11} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Existing Designators</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Existing designators</span>
           </div>
-          {["Annotate Designator", "Clear Designators"].map((v) => radioRow(v, a.op === v, () => actions.setAnnot({ op: v })))}
+          {radioRow("Clear designators", a.op === "Clear designators", () => actions.setAnnot({ op: "Clear designators" }))}
 
-          <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-7) var(--spacing-0)" }} />
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-5)" }}>Range</div>
-          {["Annotate Designator", "Current page", "Selected components at current page"].map((v) => radioRow(v, a.range === v, () => actions.setAnnot({ range: v })))}
-
-          <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-7) var(--spacing-0)" }} />
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-5)" }}>Hierarchical</div>
-          <div onClick={() => actions.setAnnot({ hierarchical: !a.hierarchical })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-0)", cursor: "pointer" }}>
-            <Check on={a.hierarchical} size={18} radius={5} checkSize={11} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Simultaneously Operate the Underlying Grap</span>
+          {/* RANGE — sheet-specific options */}
+          {section("Range", isPcbSheet ? undefined : undefined)}
+          <div role="radiogroup" aria-label="Range">
+            {ranges.map((v) => radioRow(v, range === v, () => actions.setAnnot({ range: v })))}
           </div>
 
-          <div style={{ display: "flex", gap: "var(--spacing-12)", marginTop: "var(--spacing-7)" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-5)" }}>Order</div>
-              {["Across Then Down", "Across Then Up", "Down Then Across", "Up Than Across"].map((v) => radioRow(v, a.order === v, () => actions.setAnnot({ order: v })))}
+          {/* Hierarchical — schematic only (PDF: no such option on PCB) */}
+          {!isPcbSheet && (
+            <div onClick={() => actions.setAnnot({ hierarchical: !a.hierarchical })} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-5)", padding: "var(--spacing-4) 0 0", cursor: "pointer" }}>
+              <span style={{ marginTop: 1 }}><Check on={a.hierarchical} size={18} radius={5} checkSize={11} /></span>
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
+                Assign instance Designator
+                <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                  (overwrites the splice Designator from the template page)
+                </div>
+              </span>
             </div>
-            <div style={{ width: 150, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ width: 140, height: 96, border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon html={ANNOT_PREVIEW_SVG} size={100} style={{ height: 64 }} />
-              </div>
-            </div>
+          )}
+
+          {/* ORDER — 4 direction tiles */}
+          {section("Order")}
+          <DirectionTiles value={order} onChange={(v) => actions.setAnnot({ order: v })} />
+          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 6 }}>
+            Across then down · Across then up · Down then across · Up then across
           </div>
 
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", margin: "var(--spacing-7) var(--spacing-0) var(--spacing-5)" }}>Designator Rule</div>
-          {["Add page Number", "Custom Starting Number"].map((v) => radioRow(v, a.desRule === v, () => actions.setAnnot({ desRule: v })))}
-          <div style={{ marginTop: "var(--spacing-4)" }}>
-            <NumberInput value={String(a.customStart)} onChange={(v) => actions.setAnnot({ customStart: v })} min={0} placeholder="0" />
+          {/* DESIGNATOR RULE — page-number option is schematic-only */}
+          {section("Designator Rule")}
+          <div role="radiogroup" aria-label="Designator rule">
+            {!isPcbSheet && radioRow("Add page number", desRule === "Add page number", () => actions.setAnnot({ desRule: "Add page number" }))}
+            {radioRow("Custom starting number", desRule === "Custom starting number", () => actions.setAnnot({ desRule: "Custom starting number" }))}
+          </div>
+          <div style={{ marginTop: "var(--spacing-3)", maxWidth: 180, opacity: desRule === "Custom starting number" ? 1 : 0.5, pointerEvents: desRule === "Custom starting number" ? "auto" : "none" }}>
+            <NumberInput value={String(a.customStart)} onChange={(v) => actions.setAnnot({ customStart: v })} min={1} placeholder="1" size="sm" />
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-7)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+
+        {/* Footer — Apply · Confirm · Cancel (spec order kept, Confirm primary) */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Pill onClick={run} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Apply</Pill>
           <Pill onClick={actions.closeModal} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Cancel</Pill>
-          <PrimaryBtn onClick={actions.closeModal} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
+          <PrimaryBtn onClick={() => { run(); actions.closeModal(); }} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
