@@ -8,7 +8,8 @@ import * as React from "react";
 import { Icon, DsIcon } from "@/lib/pcb/icons"; // inspector + panel icons
 import { Select, Checkbox } from "@/components/ideeza";
 import { ColorPicker } from "@/components/pcb/color-picker";
-import { PcbDefaultProperties, ThreeDProperties } from "@/components/pcb/pcb-properties";
+import { PcbDefaultProperties, TwoDProperties, ThreeDProperties } from "@/components/pcb/pcb-properties";
+import { SchematicProperties } from "@/components/pcb/schem-properties";
 import { buildRightTabs } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import {
@@ -101,9 +102,18 @@ export function RightPanel() {
           <PcbDefaultProperties />
         ) : state.mode === "3d" ? (
           <ThreeDProperties />
+        ) : state.selectedIds.length === 0 && state.selected === "none" ? (
+          // Canvas (nothing selected) — the original fully-WIRED panels, so
+          // every canvas field stays editable exactly as before. The schema
+          // inspector below handles actual selections.
+          state.mode === "schematic" ? (
+            <SchematicProperties />
+          ) : (
+            <TwoDProperties />
+          )
         ) : (
-          // Schema-driven Property Inspector (Sidebar Properties.xlsx). Covers
-          // Canvas + every selection type for schematic and 2D modes.
+          // Schema-driven Property Inspector (Sidebar Properties.xlsx) for
+          // every selected-object type in schematic and 2D modes.
           <InspectorPanel />
         )}
       </div>
