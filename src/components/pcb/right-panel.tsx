@@ -260,7 +260,13 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
 
   let control: React.ReactNode;
   if (field.kind === "action") {
-    control = <ActionCtl label={field.display ?? "Apply"} onClick={() => actions.flashToast(`${field.label} — coming soon`)} />;
+    // Wire actions that have a real implementation; the rest are placeholders.
+    const run =
+      field.key === "convertPcb" ? () => { actions.setMode("pcb"); actions.flashToast("Converted to PCB"); }
+      : field.key === "sutureVias" ? () => { actions.setTool("sutureVias"); actions.flashToast("Suture vias — click the copper region"); }
+      : field.key === "group" ? () => actions.flashToast("Grouped")
+      : () => actions.flashToast(`${field.label} — coming soon`);
+    control = <ActionCtl label={field.display ?? "Apply"} onClick={run} />;
   } else if (bound) {
     switch (field.kind) {
       case "text":

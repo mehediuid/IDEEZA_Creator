@@ -56,6 +56,7 @@ type ToolbarAction =
   | "toggleSnap"
   | "openPdf"
   | "openDevicePicker"
+  | "openAutoRoute"
   | "alignLeft"
   | "alignRight"
   | "alignTop"
@@ -191,7 +192,7 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tDiffPair", tool: "diffPair", label: "Differential Pair Route", modes: PCB },
   { kind: "icon", key: "pArc", tool: "routingCorner", label: "Routing Corner", modes: PCB },
   { kind: "icon", key: "tLengthTune", tool: "lengthTune", label: "Length Tuning", modes: PCB },
-  { kind: "icon", key: "tAutoRoute", action: "openBoolOp", label: "Auto Route (coming)", modes: PCB },
+  { kind: "icon", key: "tAutoRoute", action: "openAutoRoute", label: "Auto Route", modes: PCB },
   { kind: "div" },
   /* Layout — Align, Distribute, Rotate, Flip (shared) */
   { kind: "icon", key: "alignLeft", action: "alignLeft", label: "Align Left" },
@@ -508,6 +509,7 @@ export function Toolbar() {
     toggleSnap: () => actions.toggleSnap(),
     openPdf: () => actions.openModal("exportPdf2D"),
     openDevicePicker: () => actions.openModal("devicePicker"),
+    openAutoRoute: () => actions.openModal("autoRoute"),
     // Align L/R/T/B have no bounding-box impl yet (menu parity items are
     // placeholders too) — flag intent via toast.
     alignLeft: () => actions.flashToast("Align Left — coming soon"),

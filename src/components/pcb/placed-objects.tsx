@@ -137,7 +137,7 @@ const GLYPHS: Record<string, React.ReactNode> = {
   ),
 };
 
-const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune"]);
+const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune", "polyline", "line"]);
 
 export function PlacedObjects() {
   const state = usePcbState();

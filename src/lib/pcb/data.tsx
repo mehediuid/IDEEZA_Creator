@@ -731,7 +731,20 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Move to Different Layer", {
           icon: "layer",
           sub: (state.pcbLayers ?? []).map((l) =>
-            su(l.name, "", { icon: "layer", onClick: () => actions.flashToast(`Selection moved to ${l.name}`) }),
+            su(l.name, "", {
+              icon: "layer",
+              onClick: () => {
+                const n = state.selectedIds.length;
+                if (!n) { actions.flashToast("Nothing selected"); return; }
+                actions.merge({
+                  objects: state.objects.map((o) =>
+                    state.selectedIds.includes(o.id) ? { ...o, layer: l.id } : o,
+                  ),
+                });
+                actions.flashToast(`${n} object${n > 1 ? "s" : ""} moved to ${l.name}`);
+                actions.closeAll();
+              },
+            }),
           ),
         }),
       ],

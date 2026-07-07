@@ -213,6 +213,20 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
   "slot",
   "component",
   "boardOutline",
+  // Main Toolbar Comparison parity — every toolbar/menu tool must actually
+  // place. Unknown kinds render the generic dot glyph until they get one.
+  "net",
+  "gnd",
+  "junction",
+  "image",
+  "circle",
+  "rectangle",
+  "ellipse",
+  "arc",
+  "bezier",
+  "mountingHole",
+  "prohibitedRegion",
+  "constraintRegion",
 ];
 
 // Tool keys that need two clicks (start + end) — wire-like.
@@ -223,6 +237,8 @@ export const DRAFT_TOOLS: ReadonlyArray<string> = [
   "dimension",
   "diffPair",
   "lengthTune",
+  "polyline",
+  "line",
 ];
 
 export interface PcbState {

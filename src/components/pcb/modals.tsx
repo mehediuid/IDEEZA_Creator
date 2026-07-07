@@ -18,6 +18,7 @@ import { Icon } from "@/lib/pcb/icons";
 import { DEL_OBJ_NAMES } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useManualProjects } from "@/lib/manual/projects";
+import { downloadTextFile, exportGerberViaKicad } from "@/lib/pcb/kicad-export";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
 import {
   ModalTabBar,
@@ -193,6 +194,39 @@ function ArrayModal() {
   const actions = usePcbActions();
   const unit = state.unit === "mm" ? "mm" : state.unit === "Mil" ? "mil" : "inch";
   const hasSel = state.selectedIds.length > 0;
+
+  // REAL array: clone the selection rows×cols with the given spacing.
+  // Spacing is interpreted in canvas px (0 → sensible 60px step).
+  const runArray = () => {
+    if (!hasSel) { actions.flashToast("Select objects to array first"); return; }
+    const rows = Math.max(1, parseInt(String(state.arr.row), 10) || 1);
+    const cols = Math.max(1, parseInt(String(state.arr.col), 10) || 1);
+    const rsp = parseFloat(String(state.arr.rowSp)) || 60;
+    const csp = parseFloat(String(state.arr.colSp)) || 60;
+    const src = state.objects.filter((o) => state.selectedIds.includes(o.id));
+    const stamp = Date.now().toString(36);
+    let n = 0;
+    const clones: typeof state.objects = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (r === 0 && c === 0) continue; // originals stay
+        for (const o of src) {
+          clones.push({
+            ...o,
+            id: `obj_a${stamp}_${n++}`,
+            x: o.x + c * csp,
+            y: o.y + r * rsp,
+            endX: o.endX != null ? o.endX + c * csp : o.endX,
+            endY: o.endY != null ? o.endY + r * rsp : o.endY,
+          });
+        }
+      }
+    }
+    if (!clones.length) { actions.flashToast("Row × Column must be more than 1×1"); return; }
+    actions.merge({ objects: [...state.objects, ...clones] });
+    actions.flashToast(`Array created — ${clones.length} cop${clones.length === 1 ? "y" : "ies"}`);
+    actions.closeModal();
+  };
   const fields: [string, keyof typeof state.arr, boolean][] = [
     ["Row", "row", false],
     ["Column", "col", false],
@@ -231,8 +265,8 @@ function ArrayModal() {
           >
             Adjust Array Spacing By Cursor
           </button>
-          <Pill style={{ marginLeft: "auto", padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }}>Preview</Pill>
-          <PrimaryBtn onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
+          <Pill style={{ marginLeft: "auto", padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }} onClick={() => actions.flashToast(`Preview: ${state.arr.row} × ${state.arr.col} array`)}>Preview</Pill>
+          <PrimaryBtn onClick={runArray} style={{ padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
@@ -290,6 +324,7 @@ function TextField({ value, onChange, placeholder }: { value: string; onChange: 
 }
 
 function FindReplaceModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
   const [tab, setTab] = React.useState("Find");
   const [scope, setScope] = React.useState(FR_CONTENT_SCOPES[0]);
@@ -300,8 +335,58 @@ function FindReplaceModal() {
   const [objects, setObjects] = React.useState<Record<string, boolean>>({ Components: true, Net: true, Pins: false, Texts: true });
   const [fmt, setFmt] = React.useState<Record<string, boolean>>({ regex: false, matchCase: false, expr: false });
   const [findInResult, setFindInResult] = React.useState(false);
+  const cursor = React.useRef(-1);
   const isReplace = tab === "Replace";
   const toast = (m: string) => { actions.flashToast(m); };
+
+  // REAL search over the canvas objects (text / net / kind / comment /
+  // footprint fields), honoring Match case + Blur|Equal + Find in Result.
+  const matchIds = () => {
+    const raw = findText.trim();
+    if (!raw) return null;
+    const q = fmt.matchCase ? raw : raw.toLowerCase();
+    const hits = (s?: string) => {
+      if (!s) return false;
+      const v = fmt.matchCase ? s : s.toLowerCase();
+      return mode === "Equal" ? v === q : v.includes(q);
+    };
+    const pool = findInResult && state.selectedIds.length
+      ? state.objects.filter((o) => state.selectedIds.includes(o.id))
+      : state.objects;
+    return pool
+      .filter((o) => hits(o.text) || hits(o.net) || hits(o.kind) || hits(o.comment) || hits(o.footprint))
+      .map((o) => o.id);
+  };
+  const findAll = () => {
+    const ids = matchIds();
+    if (ids === null) { toast("Enter search text"); return; }
+    actions.merge({ selectedIds: ids });
+    toast(ids.length ? `Found ${ids.length} object${ids.length > 1 ? "s" : ""} — selected` : "No matches");
+  };
+  const step = (dir: 1 | -1) => {
+    const ids = matchIds();
+    if (ids === null) { toast("Enter search text"); return; }
+    if (!ids.length) { toast("No matches"); return; }
+    cursor.current = (cursor.current + dir + ids.length) % ids.length;
+    actions.merge({ selectedIds: [ids[cursor.current]] });
+    toast(`Match ${cursor.current + 1} of ${ids.length}`);
+  };
+  const doReplace = (onlySelected: boolean) => {
+    const raw = findText.trim();
+    if (!raw) { toast("Enter search text"); return; }
+    const re = new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), fmt.matchCase ? "g" : "gi");
+    let count = 0;
+    const next = state.objects.map((o) => {
+      if (onlySelected && !state.selectedIds.includes(o.id)) return o;
+      if (!o.text || !re.test(o.text)) { re.lastIndex = 0; return o; }
+      re.lastIndex = 0;
+      count++;
+      return { ...o, text: mode === "Equal" ? replaceText : o.text.replace(re, replaceText) };
+    });
+    if (!count) { toast("No matches to replace"); return; }
+    actions.merge({ objects: next });
+    toast(`Replaced in ${count} object${count > 1 ? "s" : ""}`);
+  };
 
   return (
     <Overlay>
@@ -357,11 +442,11 @@ function FindReplaceModal() {
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <Pill onClick={actions.closeModal}>Cancel</Pill>
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
-            {isReplace && <Pill onClick={() => toast("Replace Current")}>Replace Current</Pill>}
-            {isReplace && <Pill onClick={() => toast(`Replaced all "${findText}" → "${replaceText}"`)}>Replace…</Pill>}
-            <Pill onClick={() => toast("Find Previous")}>Find Previous</Pill>
-            <Pill onClick={() => toast("Find Next")}>Find Next</Pill>
-            <PrimaryBtn onClick={() => toast(`Find All: "${findText}"`)}>Find All</PrimaryBtn>
+            {isReplace && <Pill onClick={() => doReplace(true)}>Replace Current</Pill>}
+            {isReplace && <Pill onClick={() => doReplace(false)}>Replace…</Pill>}
+            <Pill onClick={() => step(-1)}>Find Previous</Pill>
+            <Pill onClick={() => step(1)}>Find Next</Pill>
+            <PrimaryBtn onClick={findAll}>Find All</PrimaryBtn>
           </div>
         </div>
       </Card>
@@ -1215,11 +1300,14 @@ function ExportFormatModal({
   defaultName,
   formats,
   extraOpts,
+  onExport,
 }: {
   title: string;
   defaultName: string;
   formats: string[];
   extraOpts: string[];
+  // Optional real export action; falls back to the toast placeholder.
+  onExport?: (fileName: string) => void;
 }) {
   const actions = usePcbActions();
   const [fileName, setFileName] = React.useState(defaultName);
@@ -1279,7 +1367,7 @@ function ExportFormatModal({
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { if (onExport) onExport(fileName); else actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</Button>
         </div>
       </Card>
     </Overlay>
@@ -1303,16 +1391,37 @@ const SAMPLE_PROJECTS = [
 
 function OpenProjectModal() {
   const actions = usePcbActions();
-  const { projects } = useManualProjects();
+  const { projects, selectProject } = useManualProjects();
   const [workspace, setWorkspace] = React.useState("Personal");
   const [filter, setFilter] = React.useState("");
   const [selected, setSelected] = React.useState<string | null>(null);
-  const names = React.useMemo(() => {
-    const real = (projects ?? []).map((p) => p.name);
-    return [...real, ...SAMPLE_PROJECTS.filter((s) => !real.includes(s))];
+  // Real projects (openable — carry id+slug) first, sample rows after.
+  const entries = React.useMemo(() => {
+    const real = (projects ?? []).map((p) => ({ name: p.name, id: p.id, slug: p.slug }));
+    const realNames = new Set(real.map((r) => r.name));
+    return [
+      ...real,
+      ...SAMPLE_PROJECTS.filter((s) => !realNames.has(s)).map((s) => ({ name: s, id: undefined as string | undefined, slug: undefined as string | undefined })),
+    ];
   }, [projects]);
   const q = filter.trim().toLowerCase();
-  const shown = names.filter((n) => !q || n.toLowerCase().includes(q));
+  const shown = entries.filter((e) => !q || e.name.toLowerCase().includes(q));
+
+  // REAL open: activate the project in the manual-projects store and jump
+  // to its PCB editor. Sample rows have no local data — explain via toast.
+  const openSelected = (newWindow: boolean) => {
+    if (!selected) { actions.flashToast("Select a project first"); return; }
+    const e = entries.find((x) => x.name === selected);
+    if (e?.id && e.slug) {
+      selectProject(e.id);
+      const url = `/project/${e.slug}/pcb`;
+      if (newWindow) window.open(url, "_blank");
+      else window.location.href = url;
+      actions.closeModal();
+    } else {
+      actions.flashToast(`"${selected}" is a sample — no local data to open`);
+    }
+  };
 
   return (
     <Overlay>
@@ -1329,25 +1438,27 @@ function OpenProjectModal() {
           </div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--spacing-10)" }}>
-          {shown.map((n) => (
+          {shown.map((e) => (
             <div
-              key={n}
-              onClick={() => setSelected(n)}
+              key={e.name}
+              onClick={() => setSelected(e.name)}
+              onDoubleClick={() => { setSelected(e.name); openSelected(false); }}
               className="ix-row"
-              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", background: selected === n ? "var(--color-bg-brand-subtle)" : "transparent" }}
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", background: selected === e.name ? "var(--color-bg-brand-subtle)" : "transparent" }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={selected === n ? "var(--color-violet-600)" : "var(--color-text-tertiary)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={selected === e.name ? "var(--color-violet-600)" : "var(--color-text-tertiary)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
               </svg>
-              <span style={{ fontSize: "var(--font-size-sm)", color: selected === n ? "var(--color-text-brand)" : "var(--color-text-primary)", fontWeight: selected === n ? 600 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n}</span>
+              <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: selected === e.name ? "var(--color-text-brand)" : "var(--color-text-primary)", fontWeight: selected === e.name ? 600 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
+              {!e.id && <span style={{ fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>sample</span>}
             </div>
           ))}
           {shown.length === 0 && <div style={{ padding: "var(--spacing-8)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>No projects match.</div>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <Pill style={{ marginLeft: "auto" }} onClick={() => { if (selected) actions.flashToast(`Opening "${selected}" in new window`); }}>Open in New Window</Pill>
-          <PrimaryBtn onClick={() => { if (selected) { actions.flashToast(`Opened "${selected}"`); actions.closeModal(); } else actions.flashToast("Select a project first"); }}>Open Project</PrimaryBtn>
+          <Pill style={{ marginLeft: "auto" }} onClick={() => openSelected(true)}>Open in New Window</Pill>
+          <PrimaryBtn onClick={() => openSelected(false)}>Open Project</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
@@ -1368,10 +1479,30 @@ const DEVICE_TABS = ["LCSC Electronics", "EasyEDA", "Reuse Block"];
 const DEVICE_RAIL = ["System", "Recent", "Personal", "Favorite", "Project"];
 
 function DevicePickerModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
   const [tab, setTab] = React.useState(DEVICE_TABS[0]);
   const [rail, setRail] = React.useState(DEVICE_RAIL[0]);
   const [search, setSearch] = React.useState("");
+
+  // REAL place: drop a component object carrying the part number onto the
+  // canvas (near center, offset a little per placement) and select it.
+  const placePart = (p: (typeof SAMPLE_PARTS)[number]) => {
+    // Deterministic unique id — scan existing ids instead of a timestamp.
+    let n = state.objects.length + 1;
+    while (state.objects.some((o) => o.id === `obj_dp${n}`)) n++;
+    const id = `obj_dp${n}`;
+    const offset = (state.objects.length % 5) * 30;
+    actions.merge({
+      objects: [
+        ...state.objects,
+        { id, kind: "component", x: 420 + offset, y: 300 + offset, text: p.part, footprint: p.footprint, comment: p.brand },
+      ],
+      selectedIds: [id],
+    });
+    actions.flashToast(`Placed ${p.part} (${p.footprint})`);
+    actions.closeModal();
+  };
   const q = search.trim().toLowerCase();
   const rows = SAMPLE_PARTS.filter((p) => q.length < 2 || p.part.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
   const cellCss: React.CSSProperties = { padding: "var(--spacing-4) var(--spacing-5)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" };
@@ -1421,7 +1552,7 @@ function DevicePickerModal() {
                     <td style={cellCss}>{p.price}</td>
                     <td style={cellCss}>{p.stock}</td>
                     <td style={{ ...cellCss, textAlign: "right" }}>
-                      <Button hierarchy="primary" size="sm" onClick={() => { actions.flashToast(`Placed ${p.part}`); actions.closeModal(); }}>Place</Button>
+                      <Button hierarchy="primary" size="sm" onClick={() => placePart(p)}>Place</Button>
                     </td>
                   </tr>
                 ))}
@@ -1451,9 +1582,32 @@ const BOM_ROWS: { title: string; property: string; sort: string; group: string }
   { title: "Manufacturer", property: "Manufacturer", sort: "None", group: "Yes" },
 ];
 
+const BOM_COMPONENT_KINDS = new Set(["component", "resistor", "capacitor", "inductor", "diode", "ic", "connector"]);
+
 function BomModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
   const [notice, setNotice] = React.useState(true);
+
+  // REAL export: build a CSV from the components on the canvas and download
+  // it (XLSX choice still ships CSV content until a real workbook writer).
+  const exportBomFile = (fileName: string, fileType: string) => {
+    const comps = state.objects.filter((o) => BOM_COMPONENT_KINDS.has(o.kind));
+    const rows: string[][] = [
+      ["No.", "Comment", "Designator", "Footprint", "Manufacturer"],
+      ...comps.map((o, i) => [
+        String(i + 1),
+        o.comment || o.kind,
+        o.text || `U${i + 1}`,
+        o.footprint || "-",
+        "-",
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    downloadTextFile(`${fileName.slice(0, 60)}.csv`, csv);
+    actions.flashToast(comps.length ? `Exported BOM — ${comps.length} component${comps.length > 1 ? "s" : ""} (${fileType} as CSV)` : "Exported BOM — no components on canvas yet");
+    actions.closeModal();
+  };
   const [range, setRange] = React.useState("Board1 : Gigabit Eth to USB Controller");
   const [variant, setVariant] = React.useState("Basic");
   const [fileName] = React.useState("BOM_Board1_Gigabit Eth to USB Controller_2026");
@@ -1533,7 +1687,7 @@ function BomModal() {
           <Pill onClick={() => { actions.closeModal(); actions.openManager("device"); }}>Device Standardization</Pill>
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
             <Pill onClick={() => actions.flashToast("Order Parts")}>Order Parts</Pill>
-            <PrimaryBtn onClick={() => { actions.flashToast(`Exported BOM (${fileType})`); actions.closeModal(); }}>Export BOM</PrimaryBtn>
+            <PrimaryBtn onClick={() => exportBomFile(fileName, fileType)}>Export BOM</PrimaryBtn>
             <Pill onClick={actions.closeModal}>Cancel</Pill>
           </div>
         </div>
@@ -1829,7 +1983,8 @@ export function Modals() {
     case "devicePicker":
       return <DevicePickerModal />;
     case "exportGerber2D":
-      return <ExportFormatModal title="Export Gerber" defaultName="board.gbr" formats={["RS-274X (Extended)", "RS-274D"]} extraOpts={["Generate drill file", "Include silk", "Include solder mask", "Compress as ZIP"]} />;
+      // Real pipeline: server-side kicad-cli (graceful 501 hint if not installed).
+      return <ExportFormatModal title="Export Gerber" defaultName="board.gbr" formats={["RS-274X (Extended)", "RS-274D"]} extraOpts={["Generate drill file", "Include silk", "Include solder mask", "Compress as ZIP"]} onExport={() => { exportGerberViaKicad(state, actions.flashToast); }} />;
     case "exportPickPlace":
       return <ExportFormatModal title="Export Pick and Place" defaultName="board-pnp.csv" formats={["CSV", "TXT", "JSON"]} extraOpts={["Include top side", "Include bottom side", "Use metric units"]} />;
     case "exportBom":
