@@ -181,6 +181,8 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
     k,
     fg: o.disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)",
     icon: o.icon || "blank",
+    flagged: !!o.flagged,
+    note: o.note,
     onClick: o.onClick || close,
   });
   const item = (label, o = {}) => ({
@@ -190,6 +192,8 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
     hasSub: !!o.sub,
     icon: o.icon || "blank",
     sub: o.sub || [],
+    flagged: !!o.flagged,
+    note: o.note,
     onClick: o.sub ? noop : o.onClick || close,
   });
   const check = (label, k = "", isBottom = false) => {
@@ -236,7 +240,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             "Non-Electronic Flag…", "Reuse Block…", "Panel Lib…",
           ].map((n) => su(n, "", { icon: "page", onClick: () => actions.flashToast(`New ${n.replace(/…$/, "")} created`) })),
         }),
-        item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.flashToast("Open Project — pick a file") }),
+        item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.openModal("openProject") }),
         item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
         item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
         dv,
@@ -255,6 +259,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             toastSu("PADS/PADS Pro…"),
             toastSu("Protel…"),
             toastSu("LTspice…"),
+            toastSu("T/DISA 4001…"),
           ],
         }),
       ],
@@ -291,7 +296,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
           ],
         }),
         snapToggle(),
-        item("Find and Replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
+        item("Find And Place", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
         item("Array Object", { icon: "array", onClick: () => actions.openModal("array") }),
       ],
     },
@@ -347,7 +352,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Place",
       key: "P",
       items: [
-        item("Device", { icon: "pChip", onClick: () => actions.openManager("device") }),
+        item("Device", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
         item("Wire", { k: "Alt+W", icon: "pWire", onClick: tool("wire") }),
         item("Net", {
           icon: "pNetFlag",
@@ -373,6 +378,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Text", { k: "Alt+T", icon: "pText", onClick: tool("text") }),
         item("Image", { icon: "pImage", onClick: tool("image") }),
         item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
+        // Final list: "Board Shape" is flagged Remove but kept in scope,
+        // clearly marked — confirm with team before dropping.
+        item("Board Shape", { icon: "tBoardOutline", flagged: true, onClick: () => actions.flashToast("Board Shape — coming soon") }),
         dv,
         item("Net Label", { k: "Alt+N", icon: "pNetLabel", onClick: tool("netLabel") }),
       ],
@@ -390,6 +398,14 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         dv,
         item("Import GLTF", { icon: "cube", onClick: () => actions.flashToast("Import GLTF — pick a file") }),
         item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+        dv,
+        // Final list: the items below are flagged Remove but kept in scope,
+        // clearly marked (⚑) — confirm with team before dropping.
+        item("Reannotate", { icon: "dAnnotate", flagged: true, onClick: () => actions.flashToast("Reannotate — coming soon") }),
+        item("Convert to New Version", { icon: "repeat", flagged: true, onClick: () => actions.flashToast("Convert to New Version — coming soon") }),
+        item("Insert BOM Table", { icon: "pTable", flagged: true, onClick: () => actions.flashToast("Insert BOM Table — coming soon") }),
+        item("Generate Data From Chatbot", { icon: "chat", flagged: true, onClick: () => actions.flashToast("Generate Data From Chatbot — coming soon") }),
+        item("Import Image", { icon: "pImage", flagged: true, onClick: tool("image") }),
       ],
     },
     {
@@ -499,6 +515,8 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     k,
     fg: o.disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)",
     icon: o.icon || "blank",
+    flagged: !!o.flagged,
+    note: o.note,
     onClick: o.onClick || close,
   });
   // top-level item; pass `sub` for a hover flyout
@@ -509,6 +527,8 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     hasSub: !!o.sub,
     icon: o.icon || "blank",
     sub: o.sub || [],
+    flagged: !!o.flagged,
+    note: o.note,
     onClick: o.sub ? noop : o.onClick || close,
   });
   // view toggle (checkmark reflects current panel visibility)
@@ -567,7 +587,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
             su(n, "", { icon: "page", onClick: () => actions.flashToast(`New ${n.replace(/…$/, "")} created`) }),
           ),
         }),
-        item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.flashToast("Open Project — pick a file") }),
+        item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.openModal("openProject") }),
         item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
         item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
         dv,
@@ -621,7 +641,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ],
         }),
         snapToggle(),
-        item("Find and Replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
+        item("Find And Place", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
         dv,
         item("Edit Outline", { icon: "draw", onClick: () => actions.openModal("editOutline") }),
         item("Cutout", { icon: "del", onClick: () => actions.openModal("cutout") }),
@@ -690,7 +710,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Place",
       key: "P",
       items: [
-        item("Device", { icon: "pChip", onClick: () => actions.openManager("device") }),
+        item("Device", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
         item("Vias", { icon: "tVia", onClick: () => actions.setTool("via") }),
         item("Suture Vias", { icon: "tSutureVias", onClick: () => actions.setTool("sutureVias") }),
         item("Pad", { icon: "tPad", onClick: () => actions.setTool("pad") }),
@@ -738,6 +758,25 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Pad Pair Group Manager", { icon: "tPad", onClick: () => actions.openModal("padPair") }),
         dv,
         item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+        dv,
+        // Final list: the items below are flagged Remove but kept in scope,
+        // clearly marked (⚑) — confirm with team before dropping. Ones with an
+        // obvious existing action are wired; the rest are placeholders.
+        item("Polygon Pour", { icon: "tPolygon", flagged: true, onClick: () => actions.flashToast("Polygon Pour — coming soon") }),
+        item("Fill all Plane", { icon: "tFillRegion", flagged: true, onClick: () => actions.flashToast("Fill all Plane — coming soon") }),
+        item("Vias", { icon: "tVia", flagged: true, onClick: () => actions.setTool("via") }),
+        item("Export", { icon: "exp", flagged: true, onClick: () => actions.flashToast("Export — use the Export menu") }),
+        item("Rotate left", { icon: "tRotLeft", flagged: true, onClick: () => actions.rotateSelectedPlaced(-90) }),
+        item("Rotate Right", { icon: "tRotRight", flagged: true, onClick: () => actions.rotateSelectedPlaced(90) }),
+        item("Align Left", { icon: "alignLeft", flagged: true, onClick: () => actions.flashToast("Align Left — coming soon") }),
+        item("Align Right", { icon: "alignRight", flagged: true, onClick: () => actions.flashToast("Align Right — coming soon") }),
+        item("Align Top", { icon: "alignTop", flagged: true, onClick: () => actions.flashToast("Align Top — coming soon") }),
+        item("Align Bottom", { icon: "alignBottom", flagged: true, onClick: () => actions.flashToast("Align Bottom — coming soon") }),
+        item("Align Center", { icon: "alignHCenter", flagged: true, onClick: () => actions.flashToast("Align Center — coming soon") }),
+        item("Align Vertical Center", { icon: "alignVCenter", flagged: true, onClick: () => actions.flashToast("Align Vertical Center — coming soon") }),
+        item("Align Grid", { icon: "grid", flagged: true, onClick: () => actions.flashToast("Align Grid — coming soon") }),
+        item("Bring To Front", { icon: "tBringFront", flagged: true, onClick: () => actions.bringFront() }),
+        item("Send to Back", { icon: "tSendBack", flagged: true, onClick: () => actions.sendBack() }),
       ],
     },
     // Phase 7 — Route menu (IT-658).

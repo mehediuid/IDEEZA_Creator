@@ -49,7 +49,17 @@ type ToolbarAction =
   | "flipBoard"
   | "openDrc"
   | "openGerber"
-  | "openPickPlace";
+  | "openPickPlace"
+  // Main Toolbar Comparison — sub-grouped parity additions.
+  | "copy"
+  | "paste"
+  | "toggleSnap"
+  | "openPdf"
+  | "openDevicePicker"
+  | "alignLeft"
+  | "alignRight"
+  | "alignTop"
+  | "alignBottom";
 
 // `modes` constrains which editor modes accept the tool. Omitted → all modes.
 // Items not for the current mode render greyed out and ignore clicks.
@@ -75,104 +85,146 @@ const UNITS = ["Inch", "Mil", "mm"];
 const SCH: Mode[] = ["schematic"];
 const PCB: Mode[] = ["pcb"];
 
+// Main Toolbar — sub-grouped per Ideeza_Main_Toolbar_Comparison.xlsx.
+// One array, mode-tagged; filterItems() hides mode-mismatched items and
+// collapses the resulting empty dividers, so Schematic mode renders the
+// Schematic sheet's sub-groups and PCB mode renders the 2D/PCB sheet's.
+// Group order follows the sheet: File Ops → Edit/History → View/Zoom +
+// View Modes → Grid/Units → Placement (Components&Wiring / Drawing&Shapes /
+// Pads·Vias·Regions / Drawing&Text / Text&Media) → Convert → Routing →
+// Layout → Managers → Export&Mfg → Tools&Misc/Settings.
 const ITEMS: Item[] = [
   /* shared selection / nav */
   { kind: "icon", key: "tSelectVisible", tool: "select", label: "Select (V)" },
   { kind: "icon", key: "tHand", tool: "hand", label: "Hand — pan canvas (H or hold Space)" },
   { kind: "icon", key: "tViewDetails", tool: "selectVisible", label: "Select Visible Parts" },
-  /* file (Phase 5 — IT-693/694/695) */
+  { kind: "div" },
+  /* File Operations */
   { kind: "icon", key: "imp", action: "openProject", label: "Open Project" },
   { kind: "icon", key: "save", action: "save", label: "Save (Ctrl+S)" },
   { kind: "icon", key: "tSaveAll", action: "saveAll", label: "Save All" },
+  { kind: "div" },
+  /* Edit / History */
+  { kind: "icon", key: "copy", action: "copy", label: "Copy" },
+  { kind: "icon", key: "paste", action: "paste", label: "Paste" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
-  { kind: "icon", key: "board", action: "toggleBottom", label: "Dashboard" },
+  { kind: "icon", key: "array", action: "openArray", label: "Array" },
   { kind: "icon", key: "findSim", action: "openFindSim", label: "Find Similar Object" },
-  { kind: "icon", key: "tFitArea", tool: "viewDetails", label: "View details" },
   { kind: "div" },
-  /* zoom / view */
+  /* View / Zoom */
   { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
   { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit all in window" },
   { kind: "icon", key: "tFitSection", action: "fitSection", label: "Fit section" },
   { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit Area Selection view" },
-  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid options" },
+  /* View Modes (PCB sheet) */
+  { kind: "icon", key: "board", action: "view2D", label: "2D View", modes: PCB },
+  { kind: "icon", key: "cube", action: "view3D", label: "3D View", modes: PCB },
+  { kind: "icon", key: "convert", action: "flipBoard", label: "Flip Board", modes: PCB },
   { kind: "div" },
+  /* Grid / Units */
+  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid Style" },
   { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
   { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
+  { kind: "icon", key: "snap", action: "toggleSnap", label: "Snap" },
   { kind: "div" },
-  /* shared place */
-  { kind: "icon", key: "tDevReuse", action: "openDeviceMgr", label: "Device / Reuse block" },
-  /* schematic-only place tools */
+  /* Placement — Components & Wiring (Schematic) */
+  { kind: "icon", key: "tDevReuse", action: "openDevicePicker", label: "Device / Reuse block" },
   { kind: "icon", key: "tWire", tool: "wire", label: "Wire", modes: SCH },
   { kind: "icon", key: "tBus", tool: "bus", label: "Bus", modes: SCH },
+  { kind: "icon", key: "pNetLabel", tool: "net", label: "Net", modes: SCH },
+  { kind: "icon", key: "tVcc5v", tool: "vcc5v", label: "+5V (VCC)", modes: SCH },
+  { kind: "icon", key: "power", tool: "gnd", label: "GND", modes: SCH },
+  { kind: "icon", key: "tNoConn", tool: "noConnect", label: "No Connect", modes: SCH },
+  { kind: "icon", key: "pTestPoint", tool: "junction", label: "Junction", modes: SCH },
+  { kind: "icon", key: "tNetFlag", tool: "netFlag", label: "Net flag", modes: SCH },
+  { kind: "icon", key: "tShortFlag", tool: "shortFlag", label: "Short Flag", modes: SCH },
+  { kind: "icon", key: "tPort", tool: "port", label: "Port Out", modes: SCH },
   { kind: "icon", key: "tDiode", tool: "diode", label: "Diode", modes: SCH },
   { kind: "icon", key: "tResistor", tool: "resistor", label: "Resistor", modes: SCH },
   { kind: "icon", key: "tInductor", tool: "inductor", label: "Inductor", modes: SCH },
   { kind: "icon", key: "tCapacitor", tool: "capacitor", label: "Capacitor", modes: SCH },
-  { kind: "icon", key: "tNetFlag", tool: "netFlag", label: "Net flag", modes: SCH },
-  { kind: "icon", key: "tVcc5v", tool: "vcc5v", label: "+5V", modes: SCH },
-  { kind: "icon", key: "tShortFlag", tool: "shortFlag", label: "Short Flag", modes: SCH },
-  { kind: "icon", key: "tPort", tool: "port", label: "Port Out", modes: SCH },
-  { kind: "icon", key: "tNoConn", tool: "noConnect", label: "No Connect", modes: SCH },
-  { kind: "icon", key: "tText", tool: "text", label: "Text" },
-  /* Phase 5 — schematic drawing additions (IT-706/707/708/703) */
-  { kind: "icon", key: "pBezier", tool: "bezier", label: "Bezier", modes: SCH },
-  { kind: "icon", key: "pImage", tool: "image", label: "Image" },
-  { kind: "icon", key: "pTable", action: "openTable", label: "Table" },
-  { kind: "icon", key: "pChip", action: "openDeviceMgr", label: "Component — open Device Manager", modes: SCH },
-  { kind: "div" },
-  /* schematic ↔ PCB actions */
-  { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert Schematic to PCB", modes: SCH },
-  { kind: "icon", key: "dConvert", action: "convert2D", label: "Convert Schematic to 2D", modes: SCH },
-  { kind: "icon", key: "tAlignGrid", action: "alignGrid", label: "Align Grid — snap selected to grid" },
-  { kind: "icon", key: "dAnnotate", action: "openReannotate", label: "Reannotate Designators", modes: SCH },
-  { kind: "icon", key: "tJlcpcb", action: "openJlcpcb", label: "JLCPCB Layout Service" },
-  { kind: "icon", key: "tGenBlock", action: "openGenBlock", label: "Generate / Update Block Symbol", modes: SCH },
   { kind: "icon", key: "tPgnd", tool: "pgnd", label: "PGND", modes: SCH },
   { kind: "icon", key: "tAgnd", tool: "agnd", label: "AGND", modes: SCH },
+  { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label", modes: SCH },
   { kind: "div" },
-  /* shared transforms */
+  /* Placement — Drawing & Shapes (Schematic) */
+  { kind: "icon", key: "pPolyline", tool: "polyline", label: "Polyline", modes: SCH },
+  { kind: "icon", key: "pArc", tool: "arc", label: "Arc", modes: SCH },
+  { kind: "icon", key: "pCircle", tool: "circle", label: "Circle", modes: SCH },
+  { kind: "icon", key: "pRect", tool: "rectangle", label: "Rectangle", modes: SCH },
+  { kind: "icon", key: "pBezier", tool: "bezier", label: "Bezier", modes: SCH },
+  { kind: "icon", key: "pEllipse", tool: "ellipse", label: "Ellipse", modes: SCH },
+  { kind: "div" },
+  /* Placement — Pads, Vias & Regions (PCB) */
+  { kind: "icon", key: "tPad", tool: "pad", label: "Pad", modes: PCB },
+  { kind: "icon", key: "tVia", tool: "via", label: "Via", modes: PCB },
+  { kind: "icon", key: "tSutureVias", tool: "sutureVias", label: "Suture vias", modes: PCB },
+  { kind: "icon", key: "tBoardOutline", tool: "boardOutline", label: "Board Outline", modes: PCB },
+  { kind: "icon", key: "tPolygon", tool: "polygon", label: "Copper Pour Polygon", modes: PCB },
+  { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Filled Region", modes: PCB },
+  { kind: "icon", key: "tSlot", tool: "slot", label: "Slot", modes: PCB },
+  { kind: "icon", key: "pNoConnect", tool: "prohibitedRegion", label: "Prohibited Region", modes: PCB },
+  { kind: "icon", key: "tComponent", tool: "component", label: "Component / Footprint", modes: PCB },
+  { kind: "div" },
+  /* Placement — Drawing & Text (PCB) */
+  { kind: "icon", key: "pPolyline", tool: "polyline", label: "Polyline", modes: PCB },
+  { kind: "icon", key: "tDimension", tool: "dimension", label: "Dimension", modes: PCB },
+  { kind: "div" },
+  /* Placement — Text & Media (shared) */
+  { kind: "icon", key: "tText", tool: "text", label: "Text" },
+  { kind: "icon", key: "pImage", tool: "image", label: "Image" },
+  { kind: "icon", key: "pTable", action: "openTable", label: "Table" },
+  { kind: "div" },
+  /* Convert / Export Actions (Schematic) */
+  { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert Schematic to PCB", modes: SCH },
+  { kind: "icon", key: "dConvert", action: "convert2D", label: "Convert Schematic to 2D", modes: SCH },
+  { kind: "icon", key: "dAnnotate", action: "openReannotate", label: "Reannotate Designators", modes: SCH },
+  { kind: "icon", key: "tJlcpcb", action: "openJlcpcb", label: "JLCPCB Layout Service", modes: SCH },
+  { kind: "icon", key: "tGenBlock", action: "openGenBlock", label: "Generate / Update Block Symbol", modes: SCH },
+  { kind: "div" },
+  /* Routing (PCB) */
+  { kind: "icon", key: "dCheck", action: "openDrc", label: "Design Rule Check", modes: PCB },
+  { kind: "icon", key: "tTrack", tool: "track", label: "Single Route — PCB route", modes: PCB },
+  { kind: "icon", key: "pWire", tool: "stretchTrack", label: "Stretch Track", modes: PCB },
+  { kind: "icon", key: "tDiffPair", tool: "diffPair", label: "Differential Pair Route", modes: PCB },
+  { kind: "icon", key: "pArc", tool: "routingCorner", label: "Routing Corner", modes: PCB },
+  { kind: "icon", key: "tLengthTune", tool: "lengthTune", label: "Length Tuning", modes: PCB },
+  { kind: "icon", key: "tAutoRoute", action: "openBoolOp", label: "Auto Route (coming)", modes: PCB },
+  { kind: "div" },
+  /* Layout — Align, Distribute, Rotate, Flip (shared) */
+  { kind: "icon", key: "alignLeft", action: "alignLeft", label: "Align Left" },
+  { kind: "icon", key: "alignRight", action: "alignRight", label: "Align Right" },
+  { kind: "icon", key: "alignTop", action: "alignTop", label: "Align Top" },
+  { kind: "icon", key: "alignBottom", action: "alignBottom", label: "Align Bottom" },
+  { kind: "icon", key: "tAlignGrid", action: "alignGrid", label: "Align Grid — snap selected to grid" },
+  { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute Horizontally" },
+  { kind: "icon", key: "tDistV", action: "openDistribute", label: "Distribute Vertically" },
+  { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
+  { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
+  { kind: "icon", key: "tFlipH", action: "flipH", label: "Flip Horizontal" },
+  { kind: "icon", key: "tFlipV", action: "flipV", label: "Flip Vertical" },
   { kind: "icon", key: "tBringFront", action: "bringFront", label: "Bring to Front" },
   { kind: "icon", key: "tSendBack", action: "sendBack", label: "Send to Back" },
-  { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
-  { kind: "icon", key: "tFlipV", action: "flipV", label: "Flip Up and Down" },
-  { kind: "icon", key: "tFlipH", action: "flipH", label: "Flip Up and Left" },
-  { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
   { kind: "div" },
-  /* shared managers */
+  /* Managers + boolean ops (shared, live extras — kept) */
   { kind: "icon", key: "tFootMgr", action: "openFootMgr", label: "Footprint Manager" },
   { kind: "icon", key: "tDevMgr", action: "openDeviceMgr", label: "Device Manager" },
-  { kind: "div" },
-  /* boolean ops — useful in both for polygons */
   { kind: "icon", key: "tBoolPreserve", action: "openBoolOp", label: "Preserve Overlapping Areas" },
   { kind: "icon", key: "tBoolMerge", action: "openBoolOp", label: "Merge Areas" },
   { kind: "icon", key: "tBoolSubtract", action: "openBoolOp", label: "Subtract Top Area" },
   { kind: "icon", key: "tBoolExclude", action: "openBoolOp", label: "Exclude Overlapping Areas" },
   { kind: "icon", key: "tBoolSplit", action: "openBoolOp", label: "Split Area With Holes" },
   { kind: "div" },
-  /* PCB-only place tools */
-  { kind: "icon", key: "tTrack", tool: "track", label: "Track — PCB route", modes: PCB },
-  { kind: "icon", key: "tPad", tool: "pad", label: "Pad", modes: PCB },
-  { kind: "icon", key: "tVia", tool: "via", label: "Via", modes: PCB },
-  { kind: "icon", key: "tSutureVias", tool: "sutureVias", label: "Suture vias", modes: PCB },
-  { kind: "icon", key: "tPolygon", tool: "polygon", label: "Copper Pour Polygon", modes: PCB },
-  { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Filled Region", modes: PCB },
-  { kind: "icon", key: "tSlot", tool: "slot", label: "Slot", modes: PCB },
-  { kind: "icon", key: "tBoardOutline", tool: "boardOutline", label: "Board Outline", modes: PCB },
-  { kind: "icon", key: "tComponent", tool: "component", label: "Component / Footprint", modes: PCB },
-  { kind: "icon", key: "tDimension", tool: "dimension", label: "Dimension", modes: PCB },
-  /* PCB-only routing helpers */
-  { kind: "icon", key: "tDiffPair", tool: "diffPair", label: "Differential Pair Route", modes: PCB },
-  { kind: "icon", key: "tLengthTune", tool: "lengthTune", label: "Length Tuning", modes: PCB },
-  { kind: "icon", key: "tAutoRoute", action: "openBoolOp", label: "Auto Route (coming)", modes: PCB },
+  /* Export & Manufacturing (PCB) */
+  { kind: "icon", key: "gerber", action: "openGerber", label: "Gerber", modes: PCB },
+  { kind: "icon", key: "bom", action: "openPickPlace", label: "Pick and Place", modes: PCB },
+  { kind: "icon", key: "pdf", action: "openPdf", label: "Export PDF", modes: PCB },
   { kind: "div" },
-  /* shared distribute / labels */
-  { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute Horizontally" },
-  { kind: "icon", key: "tDistV", action: "openDistribute", label: "Distribute Vertically" },
-  { kind: "div" },
+  /* Tools & Misc (PCB) + Settings (shared) */
+  { kind: "icon", key: "pTestPoint", tool: "mountingHole", label: "Mounting Hole", modes: PCB },
   { kind: "icon", key: "tSettings", action: "openSettings", label: "Settings" },
-  { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label", modes: SCH },
 ];
 
 // 2D editor toolbar — Phase 7 (IT-718) expansion from the reduced strip.
@@ -434,7 +486,7 @@ export function Toolbar() {
     sendBack: () => actions.sendBack(),
     toggleBottom: () => actions.toggleBottom(),
     // Phase 5 — IT-692 / IT-569 leftovers.
-    openProject: () => actions.flashToast("Open Project — pick a file"),
+    openProject: () => actions.openModal("openProject"),
     save: () => actions.flashToast("Saved"),
     saveAll: () => actions.flashToast("All projects saved"),
     openFindSim: () => actions.openModal("findReplace"),
@@ -450,6 +502,18 @@ export function Toolbar() {
     openDrc: () => actions.openModal("pcbDrc"),
     openGerber: () => actions.openModal("exportGerber2D"),
     openPickPlace: () => actions.openModal("exportPickPlace"),
+    // Main Toolbar Comparison — sub-grouped parity additions.
+    copy: () => actions.copySelection(),
+    paste: () => actions.pasteClipboard(),
+    toggleSnap: () => actions.toggleSnap(),
+    openPdf: () => actions.openModal("exportPdf2D"),
+    openDevicePicker: () => actions.openModal("devicePicker"),
+    // Align L/R/T/B have no bounding-box impl yet (menu parity items are
+    // placeholders too) — flag intent via toast.
+    alignLeft: () => actions.flashToast("Align Left — coming soon"),
+    alignRight: () => actions.flashToast("Align Right — coming soon"),
+    alignTop: () => actions.flashToast("Align Top — coming soon"),
+    alignBottom: () => actions.flashToast("Align Bottom — coming soon"),
   };
 
   return (

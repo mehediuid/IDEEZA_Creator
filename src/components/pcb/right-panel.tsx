@@ -5,15 +5,17 @@
 // footer holds the Item / Caption rows.
 
 import * as React from "react";
-import { Icon } from "@/lib/pcb/icons";
+import { Icon, DsIcon } from "@/lib/pcb/icons"; // inspector + panel icons
 import { Select, Checkbox } from "@/components/ideeza";
 import { ColorPicker } from "@/components/pcb/color-picker";
-import { SchematicProperties } from "@/components/pcb/schem-properties";
-import { PlacedProperties } from "@/components/pcb/placed-properties";
-import { PcbDefaultProperties, TwoDProperties, ThreeDProperties } from "@/components/pcb/pcb-properties";
+import { PcbDefaultProperties, ThreeDProperties } from "@/components/pcb/pcb-properties";
 import { buildRightTabs } from "@/lib/pcb/data";
-import { buildRight } from "@/lib/pcb/content";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import {
+  INSPECTOR_SCHEMA,
+  resolveInspectorType,
+  type InspectorField,
+} from "@/lib/pcb/inspector-schema";
 
 export function RightPanel() {
   const state = usePcbState();
@@ -95,24 +97,14 @@ export function RightPanel() {
           <FilterTab />
         ) : state.rightTab === "layer" && state.mode !== "schematic" ? (
           <LayerTab />
-        ) : state.selectedIds.length > 0 ? (
-          <PlacedProperties />
-        ) : state.selected === "comp" ? (
-          <CompProps />
-        ) : state.selected === "wire" ? (
-          <WireProps />
-        ) : state.selected === "pin" ? (
-          <PinProps />
-        ) : state.mode === "schematic" ? (
-          <SchematicProperties />
-        ) : state.mode === "pcb" ? (
+        ) : state.mode === "pcb" && state.selectedIds.length === 0 ? (
           <PcbDefaultProperties />
-        ) : state.mode === "2d" ? (
-          <TwoDProperties />
         ) : state.mode === "3d" ? (
           <ThreeDProperties />
         ) : (
-          <div dangerouslySetInnerHTML={{ __html: buildRight(state.mode, state.rightTab) }} />
+          // Schema-driven Property Inspector (Sidebar Properties.xlsx). Covers
+          // Canvas + every selection type for schematic and 2D modes.
+          <InspectorPanel />
         )}
       </div>
 
@@ -126,13 +118,215 @@ export function RightPanel() {
 const DD_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>';
 
-function SectionHeader({ title }: { title: string }) {
+// Collapsible section for the schema-driven inspector.
+function InspSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(true);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-8)" }}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.6">
-        <path d="M6 9l6 6 6-6" />
-      </svg>
-      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+    <div>
+      <div
+        onClick={() => setOpen((o) => !o)}
+        style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-8)", cursor: "pointer", userSelect: "none" }}
+      >
+        <span style={{ display: "inline-flex", width: 13, height: 13, color: "var(--color-violet-600)", transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
+        </span>
+        <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+      </div>
+      {open && <div style={{ paddingBottom: "var(--spacing-2)" }}>{children}</div>}
+    </div>
+  );
+}
+
+const CTL_STYLE: React.CSSProperties = {
+  minWidth: 130,
+  width: 130,
+  boxSizing: "border-box",
+  padding: "var(--spacing-3) var(--spacing-4)",
+  border: "var(--border-width-1) solid var(--color-border-default)",
+  borderRadius: "var(--radius-md)",
+  fontSize: "var(--font-size-sm)",
+  color: "var(--color-text-primary)",
+  background: "var(--color-bg-surface)",
+  outline: "none",
+  fontFamily: "inherit",
+};
+
+// Uncontrolled inputs: `key` resets the field when the bound value changes
+// (e.g. a new object is selected) without a setState-in-effect sync loop.
+function TextCtl({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  return (
+    <input
+      key={value}
+      defaultValue={value}
+      onBlur={(e) => onCommit(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      style={CTL_STYLE}
+    />
+  );
+}
+
+function NumberCtl({ value, unit, onCommit }: { value: number | string; unit?: string; onCommit: (v: number) => void }) {
+  const initial = String(value ?? "");
+  return (
+    <div style={{ position: "relative", width: 130 }}>
+      <input
+        key={initial}
+        defaultValue={initial}
+        inputMode="decimal"
+        onBlur={(e) => { const n = parseFloat(e.target.value); if (!Number.isNaN(n)) onCommit(n); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        style={{ ...CTL_STYLE, paddingRight: unit ? 30 : undefined }}
+      />
+      {unit && <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)", pointerEvents: "none" }}>{unit}</span>}
+    </div>
+  );
+}
+
+function ToggleCtl({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      style={{ width: 38, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: on ? "var(--color-violet-600)" : "var(--color-border-default)", position: "relative", transition: "background .15s", flex: "0 0 auto" }}
+    >
+      <span style={{ position: "absolute", top: 2, left: on ? 18 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+    </button>
+  );
+}
+
+function ColorCtl({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <div
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-2) var(--spacing-3)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", cursor: "pointer", minWidth: 130, boxSizing: "border-box", justifyContent: "space-between" }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+          <Swatch color={value} />
+          <span style={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-family-mono)", color: "var(--color-text-primary)" }}>{(value || "").toUpperCase()}</span>
+        </span>
+      </div>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 90 }} onClick={(e) => e.stopPropagation()}>
+          <ColorPicker value={value} onChange={(c) => { onChange(c); }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionCtl({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ minWidth: 130, padding: "var(--spacing-3) var(--spacing-4)", border: "var(--border-width-1) solid var(--color-border-brand)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-brand)", background: "var(--color-bg-brand-subtle)", cursor: "pointer", fontFamily: "inherit" }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// One field row — reads its binding (if any) and renders an interactive
+// control; unbound fields render read-only per the agreed scope.
+function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pcb/types").CanvasObject | null }) {
+  const state = usePcbState();
+  const actions = usePcbActions();
+
+  // Resolve binding → { value, set } or null (read-only).
+  type BindVal = string | number | boolean | undefined;
+  let bound: { value: BindVal; set: (v: BindVal) => void } | null = null;
+  const b = field.bind;
+  if (b) {
+    if (b.startsWith("obj:") && obj) {
+      const key = b.slice(4);
+      const rec = obj as unknown as Record<string, BindVal>;
+      bound = { value: rec[key], set: (v) => actions.setObjectField(obj.id, { [key]: v } as Partial<import("@/lib/pcb/types").CanvasObject>) };
+    } else if (b === "wire:color") bound = { value: state.netColor, set: (v) => actions.setNetColor(String(v)) };
+    else if (b === "wire:lineWidth") bound = { value: state.wireLineWidth, set: (v) => actions.setWireLineWidth(String(v)) };
+    else if (b === "wire:lineStyle") bound = { value: state.wireLineStyle, set: (v) => actions.setWireLineStyle(String(v)) };
+    else if (b === "doc:unit") bound = { value: state.unit, set: (v) => actions.setUnit(String(v)) };
+    else if (b === "doc:gridSize") bound = { value: state.gridSize, set: (v) => actions.setGridSize(String(v)) };
+    else if (b === "doc:snap") bound = { value: state.snapEnabled !== false, set: () => actions.toggleSnap() };
+  }
+
+  const layerOpts = (state.pcbLayers ?? []).map((l: { name: string }) => l.name);
+  const options = field.optionsToken === "layers"
+    ? (layerOpts.length ? layerOpts : ["Top Layer", "Bottom Layer"])
+    : field.options ?? [];
+
+  let control: React.ReactNode;
+  if (field.kind === "action") {
+    control = <ActionCtl label={field.display ?? "Apply"} onClick={() => actions.flashToast(`${field.label} — coming soon`)} />;
+  } else if (bound) {
+    switch (field.kind) {
+      case "text":
+        control = <TextCtl value={String(bound.value ?? "")} onCommit={bound.set} />;
+        break;
+      case "number":
+      case "coord":
+        control = <NumberCtl value={String(bound.value ?? field.display ?? 0)} unit={field.unit} onCommit={bound.set} />;
+        break;
+      case "dropdown":
+        control = <div style={{ minWidth: 130 }}><Select value={String(bound.value ?? options[0] ?? "")} onChange={bound.set} options={options.map((o) => ({ label: o, value: o }))} /></div>;
+        break;
+      case "color":
+        control = <ColorCtl value={String(bound.value ?? field.display ?? "#000000")} onChange={bound.set} />;
+        break;
+      case "toggle":
+        control = <ToggleCtl on={!!bound.value} onToggle={() => bound!.set(!bound!.value)} />;
+        break;
+      default:
+        control = <ValueCell>{String(bound.value ?? field.display ?? "—")}</ValueCell>;
+    }
+  } else {
+    // Read-only display (unmodeled field).
+    const objRec = obj as unknown as Record<string, BindVal>;
+    const disp = field.display ?? (obj && field.bind?.startsWith("obj:") ? String(objRec[field.bind.slice(4)] ?? "—") : "—");
+    control = field.kind === "color"
+      ? <Swatch color={disp} />
+      : <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{field.unit ? `${disp} ${field.unit}` : disp}</span>;
+  }
+
+  return <PropRow label={field.label}>{control}</PropRow>;
+}
+
+// Schema-driven Property Inspector — the single Properties-tab renderer for
+// schematic + 2D. Resolves the selection type from the sheet schema and draws
+// its collapsible sections and typed fields.
+function InspectorPanel() {
+  const state = usePcbState();
+  const selId = state.selectedIds[0] ?? null;
+  const obj = selId ? (state.objects.find((o) => o.id === selId) ?? null) : null;
+  const { schemaMode, typeKey } = resolveInspectorType(state.mode, obj?.kind ?? null, state.selected);
+  const type = INSPECTOR_SCHEMA[schemaMode][typeKey];
+  if (!type) return null;
+
+  const count = state.selectedIds.length;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+          <span style={{ width: 15, height: 15, color: "var(--color-violet-600)", display: "inline-flex" }}>
+            <DsIcon name={type.icon} size={15} />
+          </span>
+          <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>{type.label}</span>
+        </span>
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+          {typeKey === "Canvas" ? "Nothing selected" : `Selected ${count || 1}`}
+        </span>
+      </div>
+      {type.sections.map((sec, i) => (
+        <React.Fragment key={sec.title + i}>
+          {i > 0 && <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />}
+          <InspSection title={sec.title}>
+            {sec.fields.map((f) => <FieldRow key={f.key} field={f} obj={obj} />)}
+          </InspSection>
+        </React.Fragment>
+      ))}
     </div>
   );
 }
@@ -173,141 +367,6 @@ const Swatch = ({ color }: { color: string }) => (
   <span style={{ width: 22, height: 22, borderRadius: "var(--radius-sm)", background: color, border: "var(--border-width-1) solid var(--color-border-default)" }} />
 );
 
-function CompProps() {
-  const state = usePcbState();
-  const actions = usePcbActions();
-  const ts = state.textStyle;
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
-        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>Multiple Objects</span>
-        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Selected object</span>
-      </div>
-      <SectionHeader title="Basic Properties" />
-      <PropRow label="Name"><ValueCell>U18</ValueCell></PropRow>
-      <PropRow label="Parent"><ValueCell>$1N142</ValueCell></PropRow>
-      <PropRow label="Relevance"><ValueCell>{state.editText}</ValueCell></PropRow>
-      <PropRow label="Color"><Swatch color="var(--color-violet-600)" /></PropRow>
-      <PropRow label="Pin Type"><ValueCell>Undefined</ValueCell></PropRow>
-      <PropRow label="Font"><ValueCell>None</ValueCell></PropRow>
-      <PropRow label="Font Size"><ValueCell>Undefined</ValueCell></PropRow>
-      <PropRow label="Style">
-        <div style={{ display: "flex", gap: "var(--spacing-2)" }}>
-          {(["b", "i", "u"] as const).map((k) => {
-            const on = ts[k];
-            return (
-              <span
-                key={k}
-                onClick={() => actions.toggleTextStyle(k)}
-                style={{
-                  width: 26,
-                  height: 26,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: `var(--border-width-1) solid ${on ? "var(--color-violet-600)" : "var(--color-border-default)"}`,
-                  background: on ? "var(--color-bg-brand-subtle)" : "transparent",
-                  color: on ? "var(--color-text-brand)" : "var(--color-text-secondary)",
-                  borderRadius: "var(--radius-sm)",
-                  fontSize: "var(--font-size-sm)",
-                  fontWeight: 700,
-                  fontStyle: k === "i" ? "italic" : "normal",
-                  textDecoration: k === "u" ? "underline" : "none",
-                  cursor: "pointer",
-                }}
-              >
-                {k.toUpperCase()}
-              </span>
-            );
-          })}
-        </div>
-      </PropRow>
-      <PropRow label="Origin"><Swatch color="var(--color-violet-600)" /></PropRow>
-      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-8)" }} />
-      <SectionHeader title="More Properties" />
-    </div>
-  );
-}
-
-function WireProps() {
-  const state = usePcbState();
-  const actions = usePcbActions();
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
-        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>Wire</span>
-        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Selected objects 1</span>
-      </div>
-      <SectionHeader title="Basic Properties" />
-      <PropRow label="Name"><ValueCell>USB</ValueCell></PropRow>
-      <PropRow label="ID"><ValueCell>$3894</ValueCell></PropRow>
-      <PropRow label="Global Net Name"><ValueCell>$3894</ValueCell></PropRow>
-      <PropRow label="Relevance"><ValueCell>{state.editText}</ValueCell></PropRow>
-      <PropRow label="Color">
-        <div style={{ position: "relative" }}>
-          <div
-            onClick={(e) => { e.stopPropagation(); actions.toggleColorPicker(); }}
-            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-2) var(--spacing-3)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", cursor: "pointer", minWidth: 110, justifyContent: "space-between" }}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-              <Swatch color={state.netColor} />
-              <span style={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-family-mono)", color: "var(--color-text-primary)" }}>{state.netColor.toUpperCase()}</span>
-            </span>
-          </div>
-          {state.colorPickerOpen && (
-            <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 90 }}>
-              <ColorPicker value={state.netColor} onChange={actions.setNetColor} />
-            </div>
-          )}
-        </div>
-      </PropRow>
-      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-8)" }} />
-      <SectionHeader title="Only Wire and Bus" />
-      <PropRow label="Line Width">
-        <div style={{ minWidth: 130 }}>
-          <Select
-            value={state.wireLineWidth}
-            onChange={actions.setWireLineWidth}
-            options={["3", "5", "8", "10", "12"].map((v) => ({ label: v, value: v }))}
-          />
-        </div>
-      </PropRow>
-      <PropRow label="Line Style">
-        <div style={{ minWidth: 130 }}>
-          <Select
-            value={state.wireLineStyle}
-            onChange={actions.setWireLineStyle}
-            options={["Solid (Default)", "Dashed", "Dotted", "Dash-Dot"].map((v) => ({ label: v, value: v }))}
-          />
-        </div>
-      </PropRow>
-    </div>
-  );
-}
-
-function PinProps() {
-  const state = usePcbState();
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
-        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>Pin</span>
-        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Selected object</span>
-      </div>
-      <SectionHeader title="Basic Properties" />
-      <PropRow label="Pin Number"><ValueCell>1</ValueCell></PropRow>
-      <PropRow label="Pin Name"><ValueCell>VCC</ValueCell></PropRow>
-      <PropRow label="Designator"><ValueCell>{state.editText.slice(0, 12)}</ValueCell></PropRow>
-      <PropRow label="Electrical Type"><ValueCell>Power</ValueCell></PropRow>
-      <PropRow label="Net"><ValueCell>+5V</ValueCell></PropRow>
-      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-8)" }} />
-      <SectionHeader title="Geometry" />
-      <PropRow label="Length"><ValueCell>200 mil</ValueCell></PropRow>
-      <PropRow label="Rotation"><ValueCell>0°</ValueCell></PropRow>
-      <PropRow label="Show Name"><ValueCell>Yes</ValueCell></PropRow>
-      <PropRow label="Show Number"><ValueCell>Yes</ValueCell></PropRow>
-    </div>
-  );
-}
 
 // ── Filter tab (interactive: scope dropdown + expand + per-category checkboxes) ──
 const FILTER_CATS: [string, boolean, string][] = [

@@ -25,6 +25,10 @@ type MenuSub = {
   k?: string;
   icon?: string;
   fg?: string;
+  // "Flagged for removal (kept)" — kept in scope per the Final menu list but
+  // visually marked (⚑ + tooltip) pending team confirmation.
+  flagged?: boolean;
+  note?: string;
   onClick?: () => void;
 };
 type MenuItem = {
@@ -35,8 +39,19 @@ type MenuItem = {
   submenu?: boolean;
   hasSub?: boolean;
   sub?: MenuSub[];
+  flagged?: boolean;
+  note?: string;
   onClick?: () => void;
 };
+
+// Small ⚑ glyph appended to items flagged for possible removal but kept in
+// scope. Muted amber so it reads as "attention / provisional".
+const flagGlyph = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-warning, #C77700)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flex: "0 0 auto" }}>
+    <path d="M4 21V4a1 1 0 0 1 1-1h11l-2 4 2 4H5" />
+  </svg>
+);
+const FLAG_NOTE = "Flagged for removal — kept pending team confirmation";
 
 const chevron = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.4">
@@ -163,6 +178,7 @@ export function MenuBar() {
                     role="menuitem"
                     className="ix-mi"
                     onClick={it.onClick}
+                    title={it.flagged ? it.note || FLAG_NOTE : undefined}
                     style={{
                       position: "relative",
                       display: "flex",
@@ -188,12 +204,14 @@ export function MenuBar() {
                       style={{
                         flex: 1,
                         fontSize: "var(--font-size-sm)",
-                        color: "var(--color-text-primary)",
+                        color: it.flagged ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
+                        fontStyle: it.flagged ? "italic" : undefined,
                         fontWeight: 500,
                       }}
                     >
                       {it.label}
                     </span>
+                    {it.flagged && flagGlyph}
                     {it.submenu && chevron}
                     <span
                       className="ix-mi-k"
@@ -240,6 +258,7 @@ export function MenuBar() {
                               key={j}
                               className="ix-mi"
                               onClick={su.onClick}
+                              title={su.flagged ? su.note || FLAG_NOTE : undefined}
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -264,13 +283,15 @@ export function MenuBar() {
                                 style={{
                                   flex: 1,
                                   fontSize: "var(--font-size-sm)",
-                                  color: su.fg,
+                                  color: su.flagged ? "var(--color-text-tertiary)" : su.fg,
+                                  fontStyle: su.flagged ? "italic" : undefined,
                                   fontWeight: 500,
                                   whiteSpace: "nowrap",
                                 }}
                               >
                                 {su.label}
                               </span>
+                              {su.flagged && flagGlyph}
                               <span
                                 className="ix-mi-k"
                                 style={{

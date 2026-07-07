@@ -15,9 +15,9 @@ import {
   NumberInput,
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
-import { buildFindReplace } from "@/lib/pcb/content";
 import { DEL_OBJ_NAMES } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { useManualProjects } from "@/lib/manual/projects";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
 import {
   ModalTabBar,
@@ -191,29 +191,46 @@ function DeleteObjectsModal() {
 function ArrayModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const fields: [string, keyof typeof state.arr][] = [
-    ["Row", "row"],
-    ["Column", "col"],
-    ["Row Spacing", "rowSp"],
-    ["Column Spacing", "colSp"],
+  const unit = state.unit === "mm" ? "mm" : state.unit === "Mil" ? "mil" : "inch";
+  const hasSel = state.selectedIds.length > 0;
+  const fields: [string, keyof typeof state.arr, boolean][] = [
+    ["Row", "row", false],
+    ["Column", "col", false],
+    ["Row Spacing", "rowSp", true],
+    ["Column Spacing", "colSp", true],
   ];
   return (
     <Overlay>
       <Card width={780}>
         <Header title="Array" onClose={actions.closeModal} padding="20px 26px" />
-        <div style={{ padding: "var(--spacing-12) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
-          {fields.map(([label, key]) => (
+        {!hasSel && (
+          <div style={{ margin: "var(--spacing-8) var(--spacing-12) 0", padding: "var(--spacing-5) var(--spacing-7)", background: "var(--color-bg-warning-subtle, var(--color-bg-subtle))", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            Select one or more objects (component, pin, wire…) to array.
+          </div>
+        )}
+        <div style={{ padding: "var(--spacing-10) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
+          {fields.map(([label, key, isSpacing]) => (
             <div key={key} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
               <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-md)", color: "var(--color-text-primary)" }}>{label}</span>
-              <div style={{ flex: 1 }}>
-                <NumberInput value={String(state.arr[key])} onChange={(v) => actions.setArr(key, v)} min={0} />
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
+                <div style={{ flex: 1 }}>
+                  <NumberInput value={String(state.arr[key])} onChange={(v) => actions.setArr(key, v)} min={0} />
+                </div>
+                {isSpacing && <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", width: 32 }}>{unit}</span>}
               </div>
             </div>
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-7) var(--spacing-12) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Pill onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-12)", borderRadius: "var(--radius-lg)" }}>Cancel</Pill>
-          <div style={{ padding: "var(--spacing-5) var(--spacing-10)", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-md)", fontWeight: 500, color: "var(--color-text-tertiary)", cursor: "default" }}>adjust array spacing bu cursor</div>
+          <button
+            type="button"
+            onClick={() => hasSel && actions.flashToast("Drag on canvas to set spacing")}
+            disabled={!hasSel}
+            style={{ padding: "var(--spacing-5) var(--spacing-10)", background: "var(--color-bg-subtle)", border: "none", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-md)", fontWeight: 500, color: "var(--color-text-tertiary)", cursor: hasSel ? "pointer" : "not-allowed", opacity: hasSel ? 1 : 0.5, fontFamily: "inherit" }}
+          >
+            Adjust Array Spacing By Cursor
+          </button>
           <Pill style={{ marginLeft: "auto", padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }}>Preview</Pill>
           <PrimaryBtn onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-16)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
         </div>
@@ -222,52 +239,130 @@ function ArrayModal() {
   );
 }
 
-// ── Find and Replace ───────────────────────────────────────────────────────
+// ── Find And Replace (Popup 7) ───────────────────────────────────────────────
+// Two tabs (Find / Replace). Find Content scope + Blur|Equal mode + text,
+// Replace As (replace tab), Search Range (6 opts), Search Objects, Input
+// Format, Find in Result. Tab-aware footer. Fields kept in local state — this
+// is a transient search dialog; actions flash a toast (no live index yet).
+const FR_CONTENT_SCOPES = [
+  "All",
+  "Basic Properties: ID",
+  "Basic Properties: Text",
+  "Basic Properties: Pin Name",
+  "Basic Properties: Pin Number",
+  "Basic Properties: Pin Type",
+  "Basic Properties: Name",
+  "Basic Properties: Symbol",
+  "Custom Properties: Device",
+  "Custom Properties: Description",
+  "Custom Properties: Supplier Part",
+  "Custom Properties: Manufacturer",
+  "Custom Properties: Datasheet",
+];
+const FR_RANGES = [
+  "Current Schematic",
+  "Project",
+  "Board1",
+  "Board2",
+  "Current Page",
+  "Current Page Selected Objects",
+];
+const FR_OBJECTS = ["Components", "Net", "Pins", "Texts"];
+
+function FieldRowFR({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", marginBottom: "var(--spacing-6)" }}>
+      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{label}</span>
+      <div style={{ flex: 1, display: "flex", gap: "var(--spacing-4)", alignItems: "center" }}>{children}</div>
+    </div>
+  );
+}
+
+function TextField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{ flex: 1, minWidth: 0, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+    />
+  );
+}
+
 function FindReplaceModal() {
-  const state = usePcbState();
   const actions = usePcbActions();
-  const checks: [string, "frRegex" | "frMatch" | "frExt"][] = [
-    ["Use Regular (?)", "frRegex"],
-    ["Match case", "frMatch"],
-    ["Use extension", "frExt"],
-  ];
+  const [tab, setTab] = React.useState("Find");
+  const [scope, setScope] = React.useState(FR_CONTENT_SCOPES[0]);
+  const [mode, setMode] = React.useState("Blur");
+  const [findText, setFindText] = React.useState("");
+  const [replaceText, setReplaceText] = React.useState("");
+  const [range, setRange] = React.useState(FR_RANGES[0]);
+  const [objects, setObjects] = React.useState<Record<string, boolean>>({ Components: true, Net: true, Pins: false, Texts: true });
+  const [fmt, setFmt] = React.useState<Record<string, boolean>>({ regex: false, matchCase: false, expr: false });
+  const [findInResult, setFindInResult] = React.useState(false);
+  const isReplace = tab === "Replace";
+  const toast = (m: string) => { actions.flashToast(m); };
+
   return (
     <Overlay>
-      <Card width={680} maxHeight="88%" flexCol>
-        <Header title="Find and Replace" onClose={actions.closeModal} padding="18px 24px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-12) var(--spacing-4)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-16)", marginBottom: "var(--spacing-7)" }}>
-            <span style={{ width: 110, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Output Method</span>
-            <div onClick={() => actions.setFr({ frScope: "page" })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
-              <Radio on={state.frScope === "page"} />
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Current page</span>
-            </div>
-            <div onClick={() => actions.setFr({ frScope: "object" })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
-              <Radio on={state.frScope === "object"} />
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Current selected object</span>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-16)", marginBottom: "var(--spacing-8)" }}>
-            <span style={{ width: 110, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Scope</span>
-            <Dropdown label="Component" minWidth={220} />
-          </div>
-          <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-0) var(--spacing-0) var(--spacing-7)" }} />
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-5)" }}>Property</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-12)", marginBottom: "var(--spacing-7)" }}>
-            {checks.map(([label, key]) => (
-              <div key={key} onClick={() => actions.setFr({ [key]: !state[key] })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
-                <Check on={state[key]} size={18} radius={5} checkSize={11} />
-                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
-              </div>
-            ))}
-          </div>
-          <div dangerouslySetInnerHTML={{ __html: buildFindReplace() }} />
+      <Card width={640} maxHeight="90%" flexCol>
+        <Header title="Find And Replace" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ padding: "var(--spacing-4) var(--spacing-8) 0", flex: "0 0 auto" }}>
+          <ModalTabBar tabs={["Find", "Replace"]} active={tab} onChange={setTab} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-10) var(--spacing-4)" }}>
+          <FieldRowFR label="Find Content">
+            <div style={{ minWidth: 150 }}><DsSelect value={scope} options={FR_CONTENT_SCOPES.map((s) => ({ label: s, value: s }))} onChange={setScope} minWidth={150} /></div>
+            <div style={{ minWidth: 90 }}><DsSelect value={mode} options={["Blur", "Equal"].map((s) => ({ label: s, value: s }))} onChange={setMode} minWidth={90} /></div>
+          </FieldRowFR>
+          <FieldRowFR label=" ">
+            <TextField value={findText} onChange={setFindText} placeholder="Search text…" />
+          </FieldRowFR>
+          {isReplace && (
+            <FieldRowFR label="Replace As">
+              <TextField value={replaceText} onChange={setReplaceText} placeholder="Replacement text…" />
+            </FieldRowFR>
+          )}
+          <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-4) 0 var(--spacing-7)" }} />
+          <FieldRowFR label="Search Range">
+            <div style={{ minWidth: 220 }}><DsSelect value={range} options={FR_RANGES.map((s) => ({ label: s, value: s }))} onChange={setRange} minWidth={220} /></div>
+          </FieldRowFR>
+          <FieldRowFR label="Search Objects">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-8)" }}>
+              {FR_OBJECTS.map((o) => (
+                <div key={o} onClick={() => setObjects((s) => ({ ...s, [o]: !s[o] }))} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                  <Check on={!!objects[o]} size={18} />
+                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o}</span>
+                </div>
+              ))}
+            </div>
+          </FieldRowFR>
+          <FieldRowFR label="Input Format">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-8)" }}>
+              {([["Use Regular[*?]", "regex"], ["Match case", "matchCase"], ["Use expression", "expr"]] as const).map(([label, key]) => (
+                <div key={key} onClick={() => setFmt((s) => ({ ...s, [key]: !s[key] }))} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                  <Check on={!!fmt[key]} size={18} />
+                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </FieldRowFR>
+          <FieldRowFR label="Filter objects">
+            <div onClick={() => setFindInResult((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+              <Check on={findInResult} size={18} />
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Find in Result</span>
+            </div>
+          </FieldRowFR>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <Pill style={{ marginLeft: "auto" }}>Previous</Pill>
-          <Pill>Next</Pill>
-          <PrimaryBtn onClick={actions.closeModal}>Find All</PrimaryBtn>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
+            {isReplace && <Pill onClick={() => toast("Replace Current")}>Replace Current</Pill>}
+            {isReplace && <Pill onClick={() => toast(`Replaced all "${findText}" → "${replaceText}"`)}>Replace…</Pill>}
+            <Pill onClick={() => toast("Find Previous")}>Find Previous</Pill>
+            <Pill onClick={() => toast("Find Next")}>Find Next</Pill>
+            <PrimaryBtn onClick={() => toast(`Find All: "${findText}"`)}>Find All</PrimaryBtn>
+          </div>
         </div>
       </Card>
     </Overlay>
@@ -1191,6 +1286,339 @@ function ExportFormatModal({
   );
 }
 
+// ── Open Project (Popup 9) ───────────────────────────────────────────────────
+// Project-browser dialog. Real projects from the manual-projects store plus a
+// few sample rows (no backend), Work Space + Filter dropdowns, footer actions.
+const SAMPLE_PROJECTS = [
+  "sohaib_tahir",
+  "Gigabit Ethernet to USB controller LAN7800_copy",
+  "New Project_2026-07-03_13-01-08",
+  "New one",
+  "New Project_2026-06-21_13-57-15",
+  "PCB_PCB_2026-06-17",
+  "New Project_2026-06-08_10-47-57",
+  "Participated",
+  "LCSC-Examples",
+];
+
+function OpenProjectModal() {
+  const actions = usePcbActions();
+  const { projects } = useManualProjects();
+  const [workspace, setWorkspace] = React.useState("Personal");
+  const [filter, setFilter] = React.useState("");
+  const [selected, setSelected] = React.useState<string | null>(null);
+  const names = React.useMemo(() => {
+    const real = (projects ?? []).map((p) => p.name);
+    return [...real, ...SAMPLE_PROJECTS.filter((s) => !real.includes(s))];
+  }, [projects]);
+  const q = filter.trim().toLowerCase();
+  const shown = names.filter((n) => !q || n.toLowerCase().includes(q));
+
+  return (
+    <Overlay>
+      <Card width={560} maxHeight="82%" flexCol>
+        <Header title="Open" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ display: "flex", gap: "var(--spacing-6)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-5)", flex: "0 0 auto" }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", display: "block", marginBottom: 4 }}>Work Space</span>
+            <DsSelect value={workspace} options={["Personal", "Team", "Participated"].map((s) => ({ label: s, value: s }))} onChange={setWorkspace} minWidth={180} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", display: "block", marginBottom: 4 }}>Filter</span>
+            <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--spacing-10)" }}>
+          {shown.map((n) => (
+            <div
+              key={n}
+              onClick={() => setSelected(n)}
+              className="ix-row"
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", background: selected === n ? "var(--color-bg-brand-subtle)" : "transparent" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={selected === n ? "var(--color-violet-600)" : "var(--color-text-tertiary)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+              <span style={{ fontSize: "var(--font-size-sm)", color: selected === n ? "var(--color-text-brand)" : "var(--color-text-primary)", fontWeight: selected === n ? 600 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n}</span>
+            </div>
+          ))}
+          {shown.length === 0 && <div style={{ padding: "var(--spacing-8)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>No projects match.</div>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Pill onClick={actions.closeModal}>Cancel</Pill>
+          <Pill style={{ marginLeft: "auto" }} onClick={() => { if (selected) actions.flashToast(`Opening "${selected}" in new window`); }}>Open in New Window</Pill>
+          <PrimaryBtn onClick={() => { if (selected) { actions.flashToast(`Opened "${selected}"`); actions.closeModal(); } else actions.flashToast("Select a project first"); }}>Open Project</PrimaryBtn>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// ── Device / Reuse Block picker (Popup 10) — the parts-library dialog ─────────
+// Distinct from the Device *Standardization* manager. Source tabs, search,
+// left rail, filter row, result table + Place, sort/pagination. Sample parts.
+const SAMPLE_PARTS = [
+  { part: "AP4313KTR-G1", footprint: "SOT-23-6", brand: "DIODES", price: "$0.0829", stock: "LCSC 90080" },
+  { part: "INA180A2IDBVR", footprint: "SOT-23-5", brand: "TI", price: "$0.1805", stock: "LCSC 86910" },
+  { part: "LAN7800-I/9JX", footprint: "QFN-56", brand: "Microchip", price: "$4.9200", stock: "LCSC 218430" },
+  { part: "GRM155R71C104KA88D", footprint: "0402", brand: "Murata", price: "$0.0038", stock: "LCSC 15195" },
+  { part: "RC0402FR-0710KL", footprint: "0402", brand: "Yageo", price: "$0.0012", stock: "LCSC 51765" },
+];
+const DEVICE_TABS = ["LCSC Electronics", "EasyEDA", "Reuse Block"];
+const DEVICE_RAIL = ["System", "Recent", "Personal", "Favorite", "Project"];
+
+function DevicePickerModal() {
+  const actions = usePcbActions();
+  const [tab, setTab] = React.useState(DEVICE_TABS[0]);
+  const [rail, setRail] = React.useState(DEVICE_RAIL[0]);
+  const [search, setSearch] = React.useState("");
+  const q = search.trim().toLowerCase();
+  const rows = SAMPLE_PARTS.filter((p) => q.length < 2 || p.part.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
+  const cellCss: React.CSSProperties = { padding: "var(--spacing-4) var(--spacing-5)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" };
+  const headCss: React.CSSProperties = { ...cellCss, fontWeight: 700, color: "var(--color-text-secondary)", position: "sticky", top: 0, background: "var(--color-bg-surface)" };
+
+  return (
+    <Overlay>
+      <Card width={980} maxHeight="88%" flexCol>
+        <Header title="Device / Reuse Block" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ padding: "var(--spacing-4) var(--spacing-8) 0", flex: "0 0 auto" }}>
+          <ModalTabBar tabs={DEVICE_TABS} active={tab} onChange={setTab} />
+        </div>
+        <div style={{ padding: "var(--spacing-6) var(--spacing-8) var(--spacing-4)", flex: "0 0 auto" }}>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search, at least 2 characters…" style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", gap: "var(--spacing-4)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
+            {["Package", "Manufacturer", "Features"].map((f) => (
+              <div key={f} style={{ minWidth: 130 }}><DsSelect value={f} options={[{ label: f, value: f }]} minWidth={130} /></div>
+            ))}
+            <Pill style={{ marginLeft: "auto" }} onClick={() => actions.flashToast("Filters cleared")}>Clear Filters</Pill>
+            <PrimaryBtn onClick={() => actions.flashToast("Filters applied")}>Apply Filters</PrimaryBtn>
+          </div>
+        </div>
+        <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+          {/* left rail */}
+          <div style={{ width: 150, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", overflowY: "auto", padding: "var(--spacing-3)" }}>
+            {DEVICE_RAIL.map((r) => (
+              <div key={r} onClick={() => setRail(r)} className="ix-row" style={{ padding: "var(--spacing-3) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", fontSize: "var(--font-size-sm)", fontWeight: rail === r ? 700 : 500, color: rail === r ? "var(--color-text-brand)" : "var(--color-text-primary)", background: rail === r ? "var(--color-bg-brand-subtle)" : "transparent" }}>{r}</div>
+            ))}
+          </div>
+          {/* result table */}
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={{ ...headCss, textAlign: "left" }}>Part</th>
+                  <th style={{ ...headCss, textAlign: "left" }}>Footprint / Brand</th>
+                  <th style={{ ...headCss, textAlign: "left" }}>Price (5+)</th>
+                  <th style={{ ...headCss, textAlign: "left" }}>Stock</th>
+                  <th style={{ ...headCss, textAlign: "right" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => (
+                  <tr key={p.part}>
+                    <td style={cellCss}>{p.part}</td>
+                    <td style={cellCss}>{p.footprint} · {p.brand}</td>
+                    <td style={cellCss}>{p.price}</td>
+                    <td style={cellCss}>{p.stock}</td>
+                    <td style={{ ...cellCss, textAlign: "right" }}>
+                      <Button hierarchy="primary" size="sm" onClick={() => { actions.flashToast(`Placed ${p.part}`); actions.closeModal(); }}>Place</Button>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={5} style={{ ...cellCss, textAlign: "center", color: "var(--color-text-tertiary)" }}>{q.length < 2 ? "Type at least 2 characters to search." : "No parts found."}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-5) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Sort: Price / Stock / Sales · {rows.length} results</span>
+          <Pill style={{ marginLeft: "auto" }} onClick={actions.closeModal}>Cancel</Pill>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// ── Export BOM (Popup 11) ────────────────────────────────────────────────────
+// Device Standardization notice → BOM dialog with Filter-Option table.
+const BOM_ROWS: { title: string; property: string; sort: string; group: string }[] = [
+  { title: "No.", property: "Number", sort: "None", group: "None" },
+  { title: "Comment", property: "Comment", sort: "None", group: "Yes" },
+  { title: "Designator", property: "Designator", sort: "Ascending", group: "No" },
+  { title: "Footprint", property: "Footprint", sort: "None", group: "Yes" },
+  { title: "Manufacturer", property: "Manufacturer", sort: "None", group: "Yes" },
+];
+
+function BomModal() {
+  const actions = usePcbActions();
+  const [notice, setNotice] = React.useState(true);
+  const [range, setRange] = React.useState("Board1 : Gigabit Eth to USB Controller");
+  const [variant, setVariant] = React.useState("Basic");
+  const [fileName] = React.useState("BOM_Board1_Gigabit Eth to USB Controller_2026");
+  const [fileType, setFileType] = React.useState("XLSX");
+  const [template, setTemplate] = React.useState("None");
+  const cellCss: React.CSSProperties = { padding: "var(--spacing-3) var(--spacing-5)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", textAlign: "left" };
+  const labelCss: React.CSSProperties = { width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+
+  if (notice) {
+    return (
+      <Overlay>
+        <Card width={460}>
+          <Header title="Notice" onClose={actions.closeModal} padding="16px 22px" />
+          <div style={{ padding: "var(--spacing-9) var(--spacing-10)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", lineHeight: 1.6 }}>
+            It is recommended to use Device Standardization before exporting the BOM, so every part maps to a consistent supplier / manufacturer entry.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+            <Pill onClick={() => { actions.closeModal(); actions.openManager("device"); }}>Device Standardization</Pill>
+            <PrimaryBtn style={{ marginLeft: "auto" }} onClick={() => setNotice(false)}>Export BOM</PrimaryBtn>
+            <Pill onClick={actions.closeModal}>Cancel</Pill>
+          </div>
+        </Card>
+      </Overlay>
+    );
+  }
+
+  return (
+    <Overlay>
+      <Card width={820} maxHeight="88%" flexCol>
+        <Header title="Export BOM" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-10) var(--spacing-4)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+            <span style={labelCss}>Range</span>
+            <div style={{ flex: 1 }}><DsSelect value={range} options={[range, "Board2 : Panel"].map((s) => ({ label: s, value: s }))} onChange={setRange} /></div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+            <span style={labelCss}>Assembly Variant</span>
+            <div style={{ minWidth: 160 }}><DsSelect value={variant} options={["Basic", "Extended", "Custom"].map((s) => ({ label: s, value: s }))} onChange={setVariant} minWidth={160} /></div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
+            <span style={labelCss}>File Name</span>
+            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", marginBottom: "var(--spacing-6)" }}>
+            <span style={labelCss}>File Type</span>
+            {["XLSX", "CSV"].map((t) => (
+              <div key={t} onClick={() => setFileType(t)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                <Radio on={fileType === t} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{t}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-8)" }}>
+            <span style={labelCss}>Template</span>
+            <div style={{ minWidth: 160 }}><DsSelect value={template} options={["None", "Standard", "JLCPCB"].map((s) => ({ label: s, value: s }))} onChange={setTemplate} minWidth={160} /></div>
+          </div>
+          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Filter Option</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+            <thead>
+              <tr>{["Title", "Property", "Sort", "Group"].map((h) => <th key={h} style={{ ...cellCss, fontWeight: 700, color: "var(--color-text-secondary)", background: "var(--color-bg-subtle)" }}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {BOM_ROWS.map((r) => (
+                <tr key={r.title}>
+                  <td style={cellCss}>{r.title}</td>
+                  <td style={cellCss}>{r.property}</td>
+                  <td style={cellCss}>{r.sort}</td>
+                  <td style={cellCss}>{r.group}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
+          <Pill onClick={() => actions.flashToast("Import Config")}>Import Config</Pill>
+          <Pill onClick={() => actions.flashToast("Export Config")}>Export Config</Pill>
+          <Pill onClick={() => actions.flashToast("Restored defaults")}>Restore Default</Pill>
+          <Pill onClick={() => { actions.closeModal(); actions.openManager("device"); }}>Device Standardization</Pill>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
+            <Pill onClick={() => actions.flashToast("Order Parts")}>Order Parts</Pill>
+            <PrimaryBtn onClick={() => { actions.flashToast(`Exported BOM (${fileType})`); actions.closeModal(); }}>Export BOM</PrimaryBtn>
+            <Pill onClick={actions.closeModal}>Cancel</Pill>
+          </div>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// ── Export DXF (Popup 12) ────────────────────────────────────────────────────
+function DxfModal() {
+  const actions = usePcbActions();
+  const [range, setRange] = React.useState("Board1:Gigabit Eth to USB Controller");
+  const [fileName, setFileName] = React.useState("board.dxf");
+  const [containPages, setContainPages] = React.useState(false);
+  const labelCss: React.CSSProperties = { width: 100, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  return (
+    <Overlay>
+      <Card width={480}>
+        <Header title="Export DXF" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={labelCss}>Range</span>
+            <div style={{ flex: 1 }}><DsSelect value={range} options={[range, "Board2 : Panel"].map((s) => ({ label: s, value: s }))} onChange={setRange} /></div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={labelCss}>File Name</span>
+            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+          </div>
+          <div onClick={() => setContainPages((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+            <Check on={containPages} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Contain pages</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Pill onClick={actions.closeModal}>Cancel</Pill>
+          <PrimaryBtn onClick={() => { actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</PrimaryBtn>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// ── Export Document / PDF·PNG·SVG (Popup 13) ─────────────────────────────────
+function RowRadios({ label, opts, val, set }: { label: string; opts: string[]; val: string; set: (v: string) => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
+      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{label}</span>
+      <div style={{ display: "flex", gap: "var(--spacing-8)", flexWrap: "wrap" }}>
+        {opts.map((o) => (
+          <div key={o} onClick={() => set(o)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+            <Radio on={val === o} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DocumentModal() {
+  const actions = usePcbActions();
+  const [fileType, setFileType] = React.useState("PDF");
+  const [theme, setTheme] = React.useState("Default");
+  const [lineWidth, setLineWidth] = React.useState("Default");
+  const [range, setRange] = React.useState("All");
+  const [output, setOutput] = React.useState("Merged sheet");
+  return (
+    <Overlay>
+      <Card width={560}>
+        <Header title="Export Document" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <RowRadios label="File Type" opts={["PDF", "PNG", "SVG"]} val={fileType} set={setFileType} />
+          <RowRadios label="Theme" opts={["Default", "White on Black", "Black on White"]} val={theme} set={setTheme} />
+          <RowRadios label="Line Width" opts={["Default", "Always 1px", "Follow Zoom"]} val={lineWidth} set={setLineWidth} />
+          <RowRadios label="Range" opts={["All", "Custom"]} val={range} set={setRange} />
+          <RowRadios label="Output Method" opts={["Merged sheet", "Separated sheet"]} val={output} set={setOutput} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Pill onClick={actions.closeModal}>Cancel</Pill>
+          <Pill style={{ marginLeft: "auto" }} onClick={() => actions.flashToast("Print")}>Print</Pill>
+          <PrimaryBtn onClick={() => { actions.flashToast(`Exported ${fileType}`); actions.closeModal(); }}>Export</PrimaryBtn>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 // Chamfer / Fillet (IT-609 / IT-610) — single corner-radius input, mode read
 // from store so the menu sets it before opening.
 function ChamferFilletModal() {
@@ -1393,15 +1821,19 @@ export function Modals() {
     case "reannotate":
       return <ReannotateModal />;
     case "exportDxf2D":
-      return <ExportFormatModal title="Export DXF" defaultName="board.dxf" formats={["AutoCAD 2018", "AutoCAD 2013", "AutoCAD 2010"]} extraOpts={["Top layer", "Bottom layer", "Silkscreen", "Drill"]} />;
+      return <DxfModal />;
     case "exportPdf2D":
-      return <ExportFormatModal title="Export PDF" defaultName="board.pdf" formats={["A4", "A3", "Letter", "Tabloid"]} extraOpts={["Color print", "Mirror", "Outline only"]} />;
+      return <DocumentModal />;
+    case "openProject":
+      return <OpenProjectModal />;
+    case "devicePicker":
+      return <DevicePickerModal />;
     case "exportGerber2D":
       return <ExportFormatModal title="Export Gerber" defaultName="board.gbr" formats={["RS-274X (Extended)", "RS-274D"]} extraOpts={["Generate drill file", "Include silk", "Include solder mask", "Compress as ZIP"]} />;
     case "exportPickPlace":
       return <ExportFormatModal title="Export Pick and Place" defaultName="board-pnp.csv" formats={["CSV", "TXT", "JSON"]} extraOpts={["Include top side", "Include bottom side", "Use metric units"]} />;
     case "exportBom":
-      return <ExportFormatModal title="Export BOM (Bill of Materials)" defaultName="bom.csv" formats={["CSV", "XLSX", "HTML"]} extraOpts={["Group by reference", "Group by value", "Include supplier"]} />;
+      return <BomModal />;
     case "chamferFillet":
       return <ChamferFilletModal />;
     case "editOutline":

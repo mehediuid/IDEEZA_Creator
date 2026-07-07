@@ -740,6 +740,43 @@ export function SystemSettingsPage() {
           {T("enableExtension", "Enable plugin extensions")}
           <ThemeRow />
 
+          <GroupHeader title="Canvas & Interaction" />
+          <Row label="Canvas Zooming Type" hint="How the scroll wheel zooms the canvas.">
+            <Select
+              value="Scroll"
+              options={[
+                { label: "Scroll", value: "Scroll" },
+                { label: "Ctrl + Scroll", value: "Ctrl + Scroll" },
+              ]}
+              onChange={() => {}}
+              minWidth={170}
+            />
+          </Row>
+          <Row label="Auto Panning" hint="Edge-pan behaviour while dragging near the viewport border.">
+            <Select
+              value="Uniform"
+              options={[
+                { label: "Disable", value: "Disable" },
+                { label: "Uniform", value: "Uniform" },
+                { label: "Variable Speed", value: "Variable Speed" },
+              ]}
+              onChange={() => {}}
+              minWidth={170}
+            />
+          </Row>
+          <Row label="Side Panel Auto Hide" hint="Which side panels collapse automatically.">
+            <Select
+              value="Right"
+              options={[
+                { label: "Left", value: "Left" },
+                { label: "Right", value: "Right" },
+                { label: "Bottom", value: "Bottom" },
+              ]}
+              onChange={() => {}}
+              minWidth={170}
+            />
+          </Row>
+
           <GroupHeader title="Project" />
           {T("openProjectsInNewWindow", "Open projects in a new window")}
           {T("duplicateOnOpen", "Duplicate on open (work on a copy)")}

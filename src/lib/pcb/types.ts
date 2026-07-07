@@ -62,6 +62,9 @@ export type ModalId =
   // Phase 7 — Route + Design extras
   | "autoRoute"
   | "routingWidth"
+  // All-Popups spec — File / Place dialogs
+  | "openProject"
+  | "devicePicker"
   | null;
 
 // Tools-menu manager overlays.
@@ -722,8 +725,18 @@ export interface ToolbarCatalogItem {
 // Selected subsets in state drive which icons render in the actual toolbar.
 export const TOOLBAR_CATALOGS: Record<ToolbarScope, ToolbarCatalogItem[]> = {
   schematic: [
+    // Shared nav/select tools (present on every mode's strip).
+    { id: "select",         label: "Select" },
+    { id: "hand",           label: "Hand / Pan" },
+    { id: "selectVisible",  label: "Select Visible Parts" },
     { id: "snap",           label: "Snap" },
     { id: "component",      label: "Component" },
+    // Main Toolbar Comparison parity — distinct placement tools.
+    { id: "bus",            label: "Bus" },
+    { id: "net",            label: "Net" },
+    { id: "junction",       label: "Junction" },
+    { id: "port",           label: "Port Out" },
+    { id: "rectangle",      label: "Rectangle" },
     { id: "shortcutDevice", label: "Shortcut Device" },
     { id: "resistor",       label: "Resistor" },
     { id: "capacitor",      label: "Capacitor" },
@@ -804,6 +817,16 @@ export const TOOLBAR_CATALOGS: Record<ToolbarScope, ToolbarCatalogItem[]> = {
     { id: "settings",    label: "Settings" },
   ],
   pcb: [
+    // Shared nav/select tools (present on every mode's strip).
+    { id: "select",         label: "Select" },
+    { id: "hand",           label: "Hand / Pan" },
+    { id: "selectVisible",  label: "Select Visible Parts" },
+    // Main Toolbar Comparison parity — placement / routing tools.
+    { id: "prohibitedRegion", label: "Prohibited Region" },
+    { id: "stretchTrack",   label: "Stretch Track" },
+    { id: "routingCorner",  label: "Routing Corner" },
+    { id: "mountingHole",   label: "Mounting Hole" },
+    { id: "polyline",       label: "Polyline" },
     { id: "track",          label: "Track" },
     { id: "diffPair",       label: "Differential Pair" },
     { id: "via",            label: "Via" },
@@ -881,11 +904,15 @@ export interface ToolbarCustomization {
 // Phase 5 (IT-692) — widened schematic default to expose the newly added
 // drawing tools (bezier / image / table / component). The toolbar itself
 // drops items whose tool id isn't in this set.
+// Main Toolbar Comparison — the "Final, Sub-Grouped" spec expects every tool
+// row visible by default, so schematic/pcb whitelist the FULL catalog (the
+// Top Tools Bar Settings page can still trim them per user). symbol/panel are
+// untouched by that audit and keep their partial defaults.
 export const DEFAULT_TOOLBAR_CUSTOMIZATION: ToolbarCustomization = {
   scope: "schematic",
-  schematic: TOOLBAR_CATALOGS.schematic.slice(0, 40).map((t) => t.id),
+  schematic: TOOLBAR_CATALOGS.schematic.map((t) => t.id),
   symbol: TOOLBAR_CATALOGS.symbol.slice(0, 14).map((t) => t.id),
-  pcb: TOOLBAR_CATALOGS.pcb.slice(0, 24).map((t) => t.id),
+  pcb: TOOLBAR_CATALOGS.pcb.map((t) => t.id),
   panel: TOOLBAR_CATALOGS.panel.slice(0, 12).map((t) => t.id),
 };
 
