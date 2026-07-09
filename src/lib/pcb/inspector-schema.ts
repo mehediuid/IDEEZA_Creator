@@ -557,6 +557,13 @@ const KIND_TO_TYPE: Record<string, string> = {
   rectangle: "DrawingLike", bezier: "DrawingLike", ellipse: "DrawingLike",
   // text
   text: "Text",
+  // power / flags → Nets in schematic, treated as net markers
+  gnd: "Nets", vcc5v: "Nets", agnd: "Nets", pgnd: "Nets",
+  noConnect: "Nets", shortFlag: "Nets", port: "Nets", junction: "Nets",
+  // pcb regions → Copper Fills (region-style inspector)
+  prohibitedRegion: "Copper Fills", constraintRegion: "Copper Fills",
+  // mechanical / misc
+  mountingHole: "Via", image: "DrawingLike",
 };
 
 // Vias key differs between resolver ("Via") and 2D schema ("Vias").
