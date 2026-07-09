@@ -301,7 +301,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "centerY", label: "Center Y", kind: "coord", unit: "mil", bind: "obj:y" },
           { key: "rotation", label: "Rotation", kind: "number", unit: "°", bind: "obj:rotation", display: "0" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
-          { key: "silkColor", label: "Silk Screen Color", kind: "color", display: "#FFFFFF" },
+          { key: "silkColor", label: "Silk Screen Color", kind: "color", bind: "prop:silkColor", display: "#FFFFFF" },
         ],
       },
       {
@@ -313,18 +313,18 @@ const TWOD: Record<string, InspectorType> = {
           { key: "uniqueId", label: "Unique ID", kind: "readonly", display: "—" },
           { key: "devices", label: "Devices", kind: "readonly", display: "—" },
           { key: "footprint", label: "Footprint", kind: "text", bind: "obj:footprint", display: "—" },
-          { key: "addBom", label: "Add into BOM", kind: "toggle", display: "Yes" },
-          { key: "model3d", label: "3d Model Title", kind: "text", display: "—" },
+          { key: "addBom", label: "Add into BOM", kind: "toggle", bind: "prop:addBom", display: "Yes" },
+          { key: "model3d", label: "3d Model Title", kind: "text", bind: "prop:model3d", display: "—" },
         ],
       },
       {
         title: "Key Properties",
         fields: [
-          { key: "manufacturer", label: "Manufacturer", kind: "text", display: "—" },
-          { key: "manufacturerPart", label: "Manufacturer Part", kind: "text", display: "—" },
-          { key: "supplier", label: "Supplier", kind: "text", display: "—" },
-          { key: "supplierPart", label: "Supplier Part", kind: "text", display: "—" },
-          { key: "value", label: "Value", kind: "text", display: "—" },
+          { key: "manufacturer", label: "Manufacturer", kind: "text", bind: "prop:manufacturer", display: "—" },
+          { key: "manufacturerPart", label: "Manufacturer Part", kind: "text", bind: "prop:manufacturerPart", display: "—" },
+          { key: "supplier", label: "Supplier", kind: "text", bind: "prop:supplier", display: "—" },
+          { key: "supplierPart", label: "Supplier Part", kind: "text", bind: "prop:supplierPart", display: "—" },
+          { key: "value", label: "Value", kind: "text", bind: "prop:value", display: "—" },
         ],
       },
       { title: "More Properties", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
@@ -338,7 +338,7 @@ const TWOD: Record<string, InspectorType> = {
         title: "Property",
         fields: [
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
-          { key: "number", label: "Number", kind: "text", display: "1" },
+          { key: "number", label: "Number", kind: "text", bind: "prop:number", display: "1" },
           { key: "net", label: "Net", kind: "text", bind: "obj:net", display: "—" },
           { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", display: "0" },
           { key: "id", label: "ID", kind: "readonly", display: "—" },
@@ -347,11 +347,11 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Size",
         fields: [
-          { key: "general", label: "General", kind: "toggle", display: "On" },
+          { key: "general", label: "General", kind: "toggle", bind: "prop:sizeGeneral", display: "On" },
           { key: "shape", label: "Shape", kind: "dropdown", options: PAD_SHAPES, bind: "obj:padShape", display: "Round" },
           { key: "width", label: "Width", kind: "number", unit: "mil", bind: "obj:width", display: "60" },
           { key: "height", label: "Height", kind: "number", unit: "mil", bind: "obj:height", display: "60" },
-          { key: "cornerRadiusRatio", label: "Corner Radius Ratio", kind: "number", unit: "%", display: "0" },
+          { key: "cornerRadiusRatio", label: "Corner Radius Ratio", kind: "number", unit: "%", bind: "prop:cornerRadiusRatio", display: "0" },
         ],
       },
       {
@@ -366,23 +366,23 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Solder / Paste Mask Expansion",
         fields: [
-          { key: "expMode", label: "General", kind: "dropdown", options: EXP_MODES, display: "General" },
-          { key: "expCustom", label: "Custom", kind: "toggle", display: "Off" },
-          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", display: "4" },
-          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", display: "0" },
+          { key: "expMode", label: "General", kind: "dropdown", options: EXP_MODES, bind: "prop:expMode", display: "General" },
+          { key: "expCustom", label: "Custom", kind: "toggle", bind: "prop:expCustom", display: "Off" },
+          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4" },
+          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0" },
         ],
       },
       {
         title: "Thermal",
         fields: [
-          { key: "thermalGeneral", label: "General", kind: "dropdown", options: EXP_MODES, display: "General" },
-          { key: "thermalCustom", label: "Custom", kind: "toggle", display: "Off" },
-          { key: "padConnection", label: "Pad Connection", kind: "dropdown", options: ["Direct", "Thermal Relief", "None"], display: "Thermal Relief" },
+          { key: "thermalGeneral", label: "General", kind: "dropdown", options: EXP_MODES, bind: "prop:thermalGeneral", display: "General" },
+          { key: "thermalCustom", label: "Custom", kind: "toggle", bind: "prop:thermalCustom", display: "Off" },
+          { key: "padConnection", label: "Pad Connection", kind: "dropdown", options: ["Direct", "Thermal Relief", "None"], bind: "prop:padConnection", display: "Thermal Relief" },
         ],
       },
       {
         title: "Pin Delay",
-        fields: [{ key: "pinLength", label: "Pin Length", kind: "number", unit: "mil", display: "0" }],
+        fields: [{ key: "pinLength", label: "Pin Length", kind: "number", unit: "mil", bind: "prop:pinLength", display: "0" }],
       },
     ],
   },
@@ -393,8 +393,8 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Property",
         fields: [
-          { key: "throughVia", label: "Through Via", kind: "toggle", display: "On" },
-          { key: "blindBuried", label: "Blind Or buried Via", kind: "dropdown", options: VIA_KINDS, display: "Through" },
+          { key: "throughVia", label: "Through Via", kind: "toggle", bind: "prop:throughVia", display: "On" },
+          { key: "blindBuried", label: "Blind Or buried Via", kind: "dropdown", options: VIA_KINDS, bind: "prop:blindBuried", display: "Through" },
           { key: "startLayer", label: "Start Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:startLayer" },
           { key: "endLayer", label: "End Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:endLayer" },
           { key: "net", label: "Net", kind: "text", bind: "obj:net", display: "—" },
@@ -420,10 +420,10 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Solder / Paste Mask Expansion",
         fields: [
-          { key: "expMode", label: "General", kind: "dropdown", options: EXP_MODES, display: "General" },
-          { key: "expCustom", label: "Custom", kind: "toggle", display: "Off" },
-          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", display: "4" },
-          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", display: "0" },
+          { key: "expMode", label: "General", kind: "dropdown", options: EXP_MODES, bind: "prop:expMode", display: "General" },
+          { key: "expCustom", label: "Custom", kind: "toggle", bind: "prop:expCustom", display: "Off" },
+          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4" },
+          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0" },
         ],
       },
       { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
@@ -455,7 +455,7 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Property",
         fields: [
-          { key: "type", label: "Type", kind: "dropdown", options: ["Rectangle", "Polygon", "Circle"], display: "Rectangle" },
+          { key: "type", label: "Type", kind: "dropdown", options: ["Rectangle", "Polygon", "Circle"], bind: "prop:type", display: "Rectangle" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
           { key: "lineWidth", label: "Line width", kind: "number", unit: "mil", bind: "obj:width", display: "10" },
           { key: "id", label: "ID", kind: "readonly", display: "—" },
@@ -469,7 +469,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "startY", label: "Start Y", kind: "coord", unit: "mil", bind: "obj:y" },
           { key: "width", label: "Width", kind: "number", unit: "mil", bind: "obj:width", display: "0" },
           { key: "height", label: "Height", kind: "number", unit: "mil", bind: "obj:height", display: "0" },
-          { key: "cornerRadius", label: "Corner Radius", kind: "number", unit: "mil", display: "0" },
+          { key: "cornerRadius", label: "Corner Radius", kind: "number", unit: "mil", bind: "prop:cornerRadius", display: "0" },
           { key: "rotation", label: "Rotation", kind: "number", unit: "°", bind: "obj:rotation", display: "0" },
         ],
       },
@@ -503,17 +503,17 @@ const TWOD: Record<string, InspectorType> = {
         fields: [
           { key: "content", label: "Content", kind: "text", bind: "obj:text", display: "Text" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
-          { key: "mirror", label: "Mirror", kind: "toggle", display: "Off" },
+          { key: "mirror", label: "Mirror", kind: "toggle", bind: "prop:mirror", display: "Off" },
         ],
       },
       {
         title: "Font Type",
         fields: [
-          { key: "fontFamily", label: "Font Family", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], display: "Inter" },
-          { key: "strokeWidth", label: "Stroke Width", kind: "number", unit: "mil", display: "6" },
+          { key: "fontFamily", label: "Font Family", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], bind: "prop:fontFamily", display: "Inter" },
+          { key: "strokeWidth", label: "Stroke Width", kind: "number", unit: "mil", bind: "prop:strokeWidth", display: "6" },
           { key: "height", label: "Height", kind: "number", unit: "mil", bind: "obj:height", display: "60" },
-          { key: "inverted", label: "Inverted", kind: "toggle", display: "Off" },
-          { key: "invertedExpansion", label: "Inverted Expansion", kind: "number", unit: "mil", display: "0" },
+          { key: "inverted", label: "Inverted", kind: "toggle", bind: "prop:inverted", display: "Off" },
+          { key: "invertedExpansion", label: "Inverted Expansion", kind: "number", unit: "mil", bind: "prop:invertedExpansion", display: "0" },
         ],
       },
       {
@@ -523,11 +523,11 @@ const TWOD: Record<string, InspectorType> = {
           { key: "centerY", label: "Center Y", kind: "coord", unit: "mil", bind: "obj:y" },
           { key: "rotation", label: "Rotation", kind: "number", unit: "°", bind: "obj:rotation", display: "0" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
-          { key: "origin", label: "Origin", kind: "dropdown", options: ORIGINS, display: "Top Left" },
+          { key: "origin", label: "Origin", kind: "dropdown", options: ORIGINS, bind: "prop:origin", display: "Top Left" },
         ],
       },
       { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
-      { title: "Silk", fields: [{ key: "silkColor", label: "Silk Screen Color", kind: "color", display: "#FFFFFF" }] },
+      { title: "Silk", fields: [{ key: "silkColor", label: "Silk Screen Color", kind: "color", bind: "prop:silkColor", display: "#FFFFFF" }] },
     ],
   },
 };
