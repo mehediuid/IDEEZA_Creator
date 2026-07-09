@@ -790,6 +790,7 @@ export const TOOLBAR_CATALOGS: Record<ToolbarScope, ToolbarCatalogItem[]> = {
     { id: "diode",          label: "Diode" },
     { id: "wire",           label: "Wire" },
     { id: "netLabel",       label: "Net Label" },
+    { id: "pin",            label: "Pin" },
     { id: "shortFlag",      label: "Short Flag" },
     { id: "netFlag",        label: "Net flag" },
     { id: "netPort",        label: "Net Port" },
