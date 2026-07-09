@@ -135,6 +135,52 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <rect x={-18} y={-14} width={36} height={28} rx={2} />
     </g>
   ),
+  gnd: (
+    <g stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" fill="none">
+      <path d="M0 -8v8" /><path d="M-10 0h20M-6 4h12M-2 8h4" />
+    </g>
+  ),
+  net: (
+    <g stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none">
+      <path d="M-14 0h28" /><circle cx={0} cy={0} r={3} fill="currentColor" />
+    </g>
+  ),
+  junction: (
+    <g stroke="none" fill="currentColor"><circle cx={0} cy={0} r={4} /></g>
+  ),
+  circle: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none"><circle cx={0} cy={0} r={12} /></g>
+  ),
+  rectangle: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none"><rect x={-14} y={-10} width={28} height={20} /></g>
+  ),
+  ellipse: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none"><ellipse cx={0} cy={0} rx={14} ry={9} /></g>
+  ),
+  arc: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none"><path d="M-12 8a12 12 0 0 1 24 0" /></g>
+  ),
+  bezier: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none"><path d="M-14 8C-6 -12 6 -12 14 8" /></g>
+  ),
+  image: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none">
+      <rect x={-13} y={-10} width={26} height={20} rx={2} /><circle cx={-5} cy={-3} r={2.5} /><path d="M-13 8l8-7 6 5 4-3 8 5" />
+    </g>
+  ),
+  mountingHole: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none"><circle cx={0} cy={0} r={11} /><circle cx={0} cy={0} r={5} /></g>
+  ),
+  prohibitedRegion: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none" strokeDasharray="4 3">
+      <rect x={-14} y={-12} width={28} height={24} rx={2} /><path d="M-14 12L14 -12" />
+    </g>
+  ),
+  constraintRegion: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none" strokeDasharray="4 3">
+      <rect x={-14} y={-12} width={28} height={24} rx={2} />
+    </g>
+  ),
 };
 
 const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune", "polyline", "line"]);
