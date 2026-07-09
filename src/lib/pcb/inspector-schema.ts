@@ -67,7 +67,6 @@ const ORIGINS = ["Top Left", "Top Center", "Center", "Bottom Left", "Bottom Cent
 const GRID_TYPES = ["Grid Dot", "Grid", "None"];
 const ROUTING_MODES = ["45° Diagonal", "90° Orthogonal", "Curved"];
 const PAD_SHAPES = ["Round", "Rectangle", "Oval"];
-const VIA_KINDS = ["Through", "Blind", "Buried"];
 const EXP_MODES = ["General", "Custom"];
 
 // ═══════════════════════ SCHEMATIC (7 types) ═══════════════════════
@@ -443,8 +442,7 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Property",
         fields: [
-          { key: "throughVia", label: "Through Via", kind: "radio", options: ["Through Via", "Blind Or buried Via"], bind: "prop:throughVia", display: "On" },
-          { key: "blindBuried", label: "Blind Or buried Via", kind: "dropdown", options: VIA_KINDS, bind: "prop:blindBuried", display: "Through" },
+          { key: "throughVia", label: "Through Via / Blind Or Buried Via", kind: "radio", options: ["Through Via", "Blind Or buried Via"], bind: "prop:throughVia", display: "Through Via" },
           { key: "startLayer", label: "Start Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:startLayer" },
           { key: "endLayer", label: "End Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:endLayer" },
           { key: "net", label: "Net", kind: "netRef", bind: "obj:net", display: "—" },
@@ -471,12 +469,13 @@ const TWOD: Record<string, InspectorType> = {
         title: "Solder / Paste Mask Expansion",
         fields: [
           { key: "expMode", label: "General / Custom", kind: "radio", options: EXP_MODES, bind: "prop:expMode", display: "General" },
-          // Doc §05: Custom reveals the solder-mask expansion overrides.
-          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4", showIf: { prop: "expMode", equals: "Custom" } },
-          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0", showIf: { prop: "expMode", equals: "Custom" } },
+          // Doc §05: Custom reveals TopLayer / BottomLayer solder-mask
+          // expansion overrides (unlike Pad's Solder/Paste pair).
+          { key: "topMaskExp", label: "Top Layer Expansion", kind: "number", unit: "mil", bind: "prop:topMaskExp", display: "4", showIf: { prop: "expMode", equals: "Custom" } },
+          { key: "bottomMaskExp", label: "Bottom Layer Expansion", kind: "number", unit: "mil", bind: "prop:bottomMaskExp", display: "4", showIf: { prop: "expMode", equals: "Custom" } },
         ],
       },
-      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }] },
     ],
   },
   Track: {
@@ -504,7 +503,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "endY", label: "End Y", kind: "coord", unit: "mil", bind: "obj:endY" },
         ],
       },
-      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }] },
     ],
   },
   "Outline Object": {
@@ -532,7 +531,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "rotation", label: "Rotation", kind: "number", unit: "°", bind: "obj:rotation", display: "0" },
         ],
       },
-      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }] },
     ],
   },
   "Copper Fills": {
@@ -594,7 +593,7 @@ const TWOD: Record<string, InspectorType> = {
       },
       {
         title: "Combination",
-        fields: [{ key: "group", label: "Group", kind: "text", bind: "prop:group", display: "—" }],
+        fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }],
       },
     ],
   },
@@ -630,7 +629,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "origin", label: "Origin", kind: "origin", options: ORIGINS, bind: "prop:origin", display: "Top Left" },
         ],
       },
-      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+      { title: "Combination", fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }] },
       { title: "Silk", fields: [{ key: "silkColor", label: "Silk Screen Color", kind: "color", bind: "prop:silkColor", display: "#FFFFFF" }] },
     ],
   },
