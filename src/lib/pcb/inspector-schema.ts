@@ -241,22 +241,6 @@ const TWOD: Record<string, InspectorType> = {
     icon: "board",
     sections: [
       {
-        title: "Selection Filter",
-        fields: [
-          { key: "allOn", label: "All On", kind: "toggle", bind: "set:allOn", display: "On" },
-          { key: "fComponents", label: "Components", kind: "toggle", bind: "set:fComponents", display: "On" },
-          { key: "fWires", label: "Wires", kind: "toggle", bind: "set:fWires", display: "On" },
-          { key: "fBuses", label: "Buses", kind: "toggle", bind: "set:fBuses", display: "On" },
-          { key: "fSheetSymbols", label: "Sheet Symbols", kind: "toggle", bind: "set:fSheetSymbols", display: "On" },
-          { key: "fSheetEntries", label: "Sheet Entries", kind: "toggle", bind: "set:fSheetEntries", display: "On" },
-          { key: "fNetLabels", label: "Net Labels", kind: "toggle", bind: "set:fNetLabels", display: "On" },
-          { key: "fParameters", label: "Parameters", kind: "toggle", bind: "set:fParameters", display: "On" },
-          { key: "fPorts", label: "Ports", kind: "toggle", bind: "set:fPorts", display: "On" },
-          { key: "fTexts", label: "Texts", kind: "toggle", bind: "set:fTexts", display: "On" },
-          { key: "fDrawingObjects", label: "Drawing Objects", kind: "toggle", bind: "set:fDrawingObjects", display: "On" },
-        ],
-      },
-      {
         title: "Document",
         fields: [
           { key: "unit", label: "Unit", kind: "dropdown", bind: "doc:unit", options: ["Mil", "mm"], display: "Mil" },
@@ -327,7 +311,21 @@ const TWOD: Record<string, InspectorType> = {
           { key: "value", label: "Value", kind: "text", bind: "prop:value", display: "—" },
         ],
       },
-      { title: "More Properties", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      {
+        title: "More Properties",
+        fields: [
+          { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+          { key: "supplierFootprint", label: "Supplier Footprint", kind: "text", bind: "prop:supplierFootprint", display: "—" },
+          { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+        ],
+      },
+      {
+        title: "Combination / Reuse Block",
+        fields: [
+          { key: "group", label: "Group", kind: "text", bind: "prop:group", display: "—" },
+          { key: "reuseBlock", label: "Reuse Block", kind: "readonly", display: "—" },
+        ],
+      },
     ],
   },
   Pad: {
@@ -445,6 +443,15 @@ const TWOD: Record<string, InspectorType> = {
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
         ],
       },
+      {
+        title: "Path",
+        fields: [
+          { key: "startX", label: "Start X", kind: "coord", unit: "mil", bind: "obj:x" },
+          { key: "startY", label: "Start Y", kind: "coord", unit: "mil", bind: "obj:y" },
+          { key: "endX", label: "End X", kind: "coord", unit: "mil", bind: "obj:endX" },
+          { key: "endY", label: "End Y", kind: "coord", unit: "mil", bind: "obj:endY" },
+        ],
+      },
       { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
     ],
   },
@@ -483,14 +490,59 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Property",
         fields: [
+          { key: "type", label: "Type", kind: "readonly", display: "Copper Region" },
+          { key: "name", label: "Name", kind: "text", bind: "prop:name", display: "POUR1" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
-          { key: "parent", label: "Parent", kind: "readonly", display: "—" },
           { key: "net", label: "Net", kind: "text", bind: "obj:net", display: "—" },
-          { key: "rebuild", label: "Rebuilt Copper Region", kind: "action", display: "Rebuild" },
-          { key: "sutureVias", label: "Place/Remove Suture Vias", kind: "action", display: "Apply" },
+          { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
+          { key: "id", label: "ID", kind: "readonly", display: "—" },
           { key: "convertFill", label: "Convert to Fill Region", kind: "action", display: "Convert" },
           { key: "solderMaskRegion", label: "Add Solder Mask Region", kind: "action", display: "Add" },
         ],
+      },
+      {
+        title: "Fill Setup",
+        fields: [
+          { key: "fillStyle", label: "Fill Style", kind: "dropdown", options: ["Solid", "Hatched", "None"], bind: "prop:fillStyle", display: "Solid" },
+          { key: "keepIsland", label: "Keep Island", kind: "dropdown", options: ["No", "Yes"], bind: "prop:keepIsland", display: "No" },
+          { key: "optimization", label: "Optimization", kind: "dropdown", options: ["Yes", "No"], bind: "prop:optimization", display: "Yes" },
+          { key: "minOptWidth", label: "Minimum Optimized Width", kind: "number", unit: "mil", bind: "prop:minOptWidth", display: "8" },
+          { key: "rebuild", label: "Rebuild Copper Region", kind: "action", display: "Rebuild" },
+          { key: "sutureVias", label: "Place/Remove Suture Vias", kind: "action", display: "Apply" },
+        ],
+      },
+      {
+        title: "Rule Setting",
+        fields: [
+          { key: "ruleScope", label: "By Network / Custom", kind: "dropdown", options: ["By Network", "Custom"], bind: "prop:ruleScope", display: "By Network" },
+          { key: "netSpacingRule", label: "Net Spacing Rule", kind: "text", bind: "prop:netSpacingRule", display: "—" },
+          { key: "networkSpacing", label: "Network Spacing", kind: "number", unit: "mil", bind: "prop:networkSpacing", display: "10" },
+        ],
+      },
+      {
+        title: "Multi-layer Pad",
+        fields: [
+          { key: "mlPadConnection", label: "Pad Connection", kind: "dropdown", options: ["Spoke", "Direct", "None"], bind: "prop:mlPadConnection", display: "Spoke" },
+          { key: "spokeSpacing", label: "Spoke Spacing", kind: "number", unit: "mil", bind: "prop:spokeSpacing", display: "10" },
+          { key: "spokeWidth", label: "Spoke Width", kind: "number", unit: "mil", bind: "prop:spokeWidth", display: "10" },
+          { key: "spokeAngles", label: "Spoke Angles", kind: "text", bind: "prop:spokeAngles", display: "90 Degrees" },
+          { key: "trackConnection", label: "Track Connection", kind: "dropdown", options: ["Direct", "Spoke"], bind: "prop:trackConnection", display: "Direct" },
+        ],
+      },
+      {
+        title: "Rectangle Outline",
+        fields: [
+          { key: "startX", label: "Start X", kind: "coord", unit: "mil", bind: "obj:x" },
+          { key: "startY", label: "Start Y", kind: "coord", unit: "mil", bind: "obj:y" },
+          { key: "width", label: "Width", kind: "number", unit: "mil", bind: "obj:width", display: "0" },
+          { key: "height", label: "Height", kind: "number", unit: "mil", bind: "obj:height", display: "0" },
+          { key: "cornerRadius", label: "Corner Radius", kind: "number", unit: "mil", bind: "prop:cornerRadius", display: "0" },
+          { key: "rotation", label: "Rotation", kind: "number", unit: "°", bind: "obj:rotation", display: "0" },
+        ],
+      },
+      {
+        title: "Combination",
+        fields: [{ key: "group", label: "Group", kind: "text", bind: "prop:group", display: "—" }],
       },
     ],
   },
