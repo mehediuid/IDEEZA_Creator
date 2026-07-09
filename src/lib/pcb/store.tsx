@@ -35,6 +35,7 @@ import {
   type RightTab,
   type SettingsPage,
   type TearDropSettings,
+  isSelectable,
 } from "./types";
 
 const clampZoom = (z: number) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -1096,7 +1097,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             const oy = o.endY != null ? (o.y + o.endY) / 2 : o.y;
             return ox >= minX && ox <= maxX && oy >= minY && oy <= maxY;
           });
-          const ids = hits.map((o) => o.id);
+          const ids = hits
+            .filter((o) => isSelectable(o.kind, s.boardSettings ?? {}))
+            .map((o) => o.id);
           return {
             rubberBand: null,
             selectedIds: additive ? Array.from(new Set([...s.selectedIds, ...ids])) : ids,

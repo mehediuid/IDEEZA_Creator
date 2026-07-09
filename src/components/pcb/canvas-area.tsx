@@ -17,7 +17,7 @@ import { PcbCanvas } from "@/components/pcb/pcb-canvas";
 import { PcbThreeView } from "@/components/pcb/pcb-three-view";
 import { PlacedObjects } from "@/components/pcb/placed-objects";
 import { BOARD_COLOR_HEX, PAD_COLOR_HEX } from "@/lib/pcb/pcb-3d";
-import { PLACE_TOOLS, DRAFT_TOOLS } from "@/lib/pcb/types";
+import { PLACE_TOOLS, DRAFT_TOOLS, isSelectable } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const DRAG_THRESHOLD = 4;
@@ -176,7 +176,10 @@ export function CanvasArea() {
     } else if (intentMoveObject && clickedObjectId) {
       // Select first (or add to selection if shift), then prepare to move all selected.
       if (!state.selectedIds.includes(clickedObjectId)) {
-        actions.selectPlaced(clickedObjectId, e.shiftKey || e.metaKey || e.ctrlKey);
+        const clickedObj = state.objects.find((o) => o.id === clickedObjectId);
+        if (clickedObj && isSelectable(clickedObj.kind, state.boardSettings ?? {})) {
+          actions.selectPlaced(clickedObjectId, e.shiftKey || e.metaKey || e.ctrlKey);
+        }
       }
       // Snapshot of objects that may end up dragged. We finalize the actual
       // set once the user crosses the drag threshold (in case the click was

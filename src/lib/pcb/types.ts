@@ -246,6 +246,28 @@ export const DRAFT_TOOLS: ReadonlyArray<string> = [
   "line",
 ];
 
+// Right-panel "Selection Filter" — maps a placed-object `kind` to the
+// boardSettings toggle key that governs whether it can be selected on the
+// canvas. Shared by the click-select path (canvas-area.tsx) and the
+// rubber-band path (store.tsx commitRubberBand) so both honour the same
+// filter.
+export const FILTER_KEY_FOR_KIND: Record<string, string> = {
+  component: "fComponents", resistor: "fComponents", capacitor: "fComponents",
+  inductor: "fComponents", diode: "fComponents", ic: "fComponents",
+  wire: "fWires", bus: "fBuses",
+  netLabel: "fNetLabels", net: "fNetLabels", netFlag: "fNetLabels",
+  port: "fPorts", text: "fTexts",
+  polyline: "fDrawingObjects", arc: "fDrawingObjects", circle: "fDrawingObjects",
+  rectangle: "fDrawingObjects", bezier: "fDrawingObjects", ellipse: "fDrawingObjects",
+};
+
+export function isSelectable(kind: string, bag: Record<string, unknown>): boolean {
+  if (bag.allOn === false) return false;      // master off → nothing selectable
+  const key = FILTER_KEY_FOR_KIND[kind];
+  if (!key) return true;                       // unmapped kinds always selectable
+  return bag[key] !== false;                   // default true unless explicitly off
+}
+
 export interface PcbState {
   mode: Mode;
   leftMain: LeftMain;
