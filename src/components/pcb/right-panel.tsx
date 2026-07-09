@@ -393,7 +393,25 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
   const setShow = (v: boolean) => { if (obj) actions.setObjectProp(obj.id, showKey, v); };
 
   let control: React.ReactNode;
-  if (field.kind === "action") {
+  if (field.computed && obj) {
+    // Live derived values (doc: Length = live segment length, Net Length =
+    // total length of the whole net). Read-only by definition.
+    const segLen = (o: import("@/lib/pcb/types").CanvasObject) =>
+      Math.hypot((o.endX ?? o.x) - o.x, (o.endY ?? o.y) - o.y);
+    let v = 0;
+    if (field.computed === "segmentLength") v = segLen(obj);
+    else if (field.computed === "netLength" && obj.net) {
+      v = state.objects
+        .filter((o) => o.net === obj.net && o.endX != null)
+        .reduce((sum, o) => sum + segLen(o), 0);
+    }
+    const disp = String(Math.round(v * 10) / 10);
+    control = (
+      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+        {field.unit ? `${disp} ${field.unit}` : disp}
+      </span>
+    );
+  } else if (field.kind === "action") {
     // Wire actions that have a real implementation; the rest are placeholders.
     const run =
       field.key === "convertPcb" ? () => { actions.setMode("pcb"); actions.flashToast("Converted to PCB"); }

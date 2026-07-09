@@ -42,6 +42,9 @@ export interface InspectorField {
   // props[prop] equals the given value (e.g. mask-expansion fields appear
   // only when the General/Custom radio is set to "Custom", per the doc).
   showIf?: { prop: string; equals: string };
+  // Live computed read-only value (doc: "live segment length" / "total
+  // length of the whole net") — derived from the selection, never edited.
+  computed?: "segmentLength" | "netLength";
 }
 
 export interface InspectorSection {
@@ -303,7 +306,7 @@ const TWOD: Record<string, InspectorType> = {
         title: "Basic Properties",
         fields: [
           { key: "name", label: "Name", kind: "checkText", bind: "obj:comment", display: "—" },
-          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
           { key: "designator", label: "Designator", kind: "checkText", bind: "obj:text", display: "U?" },
           { key: "uniqueId", label: "Unique ID", kind: "readonly", display: "—" },
           { key: "devices", label: "Devices", kind: "readonly", display: "—" },
@@ -390,8 +393,8 @@ const TWOD: Record<string, InspectorType> = {
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
           { key: "number", label: "Number", kind: "text", bind: "prop:number", display: "1" },
           { key: "net", label: "Net", kind: "netRef", bind: "obj:net", display: "—" },
-          { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", display: "0" },
-          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", computed: "netLength", display: "0" },
+          { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
         ],
       },
       {
@@ -446,8 +449,8 @@ const TWOD: Record<string, InspectorType> = {
           { key: "startLayer", label: "Start Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:startLayer" },
           { key: "endLayer", label: "End Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:endLayer" },
           { key: "net", label: "Net", kind: "netRef", bind: "obj:net", display: "—" },
-          { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", display: "0" },
-          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", computed: "netLength", display: "0" },
+          { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
         ],
       },
       {
@@ -487,10 +490,10 @@ const TWOD: Record<string, InspectorType> = {
         fields: [
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
           { key: "lineWidth", label: "Line width", kind: "number", unit: "mil", bind: "obj:width", display: "10" },
-          { key: "length", label: "Length", kind: "readonly", unit: "mil", display: "0" },
+          { key: "length", label: "Length", kind: "readonly", unit: "mil", computed: "segmentLength", display: "0" },
           { key: "net", label: "Net", kind: "netRef", bind: "obj:net", display: "—" },
-          { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", display: "0" },
-          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "netLength", label: "Net Length", kind: "readonly", unit: "mil", computed: "netLength", display: "0" },
+          { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
         ],
       },
@@ -516,7 +519,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "type", label: "Type", kind: "dropdown", options: ["Rectangle", "Polygon", "Circle"], bind: "prop:type", display: "Rectangle" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
           { key: "lineWidth", label: "Line width", kind: "number", unit: "mil", bind: "obj:width", display: "10" },
-          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
         ],
       },
@@ -546,7 +549,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
           { key: "net", label: "Net", kind: "netRef", bind: "obj:net", display: "—" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
-          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
           { key: "convertFill", label: "Convert to Fill Region", kind: "action", display: "Convert" },
           { key: "solderMaskRegion", label: "Add Solder Mask Region", kind: "action", display: "Add" },
         ],
