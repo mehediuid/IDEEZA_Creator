@@ -405,6 +405,8 @@ export interface PcbState {
   routingMode: "45deg" | "90deg" | "curved";
   routingCorner: "miter" | "round" | "chamfer";
   routingWidth: number;
+  // Task 4 — board-wide settings bag (2D Canvas Document / Common Setting / Selection Filter fields)
+  boardSettings: Record<string, unknown>;
 }
 
 // Hotkey row — `id` is a stable sort handle, `key` is the displayed combo.
@@ -1282,4 +1284,5 @@ export const initialState: PcbState = {
   routingMode: "45deg",
   routingCorner: "miter",
   routingWidth: 10,
+  boardSettings: {},
 };

@@ -126,6 +126,7 @@ export interface PcbActions {
   moveObject: (id: string, x: number, y: number) => void;
   setObjectField: (id: string, patch: Partial<CanvasObject>) => void;
   setObjectProp: (id: string, key: string, value: unknown) => void;
+  setBoardSetting: (key: string, value: unknown) => void;
   setObjectText: (id: string, text: string) => void;
   rotateSelectedPlaced: (deg: number) => void;
   flipSelectedV: () => void;
@@ -1008,6 +1009,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             o.id === id ? { ...o, props: { ...(o.props ?? {}), [key]: value } } : o,
           ),
         })),
+      setBoardSetting: (key, value) =>
+        merge((s) => ({ boardSettings: { ...s.boardSettings, [key]: value } })),
       setObjectText: (id, text) =>
         mergeWithHistory((s) => ({
           objects: s.objects.map((o) => (o.id === id ? { ...o, text } : o)),
