@@ -323,7 +323,7 @@ const TWOD: Record<string, InspectorType> = {
         title: "Combination / Reuse Block",
         fields: [
           { key: "group", label: "Group", kind: "text", bind: "prop:group", display: "—" },
-          { key: "reuseBlock", label: "Reuse Block", kind: "readonly", display: "—" },
+          { key: "reuseBlock", label: "Reuse Block", kind: "text", bind: "prop:reuseBlock", display: "—" },
         ],
       },
     ],
