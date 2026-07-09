@@ -148,6 +148,7 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tCapacitor", tool: "capacitor", label: "Capacitor", modes: SCH },
   { kind: "icon", key: "tPgnd", tool: "pgnd", label: "PGND", modes: SCH },
   { kind: "icon", key: "tAgnd", tool: "agnd", label: "AGND", modes: SCH },
+  { kind: "icon", key: "pNetLabel", tool: "pin", label: "Pin", modes: SCH },
   { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label", modes: SCH },
   { kind: "div" },
   /* Placement — Drawing & Shapes (Schematic) */

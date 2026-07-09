@@ -203,6 +203,7 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
   "vcc5v",
   "agnd",
   "pgnd",
+  "pin",
   "netLabel",
   "netFlag",
   "shortFlag",

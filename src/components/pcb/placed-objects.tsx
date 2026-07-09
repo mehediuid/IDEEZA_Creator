@@ -56,6 +56,11 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="M-10 -2l10 10 10 -10z" fill="currentColor" />
     </g>
   ),
+  pin: (
+    <g stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" fill="none">
+      <path d="M-16 0h20" /><circle cx={6} cy={0} r={3} fill="currentColor" />
+    </g>
+  ),
   netFlag: (
     <g stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" fill="none">
       <path d="M-12 12V-12h18l-4 6 4 6h-18" />
