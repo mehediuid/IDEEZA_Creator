@@ -136,6 +136,11 @@ export interface CanvasObject {
   comment?: string;                   // value / part number / annotation
   side?: "top" | "bottom";            // which side of the board
   locked?: boolean;                   // movement lock
+  // ── Generic property bag ─────────────────────────────────────────────
+  // Holds every inspector field that has no dedicated typed column above
+  // (Manufacturer, Pin Type, mask/thermal, font, etc.). Bound in the
+  // inspector via `prop:<key>` and edited through actions.setObjectProp.
+  props?: Record<string, unknown>;
 }
 
 // PCB net — minimal model for Phase 2 (coloring + assignment).

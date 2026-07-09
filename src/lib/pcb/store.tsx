@@ -125,6 +125,7 @@ export interface PcbActions {
   deleteSelected: () => void;
   moveObject: (id: string, x: number, y: number) => void;
   setObjectField: (id: string, patch: Partial<CanvasObject>) => void;
+  setObjectProp: (id: string, key: string, value: unknown) => void;
   setObjectText: (id: string, text: string) => void;
   rotateSelectedPlaced: (deg: number) => void;
   flipSelectedV: () => void;
@@ -1000,6 +1001,12 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       setObjectField: (id, patch) =>
         mergeWithHistory((s) => ({
           objects: s.objects.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+        })),
+      setObjectProp: (id, key, value) =>
+        mergeWithHistory((s) => ({
+          objects: s.objects.map((o) =>
+            o.id === id ? { ...o, props: { ...(o.props ?? {}), [key]: value } } : o,
+          ),
         })),
       setObjectText: (id, text) =>
         mergeWithHistory((s) => ({

@@ -255,6 +255,10 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
       const key = b.slice(4);
       const rec = obj as unknown as Record<string, BindVal>;
       bound = { value: rec[key], set: (v) => actions.setObjectField(obj.id, { [key]: v } as Partial<import("@/lib/pcb/types").CanvasObject>) };
+    } else if (b.startsWith("prop:") && obj) {
+      const key = b.slice(5);
+      const props = (obj.props ?? {}) as Record<string, BindVal>;
+      bound = { value: props[key], set: (v) => actions.setObjectProp(obj.id, key, v) };
     } else if (b === "wire:color") bound = { value: state.netColor, set: (v) => actions.setNetColor(String(v)) };
     else if (b === "wire:lineWidth") bound = { value: state.wireLineWidth, set: (v) => actions.setWireLineWidth(String(v)) };
     else if (b === "wire:lineStyle") bound = { value: state.wireLineStyle, set: (v) => actions.setWireLineStyle(String(v)) };
