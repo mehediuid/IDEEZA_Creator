@@ -158,7 +158,7 @@ export function CanvasArea() {
     // Decide intent.
     const intentPan =
       e.button === 1 || (isLeft && handMode);
-    const interactiveMode = state.mode === "schematic" || state.mode === "pcb";
+    const interactiveMode = state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d";
     const clickedObj = clickedObjectId ? state.objects.find((o) => o.id === clickedObjectId) : undefined;
     const clickedIsSelectable =
       !clickedObjectId || (clickedObj != null && isSelectable(clickedObj.kind, state.boardSettings ?? {}, state.mode));
@@ -339,7 +339,7 @@ export function CanvasArea() {
           const cx = (e.clientX - rect.left - state.pan.x) / state.zoom;
           const cy = (e.clientY - rect.top - state.pan.y) / state.zoom;
           if (handMode) return; // hand tool never places or selects
-          const interactiveMode = state.mode === "schematic" || state.mode === "pcb";
+          const interactiveMode = state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d";
           if (interactiveMode && PLACE_TOOLS.includes(state.tool)) {
             actions.placeObject(state.tool, cx, cy);
             return;
@@ -407,7 +407,7 @@ export function CanvasArea() {
               <div dangerouslySetInnerHTML={{ __html: buildCanvas(state.mode) }} />
             )}
             {state.mode === "schematic" && <CanvasObjects />}
-            {(state.mode === "schematic" || state.mode === "pcb") && <PlacedObjects />}
+            {(state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d") && <PlacedObjects />}
           </div>
         )}
       </div>

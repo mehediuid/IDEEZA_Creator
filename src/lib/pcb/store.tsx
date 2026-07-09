@@ -926,7 +926,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           inductor: "L?",
         };
         mergeWithHistory((s) => {
-          const inPcb = s.mode === "pcb";
+          // 2D is the same board surface as PCB — pad/via/component defaults
+          // and the active-layer stamp apply in both.
+          const inPcb = s.mode === "pcb" || s.mode === "2d";
           const d = s.pcbDefaults;
           // Stamp PCB defaults onto pad / via so the property panel reads them.
           const pcbExtras: Partial<CanvasObject> =
