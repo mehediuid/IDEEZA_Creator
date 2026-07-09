@@ -9,6 +9,7 @@
 import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { CanvasObject } from "@/lib/pcb/types";
+import { isSelectable } from "@/lib/pcb/types";
 
 // Each glyph is centered on (0, 0) in its own local coords. The wrapper
 // translates and rotates it.
@@ -267,6 +268,7 @@ export function PlacedObjects() {
                 style={{ pointerEvents: "stroke", cursor: "move" }}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!isSelectable(o.kind, state.boardSettings ?? {})) return;
                   actions.selectPlaced(o.id, e.shiftKey || e.metaKey || e.ctrlKey);
                 }}
               />
@@ -300,7 +302,10 @@ export function PlacedObjects() {
               ? (o.net ? netMap.get(o.net) : undefined) ?? (o.layer ? layerMap.get(o.layer)?.color : undefined)
               : undefined
           }
-          onSelect={(additive) => actions.selectPlaced(o.id, additive)}
+          onSelect={(additive) => {
+            if (!isSelectable(o.kind, state.boardSettings ?? {})) return;
+            actions.selectPlaced(o.id, additive);
+          }}
           onEditStart={() => setEditingId(o.id)}
           onEditEnd={() => setEditingId(null)}
           onTextChange={(t) => actions.setObjectText(o.id, t)}
