@@ -409,10 +409,19 @@ export function PcbDefaultProperties() {
               />
             </Row>
             <Row label="Highlight">
-              <NumberCell
-                value={Number(bs.highlight ?? 5)}
-                onChange={(v) => setBoardSetting("highlight", v)}
-              />
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", width: 130 }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Number(bs.highlight ?? 5)}
+                  onChange={(e) => setBoardSetting("highlight", Number(e.target.value))}
+                  style={{ flex: 1, accentColor: "var(--color-violet-600)" }}
+                />
+                <span style={{ fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)", minWidth: 22, textAlign: "right" }}>
+                  {Number(bs.highlight ?? 5)}
+                </span>
+              </div>
             </Row>
             <Row label="Board Width">
               <NumberCell value={board.width} onChange={(v) => actions.setPcbBoard({ width: v })} suffix="mil" />
