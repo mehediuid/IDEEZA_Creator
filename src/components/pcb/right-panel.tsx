@@ -392,61 +392,142 @@ const Swatch = ({ color }: { color: string }) => (
 );
 
 
-// ── Filter tab (interactive: scope dropdown + expand + per-category checkboxes) ──
-const FILTER_CATS: [string, boolean, string][] = [
-  ["All Objects", true, "248"],
-  ["Components", true, "42"],
-  ["Pads", true, "168"],
-  ["Vias", true, "31"],
-  ["Tracks", true, "96"],
-  ["Arcs", false, "12"],
-  ["Fills", false, "4"],
-  ["Text", true, "18"],
-  ["Nets", true, "27"],
-  ["Dimensions", false, "3"],
+// ── Filter tab — EasyEDA PCB(2D) "Selection Filter" (PDF §01b) ─────────────
+// One row per object kind: Checkbox (selectable on canvas, drives
+// boardSettings[key] via isSelectable()) + label + eye toggle (visual-only,
+// drives boardSettings[`vis_${key}`]). Grouped exactly per spec.
+type FilterRowDef = { key: string; label: string; off?: boolean };
+type FilterGroupDef = { title: string; rows: FilterRowDef[] };
+
+const FILTER_GROUPS: FilterGroupDef[] = [
+  {
+    title: "Independent Object",
+    rows: [
+      { key: "fComponent", label: "Component" },
+      { key: "fComponentProperty", label: "Component Property" },
+      { key: "fComponentSilk", label: "Component Silkscreen", off: true },
+      { key: "fTrack", label: "Track" },
+      { key: "fTestPoint", label: "Test Point" },
+      { key: "fPad", label: "Pad" },
+      { key: "fVia", label: "Via" },
+      { key: "fSutureHole", label: "Suture Hole" },
+      { key: "fText", label: "Text" },
+      { key: "fColorfulImage", label: "Colorful Image" },
+      { key: "fImage", label: "Image" },
+      { key: "fFpcStiffener", label: "FPC Stiffener" },
+      { key: "fDimension", label: "Dimension" },
+    ],
+  },
+  {
+    title: "Outline Object",
+    rows: [
+      { key: "fOutline", label: "Outline" },
+      { key: "fScrewPillar", label: "Screw Pillar" },
+      { key: "fSideDatumLine", label: "Side Datum Line" },
+      { key: "fSideSlotRegion", label: "Side Slot Region" },
+      { key: "fTopBottomSlotRegion", label: "Top-Bottom Slot Region" },
+      { key: "fSideEntity", label: "Side Entity" },
+      { key: "fTopBottomEntity", label: "Top-Bottom Entity" },
+    ],
+  },
+  {
+    title: "Other",
+    rows: [
+      { key: "fPadPair", label: "Pad Pair", off: true },
+      { key: "fNet", label: "Net", off: true },
+      { key: "fTearDrop", label: "TearDrop" },
+      { key: "fDrcMarking", label: "DRC Marking", off: true },
+      { key: "fGroup", label: "Group", off: true },
+    ],
+  },
+  {
+    title: "Status",
+    rows: [
+      { key: "fLocked", label: "Locked" },
+      { key: "fUnlocked", label: "UnLocked" },
+    ],
+  },
 ];
 
-function FilterTab() {
+function FilterGroupHeader({ title }: { title: string }) {
+  return (
+    <div style={{ padding: "var(--spacing-5) var(--spacing-0) var(--spacing-2)" }}>
+      <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>
+        {title}
+      </span>
+    </div>
+  );
+}
+
+function FilterRow({ row }: { row: FilterRowDef }) {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [checked, setChecked] = React.useState<Record<string, boolean>>(() =>
-    Object.fromEntries(FILTER_CATS.map(([n, on]) => [n, on])),
+  const bag = (state.boardSettings ?? {}) as Record<string, unknown>;
+  const checked = row.off ? bag[row.key] === true : bag[row.key] !== false;
+  const visKey = `vis_${row.key}`;
+  const visible = bag[visKey] !== false;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-0)" }}>
+      <Checkbox checked={checked} onChange={() => actions.setBoardSetting(row.key, !checked)} />
+      <span
+        onClick={() => actions.setBoardSetting(row.key, !checked)}
+        style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}
+      >
+        {row.label}
+      </span>
+      <span
+        onClick={() => actions.setBoardSetting(visKey, !visible)}
+        title={visible ? "Hide" : "Show"}
+        style={{ display: "inline-flex", width: 16, height: 16, color: visible ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", cursor: "pointer" }}
+      >
+        <Icon html={visible ? EYE : EYE_OFF} />
+      </span>
+    </div>
   );
-  const [scope, setScope] = React.useState("All Objects");
+}
+
+function FilterTab() {
+  const actions = usePcbActions();
+
+  const resetFilters = () => {
+    FILTER_GROUPS.forEach((g) =>
+      g.rows.forEach((r) => {
+        actions.setBoardSetting(r.key, !r.off);
+        actions.setBoardSetting(`vis_${r.key}`, true);
+      }),
+    );
+  };
 
   return (
     <div style={{ padding: "var(--spacing-6) var(--spacing-8)" }}>
-      <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <Select
-          value={scope}
-          onChange={(v) => {
-            setScope(v);
-            actions.toggleFilterDropdown(false);
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", marginBottom: "var(--spacing-4)" }}>
+        <div style={{ flex: 1 }}>
+          <Select value="Common(Default)" options={[{ label: "Common(Default)", value: "Common(Default)" }]} onChange={() => {}} minWidth={160} />
+        </div>
+        <button
+          onClick={resetFilters}
+          style={{
+            padding: "var(--spacing-2) var(--spacing-4)",
+            border: "var(--border-width-1) solid var(--color-border-default)",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-bg-surface)",
+            color: "var(--color-text-secondary)",
+            cursor: "pointer",
+            fontSize: "var(--font-size-xs)",
+            fontWeight: 600,
+            fontFamily: "inherit",
           }}
-          options={["All Objects", "Selected Only", "Visible Only"].map((v) => ({ label: v, value: v }))}
-        />
+        >
+          Reset
+        </button>
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
-        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>Object Filter</span>
-        <span onClick={actions.toggleFilterExpanded} style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-brand)", fontWeight: 600, cursor: "pointer" }}>
-          {state.filterExpanded ? "Collapse" : "Expand"}
-        </span>
-      </div>
-      {FILTER_CATS.map(([name, , count]) => (
-        <div key={name}>
-          <div
-            onClick={() => setChecked((c) => ({ ...c, [name]: !c[name] }))}
-            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-0)", cursor: "pointer" }}
-          >
-            <Checkbox checked={!!checked[name]} />
-            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{name}</span>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>{count}</span>
-          </div>
-          {state.filterExpanded && (
-            <div style={{ paddingLeft: 35, paddingBottom: "var(--spacing-3)", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>
-              Layer: All · Net: Any
-            </div>
-          )}
+      {FILTER_GROUPS.map((g) => (
+        <div key={g.title}>
+          <FilterGroupHeader title={g.title} />
+          {g.rows.map((r) => (
+            <FilterRow key={r.key} row={r} />
+          ))}
         </div>
       ))}
     </div>
