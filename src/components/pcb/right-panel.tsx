@@ -730,6 +730,11 @@ const CHEV_DOWN_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>';
 
 function CoordReadout() {
+  const state = usePcbState();
+  const selId = state.selectedIds[0];
+  const sel = selId ? state.objects.find((o) => o.id === selId) : null;
+  const x = sel?.x ?? 0;
+  const y = sel?.y ?? 0;
   const cell = (a: string, b: string) => (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "var(--spacing-2) 0" }}>
       <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>{a}</span>
@@ -749,9 +754,9 @@ function CoordReadout() {
     >
       {cell("S", "74%")}
       {cell("G", "0.005 inch")}
-      {cell("X", "17.34 inch")}
+      {cell("X", `${x} mil`)}
       {cell("dx", "11.17 inch")}
-      {cell("Y", "3 inch")}
+      {cell("Y", `${y} mil`)}
       {cell("dY", "-0.12 inch")}
     </div>
   );
