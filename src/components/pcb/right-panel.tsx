@@ -530,7 +530,11 @@ function InspectorPanel() {
         <React.Fragment key={sec.title + i}>
           {i > 0 && <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />}
           <InspSection title={sec.title}>
-            {sec.fields.map((f) => <FieldRow key={f.key} field={f} obj={obj} />)}
+            {sec.fields
+              // Conditional fields (doc: "Custom reveals …") render only when
+              // the referenced prop matches — e.g. mask expansions on Custom.
+              .filter((f) => !f.showIf || String((obj?.props ?? {})[f.showIf.prop] ?? "") === f.showIf.equals)
+              .map((f) => <FieldRow key={f.key} field={f} obj={obj} />)}
           </InspSection>
         </React.Fragment>
       ))}

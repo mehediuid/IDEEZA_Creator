@@ -38,6 +38,10 @@ export interface InspectorField {
   bind?: string;
   // Fallback display value for read-only fields with no live source.
   display?: string;
+  // Conditional visibility: render this field only when the selected object's
+  // props[prop] equals the given value (e.g. mask-expansion fields appear
+  // only when the General/Custom radio is set to "Custom", per the doc).
+  showIf?: { prop: string; equals: string };
 }
 
 export interface InspectorSection {
@@ -413,17 +417,16 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Solder / Paste Mask Expansion",
         fields: [
-          { key: "expMode", label: "General", kind: "radio", options: EXP_MODES, bind: "prop:expMode", display: "General" },
-          { key: "expCustom", label: "Custom", kind: "toggle", bind: "prop:expCustom", display: "Off" },
-          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4" },
-          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0" },
+          { key: "expMode", label: "General / Custom", kind: "radio", options: EXP_MODES, bind: "prop:expMode", display: "General" },
+          // Doc §04: selecting Custom reveals the two expansion fields.
+          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4", showIf: { prop: "expMode", equals: "Custom" } },
+          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0", showIf: { prop: "expMode", equals: "Custom" } },
         ],
       },
       {
         title: "Thermal",
         fields: [
-          { key: "thermalGeneral", label: "General", kind: "radio", options: EXP_MODES, bind: "prop:thermalGeneral", display: "General" },
-          { key: "thermalCustom", label: "Custom", kind: "toggle", bind: "prop:thermalCustom", display: "Off" },
+          { key: "thermalGeneral", label: "General / Custom", kind: "radio", options: EXP_MODES, bind: "prop:thermalGeneral", display: "General" },
           { key: "padConnection", label: "Pad Connection", kind: "dropdown", options: ["Direct", "Thermal Relief", "None"], bind: "prop:padConnection", display: "Thermal Relief" },
         ],
       },
@@ -467,10 +470,10 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Solder / Paste Mask Expansion",
         fields: [
-          { key: "expMode", label: "General", kind: "radio", options: EXP_MODES, bind: "prop:expMode", display: "General" },
-          { key: "expCustom", label: "Custom", kind: "toggle", bind: "prop:expCustom", display: "Off" },
-          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4" },
-          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0" },
+          { key: "expMode", label: "General / Custom", kind: "radio", options: EXP_MODES, bind: "prop:expMode", display: "General" },
+          // Doc §05: Custom reveals the solder-mask expansion overrides.
+          { key: "solderMaskExp", label: "Solder Mask Expansion", kind: "number", unit: "mil", bind: "prop:solderMaskExp", display: "4", showIf: { prop: "expMode", equals: "Custom" } },
+          { key: "pasteMaskExp", label: "Paste Mask Expansion", kind: "number", unit: "mil", bind: "prop:pasteMaskExp", display: "0", showIf: { prop: "expMode", equals: "Custom" } },
         ],
       },
       { title: "Combination", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
