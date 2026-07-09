@@ -268,7 +268,11 @@ export const DEFAULT_OFF_FILTERS = new Set<string>([
   "fNet", "fPadPair", "fDrcMarking", "fGroup", "fComponentSilk",
 ]);
 
-export function isSelectable(kind: string, bag: Record<string, unknown>): boolean {
+// `mode` gates whether the PCB Selection Filter applies. The filter is a
+// PCB(2D)-only feature; in schematic mode nothing is filtered (every object
+// stays selectable) so the schematic editor is untouched by it.
+export function isSelectable(kind: string, bag: Record<string, unknown>, mode?: string): boolean {
+  if (mode === "schematic") return true;        // schematic has no PCB selection filter
   const key = FILTER_KEY_FOR_KIND[kind];
   if (!key) return true;                        // unmapped kinds always selectable
   const on = DEFAULT_OFF_FILTERS.has(key) ? bag[key] === true : bag[key] !== false;

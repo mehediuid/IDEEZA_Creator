@@ -1098,7 +1098,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             return ox >= minX && ox <= maxX && oy >= minY && oy <= maxY;
           });
           const ids = hits
-            .filter((o) => isSelectable(o.kind, s.boardSettings ?? {}))
+            .filter((o) => isSelectable(o.kind, s.boardSettings ?? {}, s.mode))
             .map((o) => o.id);
           return {
             rubberBand: null,

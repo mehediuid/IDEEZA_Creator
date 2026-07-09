@@ -161,7 +161,7 @@ export function CanvasArea() {
     const interactiveMode = state.mode === "schematic" || state.mode === "pcb";
     const clickedObj = clickedObjectId ? state.objects.find((o) => o.id === clickedObjectId) : undefined;
     const clickedIsSelectable =
-      !clickedObjectId || (clickedObj != null && isSelectable(clickedObj.kind, state.boardSettings ?? {}));
+      !clickedObjectId || (clickedObj != null && isSelectable(clickedObj.kind, state.boardSettings ?? {}, state.mode));
     const intentMoveObject =
       isLeft &&
       !handMode &&

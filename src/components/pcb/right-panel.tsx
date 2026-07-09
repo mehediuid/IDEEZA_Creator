@@ -487,7 +487,77 @@ function FilterRow({ row }: { row: FilterRowDef }) {
   );
 }
 
+// Dispatcher: schematic keeps its own (untouched) filter; PCB/2D use the
+// EasyEDA PCB(2D) Selection Filter (PDF §01b). The two never share a list.
 function FilterTab() {
+  const state = usePcbState();
+  return state.mode === "schematic" ? <SchematicFilterTab /> : <PcbFilterTab />;
+}
+
+// Schematic-side object filter — restored unchanged from before the PCB(2D)
+// filter rebuild, so the schematic editor's Filter tab behaves exactly as it
+// always did (cosmetic per-category list; schematic selection is never gated).
+const FILTER_CATS: [string, boolean, string][] = [
+  ["All Objects", true, "248"],
+  ["Components", true, "42"],
+  ["Pads", true, "168"],
+  ["Vias", true, "31"],
+  ["Tracks", true, "96"],
+  ["Arcs", false, "12"],
+  ["Fills", false, "4"],
+  ["Text", true, "18"],
+  ["Nets", true, "27"],
+  ["Dimensions", false, "3"],
+];
+
+function SchematicFilterTab() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const [checked, setChecked] = React.useState<Record<string, boolean>>(() =>
+    Object.fromEntries(FILTER_CATS.map(([n, on]) => [n, on])),
+  );
+  const [scope, setScope] = React.useState("All Objects");
+
+  return (
+    <div style={{ padding: "var(--spacing-6) var(--spacing-8)" }}>
+      <div style={{ marginBottom: "var(--spacing-6)" }}>
+        <Select
+          value={scope}
+          onChange={(v) => {
+            setScope(v);
+            actions.toggleFilterDropdown(false);
+          }}
+          options={["All Objects", "Selected Only", "Visible Only"].map((v) => ({ label: v, value: v }))}
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>Object Filter</span>
+        <span onClick={actions.toggleFilterExpanded} style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-brand)", fontWeight: 600, cursor: "pointer" }}>
+          {state.filterExpanded ? "Collapse" : "Expand"}
+        </span>
+      </div>
+      {FILTER_CATS.map(([name, , count]) => (
+        <div key={name}>
+          <div
+            onClick={() => setChecked((c) => ({ ...c, [name]: !c[name] }))}
+            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-0)", cursor: "pointer" }}
+          >
+            <Checkbox checked={!!checked[name]} />
+            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{name}</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>{count}</span>
+          </div>
+          {state.filterExpanded && (
+            <div style={{ paddingLeft: 35, paddingBottom: "var(--spacing-3)", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>
+              Layer: All · Net: Any
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PcbFilterTab() {
   const actions = usePcbActions();
 
   const resetFilters = () => {

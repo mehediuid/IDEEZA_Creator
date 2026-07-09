@@ -268,7 +268,7 @@ export function PlacedObjects() {
                 style={{ pointerEvents: "stroke", cursor: "move" }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!isSelectable(o.kind, state.boardSettings ?? {})) return;
+                  if (!isSelectable(o.kind, state.boardSettings ?? {}, state.mode)) return;
                   actions.selectPlaced(o.id, e.shiftKey || e.metaKey || e.ctrlKey);
                 }}
               />
@@ -303,7 +303,7 @@ export function PlacedObjects() {
               : undefined
           }
           onSelect={(additive) => {
-            if (!isSelectable(o.kind, state.boardSettings ?? {})) return;
+            if (!isSelectable(o.kind, state.boardSettings ?? {}, state.mode)) return;
             actions.selectPlaced(o.id, additive);
           }}
           onEditStart={() => setEditingId(o.id)}
