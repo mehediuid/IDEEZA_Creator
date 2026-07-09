@@ -58,6 +58,9 @@ export function CanvasArea() {
 
   const canvasRef = React.useRef<HTMLDivElement>(null);
   const panRef = React.useRef<{ x: number; y: number } | null>(null);
+  // Set when a drag gesture already completed a draft segment on mouseup —
+  // the browser's trailing click must not start a new draft.
+  const suppressClickRef = React.useRef(false);
   const [isPanning, setIsPanning] = React.useState(false);
   const [spaceHeld, setSpaceHeld] = React.useState(false);
   const handMode = state.tool === "hand" || spaceHeld;
@@ -171,8 +174,15 @@ export function CanvasArea() {
       clickedIsSelectable;
     const intentRubber =
       isLeft && !handMode && state.tool === "select" && !clickedObjectId && interactiveMode && canvasStart != null;
+    // A drawing tool is armed: dragging must never pan the board out from
+    // under the cursor (the #1 "tool doesn't work" trap). Draft tools also
+    // support press-drag-release as a single gesture.
+    const intentTool =
+      isLeft && !handMode && interactiveMode &&
+      (DRAFT_TOOLS.includes(state.tool) || PLACE_TOOLS.includes(state.tool));
 
-    let mode: "idle" | "pan" | "rubber" | "moveObj" = "idle";
+    let mode: "idle" | "pan" | "rubber" | "moveObj" | "tool" = "idle";
+    let draftStartedInDrag = false;
     let movePivot = { ...start };
     let movedObjects: { id: string; origX: number; origY: number; origEndX?: number; origEndY?: number }[] = [];
 
@@ -208,6 +218,15 @@ export function CanvasArea() {
         } else if (intentRubber && canvasStart) {
           mode = "rubber";
           actions.startRubberBand(canvasStart.x, canvasStart.y);
+        } else if (intentTool) {
+          // Drawing tool armed: never hijack the drag into a pan. For draft
+          // tools the press point starts the segment so press-drag-release
+          // draws it in one gesture (DraftLine previews live).
+          mode = "tool";
+          if (DRAFT_TOOLS.includes(state.tool) && !state.draftWire && canvasStart) {
+            actions.startWire(state.tool, canvasStart.x, canvasStart.y);
+            draftStartedInDrag = true;
+          }
         } else {
           mode = "pan";
           panRef.current = { x: ev.clientX, y: ev.clientY };
@@ -242,6 +261,19 @@ export function CanvasArea() {
     const up = (ev: MouseEvent) => {
       if (mode === "rubber") {
         actions.commitRubberBand(ev.shiftKey);
+      } else if (
+        mode === "tool" &&
+        DRAFT_TOOLS.includes(state.tool) &&
+        rect &&
+        (draftStartedInDrag || state.draftWire)
+      ) {
+        // Press-drag-release with a draft tool: complete the segment at the
+        // release point and swallow the browser's trailing click so it does
+        // not immediately start a new dangling draft.
+        const cx = (ev.clientX - rect.left - state.pan.x) / state.zoom;
+        const cy = (ev.clientY - rect.top - state.pan.y) / state.zoom;
+        actions.finishWire(cx, cy);
+        suppressClickRef.current = true;
       }
       panRef.current = null;
       setIsPanning(false);
@@ -334,6 +366,10 @@ export function CanvasArea() {
         onWheel={onWheel}
         onMouseDown={onMouseDown}
         onClick={(e) => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
           const rect = canvasRef.current?.getBoundingClientRect();
           if (!rect) return;
           const cx = (e.clientX - rect.left - state.pan.x) / state.zoom;
