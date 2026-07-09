@@ -331,6 +331,8 @@ export function PcbDefaultProperties() {
 
   const d = state.pcbDefaults;
   const board = state.pcbBoard;
+  const bs = state.boardSettings ?? {};
+  const setBoardSetting = actions.setBoardSetting;
 
   const topSilkLayer = state.pcbLayers.find((l) => l.id === "topSilk");
   const bottomSilkLayer = state.pcbLayers.find((l) => l.id === "bottomSilk");
@@ -355,6 +357,28 @@ export function PcbDefaultProperties() {
                 minWidth={120}
               />
             </Row>
+            <Row label="Grid Type">
+              <Select
+                value={String(bs.gridType ?? "Grid")}
+                options={["Grid", "Dot"].map((v) => ({ label: v, value: v }))}
+                onChange={(v) => setBoardSetting("gridType", v)}
+                minWidth={120}
+              />
+            </Row>
+            <Row label="Bold Grid Type">
+              <Select
+                value={String(bs.boldGridType ?? "Dot")}
+                options={["Grid", "Dot"].map((v) => ({ label: v, value: v }))}
+                onChange={(v) => setBoardSetting("boldGridType", v)}
+                minWidth={120}
+              />
+            </Row>
+            <Row label="Bold Grid Ratio">
+              <NumberCell
+                value={Number(bs.boldGridRatio ?? 5)}
+                onChange={(v) => setBoardSetting("boldGridRatio", v)}
+              />
+            </Row>
             <Row label="Grid Size">
               <Select
                 value={state.gridSize}
@@ -363,22 +387,38 @@ export function PcbDefaultProperties() {
                 minWidth={120}
               />
             </Row>
+            <Row label="Snap Size">
+              <NumberCell
+                value={Number(bs.snapSize ?? 5)}
+                onChange={(v) => setBoardSetting("snapSize", v)}
+                suffix="mil"
+              />
+            </Row>
+            <Row label="Alt Snap Size">
+              <NumberCell
+                value={Number(bs.altSnapSize ?? 1)}
+                onChange={(v) => setBoardSetting("altSnapSize", v)}
+                suffix="mil"
+              />
+            </Row>
+            <Row label="Snap">
+              <input
+                type="checkbox"
+                checked={state.snapEnabled !== false}
+                onChange={() => actions.toggleSnap()}
+              />
+            </Row>
+            <Row label="Highlight">
+              <NumberCell
+                value={Number(bs.highlight ?? 5)}
+                onChange={(v) => setBoardSetting("highlight", v)}
+              />
+            </Row>
             <Row label="Board Width">
               <NumberCell value={board.width} onChange={(v) => actions.setPcbBoard({ width: v })} suffix="mil" />
             </Row>
             <Row label="Board Height">
               <NumberCell value={board.height} onChange={(v) => actions.setPcbBoard({ height: v })} suffix="mil" />
-            </Row>
-            <Row label="Snap to Grid">
-              <input type="checkbox" checked readOnly />
-            </Row>
-            <Row label="Routing Mode">
-              <Select
-                value="45° / 90°"
-                options={["45° / 90°", "Free angle", "Curved"].map((v) => ({ label: v, value: v }))}
-                onChange={() => {}}
-                minWidth={140}
-              />
             </Row>
           </>
         )}
@@ -395,23 +435,106 @@ export function PcbDefaultProperties() {
           <>
             <Row label="Start Track Width">
               <NumberCell
+                value={Number(bs.startTrackWidth ?? 8)}
+                onChange={(v) => setBoardSetting("startTrackWidth", v)}
+                suffix="mil"
+              />
+            </Row>
+            <Row label="Track Width">
+              <NumberCell
                 value={d.trackWidth}
                 onChange={(v) => actions.setPcbDefaults({ trackWidth: v })}
                 suffix="mil"
               />
             </Row>
-            <Row label="Via Size">
+            <Row label="Start Via Size">
+              <NumberCell
+                value={Number(bs.startViaSize ?? 24)}
+                onChange={(v) => setBoardSetting("startViaSize", v)}
+                suffix="mil"
+              />
+            </Row>
+            <Row label="Via Outside Diameter">
               <NumberCell
                 value={d.viaSize}
                 onChange={(v) => actions.setPcbDefaults({ viaSize: v })}
                 suffix="mil"
               />
             </Row>
-            <Row label="Via Drill">
+            <Row label="Via Inside Diameter">
               <NumberCell
                 value={d.viaDrill}
                 onChange={(v) => actions.setPcbDefaults({ viaDrill: v })}
                 suffix="mil"
+              />
+            </Row>
+            <Row label="Routing Mode">
+              <Select
+                value={String(bs.routingMode ?? "Around")}
+                options={["Around", "Free angle", "Curved"].map((v) => ({ label: v, value: v }))}
+                onChange={(v) => setBoardSetting("routingMode", v)}
+                minWidth={140}
+              />
+            </Row>
+            <Row label="Current Track Path Optimization">
+              <Select
+                value={String(bs.trackOpt ?? "Weak")}
+                options={["Weak", "Strong", "Off"].map((v) => ({ label: v, value: v }))}
+                onChange={(v) => setBoardSetting("trackOpt", v)}
+                minWidth={120}
+              />
+            </Row>
+            <Row label="Remove Loop">
+              <input
+                type="checkbox"
+                checked={bs.removeLoop !== false}
+                onChange={(e) => setBoardSetting("removeLoop", e.target.checked)}
+              />
+            </Row>
+            {bs.removeLoop !== false && (
+              <>
+                <Row label=" Remove Loops With Vias">
+                  <input
+                    type="checkbox"
+                    checked={bs.removeLoopVias !== false}
+                    onChange={(e) => setBoardSetting("removeLoopVias", e.target.checked)}
+                  />
+                </Row>
+                <Row label=" Remove Antenna">
+                  <input
+                    type="checkbox"
+                    checked={bs.removeAntenna !== false}
+                    onChange={(e) => setBoardSetting("removeAntenna", e.target.checked)}
+                  />
+                </Row>
+              </>
+            )}
+            <Row label="Hide Copper Region">
+              <input
+                type="checkbox"
+                checked={bs.hideCopper === true}
+                onChange={(e) => setBoardSetting("hideCopper", e.target.checked)}
+              />
+            </Row>
+            <Row label="Move Footprint The Wire Follows">
+              <input
+                type="checkbox"
+                checked={bs.moveFootprint === true}
+                onChange={(e) => setBoardSetting("moveFootprint", e.target.checked)}
+              />
+            </Row>
+            <Row label="Rotation Objects">
+              <Select
+                value={String(bs.rotationObjects ?? "Rotate together")}
+                options={["Rotate together", "Rotate individually"].map((v) => ({ label: v, value: v }))}
+                onChange={(v) => setBoardSetting("rotationObjects", v)}
+                minWidth={160}
+              />
+            </Row>
+            <Row label="Minimum Track Corners">
+              <NumberCell
+                value={Number(bs.minTrackCorners ?? 1)}
+                onChange={(v) => setBoardSetting("minTrackCorners", v)}
               />
             </Row>
             <Row label="Pad Width">
