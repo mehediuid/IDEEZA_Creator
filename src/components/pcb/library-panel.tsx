@@ -27,6 +27,14 @@ const COMMON_TABS: { label: string; value: LibCommonTab }[] = [
 
 type CommonGroup = { name: string; parts: { label: string; count: number }[] };
 
+// Maps a Common-Library group name to the canvas object kind placed on click.
+const GROUP_KIND: Record<string, string> = {
+  Resistors: "resistor", Capacitors: "capacitor", Connectors: "component", ICs: "component",
+  "Footprints 0402": "component", "Footprints 0603": "component",
+  Vias: "via", Pads: "pad",
+  "Panel Frames": "boardOutline", Fiducials: "pad", "Tooling Holes": "mountingHole",
+};
+
 const COMMON_GROUPS: Record<LibCommonTab, CommonGroup[]> = {
   schematic: [
     { name: "Resistors", parts: [
@@ -172,6 +180,14 @@ export function LibraryPanel() {
 
   const toggle = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
 
+  // Cascading placement: each click drops the part at a slightly offset spot
+  // so successive clicks don't stack objects directly on top of each other.
+  const placeCount = React.useRef(0);
+  const placeFromLib = (kind: string) => {
+    const n = placeCount.current++;
+    actions.placeObject(kind, 120 + (n % 8) * 28, 120 + (n % 8) * 28);
+  };
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
       {/* view tabs (underline text tabs, Figma) */}
@@ -244,7 +260,7 @@ export function LibraryPanel() {
                 {g.parts
                   .filter((p) => cq === "" || p.label.toLowerCase().includes(cq) || g.name.toLowerCase().includes(cq))
                   .map((p) => (
-                    <div key={p.label} className="ix-row" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-4)", paddingLeft: "var(--spacing-8)", borderRadius: "var(--radius-md)", cursor: "pointer" }}>
+                    <div key={p.label} className="ix-row" onClick={() => placeFromLib(GROUP_KIND[g.name] ?? "component")} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-4)", paddingLeft: "var(--spacing-8)", borderRadius: "var(--radius-md)", cursor: "pointer" }}>
                       <span style={{ width: 15, height: 15, flex: "0 0 auto", color: "var(--color-text-tertiary)" }}>
                         <DsIcon name="chip" size={15} />
                       </span>
