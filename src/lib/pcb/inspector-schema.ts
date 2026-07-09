@@ -336,6 +336,47 @@ const TWOD: Record<string, InspectorType> = {
       },
     ],
   },
+  Designator: {
+    label: "Designator",
+    icon: "pText",
+    sections: [
+      {
+        title: "Property",
+        fields: [
+          { key: "propName", label: "Property Name", kind: "readonly", display: "Designator" },
+          { key: "propValue", label: "Property Value", kind: "text", bind: "obj:text", display: "R?" },
+          { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "prop:desig_layer" },
+          { key: "mirror", label: "Mirror", kind: "dropdown", options: ["No", "Yes"], bind: "prop:desig_mirror", display: "No" },
+        ],
+      },
+      {
+        title: "Font Type",
+        fields: [
+          { key: "fontFamily", label: "Font Family", kind: "dropdown", options: ["default", "Inter", "Arial", "Roboto", "Courier"], bind: "prop:desig_font", display: "default" },
+          { key: "strokeWidth", label: "Stroke Width", kind: "text", unit: "mil", bind: "prop:desig_stroke", display: "6" },
+          { key: "height", label: "Height", kind: "text", unit: "mil", bind: "prop:desig_height", display: "45" },
+          { key: "inverted", label: "Inverted", kind: "dropdown", options: ["No", "Yes"], bind: "prop:desig_inverted", display: "No" },
+          { key: "invExp", label: "Inverted Expansion", kind: "text", unit: "mil", bind: "prop:desig_invexp", display: "0" },
+        ],
+      },
+      {
+        title: "Location",
+        fields: [
+          { key: "centerX", label: "Center X", kind: "coord", unit: "mil", bind: "prop:desig_x" },
+          { key: "centerY", label: "Center Y", kind: "coord", unit: "mil", bind: "prop:desig_y" },
+          { key: "rotation", label: "Rotation", kind: "text", unit: "°", bind: "prop:desig_rot", display: "0" },
+          { key: "locked", label: "Locked", kind: "toggle", bind: "prop:desig_locked", display: "Off" },
+          { key: "origin", label: "Origin", kind: "origin", bind: "prop:desig_origin", display: "Top Left" },
+        ],
+      },
+      {
+        title: "Silk",
+        fields: [
+          { key: "silk", label: "Silk Screen Color", kind: "color", bind: "prop:desig_silk", display: "#FFFFFF" },
+        ],
+      },
+    ],
+  },
   Pad: {
     label: "Pad",
     icon: "tPad",

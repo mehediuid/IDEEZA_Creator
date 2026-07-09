@@ -285,6 +285,9 @@ export interface PcbState {
   leftSub: LeftSub;
   netSub: "net" | "component";
   compSub: "designator" | "name" | "device" | "footprint";
+  // Which per-component floating text sub-object is selected on the canvas
+  // ("none" = the component body itself). Drives the Designator inspector.
+  selSub: "none" | "designator" | "name";
   rightTab: RightTab;
   openMenu: MenuId | null;
   ctx: boolean | null;
@@ -1156,6 +1159,7 @@ export const initialState: PcbState = {
   leftSub: "page",
   netSub: "net",
   compSub: "designator",
+  selSub: "none",
   rightTab: "properties",
   openMenu: null,
   ctx: null,

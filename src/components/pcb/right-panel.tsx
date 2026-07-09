@@ -501,7 +501,14 @@ function InspectorPanel() {
   const state = usePcbState();
   const selId = state.selectedIds[0] ?? null;
   const obj = selId ? (state.objects.find((o) => o.id === selId) ?? null) : null;
-  const { schemaMode, typeKey } = resolveInspectorType(state.mode, obj?.kind ?? null, state.selected);
+  const resolved = resolveInspectorType(state.mode, obj?.kind ?? null, state.selected);
+  const schemaMode = resolved.schemaMode;
+  let typeKey = resolved.typeKey;
+  // A selected component's floating designator/name label uses the Designator
+  // panel (PDF §03) rather than the Component body panel.
+  if (state.selSub !== "none" && schemaMode === "2d" && typeKey === "Component") {
+    typeKey = "Designator";
+  }
   const type = INSPECTOR_SCHEMA[schemaMode][typeKey];
   if (!type) return null;
 

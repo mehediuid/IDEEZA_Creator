@@ -302,10 +302,12 @@ export function PlacedObjects() {
               ? (o.net ? netMap.get(o.net) : undefined) ?? (o.layer ? layerMap.get(o.layer)?.color : undefined)
               : undefined
           }
+          designatorActive={selectedSet.has(o.id) && state.selSub === "designator"}
           onSelect={(additive) => {
             if (!isSelectable(o.kind, state.boardSettings ?? {}, state.mode)) return;
             actions.selectPlaced(o.id, additive);
           }}
+          onSelectDesignator={() => actions.selectDesignator(o.id, "designator")}
           onEditStart={() => setEditingId(o.id)}
           onEditEnd={() => setEditingId(null)}
           onTextChange={(t) => actions.setObjectText(o.id, t)}
@@ -348,12 +350,19 @@ function DraftLine() {
   );
 }
 
+// Component-family kinds whose floating label is the Designator child object.
+const DESIGNATOR_KINDS = new Set([
+  "component", "resistor", "capacitor", "inductor", "diode", "ic", "connector",
+]);
+
 function PlacedGlyph({
   obj,
   selected,
   editing,
   layerColor,
+  designatorActive,
   onSelect,
+  onSelectDesignator,
   onEditStart,
   onEditEnd,
   onTextChange,
@@ -362,7 +371,9 @@ function PlacedGlyph({
   selected: boolean;
   editing: boolean;
   layerColor?: string;
+  designatorActive?: boolean;
   onSelect: (additive: boolean) => void;
+  onSelectDesignator?: () => void;
   onEditStart: () => void;
   onEditEnd: () => void;
   onTextChange: (t: string) => void;
@@ -452,23 +463,34 @@ function PlacedGlyph({
       <svg viewBox="-24 -24 48 48" width="48" height="48">
         {GLYPHS[obj.kind] ?? <circle cx={0} cy={0} r={6} fill="currentColor" />}
       </svg>
-      {obj.text && obj.kind !== "vcc5v" && (
-        <span
-          style={{
-            position: "absolute",
-            bottom: -4,
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            fontSize: 9,
-            color: "currentColor",
-            pointerEvents: "none",
-            transform: `rotate(${-rotation}deg)`,
-          }}
-        >
-          {obj.text}
-        </span>
-      )}
+      {obj.text && obj.kind !== "vcc5v" && (() => {
+        const isDesig = DESIGNATOR_KINDS.has(obj.kind);
+        const p = obj.props ?? {};
+        const dx = Number(p.desig_x ?? 0);
+        const dy = Number(p.desig_y ?? 0);
+        const drot = Number(p.desig_rot ?? 0);
+        const silk = p.desig_silk ? String(p.desig_silk) : null;
+        return (
+          <span
+            onClick={isDesig && onSelectDesignator ? (e) => { e.stopPropagation(); onSelectDesignator(); } : undefined}
+            style={{
+              position: "absolute",
+              bottom: -4,
+              left: 0,
+              right: 0,
+              textAlign: "center",
+              fontSize: 9,
+              color: designatorActive ? "var(--color-violet-600)" : (silk ?? "currentColor"),
+              pointerEvents: isDesig ? "auto" : "none",
+              cursor: isDesig ? "pointer" : undefined,
+              outline: designatorActive ? "1px dashed var(--color-violet-600)" : undefined,
+              transform: `translate(${dx}px, ${dy}px) rotate(${-rotation + drot}deg)`,
+            }}
+          >
+            {obj.text}
+          </span>
+        );
+      })()}
     </div>
   );
 }

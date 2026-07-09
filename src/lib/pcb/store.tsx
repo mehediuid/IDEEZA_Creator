@@ -121,6 +121,7 @@ export interface PcbActions {
   finishWire: (x: number, y: number) => void;
   cancelDraft: () => void;
   selectPlaced: (id: string | null, additive?: boolean) => void;
+  selectDesignator: (compId: string, sub: "designator" | "name") => void;
   selectMany: (ids: string[]) => void;
   selectAll: () => void;
   deleteSelected: () => void;
@@ -974,18 +975,22 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       cancelDraft: () => merge({ draftWire: null }),
       selectPlaced: (id, additive) =>
         merge((s) => {
-          if (id == null) return { selectedIds: [] };
+          // Any normal object selection clears the designator sub-selection.
+          if (id == null) return { selectedIds: [], selSub: "none" };
           if (additive) {
             const present = s.selectedIds.includes(id);
             return {
               selectedIds: present
                 ? s.selectedIds.filter((x) => x !== id)
                 : [...s.selectedIds, id],
+              selSub: "none",
             };
           }
-          return { selectedIds: [id] };
+          return { selectedIds: [id], selSub: "none" };
         }),
-      selectMany: (ids) => merge({ selectedIds: ids }),
+      selectDesignator: (compId, sub) =>
+        merge({ selectedIds: [compId], selSub: sub, selected: "comp" }),
+      selectMany: (ids) => merge({ selectedIds: ids, selSub: "none" }),
       selectAll: () => merge((s) => ({ selectedIds: s.objects.map((o) => o.id) })),
       deleteSelected: () =>
         mergeWithHistory((s) => {
