@@ -159,8 +159,16 @@ export function CanvasArea() {
     const intentPan =
       e.button === 1 || (isLeft && handMode);
     const interactiveMode = state.mode === "schematic" || state.mode === "pcb";
+    const clickedObj = clickedObjectId ? state.objects.find((o) => o.id === clickedObjectId) : undefined;
+    const clickedIsSelectable =
+      !clickedObjectId || (clickedObj != null && isSelectable(clickedObj.kind, state.boardSettings ?? {}));
     const intentMoveObject =
-      isLeft && !handMode && state.tool === "select" && clickedObjectId != null && interactiveMode;
+      isLeft &&
+      !handMode &&
+      state.tool === "select" &&
+      clickedObjectId != null &&
+      interactiveMode &&
+      clickedIsSelectable;
     const intentRubber =
       isLeft && !handMode && state.tool === "select" && !clickedObjectId && interactiveMode && canvasStart != null;
 
@@ -175,11 +183,9 @@ export function CanvasArea() {
       mode = "pan";
     } else if (intentMoveObject && clickedObjectId) {
       // Select first (or add to selection if shift), then prepare to move all selected.
+      // intentMoveObject already guarantees clickedObj is selectable.
       if (!state.selectedIds.includes(clickedObjectId)) {
-        const clickedObj = state.objects.find((o) => o.id === clickedObjectId);
-        if (clickedObj && isSelectable(clickedObj.kind, state.boardSettings ?? {})) {
-          actions.selectPlaced(clickedObjectId, e.shiftKey || e.metaKey || e.ctrlKey);
-        }
+        actions.selectPlaced(clickedObjectId, e.shiftKey || e.metaKey || e.ctrlKey);
       }
       // Snapshot of objects that may end up dragged. We finalize the actual
       // set once the user crosses the drag threshold (in case the click was
