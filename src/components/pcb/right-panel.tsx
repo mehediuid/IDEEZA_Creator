@@ -240,6 +240,116 @@ function ActionCtl({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
+// Auto-growing textarea (`textarea` kind) — uncontrolled like TextCtl, resizes
+// to fit content on input and commits on blur.
+function TextareaCtl({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const autoGrow = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  return (
+    <textarea
+      key={value}
+      ref={autoGrow}
+      defaultValue={value}
+      rows={2}
+      onInput={(e) => autoGrow(e.currentTarget)}
+      onBlur={(e) => onCommit(e.target.value)}
+      style={{ ...CTL_STYLE, width: 130, resize: "none", overflow: "hidden", fontFamily: "inherit", lineHeight: 1.4 }}
+    />
+  );
+}
+
+// Small icon button used beside a Select (gear = "settings", jump = "go to net").
+function IconAffordanceBtn({ svg, title, onClick }: { svg: string; title: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      style={{ width: 22, height: 22, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: "pointer" }}
+    >
+      <Icon html={svg} size={11} />
+    </button>
+  );
+}
+
+const GEAR_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>';
+const JUMP_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M17 7H8M17 7v9"/></svg>';
+
+// Horizontal segmented control (`radio` kind) — 2–3 exclusive options.
+function SegmentedCtl({ value, options, onChange }: { value: string; options: string[]; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 2, minWidth: 130 }}>
+      {options.map((o) => {
+        const active = o === value;
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onChange(o)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "var(--spacing-2) var(--spacing-2)",
+              border: `var(--border-width-1) solid ${active ? "var(--color-violet-600)" : "var(--color-border-default)"}`,
+              borderRadius: "var(--radius-md)",
+              background: active ? "var(--color-bg-brand-subtle)" : "var(--color-bg-surface)",
+              color: active ? "var(--color-violet-600)" : "var(--color-text-secondary)",
+              fontSize: "var(--font-size-2xs)",
+              fontWeight: 600,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// 3×3 anchor picker (`origin` kind).
+const ORIGIN_POSITIONS = [
+  "Top Left", "Top Center", "Top Right",
+  "Center Left", "Center", "Center Right",
+  "Bottom Left", "Bottom Center", "Bottom Right",
+];
+
+function OriginGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gridTemplateRows: "repeat(3, 1fr)", gap: 2, width: 54, height: 54, flex: "0 0 auto" }}>
+      {ORIGIN_POSITIONS.map((pos) => {
+        const active = pos === value;
+        return (
+          <button
+            key={pos}
+            type="button"
+            title={pos}
+            onClick={() => onChange(pos)}
+            style={{
+              width: "100%",
+              height: "100%",
+              padding: 0,
+              border: `var(--border-width-1) solid ${active ? "var(--color-violet-600)" : "var(--color-border-default)"}`,
+              borderRadius: "var(--radius-sm)",
+              background: active ? "var(--color-violet-600)" : "var(--color-bg-surface)",
+              cursor: "pointer",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // One field row — reads its binding (if any) and renders an interactive
 // control; unbound fields render read-only per the agreed scope.
 function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pcb/types").CanvasObject | null }) {
@@ -276,6 +386,12 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
     ? (layerOpts.length ? layerOpts : ["Top Layer", "Bottom Layer"])
     : field.options ?? [];
 
+  // Checkbox-prefixed kinds (`checkText`/`checkDropdown`) persist their
+  // show-on-silk state at `prop:<key>__show` (boolean, default on).
+  const showKey = `${field.key}__show`;
+  const showState = obj ? ((obj.props ?? {}) as Record<string, BindVal>)[showKey] !== false : true;
+  const setShow = (v: boolean) => { if (obj) actions.setObjectProp(obj.id, showKey, v); };
+
   let control: React.ReactNode;
   if (field.kind === "action") {
     // Wire actions that have a real implementation; the rest are placeholders.
@@ -302,6 +418,66 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
         break;
       case "toggle":
         control = <ToggleCtl on={!!bound.value} onToggle={() => bound!.set(!bound!.value)} />;
+        break;
+      case "checkText":
+        control = (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+            <Checkbox checked={showState} onChange={() => setShow(!showState)} size="sm" />
+            <TextCtl value={String(bound.value ?? "")} onCommit={bound.set} />
+          </div>
+        );
+        break;
+      case "checkDropdown":
+        control = (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+            <Checkbox checked={showState} onChange={() => setShow(!showState)} size="sm" />
+            <Select value={String(bound.value ?? options[0] ?? "")} onChange={bound.set} options={options.map((o) => ({ label: o, value: o }))} minWidth={104} />
+          </div>
+        );
+        break;
+      case "dropdownGear":
+        control = (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+            <Select value={String(bound.value ?? options[0] ?? "")} onChange={bound.set} options={options.map((o) => ({ label: o, value: o }))} minWidth={104} />
+            <IconAffordanceBtn svg={GEAR_SVG} title="Settings" onClick={() => actions.flashToast(`${field.label} settings — coming soon`)} />
+          </div>
+        );
+        break;
+      case "slider": {
+        const n = Number(bound.value ?? field.display ?? 0);
+        control = (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", minWidth: 130 }}>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={n}
+              onChange={(e) => bound!.set(Number(e.target.value))}
+              style={{ flex: 1 }}
+            />
+            <span style={{ minWidth: 22, textAlign: "right", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>{n}</span>
+          </div>
+        );
+        break;
+      }
+      case "radio":
+        control = <SegmentedCtl value={String(bound.value ?? options[0] ?? "")} options={options} onChange={bound.set} />;
+        break;
+      case "origin":
+        control = <OriginGrid value={String(bound.value ?? "Top Left")} onChange={bound.set} />;
+        break;
+      case "netRef": {
+        const netOpts = options.length ? options : (state.pcbNets ?? []).map((n) => n.name);
+        control = (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
+            <Select value={String(bound.value ?? netOpts[0] ?? "")} onChange={bound.set} options={netOpts.map((o) => ({ label: o, value: o }))} minWidth={104} />
+            <IconAffordanceBtn svg={JUMP_SVG} title="Jump to net" onClick={() => actions.flashToast("Jump to net — coming soon")} />
+          </div>
+        );
+        break;
+      }
+      case "textarea":
+        control = <TextareaCtl value={String(bound.value ?? "")} onCommit={bound.set} />;
         break;
       default:
         control = <ValueCell>{String(bound.value ?? field.display ?? "—")}</ValueCell>;

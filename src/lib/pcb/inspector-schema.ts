@@ -15,7 +15,15 @@ export type FieldKind =
   | "toggle"
   | "coord" // single axis of an X/Y pair (label carries the axis)
   | "action"
-  | "readonly";
+  | "readonly"
+  | "checkText"
+  | "checkDropdown"
+  | "dropdownGear"
+  | "slider"
+  | "radio"
+  | "origin"
+  | "netRef"
+  | "textarea";
 
 export interface InspectorField {
   key: string;
