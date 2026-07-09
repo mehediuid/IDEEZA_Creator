@@ -938,6 +938,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
               ? { width: d.viaSize, drill: d.viaDrill, startLayer: "top", endLayer: "bottom" }
               : inPcb && kind === "component"
               ? { footprint: "Generic-SO8", comment: "Component", side: "top" }
+              : inPcb && (kind === "boardOutline" || kind === "slot")
+              ? { layer: "outline" } // doc §07: outline objects live on the Board Outline layer
               : {};
           const obj: CanvasObject = {
             id,

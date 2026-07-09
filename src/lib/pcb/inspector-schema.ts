@@ -516,9 +516,11 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Property",
         fields: [
-          { key: "type", label: "Type", kind: "dropdown", options: ["Rectangle", "Polygon", "Circle"], bind: "prop:type", display: "Rectangle" },
+          { key: "type", label: "Type", kind: "dropdown", options: ["Board Outline"], bind: "prop:type", display: "Board Outline" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
-          { key: "lineWidth", label: "Line width", kind: "number", unit: "mil", bind: "obj:width", display: "10" },
+          // Stroke width — distinct from the geometry Width below (obj:width),
+          // which previously shared the same bind and cross-edited.
+          { key: "lineWidth", label: "Line width", kind: "number", unit: "mil", bind: "prop:lineWidth", display: "10" },
           { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
         ],
