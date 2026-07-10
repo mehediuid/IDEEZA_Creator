@@ -924,6 +924,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           capacitor: "C?",
           diode: "D?",
           inductor: "L?",
+          testPoint: "TP",
+          stackTable: "Stack Table",
+          drillTable: "Drill Table",
         };
         mergeWithHistory((s) => {
           // 2D is the same board surface as PCB — pad/via/component defaults

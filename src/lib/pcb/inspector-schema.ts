@@ -677,6 +677,11 @@ const KIND_TO_TYPE: Record<string, string> = {
   prohibitedRegion: "Copper Fills", constraintRegion: "Copper Fills",
   // mechanical / misc
   mountingHole: "Via", image: "DrawingLike",
+  // PDF §10 place-menu inventory — panels pending doc capture; mapped to the
+  // closest captured panel so selection never falls back to Canvas.
+  testPoint: "Pad", shapedPad: "Pad", viaFence: "Via",
+  fpcStiffener: "Copper Fills",
+  stackTable: "Text", drillTable: "Text", canvasOrigin: "Text",
 };
 
 // Vias key differs between resolver ("Via") and 2D schema ("Vias").

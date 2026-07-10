@@ -233,6 +233,14 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
   "mountingHole",
   "prohibitedRegion",
   "constraintRegion",
+  // PDF §10 Place-menu inventory (panels pending doc capture)
+  "testPoint",
+  "viaFence",
+  "shapedPad",
+  "fpcStiffener",
+  "stackTable",
+  "drillTable",
+  "canvasOrigin",
 ];
 
 // Tool keys that need two clicks (start + end) — wire-like.
@@ -260,6 +268,9 @@ export const FILTER_KEY_FOR_KIND: Record<string, string> = {
   text: "fText", image: "fImage", dimension: "fDimension",
   net: "fNet", netLabel: "fNet", netFlag: "fNet",
   boardOutline: "fOutline",
+  // PDF §10 place-menu objects
+  testPoint: "fTestPoint", shapedPad: "fPad", viaFence: "fVia",
+  fpcStiffener: "fFpcStiffener",
 };
 
 // Filter keys whose default state is OFF (must be explicitly enabled via

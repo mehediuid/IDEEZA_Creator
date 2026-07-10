@@ -187,6 +187,56 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <rect x={-14} y={-12} width={28} height={24} rx={2} />
     </g>
   ),
+  // ── PDF §10 place-menu inventory ──────────────────────────────────────
+  testPoint: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none">
+      <circle cx={0} cy={0} r={9} />
+      <circle cx={0} cy={0} r={2.5} fill="currentColor" stroke="none" />
+      <path d="M0 -13v-3M0 13v3M-13 0h-3M13 0h3" strokeLinecap="round" />
+    </g>
+  ),
+  viaFence: (
+    <g stroke="currentColor" strokeWidth={1.4} fill="none">
+      {[-14, -7, 0, 7, 14].map((cx) => (
+        <React.Fragment key={cx}>
+          <circle cx={cx} cy={0} r={3} />
+          <circle cx={cx} cy={0} r={1} fill="currentColor" stroke="none" />
+        </React.Fragment>
+      ))}
+    </g>
+  ),
+  shapedPad: (
+    <g stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="currentColor" fillOpacity={0.25}>
+      <path d="M-14 -6q4 -8 12 -6l10 3q6 2 4 9l-3 8q-2 6 -9 4l-11 -3q-7 -2 -5 -9z" />
+      <circle cx={0} cy={0} r={2.5} fillOpacity={1} stroke="none" />
+    </g>
+  ),
+  fpcStiffener: (
+    <g stroke="currentColor" strokeWidth={1.5} fill="none">
+      <rect x={-15} y={-10} width={30} height={20} rx={2} />
+      <path d="M-9 -10v20M-3 -10v20M3 -10v20M9 -10v20" opacity={0.6} />
+    </g>
+  ),
+  stackTable: (
+    <g stroke="currentColor" strokeWidth={1.4} fill="none">
+      <rect x={-15} y={-11} width={30} height={22} />
+      <path d="M-15 -4h30M-15 3h30M-3 -11v22" />
+    </g>
+  ),
+  drillTable: (
+    <g stroke="currentColor" strokeWidth={1.4} fill="none">
+      <rect x={-15} y={-11} width={30} height={22} />
+      <path d="M-15 -3h30M-3 -11v22" />
+      <circle cx={-9} cy={3.5} r={2.2} />
+      <circle cx={5} cy={3.5} r={1.4} />
+    </g>
+  ),
+  canvasOrigin: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none" strokeLinecap="round">
+      <circle cx={0} cy={0} r={7} />
+      <path d="M0 -14v28M-14 0h28" />
+    </g>
+  ),
 };
 
 const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune", "polyline", "line"]);
