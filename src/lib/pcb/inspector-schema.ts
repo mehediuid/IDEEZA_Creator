@@ -546,14 +546,15 @@ const TWOD: Record<string, InspectorType> = {
       {
         title: "Property",
         fields: [
-          { key: "type", label: "Type", kind: "readonly", display: "Copper Region" },
+          { key: "type", label: "Type", kind: "dropdown", options: ["Copper Region"], bind: "prop:type", display: "Copper Region" },
           { key: "name", label: "Name", kind: "text", bind: "prop:name", display: "POUR1" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
           { key: "net", label: "Net", kind: "netRef", bind: "obj:net", display: "—" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
           { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
-          { key: "convertFill", label: "Convert to Fill Region", kind: "action", display: "Convert" },
-          { key: "solderMaskRegion", label: "Add Solder Mask Region", kind: "action", display: "Add" },
+          // Doc §08 live capture: "Convert to Fill Region" / "Add Solder Mask
+          // Region" are NOT sidebar fields (likely context-menu actions) —
+          // deliberately absent here.
         ],
       },
       {

@@ -940,6 +940,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
               ? { footprint: "Generic-SO8", comment: "Component", side: "top" }
               : inPcb && (kind === "boardOutline" || kind === "slot")
               ? { layer: "outline" } // doc §07: outline objects live on the Board Outline layer
+              : inPcb && kind === "polygon"
+              // doc §08: copper regions get an auto name (POUR1, POUR2, …)
+              ? { props: { name: `POUR${s.objects.filter((o) => o.kind === "polygon").length + 1}` } }
               : {};
           const obj: CanvasObject = {
             id,
