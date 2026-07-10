@@ -530,6 +530,18 @@ function InspectorPanel() {
   const type = INSPECTOR_SCHEMA[schemaMode][typeKey];
   if (!type) return null;
 
+  // Doc §09: the Silk group only shows when the object's layer is a
+  // silkscreen layer. obj.layer may hold a layer id or a display name.
+  const layerIsSilk = (() => {
+    const lv = obj?.layer;
+    if (!lv) return false;
+    const l = (state.pcbLayers ?? []).find((x) => x.id === lv || x.name === lv);
+    return l?.type === "silkscreen";
+  })();
+  const fieldVisible = (f: InspectorField) =>
+    (!f.showIf || String((obj?.props ?? {})[f.showIf.prop] ?? "") === f.showIf.equals) &&
+    (!f.showIfSilkLayer || layerIsSilk);
+
   const count = state.selectedIds.length;
   return (
     <div>
@@ -544,18 +556,21 @@ function InspectorPanel() {
           {typeKey === "Canvas" ? "Nothing selected" : `Selected ${count || 1}`}
         </span>
       </div>
-      {type.sections.map((sec, i) => (
-        <React.Fragment key={sec.title + i}>
-          {i > 0 && <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />}
-          <InspSection title={sec.title}>
-            {sec.fields
-              // Conditional fields (doc: "Custom reveals …") render only when
-              // the referenced prop matches — e.g. mask expansions on Custom.
-              .filter((f) => !f.showIf || String((obj?.props ?? {})[f.showIf.prop] ?? "") === f.showIf.equals)
-              .map((f) => <FieldRow key={f.key} field={f} obj={obj} />)}
-          </InspSection>
-        </React.Fragment>
-      ))}
+      {type.sections.map((sec, i) => {
+        // Conditional fields (doc: "Custom reveals …", silk-layer-only groups)
+        // render only when their condition matches; a section whose fields are
+        // all hidden disappears entirely (e.g. Silk on a copper layer).
+        const visible = sec.fields.filter(fieldVisible);
+        if (visible.length === 0) return null;
+        return (
+          <React.Fragment key={sec.title + i}>
+            {i > 0 && <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />}
+            <InspSection title={sec.title}>
+              {visible.map((f) => <FieldRow key={f.key} field={f} obj={obj} />)}
+            </InspSection>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }

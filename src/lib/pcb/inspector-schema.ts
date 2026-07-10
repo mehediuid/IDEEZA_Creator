@@ -45,6 +45,9 @@ export interface InspectorField {
   // Live computed read-only value (doc: "live segment length" / "total
   // length of the whole net") — derived from the selection, never edited.
   computed?: "segmentLength" | "netLength";
+  // Doc §09: the Silk group only appears when the object's layer is a
+  // silkscreen layer.
+  showIfSilkLayer?: boolean;
 }
 
 export interface InspectorSection {
@@ -612,16 +615,16 @@ const TWOD: Record<string, InspectorType> = {
         fields: [
           { key: "content", label: "Content", kind: "textarea", bind: "obj:text", display: "Text" },
           { key: "layer", label: "Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
-          { key: "mirror", label: "Mirror", kind: "dropdown", options: ["No", "Yes"], bind: "prop:mirror", display: "Off" },
+          { key: "mirror", label: "Mirror", kind: "dropdown", options: ["No", "Yes"], bind: "prop:mirror", display: "No" },
         ],
       },
       {
         title: "Font Type",
         fields: [
-          { key: "fontFamily", label: "Font Family", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], bind: "prop:fontFamily", display: "Inter" },
-          { key: "strokeWidth", label: "Stroke Width", kind: "number", unit: "mil", bind: "prop:strokeWidth", display: "6" },
-          { key: "height", label: "Height", kind: "number", unit: "mil", bind: "obj:height", display: "60" },
-          { key: "inverted", label: "Inverted", kind: "dropdown", options: ["No", "Yes"], bind: "prop:inverted", display: "Off" },
+          { key: "fontFamily", label: "Font Family", kind: "dropdown", options: ["default", "Inter", "Arial", "Roboto", "Courier"], bind: "prop:fontFamily", display: "default" },
+          { key: "strokeWidth", label: "Stroke Width", kind: "number", unit: "mil", bind: "prop:strokeWidth", display: "8" },
+          { key: "height", label: "Height", kind: "number", unit: "mil", bind: "obj:height", display: "120" },
+          { key: "inverted", label: "Inverted", kind: "dropdown", options: ["No", "Yes"], bind: "prop:inverted", display: "No" },
           { key: "invertedExpansion", label: "Inverted Expansion", kind: "number", unit: "mil", bind: "prop:invertedExpansion", display: "0" },
         ],
       },
@@ -636,7 +639,8 @@ const TWOD: Record<string, InspectorType> = {
         ],
       },
       { title: "Combination", fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }] },
-      { title: "Silk", fields: [{ key: "silkColor", label: "Silk Screen Color", kind: "color", bind: "prop:silkColor", display: "#FFFFFF" }] },
+      // Doc §09: the Silk group only appears when Layer is a silkscreen layer.
+      { title: "Silk", fields: [{ key: "silkColor", label: "Silk Screen Color", kind: "color", bind: "prop:silkColor", display: "#FFFFFF", showIfSilkLayer: true }] },
     ],
   },
 };
