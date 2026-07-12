@@ -9,7 +9,6 @@
 import * as React from "react";
 import { useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
-import { LeftPanel } from "@/components/pcb/left-panel";
 import { TopBar } from "@/components/pcb/top-bar";
 import { CodeRail } from "@/components/code/code-rail";
 import { CodeMenuStrip } from "@/components/code/code-menu-strip";
@@ -82,9 +81,8 @@ export function CodeApp() {
   //   - blockly: chrome ends at 98
   const railTop = mode === "blockly" ? 98 : 62;
   const contentTop = railTop;
-  // Shared project panel (Project Design | Library) sits right of the rail on
-  // every module tab — content starts after it.
-  const contentLeft = 74 + 292;
+  // No project panel in the Code module — content starts right after the rail.
+  const contentLeft = 74;
 
   const requestMode = (next: CodeMode) => {
     if (mode === null) {
@@ -110,10 +108,6 @@ export function CodeApp() {
       {mode !== null && <ModeSwitcher mode={mode} onPick={requestMode} topOffset={railTop + 6} />}
 
       <CodeRail topOffset={railTop} />
-
-      {/* Shared project panel — Library only; the Code module hides the
-          project-design sub-tabs / search / tree like the 3D module. */}
-      <LeftPanel topOffset={railTop} hideProjectTree />
 
       {mode === null && (
         <LandingCanvas
