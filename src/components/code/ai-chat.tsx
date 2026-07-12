@@ -116,19 +116,38 @@ export const AI_BOT_ICON = (
 // Full-height chat panel — the host provides the tab chrome; this fills it.
 export function AiChatPanel({ context }: { context: ChatContext }) {
   const [input, setInput] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
   const [msgs, setMsgs] = React.useState<Msg[]>([{ role: "assistant", text: INTRO[context] }]);
   const listRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs]);
+  }, [msgs, busy]);
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text || busy) return;
     setInput("");
-    setMsgs((m) => [...m, { role: "user", text }, { role: "assistant", text: getAssistantReply(context, text) }]);
+    const history = [...msgs, { role: "user" as const, text }];
+    setMsgs(history);
+    setBusy(true);
+    // Real LLM via /api/ai-chat (free, keyless); the local rule-based reply
+    // is the offline/failure fallback so the assistant always answers.
+    let reply = "";
+    try {
+      const res = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context, messages: history }),
+      });
+      if (res.ok) reply = String((await res.json()).reply ?? "").trim();
+    } catch {
+      reply = "";
+    }
+    if (!reply) reply = getAssistantReply(context, text);
+    setBusy(false);
+    setMsgs((m) => [...m, { role: "assistant", text: reply }]);
   };
 
   return (
@@ -156,6 +175,11 @@ export function AiChatPanel({ context }: { context: ChatContext }) {
             {m.text}
           </div>
         ))}
+        {busy && (
+          <div style={{ alignSelf: "flex-start", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-sm)", background: "var(--color-bg-subtle)", color: "var(--color-text-tertiary)" }}>
+            …
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: "var(--spacing-2)", padding: "var(--spacing-3)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
