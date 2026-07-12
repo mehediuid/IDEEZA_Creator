@@ -117,7 +117,8 @@ export function LeftPanel({
 
       {state.leftMain === "project" && (
         <>
-          {/* sub tabs */}
+          {/* sub tabs + search + pills — hidden with the project tree (3D module) */}
+          {!hideProjectTree && (<>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", padding: "var(--spacing-1) var(--spacing-8) var(--spacing-5)" }}>
             {subTabs.map((s) => (
               <div
@@ -167,6 +168,7 @@ export function LeftPanel({
               ))}
             </div>
           )}
+          </>)}
 
           {/* tree */}
           <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-2) var(--spacing-4) var(--spacing-6)" }}>
