@@ -82,6 +82,7 @@ function PreviewBody({ variant }: { variant: PreviewVariant }) {
         <LeftPanel
           topOffset={VIEWPORT_TOP}
           bottomOffset={0}
+          hideProjectTree
           moduleSlot={<InstancesSection />}
         />
       )}
