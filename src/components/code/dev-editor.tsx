@@ -8,6 +8,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+import { AiChat } from "./ai-chat";
 import { C } from "@/lib/pcb/colors";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
@@ -484,7 +485,8 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
           >
             {activeFile?.name || "—"} — IDEEZA Code
           </div>
-          <div style={{ marginLeft: "auto" }}>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+            <AiChat context="code" />
             <ChooseLanguage
               value={activeFile?.language || "plaintext"}
               langOpen={langOpen}

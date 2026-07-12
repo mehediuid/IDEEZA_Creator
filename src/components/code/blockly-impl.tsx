@@ -9,6 +9,7 @@
 // Function categories use Blockly's button handlers to create/list dynamics.
 
 import * as React from "react";
+import { AiChat } from "./ai-chat";
 import * as Blockly from "blockly/core";
 import "blockly/blocks";
 import { javascriptGenerator } from "blockly/javascript";
@@ -243,6 +244,7 @@ function LibTabs({ value, onChange }: { value: LibTab; onChange: (v: LibTab) => 
           </button>
         );
       })}
+      <AiChat context="blockly" />
     </div>
   );
 }
