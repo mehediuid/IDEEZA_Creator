@@ -4,12 +4,11 @@
 // Default Geometry icon bar + Parts (Group Name [N]) tree with per-row eye +
 // 3-dot context menu (Copy / Cut / Duplicate / Reset material / Paste /
 // Bring to front / Send to back / Rotate Left / Rotate Right / Flip
-// Horizontal / Flip Vertical / Lock / Group / Delete) + Shapes tiles that
-// dispatch shape:* ThreeActions. Rendered inside LeftPanel's moduleSlot.
+// Horizontal / Flip Vertical / Lock / Group / Delete). Rendered inside
+// LeftPanel's moduleSlot.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
 import type { SceneShape } from "./three-canvas";
 
 export type PartActions = {
@@ -308,16 +307,6 @@ function ShapeRow({
   );
 }
 
-const LIBRARY_SHAPES: { id: ThreeAction; label: string; path: string }[] = [
-  { id: "shape:box",      label: "Box",      path: "M3 7l9-4 9 4-9 4-9-4z M3 7v10l9 4 9-4V7" },
-  { id: "shape:sphere",   label: "Sphere",   path: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M3 12h18 M12 3c3 3 3 15 0 18" },
-  { id: "shape:cylinder", label: "Cylinder", path: "M5 6a7 2 0 1 0 14 0 7 2 0 1 0-14 0z M5 6v12a7 2 0 0 0 14 0V6" },
-  { id: "shape:cone",     label: "Cone",     path: "M12 3l8 16H4z" },
-  { id: "shape:torus",    label: "Torus",    path: "M3 12c0-3 4-6 9-6s9 3 9 6-4 6-9 6-9-3-9-6z" },
-  { id: "shape:plane",    label: "Plane",    path: "M3 18l6-12h12L15 18z" },
-  { id: "shape:spline",   label: "Spline",   path: "M3 17c4-8 14-2 18-10" },
-];
-
 // ThreePartsSection — the 3D module's tree content, embeddable inside the
 // shared project panel (LeftPanel moduleSlot). Same Default Geometry bar,
 // Parts group (rows with eye + 3-dot context menu) and shape library tiles
@@ -338,7 +327,6 @@ export function ThreePartsSection({
 }) {
   const [partsOpen, setPartsOpen] = React.useState(true);
   const [groupOpen, setGroupOpen] = React.useState(true);
-  const [shapesOpen, setShapesOpen] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [openMenuFor, setOpenMenuFor] = React.useState<string | null>(null);
 
@@ -434,62 +422,12 @@ export function ThreePartsSection({
           ))}
           {groupOpen && filtered.length === 0 && (
             <div style={{ padding: "var(--spacing-3) var(--spacing-4)", fontSize: "var(--font-size-xs)", color: C.body }}>
-              No parts. Add one from the Shapes group below.
+              No parts yet — add one from the 3D toolbar.
             </div>
           )}
         </>
       )}
 
-      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-3) var(--spacing-2)" }} />
-
-      <div
-        onClick={() => setShapesOpen((v) => !v)}
-        className="ix-nav"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--spacing-2)",
-          padding: "var(--spacing-2)",
-          fontSize: "var(--font-size-sm)",
-          fontWeight: 700,
-          color: C.text,
-          cursor: "pointer",
-          borderRadius: "var(--radius-sm)",
-        }}
-      >
-        <Chevron open={shapesOpen} />
-        <span>Shapes</span>
-      </div>
-      {shapesOpen && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-2)", padding: "var(--spacing-2)" }}>
-          {LIBRARY_SHAPES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => dispatchThreeAction(s.id)}
-              className="ix-tool"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "var(--spacing-2)",
-                padding: "var(--spacing-4)",
-                background: "var(--color-bg-page)",
-                border: "var(--border-width-1) solid var(--color-border-subtle)",
-                borderRadius: "var(--radius-md)",
-                cursor: "pointer",
-                color: C.text,
-                fontSize: "var(--font-size-xs)",
-                fontWeight: 600,
-              }}
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="1.5">
-                <path d={s.path} />
-              </svg>
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
