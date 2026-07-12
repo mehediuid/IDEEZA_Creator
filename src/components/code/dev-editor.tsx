@@ -8,7 +8,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { AiChatPanel, AI_BOT_ICON } from "./ai-chat";
+import { AiChatPanel, AI_BOT_ICON, hasAiHandoff } from "./ai-chat";
 import { C } from "@/lib/pcb/colors";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
@@ -303,6 +303,14 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
   const [showTerminal, setShowTerminal] = React.useState(true);
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showAi, setShowAi] = React.useState(false);
+
+  // A cross-tab AI handoff for the Code module opens the AI side panel;
+  // the chat consumes and auto-sends the carried message.
+  React.useEffect(() => {
+    if (!hasAiHandoff("code")) return;
+    const t = setTimeout(() => setShowAi(true), 0);
+    return () => clearTimeout(t);
+  }, []);
   const [terminal, setTerminal] = React.useState<TerminalLine[]>([
     { kind: "out", text: "Microsoft Windows [Version 10.0.19044.2728]" },
     { kind: "out", text: "(c) Microsoft Corporation. All rights reserved." },
@@ -618,7 +626,21 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
                 background: "var(--color-bg-surface)",
               }}
             >
-              <AiChatPanel context="code" />
+              <AiChatPanel
+                context="code"
+                runActions={(list) => {
+                  const done: string[] = [];
+                  for (const raw of list) {
+                    const a = raw as { op?: string; code?: string };
+                    if (a.op === "insertCode" && typeof a.code === "string" && a.code.trim()) {
+                      const code = a.code;
+                      setFiles((fs) => fs.map((f) => (f.name === activeName ? { ...f, content: f.content + "\n" + code } : f)));
+                      done.push(`inserted code into ${activeName}`);
+                    }
+                  }
+                  return done;
+                }}
+              />
             </div>
           )}
 

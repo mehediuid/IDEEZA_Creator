@@ -8,7 +8,9 @@ import * as React from "react";
 import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { SearchInput } from "@/components/ideeza";
 import { AllLibraryFlyout, LibraryPanel } from "@/components/pcb/library-panel";
-import { AiChatPanel, type ChatContext } from "@/components/code/ai-chat";
+import { AiChatPanel, hasAiHandoff, MODULE_OF_CONTEXT, type ChatContext } from "@/components/code/ai-chat";
+import { dispatchThreeAction, type ThreeAction } from "@/components/3d/three-menu-bar";
+import { PLACE_TOOLS } from "@/lib/pcb/types";
 import { buildCompPills, buildLeftTabs, buildNetPills, buildSubTabs, buildTree } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
@@ -56,6 +58,48 @@ export function LeftPanel({
   const actions = usePcbActions();
   const [query, setQuery] = React.useState("");
   const [aiOpen, setAiOpen] = React.useState(false);
+
+  // A cross-tab AI handoff targeting this module opens the chat immediately;
+  // the panel itself consumes and auto-sends the carried message.
+  React.useEffect(() => {
+    if (!hasAiHandoff(MODULE_OF_CONTEXT[aiContext])) return;
+    const t = setTimeout(() => setAiOpen(true), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // AI action executor — lets the assistant actually edit the open module:
+  // place parts / route tracks on the board, add primitive shapes in 3D.
+  const aiOffset = React.useRef(0);
+  const runAiActions = React.useCallback(
+    (list: unknown[]): string[] => {
+      const done: string[] = [];
+      for (const raw of list) {
+        const a = raw as { op?: string; kind?: string; x?: number; y?: number; x1?: number; y1?: number; x2?: number; y2?: number; shape?: string };
+        if (aiContext === "pcb") {
+          if (a.op === "place" && typeof a.kind === "string" && PLACE_TOOLS.includes(a.kind)) {
+            const n = aiOffset.current++;
+            const x = typeof a.x === "number" ? a.x : 140 + (n % 5) * 60;
+            const y = typeof a.y === "number" ? a.y : 140 + Math.floor(n / 5) * 60;
+            actions.placeObject(a.kind, x, y);
+            done.push(`placed ${a.kind}`);
+          } else if (a.op === "route" && [a.x1, a.y1, a.x2, a.y2].every((v) => typeof v === "number")) {
+            actions.startWire("track", a.x1 as number, a.y1 as number);
+            actions.finishWire(a.x2 as number, a.y2 as number);
+            done.push("routed track");
+          }
+        } else if (aiContext === "3d") {
+          const shapes = ["box", "sphere", "cylinder", "cone", "torus", "plane", "spline"];
+          if (a.op === "addShape" && typeof a.shape === "string" && shapes.includes(a.shape)) {
+            dispatchThreeAction(`shape:${a.shape}` as ThreeAction);
+            done.push(`added ${a.shape}`);
+          }
+        }
+      }
+      return done;
+    },
+    [aiContext, actions],
+  );
   const leftTabs = buildLeftTabs(state, actions);
   const subTabs = buildSubTabs(state, actions);
   const tree = buildTree(state, actions);
@@ -127,7 +171,7 @@ export function LeftPanel({
 
       {/* AI assistant view — the robot button swaps the panel body for the
           module-aware chat (tab system, same as the Code editors). */}
-      {aiOpen && <AiChatPanel context={aiContext} />}
+      {aiOpen && <AiChatPanel context={aiContext} runActions={runAiActions} />}
 
       {!aiOpen && state.leftMain === "project" && (
         <>

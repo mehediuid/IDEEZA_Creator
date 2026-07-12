@@ -9,7 +9,7 @@
 // Function categories use Blockly's button handlers to create/list dynamics.
 
 import * as React from "react";
-import { AiChatPanel, AI_BOT_ICON } from "./ai-chat";
+import { AiChatPanel, AI_BOT_ICON, hasAiHandoff } from "./ai-chat";
 import * as Blockly from "blockly/core";
 import "blockly/blocks";
 import { javascriptGenerator } from "blockly/javascript";
@@ -573,6 +573,14 @@ export function BlocklyImpl() {
   const [openCats, setOpenCats] = React.useState<Record<string, boolean>>({ Logic: true });
   const [search, setSearch] = React.useState("");
 
+  // A cross-tab AI handoff for the Code module opens the AI tab right away;
+  // the chat panel consumes and auto-sends the carried message.
+  React.useEffect(() => {
+    if (!hasAiHandoff("code")) return;
+    const t = setTimeout(() => setLibTab("ai"), 0);
+    return () => clearTimeout(t);
+  }, []);
+
   // Inject Blockly once
   React.useEffect(() => {
     if (!wsHostRef.current || wsRef.current) return;
@@ -803,7 +811,22 @@ export function BlocklyImpl() {
         <LibTabs value={libTab} onChange={setLibTab} />
         {libTab === "ai" ? (
           // AI assistant tab — chat panel replaces the block library body.
-          <AiChatPanel context="blockly" />
+          <AiChatPanel
+            context="blockly"
+            runActions={(list) => {
+              const done: string[] = [];
+              for (const raw of list) {
+                const a = raw as { op?: string; type?: string };
+                if (a.op === "addBlock" && typeof a.type === "string" && /^[a-z0-9_]+$/i.test(a.type)) {
+                  try {
+                    addBlock(a.type);
+                    done.push(`added ${a.type}`);
+                  } catch { /* unknown block type — skip */ }
+                }
+              }
+              return done;
+            }}
+          />
         ) : (
         <>
         <div style={{ padding: "0 var(--spacing-3) var(--spacing-3)" }}>

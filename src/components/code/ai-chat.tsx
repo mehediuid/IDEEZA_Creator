@@ -9,7 +9,58 @@
 import * as React from "react";
 
 export type ChatContext = "blockly" | "code" | "pcb" | "3d" | "preview";
-type Msg = { role: "user" | "assistant"; text: string };
+export type AiModule = "pcb" | "code" | "3d" | "preview";
+
+// Which product tab each chat context lives in (blockly + code IDE share /code).
+export const MODULE_OF_CONTEXT: Record<ChatContext, AiModule> = {
+  pcb: "pcb", blockly: "code", code: "code", "3d": "3d", preview: "preview",
+};
+
+const MODULE_LABEL: Record<AiModule, string> = {
+  pcb: "PCB Design", code: "Code", "3d": "3D Module", preview: "Product Preview",
+};
+
+// Cross-tab handoff: the offer button stores the user's message here and
+// navigates; the target module's chat consumes it on mount and auto-sends.
+const HANDOFF_KEY = "ideeza:ai:handoff";
+
+export function readAiHandoff(module: AiModule): string | null {
+  try {
+    const raw = sessionStorage.getItem(HANDOFF_KEY);
+    if (!raw) return null;
+    const h = JSON.parse(raw) as { module?: string; text?: string };
+    if (h.module !== module || !h.text) return null;
+    return h.text;
+  } catch {
+    return null;
+  }
+}
+
+// Peek without consuming — hosts use this to auto-open their chat tab/panel.
+export function hasAiHandoff(module: AiModule): boolean {
+  return readAiHandoff(module) != null;
+}
+
+function clearAiHandoff() {
+  try { sessionStorage.removeItem(HANDOFF_KEY); } catch { /* ignore */ }
+}
+
+function goToModule(module: AiModule, carryText: string) {
+  try {
+    sessionStorage.setItem(HANDOFF_KEY, JSON.stringify({ module, text: carryText }));
+  } catch { /* storage unavailable — navigation still works, message just won't carry */ }
+  const parts = window.location.pathname.split("/"); // /project/<slug>/<step>
+  if (parts[1] === "project" && parts[2]) {
+    window.location.href = `/project/${parts[2]}/${module}`;
+  }
+}
+
+type Msg = {
+  role: "user" | "assistant";
+  text: string;
+  // Cross-module suggestion: button that jumps to the right tab with the message.
+  offer?: { module: AiModule; carryText: string };
+};
 
 const INTRO: Record<ChatContext, string> = {
   blockly:
@@ -114,19 +165,28 @@ export const AI_BOT_ICON = (
 );
 
 // Full-height chat panel — the host provides the tab chrome; this fills it.
-export function AiChatPanel({ context }: { context: ChatContext }) {
+export function AiChatPanel({
+  context,
+  runActions,
+}: {
+  context: ChatContext;
+  // Host-provided executor: performs the model's actions in the live editor
+  // and returns one human-readable line per action actually done.
+  runActions?: (actions: unknown[]) => string[];
+}) {
   const [input, setInput] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [msgs, setMsgs] = React.useState<Msg[]>([{ role: "assistant", text: INTRO[context] }]);
   const listRef = React.useRef<HTMLDivElement>(null);
+  const myModule = MODULE_OF_CONTEXT[context];
 
   React.useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [msgs, busy]);
 
-  const send = async () => {
-    const text = input.trim();
+  const send = React.useCallback(async (textArg?: string) => {
+    const text = (textArg ?? input).trim();
     if (!text || busy) return;
     setInput("");
     const history = [...msgs, { role: "user" as const, text }];
@@ -134,21 +194,63 @@ export function AiChatPanel({ context }: { context: ChatContext }) {
     setBusy(true);
     // Real LLM via /api/ai-chat (free, keyless); the local rule-based reply
     // is the offline/failure fallback so the assistant always answers.
-    let reply = "";
+    let say = "";
+    let mod: AiModule = myModule;
+    let actions: unknown[] = [];
     try {
       const res = await fetch("/api/ai-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ context, messages: history }),
       });
-      if (res.ok) reply = String((await res.json()).reply ?? "").trim();
-    } catch {
-      reply = "";
-    }
-    if (!reply) reply = getAssistantReply(context, text);
+      if (res.ok) {
+        const data = await res.json();
+        say = String(data.say ?? "").trim();
+        if (["pcb", "code", "3d", "preview"].includes(data.module)) mod = data.module;
+        actions = Array.isArray(data.actions) ? data.actions : [];
+      }
+    } catch { /* fall through to local fallback */ }
     setBusy(false);
-    setMsgs((m) => [...m, { role: "assistant", text: reply }]);
-  };
+
+    if (!say) {
+      setMsgs((m) => [...m, { role: "assistant", text: getAssistantReply(context, text) }]);
+      return;
+    }
+    if (mod !== myModule) {
+      // Wrong tab for this request — explain and offer to jump there with it.
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "assistant",
+          text: `${say ? say + " " : ""}এটা ${MODULE_LABEL[mod]} tab-এর কাজ।`,
+          offer: { module: mod, carryText: text },
+        },
+      ]);
+      return;
+    }
+    const done = actions.length && runActions ? runActions(actions) : [];
+    setMsgs((m) => [
+      ...m,
+      { role: "assistant", text: say },
+      ...(done.length ? [{ role: "assistant" as const, text: `✔ ${done.join(" · ")}` }] : []),
+    ]);
+  }, [busy, context, input, msgs, myModule, runActions]);
+
+  // Consume a cross-tab handoff: auto-send the carried message once.
+  const handedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (handedRef.current || busy) return;
+    // Peek only — consume at send time, so StrictMode's mount/unmount/mount
+    // cycle (which cancels the first timer) cannot swallow the message.
+    const carried = readAiHandoff(myModule);
+    if (!carried) return;
+    const t = setTimeout(() => {
+      handedRef.current = true;
+      clearAiHandoff();
+      void send(carried);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [busy, myModule, send]);
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -173,6 +275,25 @@ export function AiChatPanel({ context }: { context: ChatContext }) {
             }}
           >
             {m.text}
+            {m.offer && (
+              <button
+                onClick={() => goToModule(m.offer!.module, m.offer!.carryText)}
+                style={{
+                  display: "block",
+                  marginTop: "var(--spacing-3)",
+                  padding: "var(--spacing-2) var(--spacing-4)",
+                  borderRadius: "var(--radius-md)",
+                  border: "var(--border-width-1) solid var(--color-border-brand)",
+                  background: "var(--color-bg-brand-subtle)",
+                  color: "var(--color-text-brand)",
+                  fontSize: "var(--font-size-sm)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {MODULE_LABEL[m.offer.module]} tab-এ যান →
+              </button>
+            )}
           </div>
         ))}
         {busy && (
@@ -202,7 +323,7 @@ export function AiChatPanel({ context }: { context: ChatContext }) {
           }}
         />
         <button
-          onClick={send}
+          onClick={() => send()}
           aria-label="Send"
           style={{
             width: 34,
