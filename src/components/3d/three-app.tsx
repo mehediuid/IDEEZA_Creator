@@ -536,10 +536,11 @@ export function ThreeApp() {
       <ThreeRail topOffset={fullView || preview ? 62 : TOP} />
       {showPanels && (
         <>
-          {/* Shared project panel — 3D parts tree + shape tiles merge into
-              the same Project Design | Library navigator every tab has. */}
+          {/* Shared project panel — the 3D navigator shows only the module's
+              own Parts section (no shared Testing/Board project tree). */}
           <LeftPanel
             topOffset={TOP}
+            hideProjectTree
             moduleSlot={
               <ThreePartsSection
                 selectedId={selectedPart}

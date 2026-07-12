@@ -39,10 +39,14 @@ export function LeftPanel({
   topOffset,
   bottomOffset = 36,
   moduleSlot,
+  hideProjectTree = false,
 }: {
   topOffset?: number;
   bottomOffset?: number;
   moduleSlot?: React.ReactNode;
+  // 3D module: its navigator shows only the module slot (Parts), not the
+  // shared Testing/Board project tree. Other modules keep the tree.
+  hideProjectTree?: boolean;
 } = {}) {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -166,7 +170,7 @@ export function LeftPanel({
 
           {/* tree */}
           <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-2) var(--spacing-4) var(--spacing-6)" }}>
-            {tree.map((n: TreeNode, i: number) => (
+            {!hideProjectTree && tree.map((n: TreeNode, i: number) => (
               <div
                 key={i}
                 className="ix-row"
