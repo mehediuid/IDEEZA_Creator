@@ -111,8 +111,9 @@ export function CodeApp() {
 
       <CodeRail topOffset={railTop} />
 
-      {/* Shared project panel — same Project Design | Library system as PCB */}
-      <LeftPanel topOffset={railTop} />
+      {/* Shared project panel — Library only; the Code module hides the
+          project-design sub-tabs / search / tree like the 3D module. */}
+      <LeftPanel topOffset={railTop} hideProjectTree />
 
       {mode === null && (
         <LandingCanvas
