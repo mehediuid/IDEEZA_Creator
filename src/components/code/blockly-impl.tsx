@@ -9,7 +9,7 @@
 // Function categories use Blockly's button handlers to create/list dynamics.
 
 import * as React from "react";
-import { AiChat } from "./ai-chat";
+import { AiChatPanel, AI_BOT_ICON } from "./ai-chat";
 import * as Blockly from "blockly/core";
 import "blockly/blocks";
 import { javascriptGenerator } from "blockly/javascript";
@@ -21,7 +21,7 @@ import { CODE_EVENT, type CodeAction } from "./code-menu-strip";
 Blockly.setLocale(En as unknown as { [key: string]: string });
 
 type PreviewTab = "blocks" | "code";
-type LibTab = "common" | "arduino" | "raspberry";
+type LibTab = "common" | "arduino" | "raspberry" | "ai";
 
 type TileDef = {
   type: string;
@@ -215,6 +215,7 @@ function LibTabs({ value, onChange }: { value: LibTab; onChange: (v: LibTab) => 
         </svg>
       ),
     },
+    { id: "ai", label: AI_BOT_ICON },
   ];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-2)", padding: "var(--spacing-3)" }}>
@@ -244,7 +245,6 @@ function LibTabs({ value, onChange }: { value: LibTab; onChange: (v: LibTab) => 
           </button>
         );
       })}
-      <AiChat context="blockly" />
     </div>
   );
 }
@@ -801,6 +801,11 @@ export function BlocklyImpl() {
         }}
       >
         <LibTabs value={libTab} onChange={setLibTab} />
+        {libTab === "ai" ? (
+          // AI assistant tab — chat panel replaces the block library body.
+          <AiChatPanel context="blockly" />
+        ) : (
+        <>
         <div style={{ padding: "0 var(--spacing-3) var(--spacing-3)" }}>
           <SearchInput value={search} onChange={setSearch} />
         </div>
@@ -872,6 +877,8 @@ export function BlocklyImpl() {
         >
           +
         </button>
+        </>
+        )}
       </div>
 
       {/* CANVAS / PREVIEW AREA */}

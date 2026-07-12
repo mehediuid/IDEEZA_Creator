@@ -8,7 +8,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { AiChat } from "./ai-chat";
+import { AiChatPanel, AI_BOT_ICON } from "./ai-chat";
 import { C } from "@/lib/pcb/colors";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
@@ -302,6 +302,7 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
   const [langOpen, setLangOpen] = React.useState(false);
   const [showTerminal, setShowTerminal] = React.useState(true);
   const [showSidebar, setShowSidebar] = React.useState(true);
+  const [showAi, setShowAi] = React.useState(false);
   const [terminal, setTerminal] = React.useState<TerminalLine[]>([
     { kind: "out", text: "Microsoft Windows [Version 10.0.19044.2728]" },
     { kind: "out", text: "(c) Microsoft Corporation. All rights reserved." },
@@ -485,8 +486,7 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
           >
             {activeFile?.name || "—"} — IDEEZA Code
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-            <AiChat context="code" />
+          <div style={{ marginLeft: "auto" }}>
             <ChooseLanguage
               value={activeFile?.language || "plaintext"}
               langOpen={langOpen}
@@ -539,6 +539,14 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
               style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: "var(--color-green-600)" }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 21,12 5,21" /></svg>
+            </button>
+            <button
+              onClick={() => setShowAi((v) => !v)}
+              title="AI assistant"
+              aria-label="AI assistant"
+              style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", color: showAi ? C.primary : "var(--color-text-tertiary)" }}
+            >
+              {AI_BOT_ICON}
             </button>
             <div style={{ flex: 1 }} />
             <button
@@ -594,6 +602,23 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
                   {f.name}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* AI assistant side panel — activity-bar tab, VSCode-style */}
+          {showAi && (
+            <div
+              style={{
+                width: 280,
+                flex: "0 0 280px",
+                borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: 0,
+                background: "var(--color-bg-surface)",
+              }}
+            >
+              <AiChatPanel context="code" />
             </div>
           )}
 

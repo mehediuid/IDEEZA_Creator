@@ -1,9 +1,10 @@
 "use client";
 
-// AI assistant chat for the Code module — one button + drop-down chat panel,
-// mounted in the Blockly library header and the Code Development toolbar.
-// Replies come from a local rule-based helper for now; swap `getAssistantReply`
-// for the real AI pipeline (roadmap phase 3) without touching the UI.
+// AI assistant chat for the Code module — an embeddable, full-height panel
+// used as a TAB: a library tab in the Blockly editor and an activity-bar
+// side panel in the Code Development IDE. Replies come from a local
+// rule-based helper for now; swap `getAssistantReply` for the real AI
+// pipeline (roadmap phase 3) without touching the UI.
 
 import * as React from "react";
 
@@ -58,7 +59,8 @@ function getAssistantReply(context: ChatContext, raw: string): string {
     : "I can help with your code — try asking “how do I blink an LED”, “how do I use a loop”, or “how do I store a value”.";
 }
 
-const BOT_SVG = (
+// Bot glyph — also used by the host editors for their tab / rail buttons.
+export const AI_BOT_ICON = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <rect x="5" y="9" width="14" height="10" rx="2.5" />
     <path d="M12 9V5M12 5h.01" />
@@ -68,29 +70,16 @@ const BOT_SVG = (
   </svg>
 );
 
-export function AiChat({ context, align = "right" }: { context: ChatContext; align?: "left" | "right" }) {
-  const [open, setOpen] = React.useState(false);
+// Full-height chat panel — the host provides the tab chrome; this fills it.
+export function AiChatPanel({ context }: { context: ChatContext }) {
   const [input, setInput] = React.useState("");
   const [msgs, setMsgs] = React.useState<Msg[]>([{ role: "assistant", text: INTRO[context] }]);
   const listRef = React.useRef<HTMLDivElement>(null);
-  const wrapRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [msgs, open]);
-
-  // Click-outside + Esc closes the panel.
-  React.useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
-  }, [open]);
+  }, [msgs]);
 
   const send = () => {
     const text = input.trim();
@@ -100,111 +89,72 @@ export function AiChat({ context, align = "right" }: { context: ChatContext; ali
   };
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", marginLeft: "auto" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="AI assistant"
-        aria-label="AI assistant"
-        className="ix-tool"
-        style={{
-          width: 32,
-          height: 28,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: "var(--radius-md)",
-          border: "none",
-          cursor: "pointer",
-          background: open ? "var(--color-violet-600)" : "var(--color-bg-brand-subtle)",
-          color: open ? "var(--color-text-on-brand)" : "var(--color-violet-600)",
-        }}
-      >
-        {BOT_SVG}
-      </button>
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-5)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+        <span style={{ color: "var(--color-violet-600)", display: "inline-flex" }}>{AI_BOT_ICON}</span>
+        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>AI assistant</span>
+      </div>
 
-      {open && (
-        <div
+      <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4)", display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+        {msgs.map((m, i) => (
+          <div
+            key={i}
+            style={{
+              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: "88%",
+              padding: "var(--spacing-3) var(--spacing-4)",
+              borderRadius: "var(--radius-lg)",
+              fontSize: "var(--font-size-sm)",
+              lineHeight: 1.45,
+              background: m.role === "user" ? "var(--color-violet-600)" : "var(--color-bg-subtle)",
+              color: m.role === "user" ? "var(--color-text-on-brand)" : "var(--color-text-primary)",
+            }}
+          >
+            {m.text}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: "var(--spacing-2)", padding: "var(--spacing-3)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+          placeholder="Ask about your program…"
           style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            [align]: 0,
-            width: 300,
-            maxHeight: 400,
-            display: "flex",
-            flexDirection: "column",
-            background: "var(--color-bg-surface)",
+            flex: 1,
+            minWidth: 0,
+            padding: "var(--spacing-3) var(--spacing-4)",
             border: "var(--border-width-1) solid var(--color-border-default)",
-            borderRadius: "var(--radius-xl)",
-            boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.28))",
-            zIndex: 80,
-            overflow: "hidden",
-          } as React.CSSProperties}
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-bg-page)",
+            color: "var(--color-text-primary)",
+            fontSize: "var(--font-size-sm)",
+            outline: "none",
+            fontFamily: "inherit",
+          }}
+        />
+        <button
+          onClick={send}
+          aria-label="Send"
+          style={{
+            width: 34,
+            flex: "0 0 34px",
+            borderRadius: "var(--radius-md)",
+            border: "none",
+            background: "var(--color-violet-600)",
+            color: "var(--color-text-on-brand)",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-4) var(--spacing-5)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-            <span style={{ color: "var(--color-violet-600)", display: "inline-flex" }}>{BOT_SVG}</span>
-            <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>AI assistant</span>
-          </div>
-
-          <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4)", display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
-            {msgs.map((m, i) => (
-              <div
-                key={i}
-                style={{
-                  alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                  maxWidth: "85%",
-                  padding: "var(--spacing-3) var(--spacing-4)",
-                  borderRadius: "var(--radius-lg)",
-                  fontSize: "var(--font-size-sm)",
-                  lineHeight: 1.45,
-                  background: m.role === "user" ? "var(--color-violet-600)" : "var(--color-bg-subtle)",
-                  color: m.role === "user" ? "var(--color-text-on-brand)" : "var(--color-text-primary)",
-                }}
-              >
-                {m.text}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", gap: "var(--spacing-2)", padding: "var(--spacing-3)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") send(); }}
-              placeholder="Ask about your program…"
-              style={{
-                flex: 1,
-                padding: "var(--spacing-3) var(--spacing-4)",
-                border: "var(--border-width-1) solid var(--color-border-default)",
-                borderRadius: "var(--radius-md)",
-                background: "var(--color-bg-page)",
-                color: "var(--color-text-primary)",
-                fontSize: "var(--font-size-sm)",
-                outline: "none",
-                fontFamily: "inherit",
-              }}
-            />
-            <button
-              onClick={send}
-              aria-label="Send"
-              style={{
-                width: 34,
-                borderRadius: "var(--radius-md)",
-                border: "none",
-                background: "var(--color-violet-600)",
-                color: "var(--color-text-on-brand)",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
