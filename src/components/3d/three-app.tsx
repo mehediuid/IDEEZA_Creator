@@ -541,6 +541,7 @@ export function ThreeApp() {
           <LeftPanel
             topOffset={TOP}
             hideProjectTree
+            aiContext="3d"
             moduleSlot={
               <ThreePartsSection
                 selectedId={selectedPart}

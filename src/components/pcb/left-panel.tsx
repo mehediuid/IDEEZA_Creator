@@ -8,6 +8,7 @@ import * as React from "react";
 import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { SearchInput } from "@/components/ideeza";
 import { AllLibraryFlyout, LibraryPanel } from "@/components/pcb/library-panel";
+import { AiChatPanel, type ChatContext } from "@/components/code/ai-chat";
 import { buildCompPills, buildLeftTabs, buildNetPills, buildSubTabs, buildTree } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
@@ -40,6 +41,7 @@ export function LeftPanel({
   bottomOffset = 36,
   moduleSlot,
   hideProjectTree = false,
+  aiContext = "pcb",
 }: {
   topOffset?: number;
   bottomOffset?: number;
@@ -47,10 +49,13 @@ export function LeftPanel({
   // 3D module: its navigator shows only the module slot (Parts), not the
   // shared Testing/Board project tree. Other modules keep the tree.
   hideProjectTree?: boolean;
+  // Which module the AI assistant (robot button) gives guidance for.
+  aiContext?: ChatContext;
 } = {}) {
   const state = usePcbState();
   const actions = usePcbActions();
   const [query, setQuery] = React.useState("");
+  const [aiOpen, setAiOpen] = React.useState(false);
   const leftTabs = buildLeftTabs(state, actions);
   const subTabs = buildSubTabs(state, actions);
   const tree = buildTree(state, actions);
@@ -99,11 +104,16 @@ export function LeftPanel({
         </div>
         <div
           className="ix-btn"
+          onClick={() => setAiOpen((v) => !v)}
+          title="AI assistant"
+          aria-label="AI assistant"
+          role="button"
           style={{
             width: 34,
             height: 34,
             borderRadius: "var(--radius-lg)",
-            background: "var(--color-violet-600)",
+            background: aiOpen ? "var(--color-violet-800, #5b21b6)" : "var(--color-violet-600)",
+            outline: aiOpen ? "2px solid var(--color-border-brand)" : "none",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -115,7 +125,11 @@ export function LeftPanel({
         </div>
       </div>
 
-      {state.leftMain === "project" && (
+      {/* AI assistant view — the robot button swaps the panel body for the
+          module-aware chat (tab system, same as the Code editors). */}
+      {aiOpen && <AiChatPanel context={aiContext} />}
+
+      {!aiOpen && state.leftMain === "project" && (
         <>
           {/* sub tabs + search + pills — hidden with the project tree (3D module) */}
           {!hideProjectTree && (<>
@@ -219,7 +233,7 @@ export function LeftPanel({
         </>
       )}
 
-      {state.leftMain === "library" && (
+      {!aiOpen && state.leftMain === "library" && (
         <>
           <LibraryPanel />
           {state.libView === "all" && <AllLibraryFlyout />}

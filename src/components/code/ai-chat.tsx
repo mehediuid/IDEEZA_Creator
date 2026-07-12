@@ -8,7 +8,7 @@
 
 import * as React from "react";
 
-type ChatContext = "blockly" | "code";
+export type ChatContext = "blockly" | "code" | "pcb" | "3d" | "preview";
 type Msg = { role: "user" | "assistant"; text: string };
 
 const INTRO: Record<ChatContext, string> = {
@@ -16,14 +16,57 @@ const INTRO: Record<ChatContext, string> = {
     "Hi! I can help you build your program with blocks — ask me about loops, conditions, variables, functions, or reading sensors.",
   code:
     "Hi! I can help you write and debug your firmware code — ask me about loops, conditions, variables, functions, or pins and sensors.",
+  pcb:
+    "Hi! I can help you design your board — ask me about placing components, routing tracks, pads and vias, layers, copper pours, or running DRC.",
+  "3d":
+    "Hi! I can help you model your enclosure — ask me about adding shapes, moving and rotating parts, scaling, or materials.",
+  preview:
+    "Hi! I can help you assemble the product preview — ask me about instances, mate types, alignment, or fixing overflow warnings.",
+};
+
+// Per-module knowledge base for the non-code editors: first matching rule wins.
+const MODULE_RULES: Record<"pcb" | "3d" | "preview", { match: RegExp; reply: string }[]> = {
+  pcb: [
+    { match: /track|route|routing|trace/, reply: "Pick “Single Route” from the toolbar (or Place ▸ Track), then press-drag-release on the canvas to draw the segment — or click once for the start and once for the end. The Track panel on the right shows its live length." },
+    { match: /pad|via/, reply: "Use Place ▸ Pad or Place ▸ Via (also on the toolbar) and click the board where you want it. Select it afterwards to edit shape, size, layers, and mask expansion in the right sidebar." },
+    { match: /layer/, reply: "Switch the active layer from the bottom-right Layer selector; a placed object's layer can be changed from its Layer dropdown in the property panel. The Layer tab on the right controls visibility and locking per layer." },
+    { match: /copper|pour|polygon|fill/, reply: "Use Place ▸ Copper Pour Polygon and click the board — the Copper Fills panel then controls fill style, per-net spacing rules, and pad connection (spokes)." },
+    { match: /drc|rule|check/, reply: "Run Design ▸ Check DRC to open the DRC tab, and Design ▸ Design Rule to edit clearance and width rules." },
+    { match: /component|place|resistor|capacitor/, reply: "Open the Library tab on the left and click a part to drop it on the canvas, or use Place ▸ Component. Select it to edit designator, footprint, and location in the right sidebar." },
+    { match: /select|filter/, reply: "If you can't select something, check the Filter tab on the right — the Selection Filter controls which object types the mouse can pick." },
+  ],
+  "3d": [
+    { match: /shape|box|sphere|cylinder|add|create/, reply: "Add shapes from the 3D toolbar (Shape Creation group) — pick a primitive and it drops into the scene, then appears under Parts in the left panel." },
+    { match: /move|translate|rotate|scale|transform/, reply: "Select a part, then choose Translate / Rotate / Scale under Transform in the right Settings panel and drag the gizmo. Snap toggles per axis keep movements on the grid." },
+    { match: /material|color|texture/, reply: "With a part selected, open Materials in the right panel to change its finish; Scene Settings controls the environment and background." },
+    { match: /enclosure|cover|shell/, reply: "Model the enclosure around the board here — it carries over to Product Preview as the Enclosure instance, where you can mate it to the PCB." },
+    { match: /delete|remove|copy|duplicate/, reply: "Right-click a part row in the Parts list (or use its ⋯ menu) for Copy / Duplicate / Delete and ordering actions." },
+  ],
+  preview: [
+    { match: /instance|list|part/, reply: "The Instances list on the left shows everything in the assembly — PCB parts and the Enclosure. Click one to select it and edit its properties on the right." },
+    { match: /mate|align|coincident|parallel|tangent/, reply: "Select an instance and pick a Mate Type (Coincident, Parallel, Perpendicular, Tangent, Concentric, Lock) on the right, then set the offset distance/angle and alignment direction." },
+    { match: /overflow|exceed|fit|warning/, reply: "“PCB exceeds enclosure” means the board is larger than the cover on the shown axis — scale the enclosure up in the 3D module or shrink the board outline in PCB." },
+    { match: /hide|show|visib/, reply: "Use the Visibility toggles on the right (PCB / Enclosure), or the eye icons in the Instances list, to show and hide parts of the assembly." },
+    { match: /move|transform|rotate/, reply: "Set Transform to Translate or Rotate on the right, then drag the selected instance in the viewport; per-axis Snap keeps it aligned." },
+  ],
+};
+
+const MODULE_DEFAULT: Record<"pcb" | "3d" | "preview", string> = {
+  pcb: "I can help with board design — try asking “how do I route a track”, “how do I add a via”, or “why can't I select this”.",
+  "3d": "I can help with 3D modelling — try asking “how do I add a shape”, “how do I rotate a part”, or “how do I change material”.",
+  preview: "I can help with the assembly — try asking “how do mates work”, “why does the PCB exceed the enclosure”, or “how do I hide the cover”.",
 };
 
 // Rule-based stub assistant. Deterministic, context-aware; replaced by the
 // real AI backend later — keep the signature (context, text) => string.
 function getAssistantReply(context: ChatContext, raw: string): string {
   const t = raw.toLowerCase();
-  const inBlocks = context === "blockly";
   if (/^(hi|hello|hey|salam|assalamu)/.test(t)) return INTRO[context];
+  if (context === "pcb" || context === "3d" || context === "preview") {
+    const hit = MODULE_RULES[context].find((r) => r.match.test(t));
+    return hit ? hit.reply : MODULE_DEFAULT[context];
+  }
+  const inBlocks = context === "blockly";
   if (/loop|repeat|while|for\b/.test(t)) {
     return inBlocks
       ? "For repetition, open the Loops group and drag a “repeat … times” or “while” block onto the workspace, then put the blocks you want repeated inside it."
