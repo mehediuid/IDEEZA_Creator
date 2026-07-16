@@ -1450,26 +1450,28 @@ export function regroupMenus(menus) {
 
 // Flatten a regrouped menu set into a searchable command list for ⌘K. Every
 // leaf action (including one level of hover-flyout children) becomes one
-// command, breadcrumb-labelled ("Design · Annotate Designator"). Dividers,
-// pure containers, and label-less rows are skipped.
+// command carrying its structure — { group, trail, label } — so the palette
+// can group results and show a clean primary label with a muted breadcrumb
+// tail. Dividers, pure containers, and label-less rows are skipped.
 export function flattenCommands(groups) {
   const menus = [groups.primary, groups.settings ? [groups.settings] : [], groups.help ? [groups.help] : []].flat();
   const out = [];
   const seen = new Set();
-  const push = (label, icon, onClick) => {
+  const push = (group, trail, label, icon, onClick) => {
     if (!label || typeof onClick !== "function") return;
-    if (seen.has(label)) return;
-    seen.add(label);
-    out.push({ label, icon: icon || "blank", onClick });
+    const key = `${group}/${trail}/${label}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ group, trail, label, icon: icon || "blank", onClick });
   };
   for (const m of menus) {
     for (const it of m.items || []) {
       if (it.divider || !it.label) continue;
       const children = (it.sub || []).filter((s) => s && !s.divider && s.label);
       if (children.length) {
-        for (const s of children) push(`${m.label} · ${it.label} · ${s.label}`, s.icon, s.onClick);
+        for (const s of children) push(m.label, it.label, s.label, s.icon, s.onClick);
       } else {
-        push(`${m.label} · ${it.label}`, it.icon, it.onClick);
+        push(m.label, "", it.label, it.icon, it.onClick);
       }
     }
   }

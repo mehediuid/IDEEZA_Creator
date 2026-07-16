@@ -15,10 +15,12 @@ export interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInp
 }
 
 const MagnifierIcon = () => (
-  <svg className="shrink-0" width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth={2}>
-    <circle cx="11" cy="11" r="7" />
-    <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-  </svg>
+  <span className="inline-flex shrink-0 text-[color:var(--color-text-tertiary)] transition-colors duration-150 group-focus-within:text-[color:var(--color-violet-600)]">
+    <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+    </svg>
+  </span>
 );
 
 const ClearIcon = () => (
@@ -32,7 +34,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <div
         className={cn(
-          "flex items-center gap-[var(--spacing-4)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-[var(--spacing-6)] py-[var(--spacing-4)] transition-colors focus-within:border-[var(--color-border-focus)]",
+          "group flex items-center gap-[var(--spacing-4)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-[var(--spacing-6)] py-[var(--spacing-4)] transition-[background-color,border-color,box-shadow] duration-150 focus-within:border-[var(--color-border-brand)] focus-within:bg-[var(--color-bg-surface)] focus-within:shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]",
           containerClassName,
         )}
       >
