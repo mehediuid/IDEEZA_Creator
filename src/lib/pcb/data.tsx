@@ -1394,3 +1394,84 @@ export function buildSettingsNav(state: PcbState, actions: PcbActions) {
 export function settingsTitle(state: PcbState) {
   return (SET_NAV_DEFS.find((d) => d[0] === state.settingsPage) || ['', 'Settings'])[1];
 }
+
+// ── IDEEZA menu regroup ────────────────────────────────────────────────────
+// The raw builders still describe every action under the familiar
+// File / Edit / View / Place / Design / Layout / Export / Setting / Help
+// buckets — that's where the spec-parity lives. For the app chrome we present
+// a leaner, IDEEZA-native shape so it no longer reads as an EasyEDA clone:
+//   • File (+ Export folded in)  → "Project"
+//   • Place                       → "Insert"
+//   • Layout                      → "Arrange"
+//   • Setting / Help              → right-side icon cluster (⚙ / ?)
+// Nothing is dropped — items are only moved / relabelled, and menu ids stay
+// intact so the existing open/toggle wiring keeps working.
+export function regroupMenus(menus) {
+  const by = {};
+  for (const m of menus) by[m.id] = m;
+  const relabel = (m, label) => (m ? { ...m, label } : null);
+
+  // Project = File, with Export folded in as a hover flyout at the bottom.
+  let project = null;
+  if (by.file) {
+    const items = [...by.file.items];
+    if (by.export) {
+      items.push({ divider: true });
+      items.push({
+        label: "Export",
+        icon: "exp",
+        submenu: true,
+        hasSub: true,
+        sub: by.export.items,
+        onClick: () => {},
+      });
+    }
+    project = { ...by.file, label: "Project", items };
+  }
+
+  const primary = [
+    project,
+    by.edit,
+    relabel(by.place, "Insert"),
+    by.design,
+    by.route,
+    relabel(by.layout, "Arrange"),
+    by.view,
+    // Modes without a File menu (e.g. 3D) keep Export as its own menu.
+    !by.file ? by.export : null,
+  ].filter(Boolean);
+
+  return {
+    primary,
+    settings: relabel(by.setting, "Settings"),
+    help: by.help || null,
+  };
+}
+
+// Flatten a regrouped menu set into a searchable command list for ⌘K. Every
+// leaf action (including one level of hover-flyout children) becomes one
+// command, breadcrumb-labelled ("Design · Annotate Designator"). Dividers,
+// pure containers, and label-less rows are skipped.
+export function flattenCommands(groups) {
+  const menus = [groups.primary, groups.settings ? [groups.settings] : [], groups.help ? [groups.help] : []].flat();
+  const out = [];
+  const seen = new Set();
+  const push = (label, icon, onClick) => {
+    if (!label || typeof onClick !== "function") return;
+    if (seen.has(label)) return;
+    seen.add(label);
+    out.push({ label, icon: icon || "blank", onClick });
+  };
+  for (const m of menus) {
+    for (const it of m.items || []) {
+      if (it.divider || !it.label) continue;
+      const children = (it.sub || []).filter((s) => s && !s.divider && s.label);
+      if (children.length) {
+        for (const s of children) push(`${m.label} · ${it.label} · ${s.label}`, s.icon, s.onClick);
+      } else {
+        push(`${m.label} · ${it.label}`, it.icon, it.onClick);
+      }
+    }
+  }
+  return out;
+}
