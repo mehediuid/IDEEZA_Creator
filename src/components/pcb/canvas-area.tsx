@@ -47,31 +47,63 @@ function GridPattern() {
   );
 }
 
-// Schematic left tool palette — vertical, docked at the left edge of the
-// canvas. Icons + a dropdown caret on tools that carry variants. Clicking an
-// icon arms the tool (or opens the parts picker for Component).
-type SchemTool = { key: string; label: string; tool?: string; action?: "devicePicker"; caret?: boolean; svg: string };
+// Schematic left tool palette — vertical, vertically centered on the canvas,
+// clear of the rulers. Each tool arms a real tool; tools that carry variants
+// get a separate caret button (own hover) that opens a dropdown of options.
+type SchemOpt = { label: string; tool?: string; action?: "devicePicker" | "erase" };
+type SchemTool = { key: string; label: string; tool?: string; action?: "devicePicker" | "erase"; svg: string; options?: SchemOpt[] };
 const SCHEM_TOOLS: SchemTool[] = [
-  { key: "select", label: "Select", tool: "select", caret: true, svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
-  { key: "wire", label: "Wire", tool: "wire", caret: true, svg: '<path d="M4 20L20 4M14 4h6v6"/>' },
-  { key: "component", label: "Component", action: "devicePicker", caret: true, svg: '<rect x="7" y="8" width="10" height="8" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/>' },
-  { key: "netPort", label: "Net Port", tool: "port", caret: true, svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
-  { key: "power", label: "Power / Net Flag", tool: "vcc5v", caret: true, svg: '<path d="M12 21V9M6 9h12M9 5h6"/>' },
+  { key: "select", label: "Select", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>', options: [
+    { label: "Select", tool: "select" }, { label: "Select Visible", tool: "selectVisible" }, { label: "Hand / Pan", tool: "hand" },
+  ] },
+  { key: "wire", label: "Wire", tool: "wire", svg: '<path d="M4 20L20 4M14 4h6v6"/>', options: [
+    { label: "Wire", tool: "wire" }, { label: "Bus", tool: "bus" }, { label: "Net Label", tool: "netLabel" },
+  ] },
+  { key: "component", label: "Component", action: "devicePicker", svg: '<rect x="7" y="8" width="10" height="8" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/>', options: [
+    { label: "Device…", action: "devicePicker" }, { label: "Reuse Block…", action: "devicePicker" },
+  ] },
+  { key: "netPort", label: "Net Port", tool: "port", svg: '<path d="M4 8h9l4 4-4 4H4z"/>', options: [
+    { label: "Net Port", tool: "port" }, { label: "Net Flag", tool: "netFlag" }, { label: "Short Flag", tool: "shortFlag" },
+  ] },
+  { key: "power", label: "Power / Net Flag", tool: "vcc5v", svg: '<path d="M12 21V9M6 9h12M9 5h6"/>', options: [
+    { label: "VCC", tool: "vcc5v" }, { label: "+5V", tool: "vcc5v" }, { label: "GND", tool: "pgnd" }, { label: "AGND", tool: "agnd" }, { label: "PGND", tool: "pgnd" },
+  ] },
   { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
   { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 5v14M5 12h14"/>' },
-  { key: "text", label: "Text", tool: "text", caret: true, svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
-  { key: "eraser", label: "Eraser", tool: "eraser", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
+  { key: "text", label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>', options: [
+    { label: "Text", tool: "text" }, { label: "Net Label", tool: "netLabel" },
+  ] },
+  { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
 ];
 
-function SchemToolPalette({ leftInset, top }: { leftInset: number; top: number }) {
+function SchemToolPalette() {
   const state = usePcbState();
   const actions = usePcbActions();
+  const [openKey, setOpenKey] = React.useState<string | null>(null);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!openKey) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpenKey(null); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [openKey]);
+
+  const run = (o: { tool?: string; action?: "devicePicker" | "erase" }) => {
+    if (o.action === "devicePicker") actions.openModal("devicePicker");
+    else if (o.action === "erase") actions.deleteSelected();
+    else if (o.tool) actions.setTool(o.tool);
+    setOpenKey(null);
+  };
+
   return (
     <div
+      ref={ref}
       style={{
         position: "absolute",
-        left: leftInset + 20,
-        top: top + 92,
+        left: 40,
+        top: "50%",
+        transform: "translateY(-50%)",
         display: "flex",
         flexDirection: "column",
         gap: "var(--spacing-1)",
@@ -86,25 +118,66 @@ function SchemToolPalette({ leftInset, top }: { leftInset: number; top: number }
       {SCHEM_TOOLS.map((t) => {
         const active = !!t.tool && state.tool === t.tool;
         return (
-          <button
-            key={t.key}
-            type="button"
-            title={t.label}
-            aria-label={t.label}
-            onClick={() => (t.action === "devicePicker" ? actions.openModal("devicePicker") : t.tool && actions.setTool(t.tool))}
-            style={{
-              display: "flex", alignItems: "center", gap: 3,
-              height: 34, padding: t.caret ? "0 4px 0 7px" : "0 7px",
-              borderRadius: "var(--radius-lg)", border: "none", cursor: "pointer",
-              background: active ? "var(--color-bg-brand-subtle)" : "transparent",
-              color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
-            }}
-          >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: t.svg }} />
-            {t.caret && (
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.4"><path d="M6 9l6 6 6-6" /></svg>
+          <div key={t.key} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            {/* primary icon — arms the tool / opens picker */}
+            <button
+              type="button"
+              className="ix-tool"
+              title={t.label}
+              aria-label={t.label}
+              onClick={() => run(t)}
+              style={{
+                width: t.options ? 30 : 40,
+                height: 34,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: t.options ? "var(--radius-lg) 0 0 var(--radius-lg)" : "var(--radius-lg)",
+                border: "none", cursor: "pointer",
+                background: active ? "var(--color-bg-brand-subtle)" : "transparent",
+                color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: t.svg }} />
+            </button>
+            {/* separate caret with its own hover — opens the dropdown */}
+            {t.options && (
+              <button
+                type="button"
+                className="ix-tool"
+                aria-label={`${t.label} options`}
+                aria-expanded={openKey === t.key}
+                onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
+                style={{
+                  width: 16, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "0 var(--radius-lg) var(--radius-lg) 0", border: "none", cursor: "pointer",
+                  background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
+                  color: "var(--color-text-tertiary)",
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
+              </button>
             )}
-          </button>
+            {/* dropdown popover (opens to the right) */}
+            {t.options && openKey === t.key && (
+              <div
+                role="menu"
+                style={{ position: "absolute", left: "calc(100% + 6px)", top: 0, minWidth: 150, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", boxShadow: "var(--elevation-5)", padding: "var(--spacing-1)", zIndex: 40 }}
+              >
+                {t.options.map((o) => {
+                  const optActive = !!o.tool && state.tool === o.tool;
+                  return (
+                    <div
+                      key={o.label}
+                      className="ix-row"
+                      onClick={() => run(o)}
+                      style={{ padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-sm)", cursor: "pointer", fontSize: "var(--font-size-sm)", fontWeight: optActive ? 700 : 500, color: optActive ? "var(--color-text-brand)" : "var(--color-text-primary)", background: optActive ? "var(--color-bg-brand-subtle)" : "transparent", whiteSpace: "nowrap" }}
+                    >
+                      {o.label}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         );
       })}
     </div>
@@ -522,7 +595,7 @@ export function CanvasArea() {
 
       {/* schematic tool palette — vertical, docked at the left of the canvas */}
       {state.mode === "schematic" && v["Floating Tool"] !== false && (
-        <SchemToolPalette leftInset={0} top={0} />
+        <SchemToolPalette />
       )}
 
       {/* floating tools (2D editor · View ▸ Floating Tool) — Drawing / Wiring / Preview */}

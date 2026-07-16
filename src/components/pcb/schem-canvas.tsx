@@ -93,12 +93,29 @@ export function SchematicCanvas() {
         left: 60,
         width: page.w,
         height: page.h,
-        // Transparent so the canvas' lavender square-grid shows through — the
-        // sheet is defined by the violet corner brackets, not a white card.
         background: "transparent",
         color: stroke,
       }}
     >
+      {/* design area — a distinct surface panel inside the corner brackets,
+          with its own subtle square grid, sitting on the darker canvas. */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: innerLeft,
+          top: innerTop,
+          width: innerW,
+          height: innerH,
+          background: "var(--color-bg-surface)",
+          backgroundImage:
+            "linear-gradient(color-mix(in srgb, var(--color-violet-600) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--color-violet-600) 10%, transparent) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+          borderRadius: "var(--radius-md)",
+          pointerEvents: "none",
+        }}
+      />
+
       {/* column number labels (top + bottom) */}
       {Array.from({ length: xN }).map((_, i) => {
         const label = String(numbersOnTop ? i + 1 : xN - i);
