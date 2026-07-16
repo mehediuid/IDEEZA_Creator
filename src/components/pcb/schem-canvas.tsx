@@ -94,11 +94,29 @@ export function SchematicCanvas() {
         width: page.w,
         height: page.h,
         background: "var(--color-bg-surface)",
-        border: `var(--border-width-1) solid ${stroke}`,
+        border: "var(--border-width-1) solid var(--color-border-subtle)",
+        borderRadius: "var(--radius-md)",
         boxShadow: "var(--elevation-3)",
         color: stroke,
       }}
     >
+      {/* engineering grid — subtle dots inside the drawing area */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: innerLeft,
+          top: innerTop,
+          width: innerW,
+          height: innerH,
+          backgroundImage: "radial-gradient(var(--color-border-default) 1px, transparent 1.2px)",
+          backgroundSize: "22px 22px",
+          backgroundPosition: "center",
+          opacity: 0.5,
+          pointerEvents: "none",
+        }}
+      />
+
       {/* column number labels (top + bottom) */}
       {Array.from({ length: xN }).map((_, i) => {
         const label = String(numbersOnTop ? i + 1 : xN - i);
@@ -167,7 +185,8 @@ export function SchematicCanvas() {
         );
       })}
 
-      {/* inner drawing area border */}
+      {/* inner drawing area — subtle full border + prominent violet corner
+          brackets (the sheet boundary the user reads). */}
       <div
         style={{
           position: "absolute",
@@ -175,14 +194,14 @@ export function SchematicCanvas() {
           top: innerTop,
           width: innerW,
           height: innerH,
-          border: `var(--border-width-1-5) solid ${stroke}`,
+          border: "var(--border-width-1) solid var(--color-border-subtle)",
         }}
       />
+      <CornerBrackets left={innerLeft} top={innerTop} width={innerW} height={innerH} />
 
       {/* title block */}
       {showTitle && (
         <TitleBlock
-          stroke={stroke}
           width={titleW}
           right={titleRight}
           bottom={titleBottom}
@@ -193,133 +212,97 @@ export function SchematicCanvas() {
   );
 }
 
+// Violet L-brackets marking the four corners of the drawing area — the sheet
+// boundary the reference uses instead of a heavy ruled frame.
+function CornerBrackets({ left, top, width, height }: { left: number; top: number; width: number; height: number }) {
+  const ARM = 26;
+  const T = 2.5;
+  const c = "var(--color-violet-600)";
+  const base: React.CSSProperties = { position: "absolute", width: ARM, height: ARM, pointerEvents: "none" };
+  return (
+    <>
+      <div style={{ ...base, left, top, borderTop: `${T}px solid ${c}`, borderLeft: `${T}px solid ${c}`, borderTopLeftRadius: 6 }} />
+      <div style={{ ...base, left: left + width - ARM, top, borderTop: `${T}px solid ${c}`, borderRight: `${T}px solid ${c}`, borderTopRightRadius: 6 }} />
+      <div style={{ ...base, left, top: top + height - ARM, borderBottom: `${T}px solid ${c}`, borderLeft: `${T}px solid ${c}`, borderBottomLeftRadius: 6 }} />
+      <div style={{ ...base, left: left + width - ARM, top: top + height - ARM, borderBottom: `${T}px solid ${c}`, borderRight: `${T}px solid ${c}`, borderBottomRightRadius: 6 }} />
+    </>
+  );
+}
+
+// Title block — a clean card (logo · board name · schematic subtitle · meta
+// row) rather than a ruled table. Every value stays wired to the title fields.
 function TitleBlock({
-  stroke,
   width,
   right,
   bottom,
   fields,
 }: {
-  stroke: string;
   width: number;
   right: boolean;
   bottom: boolean;
   fields: Array<{ key: string; on: boolean; valueOn: boolean; value: string }>;
 }) {
-  const cellStyle = (last = false): React.CSSProperties => ({
-    borderRight: last ? "none" : `var(--border-width-1) solid ${stroke}`,
-    borderBottom: `var(--border-width-1) solid ${stroke}`,
-    padding: "var(--spacing-2) var(--spacing-4)",
-    fontSize: "var(--font-size-xs)",
-    color: stroke,
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  });
-  const labelHead = (): React.CSSProperties => ({
-    ...cellStyle(false),
-    fontWeight: 600,
-  });
+  const boardName = findValue(fields, "boardName", "");
+  const schematic = findValue(fields, "schematic", "");
+  const title = boardName || schematic || "Untitled Board";
+  const rev = findValue(fields, "version", "");
+  const pageNo = findValue(fields, "pageNo", "");
+  const pageCount = findValue(fields, "pageCount", "");
+  const size = findValue(fields, "pageSize", "");
+  const date = findValue(fields, "createDate", "");
+  const company = findValue(fields, "company", "");
+
+  const meta: string[] = [];
+  if (rev && rev !== "—") meta.push(`Rev ${rev}`);
+  if (pageNo && pageNo !== "—") meta.push(`${pageNo}${pageCount && pageCount !== "—" ? ` / ${pageCount}` : ""}`);
+  if (size && size !== "—") meta.push(size);
+  if (date && date !== "—") meta.push(date);
+
   return (
     <div
       style={{
         position: "absolute",
-        ...(right ? { right: 30 } : { left: 30 }),
-        ...(bottom ? { bottom: 30 } : { top: 30 }),
-        width,
-        border: `var(--border-width-1-5) solid ${stroke}`,
+        ...(right ? { right: 34 } : { left: 34 }),
+        ...(bottom ? { bottom: 34 } : { top: 34 }),
+        width: Math.min(width, 320),
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-lg)",
         background: "var(--color-bg-surface)",
-        color: stroke,
-        boxShadow: "var(--elevation-1)",
+        boxShadow: "var(--elevation-3)",
+        padding: "var(--spacing-6) var(--spacing-7)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--spacing-3)",
       }}
     >
-      {/* row 1 — header labels */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr" }}>
-        <div style={labelHead()}>Schematic</div>
-        <div style={labelHead()}>Board</div>
-        <div style={{ ...cellStyle(true), fontWeight: 600 }}>Page</div>
-        {/* row 2 — values */}
-        <div style={cellStyle()}>{findValue(fields, "schematic", "—")}</div>
-        <div style={cellStyle()}>{findValue(fields, "boardName", "—")}</div>
-        <div style={cellStyle(true)}>{findValue(fields, "pageName", "—")}</div>
+      {/* logo + company */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+        <span style={{ width: 20, height: 20, borderRadius: "var(--radius-full)", background: "var(--color-violet-600)", display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-text-on-brand)"><path d="M6 4l14 8-14 8z" /></svg>
+        </span>
+        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-violet-600)", letterSpacing: 0.2 }}>
+          {company && company !== "—" ? company : "IDEEZA"}
+        </span>
       </div>
 
-      {/* row 3 — Review : description */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 2.2fr" }}>
-        <div style={{ ...cellStyle(false), fontWeight: 600 }}>Review</div>
-        <div style={cellStyle(true)}>{findValue(fields, "description", "—")}</div>
+      {/* board name + subtitle */}
+      <div>
+        <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {title}
+        </div>
+        <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {schematic && schematic !== "—" ? `${schematic} · schematic` : "schematic"}
+        </div>
       </div>
 
-      {/* row 4 — Reviewed / Version / Size / Page / Total */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr 1fr 1fr" }}>
-        <div style={{ ...cellStyle(false), fontWeight: 600 }}>Reviewed</div>
-        <div style={{ ...cellStyle(false), fontWeight: 600 }}>Version</div>
-        <div style={{ ...cellStyle(false), fontWeight: 600 }}>Size</div>
-        <div style={{ ...cellStyle(false), fontWeight: 600 }}>Page</div>
-        <div style={{ ...cellStyle(true), fontWeight: 600 }}>Total</div>
-        <div style={cellStyle()}>{findValue(fields, "reviewed", "—")}</div>
-        <div style={cellStyle()}>{findValue(fields, "version", "—")}</div>
-        <div style={cellStyle()}>{findValue(fields, "pageSize", "—")}</div>
-        <div style={cellStyle()}>{findValue(fields, "pageNo", "—")}</div>
-        <div style={cellStyle(true)}>{findValue(fields, "pageCount", "—")}</div>
-      </div>
-
-      {/* footer — company logo + drawn + create date + company name */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.6fr .8fr 1fr 1.2fr" }}>
-        <div
-          style={{
-            padding: "var(--spacing-4)",
-            borderRight: `var(--border-width-1) solid ${stroke}`,
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--spacing-3)",
-            fontWeight: 700,
-            color: "var(--color-violet-600)",
-            fontSize: "var(--font-size-sm)",
-          }}
-        >
-          <span
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: "var(--radius-full)",
-              background: "var(--color-violet-600)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--color-text-on-brand)",
-              fontSize: 10,
-              fontWeight: 800,
-            }}
-          >
-            ▶
-          </span>
-          IDEEZA
+      {/* meta row */}
+      {meta.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", flexWrap: "wrap", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", paddingTop: "var(--spacing-3)" }}>
+          {meta.map((m, i) => (
+            <span key={i} style={{ fontSize: "var(--font-size-xs)", fontWeight: 500, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>{m}</span>
+          ))}
         </div>
-        <div
-          style={{
-            padding: "var(--spacing-4)",
-            borderRight: `var(--border-width-1) solid ${stroke}`,
-            fontSize: "var(--font-size-xs)",
-            color: stroke,
-          }}
-        >
-          {findValue(fields, "drawn", "—")}
-        </div>
-        <div
-          style={{
-            padding: "var(--spacing-4)",
-            borderRight: `var(--border-width-1) solid ${stroke}`,
-            fontSize: "var(--font-size-xs)",
-            color: stroke,
-          }}
-        >
-          {findValue(fields, "createDate", "—")}
-        </div>
-        <div style={{ padding: "var(--spacing-4)", fontSize: "var(--font-size-xs)", color: stroke }}>
-          {findValue(fields, "company", "—")}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

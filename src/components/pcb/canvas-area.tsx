@@ -448,7 +448,8 @@ export function CanvasArea() {
         )}
       </div>
 
-      {/* floating tools (schematic only · View ▸ Floating Tool) */}
+      {/* floating tools (schematic only · View ▸ Floating Tool) — compact
+          horizontal pill, draggable by the grip on the left. */}
       {state.mode === "schematic" && v["Floating Tool"] !== false && (
         <div
           style={{
@@ -456,56 +457,39 @@ export function CanvasArea() {
             top: state.floatPos.y,
             left: state.floatPos.x,
             display: "flex",
-            gap: "var(--spacing-7)",
+            alignItems: "center",
+            gap: "var(--spacing-1)",
+            padding: "var(--spacing-2) var(--spacing-3)",
+            background: "var(--color-bg-surface)",
+            border: "var(--border-width-1) solid var(--color-border-default)",
+            borderRadius: "var(--radius-full)",
+            boxShadow: "var(--elevation-4)",
             zIndex: 13,
           }}
         >
+          {/* drag grip */}
           <div
-            style={{
-              background: "var(--color-bg-surface)",
-              border: "var(--border-width-1) solid var(--color-border-default)",
-              borderRadius: "var(--radius-lg)",
-              boxShadow: "var(--elevation-4)",
-              width: 166,
-            }}
+            onMouseDown={actions.startFloatDrag}
+            aria-label="Move tools"
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 30, cursor: "move", color: "var(--color-text-tertiary)", userSelect: "none" }}
           >
-            <div
-              onMouseDown={actions.startFloatDrag}
+            <svg width="10" height="18" viewBox="0 0 10 18" fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="9" r="1.4"/><circle cx="7" cy="9" r="1.4"/><circle cx="3" cy="15" r="1.4"/><circle cx="7" cy="15" r="1.4"/></svg>
+          </div>
+          <span style={{ width: 1, height: 20, background: "var(--color-border-subtle)", margin: "0 2px" }} />
+          {FLOAT_SVGS.map((svg, i) => (
+            <button
+              key={i}
+              type="button"
+              className="ix-tool"
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "var(--spacing-3) var(--spacing-5)",
-                borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-                cursor: "move",
-                userSelect: "none",
+                height: 30, width: 30, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: "var(--radius-md)", border: "none", background: "transparent",
+                color: "var(--color-text-primary)", cursor: "pointer",
               }}
             >
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", fontWeight: 600 }}>Floating Tools</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" stroke="var(--color-text-tertiary)" strokeWidth="2.5">
-                <path d="M6 12h12" />
-              </svg>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "var(--spacing-1)", padding: "var(--spacing-3)" }}>
-              {FLOAT_SVGS.map((svg, i) => (
-                <div
-                  key={i}
-                  className="ix-tool"
-                  style={{
-                    height: 26,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "var(--radius-md)",
-                    color: "var(--color-text-primary)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon html={svg} size={16} />
-                </div>
-              ))}
-            </div>
-          </div>
+              <Icon html={svg} size={16} />
+            </button>
+          ))}
         </div>
       )}
 

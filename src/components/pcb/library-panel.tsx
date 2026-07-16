@@ -7,7 +7,7 @@
 // 445:204996 / 206940 / 210432 / 214833 and the right-click menu 2224:115245.
 
 import * as React from "react";
-import { DsIcon, Icon } from "@/lib/pcb/icons";
+import { Icon } from "@/lib/pcb/icons";
 import { Button, SearchInput } from "@/components/ideeza";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { LibCommonTab, LibFilter, LibPrice } from "@/lib/pcb/types";
@@ -25,68 +25,82 @@ const COMMON_TABS: { label: string; value: LibCommonTab }[] = [
   { label: "Panel", value: "panel" },
 ];
 
-type CommonGroup = { name: string; parts: { label: string; count: number }[] };
+// Common Library is a browsable grid of symbol-preview cards. Each card shows
+// the actual schematic/PCB symbol, a name, and a variant dropdown (package /
+// value). Clicking the preview drops that part on the canvas.
+type SymbolKind =
+  | "resistor" | "capacitor" | "power" | "ground" | "inductor" | "diode"
+  | "connector" | "ic" | "via" | "pad" | "frame" | "fiducial" | "hole";
 
-// Maps a Common-Library group name to the canvas object kind placed on click.
-const GROUP_KIND: Record<string, string> = {
-  Resistors: "resistor", Capacitors: "capacitor", Connectors: "component", ICs: "component",
-  "Footprints 0402": "component", "Footprints 0603": "component",
-  Vias: "via", Pads: "pad",
-  "Panel Frames": "boardOutline", Fiducials: "pad", "Tooling Holes": "mountingHole",
+type LibCard = { name: string; kind: string; symbol: SymbolKind; variants: string[] };
+type CommonGroup = { name: string; cards: LibCard[] };
+
+// Schematic symbols drawn on a 48×32 canvas, centered, stroked in currentColor.
+const SYMBOLS: Record<SymbolKind, React.ReactNode> = {
+  resistor: <><path d="M2 16h8M38 16h8" /><rect x="10" y="10" width="28" height="12" rx="1" /></>,
+  capacitor: <><path d="M2 16h18M20 6v20M28 6v20M28 16h18" /></>,
+  power: <><path d="M24 28V10M14 10h20" /><path d="M24 10l-3 -5M24 10l3 -5" /></>,
+  ground: <><path d="M24 4v14M14 18h20M18 23h12M21 28h6" /></>,
+  inductor: <path d="M2 18h6a5 5 0 0 1 10 0 5 5 0 0 1 10 0 5 5 0 0 1 10 0h6" />,
+  diode: <><path d="M2 16h14M32 16h14M32 8v16" /><path d="M16 8l16 8-16 8z" fill="currentColor" stroke="none" /></>,
+  connector: <><rect x="14" y="6" width="20" height="20" rx="2" /><path d="M6 11h8M6 21h8M14 11v10" /></>,
+  ic: <><rect x="12" y="6" width="24" height="20" rx="2" /><path d="M6 11h6M6 16h6M6 21h6M36 11h6M36 16h6M36 21h6" /></>,
+  via: <><circle cx="24" cy="16" r="9" /><circle cx="24" cy="16" r="3.5" fill="currentColor" stroke="none" /></>,
+  pad: <rect x="12" y="8" width="24" height="16" rx="2" fill="currentColor" stroke="none" opacity="0.85" />,
+  frame: <rect x="6" y="5" width="36" height="22" rx="1" strokeDasharray="3 3" />,
+  fiducial: <><circle cx="24" cy="16" r="7" fill="currentColor" stroke="none" opacity="0.85" /><circle cx="24" cy="16" r="11" /></>,
+  hole: <><circle cx="24" cy="16" r="9" /><circle cx="24" cy="16" r="4" /></>,
 };
+
+const R_PKGS = ["0402", "0603", "0805", "1206"];
+const C_PKGS = ["0402", "0603", "0805", "1210"];
 
 const COMMON_GROUPS: Record<LibCommonTab, CommonGroup[]> = {
   schematic: [
-    { name: "Resistors", parts: [
-      { label: "R_US 0402", count: 128 },
-      { label: "R_US 0603", count: 96 },
-      { label: "R_EU 0805", count: 54 },
+    { name: "Supply Flag", cards: [
+      { name: "VCC", kind: "vcc5v", symbol: "power", variants: ["VCC", "VDD", "VBAT"] },
+      { name: "+5V", kind: "vcc5v", symbol: "power", variants: ["+5V", "+3.3V", "+12V"] },
+      { name: "GND", kind: "pgnd", symbol: "ground", variants: ["GND", "AGND", "PGND"] },
     ] },
-    { name: "Capacitors", parts: [
-      { label: "C 0402 X7R", count: 210 },
-      { label: "C 0603 X5R", count: 142 },
-      { label: "C Polarized", count: 33 },
+    { name: "Resistor", cards: [
+      { name: "R 0402", kind: "resistor", symbol: "resistor", variants: R_PKGS },
+      { name: "R 0603", kind: "resistor", symbol: "resistor", variants: R_PKGS },
     ] },
-    { name: "Connectors", parts: [
-      { label: "USB-C 16P", count: 18 },
-      { label: "Header 2x5", count: 27 },
+    { name: "Capacitor", cards: [
+      { name: "C 0402", kind: "capacitor", symbol: "capacitor", variants: C_PKGS },
+      { name: "C 0603", kind: "capacitor", symbol: "capacitor", variants: C_PKGS },
     ] },
-    { name: "ICs", parts: [
-      { label: "ESP32-WROOM", count: 9 },
-      { label: "STM32F103", count: 14 },
-      { label: "LM358", count: 22 },
+    { name: "Discrete", cards: [
+      { name: "Inductor", kind: "inductor", symbol: "inductor", variants: ["0603", "0805", "1210"] },
+      { name: "Diode", kind: "diode", symbol: "diode", variants: ["SOD-123", "SOD-323", "SMA"] },
+    ] },
+    { name: "Connector / IC", cards: [
+      { name: "Header 2x5", kind: "component", symbol: "connector", variants: ["2x5", "2x8", "1x4"] },
+      { name: "IC (SOIC)", kind: "component", symbol: "ic", variants: ["SOIC-8", "SOIC-14", "TSSOP-20"] },
     ] },
   ],
   pcb: [
-    { name: "Footprints 0402", parts: [
-      { label: "0402 Resistor", count: 64 },
-      { label: "0402 Capacitor", count: 71 },
+    { name: "Footprints", cards: [
+      { name: "R 0402", kind: "component", symbol: "pad", variants: R_PKGS },
+      { name: "C 0603", kind: "component", symbol: "pad", variants: C_PKGS },
     ] },
-    { name: "Footprints 0603", parts: [
-      { label: "0603 Resistor", count: 58 },
-      { label: "0603 Capacitor", count: 49 },
+    { name: "Vias", cards: [
+      { name: "Via", kind: "via", symbol: "via", variants: ["0.3/0.6", "0.2/0.45", "0.25/0.5"] },
     ] },
-    { name: "Vias", parts: [
-      { label: "Via 0.3/0.6", count: 12 },
-      { label: "Via 0.2/0.45", count: 8 },
-    ] },
-    { name: "Pads", parts: [
-      { label: "SMD Pad", count: 30 },
-      { label: "TH Pad", count: 24 },
+    { name: "Pads", cards: [
+      { name: "SMD Pad", kind: "pad", symbol: "pad", variants: ["Round", "Rect", "Oval"] },
+      { name: "TH Pad", kind: "pad", symbol: "hole", variants: ["0.8mm", "1.0mm"] },
     ] },
   ],
   panel: [
-    { name: "Panel Frames", parts: [
-      { label: "Frame 100x80", count: 6 },
-      { label: "Frame 160x100", count: 4 },
+    { name: "Panel Frames", cards: [
+      { name: "Frame", kind: "boardOutline", symbol: "frame", variants: ["100×80", "160×100"] },
     ] },
-    { name: "Fiducials", parts: [
-      { label: "Fiducial 1mm", count: 10 },
-      { label: "Fiducial 1.5mm", count: 7 },
+    { name: "Fiducials", cards: [
+      { name: "Fiducial", kind: "pad", symbol: "fiducial", variants: ["1.0mm", "1.5mm"] },
     ] },
-    { name: "Tooling Holes", parts: [
-      { label: "Hole 3.0mm", count: 9 },
-      { label: "Hole 4.0mm", count: 5 },
+    { name: "Tooling Holes", cards: [
+      { name: "Tooling Hole", kind: "mountingHole", symbol: "hole", variants: ["3.0mm", "4.0mm"] },
     ] },
   ],
 };
@@ -248,28 +262,30 @@ export function LibraryPanel() {
             <SearchInput value={commonQuery} onValueChange={setCommonQuery} placeholder="Search parts & compo.." />
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-0) var(--spacing-5) var(--spacing-6)" }}>
-            {groups.map((g) => (
-              <div key={g.name} style={{ marginBottom: "var(--spacing-3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-md)" }}>
-                  <span style={{ width: 12, height: 12, display: "inline-flex", color: "var(--color-text-tertiary)", transform: "rotate(90deg)" }}>
-                    <Icon html={CARET} />
-                  </span>
-                  <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>{g.name}</span>
+          <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-0) var(--spacing-6) var(--spacing-6)" }}>
+            {groups.map((g) => {
+              const cards = g.cards.filter(
+                (c) => cq === "" || c.name.toLowerCase().includes(cq) || g.name.toLowerCase().includes(cq),
+              );
+              if (cards.length === 0) return null;
+              return (
+                <div key={g.name} style={{ marginBottom: "var(--spacing-5)" }}>
+                  <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, letterSpacing: 0.3, color: "var(--color-text-secondary)", padding: "var(--spacing-2) var(--spacing-1) var(--spacing-3)" }}>
+                    {g.name}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4)" }}>
+                    {cards.map((c, i) => (
+                      <PartCard key={`${g.name}-${c.name}-${i}`} card={c} onPlace={() => placeFromLib(c.kind)} />
+                    ))}
+                  </div>
                 </div>
-                {g.parts
-                  .filter((p) => cq === "" || p.label.toLowerCase().includes(cq) || g.name.toLowerCase().includes(cq))
-                  .map((p) => (
-                    <div key={p.label} className="ix-row" onClick={() => placeFromLib(GROUP_KIND[g.name] ?? "component")} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-4)", paddingLeft: "var(--spacing-8)", borderRadius: "var(--radius-md)", cursor: "pointer" }}>
-                      <span style={{ width: 15, height: 15, flex: "0 0 auto", color: "var(--color-text-tertiary)" }}>
-                        <DsIcon name="chip" size={15} />
-                      </span>
-                      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.label}</span>
-                      <span style={{ fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)", fontWeight: 600 }}>{p.count}</span>
-                    </div>
-                  ))}
+              );
+            })}
+            {groups.every((g) => g.cards.every((c) => cq !== "" && !c.name.toLowerCase().includes(cq) && !g.name.toLowerCase().includes(cq))) && (
+              <div style={{ padding: "var(--spacing-8) var(--spacing-2)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+                No parts match “{commonQuery}”.
               </div>
-            ))}
+            )}
           </div>
         </>
       )}
@@ -323,6 +339,91 @@ export function LibraryPanel() {
             })}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// A single library card: symbol preview (click to place) + variant dropdown.
+function PartCard({ card, onPlace }: { card: LibCard; onPlace: () => void }) {
+  const [variant, setVariant] = React.useState(card.variants[0]);
+  const [hover, setHover] = React.useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        border: `var(--border-width-1) solid ${hover ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
+        borderRadius: "var(--radius-lg)",
+        overflow: "hidden",
+        background: "var(--color-bg-surface)",
+        transition: "border-color .14s, box-shadow .14s",
+        boxShadow: hover ? "var(--elevation-2)" : "none",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onPlace}
+        title={`Place ${card.name} (${variant})`}
+        aria-label={`Place ${card.name} ${variant}`}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+          height: 58, background: "var(--color-bg-page)", border: "none",
+          borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+          cursor: "pointer", color: hover ? "var(--color-violet-600)" : "var(--color-text-secondary)",
+          transition: "color .14s",
+        }}
+      >
+        <svg width="52" height="34" viewBox="0 0 48 32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          {SYMBOLS[card.symbol]}
+        </svg>
+      </button>
+      <VariantDropdown name={card.name} variant={variant} variants={card.variants} onChange={setVariant} />
+    </div>
+  );
+}
+
+function VariantDropdown({ name, variant, variants, onChange }: { name: string; variant: string; variants: string[]; onChange: (v: string) => void }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: "var(--spacing-2)", padding: "var(--spacing-3) var(--spacing-4)", background: "transparent",
+          border: "none", cursor: "pointer", fontFamily: "inherit",
+          fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-primary)",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name} · {variant}</span>
+        <span style={{ width: 11, height: 11, flex: "0 0 auto", color: "var(--color-text-tertiary)", transform: open ? "rotate(90deg)" : "none", transition: "transform .12s" }}><Icon html={CARET} /></span>
+      </button>
+      {open && (
+        <div role="listbox" style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 2, zIndex: 40, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", boxShadow: "var(--elevation-4)", padding: "var(--spacing-1)", maxHeight: 160, overflowY: "auto" }}>
+          {variants.map((v) => (
+            <div
+              key={v}
+              role="option"
+              aria-selected={v === variant}
+              className="ix-row"
+              onClick={() => { onChange(v); setOpen(false); }}
+              style={{ padding: "var(--spacing-2) var(--spacing-4)", borderRadius: "var(--radius-sm)", cursor: "pointer", fontSize: "var(--font-size-xs)", fontWeight: v === variant ? 700 : 500, color: v === variant ? "var(--color-text-brand)" : "var(--color-text-secondary)", background: v === variant ? "var(--color-bg-brand-subtle)" : "transparent" }}
+            >
+              {v}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
