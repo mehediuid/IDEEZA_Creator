@@ -58,6 +58,8 @@ type ToolbarAction =
   | "openPdf"
   | "openDevicePicker"
   | "openAutoRoute"
+  | "openDesignRules"
+  | "openAnnotate"
   | "alignLeft"
   | "alignRight"
   | "alignTop"
@@ -451,10 +453,43 @@ function ToolIcon({
         padding: 0,
       }}
     >
-      <DsIcon name={iconKey} size={18} strokeWidth={1.7} />
+      <DsIcon name={iconKey} size={20} strokeWidth={1.7} />
     </button>
   );
 }
+
+// Schematic top toolbar — a fixed set of the 12 essential controls (the rest
+// live in the "…" overflow). Icons render at 20px with a 20px icon-to-icon gap.
+const SCHEM_ESSENTIAL: Item[] = [
+  { kind: "icon", key: "dRule", action: "openDesignRules", label: "Design Rule" },
+  { kind: "icon", key: "dAnnotate", action: "openAnnotate", label: "Annotate Designator" },
+  { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert to PCB" },
+  { kind: "div" },
+  { kind: "icon", key: "undo", action: "undo", label: "Undo" },
+  { kind: "icon", key: "redo", action: "redo", label: "Redo" },
+  { kind: "div" },
+  { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
+  { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
+  { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit to Screen" },
+  { kind: "div" },
+  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid" },
+  { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
+  { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
+  { kind: "div" },
+  { kind: "icon", key: "find", action: "openFindSim", label: "Find / Search" },
+];
+const SCHEM_OVERFLOW: Item[] = [
+  { kind: "icon", key: "imp", action: "openProject", label: "Open Project" },
+  { kind: "icon", key: "save", action: "save", label: "Save" },
+  { kind: "icon", key: "tSaveAll", action: "saveAll", label: "Save All" },
+  { kind: "icon", key: "copy", action: "copy", label: "Copy" },
+  { kind: "icon", key: "paste", action: "paste", label: "Paste" },
+  { kind: "icon", key: "array", action: "openArray", label: "Array" },
+  { kind: "icon", key: "tFitSection", action: "fitSection", label: "Fit Section" },
+  { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit Area" },
+  { kind: "icon", key: "snap", action: "toggleSnap", label: "Snap" },
+  { kind: "icon", key: "tSettings", action: "openSettings", label: "Settings" },
+];
 
 export function Toolbar() {
   const state = usePcbState();
@@ -512,6 +547,8 @@ export function Toolbar() {
     openPdf: () => actions.openModal("exportPdf2D"),
     openDevicePicker: () => actions.openModal("devicePicker"),
     openAutoRoute: () => actions.openModal("autoRoute"),
+    openDesignRules: () => actions.openModal("designRules"),
+    openAnnotate: () => actions.openModal("annotate"),
     // Align L/R/T/B have no bounding-box impl yet (menu parity items are
     // placeholders too) — flag intent via toast.
     alignLeft: () => actions.flashToast("Align Left — coming soon"),
@@ -608,15 +645,25 @@ export function Toolbar() {
 
       <Divider />
 
-      {/* primary tools — single row, no wrap */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "var(--spacing-1)", overflow: "hidden" }}>
-        {inline.map((it, i) => renderItem(it, i))}
-        {dropdowns.length > 0 && <Divider />}
-        {dropdowns.map((it, i) => renderItem(it, 1000 + i))}
-      </div>
-
-      {/* overflow — everything that didn't fit inline */}
-      {overflow.length > 0 && <OverflowMenu items={overflow} render={renderItem} />}
+      {state.mode === "schematic" ? (
+        <>
+          {/* schematic: fixed 12 essentials, 20px icon-to-icon gap */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
+            {SCHEM_ESSENTIAL.map((it, i) => renderItem(it, i))}
+          </div>
+          <OverflowMenu items={SCHEM_OVERFLOW} render={renderItem} />
+        </>
+      ) : (
+        <>
+          {/* other modes: primary tools inline, the rest fold into "…" */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "var(--spacing-1)", overflow: "hidden" }}>
+            {inline.map((it, i) => renderItem(it, i))}
+            {dropdowns.length > 0 && <Divider />}
+            {dropdowns.map((it, i) => renderItem(it, 1000 + i))}
+          </div>
+          {overflow.length > 0 && <OverflowMenu items={overflow} render={renderItem} />}
+        </>
+      )}
     </div>
   );
 }

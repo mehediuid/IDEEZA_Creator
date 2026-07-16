@@ -47,33 +47,45 @@ function GridPattern() {
   );
 }
 
-// Schematic left tool palette — vertical, vertically centered on the canvas,
-// clear of the rulers. Each tool arms a real tool; tools that carry variants
-// get a separate caret button (own hover) that opens a dropdown of options.
-type SchemOpt = { label: string; tool?: string; action?: "devicePicker" | "erase" };
-type SchemTool = { key: string; label: string; tool?: string; action?: "devicePicker" | "erase"; svg: string; options?: SchemOpt[] };
+// Schematic left tool palette — 6 grouped tools, each opening a dropdown of
+// variants (matching the design spec). The palette button shows the group's
+// default icon; a separate caret opens the variant list. Hand lives inside
+// Select. Every option arms a real tool (or opens the device picker).
+type SchemOpt = { label: string; tool?: string; action?: "devicePicker"; svg: string };
+type SchemTool = { key: string; label: string; options: SchemOpt[] };
 const SCHEM_TOOLS: SchemTool[] = [
-  { key: "select", label: "Select", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>', options: [
-    { label: "Select", tool: "select" }, { label: "Select Visible", tool: "selectVisible" }, { label: "Hand / Pan", tool: "hand" },
+  { key: "select", label: "Select", options: [
+    { label: "Pointer", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
+    { label: "Lasso", tool: "lasso", svg: '<path d="M4 11a6 4 0 1 1 11 3M7 15c-2 1-3 3 0 4"/>' },
+    { label: "Area select", tool: "areaSelect", svg: '<path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>' },
+    { label: "Hand", tool: "hand", svg: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6 6 6 0 0 1-5-2.7L4.5 15a1.5 1.5 0 0 1 2.6-1.5L8 15"/>' },
   ] },
-  { key: "wire", label: "Wire", tool: "wire", svg: '<path d="M4 20L20 4M14 4h6v6"/>', options: [
-    { label: "Wire", tool: "wire" }, { label: "Bus", tool: "bus" }, { label: "Net Label", tool: "netLabel" },
+  { key: "wire", label: "Wire", options: [
+    { label: "Wire", tool: "wire", svg: '<path d="M5 19L19 5"/>' },
+    { label: "Bus", tool: "bus", svg: '<path d="M5 18c4 0 3-12 7-12M12 6"/><path d="M6 18h12" opacity="0"/>' },
+    { label: "Bus entry", tool: "busEntry", svg: '<path d="M6 18c5 0 7-2 7-7"/>' },
   ] },
-  { key: "component", label: "Component", action: "devicePicker", svg: '<rect x="7" y="8" width="10" height="8" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/>', options: [
-    { label: "Device…", action: "devicePicker" }, { label: "Reuse Block…", action: "devicePicker" },
+  { key: "component", label: "Component", options: [
+    { label: "Symbol", action: "devicePicker", svg: '<rect x="7" y="8" width="10" height="8" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/>' },
+    { label: "Power port", tool: "vcc5v", svg: '<path d="M12 20V7M7 12l5-5 5 5"/>' },
+    { label: "Net tie", tool: "netTie", svg: '<path d="M6 16a6 6 0 0 1 12 0"/>' },
   ] },
-  { key: "netPort", label: "Net Port", tool: "port", svg: '<path d="M4 8h9l4 4-4 4H4z"/>', options: [
-    { label: "Net Port", tool: "port" }, { label: "Net Flag", tool: "netFlag" }, { label: "Short Flag", tool: "shortFlag" },
+  { key: "netLabel", label: "Net Label", options: [
+    { label: "Local label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
+    { label: "Global label", tool: "globalLabel", svg: '<rect x="3" y="9" width="18" height="6" rx="3"/>' },
+    { label: "Hierarchical", tool: "hierLabel", svg: '<path d="M8 6h8l4 6-4 6H8l-4-6z"/>' },
   ] },
-  { key: "power", label: "Power / Net Flag", tool: "vcc5v", svg: '<path d="M12 21V9M6 9h12M9 5h6"/>', options: [
-    { label: "VCC", tool: "vcc5v" }, { label: "+5V", tool: "vcc5v" }, { label: "GND", tool: "pgnd" }, { label: "AGND", tool: "agnd" }, { label: "PGND", tool: "pgnd" },
+  { key: "power", label: "Power", options: [
+    { label: "VCC", tool: "vcc5v", svg: '<path d="M12 20V8M8 8h8M10 5h4"/>' },
+    { label: "GND", tool: "pgnd", svg: '<path d="M12 4v9M6 13h12M9 17h6M11 20h2"/>' },
+    { label: "+5V", tool: "vcc5v", svg: '<path d="M12 20V9M6 9h12M9 5h6"/>' },
+    { label: "Earth / AGND", tool: "agnd", svg: '<path d="M12 4v9M6 13h12M9 16l3 4 3-4"/>' },
   ] },
-  { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
-  { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 5v14M5 12h14"/>' },
-  { key: "text", label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>', options: [
-    { label: "Text", tool: "text" }, { label: "Net Label", tool: "netLabel" },
+  { key: "text", label: "Text", options: [
+    { label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
+    { label: "Note", tool: "note", svg: '<path d="M5 5h14v10H9l-4 4z"/>' },
+    { label: "Field", tool: "field", svg: '<path d="M9 5c-2 0-2 3-3 4 1 1 1 6 3 6M15 5c2 0 2 3 3 4-1 1-1 6-3 6"/>' },
   ] },
-  { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
 ];
 
 function SchemToolPalette() {
@@ -89,9 +101,8 @@ function SchemToolPalette() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [openKey]);
 
-  const run = (o: { tool?: string; action?: "devicePicker" | "erase" }) => {
+  const run = (o: SchemOpt) => {
     if (o.action === "devicePicker") actions.openModal("devicePicker");
-    else if (o.action === "erase") actions.deleteSelected();
     else if (o.tool) actions.setTool(o.tool);
     setOpenKey(null);
   };
@@ -116,7 +127,8 @@ function SchemToolPalette() {
       }}
     >
       {SCHEM_TOOLS.map((t) => {
-        const active = !!t.tool && state.tool === t.tool;
+        const primary = t.options[0];
+        const active = t.options.some((o) => o.tool && state.tool === o.tool);
         return (
           <div key={t.key} style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
             {/* primary icon — fixed 34px column so every icon aligns vertically */}
@@ -125,7 +137,7 @@ function SchemToolPalette() {
               className="ix-tool"
               title={t.label}
               aria-label={t.label}
-              onClick={() => run(t)}
+              onClick={() => run(primary)}
               style={{
                 width: 34,
                 height: 34,
@@ -137,35 +149,31 @@ function SchemToolPalette() {
                 color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: t.svg }} />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: primary.svg }} />
             </button>
-            {/* caret slot — a real button when the tool has options, else an
-                empty spacer so the icon column stays aligned for every row */}
-            {t.options ? (
-              <button
-                type="button"
-                className="ix-tool"
-                aria-label={`${t.label} options`}
-                aria-expanded={openKey === t.key}
-                onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
-                style={{
-                  width: 16, height: 34, flex: "0 0 16px", display: "flex", alignItems: "center", justifyContent: "center",
-                  borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
-                  background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
-                  color: "var(--color-text-tertiary)",
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
-              </button>
-            ) : (
-              <span style={{ width: 16, flex: "0 0 16px" }} aria-hidden />
-            )}
-            {/* dropdown popover (opens to the right) */}
-            {t.options && openKey === t.key && (
+            {/* separate caret (own hover) — opens the variant dropdown */}
+            <button
+              type="button"
+              className="ix-tool"
+              aria-label={`${t.label} options`}
+              aria-expanded={openKey === t.key}
+              onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
+              style={{
+                width: 16, height: 34, flex: "0 0 16px", display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
+                background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
+                color: "var(--color-text-tertiary)",
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
+            </button>
+            {/* dropdown — group label + variant rows (icon · name · check) */}
+            {openKey === t.key && (
               <div
                 role="menu"
-                style={{ position: "absolute", left: "calc(100% + 6px)", top: 0, minWidth: 150, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", boxShadow: "var(--elevation-5)", padding: "var(--spacing-1)", zIndex: 40 }}
+                style={{ position: "absolute", left: "calc(100% + 8px)", top: 0, minWidth: 190, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-3)", zIndex: 40 }}
               >
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--color-text-tertiary)", padding: "2px 8px 6px" }}>{t.label}</div>
                 {t.options.map((o) => {
                   const optActive = !!o.tool && state.tool === o.tool;
                   return (
@@ -173,9 +181,13 @@ function SchemToolPalette() {
                       key={o.label}
                       className="ix-row"
                       onClick={() => run(o)}
-                      style={{ padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-sm)", cursor: "pointer", fontSize: "var(--font-size-sm)", fontWeight: optActive ? 700 : 500, color: optActive ? "var(--color-text-brand)" : "var(--color-text-primary)", background: optActive ? "var(--color-bg-brand-subtle)" : "transparent", whiteSpace: "nowrap" }}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optActive ? "var(--color-bg-brand-subtle)" : "transparent" }}
                     >
-                      {o.label}
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={optActive ? "var(--color-violet-600)" : "var(--color-text-secondary)"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }} dangerouslySetInnerHTML={{ __html: o.svg }} />
+                      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optActive ? 700 : 500, color: optActive ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
+                      {optActive && (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
+                      )}
                     </div>
                   );
                 })}
