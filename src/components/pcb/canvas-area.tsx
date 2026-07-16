@@ -118,8 +118,8 @@ function SchemToolPalette() {
       {SCHEM_TOOLS.map((t) => {
         const active = !!t.tool && state.tool === t.tool;
         return (
-          <div key={t.key} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            {/* primary icon — arms the tool / opens picker */}
+          <div key={t.key} style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
+            {/* primary icon — fixed 34px column so every icon aligns vertically */}
             <button
               type="button"
               className="ix-tool"
@@ -127,10 +127,11 @@ function SchemToolPalette() {
               aria-label={t.label}
               onClick={() => run(t)}
               style={{
-                width: t.options ? 30 : 40,
+                width: 34,
                 height: 34,
+                flex: "0 0 34px",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: t.options ? "var(--radius-lg) 0 0 var(--radius-lg)" : "var(--radius-lg)",
+                borderRadius: "var(--radius-lg)",
                 border: "none", cursor: "pointer",
                 background: active ? "var(--color-bg-brand-subtle)" : "transparent",
                 color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
@@ -138,8 +139,9 @@ function SchemToolPalette() {
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: t.svg }} />
             </button>
-            {/* separate caret with its own hover — opens the dropdown */}
-            {t.options && (
+            {/* caret slot — a real button when the tool has options, else an
+                empty spacer so the icon column stays aligned for every row */}
+            {t.options ? (
               <button
                 type="button"
                 className="ix-tool"
@@ -147,14 +149,16 @@ function SchemToolPalette() {
                 aria-expanded={openKey === t.key}
                 onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
                 style={{
-                  width: 16, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
-                  borderRadius: "0 var(--radius-lg) var(--radius-lg) 0", border: "none", cursor: "pointer",
+                  width: 16, height: 34, flex: "0 0 16px", display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
                   background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
                   color: "var(--color-text-tertiary)",
                 }}
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
               </button>
+            ) : (
+              <span style={{ width: 16, flex: "0 0 16px" }} aria-hidden />
             )}
             {/* dropdown popover (opens to the right) */}
             {t.options && openKey === t.key && (
