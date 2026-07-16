@@ -27,7 +27,7 @@ export function RightPanel() {
     <div
       style={{
         position: "absolute",
-        top: state.viewTog["Top Toolbar"] !== false ? 145 : 62,
+        top: state.viewTog["Top Toolbar"] !== false ? 108 : 62,
         bottom: 36,
         right: 0,
         width: 292,

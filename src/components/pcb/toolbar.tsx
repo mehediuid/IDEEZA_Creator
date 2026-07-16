@@ -8,6 +8,7 @@
 import * as React from "react";
 import { DsIcon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { buildModeTabs } from "@/lib/pcb/data";
 
 type ToolbarAction =
   | "undo"
@@ -519,53 +520,139 @@ export function Toolbar() {
     alignBottom: () => actions.flashToast("Align Bottom — coming soon"),
   };
 
+  const modeTabs = buildModeTabs(state, actions);
+
+  // One flat list of the current mode's tools (icons + dividers + dropdowns),
+  // already filtered by mode + the per-scope customization whitelist.
+  const items = filterItems(
+    state.mode === "2d" || state.mode === "3d" ? ITEMS_2D : ITEMS,
+    state.mode as Mode,
+    state.mode === "schematic"
+      ? new Set(state.toolbarCustomization.schematic)
+      : state.mode === "pcb"
+      ? new Set(state.toolbarCustomization.pcb)
+      : null,
+  );
+
+  // Render a single toolbar entry (icon / divider / dropdown).
+  const renderItem = (it: Item, i: number) => {
+    if (it.kind === "div") return <Divider key={i} />;
+    if (it.kind === "dd") {
+      const v = it.field === "gridSize" ? state.gridSize : state.unit;
+      const set = it.field === "gridSize" ? actions.setGridSize : actions.setUnit;
+      return <Dropdown key={i} value={v} options={it.options} onChange={set} ariaLabel={it.label} />;
+    }
+    const active = it.tool ? state.tool === it.tool : false;
+    const onClick = it.action ? handlers[it.action] : it.tool ? () => actions.setTool(it.tool!) : undefined;
+    return <ToolIcon key={i} iconKey={it.key} active={active} label={it.label} onClick={onClick} />;
+  };
+
+  // Compact single-row bar: the primary tools stay inline; the rest fold into
+  // a "…" overflow. PRIMARY_INLINE is tuned so the row never wraps.
+  const PRIMARY_INLINE = 15;
+  const iconItems = items.filter((it) => it.kind === "icon"); // dividers handled by grouping below
+  const inline = iconItems.slice(0, PRIMARY_INLINE);
+  const overflow = iconItems.slice(PRIMARY_INLINE);
+  const dropdowns = items.filter((it) => it.kind === "dd");
+
   return (
     <div
       style={{
         position: "absolute",
-        // Sits directly under the TopBar now that the Breadcrumb + old
-        // MenuBar strips have been removed (80px of vertical chrome freed).
         top: 62,
         left: 0,
         right: 0,
+        height: 46,
         background: "var(--color-bg-surface)",
         borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-        padding: "var(--spacing-3) var(--spacing-7)",
+        padding: "0 var(--spacing-7)",
         zIndex: 18,
         display: "flex",
-        flexWrap: "wrap",
-        rowGap: "var(--spacing-3)",
-        columnGap: "var(--spacing-2)",
         alignItems: "center",
+        gap: "var(--spacing-2)",
       }}
     >
-      {filterItems(
-        state.mode === "2d" || state.mode === "3d" ? ITEMS_2D : ITEMS,
-        state.mode as Mode,
-        // Schematic/PCB modes use the Top Tools Bar Settings page's
-        // per-scope selection to whitelist tool ids. Other modes opt out.
-        state.mode === "schematic"
-          ? new Set(state.toolbarCustomization.schematic)
-          : state.mode === "pcb"
-          ? new Set(state.toolbarCustomization.pcb)
-          : null,
-      ).map((it, i) => {
-        if (it.kind === "div") return <Divider key={i} />;
-        if (it.kind === "dd") {
-          const v = it.field === "gridSize" ? state.gridSize : state.unit;
-          const set = it.field === "gridSize" ? actions.setGridSize : actions.setUnit;
-          return <Dropdown key={i} value={v} options={it.options} onChange={set} ariaLabel={it.label} />;
-        }
-        const active = it.tool ? state.tool === it.tool : false;
-        const onClick = it.action
-          ? handlers[it.action]
-          : it.tool
-          ? () => actions.setTool(it.tool!)
-          : undefined;
-        return (
-          <ToolIcon key={i} iconKey={it.key} active={active} label={it.label} onClick={onClick} />
-        );
-      })}
+      {/* Schematic | PCB (+ 2D / 3D) mode toggle */}
+      <div style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-full)", padding: 3, flex: "0 0 auto" }}>
+        {modeTabs.map((mt) => {
+          const active = mt.bg !== "transparent";
+          return (
+            <button
+              key={mt.label}
+              onClick={mt.onClick}
+              style={{
+                padding: "6px 16px",
+                borderRadius: "var(--radius-full)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "var(--font-size-sm)",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                background: active ? "var(--color-violet-600)" : "transparent",
+                color: active ? "#fff" : "var(--color-text-secondary)",
+                transition: "background .14s, color .14s",
+              }}
+            >
+              {mt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <Divider />
+
+      {/* primary tools — single row, no wrap */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "var(--spacing-1)", overflow: "hidden" }}>
+        {inline.map((it, i) => renderItem(it, i))}
+        {dropdowns.length > 0 && <Divider />}
+        {dropdowns.map((it, i) => renderItem(it, 1000 + i))}
+      </div>
+
+      {/* overflow — everything that didn't fit inline */}
+      {overflow.length > 0 && <OverflowMenu items={overflow} render={renderItem} />}
     </div>
+  );
+}
+
+// "…" overflow: opens a popover grid of the remaining tools. Uses position:
+// fixed so it escapes the toolbar's clipping.
+function OverflowMenu({ items, render }: { items: Item[]; render: (it: Item, i: number) => React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = React.useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!btnRef.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const toggle = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    setOpen((v) => !v);
+  };
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        aria-label="More tools"
+        aria-expanded={open}
+        title="More tools"
+        className="ix-tool"
+        style={{ width: 30, height: 30, flex: "0 0 auto", borderRadius: "var(--radius-md)", border: "none", background: open ? "var(--color-bg-brand-subtle)" : "transparent", color: "var(--color-text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 62, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-xl)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-4)", display: "grid", gridTemplateColumns: "repeat(6, 30px)", gap: "var(--spacing-2)", maxWidth: 260 }}
+          onClick={() => setOpen(false)}
+        >
+          {items.map((it, i) => render(it, 5000 + i))}
+        </div>
+      )}
+    </>
   );
 }

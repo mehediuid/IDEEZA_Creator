@@ -52,7 +52,7 @@ export function CanvasArea() {
   // Breadcrumb + old MenuBar strips removed; everything that used to sit at
   // 225/142 now starts at 145/62 (just below the TopBar, optionally below the
   // toolbar). Same 80px delta as left-panel / left-rail / right-panel.
-  const top = v["Top Toolbar"] !== false ? 145 : 62;
+  const top = v["Top Toolbar"] !== false ? 108 : 62;
   const left = v["Left-Side panel"] !== false ? 366 : 74;
   const right = v["Right-Side Panel"] !== false ? 292 : 0;
 
@@ -318,41 +318,45 @@ export function CanvasArea() {
       {/* left ruler */}
       <Ruler axis="y" zoom={state.zoom} offset={state.pan.y} />
 
-      {/* mode segmented control */}
-      <div
-        style={{
-          position: "absolute",
-          top: 30,
-          left: "50%",
-          transform: "translateX(-50%)",
-          display: "flex",
-          background: "var(--color-bg-surface)",
-          border: "var(--border-width-1) solid var(--color-border-default)",
-          borderRadius: "var(--radius-xl)",
-          padding: "var(--spacing-2)",
-          boxShadow: "var(--elevation-3)",
-          zIndex: 12,
-        }}
-      >
-        {modeTabs.map((mt) => (
-          <div
-            key={mt.label}
-            className="ix-seg"
-            onClick={mt.onClick}
-            style={{
-              padding: "var(--spacing-3) var(--spacing-10)",
-              borderRadius: "var(--radius-lg)",
-              fontSize: "var(--font-size-md)",
-              fontWeight: 600,
-              cursor: "pointer",
-              background: mt.bg,
-              color: mt.fg,
-            }}
-          >
-            {mt.label}
-          </div>
-        ))}
-      </div>
+      {/* mode segmented control — the Schematic|PCB toggle now lives in the
+          top toolbar; only fall back to this centered control when the top
+          toolbar is hidden, so the toggle is never duplicated. */}
+      {state.viewTog["Top Toolbar"] === false && (
+        <div
+          style={{
+            position: "absolute",
+            top: 30,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            background: "var(--color-bg-surface)",
+            border: "var(--border-width-1) solid var(--color-border-default)",
+            borderRadius: "var(--radius-xl)",
+            padding: "var(--spacing-2)",
+            boxShadow: "var(--elevation-3)",
+            zIndex: 12,
+          }}
+        >
+          {modeTabs.map((mt) => (
+            <div
+              key={mt.label}
+              className="ix-seg"
+              onClick={mt.onClick}
+              style={{
+                padding: "var(--spacing-3) var(--spacing-10)",
+                borderRadius: "var(--radius-lg)",
+                fontSize: "var(--font-size-md)",
+                fontWeight: 600,
+                cursor: "pointer",
+                background: mt.bg,
+                color: mt.fg,
+              }}
+            >
+              {mt.label}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 3D axis glyph */}
       <div style={{ position: "absolute", top: 34, right: 24, color: "var(--color-text-tertiary)", width: 26, height: 26 }}>
