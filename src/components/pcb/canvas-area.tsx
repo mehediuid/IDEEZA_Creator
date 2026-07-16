@@ -152,12 +152,15 @@ function SchemToolPalette() {
         const chosenIdx = t.options ? Math.min(chosen[t.key] ?? 0, t.options.length - 1) : 0;
         const primary = t.options ? t.options[chosenIdx] : t;
         const primarySvg = t.options ? t.options[chosenIdx].svg : (t.svg ?? "");
+        const open = openKey === t.key;
         const active = t.options
           ? t.options.some((o) => o.tool && state.tool === o.tool)
           : !!t.tool && state.tool === t.tool;
         return (
-          <div key={t.key} style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
-            {/* primary icon — fixed 34px column so every icon aligns vertically */}
+          // One uniform 38px cell per tool — no second caret button, so the
+          // column reads as a clean, evenly-aligned strip of icons.
+          <div key={t.key} style={{ position: "relative", width: 38, height: 38 }}>
+            {/* the icon itself — a single click arms the chosen tool (fast path) */}
             <button
               type="button"
               className="ix-tool"
@@ -165,58 +168,62 @@ function SchemToolPalette() {
               aria-label={t.label}
               onClick={() => run(primary)}
               style={{
-                width: 34,
-                height: 34,
-                flex: "0 0 34px",
+                width: 38,
+                height: 38,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 borderRadius: "var(--radius-lg)",
                 border: "none", cursor: "pointer",
                 background: active ? "var(--color-bg-brand-subtle)" : "transparent",
                 color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
+                boxShadow: open ? "inset 0 0 0 1.5px var(--color-border-brand)" : "none",
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: primarySvg }} />
             </button>
-            {/* caret slot — a real button when the row has a dropdown, else an
-                empty 16px spacer so every icon column stays aligned */}
-            {t.options ? (
+
+            {/* corner triangle — the recognised "this tool has variants" flyout
+                cue (Figma / Illustrator). Clicking it opens the list only; it
+                never arms the tool, so the icon click stays the fast path. */}
+            {t.options && (
               <button
                 type="button"
                 className="ix-tool"
-                aria-label={`${t.label} options`}
-                aria-expanded={openKey === t.key}
-                onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
+                aria-label={`${t.label} variants`}
+                aria-expanded={open}
+                title={`${t.label} — more`}
+                onClick={(e) => { e.stopPropagation(); setOpenKey((k) => (k === t.key ? null : t.key)); }}
                 style={{
-                  width: 16, height: 34, flex: "0 0 16px", display: "flex", alignItems: "center", justifyContent: "center",
-                  borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
-                  background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
-                  color: "var(--color-text-tertiary)",
+                  position: "absolute", right: 1, bottom: 1, width: 14, height: 14,
+                  display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
+                  padding: 2, border: "none", background: "transparent", cursor: "pointer",
+                  borderRadius: "var(--radius-sm)",
+                  color: active || open ? "var(--color-violet-600)" : "var(--color-text-tertiary)",
                 }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
+                <svg width="6" height="6" viewBox="0 0 6 6" aria-hidden><path d="M6 0V6H0Z" fill="currentColor" /></svg>
               </button>
-            ) : (
-              <span style={{ width: 16, flex: "0 0 16px" }} aria-hidden />
             )}
-            {/* dropdown — group label + variant rows (icon · name · check) */}
-            {t.options && openKey === t.key && (
+
+            {/* variant flyout — floats to the right, aligned to this tool */}
+            {t.options && open && (
               <div
                 role="menu"
-                style={{ position: "absolute", left: "calc(100% + 8px)", top: 0, minWidth: 190, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-3)", zIndex: 40 }}
+                style={{ position: "absolute", left: "calc(100% + 10px)", top: -2, minWidth: 178, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "0 12px 32px -10px rgba(0,0,0,.35)", padding: "var(--spacing-2)", zIndex: 40 }}
               >
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--color-text-tertiary)", padding: "2px 8px 6px" }}>{t.label}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", padding: "var(--spacing-2) var(--spacing-3) var(--spacing-3)" }}>{t.label}</div>
                 {t.options.map((o, oi) => {
-                  // Mark the variant currently shown in the palette (the chosen
-                  // one) so the dropdown reflects what the split button displays.
+                  // Mark the variant currently shown on the palette button.
                   const optChosen = oi === chosenIdx;
                   return (
                     <div
                       key={o.label}
                       className="ix-row"
                       onClick={() => { setChosen((c) => ({ ...c, [t.key]: oi })); run(o); }}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optChosen ? "var(--color-bg-brand-subtle)" : "transparent" }}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optChosen ? "var(--color-bg-brand-subtle)" : "transparent" }}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={optChosen ? "var(--color-violet-600)" : "var(--color-text-secondary)"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }} dangerouslySetInnerHTML={{ __html: o.svg }} />
+                      <span style={{ width: 28, height: 28, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", background: optChosen ? "var(--color-violet-600)" : "var(--color-bg-subtle)", color: optChosen ? "#fff" : "var(--color-text-secondary)" }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: o.svg }} />
+                      </span>
                       <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optChosen ? 700 : 500, color: optChosen ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
                       {optChosen && (
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
