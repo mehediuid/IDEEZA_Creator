@@ -11,7 +11,7 @@ import { useStepNav } from "@/components/manual/use-step-nav";
 import { Icon } from "@/lib/pcb/icons";
 import { buildCanvas } from "@/lib/pcb/content";
 import { buildModeTabs } from "@/lib/pcb/data";
-import { AXIS_SVG, FLOAT_SVGS, NEXT_SVG, PLANE_SVG } from "@/lib/pcb/markup";
+import { AXIS_SVG, NEXT_SVG, PLANE_SVG } from "@/lib/pcb/markup";
 import { SchematicCanvas } from "@/components/pcb/schem-canvas";
 import { PcbCanvas } from "@/components/pcb/pcb-canvas";
 import { PcbThreeView } from "@/components/pcb/pcb-three-view";
@@ -22,24 +22,92 @@ import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const DRAG_THRESHOLD = 4;
 
-const GRID_MINOR = 20;
-const GRID_MAJOR = 100;
+const GRID_MINOR = 24;
+const GRID_MAJOR = 120;
 
 function GridPattern() {
-  // SVG-based dotted grid that tiles infinitely with two scales of dots.
+  // Faint violet square-line grid (two scales), tiling infinitely — matches
+  // the schematic design-area reference. Lines are violet-tinted so the whole
+  // canvas reads as a light lavender engineering sheet.
+  const minor = "color-mix(in srgb, var(--color-violet-600) 14%, transparent)";
+  const major = "color-mix(in srgb, var(--color-violet-600) 26%, transparent)";
   return (
     <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       <defs>
         <pattern id="ix-grid-minor" width={GRID_MINOR} height={GRID_MINOR} patternUnits="userSpaceOnUse">
-          <circle cx="0.5" cy="0.5" r="0.75" fill="var(--color-text-tertiary)" opacity="0.35" />
+          <path d={`M ${GRID_MINOR} 0 L 0 0 0 ${GRID_MINOR}`} fill="none" stroke={minor} strokeWidth="1" />
         </pattern>
         <pattern id="ix-grid-major" width={GRID_MAJOR} height={GRID_MAJOR} patternUnits="userSpaceOnUse">
-          <circle cx="0.5" cy="0.5" r="1.2" fill="var(--color-text-secondary)" opacity="0.5" />
+          <path d={`M ${GRID_MAJOR} 0 L 0 0 0 ${GRID_MAJOR}`} fill="none" stroke={major} strokeWidth="1.2" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#ix-grid-minor)" />
       <rect width="100%" height="100%" fill="url(#ix-grid-major)" />
     </svg>
+  );
+}
+
+// Schematic left tool palette — vertical, docked at the left edge of the
+// canvas. Icons + a dropdown caret on tools that carry variants. Clicking an
+// icon arms the tool (or opens the parts picker for Component).
+type SchemTool = { key: string; label: string; tool?: string; action?: "devicePicker"; caret?: boolean; svg: string };
+const SCHEM_TOOLS: SchemTool[] = [
+  { key: "select", label: "Select", tool: "select", caret: true, svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
+  { key: "wire", label: "Wire", tool: "wire", caret: true, svg: '<path d="M4 20L20 4M14 4h6v6"/>' },
+  { key: "component", label: "Component", action: "devicePicker", caret: true, svg: '<rect x="7" y="8" width="10" height="8" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/>' },
+  { key: "netPort", label: "Net Port", tool: "port", caret: true, svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
+  { key: "power", label: "Power / Net Flag", tool: "vcc5v", caret: true, svg: '<path d="M12 21V9M6 9h12M9 5h6"/>' },
+  { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
+  { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 5v14M5 12h14"/>' },
+  { key: "text", label: "Text", tool: "text", caret: true, svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
+  { key: "eraser", label: "Eraser", tool: "eraser", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
+];
+
+function SchemToolPalette({ leftInset, top }: { leftInset: number; top: number }) {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: leftInset + 20,
+        top: top + 92,
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--spacing-1)",
+        padding: "var(--spacing-2)",
+        background: "var(--color-bg-surface)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-xl)",
+        boxShadow: "var(--elevation-4)",
+        zIndex: 13,
+      }}
+    >
+      {SCHEM_TOOLS.map((t) => {
+        const active = !!t.tool && state.tool === t.tool;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            title={t.label}
+            aria-label={t.label}
+            onClick={() => (t.action === "devicePicker" ? actions.openModal("devicePicker") : t.tool && actions.setTool(t.tool))}
+            style={{
+              display: "flex", alignItems: "center", gap: 3,
+              height: 34, padding: t.caret ? "0 4px 0 7px" : "0 7px",
+              borderRadius: "var(--radius-lg)", border: "none", cursor: "pointer",
+              background: active ? "var(--color-bg-brand-subtle)" : "transparent",
+              color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
+            }}
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: t.svg }} />
+            {t.caret && (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.4"><path d="M6 9l6 6 6-6" /></svg>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -293,7 +361,12 @@ export function CanvasArea() {
         bottom: 36,
         left,
         right,
-        background: "var(--color-bg-page)",
+        // Schematic uses a light lavender engineering-sheet wash; other modes
+        // keep the neutral page background.
+        background:
+          state.mode === "schematic"
+            ? "color-mix(in srgb, var(--color-violet-600) 4%, var(--color-bg-surface))"
+            : "var(--color-bg-page)",
         overflow: "hidden",
         zIndex: 10,
       }}
@@ -452,49 +525,9 @@ export function CanvasArea() {
         )}
       </div>
 
-      {/* floating tools (schematic only · View ▸ Floating Tool) — compact
-          horizontal pill, draggable by the grip on the left. */}
+      {/* schematic tool palette — vertical, docked at the left of the canvas */}
       {state.mode === "schematic" && v["Floating Tool"] !== false && (
-        <div
-          style={{
-            position: "absolute",
-            top: state.floatPos.y,
-            left: state.floatPos.x,
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--spacing-1)",
-            padding: "var(--spacing-2) var(--spacing-3)",
-            background: "var(--color-bg-surface)",
-            border: "var(--border-width-1) solid var(--color-border-default)",
-            borderRadius: "var(--radius-full)",
-            boxShadow: "var(--elevation-4)",
-            zIndex: 13,
-          }}
-        >
-          {/* drag grip */}
-          <div
-            onMouseDown={actions.startFloatDrag}
-            aria-label="Move tools"
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 18, height: 30, cursor: "move", color: "var(--color-text-tertiary)", userSelect: "none" }}
-          >
-            <svg width="10" height="18" viewBox="0 0 10 18" fill="currentColor"><circle cx="3" cy="3" r="1.4"/><circle cx="7" cy="3" r="1.4"/><circle cx="3" cy="9" r="1.4"/><circle cx="7" cy="9" r="1.4"/><circle cx="3" cy="15" r="1.4"/><circle cx="7" cy="15" r="1.4"/></svg>
-          </div>
-          <span style={{ width: 1, height: 20, background: "var(--color-border-subtle)", margin: "0 2px" }} />
-          {FLOAT_SVGS.map((svg, i) => (
-            <button
-              key={i}
-              type="button"
-              className="ix-tool"
-              style={{
-                height: 30, width: 30, display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: "var(--radius-md)", border: "none", background: "transparent",
-                color: "var(--color-text-primary)", cursor: "pointer",
-              }}
-            >
-              <Icon html={svg} size={16} />
-            </button>
-          ))}
-        </div>
+        <SchemToolPalette leftInset={0} top={0} />
       )}
 
       {/* floating tools (2D editor · View ▸ Floating Tool) — Drawing / Wiring / Preview */}

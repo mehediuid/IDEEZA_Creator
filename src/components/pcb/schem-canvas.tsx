@@ -93,30 +93,12 @@ export function SchematicCanvas() {
         left: 60,
         width: page.w,
         height: page.h,
-        background: "var(--color-bg-surface)",
-        border: "var(--border-width-1) solid var(--color-border-subtle)",
-        borderRadius: "var(--radius-md)",
-        boxShadow: "var(--elevation-3)",
+        // Transparent so the canvas' lavender square-grid shows through — the
+        // sheet is defined by the violet corner brackets, not a white card.
+        background: "transparent",
         color: stroke,
       }}
     >
-      {/* engineering grid — subtle dots inside the drawing area */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: innerLeft,
-          top: innerTop,
-          width: innerW,
-          height: innerH,
-          backgroundImage: "radial-gradient(var(--color-border-default) 1px, transparent 1.2px)",
-          backgroundSize: "22px 22px",
-          backgroundPosition: "center",
-          opacity: 0.5,
-          pointerEvents: "none",
-        }}
-      />
-
       {/* column number labels (top + bottom) */}
       {Array.from({ length: xN }).map((_, i) => {
         const label = String(numbersOnTop ? i + 1 : xN - i);
@@ -185,18 +167,7 @@ export function SchematicCanvas() {
         );
       })}
 
-      {/* inner drawing area — subtle full border + prominent violet corner
-          brackets (the sheet boundary the user reads). */}
-      <div
-        style={{
-          position: "absolute",
-          left: innerLeft,
-          top: innerTop,
-          width: innerW,
-          height: innerH,
-          border: "var(--border-width-1) solid var(--color-border-subtle)",
-        }}
-      />
+      {/* violet corner brackets mark the sheet boundary (no full frame). */}
       <CornerBrackets left={innerLeft} top={innerTop} width={innerW} height={innerH} />
 
       {/* title block */}
