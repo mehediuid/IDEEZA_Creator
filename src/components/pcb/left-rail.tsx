@@ -25,7 +25,7 @@ export function LeftRail({
   const items = buildRail(state, activeKey);
   const { go: goStep, activeProject } = useStepNav();
   const resolvedTop =
-    topOffset ?? (state.viewTog["Top Toolbar"] !== false ? 108 : 62);
+    topOffset ?? 62;
 
   return (
     <div

@@ -555,17 +555,24 @@ export function Toolbar() {
   const overflow = iconItems.slice(PRIMARY_INLINE);
   const dropdowns = items.filter((it) => it.kind === "dd");
 
+  // The toolbar is a bar that sits over the canvas column only — the side
+  // panels run full-height under the TopBar and flank it. Its left/right
+  // insets mirror the canvas so it aligns exactly with the drawing area.
+  const v = state.viewTog;
+  const leftInset = v["Left-Side panel"] !== false ? 366 : 74;
+  const rightInset = v["Right-Side Panel"] !== false ? 292 : 0;
+
   return (
     <div
       style={{
         position: "absolute",
         top: 62,
-        left: 0,
-        right: 0,
+        left: leftInset,
+        right: rightInset,
         height: 46,
         background: "var(--color-bg-surface)",
         borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-        padding: "0 var(--spacing-7)",
+        padding: "0 var(--spacing-6)",
         zIndex: 18,
         display: "flex",
         alignItems: "center",

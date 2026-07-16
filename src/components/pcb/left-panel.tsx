@@ -111,7 +111,7 @@ export function LeftPanel({
     <div
       style={{
         position: "absolute",
-        top: topOffset ?? (state.viewTog["Top Toolbar"] !== false ? 108 : 62),
+        top: topOffset ?? (62),
         bottom: bottomOffset,
         left: 74,
         width: 292,
