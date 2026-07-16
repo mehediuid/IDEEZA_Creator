@@ -106,6 +106,10 @@ function SchemToolPalette() {
   const state = usePcbState();
   const actions = usePcbActions();
   const [openKey, setOpenKey] = React.useState<string | null>(null);
+  // Per-group chosen variant index — the palette shows whatever was last
+  // picked from that group's dropdown (split-button behaviour), not always
+  // the first option.
+  const [chosen, setChosen] = React.useState<Record<string, number>>({});
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -142,10 +146,12 @@ function SchemToolPalette() {
       }}
     >
       {SCHEM_TOOLS.map((t) => {
-        // Grouped row → primary icon/action comes from the first variant;
-        // standalone row → the row itself carries the tool/action + glyph.
-        const primary = t.options ? t.options[0] : t;
-        const primarySvg = t.options ? t.options[0].svg : (t.svg ?? "");
+        // Grouped row → primary icon/action is the last-chosen variant (falls
+        // back to the first); standalone row → the row itself carries the
+        // tool/action + glyph.
+        const chosenIdx = t.options ? Math.min(chosen[t.key] ?? 0, t.options.length - 1) : 0;
+        const primary = t.options ? t.options[chosenIdx] : t;
+        const primarySvg = t.options ? t.options[chosenIdx].svg : (t.svg ?? "");
         const active = t.options
           ? t.options.some((o) => o.tool && state.tool === o.tool)
           : !!t.tool && state.tool === t.tool;
@@ -199,18 +205,20 @@ function SchemToolPalette() {
                 style={{ position: "absolute", left: "calc(100% + 8px)", top: 0, minWidth: 190, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-3)", zIndex: 40 }}
               >
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--color-text-tertiary)", padding: "2px 8px 6px" }}>{t.label}</div>
-                {t.options.map((o) => {
-                  const optActive = !!o.tool && state.tool === o.tool;
+                {t.options.map((o, oi) => {
+                  // Mark the variant currently shown in the palette (the chosen
+                  // one) so the dropdown reflects what the split button displays.
+                  const optChosen = oi === chosenIdx;
                   return (
                     <div
                       key={o.label}
                       className="ix-row"
-                      onClick={() => run(o)}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optActive ? "var(--color-bg-brand-subtle)" : "transparent" }}
+                      onClick={() => { setChosen((c) => ({ ...c, [t.key]: oi })); run(o); }}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optChosen ? "var(--color-bg-brand-subtle)" : "transparent" }}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={optActive ? "var(--color-violet-600)" : "var(--color-text-secondary)"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }} dangerouslySetInnerHTML={{ __html: o.svg }} />
-                      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optActive ? 700 : 500, color: optActive ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
-                      {optActive && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={optChosen ? "var(--color-violet-600)" : "var(--color-text-secondary)"} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }} dangerouslySetInnerHTML={{ __html: o.svg }} />
+                      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optChosen ? 700 : 500, color: optChosen ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
+                      {optChosen && (
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
                       )}
                     </div>

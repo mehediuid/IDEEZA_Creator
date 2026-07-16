@@ -289,14 +289,17 @@ const ITEMS_2D: Item[] = [
   { kind: "icon", key: "bom", action: "openPickPlace", label: "Pick and Place" },
 ];
 
-function Divider() {
+// `gutter` overrides the horizontal margin (px). Because flex `gap` also adds
+// space around each item, the caller passes a gutter that nets the desired
+// visible side-gap: (gutter + containerGap) px on each side of the rule.
+function Divider({ gutter }: { gutter?: number } = {}) {
   return (
     <div
       style={{
         width: 1,
         height: 22,
         background: "var(--color-border-default)",
-        margin: "0 var(--spacing-3)",
+        margin: gutter != null ? `0 ${gutter}px` : "0 var(--spacing-3)",
         flex: "0 0 auto",
       }}
     />
@@ -643,13 +646,17 @@ export function Toolbar() {
         })}
       </div>
 
-      <Divider />
+      {/* leading rule: 12px each side (outer gap is --spacing-2 = 4px → +8) */}
+      <Divider gutter={state.mode === "schematic" ? 8 : undefined} />
 
       {state.mode === "schematic" ? (
         <>
-          {/* schematic: fixed 12 essentials, 20px icon-to-icon gap */}
+          {/* schematic: fixed 12 essentials — 20px icon-to-icon; each divider
+              nets 12px per side (row gap 20 + −8 margin). */}
           <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
-            {SCHEM_ESSENTIAL.map((it, i) => renderItem(it, i))}
+            {SCHEM_ESSENTIAL.map((it, i) =>
+              it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i),
+            )}
           </div>
           <OverflowMenu items={SCHEM_OVERFLOW} render={renderItem} />
         </>
