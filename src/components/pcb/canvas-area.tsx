@@ -47,12 +47,23 @@ function GridPattern() {
   );
 }
 
-// Schematic left tool palette — 6 grouped tools, each opening a dropdown of
-// variants (matching the design spec). The palette button shows the group's
-// default icon; a separate caret opens the variant list. Hand lives inside
-// Select. Every option arms a real tool (or opens the device picker).
+// Schematic left tool palette — the full tool set (as before), with the
+// variant dropdowns from the design spec layered on top. Grouped rows show a
+// default icon + a caret that opens the variant list; standalone rows
+// (No Connect · Junction · Eraser) are a single icon button. Hand lives inside
+// Select. Every option arms a real tool, places a symbol, opens the device
+// picker, or erases the selection.
 type SchemOpt = { label: string; tool?: string; action?: "devicePicker"; svg: string };
-type SchemTool = { key: string; label: string; options: SchemOpt[] };
+type SchemTool = {
+  key: string;
+  label: string;
+  // standalone row (no dropdown): a direct tool/action + its own glyph
+  tool?: string;
+  action?: "devicePicker" | "erase";
+  svg?: string;
+  // grouped row (dropdown of variants; the primary icon = options[0])
+  options?: SchemOpt[];
+};
 const SCHEM_TOOLS: SchemTool[] = [
   { key: "select", label: "Select", options: [
     { label: "Pointer", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
@@ -81,11 +92,14 @@ const SCHEM_TOOLS: SchemTool[] = [
     { label: "+5V", tool: "vcc5v", svg: '<path d="M12 20V9M6 9h12M9 5h6"/>' },
     { label: "Earth / AGND", tool: "agnd", svg: '<path d="M12 4v9M6 13h12M9 16l3 4 3-4"/>' },
   ] },
+  { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
+  { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
   { key: "text", label: "Text", options: [
     { label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
     { label: "Note", tool: "note", svg: '<path d="M5 5h14v10H9l-4 4z"/>' },
     { label: "Field", tool: "field", svg: '<path d="M9 5c-2 0-2 3-3 4 1 1 1 6 3 6M15 5c2 0 2 3 3 4-1 1-1 6-3 6"/>' },
   ] },
+  { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
 ];
 
 function SchemToolPalette() {
@@ -101,8 +115,9 @@ function SchemToolPalette() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [openKey]);
 
-  const run = (o: SchemOpt) => {
+  const run = (o: { tool?: string; action?: "devicePicker" | "erase" }) => {
     if (o.action === "devicePicker") actions.openModal("devicePicker");
+    else if (o.action === "erase") actions.deleteSelected();
     else if (o.tool) actions.setTool(o.tool);
     setOpenKey(null);
   };
@@ -127,8 +142,13 @@ function SchemToolPalette() {
       }}
     >
       {SCHEM_TOOLS.map((t) => {
-        const primary = t.options[0];
-        const active = t.options.some((o) => o.tool && state.tool === o.tool);
+        // Grouped row → primary icon/action comes from the first variant;
+        // standalone row → the row itself carries the tool/action + glyph.
+        const primary = t.options ? t.options[0] : t;
+        const primarySvg = t.options ? t.options[0].svg : (t.svg ?? "");
+        const active = t.options
+          ? t.options.some((o) => o.tool && state.tool === o.tool)
+          : !!t.tool && state.tool === t.tool;
         return (
           <div key={t.key} style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
             {/* primary icon — fixed 34px column so every icon aligns vertically */}
@@ -149,26 +169,31 @@ function SchemToolPalette() {
                 color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: primary.svg }} />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: primarySvg }} />
             </button>
-            {/* separate caret (own hover) — opens the variant dropdown */}
-            <button
-              type="button"
-              className="ix-tool"
-              aria-label={`${t.label} options`}
-              aria-expanded={openKey === t.key}
-              onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
-              style={{
-                width: 16, height: 34, flex: "0 0 16px", display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
-                background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
-                color: "var(--color-text-tertiary)",
-              }}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
-            </button>
+            {/* caret slot — a real button when the row has a dropdown, else an
+                empty 16px spacer so every icon column stays aligned */}
+            {t.options ? (
+              <button
+                type="button"
+                className="ix-tool"
+                aria-label={`${t.label} options`}
+                aria-expanded={openKey === t.key}
+                onClick={() => setOpenKey((k) => (k === t.key ? null : t.key))}
+                style={{
+                  width: 16, height: 34, flex: "0 0 16px", display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "var(--radius-md)", border: "none", cursor: "pointer",
+                  background: openKey === t.key ? "var(--color-bg-brand-subtle)" : "transparent",
+                  color: "var(--color-text-tertiary)",
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+            ) : (
+              <span style={{ width: 16, flex: "0 0 16px" }} aria-hidden />
+            )}
             {/* dropdown — group label + variant rows (icon · name · check) */}
-            {openKey === t.key && (
+            {t.options && openKey === t.key && (
               <div
                 role="menu"
                 style={{ position: "absolute", left: "calc(100% + 8px)", top: 0, minWidth: 190, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-3)", zIndex: 40 }}
