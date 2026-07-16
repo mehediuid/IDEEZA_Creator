@@ -361,12 +361,7 @@ export function CanvasArea() {
         bottom: 36,
         left,
         right,
-        // Schematic uses a light lavender engineering-sheet wash; other modes
-        // keep the neutral page background.
-        background:
-          state.mode === "schematic"
-            ? "color-mix(in srgb, var(--color-violet-600) 4%, var(--color-bg-surface))"
-            : "var(--color-bg-page)",
+        background: "var(--color-bg-page)",
         overflow: "hidden",
         zIndex: 10,
       }}
