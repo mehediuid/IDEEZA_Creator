@@ -19,12 +19,6 @@ const VIEW_ITEMS: { label: string; value: "common" | "all" }[] = [
   { label: "All Library", value: "all" },
 ];
 
-const COMMON_TABS: { label: string; value: LibCommonTab }[] = [
-  { label: "Schematic", value: "schematic" },
-  { label: "PCB", value: "pcb" },
-  { label: "Panel", value: "panel" },
-];
-
 // Common Library is a browsable grid of symbol-preview cards. Each card shows
 // the actual schematic/PCB symbol, a name, and a variant dropdown (package /
 // value). Clicking the preview drops that part on the canvas.
@@ -231,34 +225,7 @@ export function LibraryPanel() {
 
       {state.libView === "common" && (
         <>
-          <div style={{ display: "flex", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-7) var(--spacing-5)" }}>
-            {COMMON_TABS.map((t) => {
-              const active = state.libCommonTab === t.value;
-              return (
-                <div
-                  key={t.value}
-                  className="ix-tab"
-                  onClick={() => actions.setLibCommonTab(t.value)}
-                  style={{
-                    flex: 1,
-                    textAlign: "center",
-                    fontSize: "var(--font-size-sm)",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: "var(--spacing-2) var(--spacing-4)",
-                    borderRadius: "var(--radius-full)",
-                    background: active ? "var(--color-bg-brand-subtle)" : "transparent",
-                    color: active ? "var(--color-text-brand)" : "var(--color-text-tertiary)",
-                    border: `var(--border-width-1) solid ${active ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
-                  }}
-                >
-                  {t.label}
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ padding: "var(--spacing-0) var(--spacing-7) var(--spacing-6)" }}>
+          <div style={{ padding: "var(--spacing-5) var(--spacing-7) var(--spacing-6)" }}>
             <SearchInput value={commonQuery} onValueChange={setCommonQuery} placeholder="Search parts & compo.." />
           </div>
 

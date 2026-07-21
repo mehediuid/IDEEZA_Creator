@@ -109,7 +109,7 @@ export function SchematicCanvas() {
           height: innerH,
           background: "var(--color-bg-surface)",
           backgroundImage:
-            "linear-gradient(color-mix(in srgb, var(--color-violet-600) 10%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--color-violet-600) 10%, transparent) 1px, transparent 1px)",
+            "linear-gradient(color-mix(in srgb, var(--color-text-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--color-text-primary) 7%, transparent) 1px, transparent 1px)",
           backgroundSize: "24px 24px",
           borderRadius: "var(--radius-md)",
           pointerEvents: "none",
@@ -117,7 +117,7 @@ export function SchematicCanvas() {
       />
 
       {/* column number labels (top + bottom) */}
-      {Array.from({ length: xN }).map((_, i) => {
+      {b.show && b.zoneRefOn && Array.from({ length: xN }).map((_, i) => {
         const label = String(numbersOnTop ? i + 1 : xN - i);
         const cx = innerLeft + colStep * (i + 0.5);
         return (
@@ -129,7 +129,7 @@ export function SchematicCanvas() {
                 left: cx - 6,
                 fontSize: "var(--font-size-xs)",
                 color: stroke,
-                opacity: 0.75,
+                opacity: 0.5,
               }}
             >
               {label}
@@ -141,7 +141,7 @@ export function SchematicCanvas() {
                 left: cx - 6,
                 fontSize: "var(--font-size-xs)",
                 color: stroke,
-                opacity: 0.75,
+                opacity: 0.5,
               }}
             >
               {label}
@@ -151,7 +151,7 @@ export function SchematicCanvas() {
       })}
 
       {/* row letter labels (left + right) */}
-      {Array.from({ length: yN }).map((_, i) => {
+      {b.show && b.zoneRefOn && Array.from({ length: yN }).map((_, i) => {
         const label = lettersOnLeft ? toLetters(i) : toLetters(yN - 1 - i);
         const cy = innerTop + rowStep * (i + 0.5);
         return (
@@ -163,7 +163,7 @@ export function SchematicCanvas() {
                 top: cy - 6,
                 fontSize: "var(--font-size-xs)",
                 color: stroke,
-                opacity: 0.75,
+                opacity: 0.5,
               }}
             >
               {label}
@@ -175,7 +175,7 @@ export function SchematicCanvas() {
                 top: cy - 6,
                 fontSize: "var(--font-size-xs)",
                 color: stroke,
-                opacity: 0.75,
+                opacity: 0.5,
               }}
             >
               {label}
@@ -185,7 +185,7 @@ export function SchematicCanvas() {
       })}
 
       {/* violet corner brackets mark the sheet boundary (no full frame). */}
-      <CornerBrackets left={innerLeft} top={innerTop} width={innerW} height={innerH} />
+      {b.show && <CornerBrackets left={innerLeft} top={innerTop} width={innerW} height={innerH} />}
 
       {/* title block */}
       {showTitle && (
@@ -203,9 +203,9 @@ export function SchematicCanvas() {
 // Violet L-brackets marking the four corners of the drawing area — the sheet
 // boundary the reference uses instead of a heavy ruled frame.
 function CornerBrackets({ left, top, width, height }: { left: number; top: number; width: number; height: number }) {
-  const ARM = 26;
-  const T = 2.5;
-  const c = "var(--color-violet-600)";
+  const ARM = 22;
+  const T = 1.5;
+  const c = "color-mix(in srgb, var(--color-violet-600) 78%, transparent)";
   const base: React.CSSProperties = { position: "absolute", width: ARM, height: ARM, pointerEvents: "none" };
   return (
     <>
@@ -230,20 +230,18 @@ function TitleBlock({
   bottom: boolean;
   fields: Array<{ key: string; on: boolean; valueOn: boolean; value: string }>;
 }) {
-  const boardName = findValue(fields, "boardName", "");
-  const schematic = findValue(fields, "schematic", "");
-  const title = boardName || schematic || "Untitled Board";
-  const rev = findValue(fields, "version", "");
-  const pageNo = findValue(fields, "pageNo", "");
-  const pageCount = findValue(fields, "pageCount", "");
-  const size = findValue(fields, "pageSize", "");
-  const date = findValue(fields, "createDate", "");
+  const title = findValue(fields, "title", "") || "Untitled Board";
+  const docNo = findValue(fields, "docNo", "");
+  const rev = findValue(fields, "revision", "");
+  const date = findValue(fields, "date", "");
+  const author = findValue(fields, "author", "");
+  const sheetNo = findValue(fields, "sheetNo", "");
   const company = findValue(fields, "company", "");
 
   const meta: string[] = [];
   if (rev && rev !== "—") meta.push(`Rev ${rev}`);
-  if (pageNo && pageNo !== "—") meta.push(`${pageNo}${pageCount && pageCount !== "—" ? ` / ${pageCount}` : ""}`);
-  if (size && size !== "—") meta.push(size);
+  if (sheetNo && sheetNo !== "—") meta.push(sheetNo);
+  if (docNo && docNo !== "—") meta.push(docNo);
   if (date && date !== "—") meta.push(date);
 
   return (
@@ -279,7 +277,7 @@ function TitleBlock({
           {title}
         </div>
         <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {schematic && schematic !== "—" ? `${schematic} · schematic` : "schematic"}
+          {author && author !== "—" ? `${author} · schematic` : "schematic"}
         </div>
       </div>
 

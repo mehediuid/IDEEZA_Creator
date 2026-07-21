@@ -10,14 +10,15 @@ import * as React from "react";
 import { useStepNav } from "@/components/manual/use-step-nav";
 import { Icon } from "@/lib/pcb/icons";
 import { buildCanvas } from "@/lib/pcb/content";
-import { buildModeTabs } from "@/lib/pcb/data";
-import { AXIS_SVG, NEXT_SVG, PLANE_SVG } from "@/lib/pcb/markup";
+import { buildModeTabs, buildPcbViewTabs } from "@/lib/pcb/data";
+import { AXIS_SVG, NEXT_SVG } from "@/lib/pcb/markup";
 import { SchematicCanvas } from "@/components/pcb/schem-canvas";
 import { PcbCanvas } from "@/components/pcb/pcb-canvas";
 import { PcbThreeView } from "@/components/pcb/pcb-three-view";
 import { PlacedObjects } from "@/components/pcb/placed-objects";
 import { BOARD_COLOR_HEX, PAD_COLOR_HEX } from "@/lib/pcb/pcb-3d";
 import { PLACE_TOOLS, DRAFT_TOOLS, isSelectable } from "@/lib/pcb/types";
+import { pinsOf } from "@/lib/pcb/nets";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const DRAG_THRESHOLD = 4;
@@ -26,11 +27,13 @@ const GRID_MINOR = 24;
 const GRID_MAJOR = 120;
 
 function GridPattern() {
-  // Faint violet square-line grid (two scales), tiling infinitely — matches
-  // the schematic design-area reference. Lines are violet-tinted so the whole
-  // canvas reads as a light lavender engineering sheet.
-  const minor = "color-mix(in srgb, var(--color-violet-600) 14%, transparent)";
-  const major = "color-mix(in srgb, var(--color-violet-600) 26%, transparent)";
+  // Faint neutral square-line grid (two scales), tiling infinitely. Lines are
+  // a low-alpha mix of the primary ink, so they stay theme-adaptive (dark on a
+  // light sheet, light on a dark sheet) and read as quiet engineering
+  // scaffolding — never the brand violet, which is reserved for content + UI
+  // accents so it can actually stand out against the grid.
+  const minor = "color-mix(in srgb, var(--color-text-primary) 6%, transparent)";
+  const major = "color-mix(in srgb, var(--color-text-primary) 11%, transparent)";
   return (
     <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       <defs>
@@ -38,7 +41,7 @@ function GridPattern() {
           <path d={`M ${GRID_MINOR} 0 L 0 0 0 ${GRID_MINOR}`} fill="none" stroke={minor} strokeWidth="1" />
         </pattern>
         <pattern id="ix-grid-major" width={GRID_MAJOR} height={GRID_MAJOR} patternUnits="userSpaceOnUse">
-          <path d={`M ${GRID_MAJOR} 0 L 0 0 0 ${GRID_MAJOR}`} fill="none" stroke={major} strokeWidth="1.2" />
+          <path d={`M ${GRID_MAJOR} 0 L 0 0 0 ${GRID_MAJOR}`} fill="none" stroke={major} strokeWidth="1" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#ix-grid-minor)" />
@@ -76,10 +79,18 @@ const SCHEM_TOOLS: SchemTool[] = [
     { label: "Bus", tool: "bus", svg: '<path d="M5 18c4 0 3-12 7-12M12 6"/><path d="M6 18h12" opacity="0"/>' },
     { label: "Bus entry", tool: "busEntry", svg: '<path d="M6 18c5 0 7-2 7-7"/>' },
   ] },
-  { key: "component", label: "Component", options: [
-    { label: "Symbol", action: "devicePicker", svg: '<rect x="7" y="8" width="10" height="8" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/>' },
-    { label: "Power port", tool: "vcc5v", svg: '<path d="M12 20V7M7 12l5-5 5 5"/>' },
-    { label: "Net tie", tool: "netTie", svg: '<path d="M6 16a6 6 0 0 1 12 0"/>' },
+  // Shapes — the drawing primitives a schematic needs to sketch symbols,
+  // outlines and annotations. Rectangle/Circle/Ellipse/Arc/Bezier place a
+  // shape; Line/Polyline draw click-to-click segments. Every option arms a
+  // real place/draft tool (see PLACE_TOOLS / DRAFT_TOOLS).
+  { key: "shapes", label: "Shapes", options: [
+    { label: "Rectangle", tool: "rectangle", svg: '<rect x="4.5" y="6.5" width="15" height="11" rx="1"/>' },
+    { label: "Line", tool: "line", svg: '<path d="M5 19L19 5"/>' },
+    { label: "Polyline", tool: "polyline", svg: '<path d="M4 15l5-6 4 3 7-8"/>' },
+    { label: "Circle", tool: "circle", svg: '<circle cx="12" cy="12" r="7.5"/>' },
+    { label: "Ellipse", tool: "ellipse", svg: '<ellipse cx="12" cy="12" rx="9" ry="6"/>' },
+    { label: "Arc", tool: "arc", svg: '<path d="M4 17a8 8 0 0 1 16 0"/>' },
+    { label: "Bezier curve", tool: "bezier", svg: '<path d="M4 18C4 9 20 15 20 6"/>' },
   ] },
   { key: "netLabel", label: "Net Label", options: [
     { label: "Local label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
@@ -245,6 +256,7 @@ export function CanvasArea() {
   const actions = usePcbActions();
   const { go: goStep } = useStepNav();
   const modeTabs = buildModeTabs(state, actions);
+  const pcbViewTabs = buildPcbViewTabs(state, actions);
   const v = state.viewTog;
   // Breadcrumb + old MenuBar strips removed; everything that used to sit at
   // 225/142 now starts at 145/62 (just below the TopBar, optionally below the
@@ -325,6 +337,51 @@ export function CanvasArea() {
     };
   }, [state.selectedIds, state.draftWire, state.rubberBand, state.tool, actions]);
 
+  // Grab-move (right-click ▸ Move): the picked-up selection follows the cursor;
+  // the next mousedown drops it (committing one undo step), Escape cancels.
+  React.useEffect(() => {
+    if (!state.moveMode) return;
+    let last: { x: number; y: number } | null = null;
+    const onMove = (e: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const cx = (e.clientX - rect.left - state.pan.x) / state.zoom;
+      const cy = (e.clientY - rect.top - state.pan.y) / state.zoom;
+      if (last) actions.translateMove(cx - last.x, cy - last.y);
+      last = { x: cx, y: cy };
+    };
+    const onDown = (e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); actions.commitMove(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") actions.cancelMove(); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mousedown", onDown, true); // capture: beat canvas handlers
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mousedown", onDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [state.moveMode, state.pan, state.zoom, actions]);
+
+  // Snap a wire point to the nearest symbol pin / wire endpoint (so wires land
+  // exactly on pins → clean connectivity), else to the grid when Snap is on.
+  const snapWire = (cx: number, cy: number) => {
+    if (state.mode !== "schematic") return { x: cx, y: cy };
+    const TOL = 12;
+    let best: { x: number; y: number } | null = null;
+    let bd = TOL * TOL;
+    const first = state.schematicSheets[0]?.id;
+    for (const o of state.objects) {
+      if (o.scope && o.scope !== "schematic") continue;
+      if ((o.sheetId ?? first) !== state.activeSheetId) continue;
+      const cands: { x: number; y: number }[] = pinsOf(o);
+      if (o.kind === "wire" || o.kind === "bus") cands.push({ x: o.x, y: o.y }, { x: o.endX ?? o.x, y: o.endY ?? o.y });
+      for (const p of cands) { const d = (p.x - cx) ** 2 + (p.y - cy) ** 2; if (d < bd) { bd = d; best = p; } }
+    }
+    if (best) return best;
+    if (state.snapEnabled) return { x: Math.round(cx / 10) * 10, y: Math.round(cy / 10) * 10 };
+    return { x: cx, y: cy };
+  };
+
   // Ctrl/Cmd + wheel zooms at the cursor; plain wheel scrolls inside flow (no-op here).
   const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (!(e.ctrlKey || e.metaKey)) return;
@@ -344,8 +401,10 @@ export function CanvasArea() {
   //  - left + select tool + clicked on empty canvas: rubber-band selection
   //  - everything else: place/draft handled by onClick on mouseup
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (state.moveMode) return; // grab-move owns the pointer; its window listener drops it
     if (e.button !== 0 && e.button !== 1) return;
     const isLeft = e.button === 0;
+    const downAdditive = e.shiftKey || e.metaKey || e.ctrlKey;
     const target = e.target as HTMLElement;
     const objNode = target.closest("[data-object-id]") as HTMLElement | null;
     const clickedObjectId = objNode?.getAttribute("data-object-id") ?? null;
@@ -389,10 +448,15 @@ export function CanvasArea() {
       setIsPanning(true);
       mode = "pan";
     } else if (intentMoveObject && clickedObjectId) {
-      // Select first (or add to selection if shift), then prepare to move all selected.
-      // intentMoveObject already guarantees clickedObj is selectable.
-      if (!state.selectedIds.includes(clickedObjectId)) {
-        actions.selectPlaced(clickedObjectId, e.shiftKey || e.metaKey || e.ctrlKey);
+      // mousedown is the single selection authority (it always fires — unlike
+      // the object's click, which also double-toggled shift+click). Additive =
+      // toggle in/out of the selection; a fresh non-additive press selects so
+      // an immediate drag moves it. A plain click that isn't a drag collapses
+      // the selection to this object (handled in `up`).
+      if (downAdditive) {
+        actions.selectPlaced(clickedObjectId, true);
+      } else if (!state.selectedIds.includes(clickedObjectId)) {
+        actions.selectPlaced(clickedObjectId, false);
       }
       // Snapshot of objects that may end up dragged. We finalize the actual
       // set once the user crosses the drag threshold (in case the click was
@@ -421,7 +485,8 @@ export function CanvasArea() {
           // draws it in one gesture (DraftLine previews live).
           mode = "tool";
           if (DRAFT_TOOLS.includes(state.tool) && !state.draftWire && canvasStart) {
-            actions.startWire(state.tool, canvasStart.x, canvasStart.y);
+            const sp = snapWire(canvasStart.x, canvasStart.y);
+            actions.startWire(state.tool, sp.x, sp.y);
             draftStartedInDrag = true;
           }
         } else {
@@ -458,6 +523,9 @@ export function CanvasArea() {
     const up = (ev: MouseEvent) => {
       if (mode === "rubber") {
         actions.commitRubberBand(ev.shiftKey);
+        // Swallow the trailing click — otherwise the canvas onClick clears the
+        // just-committed marquee selection.
+        suppressClickRef.current = true;
       } else if (
         mode === "tool" &&
         DRAFT_TOOLS.includes(state.tool) &&
@@ -469,8 +537,12 @@ export function CanvasArea() {
         // not immediately start a new dangling draft.
         const cx = (ev.clientX - rect.left - state.pan.x) / state.zoom;
         const cy = (ev.clientY - rect.top - state.pan.y) / state.zoom;
-        actions.finishWire(cx, cy);
+        const sp = snapWire(cx, cy);
+        actions.finishWire(sp.x, sp.y);
         suppressClickRef.current = true;
+      } else if (mode === "idle" && intentMoveObject && clickedObjectId && !downAdditive) {
+        // A plain click on an object (no drag, no shift) → sole selection.
+        actions.selectPlaced(clickedObjectId, false);
       }
       panRef.current = null;
       setIsPanning(false);
@@ -503,7 +575,7 @@ export function CanvasArea() {
           left: 0,
           width: 30,
           height: 22,
-          background: "var(--color-bg-surface)",
+          background: "var(--color-bg-page)",
           borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
           borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
           zIndex: 11,
@@ -552,6 +624,29 @@ export function CanvasArea() {
               {mt.label}
             </div>
           ))}
+          {(state.mode === "pcb" || state.mode === "3d") && (
+            <>
+              <span style={{ width: 1, alignSelf: "stretch", margin: "var(--spacing-1) var(--spacing-2)", background: "var(--color-border-subtle)" }} />
+              {pcbViewTabs.map((vt) => (
+                <div
+                  key={vt.label}
+                  className="ix-seg"
+                  onClick={vt.onClick}
+                  style={{
+                    padding: "var(--spacing-3) var(--spacing-8)",
+                    borderRadius: "var(--radius-lg)",
+                    fontSize: "var(--font-size-sm)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: vt.bg,
+                    color: vt.fg,
+                  }}
+                >
+                  {vt.label}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -582,10 +677,11 @@ export function CanvasArea() {
             return;
           }
           if (interactiveMode && DRAFT_TOOLS.includes(state.tool)) {
+            const sp = snapWire(cx, cy);
             if (!state.draftWire) {
-              actions.startWire(state.tool, cx, cy);
+              actions.startWire(state.tool, sp.x, sp.y);
             } else {
-              actions.finishWire(cx, cy);
+              actions.finishWire(sp.x, sp.y);
             }
             return;
           }
@@ -609,7 +705,9 @@ export function CanvasArea() {
               : state.mode === "3d"
               ? state.threeD.bgColor
               : undefined,
-          cursor: isPanning
+          cursor: state.moveMode
+            ? "grabbing"
+            : isPanning
             ? "grabbing"
             : handMode
             ? "grab"
@@ -629,7 +727,14 @@ export function CanvasArea() {
               position: "absolute",
               top: 0,
               left: 0,
-              transform: `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`,
+              // Flip Board: mirror the PCB content horizontally about the board
+              // centre so the operator sees the bottom side (text reads mirrored,
+              // as it should when viewed from below).
+              transform:
+                `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})` +
+                (state.mode === "pcb" && state.boardFlipped
+                  ? ` translate(${2 * (60 + state.pcbBoard.width / 2)}px, 0) scaleX(-1)`
+                  : ""),
               transformOrigin: "0 0",
               willChange: "transform",
             }}
@@ -643,7 +748,6 @@ export function CanvasArea() {
             ) : (
               <div dangerouslySetInnerHTML={{ __html: buildCanvas(state.mode) }} />
             )}
-            {state.mode === "schematic" && <CanvasObjects />}
             {(state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d") && <PlacedObjects />}
           </div>
         )}
@@ -675,28 +779,6 @@ export function CanvasArea() {
       {/* Zoom indicator */}
       <ZoomBadge zoom={state.zoom} />
 
-      {/* Plane pill */}
-      <div
-        className="ix-btn"
-        style={{
-          position: "absolute",
-          bottom: 24,
-          left: 50,
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--spacing-4)",
-          padding: "var(--spacing-4) var(--spacing-8)",
-          background: "var(--color-bg-surface)",
-          border: "var(--border-width-1-5) solid #fbd5f3",
-          borderRadius: "var(--radius-3xl)",
-          cursor: "pointer",
-          boxShadow: "0 4px 12px rgba(254,42,212,.12)",
-        }}
-      >
-        <Icon html={PLANE_SVG} size={16} />
-        <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>XY Plane</span>
-      </div>
-
       {/* Continue pill — explicit destination label so the user always knows
           which step comes next (we no longer rely on a separate stepper CTA). */}
       <div
@@ -710,14 +792,14 @@ export function CanvasArea() {
           alignItems: "center",
           gap: "var(--spacing-4)",
           padding: "var(--spacing-4) var(--spacing-10)",
-          background: "var(--color-bg-surface)",
-          border: "var(--border-width-1-5) solid #fbd5f3",
+          background: "var(--color-violet-600)",
+          border: "none",
           borderRadius: "var(--radius-3xl)",
           cursor: "pointer",
-          boxShadow: "0 4px 12px rgba(254,42,212,.12)",
+          boxShadow: "0 6px 16px color-mix(in srgb, var(--color-violet-600) 30%, transparent)",
         }}
       >
-        <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "#fe2ad4" }}>Continue to Code</span>
+        <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-on-brand)" }}>Continue to Code</span>
         <Icon html={NEXT_SVG} size={16} />
       </div>
     </div>
@@ -1017,13 +1099,13 @@ function Ruler({ axis, zoom, offset }: { axis: "x" | "y"; zoom: number; offset: 
         ...(horizontal
           ? { top: 0, left: 30, right: 0, height: 22 }
           : { top: 22, bottom: 0, left: 0, width: 30 }),
-        background: "var(--color-bg-surface)",
+        background: "var(--color-bg-page)",
         borderBottom: horizontal ? "var(--border-width-1) solid var(--color-border-subtle)" : undefined,
         borderRight: !horizontal ? "var(--border-width-1) solid var(--color-border-subtle)" : undefined,
         overflow: "hidden",
         fontFamily: "var(--font-family-mono), monospace",
         fontSize: 9,
-        color: "var(--color-text-tertiary)",
+        color: "color-mix(in srgb, var(--color-text-tertiary) 55%, transparent)",
         zIndex: 11,
       }}
     >
@@ -1033,7 +1115,7 @@ function Ruler({ axis, zoom, offset }: { axis: "x" | "y"; zoom: number; offset: 
             style={{
               position: "absolute",
               background: "var(--color-text-tertiary)",
-              opacity: 0.65,
+              opacity: 0.3,
               ...(horizontal
                 ? { left: t.pos, top: 14, width: 1, height: 8 }
                 : { top: t.pos, left: 14, height: 1, width: 8 }),
@@ -1138,134 +1220,3 @@ function ZoomBtn({ label, onClick, aria }: { label: string; onClick: () => void;
   );
 }
 
-// Sample on-canvas objects (schematic): a component (U12) + a wire.
-// Click selects → right panel shows object/wire properties. Double-click the
-// designator → inline text editor. Mirrors the Figma double-click + connection-
-// line editing flows.
-function CanvasObjects() {
-  const state = usePcbState();
-  const actions = usePcbActions();
-  const selComp = state.selected === "comp";
-  const selWire = state.selected === "wire";
-
-  return (
-    <div style={{ position: "absolute", top: 150, left: 250, width: 360, height: 220 }}>
-      {/* wire (elbow) */}
-      <svg
-        width="360"
-        height="220"
-        style={{ position: "absolute", inset: 0, overflow: "visible", cursor: "pointer" }}
-        onClick={(e) => {
-          e.stopPropagation();
-          actions.selectObject("wire");
-        }}
-      >
-        <path
-          d="M0 120 H70 V60 H120"
-          fill="none"
-          stroke={selWire ? "var(--color-violet-600)" : "var(--color-text-secondary)"}
-          strokeWidth={selWire ? 2.5 : 1.6}
-        />
-        {selWire && (
-          <>
-            <circle cx="0" cy="120" r="3.5" fill="var(--color-violet-600)" />
-            <circle cx="70" cy="60" r="3.5" fill="var(--color-violet-600)" />
-            <circle cx="120" cy="60" r="3.5" fill="var(--color-violet-600)" />
-          </>
-        )}
-      </svg>
-
-      {/* component U12 (rotation/flip/z-order driven by toolbar) */}
-      <div
-        style={{
-          position: "absolute",
-          left: 120,
-          top: 30,
-          zIndex: state.compZ === "front" ? 2 : 0,
-          transform: `rotate(${state.compRot}deg) scale(${state.compFlipH ? -1 : 1}, ${state.compFlipV ? -1 : 1})`,
-          transformOrigin: "35px 32px",
-          transition: "transform .2s ease",
-        }}
-      >
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            actions.selectObject("comp");
-          }}
-          style={{
-            width: 70,
-            height: 64,
-            background: "var(--color-bg-surface)",
-            border: `${selComp ? "var(--border-width-2)" : "var(--border-width-1)"} solid ${selComp ? "var(--color-violet-600)" : "var(--color-text-primary)"}`,
-            borderRadius: "var(--radius-xs)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-primary)",
-            position: "relative",
-            cursor: "pointer",
-            boxShadow: selComp ? "0 0 0 3px rgba(124,45,185,.15)" : "none",
-          }}
-        >
-          U12
-          {/* pins (clickable → select 'pin') */}
-          {[14, 28, 42, 56].map((y, i) => {
-            const selPin = state.selected === "pin";
-            return (
-              <span
-                key={i}
-                title={`Pin ${i + 1}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  actions.selectObject("pin");
-                }}
-                style={{
-                  position: "absolute",
-                  right: -28,
-                  top: y - 7,
-                  width: 28,
-                  height: 15,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  cursor: "pointer",
-                }}
-              >
-                <span style={{ width: 10, height: 1.5, background: selPin ? "var(--color-violet-600)" : "var(--color-text-primary)" }} />
-                <span style={{ fontSize: "var(--font-size-2xs)", color: selPin ? "var(--color-violet-600)" : "var(--color-text-tertiary)" }}>{i + 1}</span>
-              </span>
-            );
-          })}
-        </div>
-
-        {/* designator (double-click → Text modal + right-panel props, per Figma) */}
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            actions.selectObject("comp");
-          }}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            actions.selectObject("comp");
-            actions.openModal("textEdit");
-          }}
-          style={{
-            position: "absolute",
-            top: 70,
-            left: -10,
-            fontSize: "var(--font-size-2xs)",
-            color: "var(--color-text-error)",
-            whiteSpace: "nowrap",
-            cursor: "text",
-            fontWeight: state.textStyle.b ? 800 : 600,
-            fontStyle: state.textStyle.i ? "italic" : "normal",
-            textDecoration: state.textStyle.u ? "underline" : "none",
-          }}
-        >
-          {state.editText}
-        </div>
-      </div>
-    </div>
-  );
-}

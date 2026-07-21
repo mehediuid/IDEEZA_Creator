@@ -38,6 +38,37 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="M16 0h4" />
     </g>
   ),
+  crystal: (
+    <g stroke="currentColor" strokeWidth={1.7} fill="none" strokeLinecap="round">
+      <path d="M-18 0h9M9 0h9" />
+      <path d="M-6 -9v18M6 -9v18" />
+      <rect x={-3} y={-11} width={6} height={22} />
+    </g>
+  ),
+  // Op-amp / in-amp triangle: two inputs left (+ top, − bottom), output right.
+  opamp: (
+    <g stroke="currentColor" strokeWidth={1.5} fill="none" strokeLinejoin="round" strokeLinecap="round">
+      <path d="M-13 -16 L-13 16 L17 0 Z" />
+      <path d="M-20 -8 H-13 M-20 8 H-13 M17 0 H23" />
+      <path d="M-10 -8 h4 M-8 -10 v4" />
+      <path d="M-10 8 h4" />
+    </g>
+  ),
+  // Rectangular (IEC) resistor — matches the reference sheet's resistor style.
+  resistorBox: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none" strokeLinecap="round">
+      <path d="M-24 0h6M18 0h6" />
+      <rect x={-18} y={-7} width={36} height={14} />
+    </g>
+  ),
+  // Current source: circle with an internal arrow, vertical leads.
+  currentSource: (
+    <g stroke="currentColor" strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx={0} cy={0} r={11} />
+      <path d="M0 -11 V-20 M0 11 V20" />
+      <path d="M0 6 V-5 M-4 -1 L0 -6 L4 -1" />
+    </g>
+  ),
   vcc5v: (
     <g stroke="currentColor" strokeWidth={1.8} fill="currentColor">
       <path d="M0 -14l-6 6h12z" />
@@ -112,6 +143,44 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="M-10 -6h18l4 6-4 6h-18z" />
     </g>
   ),
+  // ── Schematic objects with dedicated property panels (placeable) ────────
+  offPageConnector: (
+    <g stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" fill="none">
+      <path d="M-16 0h6" />
+      <path d="M-10 -7h10l8 7-8 7h-10z" />
+    </g>
+  ),
+  maskRegion: (
+    <g stroke="currentColor" strokeWidth={1.5} strokeDasharray="4 3" fill="currentColor" fillOpacity={0.12}>
+      <rect x={-16} y={-12} width={32} height={24} rx={2} />
+    </g>
+  ),
+  componentMask: (
+    <g stroke="currentColor" strokeWidth={1.5} fill="none">
+      <rect x={-16} y={-12} width={32} height={24} rx={2} strokeDasharray="4 3" />
+      <rect x={-7} y={-5} width={14} height={10} rx={1} />
+    </g>
+  ),
+  diffPairFlag: (
+    <g stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" fill="none">
+      <path d="M-13 -7a11 11 0 0 1 0 14" />
+      <path d="M13 -7a11 11 0 0 0 0 14" />
+      <path d="M-7 -3h14M-7 3h14" strokeWidth={1.3} opacity={0.7} />
+    </g>
+  ),
+  reuseBlock: (
+    <g stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none">
+      <rect x={-15} y={-12} width={30} height={24} rx={2} strokeDasharray="5 3" />
+      <rect x={-5} y={-4} width={10} height={8} rx={1} fill="currentColor" fillOpacity={0.2} />
+    </g>
+  ),
+  netBusLabel: (
+    <g stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <path d="M-16 0h5" />
+      <path d="M-11 -6h16l4 6-4 6h-16z" />
+      <path d="M-6 0h9" strokeDasharray="2 2" opacity={0.55} />
+    </g>
+  ),
   polygon: (
     <g stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" fill="none">
       <path d="M-14 -2l8-12 16 4 4 14-12 10-16-4z" />
@@ -134,6 +203,47 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <rect x={-14} y={-10} width={28} height={20} rx={1.5} />
       <path d="M-14 -5h-4M-14 0h-4M-14 5h-4M14 -5h4M14 0h4M14 5h4" strokeLinecap="round" />
       <text x={0} y={2} textAnchor="middle" fontSize={8} stroke="none" fill="currentColor">U?</text>
+    </g>
+  ),
+  // ── Real land patterns (Schematic → PCB convert output) ────────────────
+  // Filled copper pads in the layer color + faint silkscreen body outline.
+  // 0805 chip (R / C / L): two pads flanking a body.
+  fp0805: (
+    <g>
+      <rect x={-9} y={-9} width={18} height={18} rx={1.5} fill="none" stroke="currentColor" strokeWidth={0.8} strokeOpacity={0.4} />
+      <rect x={-15} y={-8} width={10} height={16} rx={1.5} fill="currentColor" />
+      <rect x={5} y={-8} width={10} height={16} rx={1.5} fill="currentColor" />
+    </g>
+  ),
+  // SOD-123 diode: two pads, cathode end marked with a band.
+  fpSOD123: (
+    <g>
+      <rect x={-6} y={-8} width={12} height={16} rx={1} fill="none" stroke="currentColor" strokeWidth={0.8} strokeOpacity={0.45} />
+      <rect x={2} y={-8} width={4} height={16} fill="currentColor" fillOpacity={0.55} />
+      <rect x={-15} y={-7} width={9} height={14} rx={1.5} fill="currentColor" />
+      <rect x={6} y={-7} width={9} height={14} rx={1.5} fill="currentColor" />
+    </g>
+  ),
+  // SOT-23: three pads (two bottom, one top) + body.
+  fpSOT23: (
+    <g>
+      <rect x={-10} y={-5} width={20} height={10} rx={1.5} fill="none" stroke="currentColor" strokeWidth={0.8} strokeOpacity={0.45} />
+      <rect x={-13} y={5} width={9} height={7} rx={1.2} fill="currentColor" />
+      <rect x={4} y={5} width={9} height={7} rx={1.2} fill="currentColor" />
+      <rect x={-4.5} y={-12} width={9} height={7} rx={1.2} fill="currentColor" />
+    </g>
+  ),
+  // SOIC-8: 4 pads per side, body outline + pin-1 dot.
+  fpSOIC8: (
+    <g>
+      <rect x={-9} y={-18} width={18} height={36} rx={1.5} fill="none" stroke="currentColor" strokeWidth={0.9} strokeOpacity={0.55} />
+      {[-13.5, -4.5, 4.5, 13.5].map((cy) => (
+        <React.Fragment key={cy}>
+          <rect x={-18} y={cy - 3} width={8} height={6} rx={1} fill="currentColor" />
+          <rect x={10} y={cy - 3} width={8} height={6} rx={1} fill="currentColor" />
+        </React.Fragment>
+      ))}
+      <circle cx={-5} cy={-14} r={1.6} fill="currentColor" />
     </g>
   ),
   boardOutline: (
@@ -239,7 +349,7 @@ const GLYPHS: Record<string, React.ReactNode> = {
   ),
 };
 
-const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune", "polyline", "line"]);
+const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune", "polyline", "line", "ratsnest"]);
 
 export function PlacedObjects() {
   const state = usePcbState();
@@ -247,6 +357,24 @@ export function PlacedObjects() {
   const SELECTED = "var(--color-violet-600)";
   const NORMAL = "var(--color-text-primary)";
   const selectedSet = React.useMemo(() => new Set(state.selectedIds), [state.selectedIds]);
+
+  // Objects carry an optional editing scope. Schematic-scoped objects render
+  // only in Schematic mode; everything else (pcb / unscoped) in PCB & 2D.
+  const modeScope = state.mode === "schematic" ? "schematic" : "pcb";
+  // Multi-sheet: in schematic mode only the active sheet's objects render
+  // (undefined sheetId belongs to the first sheet, for back-compat).
+  const firstSheetId = state.schematicSheets[0]?.id;
+  const inScope = (o: CanvasObject) => {
+    if (o.scope && o.scope !== modeScope) return false;
+    if (state.mode === "schematic" && (o.sheetId ?? firstSheetId) !== state.activeSheetId) return false;
+    return true;
+  };
+  // Net highlight — objects on the highlighted net glow amber over everything.
+  // Schematic nets are computed live (no stored `net`), so members come from the
+  // id list the store resolved when the net was highlighted; PCB uses `o.net`.
+  const HIGHLIGHT = "#f5a623";
+  const hotSet = React.useMemo(() => new Set(state.highlightedMembers), [state.highlightedMembers]);
+  const isHot = (o: CanvasObject) => hotSet.has(o.id) || (!!state.highlightedNet && o.net === state.highlightedNet);
 
   // PCB mode: look up layer color + visibility per object. Schematic mode
   // ignores `obj.layer` entirely.
@@ -285,7 +413,10 @@ export function PlacedObjects() {
 
   return (
     <>
-      {/* Wires + buses + draft + rubber-band rect — single SVG overlay. */}
+      {/* Wires + buses + draft + rubber-band rect — single SVG overlay.
+          zIndex lifts the wires above the sheet surface (which sits in its own
+          positioned subtree); glyph divs below use a higher zIndex so component
+          bodies still sit on top of the wire ends. */}
       <svg
         style={{
           position: "absolute",
@@ -293,17 +424,42 @@ export function PlacedObjects() {
           top: -OX,
           width: W,
           height: W,
+          // reset.css applies `svg { max-width: 100% }`; the canvas layer is
+          // auto-width (~0), which would collapse this overlay to zero width and
+          // stop the wires painting. Opt out so the full-size overlay renders.
+          maxWidth: "none",
           pointerEvents: "none",
           overflow: "visible",
+          zIndex: 1,
         }}
       >
         <g transform={`translate(${OX} ${OX})`}>
-          {state.objects.filter((o) => WIRE_KINDS.has(o.kind) && isVisible(o)).map((o) => {
+          {state.objects.filter((o) => WIRE_KINDS.has(o.kind) && isVisible(o) && inScope(o)).map((o) => {
             const sel = selectedSet.has(o.id);
+            // Ratsnest = unrouted airwire: thin, dashed, muted, non-interactive.
+            if (o.kind === "ratsnest") {
+              return (
+                <line
+                  key={o.id}
+                  data-object-id={o.id}
+                  x1={o.x}
+                  y1={o.y}
+                  x2={o.endX ?? o.x}
+                  y2={o.endY ?? o.y}
+                  stroke="var(--color-text-tertiary)"
+                  strokeWidth={0.9}
+                  strokeDasharray="2 3"
+                  strokeLinecap="round"
+                  opacity={0.75}
+                  pointerEvents="none"
+                />
+              );
+            }
             const isBus = o.kind === "bus";
             const isTrack = o.kind === "track";
-            const stroke = sel ? SELECTED : colorFor(o);
-            const w = isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : sel ? 2.6 : 1.7;
+            const hot = isHot(o);
+            const stroke = sel ? SELECTED : hot ? HIGHLIGHT : colorFor(o);
+            const w = (isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : sel ? 2.6 : 1.7) + (hot ? 1.2 : 0);
             return (
               <line
                 key={o.id}
@@ -315,12 +471,8 @@ export function PlacedObjects() {
                 stroke={stroke}
                 strokeWidth={w}
                 strokeLinecap="round"
-                style={{ pointerEvents: "stroke", cursor: "move" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isSelectable(o.kind, state.boardSettings ?? {}, state.mode)) return;
-                  actions.selectPlaced(o.id, e.shiftKey || e.metaKey || e.ctrlKey);
-                }}
+                style={{ pointerEvents: "stroke", cursor: "move", filter: hot ? "drop-shadow(0 0 3px #f5a623)" : undefined }}
+                onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
               />
             );
           })}
@@ -341,11 +493,15 @@ export function PlacedObjects() {
         </g>
       </svg>
 
-      {state.objects.filter((o) => !WIRE_KINDS.has(o.kind) && isVisible(o)).map((o) => (
+      {state.objects.filter((o) => !WIRE_KINDS.has(o.kind) && isVisible(o) && inScope(o)).map((o) =>
+        o.points && o.points.length ? (
+          <CombineShape key={o.id} obj={o} selected={selectedSet.has(o.id)} highlighted={isHot(o)} />
+        ) : (
         <PlacedGlyph
           key={o.id}
           obj={o}
           selected={selectedSet.has(o.id)}
+          highlighted={isHot(o)}
           editing={editingId === o.id}
           layerColor={
             state.mode === "pcb"
@@ -362,8 +518,50 @@ export function PlacedObjects() {
           onEditEnd={() => setEditingId(null)}
           onTextChange={(t) => actions.setObjectText(o.id, t)}
         />
-      ))}
+        ),
+      )}
     </>
+  );
+}
+
+// A boolean/Combine result — a real filled polygon (rings in LOCAL coords,
+// evenodd fill so holes show). Positioned like a glyph at its centroid (x,y).
+function CombineShape({ obj, selected, highlighted }: { obj: CanvasObject; selected: boolean; highlighted?: boolean }) {
+  const rings = obj.points ?? [];
+  const all = rings.flat();
+  if (!all.length) return null;
+  const minX = Math.min(...all.map((p) => p.x)), maxX = Math.max(...all.map((p) => p.x));
+  const minY = Math.min(...all.map((p) => p.y)), maxY = Math.max(...all.map((p) => p.y));
+  const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
+  const d = rings
+    .map((r) => (r.length ? `M ${r[0].x} ${r[0].y} ` + r.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ") + " Z" : ""))
+    .join(" ");
+  const color = selected ? "var(--color-violet-600)" : highlighted ? "#f5a623" : (obj.color || "var(--color-text-primary)");
+  const rot = obj.rotation ?? 0;
+  return (
+    <div
+      data-object-id={obj.id}
+      onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+      title={`Combined shape (${String((obj.props as Record<string, unknown> | undefined)?.combineOp ?? "")})`}
+      style={{
+        position: "absolute",
+        left: obj.x + minX,
+        top: obj.y + minY,
+        width: w,
+        height: h,
+        transform: rot ? `rotate(${rot}deg)` : undefined,
+        transformOrigin: "center",
+        color,
+        cursor: "move",
+        outline: selected ? "1px dashed var(--color-violet-600)" : "none",
+        outlineOffset: 2,
+        zIndex: 2,
+      }}
+    >
+      <svg width={w} height={h} viewBox={`${minX} ${minY} ${w} ${h}`} style={{ overflow: "visible", display: "block" }}>
+        <path d={d} fill="currentColor" fillOpacity={selected ? 0.24 : 0.16} stroke="currentColor" strokeWidth={1.6} fillRule="evenodd" strokeLinejoin="round" />
+      </svg>
+    </div>
   );
 }
 
@@ -403,11 +601,13 @@ function DraftLine() {
 // Component-family kinds whose floating label is the Designator child object.
 const DESIGNATOR_KINDS = new Set([
   "component", "resistor", "capacitor", "inductor", "diode", "ic", "connector",
+  "fp0805", "fpSOD123", "fpSOT23", "fpSOIC8",
 ]);
 
 function PlacedGlyph({
   obj,
   selected,
+  highlighted,
   editing,
   layerColor,
   designatorActive,
@@ -419,6 +619,7 @@ function PlacedGlyph({
 }: {
   obj: CanvasObject;
   selected: boolean;
+  highlighted?: boolean;
   editing: boolean;
   layerColor?: string;
   designatorActive?: boolean;
@@ -429,16 +630,18 @@ function PlacedGlyph({
   onTextChange: (t: string) => void;
 }) {
   const rotation = obj.rotation ?? 0;
-  // Priority: explicit per-object color → PCB layer color (when on a layer) → theme.
+  // Per-object mirror flags (set by Flip H/V) → scale(-1) so a single symbol
+  // visibly mirrors, not just its position within a multi-selection.
+  const fx = (obj.props as Record<string, unknown> | undefined)?.flipX ? -1 : 1;
+  const fy = (obj.props as Record<string, unknown> | undefined)?.flipY ? -1 : 1;
+  // Priority: selection → net-highlight → explicit color → PCB layer → theme.
   const normalColor = obj.color || layerColor || "var(--color-text-primary)";
+  const glyphColor = selected ? "var(--color-violet-600)" : highlighted ? "#f5a623" : normalColor;
   if (obj.kind === "text") {
     return (
       <div
         data-object-id={obj.id}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(e.shiftKey || e.metaKey || e.ctrlKey);
-        }}
+        onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
         onDoubleClick={(e) => {
           e.stopPropagation();
           onEditStart();
@@ -452,11 +655,13 @@ function PlacedGlyph({
           padding: "2px 6px",
           fontSize: 12,
           fontFamily: "var(--font-family-body)",
-          color: selected ? "var(--color-violet-600)" : normalColor,
+          color: glyphColor,
+          textShadow: highlighted && !selected ? "0 0 6px #f5a623" : undefined,
           border: selected ? "1px dashed var(--color-violet-600)" : "1px dashed transparent",
           background: "transparent",
           cursor: editing ? "text" : "move",
           userSelect: editing ? "text" : "none",
+          zIndex: 2,
         }}
       >
         {editing ? (
@@ -487,26 +692,25 @@ function PlacedGlyph({
   return (
     <div
       data-object-id={obj.id}
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect(e.shiftKey || e.metaKey || e.ctrlKey);
-      }}
+      onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
       style={{
         position: "absolute",
         left: obj.x - 24,
         top: obj.y - 24,
         width: 48,
         height: 48,
-        transform: `rotate(${rotation}deg)`,
+        transform: `rotate(${rotation}deg) scale(${fx}, ${fy})`,
         transformOrigin: "50% 50%",
-        color: selected ? "var(--color-violet-600)" : normalColor,
+        color: glyphColor,
+        filter: highlighted && !selected ? "drop-shadow(0 0 4px #f5a623)" : undefined,
         cursor: "move",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: selected ? "rgba(124,45,185,.10)" : "transparent",
+        background: selected ? "rgba(124,45,185,.10)" : highlighted ? "rgba(245,166,35,.12)" : "transparent",
         outline: selected ? "1px dashed var(--color-violet-600)" : "none",
         borderRadius: 4,
+        zIndex: 2,
       }}
       title={obj.kind}
     >

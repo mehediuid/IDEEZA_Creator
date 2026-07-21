@@ -8,6 +8,7 @@ import * as React from "react";
 import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { SearchInput } from "@/components/ideeza";
 import { AllLibraryFlyout, LibraryPanel } from "@/components/pcb/library-panel";
+import { ProjectNavigator } from "@/components/pcb/project-navigator";
 import { AiChatPanel, hasAiHandoff, MODULE_OF_CONTEXT, type ChatContext } from "@/components/code/ai-chat";
 import { dispatchThreeAction, type ThreeAction } from "@/components/3d/three-menu-bar";
 import { PLACE_TOOLS } from "@/lib/pcb/types";
@@ -202,78 +203,16 @@ export function LeftPanel({
             <SearchInput value={query} onValueChange={setQuery} placeholder="Search parts & compo.." />
           </div>
 
-          {/* sub-pills (Net / Component · Designator / Name / Device / Footprint) */}
-          {pills && (
-            <div style={{ display: "flex", gap: "var(--spacing-3)", padding: "var(--spacing-0) var(--spacing-7) var(--spacing-5)", flexWrap: "wrap" }}>
-              {pills.map((p) => (
-                <div
-                  key={p.label}
-                  onClick={p.onClick}
-                  className="ix-tab"
-                  style={{
-                    fontSize: "var(--font-size-sm)",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: "var(--spacing-2) var(--spacing-5)",
-                    borderRadius: "var(--radius-full)",
-                    background: p.active ? "var(--color-bg-brand-subtle)" : "transparent",
-                    color: p.active ? "var(--color-text-brand)" : "var(--color-text-tertiary)",
-                    border: `var(--border-width-1) solid ${p.active ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
-                  }}
-                >
-                  {p.label}
-                </div>
-              ))}
-            </div>
-          )}
           </>)}
 
-          {/* tree */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-2) var(--spacing-4) var(--spacing-6)" }}>
-            {!hideProjectTree && tree.map((n: TreeNode, i: number) => (
-              <div
-                key={i}
-                className="ix-row"
-                onClick={n.onClick}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--spacing-3)",
-                  paddingTop: "var(--spacing-3)",
-                  paddingBottom: "var(--spacing-3)",
-                  paddingRight: "var(--spacing-4)",
-                  paddingLeft: n.pad,
-                  borderRadius: "var(--radius-md)",
-                  cursor: "pointer",
-                  background: n.bg,
-                }}
-              >
-                {n.hasCaret && (
-                  <span
-                    style={{
-                      width: 13,
-                      height: 13,
-                      display: "inline-flex",
-                      transform: `rotate(${n.caretRot})`,
-                      transition: "transform .15s ease",
-                    }}
-                  >
-                    <Icon html={CARET_SVG} />
-                  </span>
-                )}
-                <div style={{ width: 15, height: 15, flex: "0 0 auto", color: n.iconColor }}>
-                  <DsIcon name={n.icon} size={15} />
-                </div>
-                <span style={{ fontSize: "var(--font-size-sm)", whiteSpace: "nowrap", color: n.fg, fontWeight: Number(n.weight) }}>
-                  {n.label}
-                </span>
-              </div>
-            ))}
-
-            {/* module-specific tree (3D parts / preview instances) merged
-                into the same navigator, under the project tree */}
-            {moduleSlot}
-          </div>
+          {/* Real, data-driven navigator (Sheets / Nets / Parts / Objects) with
+              per-item right-click. The 3D/preview module tree still uses its own
+              moduleSlot. */}
+          {hideProjectTree ? (
+            <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-2) var(--spacing-4) var(--spacing-6)" }}>{moduleSlot}</div>
+          ) : (
+            <ProjectNavigator query={query} />
+          )}
         </>
       )}
 

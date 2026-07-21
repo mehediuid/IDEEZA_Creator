@@ -5,6 +5,7 @@
 // footer holds the Item / Caption rows.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Icon, DsIcon } from "@/lib/pcb/icons"; // inspector + panel icons
 import { Select, Checkbox } from "@/components/ideeza";
 import { ColorPicker } from "@/components/pcb/color-picker";
@@ -17,6 +18,7 @@ import {
   resolveInspectorType,
   type InspectorField,
 } from "@/lib/pcb/inspector-schema";
+import { isCombinable } from "@/lib/pcb/shape-boolean";
 
 export function RightPanel() {
   const state = usePcbState();
@@ -352,7 +354,7 @@ function OriginGrid({ value, onChange }: { value: string; onChange: (v: string) 
 
 // One field row — reads its binding (if any) and renders an interactive
 // control; unbound fields render read-only per the agreed scope.
-function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pcb/types").CanvasObject | null }) {
+function FieldRow({ field, obj, objs }: { field: InspectorField; obj: import("@/lib/pcb/types").CanvasObject | null; objs?: import("@/lib/pcb/types").CanvasObject[] }) {
   const state = usePcbState();
   const actions = usePcbActions();
 
@@ -379,6 +381,35 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
     else if (b === "doc:unit") bound = { value: state.unit, set: (v) => actions.setUnit(String(v)) };
     else if (b === "doc:gridSize") bound = { value: state.gridSize, set: (v) => actions.setGridSize(String(v)) };
     else if (b === "doc:snap") bound = { value: state.snapEnabled !== false, set: () => actions.toggleSnap() };
+  }
+
+  // Multi-select batch edit (PDF §09): with 2+ objects selected, a bound field
+  // stays editable only when every selected object shares the same value — then
+  // the edit applies to all; differing values collapse to a read-only <...>.
+  let multiDiff = false;
+  const sel = objs && objs.length > 1 ? objs : null;
+  if (sel && bound && b && (b.startsWith("obj:") || b.startsWith("prop:"))) {
+    const isObj = b.startsWith("obj:");
+    const key = isObj ? b.slice(4) : b.slice(5);
+    const readVal = (o: import("@/lib/pcb/types").CanvasObject): BindVal =>
+      isObj
+        ? (o as unknown as Record<string, BindVal>)[key]
+        : ((o.props ?? {}) as Record<string, BindVal>)[key];
+    const first = readVal(sel[0]);
+    if (!sel.every((o) => readVal(o) === first)) {
+      multiDiff = true;
+      bound = null;
+    } else {
+      bound = {
+        value: first,
+        set: (v) =>
+          sel.forEach((o) =>
+            isObj
+              ? actions.setObjectField(o.id, { [key]: v } as Partial<import("@/lib/pcb/types").CanvasObject>)
+              : actions.setObjectProp(o.id, key, v),
+          ),
+      };
+    }
   }
 
   const layerOpts = (state.pcbLayers ?? []).map((l: { name: string }) => l.name);
@@ -413,12 +444,16 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
     );
   } else if (field.kind === "action") {
     // Wire actions that have a real implementation; the rest are placeholders.
+    const grouped = !!(obj?.props as Record<string, BindVal> | undefined)?.groupId;
     const run =
       field.key === "convertPcb" ? () => { actions.setMode("pcb"); actions.flashToast("Converted to PCB"); }
       : field.key === "sutureVias" ? () => { actions.setTool("sutureVias"); actions.flashToast("Suture vias — click the copper region"); }
-      : field.key === "group" ? () => actions.flashToast("Grouped")
+      : field.key === "group" ? () => (grouped ? actions.ungroupSelection() : actions.groupSelection())
+      : field.key === "resetStyle" ? () => actions.resetObjectStyle()
+      : field.key === "addProperty" ? () => actions.addCustomProp()
       : () => actions.flashToast(`${field.label} — coming soon`);
-    control = <ActionCtl label={field.display ?? "Apply"} onClick={run} />;
+    const actionLabel = field.key === "group" ? (grouped ? "Ungroup" : "Group") : (field.display ?? "Apply");
+    control = <ActionCtl label={actionLabel} onClick={run} />;
   } else if (bound) {
     switch (field.kind) {
       case "text":
@@ -501,15 +536,240 @@ function FieldRow({ field, obj }: { field: InspectorField; obj: import("@/lib/pc
         control = <ValueCell>{String(bound.value ?? field.display ?? "—")}</ValueCell>;
     }
   } else {
-    // Read-only display (unmodeled field).
+    // Read-only display (unmodeled field, or a multi-select field whose values
+    // differ → <...> placeholder per PDF §09).
     const objRec = obj as unknown as Record<string, BindVal>;
-    const disp = field.display ?? (obj && field.bind?.startsWith("obj:") ? String(objRec[field.bind.slice(4)] ?? "—") : "—");
-    control = field.kind === "color"
+    const disp = multiDiff
+      ? "<...>"
+      : field.display ?? (obj && field.bind?.startsWith("obj:") ? String(objRec[field.bind.slice(4)] ?? "—") : "—");
+    control = field.kind === "color" && !multiDiff
       ? <Swatch color={disp} />
-      : <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{field.unit ? `${disp} ${field.unit}` : disp}</span>;
+      : <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{field.unit && !multiDiff ? `${disp} ${field.unit}` : disp}</span>;
   }
 
   return <PropRow label={field.label}>{control}</PropRow>;
+}
+
+// Align / distribute / rotate / flip / order toolbar shown at the top of the
+// Property panel whenever one or more objects are selected. Wired to the store.
+interface ArrangeTool { icon: string; title: string; run: () => void; multi?: boolean }
+
+// "More align" overflow — the extras that don't fit the inline align row
+// (tidy-up + distribute spacing + z-order). Trigger sits at the end of the
+// align row as a matching segment; the menu is portalled to <body> so the
+// scrollable Property panel never clips it. The ⌃⌥ shortcuts are real: a
+// window keydown handler runs the same actions (gated to 2+ objects).
+type AlignItem = { icon: string; label: string; keys?: string; run: () => void; multi?: boolean } | { divider: true };
+function AlignMenu({ multi }: { multi: boolean }) {
+  const actions = usePcbActions();
+  const [open, setOpen] = React.useState(false);
+  const [pos, setPos] = React.useState<{ top: number; right: number } | null>(null);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  // Close-on-outside / Escape while open.
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (btnRef.current && !btnRef.current.contains(t) && !t.closest("[data-align-menu]")) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  // Real ⌃⌥ keyboard shortcuts (code-based so Option-remapped keys on macOS
+  // still match). Only fire with a real multi-selection and no text field focused.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || !e.altKey || e.metaKey) return;
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)) return;
+      if (!multi) return;
+      if (e.code === "KeyT") { e.preventDefault(); actions.alignSelectedToGrid(); }
+      else if (e.code === "KeyV") { e.preventDefault(); actions.alignSelected("distV"); }
+      else if (e.code === "KeyH") { e.preventDefault(); actions.alignSelected("distH"); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [multi, actions]);
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, right: Math.round(window.innerWidth - r.right) });
+    }
+    setOpen((o) => !o);
+  };
+  const items: AlignItem[] = [
+    { icon: "tAlignGrid", label: "Tidy up", keys: "⌃⌥T", run: () => actions.alignSelectedToGrid(), multi: true },
+    { icon: "distributeV", label: "Distribute vertical spacing", keys: "⌃⌥V", run: () => actions.alignSelected("distV"), multi: true },
+    { icon: "distribute", label: "Distribute horizontal spacing", keys: "⌃⌥H", run: () => actions.alignSelected("distH"), multi: true },
+    { divider: true },
+    { icon: "tBringFront", label: "Bring to front", run: () => actions.bringFront() },
+    { icon: "tSendBack", label: "Send to back", run: () => actions.sendBack() },
+  ];
+  return (
+    <>
+      <div style={{ display: "inline-flex", height: 34, background: open ? "var(--color-bg-brand-subtle)" : "var(--color-bg-subtle)", borderRadius: "var(--radius-md)", border: `var(--border-width-1) solid ${open ? "var(--color-violet-600)" : "var(--color-border-subtle)"}`, flex: "0 0 auto", overflow: "hidden" }}>
+        <button
+          ref={btnRef}
+          onClick={toggle}
+          className="ix-tool"
+          title="More align options"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="More align options"
+          style={{ width: 34, height: "100%", border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", color: open ? "var(--color-violet-600)" : "var(--color-text-primary)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M4 8.5h16M4 15.5h16" /></svg>
+        </button>
+      </div>
+      {open && pos && createPortal(
+        <div
+          data-align-menu
+          role="menu"
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 300, minWidth: 264, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-3)", padding: "var(--spacing-3)", display: "flex", flexDirection: "column", gap: 1 }}
+        >
+          {items.map((it, i) => {
+            if ("divider" in it) return <div key={`d${i}`} style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) 0" }} />;
+            const disabled = !!it.multi && !multi;
+            return (
+              <button
+                key={it.label}
+                role="menuitem"
+                disabled={disabled}
+                onClick={disabled ? undefined : () => { it.run(); setOpen(false); }}
+                className={disabled ? undefined : "ix-row"}
+                style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) var(--spacing-4)", border: "none", background: "transparent", borderRadius: "var(--radius-md)", cursor: disabled ? "default" : "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", fontSize: "var(--font-size-sm)", color: disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)", opacity: disabled ? 0.5 : 1 }}
+              >
+                <span style={{ display: "inline-flex", width: 18, flex: "0 0 auto", color: disabled ? "var(--color-text-disabled)" : "var(--color-text-secondary)" }}><DsIcon name={it.icon} size={18} strokeWidth={1.7} /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>{it.label}</span>
+                {it.keys && <span style={{ flex: "0 0 auto", fontSize: "var(--font-size-xs)", letterSpacing: ".5px", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{it.keys}</span>}
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+// A segmented icon group (rounded surface, hairline internal dividers). With
+// `fill` it stretches to its container and the buttons share the width equally
+// — so a 3-icon group becomes a full grid cell matching the fields beside it.
+function PosSeg({ tools, multi, fill }: { tools: ArrangeTool[]; multi: boolean; fill?: boolean }) {
+  return (
+    <div style={{ display: "flex", width: fill ? "100%" : undefined, height: 34, flex: "0 0 auto", boxSizing: "border-box", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-subtle)", overflow: "hidden" }}>
+      {tools.map((t, i) => {
+        const disabled = !!t.multi && !multi;
+        return (
+          <React.Fragment key={t.icon}>
+            {i > 0 && <span style={{ width: 1, background: "var(--color-border-subtle)", flex: "0 0 auto" }} />}
+            <button
+              className={disabled ? undefined : "ix-tool"}
+              onClick={disabled ? undefined : t.run}
+              disabled={disabled}
+              title={disabled ? `${t.title} — needs 2+ objects` : t.title}
+              aria-label={t.title}
+              style={{ width: fill ? "auto" : 32, flex: fill ? "1 1 0" : "0 0 auto", height: "100%", border: "none", background: "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: disabled ? "default" : "pointer", color: disabled ? "var(--color-text-disabled)" : "var(--color-text-primary)", opacity: disabled ? 0.4 : 1 }}
+            >
+              <DsIcon name={t.icon} size={18} strokeWidth={1.7} />
+            </button>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// A labelled numeric field (X / Y / rotation). Uncontrolled + keyed on the
+// incoming value so it re-syncs after an align/move; commits on blur / Enter.
+// Shows the "Mixed" placeholder when the selection's value isn't uniform.
+function NumField({ label, icon, value, placeholder, suffix, onCommit }: {
+  label?: string; icon?: React.ReactNode; value: string; placeholder: string; suffix?: string; onCommit: (v: string) => void;
+}) {
+  return (
+    <label style={{ width: "100%", minWidth: 0, height: 34, boxSizing: "border-box", display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "0 10px", background: "var(--color-bg-subtle)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-md)" }}>
+      <span style={{ color: "var(--color-text-tertiary)", fontSize: "var(--font-size-sm)", display: "inline-flex", flex: "0 0 auto" }}>{icon ?? label}</span>
+      <input
+        key={value}
+        defaultValue={value}
+        placeholder={placeholder}
+        inputMode="numeric"
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        onBlur={(e) => { const v = e.target.value.trim(); if (v !== "" && v !== value) onCommit(v); }}
+        style={{ flex: 1, minWidth: 0, width: "100%", border: "none", background: "transparent", outline: "none", color: "var(--color-text-primary)", fontSize: "var(--font-size-sm)", fontFamily: "inherit", fontVariantNumeric: "tabular-nums" }}
+      />
+      {suffix && <span style={{ color: "var(--color-text-tertiary)", fontSize: "var(--font-size-sm)", flex: "0 0 auto" }}>{suffix}</span>}
+    </label>
+  );
+}
+
+// Position panel — align (H / V groups) + editable X / Y + rotation + flip,
+// modelled on the reference. Align/distribute need 2+ objects (disabled on a
+// single selection); X/Y/rotation/flip work on any selection.
+function PositionPanel() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const objs = state.objects.filter((o) => state.selectedIds.includes(o.id));
+  if (objs.length === 0) return null;
+  const multi = objs.length >= 2;
+  const sameX = objs.every((o) => o.x === objs[0].x);
+  const sameY = objs.every((o) => o.y === objs[0].y);
+  const rot0 = objs[0].rotation ?? 0;
+  const sameRot = objs.every((o) => (o.rotation ?? 0) === rot0);
+  const hAlign: ArrangeTool[] = [
+    { icon: "alignLeft", title: "Align left", run: () => actions.alignSelected("left"), multi: true },
+    { icon: "alignHCenter", title: "Align horizontal centers", run: () => actions.alignSelected("hcenter"), multi: true },
+    { icon: "alignRight", title: "Align right", run: () => actions.alignSelected("right"), multi: true },
+  ];
+  const vAlign: ArrangeTool[] = [
+    { icon: "alignTop", title: "Align top", run: () => actions.alignSelected("top"), multi: true },
+    { icon: "alignVCenter", title: "Align vertical centers", run: () => actions.alignSelected("vcenter"), multi: true },
+    { icon: "alignBottom", title: "Align bottom", run: () => actions.alignSelected("bottom"), multi: true },
+  ];
+  const transform: ArrangeTool[] = [
+    { icon: "tRotRight", title: "Rotate 90°", run: () => actions.rotateSelectedPlaced(90) },
+    { icon: "flip", title: "Flip horizontal", run: () => actions.flipSelectedH() },
+    { icon: "flipV", title: "Flip vertical", run: () => actions.flipSelectedV() },
+  ];
+  // Combine (boolean) — only when 2+ selected objects can be reduced to polygons
+  // (shapes / copper regions). Runs the real geometry op in the store.
+  const canCombine = objs.filter(isCombinable).length >= 2;
+  const combine: ArrangeTool[] = [
+    { icon: "tBoolPreserve", title: "Intersect — keep only the overlap", run: () => actions.combineSelected("intersect") },
+    { icon: "tBoolMerge", title: "Union — merge into one shape", run: () => actions.combineSelected("union") },
+    { icon: "tBoolSubtract", title: "Subtract — first shape minus the rest", run: () => actions.combineSelected("difference") },
+    { icon: "tBoolExclude", title: "Exclude — remove the overlap (XOR)", run: () => actions.combineSelected("xor") },
+  ];
+  const angleIcon = (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4v15h15" /><path d="M5 19a11 11 0 0 1 8-10" /></svg>
+  );
+  return (
+    <div style={{ padding: "var(--spacing-5) var(--spacing-8) var(--spacing-6)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>Position</span>
+      {/* Six equal boxes on two 1fr columns; the "more align" (≡) trigger lives
+          in a dedicated right column of the align row (row 1) — the column is
+          reserved on every row so the six boxes stay one size and aligned. */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "var(--spacing-4)", alignItems: "center" }}>
+        <PosSeg tools={hAlign} multi={multi} fill />
+        <PosSeg tools={vAlign} multi={multi} fill />
+        <AlignMenu multi={multi} />
+        <NumField label="X" value={sameX ? String(Math.round(objs[0].x)) : ""} placeholder={sameX ? "0" : "Mixed"} onCommit={(v) => actions.setSelectionPos("x", Number(v))} />
+        <NumField label="Y" value={sameY ? String(Math.round(objs[0].y)) : ""} placeholder={sameY ? "0" : "Mixed"} onCommit={(v) => actions.setSelectionPos("y", Number(v))} />
+        <span aria-hidden />
+        <NumField icon={angleIcon} value={sameRot ? String(rot0) : ""} placeholder={sameRot ? "0" : "Mixed"} suffix="°" onCommit={(v) => actions.setSelectionRotation(Number(v))} />
+        <PosSeg tools={transform} multi={multi} fill />
+        <span aria-hidden />
+      </div>
+      {canCombine && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+          <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-tertiary)" }}>Combine</span>
+          <PosSeg tools={combine} multi fill />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Schema-driven Property Inspector — the single Properties-tab renderer for
@@ -543,6 +803,10 @@ function InspectorPanel() {
     (!f.showIfSilkLayer || layerIsSilk);
 
   const count = state.selectedIds.length;
+  // Full selection set for batch-edit (PDF §09).
+  const selObjs = state.selectedIds
+    .map((id) => state.objects.find((o) => o.id === id))
+    .filter(Boolean) as import("@/lib/pcb/types").CanvasObject[];
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
@@ -556,6 +820,7 @@ function InspectorPanel() {
           {typeKey === "Canvas" ? "Nothing selected" : `Selected ${count || 1}`}
         </span>
       </div>
+      {count >= 1 && <PositionPanel />}
       {type.sections.map((sec, i) => {
         // Conditional fields (doc: "Custom reveals …", silk-layer-only groups)
         // render only when their condition matches; a section whose fields are
@@ -566,11 +831,26 @@ function InspectorPanel() {
           <React.Fragment key={sec.title + i}>
             {i > 0 && <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />}
             <InspSection title={sec.title}>
-              {visible.map((f) => <FieldRow key={f.key} field={f} obj={obj} />)}
+              {visible.map((f) => <FieldRow key={f.key} field={f} obj={obj} objs={selObjs} />)}
             </InspSection>
           </React.Fragment>
         );
       })}
+      {/* Custom properties added via "Add Property" render as editable rows. */}
+      {obj && (() => {
+        const ck = Object.keys(obj.props ?? {}).filter((k) => k.startsWith("custom:"));
+        if (!ck.length) return null;
+        return (
+          <React.Fragment>
+            <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />
+            <InspSection title="Custom">
+              {ck.map((k) => (
+                <FieldRow key={k} field={{ key: k, label: k.slice(7), kind: "text", bind: `prop:${k}` }} obj={obj} objs={selObjs} />
+              ))}
+            </InspSection>
+          </React.Fragment>
+        );
+      })()}
     </div>
   );
 }

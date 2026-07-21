@@ -8,7 +8,7 @@
 import * as React from "react";
 import { DsIcon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
-import { buildModeTabs } from "@/lib/pcb/data";
+import { buildModeTabs, buildPcbViewTabs } from "@/lib/pcb/data";
 
 type ToolbarAction =
   | "undo"
@@ -63,7 +63,9 @@ type ToolbarAction =
   | "alignLeft"
   | "alignRight"
   | "alignTop"
-  | "alignBottom";
+  | "alignBottom"
+  | "distributeH"
+  | "distributeV";
 
 // `modes` constrains which editor modes accept the tool. Omitted → all modes.
 // Items not for the current mode render greyed out and ignore clicks.
@@ -204,8 +206,8 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "alignTop", action: "alignTop", label: "Align Top" },
   { kind: "icon", key: "alignBottom", action: "alignBottom", label: "Align Bottom" },
   { kind: "icon", key: "tAlignGrid", action: "alignGrid", label: "Align Grid — snap selected to grid" },
-  { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute Horizontally" },
-  { kind: "icon", key: "tDistV", action: "openDistribute", label: "Distribute Vertically" },
+  { kind: "icon", key: "tDistH", action: "distributeH", label: "Distribute Horizontally" },
+  { kind: "icon", key: "tDistV", action: "distributeV", label: "Distribute Vertically" },
   { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
   { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
   { kind: "icon", key: "tFlipH", action: "flipH", label: "Flip Horizontal" },
@@ -242,8 +244,8 @@ const ITEMS_2D: Item[] = [
   { kind: "icon", key: "tSaveAll", action: "saveAll", label: "Save All" },
   { kind: "div" },
   /* edit */
-  { kind: "icon", key: "copy", action: "openDistribute", label: "Copy" },
-  { kind: "icon", key: "paste", action: "openDistribute", label: "Paste" },
+  { kind: "icon", key: "copy", action: "copy", label: "Copy" },
+  { kind: "icon", key: "paste", action: "paste", label: "Paste" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
   { kind: "icon", key: "array", action: "openArray", label: "Array" },
@@ -282,7 +284,7 @@ const ITEMS_2D: Item[] = [
   /* transform */
   { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
   { kind: "icon", key: "tRotRight", action: "rotateRight", label: "Rotate Right" },
-  { kind: "icon", key: "tDistH", action: "openDistribute", label: "Distribute" },
+  { kind: "icon", key: "tDistH", action: "distributeH", label: "Distribute" },
   { kind: "div" },
   /* export */
   { kind: "icon", key: "gerber", action: "openGerber", label: "Gerber" },
@@ -474,6 +476,7 @@ const SCHEM_ESSENTIAL: Item[] = [
   { kind: "icon", key: "zoomin", action: "zoomIn", label: "Zoom In" },
   { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit to Screen" },
+  { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit to Selection" },
   { kind: "div" },
   { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid" },
   { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
@@ -481,18 +484,10 @@ const SCHEM_ESSENTIAL: Item[] = [
   { kind: "div" },
   { kind: "icon", key: "find", action: "openFindSim", label: "Find / Search" },
 ];
-const SCHEM_OVERFLOW: Item[] = [
-  { kind: "icon", key: "imp", action: "openProject", label: "Open Project" },
-  { kind: "icon", key: "save", action: "save", label: "Save" },
-  { kind: "icon", key: "tSaveAll", action: "saveAll", label: "Save All" },
-  { kind: "icon", key: "copy", action: "copy", label: "Copy" },
-  { kind: "icon", key: "paste", action: "paste", label: "Paste" },
-  { kind: "icon", key: "array", action: "openArray", label: "Array" },
-  { kind: "icon", key: "tFitSection", action: "fitSection", label: "Fit Section" },
-  { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit Area" },
-  { kind: "icon", key: "snap", action: "toggleSnap", label: "Snap" },
-  { kind: "icon", key: "tSettings", action: "openSettings", label: "Settings" },
-];
+// No schematic overflow: every other toolbar action is already reachable from
+// the menu bar (File/Edit/View) or the always-visible essentials, so a "…"
+// menu here would only repeat them. Fit-to-Selection — the one unique control —
+// now lives inline above, next to Fit to Screen.
 
 export function Toolbar() {
   const state = usePcbState();
@@ -503,9 +498,9 @@ export function Toolbar() {
     redo: () => actions.redo(),
     zoomIn: () => actions.zoomIn(),
     zoomOut: () => actions.zoomOut(),
-    fitAll: () => actions.zoomFit(),
-    fitSection: () => actions.setZoom(1.5),
-    fitArea: () => actions.setZoom(2),
+    fitAll: () => actions.zoomFit("all"),
+    fitSection: () => actions.zoomFit("all"),
+    fitArea: () => actions.zoomFit("selection"),
     toggleGrid: () => actions.toggleGridVisible(),
     openSettings: () => actions.openSettings(),
     openDeviceMgr: () => actions.openManager("device"),
@@ -528,18 +523,18 @@ export function Toolbar() {
     toggleBottom: () => actions.toggleBottom(),
     // Phase 5 — IT-692 / IT-569 leftovers.
     openProject: () => actions.openModal("openProject"),
-    save: () => actions.flashToast("Saved"),
-    saveAll: () => actions.flashToast("All projects saved"),
+    save: () => actions.saveDoc(),
+    saveAll: () => actions.saveDoc(),
     openFindSim: () => actions.openModal("findReplace"),
     openTable: () => actions.openModal("tableProps"),
-    convert2D: () => actions.setMode("2d"),
+    convert2D: () => actions.setMode("pcb"),
     alignGrid: () => actions.alignSelectedToGrid(),
     openReannotate: () => actions.openModal("reannotate"),
     // Phase 7 — IT-718 toolbar additions
     openArray: () => actions.openModal("array"),
-    view2D: () => actions.setMode("2d"),
+    view2D: () => actions.setMode("pcb"),
     view3D: () => actions.setMode("3d"),
-    flipBoard: () => actions.flashToast("Board flipped (Top ↔ Bottom)"),
+    flipBoard: () => actions.toggleBoardFlip(),
     openDrc: () => actions.openModal("pcbDrc"),
     openGerber: () => actions.openModal("exportGerber2D"),
     openPickPlace: () => actions.openModal("exportPickPlace"),
@@ -552,15 +547,19 @@ export function Toolbar() {
     openAutoRoute: () => actions.openModal("autoRoute"),
     openDesignRules: () => actions.openModal("designRules"),
     openAnnotate: () => actions.openModal("annotate"),
-    // Align L/R/T/B have no bounding-box impl yet (menu parity items are
-    // placeholders too) — flag intent via toast.
-    alignLeft: () => actions.flashToast("Align Left — coming soon"),
-    alignRight: () => actions.flashToast("Align Right — coming soon"),
-    alignTop: () => actions.flashToast("Align Top — coming soon"),
-    alignBottom: () => actions.flashToast("Align Bottom — coming soon"),
+    // Align / distribute the multi-selection (needs 2+ objects; the store no-ops
+    // otherwise). Wired to the same real bounding-box logic as the Position panel.
+    alignLeft: () => actions.alignSelected("left"),
+    alignRight: () => actions.alignSelected("right"),
+    alignTop: () => actions.alignSelected("top"),
+    alignBottom: () => actions.alignSelected("bottom"),
+    distributeH: () => actions.alignSelected("distH"),
+    distributeV: () => actions.alignSelected("distV"),
   };
 
   const modeTabs = buildModeTabs(state, actions);
+  const pcbViewTabs = buildPcbViewTabs(state, actions);
+  const inPcb = state.mode === "pcb" || state.mode === "3d";
 
   // One flat list of the current mode's tools (icons + dividers + dropdowns),
   // already filtered by mode + the per-scope customization whitelist.
@@ -646,6 +645,35 @@ export function Toolbar() {
         })}
       </div>
 
+      {/* PCB sub-views (2D · 3D) — only inside the PCB context */}
+      {inPcb && (
+        <div style={{ display: "flex", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-full)", padding: 3, flex: "0 0 auto", marginLeft: "var(--spacing-2)" }}>
+          {pcbViewTabs.map((vt) => {
+            const active = vt.bg !== "transparent";
+            return (
+              <button
+                key={vt.label}
+                onClick={vt.onClick}
+                style={{
+                  padding: "5px 13px",
+                  borderRadius: "var(--radius-full)",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  background: active ? "var(--color-violet-600)" : "transparent",
+                  color: active ? "#fff" : "var(--color-text-secondary)",
+                  transition: "background .14s, color .14s",
+                }}
+              >
+                {vt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* leading rule: 12px each side (outer gap is --spacing-2 = 4px → +8) */}
       <Divider gutter={state.mode === "schematic" ? 8 : undefined} />
 
@@ -658,7 +686,6 @@ export function Toolbar() {
               it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i),
             )}
           </div>
-          <OverflowMenu items={SCHEM_OVERFLOW} render={renderItem} />
         </>
       ) : (
         <>

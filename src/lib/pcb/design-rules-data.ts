@@ -99,23 +99,53 @@ export const PIN_TYPES = [
 export function defaultPinMatrix(): Severity[][] {
   const n = PIN_TYPES.length;
   const m: Severity[][] = [];
-  for (let r = 0; r < n; r++) m.push(Array(r + 1).fill("Warning") as Severity[]);
+  // Default is Ignore (most pairings are benign — the doc's grid is mostly
+  // dark). Only genuine electrical faults get a severity, so a normal circuit
+  // stays clean and only real conflicts fire. Every cell is still tunable.
+  for (let r = 0; r < n; r++) m.push(Array(r + 1).fill("Ignore") as Severity[]);
   const idx = (name: (typeof PIN_TYPES)[number]) => PIN_TYPES.indexOf(name);
   const set = (a: (typeof PIN_TYPES)[number], b: (typeof PIN_TYPES)[number], s: Severity) => {
     const i = Math.max(idx(a), idx(b));
     const j = Math.min(idx(a), idx(b));
     m[i][j] = s;
   };
-  set("OUT", "OUT", "Error");
-  set("OUT", "Power", "Fatal Error");
-  set("OUT", "Ground", "Fatal Error");
-  set("Power", "Ground", "Fatal Error");
+  // Genuine faults (doc Examples 1–3 + standard EDA conventions).
+  set("OUT", "OUT", "Error");            // bus contention — two drivers
+  set("OUT", "Power", "Fatal Error");    // driver into a power rail
+  set("OUT", "Ground", "Fatal Error");   // driver into ground
+  set("Power", "Ground", "Fatal Error"); // rail tied to ground — short
   set("Open Collector", "Power", "Error");
   set("Open Emitter", "Ground", "Error");
-  set("IN", "IN", "Note");
-  set("Passive", "Passive", "Ignore");
-  set("Undefined", "Undefined", "Note");
+  // Intent-dependent (doc Examples 4–5).
+  set("HIZ", "OUT", "Warning");          // tri-state pin on a driven net
+  for (const t of PIN_TYPES) set("Undefined", t, "Warning"); // unspecified pin type
   return m;
+}
+
+// ── Schematic rules config ──────────────────────────────────────────────
+// The Design Rules dialog's editable state (per-rule enable + severity, the
+// pin-conflict matrix, and its master toggle). Shared by the dialog, the store
+// (persisted per-project), and the ERC engine (which reads it so tuning is
+// real — a disabled rule is skipped, a re-severitied rule reports at the new
+// level, and the matrix/toggle drive pin-conflict detection).
+export type SchRuleState = { enabled: boolean; severity: Severity };
+export type SchRulesConfig = {
+  Net: SchRuleState[];
+  Component: SchRuleState[];
+  "Reuse Block": SchRuleState[];
+  pinMatrix: Severity[][];
+  pinCheckEnabled: boolean;
+};
+
+export function defaultSchRulesConfig(): SchRulesConfig {
+  const mk = (defs: RuleDef[]) => defs.map((d) => ({ enabled: true, severity: d.severity }));
+  return {
+    Net: mk(SCH_NET_RULES),
+    Component: mk(SCH_COMPONENT_RULES),
+    "Reuse Block": mk(SCH_REUSE_RULES),
+    pinMatrix: defaultPinMatrix(),
+    pinCheckEnabled: true,
+  };
 }
 
 // ── Popup 4 — PCB Design Rules ──────────────────────────────────────────

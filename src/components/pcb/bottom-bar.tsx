@@ -7,7 +7,7 @@
 
 import { DsIcon, Icon } from "@/lib/pcb/icons";
 import { buildBottomTabs, bottomTitle } from "@/lib/pcb/data";
-import { buildBottom } from "@/lib/pcb/content";
+import { BottomContent } from "./bottom-content";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const UPLOAD_SVG =
@@ -113,7 +113,9 @@ export function BottomBar() {
               </div>
             </div>
           </div>
-          <div style={{ flex: 1, overflowY: "auto" }} dangerouslySetInnerHTML={{ __html: buildBottom(state.bottomTab) }} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <BottomContent tab={state.bottomTab} />
+          </div>
         </div>
       )}
 
@@ -184,6 +186,9 @@ export function BottomBar() {
           </span>
           <span>
             Zoom: <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>{Math.round(state.zoom * 100)}%</span>
+          </span>
+          <span>
+            Plane: <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>XY</span>
           </span>
           {state.mode === "pcb" && <ActiveLayerChip />}
         </div>

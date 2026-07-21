@@ -182,7 +182,7 @@ function Toast() {
         transform: "translateX(-50%)",
         padding: "var(--spacing-4) var(--spacing-8)",
         background: "var(--color-bg-inverse, #1E1E1E)",
-        color: "var(--color-text-on-brand, #FFFFFF)",
+        color: "var(--color-text-inverse, #FFFFFF)",
         borderRadius: "var(--radius-lg)",
         boxShadow: "var(--elevation-4)",
         fontSize: "var(--font-size-sm)",

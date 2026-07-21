@@ -6,7 +6,12 @@
 // partial or updater-function), so the ported handlers read identically.
 
 import * as React from "react";
+import { convertSchematicToPcb, routeRatsnest } from "./schematic-to-pcb";
+import { booleanRings, shapeToPolygon, isCombinable, ringArea } from "./shape-boolean";
+import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
+import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import {
+  DEFAULT_SCHEM_OBJECTS,
   DEL_OBJ_NAMES,
   TOOLBAR_CATALOGS,
   ZOOM_MAX,
@@ -14,6 +19,7 @@ import {
   ZOOM_STEP,
   initialState,
   type BottomTab,
+  type FindMatch,
   type CanvasObject,
   type Copper,
   type DiffPair,
@@ -65,6 +71,9 @@ export interface PcbActions {
   setCompSub: (k: PcbState["compSub"]) => void;
   setRightTab: (k: RightTab) => void;
   clickBottomTab: (k: BottomTab) => void;
+  /** Populate the Find Result tab and open it (from Ctrl+F → Find All). */
+  runFind: (matches: FindMatch[]) => void;
+  clearFind: () => void;
   closeBottom: () => void;
   toggleBottom: () => void;
   setTool: (t: string) => void;
@@ -101,7 +110,42 @@ export interface PcbActions {
   zoomIn: (focus?: { x: number; y: number }) => void;
   zoomOut: (focus?: { x: number; y: number }) => void;
   zoomReset: () => void;
-  zoomFit: () => void;
+  /** Fit the view to all in-scope objects, or just the current selection. */
+  zoomFit: (target?: "all" | "selection") => void;
+  /** Force-write the current document to localStorage now (toolbar Save). */
+  saveDoc: () => void;
+  /** Mirror the PCB view to inspect the board from the bottom (Flip Board). */
+  toggleBoardFlip: () => void;
+  /** Net highlight — glow every object on `net` (null clears / Unhighlight All). */
+  highlightNet: (net: string | null) => void;
+  unhighlightAll: () => void;
+  /** Electrical Rule Check (schematic) — compute issues + show in the ERC/DRC tab. */
+  runErcCheck: () => void;
+  setDesignRules: (cfg: SchRulesConfig) => void;
+  /** Auto-number component designators (R1, C1, U1…) in reading order. */
+  reannotate: () => void;
+  /** Export a project netlist (.net) — nets → component pins, merged across sheets. */
+  exportNetlist: () => void;
+  /** Multi-sheet page navigation. */
+  prevSheet: () => void;
+  nextSheet: () => void;
+  gotoSheet: (id: string) => void;
+  addSheet: () => void;
+  renameSheet: (id: string, name: string) => void;
+  deleteSheet: (id: string) => void;
+  /** Navigator (Nets/Parts/Objects tabs) helpers. */
+  renameNet: (oldName: string, newName: string) => void;
+  selectByNet: (net: string) => void;
+  removeObjects: (ids: string[]) => void;
+  /** Cross Probe — jump from a schematic symbol to its linked PCB footprint. */
+  crossProbe: (id: string) => void;
+  /** Boolean/Combine on 2+ selected shapes/regions → one real polygon result. */
+  combineSelected: (op: "union" | "intersect" | "difference" | "xor") => void;
+  /** Grab-move: pick up the selection so it follows the cursor (right-click Move). */
+  startMoveSelected: () => void;
+  translateMove: (dx: number, dy: number) => void;
+  commitMove: () => void;
+  cancelMove: () => void;
   setZoom: (z: number, focus?: { x: number; y: number }) => void;
   panBy: (dx: number, dy: number) => void;
   // Toolbar — grid / unit / visibility / transforms / z-order / undo-redo
@@ -125,6 +169,19 @@ export interface PcbActions {
   selectMany: (ids: string[]) => void;
   selectAll: () => void;
   deleteSelected: () => void;
+  /** Replace the schematic sheet with the built-in current-sense-amp sample. */
+  loadSampleSchematic: () => void;
+  /** Derive footprints + ratsnest from the schematic and switch to PCB 2D. */
+  convertSchematicToPcb: () => void;
+  /** Turn the ratsnest airwires into copper tracks (simple L-route). */
+  autoRoute: () => void;
+  /** Assign the current selection to a new group (selects together after). */
+  groupSelection: () => void;
+  ungroupSelection: () => void;
+  /** Clear style props on the selection back to defaults. */
+  resetObjectStyle: () => void;
+  /** Add an empty custom property row to the primary selected object. */
+  addCustomProp: () => void;
   moveObject: (id: string, x: number, y: number) => void;
   setObjectField: (id: string, patch: Partial<CanvasObject>) => void;
   setObjectProp: (id: string, key: string, value: unknown) => void;
@@ -232,6 +289,12 @@ export interface PcbActions {
   // Phase 5 — IT-692 / IT-569 toolbar additions
   flashToast: (msg: string) => void;
   alignSelectedToGrid: () => void;
+  /** Align / distribute the current multi-selection (left/right/top/bottom/hcenter/vcenter/distH/distV). */
+  alignSelected: (mode: string) => void;
+  /** Move the selection so its bounding-box min on the axis equals `value`. */
+  setSelectionPos: (axis: "x" | "y", value: number) => void;
+  /** Set every selected object's rotation to an absolute degree. */
+  setSelectionRotation: (deg: number) => void;
   // Phase 6 — 2D File / Edit / Export menu helpers
   toggleSnap: () => void;
   setCornerOp: (patch: Partial<PcbState["cornerOp"]>) => void;
@@ -243,6 +306,22 @@ export interface PcbActions {
 
 const StateCtx = React.createContext<PcbState | null>(null);
 const ActionsCtx = React.createContext<PcbActions | null>(null);
+
+// Bounding-box centre of a set of placed objects (including wire endpoints).
+// This is the pivot for group rotate / flip — so a multi-selection turns and
+// mirrors as one unit, not each object spinning in place.
+function selCenter(objs: CanvasObject[]): { cx: number; cy: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const o of objs) {
+    const pts: Array<[number, number]> = [[o.x, o.y]];
+    if (o.endX != null && o.endY != null) pts.push([o.endX, o.endY]);
+    for (const [x, y] of pts) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
 
 // Fields captured by Undo/Redo (the "model" — not transient UI like menu open).
 type Snapshot = Pick<
@@ -313,7 +392,7 @@ function pcbDocKey(): string {
 
 type PcbDoc = Pick<
   PcbState,
-  "objects" | "pcbBoard" | "twoD" | "threeD" | "gridSize" | "unit" | "snapEnabled"
+  "objects" | "pcbBoard" | "twoD" | "threeD" | "gridSize" | "unit" | "snapEnabled" | "designRules"
 >;
 
 // Rebuild a safe document from persisted storage — stale or hand-edited data
@@ -355,6 +434,12 @@ function sanitizePcbDoc(raw: unknown): Partial<PcbDoc> | null {
   if (typeof r.gridSize === "string") out.gridSize = r.gridSize;
   if (typeof r.unit === "string") out.unit = r.unit;
   if (typeof r.snapEnabled === "boolean") out.snapEnabled = r.snapEnabled;
+  // Design rules: accept a well-formed config, else fall back to defaults so a
+  // stale/partial blob can't break ERC.
+  const dr = r.designRules as Partial<SchRulesConfig> | undefined;
+  if (dr && typeof dr === "object" && Array.isArray(dr.Net) && Array.isArray(dr.pinMatrix) && typeof dr.pinCheckEnabled === "boolean") {
+    out.designRules = { ...defaultSchRulesConfig(), ...(dr as SchRulesConfig) };
+  }
   return out;
 }
 
@@ -374,6 +459,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
   const MAX_HISTORY = 50;
   // Monotonic ID generator for placed canvas objects.
   const objIdCounter = React.useRef(1);
+  // Snapshot captured when a grab-move starts, so the whole move commits/undoes
+  // as ONE history step (live translation uses plain merge, no per-frame history).
+  const moveOrigRef = React.useRef<Snapshot | null>(null);
 
   // Hydrate the persisted document once on mount (client only), then bump the
   // id counter past any restored ids so new placements never collide.
@@ -412,6 +500,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           gridSize: state.gridSize,
           unit: state.unit,
           snapEnabled: state.snapEnabled,
+          designRules: state.designRules,
         };
         window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
       } catch {}
@@ -426,6 +515,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
     state.gridSize,
     state.unit,
     state.snapEnabled,
+    state.designRules,
   ]);
 
   const merge = React.useCallback<Merge>((patch) => {
@@ -460,7 +550,41 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       toggleMenu: (id) =>
         merge((s) => ({ openMenu: s.openMenu === id ? null : id, ctx: null })),
       closeAll: () => merge({ openMenu: null, ctx: null }),
-      setMode: (m) => merge({ mode: m, openMenu: null, ctx: null }),
+      setMode: (m) => {
+        const s = stateRef.current;
+        // Auto-convert on the first Schematic → PCB entry: if the board has no
+        // converted/routed layout yet, build footprints + ratsnest from the
+        // schematic automatically so the parts are there without a manual step.
+        // Once a layout exists (or the user has routed), leave it untouched —
+        // use Design ▸ Convert Schematic to PCB to re-sync deliberately.
+        if ((m === "pcb" || m === "2d") && s.mode === "schematic") {
+          const hasLayout = s.objects.some(
+            (o) => o.props?.gen === "convert" || o.props?.gen === "route",
+          );
+          if (!hasLayout) {
+            const { objects: generated, parts, nets, airwires } = convertSchematicToPcb(s.objects);
+            if (generated.length > 0) {
+              mergeWithHistory((st) => ({
+                objects: [
+                  ...st.objects.filter((o) => o.props?.gen !== "convert" && o.props?.gen !== "route"),
+                  ...generated,
+                ],
+                mode: m,
+                openMenu: null,
+                ctx: null,
+                selectedIds: [],
+                selSub: "none",
+                draftWire: null,
+              }));
+              actions.flashToast(
+                `Auto-converted — ${parts} footprints · ${nets} nets · ${airwires} airwires`,
+              );
+              return;
+            }
+          }
+        }
+        merge({ mode: m, openMenu: null, ctx: null });
+      },
       openSettings: (page) =>
         merge({ settingsOpen: true, settingsPage: page ?? "system", openMenu: null }),
       closeSettings: () => merge({ settingsOpen: false }),
@@ -509,6 +633,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           bottomTab: k,
           bottomOpen: s.bottomTab === k ? !s.bottomOpen : true,
         })),
+      runFind: (matches) => merge({ findResults: matches, bottomTab: "find", bottomOpen: true }),
+      clearFind: () => merge({ findResults: [] }),
       closeBottom: () => merge({ bottomOpen: false }),
       toggleBottom: () => merge((s) => ({ bottomOpen: !s.bottomOpen })),
       setTool: (t) => merge({ tool: t }),
@@ -521,13 +647,13 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge((s) => ({ viewTog: { ...s.viewTog, [label]: !s.viewTog[label] } })),
       openCanvasCtx: (e) => {
         e.preventDefault();
-        const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        merge({
-          ctx: true,
-          openMenu: null,
-          ctxX: `${e.clientX - r.left + 366}px`,
-          ctxY: `${e.clientY - r.top + 225}px`,
-        });
+        // The menu lives inside `.pcb-app` (position:fixed, inset:0), so its
+        // absolute top/left ARE viewport coordinates — anchor it right at the
+        // cursor. (The old +366/+225 constants assumed a fixed panel/toolbar
+        // layout and dropped the menu ~117px below the pointer.) The
+        // ContextMenu's own layout effect then clamps it inside the viewport.
+        const x = e.clientX, y = e.clientY;
+        merge({ ctx: true, openMenu: null, ctxX: `${x}px`, ctxY: `${y}px` });
       },
       setAnnot: (patch) => merge((s) => ({ annot: { ...s.annot, ...patch } })),
       setFr: (patch) => merge(patch),
@@ -602,7 +728,241 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           };
         }),
       zoomReset: () => merge({ zoom: 1, pan: { x: 0, y: 0 } }),
-      zoomFit: () => merge({ zoom: 1, pan: { x: 0, y: 0 } }),
+      // Real fit: measure the canvas viewport, compute the bounding box of the
+      // in-scope objects (or the selection), then set zoom + pan so the box is
+      // centred with padding. Falls back to a reset when there's nothing to fit.
+      zoomFit: (target = "all") =>
+        merge((s) => {
+          const el = typeof document !== "undefined" ? (document.querySelector("[data-canvas-wrapper]") as HTMLElement | null) : null;
+          const W = el?.clientWidth ?? 900;
+          const H = el?.clientHeight ?? 600;
+          const modeScope = s.mode === "schematic" ? "schematic" : "pcb";
+          let objs = s.objects.filter((o) => !o.scope || o.scope === modeScope);
+          if (target === "selection" && s.selectedIds.length > 0) {
+            objs = objs.filter((o) => s.selectedIds.includes(o.id));
+          }
+          if (objs.length === 0) return { zoom: 1, pan: { x: 0, y: 0 } };
+          const M = 20; // glyph half-extent so symbols aren't clipped at the edge
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          for (const o of objs) {
+            const xs = [o.x, o.endX ?? o.x];
+            const ys = [o.y, o.endY ?? o.y];
+            minX = Math.min(minX, ...xs); maxX = Math.max(maxX, ...xs);
+            minY = Math.min(minY, ...ys); maxY = Math.max(maxY, ...ys);
+          }
+          minX -= M; minY -= M; maxX += M; maxY += M;
+          const cw = Math.max(1, maxX - minX);
+          const ch = Math.max(1, maxY - minY);
+          const pad = 80;
+          const zoom = Math.max(0.1, Math.min(4, Math.min((W - pad) / cw, (H - pad) / ch)));
+          const bcx = (minX + maxX) / 2, bcy = (minY + maxY) / 2;
+          return { zoom, pan: { x: W / 2 - bcx * zoom, y: H / 2 - bcy * zoom } };
+        }),
+      saveDoc: () => {
+        try {
+          const s = stateRef.current;
+          const doc: PcbDoc = {
+            objects: s.objects, pcbBoard: s.pcbBoard, twoD: s.twoD, threeD: s.threeD,
+            gridSize: s.gridSize, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
+          };
+          window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
+          actions.flashToast("Saved");
+        } catch {
+          actions.flashToast("Save failed");
+        }
+      },
+      toggleBoardFlip: () =>
+        merge((s) => {
+          actions.flashToast(s.boardFlipped ? "Viewing top of board" : "Viewing bottom of board");
+          return { boardFlipped: !s.boardFlipped };
+        }),
+      highlightNet: (net) => {
+        const s = stateRef.current;
+        if (!net) { merge({ highlightedNet: null, highlightedMembers: [] }); return; }
+        let members: string[];
+        if (s.mode === "schematic") {
+          const first = s.schematicSheets[0]?.id;
+          const objs = s.objects.filter((o) => (!o.scope || o.scope === "schematic") && (o.sheetId ?? first) === s.activeSheetId);
+          members = computeNets(objs).membersOf(net);
+        } else {
+          members = s.objects.filter((o) => o.net === net).map((o) => o.id);
+        }
+        merge({ highlightedNet: net, highlightedMembers: members });
+        actions.flashToast(`Highlighting net ${net}`);
+      },
+      unhighlightAll: () =>
+        merge((s) => {
+          if (s.highlightedNet) actions.flashToast("Cleared net highlight");
+          return { highlightedNet: null, highlightedMembers: [] };
+        }),
+      exportNetlist: () => {
+        const s = stateRef.current;
+        const nl = buildNetlist(s.objects, s.schematicSheets);
+        if (!nl.length) { actions.flashToast("No connected pins — nothing to export"); return; }
+        try {
+          const blob = new Blob([netlistText(nl)], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = "netlist.net";
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          actions.flashToast(`Netlist exported — ${nl.length} nets`);
+        } catch { actions.flashToast("Netlist export failed"); }
+      },
+      runErcCheck: () => {
+        const s = stateRef.current;
+        const first = s.schematicSheets[0]?.id;
+        const objs = s.objects.filter((o) => (!o.scope || o.scope === "schematic") && (o.sheetId ?? first) === s.activeSheetId);
+        const issues = runErc(objs, s.designRules);
+        merge({ ercResults: issues, bottomTab: "drc", bottomOpen: true });
+        actions.flashToast(issues.length ? `ERC: ${issues.length} issue(s) found` : "ERC passed — no issues");
+      },
+      setDesignRules: (cfg) => merge({ designRules: cfg }),
+      reannotate: () =>
+        mergeWithHistory((s) => {
+          const prefix: Record<string, string> = { resistor: "R", resistorBox: "R", capacitor: "C", inductor: "L", diode: "D", crystal: "Y", opamp: "U", ic: "U", component: "U", currentSource: "I", transistor: "Q" };
+          const counters: Record<string, number> = {};
+          const idToText = new Map<string, string>();
+          [...s.objects]
+            .filter((o) => prefix[o.kind])
+            .sort((a, b) => a.y - b.y || a.x - b.x) // reading order: top-left → bottom-right
+            .forEach((o) => { const p = prefix[o.kind]; counters[p] = (counters[p] ?? 0) + 1; idToText.set(o.id, `${p}${counters[p]}`); });
+          if (idToText.size) actions.flashToast(`Reannotated ${idToText.size} components`);
+          return { objects: s.objects.map((o) => (idToText.has(o.id) ? { ...o, text: idToText.get(o.id) } : o)) };
+        }),
+      // Page navigation cycles the sheet list (clamped at the ends).
+      prevSheet: () =>
+        merge((s) => {
+          const i = s.schematicSheets.findIndex((sh) => sh.id === s.activeSheetId);
+          const ni = Math.max(0, i - 1);
+          return { activeSheetId: s.schematicSheets[ni].id, selectedIds: [] };
+        }),
+      nextSheet: () =>
+        merge((s) => {
+          const i = s.schematicSheets.findIndex((sh) => sh.id === s.activeSheetId);
+          const ni = Math.min(s.schematicSheets.length - 1, i + 1);
+          return { activeSheetId: s.schematicSheets[ni].id, selectedIds: [] };
+        }),
+      gotoSheet: (id) => merge({ activeSheetId: id, selectedIds: [] }),
+      addSheet: () =>
+        merge((s) => {
+          const id = `sheet-${Date.now()}`;
+          return {
+            schematicSheets: [...s.schematicSheets, { id, name: `Sheet ${s.schematicSheets.length + 1}` }],
+            activeSheetId: id,
+            selectedIds: [],
+          };
+        }),
+      renameSheet: (id, name) =>
+        merge((s) => ({ schematicSheets: s.schematicSheets.map((sh) => (sh.id === id ? { ...sh, name: name.trim() || sh.name } : sh)) })),
+      deleteSheet: (id) => {
+        const s = stateRef.current;
+        if (s.schematicSheets.length <= 1) { actions.flashToast("Can't delete the last sheet"); return; }
+        mergeWithHistory((st) => {
+          const sheets = st.schematicSheets.filter((sh) => sh.id !== id);
+          const first = st.schematicSheets[0]?.id;
+          return {
+            schematicSheets: sheets,
+            activeSheetId: st.activeSheetId === id ? sheets[0].id : st.activeSheetId,
+            objects: st.objects.filter((o) => !(o.scope === "schematic" && (o.sheetId ?? first) === id)),
+            selectedIds: [],
+          };
+        });
+      },
+      renameNet: (oldName, newName) => {
+        const nn = newName.trim();
+        if (!nn || nn === oldName) return;
+        mergeWithHistory((s) => ({
+          objects: s.objects.map((o) => (o.net === oldName ? { ...o, net: nn } : o)),
+          highlightedNet: s.highlightedNet === oldName ? nn : s.highlightedNet,
+        }));
+      },
+      selectByNet: (net) => {
+        const s = stateRef.current;
+        let ids: string[];
+        if (s.mode === "schematic") {
+          const first = s.schematicSheets[0]?.id;
+          const objs = s.objects.filter((o) => (!o.scope || o.scope === "schematic") && (o.sheetId ?? first) === s.activeSheetId);
+          ids = computeNets(objs).membersOf(net);
+        } else {
+          ids = s.objects.filter((o) => o.net === net).map((o) => o.id);
+        }
+        merge({ selectedIds: ids, selSub: "none" });
+      },
+      removeObjects: (ids) => {
+        const set = new Set(ids);
+        mergeWithHistory((s) => ({ objects: s.objects.filter((o) => !set.has(o.id)), selectedIds: s.selectedIds.filter((x) => !set.has(x)) }));
+      },
+      // Cross Probe — from a schematic symbol, find the PCB footprint that
+      // Convert linked to it (sourceId) and jump to it: switch to PCB, select
+      // it, fit the view. Falls back to a toast when there's no link yet.
+      crossProbe: (id) => {
+        const s = stateRef.current;
+        const target = s.objects.find((o) => o.sourceId === id || (o.scope === "pcb" && o.sourceId === id));
+        actions.closeAll();
+        if (!target) { actions.flashToast("No linked PCB object — run Convert to PCB first"); return; }
+        actions.setMode("pcb");
+        setTimeout(() => { actions.selectPlaced(target.id, false); actions.zoomFit("selection"); }, 60);
+      },
+      combineSelected: (op) => {
+        const s = stateRef.current;
+        const sel = s.objects.filter((o) => s.selectedIds.includes(o.id) && isCombinable(o));
+        if (sel.length < 2) { actions.flashToast("Select 2 or more shapes to combine"); return; }
+        const rings = booleanRings(sel.map(shapeToPolygon), op);
+        if (!rings.length) { actions.flashToast("Combine produced an empty shape"); return; }
+        const pts = rings.flat();
+        const minX = Math.min(...pts.map((p) => p.x)), maxX = Math.max(...pts.map((p) => p.x));
+        const minY = Math.min(...pts.map((p) => p.y)), maxY = Math.max(...pts.map((p) => p.y));
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        rings.sort((a, b) => Math.abs(ringArea(b)) - Math.abs(ringArea(a))); // outer ring first
+        const local = rings.map((r) => r.map((p) => ({ x: p.x - cx, y: p.y - cy })));
+        const first = sel[0];
+        const id = `obj_${objIdCounter.current++}`;
+        const result: CanvasObject = {
+          id, kind: "combineShape", x: cx, y: cy, rotation: 0,
+          color: first.color, layer: first.layer, scope: first.scope, sheetId: first.sheetId,
+          points: local, props: { combineOp: op },
+        };
+        const gone = new Set(sel.map((o) => o.id));
+        mergeWithHistory((st) => ({ objects: [...st.objects.filter((o) => !gone.has(o.id)), result], selectedIds: [id] }));
+        actions.flashToast(`Combined ${sel.length} shapes (${op})`);
+      },
+      startMoveSelected: () => {
+        const s = stateRef.current;
+        if (!s.selectedIds.length) { actions.closeAll(); return; }
+        moveOrigRef.current = snap(s);            // for one-step undo / cancel
+        merge({ moveMode: { ids: [...s.selectedIds] }, ctx: null, openMenu: null });
+        actions.flashToast("Moving — click to drop, Esc to cancel");
+      },
+      translateMove: (dx, dy) =>
+        merge((s) => {
+          if (!s.moveMode) return {};
+          const ids = new Set(s.moveMode.ids);
+          return {
+            objects: s.objects.map((o) =>
+              ids.has(o.id)
+                ? { ...o, x: o.x + dx, y: o.y + dy, endX: o.endX != null ? o.endX + dx : undefined, endY: o.endY != null ? o.endY + dy : undefined }
+                : o,
+            ),
+          };
+        }),
+      commitMove: () => {
+        const orig = moveOrigRef.current;
+        moveOrigRef.current = null;
+        // Record the whole move as a single undo step (guard against a no-op drop).
+        if (orig && SNAP_KEYS.some((k) => orig[k] !== snap(stateRef.current)[k])) {
+          historyRef.current.past.push(orig);
+          if (historyRef.current.past.length > MAX_HISTORY) historyRef.current.past.shift();
+          historyRef.current.future = [];
+        }
+        merge({ moveMode: null });
+      },
+      cancelMove: () => {
+        const orig = moveOrigRef.current;
+        moveOrigRef.current = null;
+        if (orig) merge({ objects: orig.objects, moveMode: null });
+        else merge({ moveMode: null });
+      },
       panBy: (dx, dy) => merge((s) => ({ pan: { x: s.pan.x + dx, y: s.pan.y + dy } })),
       setSchemBasic: (patch) =>
         merge((s) => ({ schemBasic: { ...s.schemBasic, ...patch } })),
@@ -893,8 +1253,19 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         mergeWithHistory((s) => ({ compRot: (s.compRot + deg) % 360 })),
       flipSelV: () => mergeWithHistory((s) => ({ compFlipV: !s.compFlipV })),
       flipSelH: () => mergeWithHistory((s) => ({ compFlipH: !s.compFlipH })),
-      bringFront: () => mergeWithHistory({ compZ: "front" }),
-      sendBack: () => mergeWithHistory({ compZ: "back" }),
+      bringFront: () =>
+        mergeWithHistory((s) => {
+          if (s.selectedIds.length === 0) return {};
+          const ids = new Set(s.selectedIds);
+          // Paint order = array order (later = on top). Move selection to end.
+          return { objects: [...s.objects.filter((o) => !ids.has(o.id)), ...s.objects.filter((o) => ids.has(o.id))], compZ: "front" };
+        }),
+      sendBack: () =>
+        mergeWithHistory((s) => {
+          if (s.selectedIds.length === 0) return {};
+          const ids = new Set(s.selectedIds);
+          return { objects: [...s.objects.filter((o) => ids.has(o.id)), ...s.objects.filter((o) => !ids.has(o.id))], compZ: "back" };
+        }),
       undo: () => {
         const past = historyRef.current.past;
         if (past.length === 0) return;
@@ -927,6 +1298,10 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           testPoint: "TP",
           stackTable: "Stack Table",
           drillTable: "Drill Table",
+          offPageConnector: "PORT",
+          diffPairFlag: "DP",
+          reuseBlock: "REUSE",
+          netBusLabel: "NET",
         };
         mergeWithHistory((s) => {
           // 2D is the same board surface as PCB — pad/via/component defaults
@@ -955,6 +1330,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             text: defaultText[kind],
             rotation: 0,
             layer: inPcb ? s.activePcbLayer : undefined,
+            // Schematic placements belong to the active sheet (multi-sheet).
+            sheetId: inPcb ? undefined : s.activeSheetId,
             ...pcbExtras,
           };
           return { objects: [...s.objects, obj], selectedIds: [id] };
@@ -979,8 +1356,29 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             layer: isTrack ? s.activePcbLayer : undefined,
             // Track width from PCB defaults; nets attach via the property panel.
             width: isTrack ? s.pcbDefaults.trackWidth : undefined,
+            sheetId: isTrack ? undefined : s.activeSheetId,
           };
-          return { objects: [...s.objects, obj], draftWire: null, selectedIds: [id] };
+          // Schematic auto-junction: drop a junction dot where an endpoint of the
+          // new wire lands on the INTERIOR of an existing wire (a T-connection).
+          const extra: CanvasObject[] = [];
+          if (!isTrack) {
+            const first = s.schematicSheets[0]?.id;
+            const others = s.objects.filter((o) => (o.kind === "wire" || o.kind === "bus") && (!o.scope || o.scope === "schematic") && (o.sheetId ?? first) === s.activeSheetId);
+            const already = (px: number, py: number) => s.objects.some((o) => o.kind === "junction" && Math.hypot(o.x - px, o.y - py) < 8);
+            for (const pt of [{ x: s.draftWire.startX, y: s.draftWire.startY }, { x, y }]) {
+              if (already(pt.x, pt.y)) continue;
+              const hit = others.some((w) => {
+                const abx = (w.endX ?? w.x) - w.x, aby = (w.endY ?? w.y) - w.y, L2 = abx * abx + aby * aby;
+                if (L2 < 1) return false;
+                const t = ((pt.x - w.x) * abx + (pt.y - w.y) * aby) / L2;
+                if (t < 0.08 || t > 0.92) return false;
+                const cx = w.x + t * abx, cy = w.y + t * aby;
+                return Math.hypot(pt.x - cx, pt.y - cy) < 6;
+              });
+              if (hit) extra.push({ id: `obj_${objIdCounter.current++}`, kind: "junction", x: pt.x, y: pt.y, rotation: 0, scope: "schematic", sheetId: s.activeSheetId });
+            }
+          }
+          return { objects: [...s.objects, obj, ...extra], draftWire: null, selectedIds: [id] };
         }),
       cancelDraft: () => merge({ draftWire: null }),
       selectPlaced: (id, additive) =>
@@ -995,6 +1393,12 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
                 : [...s.selectedIds, id],
               selSub: "none",
             };
+          }
+          // Grouped object → select the whole group (moves/deletes together).
+          const gid = (s.objects.find((o) => o.id === id)?.props as Record<string, unknown> | undefined)?.groupId;
+          if (gid) {
+            const members = s.objects.filter((o) => (o.props as Record<string, unknown> | undefined)?.groupId === gid).map((o) => o.id);
+            return { selectedIds: members, selSub: "none" };
           }
           return { selectedIds: [id], selSub: "none" };
         }),
@@ -1011,6 +1415,102 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             selectedIds: [],
           };
         }),
+      groupSelection: () => {
+        const s = stateRef.current;
+        if (s.selectedIds.length < 2) { actions.flashToast("Select 2 or more objects to group"); return; }
+        const ids = new Set(s.selectedIds);
+        const gid = `grp_${Math.random().toString(36).slice(2, 8)}`;
+        const existing = new Set(s.objects.map((o) => (o.props as Record<string, unknown> | undefined)?.groupId).filter(Boolean));
+        const gname = `Group ${existing.size + 1}`;
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) => (ids.has(o.id) ? { ...o, props: { ...(o.props ?? {}), groupId: gid, groupName: gname } } : o)),
+        }));
+        actions.flashToast(`Grouped ${s.selectedIds.length} objects → ${gname}`);
+      },
+      ungroupSelection: () => {
+        const ids = new Set(stateRef.current.selectedIds);
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) => {
+            if (!ids.has(o.id)) return o;
+            const p = { ...(o.props ?? {}) } as Record<string, unknown>;
+            delete p.groupId; delete p.groupName;
+            return { ...o, props: p };
+          }),
+        }));
+        actions.flashToast("Ungrouped");
+      },
+      resetObjectStyle: () => {
+        const ids = new Set(stateRef.current.selectedIds);
+        const STYLE_KEYS = ["lineStyle", "fillColor", "fillColor2", "fontSize", "style", "roundRadius", "font", "strokeColor"];
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) => {
+            if (!ids.has(o.id)) return o;
+            const p = { ...(o.props ?? {}) } as Record<string, unknown>;
+            STYLE_KEYS.forEach((k) => delete p[k]);
+            return { ...o, props: p, color: undefined };
+          }),
+        }));
+        actions.flashToast("Style reset to default");
+      },
+      addCustomProp: () => {
+        const s = stateRef.current;
+        const id = s.selectedIds[0];
+        if (!id) { actions.flashToast("Select an object first"); return; }
+        const obj = s.objects.find((o) => o.id === id);
+        const n = Object.keys(obj?.props ?? {}).filter((k) => k.startsWith("custom:")).length + 1;
+        const key = `custom:Property ${n}`;
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) => (o.id === id ? { ...o, props: { ...(o.props ?? {}), [key]: "" } } : o)),
+        }));
+        actions.flashToast("Added custom property");
+      },
+      loadSampleSchematic: () =>
+        // Replace the whole sheet with the built-in sample (undoable via Ctrl+Z).
+        // Deep-copy so the shared module constant is never mutated by later edits.
+        mergeWithHistory(() => ({
+          objects: DEFAULT_SCHEM_OBJECTS.map((o) => ({ ...o })),
+          selectedIds: [],
+          selSub: "none",
+          draftWire: null,
+        })),
+      convertSchematicToPcb: () => {
+        const src = stateRef.current.objects;
+        const { objects: generated, parts, nets, airwires } = convertSchematicToPcb(src);
+        mergeWithHistory((s) => ({
+          // Keep the schematic sheet + any hand-placed PCB objects; drop only the
+          // previous auto-convert output so re-running is idempotent.
+          objects: [
+            ...s.objects.filter((o) => o.props?.gen !== "convert" && o.props?.gen !== "route"),
+            ...generated,
+          ],
+          mode: "pcb",
+          openMenu: null,
+          ctx: null,
+          selectedIds: [],
+          selSub: "none",
+          draftWire: null,
+        }));
+        actions.flashToast(
+          `Converted to PCB — ${parts} footprints · ${nets} nets · ${airwires} airwires`,
+        );
+      },
+      autoRoute: () => {
+        const s = stateRef.current;
+        const { objects: routedObjs, routed } = routeRatsnest(s.objects, s.pcbDefaults.trackWidth);
+        if (routed === 0) {
+          actions.flashToast("No ratsnest to route — run Convert Schematic to PCB first");
+          return;
+        }
+        mergeWithHistory(() => ({
+          objects: routedObjs,
+          openMenu: null,
+          ctx: null,
+          selectedIds: [],
+          selSub: "none",
+          draftWire: null,
+        }));
+        actions.flashToast(`Auto-routed ${routed} connections → copper tracks`);
+      },
       moveObject: (id, x, y) =>
         mergeWithHistory((s) => ({
           objects: s.objects.map((o) => (o.id === id ? { ...o, x, y } : o)),
@@ -1033,32 +1533,70 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         })),
       rotateSelectedPlaced: (deg) =>
         mergeWithHistory((s) => {
-          if (s.selectedIds.length === 0) return {};
-          const sel = new Set(s.selectedIds);
+          const picked = s.objects.filter((o) => s.selectedIds.includes(o.id));
+          if (picked.length === 0) return {};
+          const { cx, cy } = selCenter(picked);
+          const rad = (deg * Math.PI) / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+          // Rotate a point around the selection centre.
+          const rot = (px: number, py: number): [number, number] => [
+            Math.round(cx + (px - cx) * cos - (py - cy) * sin),
+            Math.round(cy + (px - cx) * sin + (py - cy) * cos),
+          ];
+          const ids = new Set(s.selectedIds);
           return {
-            objects: s.objects.map((o) =>
-              sel.has(o.id) ? { ...o, rotation: (((o.rotation ?? 0) + deg) % 360 + 360) % 360 } : o,
-            ),
+            objects: s.objects.map((o) => {
+              if (!ids.has(o.id)) return o;
+              const [nx, ny] = rot(o.x, o.y);
+              const patch: Partial<CanvasObject> = {
+                x: nx, y: ny,
+                rotation: ((((o.rotation ?? 0) + deg) % 360) + 360) % 360,
+              };
+              if (o.endX != null && o.endY != null) {
+                const [ex, ey] = rot(o.endX, o.endY);
+                patch.endX = ex; patch.endY = ey;
+              }
+              return { ...o, ...patch };
+            }),
           };
         }),
       flipSelectedV: () =>
         mergeWithHistory((s) => {
-          if (s.selectedIds.length === 0) return { compFlipV: !s.compFlipV };
-          const sel = new Set(s.selectedIds);
+          const picked = s.objects.filter((o) => s.selectedIds.includes(o.id));
+          if (picked.length === 0) return {};
+          const { cy } = selCenter(picked);           // mirror across horizontal axis
+          const ids = new Set(s.selectedIds);
           return {
-            objects: s.objects.map((o) =>
-              sel.has(o.id) ? { ...o, rotation: (((360 - (o.rotation ?? 0)) % 360) + 360) % 360 } : o,
-            ),
+            objects: s.objects.map((o) => {
+              if (!ids.has(o.id)) return o;
+              const p = { ...(o.props ?? {}) } as Record<string, unknown>;
+              p.flipY = !p.flipY;                       // mirror the symbol itself too
+              return {
+                ...o,
+                y: Math.round(2 * cy - o.y),
+                endY: o.endY != null ? Math.round(2 * cy - o.endY) : undefined,
+                props: p,
+              };
+            }),
           };
         }),
       flipSelectedH: () =>
         mergeWithHistory((s) => {
-          if (s.selectedIds.length === 0) return { compFlipH: !s.compFlipH };
-          const sel = new Set(s.selectedIds);
+          const picked = s.objects.filter((o) => s.selectedIds.includes(o.id));
+          if (picked.length === 0) return {};
+          const { cx } = selCenter(picked);           // mirror across vertical axis
+          const ids = new Set(s.selectedIds);
           return {
-            objects: s.objects.map((o) =>
-              sel.has(o.id) ? { ...o, rotation: (((180 - (o.rotation ?? 0)) % 360) + 360) % 360 } : o,
-            ),
+            objects: s.objects.map((o) => {
+              if (!ids.has(o.id)) return o;
+              const p = { ...(o.props ?? {}) } as Record<string, unknown>;
+              p.flipX = !p.flipX;
+              return {
+                ...o,
+                x: Math.round(2 * cx - o.x),
+                endX: o.endX != null ? Math.round(2 * cx - o.endX) : undefined,
+                props: p,
+              };
+            }),
           };
         }),
       copySelection: () =>
@@ -1300,6 +1838,68 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
                 : o,
             ),
           };
+        }),
+      alignSelected: (mode) =>
+        mergeWithHistory((s) => {
+          const sel = s.objects.filter((o) => s.selectedIds.includes(o.id));
+          if (sel.length < 2) return {};
+          const xs = sel.map((o) => o.x), ys = sel.map((o) => o.y);
+          const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+          const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+          const target = new Map<string, { x?: number; y?: number }>();
+          sel.forEach((o) => {
+            if (mode === "left") target.set(o.id, { x: minX });
+            else if (mode === "right") target.set(o.id, { x: maxX });
+            else if (mode === "hcenter") target.set(o.id, { x: cx });
+            else if (mode === "top") target.set(o.id, { y: minY });
+            else if (mode === "bottom") target.set(o.id, { y: maxY });
+            else if (mode === "vcenter") target.set(o.id, { y: cy });
+          });
+          if (mode === "distH") {
+            const byX = [...sel].sort((a, b) => a.x - b.x);
+            const step = (maxX - minX) / (byX.length - 1);
+            byX.forEach((o, i) => target.set(o.id, { x: minX + step * i }));
+          }
+          if (mode === "distV") {
+            const byY = [...sel].sort((a, b) => a.y - b.y);
+            const step = (maxY - minY) / (byY.length - 1);
+            byY.forEach((o, i) => target.set(o.id, { y: minY + step * i }));
+          }
+          return {
+            objects: s.objects.map((o) => {
+              const t = target.get(o.id);
+              if (!t) return o;
+              const dx = t.x != null ? t.x - o.x : 0;
+              const dy = t.y != null ? t.y - o.y : 0;
+              return { ...o, x: o.x + dx, y: o.y + dy, endX: o.endX != null ? o.endX + dx : undefined, endY: o.endY != null ? o.endY + dy : undefined };
+            }),
+          };
+        }),
+      setSelectionPos: (axis, value) =>
+        mergeWithHistory((s) => {
+          const picked = s.objects.filter((o) => s.selectedIds.includes(o.id));
+          if (picked.length === 0 || !Number.isFinite(value)) return {};
+          // Move by the delta from the selection's current bbox-min → so a
+          // multi-selection shifts as a unit rather than stacking.
+          const ref = Math.min(...picked.map((o) => (axis === "x" ? o.x : o.y)));
+          const d = value - ref;
+          if (d === 0) return {};
+          const ids = new Set(s.selectedIds);
+          return {
+            objects: s.objects.map((o) => {
+              if (!ids.has(o.id)) return o;
+              return axis === "x"
+                ? { ...o, x: o.x + d, endX: o.endX != null ? o.endX + d : undefined }
+                : { ...o, y: o.y + d, endY: o.endY != null ? o.endY + d : undefined };
+            }),
+          };
+        }),
+      setSelectionRotation: (deg) =>
+        mergeWithHistory((s) => {
+          if (s.selectedIds.length === 0 || !Number.isFinite(deg)) return {};
+          const r = (((deg % 360) + 360) % 360);
+          const ids = new Set(s.selectedIds);
+          return { objects: s.objects.map((o) => (ids.has(o.id) ? { ...o, rotation: r } : o)) };
         }),
     };
   }, [merge, mergeWithHistory]);

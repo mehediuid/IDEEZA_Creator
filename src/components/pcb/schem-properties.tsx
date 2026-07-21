@@ -1,9 +1,12 @@
 "use client";
 
-// IDEEZA PCB Software — Schematic right-panel properties.
-// Default view of the Properties tab when nothing is selected in schematic
-// mode. Three collapsible sections (Basic / Drawing Border / Title Block)
-// with workable controls — values live in the store.
+// IDEEZA PCB Software — Schematic right-panel properties shown when NOTHING is
+// selected. Sheet-level settings in three groups:
+//   Sheet        — collapsible: Name · Template
+//   Sheet Border — checkbox-gated: Paper size · Orientation · Zone reference
+//   Title Block  — checkbox-gated: Title · Doc. No. · Revision · Date · …
+// All values live in the store (schemBasic / schemBorder / schemTitleFields)
+// and drive the on-canvas sheet frame + title block, so edits are live.
 
 import * as React from "react";
 import { Checkbox, Select } from "@/components/ideeza";
@@ -12,350 +15,181 @@ import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const CHEV_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg>';
-const LINK_SVG =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 15l6-6M10 7H8a4 4 0 0 0 0 8h2M14 17h2a4 4 0 0 0 0-8h-2"/></svg>';
-const SEL_SVG =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>';
-const REFRESH_SVG =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
 
 const PAD_X = "var(--spacing-8)";
-const ROW_GAP = "var(--spacing-5)";
+const DIVIDER = "var(--border-width-1) solid var(--color-border-subtle)";
 
-function SectionHeader({
-  title,
-  open,
-  onToggle,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-}) {
+const TEMPLATES = ["A4 Landscape", "A4 Portrait", "A3 Landscape", "A3 Portrait", "US Letter", "Custom"];
+const PAPER_SIZES: { label: string; value: string }[] = [
+  { label: "A5 · 210×148", value: "A5" },
+  { label: "A4 · 297×210", value: "A4" },
+  { label: "A3 · 420×297", value: "A3" },
+  { label: "A2 · 594×420", value: "A2" },
+  { label: "US Letter · 279×216", value: "Letter" },
+  { label: "Legal · 356×216", value: "Legal" },
+];
+const ORIENTATIONS = ["Landscape", "Portrait"];
+
+const FIELD_STYLE: React.CSSProperties = {
+  width: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
+  padding: "var(--spacing-3) var(--spacing-4)",
+  border: "var(--border-width-1) solid var(--color-border-default)",
+  borderRadius: "var(--radius-md)",
+  background: "var(--color-bg-surface)",
+  color: "var(--color-text-primary)",
+  fontSize: "var(--font-size-sm)",
+  outline: "none",
+  fontFamily: "inherit",
+};
+
+function CaretHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
   return (
     <div
       onClick={onToggle}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--spacing-3)",
-        padding: `var(--spacing-5) ${PAD_X}`,
-        cursor: "pointer",
-        userSelect: "none",
-      }}
+      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: `var(--spacing-5) ${PAD_X}`, cursor: "pointer", userSelect: "none" }}
     >
       <span
-        style={{
-          display: "inline-flex",
-          width: 13,
-          height: 13,
-          color: "var(--color-violet-600)",
-          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
-          transition: "transform .15s ease",
-        }}
+        style={{ display: "inline-flex", width: 13, height: 13, color: "var(--color-violet-600)", transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }}
       >
         <Icon html={CHEV_SVG} />
       </span>
-      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-        {title}
-      </span>
+      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
     </div>
   );
 }
 
-function LabelCell({ children }: { children: React.ReactNode }) {
+function CheckHeader({ title, checked, onToggle }: { title: string; checked: boolean; onToggle: () => void }) {
   return (
-    <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
-      {children}
-    </span>
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: `var(--spacing-5) ${PAD_X}` }}>
+      <Checkbox checked={checked} onChange={onToggle} />
+      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+    </div>
   );
 }
 
-function TextValue({
-  value,
-  onChange,
-  minWidth = 130,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  minWidth?: number;
-}) {
-  return (
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        minWidth,
-        padding: "var(--spacing-2) var(--spacing-4)",
-        border: "var(--border-width-1) solid var(--color-border-default)",
-        borderRadius: "var(--radius-md)",
-        background: "var(--color-bg-surface)",
-        color: "var(--color-text-primary)",
-        fontSize: "var(--font-size-sm)",
-        outline: "none",
-        fontFamily: "inherit",
-      }}
-    />
-  );
-}
-
+// One property row. When `check` is provided it takes column 1 and the label
+// shifts to column 2; otherwise the label spans columns 1–2. The control always
+// lands in the (wider) final column so every field aligns down the panel.
 function Row({
+  check,
   label,
-  right,
-  paddingV = ROW_GAP,
+  labelOn = true,
+  children,
 }: {
-  label: React.ReactNode;
-  right: React.ReactNode;
-  paddingV?: string;
+  check?: React.ReactNode;
+  label: string;
+  labelOn?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <div
       style={{
-        display: "flex",
+        display: "grid",
+        gridTemplateColumns: "18px 1fr 1.25fr",
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: "var(--spacing-4)",
-        padding: `${paddingV} ${PAD_X}`,
+        gap: "var(--spacing-3)",
+        padding: `var(--spacing-3) ${PAD_X}`,
       }}
     >
-      {typeof label === "string" ? <LabelCell>{label}</LabelCell> : label}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>{right}</div>
+      {check ?? null}
+      <span
+        style={{
+          gridColumn: check ? "2 / 3" : "1 / 3",
+          fontSize: "var(--font-size-sm)",
+          lineHeight: 1.2,
+          color: labelOn ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </span>
+      <div style={{ gridColumn: "3 / 4", minWidth: 0 }}>{children}</div>
     </div>
   );
 }
 
-function IconBtn({
-  svg,
-  onClick,
-  ariaLabel,
-}: {
-  svg: string;
-  onClick?: () => void;
-  ariaLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      title={ariaLabel}
-      style={{
-        width: 26,
-        height: 26,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        border: "var(--border-width-1) solid var(--color-border-default)",
-        borderRadius: "var(--radius-md)",
-        background: "var(--color-bg-surface)",
-        color: "var(--color-text-secondary)",
-        cursor: "pointer",
-      }}
-    >
-      <Icon html={svg} size={14} />
-    </button>
-  );
+function TextValue({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return <input value={value} onChange={(e) => onChange(e.target.value)} style={FIELD_STYLE} />;
 }
 
-function BasicProperties() {
+function Sheet() {
   const state = usePcbState();
   const actions = usePcbActions();
   const open = state.schemSectionOpen.basic;
   return (
-    <div style={{ borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-      <SectionHeader title="Basic properties" open={open} onToggle={() => actions.toggleSchemSection("basic")} />
+    <div style={{ borderBottom: DIVIDER }}>
+      <CaretHeader title="Sheet" open={open} onToggle={() => actions.toggleSchemSection("basic")} />
       {open && (
-        <Row
-          label="Name"
-          right={
-            <TextValue
-              value={state.schemBasic.name}
-              onChange={(v) => actions.setSchemBasic({ name: v })}
-              minWidth={150}
+        <>
+          <Row label="Name">
+            <TextValue value={state.schemBasic.name} onChange={(v) => actions.setSchemBasic({ name: v })} />
+          </Row>
+          <Row label="Template">
+            <Select
+              value={state.schemBasic.template}
+              options={TEMPLATES.map((t) => ({ label: t, value: t }))}
+              onChange={(v) => actions.setSchemBasic({ template: v })}
+              size="sm"
             />
-          }
-        />
+          </Row>
+        </>
       )}
     </div>
   );
 }
 
-function DrawingBorder() {
+// Free-typing zone-reference field: shows "cols × rows" but commits back to the
+// numeric xRegion / yRegion (which drive the on-canvas zone grid) only when the
+// text parses cleanly, so the user can edit mid-string without fighting it.
+function ZoneReference() {
+  const b = usePcbState().schemBorder;
+  const actions = usePcbActions();
+  const [buf, setBuf] = React.useState(`${b.xRegion} × ${b.yRegion}`);
+  React.useEffect(() => {
+    setBuf(`${b.xRegion} × ${b.yRegion}`);
+  }, [b.xRegion, b.yRegion]);
+  const onChange = (v: string) => {
+    setBuf(v);
+    const m = v.match(/(\d+)\s*[×xX*]\s*(\d+)/);
+    if (m) actions.setSchemBorder({ xRegion: m[1], yRegion: m[2] });
+  };
+  return <input value={buf} onChange={(e) => onChange(e.target.value)} style={FIELD_STYLE} />;
+}
+
+function SheetBorder() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const open = state.schemSectionOpen.border;
   const b = state.schemBorder;
   return (
-    <div style={{ borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-      <SectionHeader title="Drawing Border" open={open} onToggle={() => actions.toggleSchemSection("border")} />
-      {open && (
+    <div style={{ borderBottom: DIVIDER }}>
+      <CheckHeader title="Sheet Border" checked={b.show} onToggle={() => actions.setSchemBorder({ show: !b.show })} />
+      {b.show && (
         <>
+          <Row label="Paper size">
+            <Select
+              value={b.size}
+              options={PAPER_SIZES}
+              onChange={(v) => actions.setSchemBorder({ size: v })}
+              size="sm"
+            />
+          </Row>
+          <Row label="Orientation">
+            <Select
+              value={b.orientation}
+              options={ORIENTATIONS.map((o) => ({ label: o, value: o }))}
+              onChange={(v) => actions.setSchemBorder({ orientation: v })}
+              size="sm"
+            />
+          </Row>
           <Row
-            label="Title Block"
-            right={
-              <Checkbox
-                checked={b.showTitleBlock}
-                onChange={() => actions.setSchemBorder({ showTitleBlock: !b.showTitleBlock })}
-              />
-            }
-          />
-          <Row
-            label="Drawing"
-            right={
-              <Select
-                value={b.drawing}
-                options={["Right Bottom", "Right Top", "Left Bottom", "Left Top"].map((v) => ({ label: v, value: v }))}
-                onChange={(v) => actions.setSchemBorder({ drawing: v })}
-                minWidth={150}
-              />
-            }
-          />
-          <Row
-            label="Size"
-            right={
-              <Select
-                value={b.size}
-                options={["A0", "A1", "A2", "A3", "A4", "A5", "Letter", "Legal", "Tabloid"].map((v) => ({ label: v, value: v }))}
-                onChange={(v) => actions.setSchemBorder({ size: v })}
-                minWidth={150}
-              />
-            }
-          />
-          <Row
-            label="Drawing Height"
-            right={
-              <>
-                <TextValue
-                  value={b.drawingHeight}
-                  onChange={(v) => actions.setSchemBorder({ drawingHeight: v })}
-                  minWidth={100}
-                />
-                <IconBtn svg={LINK_SVG} ariaLabel="Link aspect" />
-              </>
-            }
-          />
-          <Row
-            label="Drawing Height"
-            right={
-              <>
-                <TextValue
-                  value={b.drawingHeightAlt}
-                  onChange={(v) => actions.setSchemBorder({ drawingHeightAlt: v })}
-                  minWidth={100}
-                />
-                <IconBtn svg={SEL_SVG} ariaLabel="Pick region" />
-              </>
-            }
-          />
-          <Row
-            label="Region Start"
-            right={
-              <Select
-                value={b.regionStart}
-                options={["Left Top", "Right Top", "Left Bottom", "Right Bottom"].map((v) => ({ label: v, value: v }))}
-                onChange={(v) => actions.setSchemBorder({ regionStart: v })}
-                minWidth={150}
-              />
-            }
-          />
-          <Row
-            label="X Region Count"
-            right={
-              <TextValue
-                value={b.xRegion}
-                onChange={(v) => actions.setSchemBorder({ xRegion: v })}
-                minWidth={150}
-              />
-            }
-          />
-          <Row
-            label="Y Region Count"
-            right={
-              <TextValue
-                value={b.yRegion}
-                onChange={(v) => actions.setSchemBorder({ yRegion: v })}
-                minWidth={150}
-              />
-            }
-          />
-          <Row
-            label="Color"
-            right={
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--spacing-2)",
-                  border: "var(--border-width-1) solid var(--color-border-default)",
-                  borderRadius: "var(--radius-md)",
-                  padding: "var(--spacing-1) var(--spacing-3)",
-                  minWidth: 150,
-                }}
-              >
-                <label
-                  style={{
-                    position: "relative",
-                    width: 22,
-                    height: 22,
-                    borderRadius: "var(--radius-sm)",
-                    background: b.color,
-                    border: "var(--border-width-1) solid var(--color-border-subtle)",
-                    flex: "0 0 auto",
-                    cursor: "pointer",
-                    overflow: "hidden",
-                  }}
-                  title="Pick a color"
-                >
-                  <input
-                    type="color"
-                    value={b.color}
-                    onChange={(e) => actions.setSchemBorder({ color: e.target.value })}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      opacity: 0,
-                      cursor: "pointer",
-                      border: "none",
-                      padding: 0,
-                    }}
-                  />
-                </label>
-                <input
-                  value={b.color}
-                  onChange={(e) => actions.setSchemBorder({ color: e.target.value })}
-                  spellCheck={false}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--color-text-primary)",
-                    fontSize: "var(--font-size-sm)",
-                    fontFamily: "var(--font-family-mono), monospace",
-                    outline: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => actions.setSchemBorder({ color: "#1E1E1E" })}
-                  aria-label="Reset color"
-                  title="Reset color"
-                  style={{
-                    width: 22,
-                    height: 22,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--color-text-tertiary)",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon html={REFRESH_SVG} size={12} />
-                </button>
-              </div>
-            }
-          />
+            check={<Checkbox checked={b.zoneRefOn} onChange={() => actions.setSchemBorder({ zoneRefOn: !b.zoneRefOn })} />}
+            label="Zone reference"
+            labelOn={b.zoneRefOn}
+          >
+            <ZoneReference />
+          </Row>
         </>
       )}
     </div>
@@ -365,63 +199,20 @@ function DrawingBorder() {
 function TitleBlock() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const open = state.schemSectionOpen.title;
   return (
-    <div style={{ borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-      <SectionHeader title="Title Block" open={open} onToggle={() => actions.toggleSchemSection("title")} />
-      {open && (
-        <>
+    <div style={{ borderBottom: DIVIDER }}>
+      <CheckHeader title="Sheet Info" checked={state.schemTitleShow} onToggle={actions.toggleSchemTitleShow} />
+      {state.schemTitleShow &&
+        state.schemTitleFields.map((f) => (
           <Row
-            label="Title Block"
-            right={<Checkbox checked={state.schemTitleShow} onChange={actions.toggleSchemTitleShow} />}
-          />
-          {state.schemTitleFields.map((f) => (
-            <div
-              key={f.key}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "18px 1fr 18px 110px",
-                alignItems: "center",
-                gap: "var(--spacing-3)",
-                padding: `var(--spacing-3) ${PAD_X}`,
-              }}
-            >
-              <Checkbox checked={f.on} onChange={() => actions.toggleSchemTitleField(f.key, "on")} />
-              <span
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--color-text-secondary)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {f.label}
-              </span>
-              <Checkbox
-                checked={f.valueOn}
-                onChange={() => actions.toggleSchemTitleField(f.key, "valueOn")}
-              />
-              <input
-                value={f.value}
-                onChange={(e) => actions.setSchemTitleFieldValue(f.key, e.target.value)}
-                disabled={!f.valueOn}
-                style={{
-                  padding: "var(--spacing-2) var(--spacing-3)",
-                  border: "var(--border-width-1) solid var(--color-border-default)",
-                  borderRadius: "var(--radius-md)",
-                  background: f.valueOn ? "var(--color-bg-surface)" : "var(--color-bg-subtle)",
-                  color: f.valueOn ? "var(--color-text-primary)" : "var(--color-text-disabled)",
-                  fontSize: "var(--font-size-sm)",
-                  outline: "none",
-                  fontFamily: "inherit",
-                  width: "100%",
-                }}
-              />
-            </div>
-          ))}
-        </>
-      )}
+            key={f.key}
+            check={<Checkbox checked={f.on} onChange={() => actions.toggleSchemTitleField(f.key, "on")} />}
+            label={f.label}
+            labelOn={f.on}
+          >
+            <TextValue value={f.value} onChange={(v) => actions.setSchemTitleFieldValue(f.key, v)} />
+          </Row>
+        ))}
     </div>
   );
 }
@@ -429,8 +220,8 @@ function TitleBlock() {
 export function SchematicProperties() {
   return (
     <div>
-      <BasicProperties />
-      <DrawingBorder />
+      <Sheet />
+      <SheetBorder />
       <TitleBlock />
     </div>
   );

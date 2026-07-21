@@ -32,11 +32,13 @@ import {
   SCH_COMPONENT_RULES,
   SCH_REUSE_RULES,
   PIN_TYPES,
-  defaultPinMatrix,
+  defaultSchRulesConfig,
   SEVERITY_COLOR,
   SEVERITY_SHORT,
   type RuleDef,
   type Severity,
+  type SchRulesConfig,
+  type SchRuleState,
 } from "@/lib/pcb/design-rules-data";
 
 const PRIMARY = "var(--color-violet-600)";
@@ -360,8 +362,25 @@ function FindReplaceModal() {
   const findAll = () => {
     const ids = matchIds();
     if (ids === null) { toast("Enter search text"); return; }
+    const byId = new Map(state.objects.map((o) => [o.id, o]));
+    const matches = ids.map((id) => {
+      const o = byId.get(id)!;
+      return {
+        id: o.id,
+        objectId: o.id,
+        page: "USB & Power",
+        device: o.footprint || o.comment || o.kind,
+        symbol: o.kind,
+        name: o.text || o.net || "—",
+        globalNet: o.net || "—",
+        pinName: o.kind === "pin" ? (o.text || "—") : "",
+        kind: o.kind,
+      };
+    });
     actions.merge({ selectedIds: ids });
-    toast(ids.length ? `Found ${ids.length} object${ids.length > 1 ? "s" : ""} — selected` : "No matches");
+    actions.runFind(matches);       // populates + opens the Find Result tab
+    actions.closeModal();
+    toast(ids.length ? `Found ${ids.length} — see Find Result` : "No matches");
   };
   const step = (dir: 1 | -1) => {
     const ids = matchIds();
@@ -492,42 +511,21 @@ function TableModal() {
 // (…) holds Import/Export Config; Connection tab = master toggle + 11×11
 // lower-triangular pin-conflict matrix (click a cell to cycle severity).
 // Config survives reopen within the session via a module-level cache.
-type SchRuleState = { enabled: boolean; severity: Severity };
-type SchRulesConfig = {
-  Net: SchRuleState[];
-  Component: SchRuleState[];
-  "Reuse Block": SchRuleState[];
-  pinMatrix: Severity[][];
-  pinCheckEnabled: boolean;
-};
-
 const SCH_RULE_SETS: Record<"Net" | "Component" | "Reuse Block", RuleDef[]> = {
   Net: SCH_NET_RULES,
   Component: SCH_COMPONENT_RULES,
   "Reuse Block": SCH_REUSE_RULES,
 };
 
-function defaultSchRulesConfig(): SchRulesConfig {
-  const mk = (defs: RuleDef[]) => defs.map((d) => ({ enabled: true, severity: d.severity }));
-  return {
-    Net: mk(SCH_NET_RULES),
-    Component: mk(SCH_COMPONENT_RULES),
-    "Reuse Block": mk(SCH_REUSE_RULES),
-    pinMatrix: defaultPinMatrix(),
-    pinCheckEnabled: true,
-  };
-}
-
-let savedSchRulesConfig: SchRulesConfig | null = null;
-
 const SCH_RULE_TABS = ["Net", "Component", "Reuse Block", "Connection"] as const;
 
 function DesignRulesModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
   const [tab, setTab] = React.useState<(typeof SCH_RULE_TABS)[number]>("Net");
-  const [cfg, setCfg] = React.useState<SchRulesConfig>(
-    () => savedSchRulesConfig ?? defaultSchRulesConfig(),
-  );
+  // Local edit buffer seeded from the store; committed on Save/Verify so Cancel
+  // discards. The store copy is what the ERC engine actually reads.
+  const [cfg, setCfg] = React.useState<SchRulesConfig>(() => state.designRules);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const openImportPicker = React.useCallback(() => {
@@ -548,7 +546,7 @@ function DesignRulesModal() {
   };
 
   const save = () => {
-    savedSchRulesConfig = cfg;
+    actions.setDesignRules(cfg);
   };
   const exportConfig = () => {
     const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: "application/json" });
@@ -1012,7 +1010,7 @@ function ReannotateModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Reannotated"); actions.closeModal(); }}>Reannotate</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.reannotate(); actions.closeModal(); }}>Reannotate</Button>
         </div>
       </Card>
     </Overlay>

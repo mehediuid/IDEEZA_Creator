@@ -82,46 +82,49 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "board",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "name", label: "Name", kind: "text", bind: "doc:name", display: "P1" },
           { key: "drawing", label: "Drawing", kind: "dropdown", options: ["Right Bottom", "Left Top", "Center"], display: "Right Bottom" },
         ],
       },
       {
-        title: "Drawing Border",
+        title: "Sheet border",
         fields: [
           { key: "border", label: "Border", kind: "toggle", display: "On" },
-          { key: "titleBlockPos", label: "Title Block Position", kind: "dropdown", options: ["Right Bottom", "Left Bottom", "Right Top"], display: "Right Bottom" },
+          { key: "titleBlockPos", label: "Sheet info position", kind: "dropdown", options: ["Right Bottom", "Left Bottom", "Right Top"], display: "Right Bottom" },
           { key: "size", label: "Size", kind: "dropdown", options: ["A0", "A1", "A2", "A3", "A4"], display: "A4" },
-          { key: "drawingWidth", label: "Drawing Width", kind: "number", unit: "in", display: "16.5" },
-          { key: "drawingHeight", label: "Drawing Height", kind: "number", unit: "in", display: "11.7" },
-          { key: "regionStart", label: "Region Start", kind: "dropdown", options: ["Left Top", "Left Bottom"], display: "Left Top" },
-          { key: "xRegionCount", label: "X Region Count", kind: "number", display: "7" },
-          { key: "yRegionCount", label: "Y Region Count", kind: "number", display: "6" },
-          { key: "bladeWidth", label: "Blade Width", kind: "number", unit: "mm", display: "0" },
+          { key: "drawingWidth", label: "Sheet width", kind: "number", unit: "in", display: "16.5" },
+          { key: "drawingHeight", label: "Sheet height", kind: "number", unit: "in", display: "11.7" },
+          { key: "regionStart", label: "Zone origin", kind: "dropdown", options: ["Left Top", "Left Bottom"], display: "Left Top" },
+          { key: "xRegionCount", label: "X zones", kind: "number", display: "7" },
+          { key: "yRegionCount", label: "Y zones", kind: "number", display: "6" },
+          { key: "bladeWidth", label: "Tick width", kind: "number", unit: "mm", display: "0" },
           { key: "color", label: "Color", kind: "color", display: "#1E1E1E" },
         ],
       },
       {
-        title: "Title Block",
+        title: "Sheet info",
         fields: [
-          { key: "titleBlockShow", label: "Title Block", kind: "toggle", display: "Visible" },
-          { key: "createDate", label: "Create date", kind: "readonly", display: "—" },
-          { key: "createTime", label: "Create Time", kind: "readonly", display: "—" },
-          { key: "pageCount", label: "Page count", kind: "readonly", display: "1" },
-          { key: "pageName", label: "Page Name", kind: "text", display: "P1" },
-          { key: "pageNo", label: "Page No", kind: "text", display: "01" },
+          { key: "titleBlockShow", label: "Show", kind: "toggle", display: "Visible" },
+          { key: "createDate", label: "Created", kind: "readonly", display: "—" },
+          { key: "createTime", label: "Created (time)", kind: "readonly", display: "—" },
+          { key: "pageCount", label: "Sheet count", kind: "readonly", display: "1" },
+          { key: "pageName", label: "Sheet name", kind: "text", display: "P1" },
+          { key: "pageNo", label: "Sheet no", kind: "text", display: "01" },
           { key: "projectName", label: "Project Name", kind: "readonly", display: "—" },
           { key: "boardName", label: "Board Name", kind: "readonly", display: "—" },
           { key: "schematicName", label: "Schematic Name", kind: "readonly", display: "Schematic 1" },
-          { key: "updateDate", label: "Update Date", kind: "readonly", display: "—" },
-          { key: "updateTime", label: "Update Time", kind: "readonly", display: "—" },
+          { key: "updateDate", label: "Modified", kind: "readonly", display: "—" },
+          { key: "updateTime", label: "Modified (time)", kind: "readonly", display: "—" },
           { key: "company", label: "Company", kind: "text", display: "IDEEZA" },
-          { key: "pageSize", label: "Page size", kind: "dropdown", options: ["A0", "A1", "A2", "A3", "A4"], display: "A4" },
-          { key: "reviewed", label: "Reviewed", kind: "text", display: "-" },
-          { key: "drawn", label: "Drawn", kind: "text", display: "-" },
+          { key: "pageSize", label: "Sheet size", kind: "dropdown", options: ["A0", "A1", "A2", "A3", "A4"], display: "A4" },
+          { key: "reviewed", label: "Reviewed by", kind: "text", display: "-" },
+          { key: "drawn", label: "Drawn by", kind: "text", display: "-" },
+          { key: "partNumber", label: "Part Number", kind: "text", display: "-" },
+          { key: "version", label: "Version", kind: "text", display: "-" },
           { key: "description", label: "Description", kind: "text", display: "-" },
+          { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
         ],
       },
     ],
@@ -131,29 +134,41 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "pChip",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "name", label: "Name", kind: "text", bind: "obj:comment", display: "—" },
           { key: "id", label: "ID", kind: "readonly", display: "—" },
-          { key: "designator", label: "Designator", kind: "text", bind: "obj:text", display: "U?" },
-          { key: "uniqueId", label: "Unique ID", kind: "readonly", display: "—" },
-          { key: "devices", label: "Devices", kind: "readonly", display: "—" },
+          { key: "designator", label: "Reference (R1)", kind: "text", bind: "obj:text", display: "U?" },
+          { key: "devices", label: "Symbol", kind: "readonly", display: "—" },
           { key: "footprint", label: "Footprint", kind: "text", bind: "obj:footprint", display: "—" },
-          { key: "addBom", label: "Add into BOM", kind: "toggle", bind: "prop:addBom", display: "Yes" },
-          { key: "convertPcb", label: "Convert to PCB", kind: "action", display: "Convert" },
+          { key: "addBom", label: "Include in BOM", kind: "toggle", bind: "prop:addBom", display: "Yes" },
+          { key: "convertPcb", label: "Send to PCB", kind: "action", display: "Convert" },
           { key: "pcbLayer", label: "PCB Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
         ],
       },
       {
-        title: "Key Properties",
+        title: "Part details",
         fields: [
+          { key: "value", label: "Value", kind: "text", bind: "prop:value", display: "0Ω" },
           { key: "manufacturer", label: "Manufacturer", kind: "text", bind: "prop:manufacturer", display: "—" },
-          { key: "manufacturerPart", label: "Manufacturer Part", kind: "text", bind: "prop:manufacturerPart", display: "—" },
+          { key: "manufacturerPart", label: "Mfr part no.", kind: "text", bind: "prop:manufacturerPart", display: "—" },
           { key: "supplier", label: "Supplier", kind: "text", bind: "prop:supplier", display: "—" },
           { key: "supplierPart", label: "Supplier Part", kind: "text", bind: "prop:supplierPart", display: "—" },
         ],
       },
-      { title: "More Properties", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Advanced", fields: [
+        { key: "lcscPart", label: "LCSC Part Name", kind: "text", bind: "prop:lcscPart", display: "—" },
+        { key: "supplierFootprint", label: "Supplier Footprint", kind: "text", bind: "prop:supplierFootprint", display: "—" },
+        { key: "jlcpcbClass", label: "JLCPCB Part Class", kind: "text", bind: "prop:jlcpcbClass", display: "—" },
+        { key: "datasheet", label: "Datasheet", kind: "text", bind: "prop:datasheet", display: "—" },
+        { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+        { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+      ] },
+      { title: "Reusable block", fields: [
+        { key: "reuseBlock", label: "Reuse Block", kind: "readonly", display: "—" },
+        { key: "groupId", label: "Group ID", kind: "text", bind: "prop:groupId", display: "—" },
+        { key: "channelId", label: "Channel ID", kind: "text", bind: "prop:channelId", display: "—" },
+      ] },
       { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
     ],
   },
@@ -162,17 +177,17 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "pNetLabel",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "pinName", label: "Pin Name", kind: "text", bind: "prop:pinName", display: "—" },
           { key: "pinNumber", label: "Pin Number", kind: "text", bind: "prop:pinNumber", display: "1" },
           { key: "id", label: "ID", kind: "readonly", display: "—" },
           { key: "pinType", label: "Pin Type", kind: "dropdown", options: PIN_TYPES, bind: "prop:pinType", display: "Undefined" },
           { key: "pinShape", label: "Pin Shape", kind: "dropdown", options: PIN_SHAPES, bind: "prop:pinShape", display: "Line" },
-          { key: "noConnectFlag", label: "No Connect Flag", kind: "toggle", bind: "prop:noConnectFlag", display: "Off" },
+          { key: "noConnectFlag", label: "No-connect", kind: "toggle", bind: "prop:noConnectFlag", display: "Off" },
         ],
       },
-      { title: "More Properties", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Advanced", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
     ],
   },
   Nets: {
@@ -180,16 +195,310 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "wire",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "—" },
           { key: "id", label: "ID", kind: "readonly", display: "—" },
-          { key: "relevance", label: "Relevance", kind: "readonly", display: "—" },
-          { key: "device", label: "Device", kind: "readonly", display: "—" },
+          { key: "relevance", label: "Applies to", kind: "readonly", display: "—" },
+          { key: "device", label: "Symbol", kind: "readonly", display: "—" },
           { key: "type", label: "Type", kind: "dropdown", options: ["Signal", "Power", "Ground"], bind: "prop:type", display: "Signal" },
         ],
       },
-      { title: "More Properties", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Advanced", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §03 — Net Flag (VCC / +5V / GND / AGND / PGND). Global Net Name is the
+  // field that ties same-named flags together electrically across the project.
+  "Net Flag": {
+    label: "Net Flag",
+    icon: "wire",
+    sections: [
+      {
+        title: "General",
+        fields: [
+          { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "GND" },
+          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "relevance", label: "Applies to", kind: "readonly", display: "All" },
+          { key: "device", label: "Symbol", kind: "readonly", display: "Ground-GND" },
+          { key: "globalNetName", label: "Net name", kind: "text", bind: "prop:globalNetName", display: "GND" },
+        ],
+      },
+      { title: "Advanced", fields: [
+        { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+        { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §03 — Net Port (IN / OUT / BI). Off-Page Connector shares this field set.
+  "Net Port": {
+    label: "Net Port",
+    icon: "wire",
+    sections: [
+      {
+        title: "General",
+        fields: [
+          { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "PORT" },
+          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "relevance", label: "Applies to", kind: "readonly", display: "All" },
+          { key: "device", label: "Symbol", kind: "readonly", display: "—" },
+          { key: "type", label: "Direction", kind: "dropdown", options: ["In", "Out", "Bidirectional"], bind: "prop:portType", display: "In" },
+        ],
+      },
+      { title: "Advanced", fields: [
+        { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+        { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §03 — Short Flag (D). No Relevance / Type — Device + Description only.
+  "Short Flag": {
+    label: "Short Flag",
+    icon: "wire",
+    sections: [
+      {
+        title: "General",
+        fields: [
+          { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "—" },
+          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "device", label: "Symbol", kind: "readonly", display: "—" },
+          { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+        ],
+      },
+      { title: "Advanced", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §02 — Net Label (standalone). A text-like label, NOT a net-marker: it
+  // carries Font / Style / Origin, not Relevance / Device.
+  "Net Label": {
+    label: "Net Label",
+    icon: "pNetLabel",
+    sections: [
+      {
+        title: "General",
+        fields: [
+          { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "NET1" },
+          { key: "fontColor", label: "Font Color", kind: "color", bind: "obj:color", display: "#0000FF" },
+          { key: "font", label: "Font", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], bind: "prop:font", display: "Arial" },
+          { key: "fontSize", label: "Font Size", kind: "number", unit: "px", bind: "prop:fontSize", display: "12" },
+          { key: "style", label: "Style", kind: "dropdown", options: FONT_STYLES, bind: "prop:style", display: "Normal" },
+          { key: "origin", label: "Anchor", kind: "dropdown", options: ORIGINS, bind: "prop:origin", display: "Center" },
+        ],
+      },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §07 — Table, the richest object: three groups (Basic / Cell / Text).
+  "Table": {
+    label: "Table",
+    icon: "pTable",
+    sections: [
+      {
+        title: "Basic",
+        fields: [
+          { key: "tableWidth", label: "Width", kind: "number", unit: "in", bind: "prop:tableWidth", display: "0.4" },
+          { key: "tableHeight", label: "Height", kind: "number", unit: "in", bind: "prop:tableHeight", display: "0.3" },
+        ],
+      },
+      {
+        title: "Cells",
+        fields: [
+          { key: "cellWidth", label: "Width", kind: "number", unit: "in", bind: "prop:cellWidth", display: "0.1" },
+          { key: "cellHeight", label: "Height", kind: "number", unit: "in", bind: "prop:cellHeight", display: "0.1" },
+          { key: "strokeColor", label: "Outline color", kind: "color", bind: "prop:strokeColor", display: "#A00000" },
+          { key: "fillColor", label: "Fill Color", kind: "color", bind: "prop:fillColor", display: "#FFFFFF" },
+          { key: "fill", label: "Fill", kind: "dropdown", options: ["Solid", "None"], bind: "prop:fill", display: "Solid" },
+          { key: "lineWidth", label: "Line Width", kind: "number", unit: "mm", bind: "prop:lineWidth", display: "1" },
+        ],
+      },
+      {
+        title: "Text",
+        fields: [
+          { key: "text", label: "Text", kind: "textarea", bind: "obj:text", display: "—" },
+          { key: "fontColor", label: "Font Color", kind: "color", bind: "obj:color", display: "#000000" },
+          { key: "font", label: "Font", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], bind: "prop:font", display: "Arial" },
+          { key: "fontSize", label: "Font Size", kind: "number", unit: "px", bind: "prop:fontSize", display: "12" },
+          { key: "rowSpacing", label: "Row Spacing", kind: "dropdown", options: ["1.0", "1.2", "1.5", "2.0"], bind: "prop:rowSpacing", display: "1.2" },
+          { key: "style", label: "Style", kind: "dropdown", options: FONT_STYLES, bind: "prop:style", display: "Normal" },
+          { key: "hAlign", label: "Horizontal Align", kind: "dropdown", options: ["Left", "Center", "Right"], bind: "prop:hAlign", display: "Left" },
+          { key: "vAlign", label: "Vertical Align", kind: "dropdown", options: ["Top", "Middle", "Bottom"], bind: "prop:vAlign", display: "Middle" },
+        ],
+      },
+      { title: "Group", fields: [
+        { key: "resetStyle", label: "Reset style", kind: "action", display: "Reset" },
+        { key: "group", label: "Group", kind: "action", display: "Group" },
+      ] },
+    ],
+  },
+  // PDF §05 — Test Point is a full Component-type object in the schematic
+  // (designator TP1, Device/Footprint "Test-Point"), not a PCB pad.
+  "Test Point": {
+    label: "Test Point",
+    icon: "pChip",
+    sections: [
+      {
+        title: "General",
+        fields: [
+          { key: "name", label: "Name", kind: "text", bind: "obj:comment", display: "—" },
+          { key: "id", label: "ID", kind: "readonly", display: "—" },
+          { key: "designator", label: "Reference (R1)", kind: "text", bind: "obj:text", display: "TP1" },
+          { key: "footprint", label: "Part / footprint", kind: "text", bind: "obj:footprint", display: "Test-Point" },
+          { key: "addBom", label: "Include in BOM", kind: "toggle", bind: "prop:addBom", display: "Yes" },
+          { key: "convertPcb", label: "Send to PCB", kind: "action", display: "Convert" },
+          { key: "pcbLayer", label: "PCB Layer", kind: "dropdown", optionsToken: "layers", bind: "obj:layer" },
+        ],
+      },
+      { title: "Advanced", fields: [
+        { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "Test Point" },
+        { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §02 — Bus (Alt+B): auto-named BUS[0:5], Line Width default 2.
+  "Bus": {
+    label: "Bus",
+    icon: "tWire",
+    sections: [
+      { title: "General", fields: [
+        { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "BUS[0:5]" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "color", label: "Color", kind: "color", bind: "obj:color", display: "#008800" },
+        { key: "lineWidth", label: "Line Width", kind: "dropdown", options: ["1", "2", "3"], bind: "prop:lineWidth", display: "2" },
+        { key: "lineStyle", label: "Line Style", kind: "dropdown", options: LINE_STYLES, bind: "prop:lineStyle", display: "Solid" },
+      ] },
+      { title: "Advanced", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §03 — Off-Page Connector (V): field-for-field identical to Net Port.
+  "Off-Page Connector": {
+    label: "Off-Page Connector",
+    icon: "wire",
+    sections: [
+      { title: "General", fields: [
+        { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "—" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "relevance", label: "Applies to", kind: "readonly", display: "All" },
+        { key: "device", label: "Symbol", kind: "readonly", display: "Off-Page-Connector-In" },
+        { key: "type", label: "Direction", kind: "dropdown", options: ["In", "Out", "Bidirectional"], bind: "prop:portType", display: "In" },
+      ] },
+      { title: "Advanced", fields: [
+        { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+        { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §05 — Mask Region (Mask defaults Yes).
+  "Mask Region": {
+    label: "Mask Region",
+    icon: "pPolyline",
+    sections: [
+      { title: "General", fields: [
+        { key: "mask", label: "Mask", kind: "dropdown", options: ["Yes", "No"], bind: "prop:mask", display: "Yes" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "maskWidth", label: "Width", kind: "number", unit: "in", bind: "prop:maskWidth", display: "0" },
+        { key: "maskHeight", label: "Height", kind: "number", unit: "in", bind: "prop:maskHeight", display: "0" },
+        { key: "lineWidth", label: "Line Width", kind: "number", unit: "mm", bind: "prop:lineWidth", display: "1" },
+        { key: "lineStyle", label: "Line Style", kind: "dropdown", options: LINE_STYLES, bind: "prop:lineStyle", display: "Solid" },
+        { key: "strokeColor", label: "Outline color", kind: "color", bind: "obj:color", display: "#000000" },
+        { key: "fillColor", label: "Fill Color", kind: "color", bind: "prop:fillColor", display: "#FFFFFF" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §05 — Component Mask: identical to Mask Region, Mask defaults No.
+  "Component Mask": {
+    label: "Component Mask",
+    icon: "pPolyline",
+    sections: [
+      { title: "General", fields: [
+        { key: "mask", label: "Mask", kind: "dropdown", options: ["Yes", "No"], bind: "prop:mask", display: "No" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "maskWidth", label: "Width", kind: "number", unit: "in", bind: "prop:maskWidth", display: "0" },
+        { key: "maskHeight", label: "Height", kind: "number", unit: "in", bind: "prop:maskHeight", display: "0" },
+        { key: "lineWidth", label: "Line Width", kind: "number", unit: "mm", bind: "prop:lineWidth", display: "1" },
+        { key: "lineStyle", label: "Line Style", kind: "dropdown", options: LINE_STYLES, bind: "prop:lineStyle", display: "Solid" },
+        { key: "strokeColor", label: "Outline color", kind: "color", bind: "obj:color", display: "#000000" },
+        { key: "fillColor", label: "Fill Color", kind: "color", bind: "prop:fillColor", display: "#FFFFFF" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §08 — Differential Pairs Flag (F): lightweight annotation.
+  "Differential Pairs Flag": {
+    label: "Differential Pairs Flag",
+    icon: "wire",
+    sections: [
+      { title: "General", fields: [
+        { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "—" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "color", label: "Color", kind: "color", bind: "obj:color", display: "#A00000" },
+      ] },
+      { title: "Advanced", fields: [
+        { key: "description", label: "Description", kind: "text", bind: "prop:description", display: "—" },
+        { key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §10 — Junction Flag: connection dot, minimal (constraint-only).
+  "Junction": {
+    label: "Junction",
+    icon: "pNetLabel",
+    sections: [
+      { title: "General", fields: [
+        { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "—" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+      ] },
+    ],
+  },
+  // PDF §04/§10 — Reuse Block instance (needs a saved block asset).
+  "Reuse Block": {
+    label: "Reuse Block",
+    icon: "pChip",
+    sections: [
+      { title: "General", fields: [
+        { key: "name", label: "Name", kind: "text", bind: "obj:comment", display: "—" },
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "groupId", label: "Group ID", kind: "text", bind: "prop:groupId", display: "—" },
+        { key: "channelId", label: "Channel ID", kind: "text", bind: "prop:channelId", display: "—" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §10 — Image: print-layer only, minimal panel.
+  "Image": {
+    label: "Image",
+    icon: "pImage",
+    sections: [
+      { title: "General", fields: [
+        { key: "id", label: "ID", kind: "readonly", display: "—" },
+        { key: "imgWidth", label: "Width", kind: "number", unit: "in", bind: "prop:imgWidth", display: "1" },
+        { key: "imgHeight", label: "Height", kind: "number", unit: "in", bind: "prop:imgHeight", display: "1" },
+      ] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
+    ],
+  },
+  // PDF §02 — Net / Bus Label (attached child): distinguished by read-only Parent.
+  "Attached Net Label": {
+    label: "Net / Bus Label",
+    icon: "pNetLabel",
+    sections: [
+      { title: "General", fields: [
+        { key: "globalNetName", label: "Net name", kind: "textarea", bind: "obj:net", display: "—" },
+        { key: "parent", label: "Parent", kind: "readonly", display: "—" },
+        { key: "fontColor", label: "Font Color", kind: "color", bind: "obj:color", display: "#0000FF" },
+        { key: "font", label: "Font", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], bind: "prop:font", display: "Arial" },
+        { key: "fontSize", label: "Font Size", kind: "number", unit: "px", bind: "prop:fontSize", display: "12" },
+        { key: "style", label: "Style", kind: "dropdown", options: FONT_STYLES, bind: "prop:style", display: "Normal" },
+        { key: "origin", label: "Anchor", kind: "dropdown", options: ORIGINS, bind: "prop:origin", display: "Center" },
+        { key: "resetStyle", label: "Reset style", kind: "action", display: "Reset" },
+      ] },
       { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
     ],
   },
@@ -198,19 +507,25 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "pPolyline",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "lineWidth", label: "Line Width", kind: "number", unit: "mm", bind: "obj:width", display: "0.15" },
           { key: "lineStyle", label: "Line Style", kind: "dropdown", options: LINE_STYLES, bind: "prop:lineStyle", display: "Solid" },
-          { key: "strokeColor", label: "Stroke Color", kind: "color", bind: "obj:color", display: "#1E1E1E" },
+          { key: "strokeColor", label: "Outline color", kind: "color", bind: "obj:color", display: "#1E1E1E" },
           { key: "fillColor", label: "Fill Color", kind: "color", bind: "prop:fillColor", display: "#FFFFFF" },
           { key: "fillColor2", label: "Fill Color", kind: "color", bind: "prop:fillColor2", display: "#FFFFFF" },
-          { key: "roundRadius", label: "Round Radius (Rectangle)", kind: "number", unit: "mm", bind: "prop:roundRadius", display: "0" },
+          { key: "roundRadius", label: "Corner radius", kind: "number", unit: "mm", bind: "prop:roundRadius", display: "0" },
           { key: "rectWidth", label: "Width (Rectangle)", kind: "number", unit: "mm", bind: "prop:rectWidth", display: "0" },
           { key: "rectHeight", label: "Height (Rectangle)", kind: "number", unit: "mm", bind: "prop:rectHeight", display: "0" },
           { key: "circleRadius", label: "Radius (Circle)", kind: "number", unit: "mm", bind: "prop:circleRadius", display: "0" },
+          { key: "xLocation", label: "X Location (Circle/Ellipse)", kind: "number", unit: "in", bind: "prop:xLocation", display: "0" },
+          { key: "yLocation", label: "Y Location (Circle/Ellipse)", kind: "number", unit: "in", bind: "prop:yLocation", display: "0" },
+          { key: "xRadius", label: "X Radius (Ellipse)", kind: "number", unit: "in", bind: "prop:xRadius", display: "0.15" },
+          { key: "yRadius", label: "Y Radius (Ellipse)", kind: "number", unit: "in", bind: "prop:yRadius", display: "0.15" },
+          { key: "resetStyle", label: "Reset style", kind: "action", display: "Reset" },
         ],
       },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
     ],
   },
   Text: {
@@ -218,16 +533,18 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "pText",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "text", label: "Text", kind: "text", bind: "obj:text", display: "Text" },
           { key: "fontColor", label: "Font Color", kind: "color", bind: "obj:color", display: "#1E1E1E" },
           { key: "font", label: "Font", kind: "dropdown", options: ["Inter", "Arial", "Roboto", "Courier"], bind: "prop:font", display: "Inter" },
           { key: "fontSize", label: "Font Size", kind: "number", unit: "px", bind: "prop:fontSize", display: "12" },
           { key: "style", label: "Style", kind: "dropdown", options: FONT_STYLES, bind: "prop:style", display: "Normal" },
-          { key: "origin", label: "Origin", kind: "dropdown", options: ORIGINS, bind: "prop:origin", display: "Top Left" },
+          { key: "origin", label: "Anchor", kind: "dropdown", options: ORIGINS, bind: "prop:origin", display: "Top Left" },
+          { key: "resetStyle", label: "Reset style", kind: "action", display: "Reset" },
         ],
       },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
     ],
   },
   Wire: {
@@ -235,18 +552,20 @@ const SCHEMATIC: Record<string, InspectorType> = {
     icon: "tWire",
     sections: [
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "name", label: "Name", kind: "text", bind: "obj:net", display: "—" },
           { key: "id", label: "ID", kind: "readonly", display: "—" },
-          { key: "globalNetName", label: "Global Net Name", kind: "text", bind: "prop:globalNetName", display: "—" },
-          { key: "relevance", label: "Relevance", kind: "readonly", display: "—" },
+          { key: "globalNetName", label: "Net name", kind: "text", bind: "prop:globalNetName", display: "—" },
+          { key: "relevance", label: "Applies to", kind: "readonly", display: "—" },
           { key: "color", label: "Color", kind: "color", bind: "wire:color", display: "#1E1E1E" },
           { key: "lineWidth", label: "Line Width", kind: "dropdown", bind: "wire:lineWidth", options: ["Thin", "Medium", "Thick"], display: "Medium" },
           { key: "lineStyle", label: "Line Style", kind: "dropdown", bind: "wire:lineStyle", options: LINE_STYLES, display: "Solid" },
+          { key: "resetStyle", label: "Reset style", kind: "action", display: "Reset" },
         ],
       },
-      { title: "More Properties", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Advanced", fields: [{ key: "addProperty", label: "Add Property", kind: "action", display: "+ Add" }] },
+      { title: "Group", fields: [{ key: "group", label: "Group", kind: "action", display: "Group" }] },
     ],
   },
 };
@@ -306,30 +625,29 @@ const TWOD: Record<string, InspectorType> = {
         ],
       },
       {
-        title: "Basic Properties",
+        title: "General",
         fields: [
           { key: "name", label: "Name", kind: "checkText", bind: "obj:comment", display: "—" },
           { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
-          { key: "designator", label: "Designator", kind: "checkText", bind: "obj:text", display: "U?" },
-          { key: "uniqueId", label: "Unique ID", kind: "readonly", display: "—" },
-          { key: "devices", label: "Devices", kind: "readonly", display: "—" },
+          { key: "designator", label: "Reference (R1)", kind: "checkText", bind: "obj:text", display: "U?" },
+          { key: "devices", label: "Symbol", kind: "readonly", display: "—" },
           { key: "footprint", label: "Footprint", kind: "checkText", bind: "obj:footprint", display: "—" },
-          { key: "addBom", label: "Add into BOM", kind: "checkDropdown", options: ["Yes", "No"], bind: "prop:addBom", display: "Yes" },
+          { key: "addBom", label: "Include in BOM", kind: "checkDropdown", options: ["Yes", "No"], bind: "prop:addBom", display: "Yes" },
           { key: "model3d", label: "3d Model Title", kind: "checkText", bind: "prop:model3d", display: "—" },
         ],
       },
       {
-        title: "Key Properties",
+        title: "Part details",
         fields: [
           { key: "manufacturer", label: "Manufacturer", kind: "text", bind: "prop:manufacturer", display: "—" },
-          { key: "manufacturerPart", label: "Manufacturer Part", kind: "text", bind: "prop:manufacturerPart", display: "—" },
+          { key: "manufacturerPart", label: "Mfr part no.", kind: "text", bind: "prop:manufacturerPart", display: "—" },
           { key: "supplier", label: "Supplier", kind: "text", bind: "prop:supplier", display: "—" },
           { key: "supplierPart", label: "Supplier Part", kind: "text", bind: "prop:supplierPart", display: "—" },
           { key: "value", label: "Value", kind: "checkText", bind: "prop:value", display: "—" },
         ],
       },
       {
-        title: "More Properties",
+        title: "Advanced",
         fields: [
           { key: "description", label: "Description", kind: "checkText", bind: "prop:description", display: "—" },
           { key: "supplierFootprint", label: "Supplier Footprint", kind: "checkText", bind: "prop:supplierFootprint", display: "—" },
@@ -346,7 +664,7 @@ const TWOD: Record<string, InspectorType> = {
     ],
   },
   Designator: {
-    label: "Designator",
+    label: "Reference (R1)",
     icon: "pText",
     sections: [
       {
@@ -375,7 +693,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "centerY", label: "Center Y", kind: "coord", unit: "mil", bind: "prop:desig_y" },
           { key: "rotation", label: "Rotation", kind: "text", unit: "°", bind: "prop:desig_rot", display: "0" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "prop:desig_locked", display: "Off" },
-          { key: "origin", label: "Origin", kind: "origin", bind: "prop:desig_origin", display: "Top Left" },
+          { key: "origin", label: "Anchor", kind: "origin", bind: "prop:desig_origin", display: "Top Left" },
         ],
       },
       {
@@ -635,7 +953,7 @@ const TWOD: Record<string, InspectorType> = {
           { key: "centerY", label: "Center Y", kind: "coord", unit: "mil", bind: "obj:y" },
           { key: "rotation", label: "Rotation", kind: "number", unit: "°", bind: "obj:rotation", display: "0" },
           { key: "locked", label: "Locked", kind: "toggle", bind: "obj:locked", display: "Off" },
-          { key: "origin", label: "Origin", kind: "origin", options: ORIGINS, bind: "prop:origin", display: "Top Left" },
+          { key: "origin", label: "Anchor", kind: "origin", options: ORIGINS, bind: "prop:origin", display: "Top Left" },
         ],
       },
       { title: "Combination", fields: [{ key: "group", label: "Group", kind: "dropdown", options: ["None"], bind: "prop:group", display: "None" }] },
@@ -656,9 +974,12 @@ const KIND_TO_TYPE: Record<string, string> = {
   // components
   component: "Component", resistor: "Component", capacitor: "Component",
   inductor: "Component", diode: "Component", ic: "Component", connector: "Component",
+  // schematic sample symbols + converted PCB footprint glyphs are all components
+  resistorBox: "Component", opamp: "Component", currentSource: "Component", crystal: "Component",
+  fp0805: "Component", fpSOD123: "Component", fpSOT23: "Component", fpSOIC8: "Component",
   // schematic electrical
-  wire: "Wire", bus: "Wire",
-  net: "Nets", netLabel: "Nets", netFlag: "Nets",
+  wire: "Wire", bus: "Bus",
+  net: "Nets", netLabel: "Net Label", netFlag: "Net Flag",
   pin: "Pin",
   // pcb primitives
   pad: "Pad", via: "Via", sutureVias: "Via",
@@ -670,9 +991,15 @@ const KIND_TO_TYPE: Record<string, string> = {
   rectangle: "DrawingLike", bezier: "DrawingLike", ellipse: "DrawingLike",
   // text
   text: "Text",
-  // power / flags → Nets in schematic, treated as net markers
-  gnd: "Nets", vcc5v: "Nets", agnd: "Nets", pgnd: "Nets",
-  noConnect: "Nets", shortFlag: "Nets", port: "Nets", junction: "Nets",
+  // power flags → dedicated Net Flag panel (PDF §03); ports → Net Port.
+  gnd: "Net Flag", vcc5v: "Net Flag", agnd: "Net Flag", pgnd: "Net Flag",
+  shortFlag: "Short Flag", port: "Net Port",
+  offPageConnector: "Off-Page Connector",
+  netBusLabel: "Attached Net Label", busLabel: "Attached Net Label",
+  diffPairFlag: "Differential Pairs Flag", diffFlag: "Differential Pairs Flag",
+  maskRegion: "Mask Region", componentMask: "Component Mask",
+  reuseBlock: "Reuse Block",
+  junction: "Junction", noConnect: "Nets",
   // pcb regions → Copper Fills (region-style inspector)
   prohibitedRegion: "Copper Fills", constraintRegion: "Copper Fills",
   // mechanical / misc
@@ -681,7 +1008,7 @@ const KIND_TO_TYPE: Record<string, string> = {
   // closest captured panel so selection never falls back to Canvas.
   testPoint: "Pad", shapedPad: "Pad", viaFence: "Via",
   fpcStiffener: "Copper Fills",
-  stackTable: "Text", drillTable: "Text", canvasOrigin: "Text",
+  table: "Table", stackTable: "Table", drillTable: "Table", canvasOrigin: "Text",
 };
 
 // Vias key differs between resolver ("Via") and 2D schema ("Vias").
@@ -695,10 +1022,16 @@ export function resolveInspectorType(
 
   if (selectedKind) {
     const mapped = KIND_TO_TYPE[selectedKind];
-    if (mapped === "DrawingLike") {
+    if (selectedKind === "image" && schemaMode === "schematic") {
+      // PDF §10: schematic Image has its own minimal panel (print-layer only).
+      typeKey = "Image";
+    } else if (mapped === "DrawingLike") {
       typeKey = schemaMode === "schematic" ? "Drawing Tools" : "Outline Object";
     } else if (mapped === "Via") {
       typeKey = "Vias";
+    } else if (selectedKind === "testPoint" && schemaMode === "schematic") {
+      // PDF §05: in the schematic a Test Point is a Component-type object, not a PCB pad.
+      typeKey = "Test Point";
     } else if (mapped) {
       typeKey = mapped;
     }

@@ -15,7 +15,6 @@
 import * as React from "react";
 import { DsIcon } from "@/lib/pcb/icons";
 import {
-  buildMenus,
   buildMenus2D,
   buildMenus3D,
   buildMenusSchematic,
@@ -167,13 +166,13 @@ function MenuPanel({ m, alignRight }: { m: MenuGroup; alignRight?: boolean }) {
 export function MenuBar() {
   const state = usePcbState();
   const actions = usePcbActions();
+  // PCB tab (mode "pcb") now shares the finalized 2D/PCB menu with the 2D
+  // render mode — the "2D" tab was merged into PCB, so both use buildMenus2D.
   const raw = (state.mode === "3d"
     ? buildMenus3D(state, actions)
-    : state.mode === "2d"
-    ? buildMenus2D(state, actions)
     : state.mode === "schematic"
     ? buildMenusSchematic(state, actions)
-    : buildMenus(state, actions)) as MenuGroup[];
+    : buildMenus2D(state, actions)) as MenuGroup[];
   const { primary, settings, help } = regroupMenus(raw) as {
     primary: MenuGroup[];
     settings: MenuGroup | null;
@@ -261,33 +260,49 @@ export function MenuBar() {
       {/* right utility cluster — separated from the workflow menus */}
       <div style={{ width: 1, height: 20, background: "var(--color-border-subtle)", margin: "0 var(--spacing-4)" }} />
 
-      {/* ⌘K command search */}
+      {/* ⌘K command search — reads as a real search field (icon · label ·
+          keycap) rather than a bare icon, so the affordance is unambiguous. */}
       <button
         type="button"
-        className="ix-menu"
         aria-label="Search commands"
         title="Search commands (⌘K)"
         onClick={() => setPaletteOpen(true)}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "var(--spacing-3)",
-          padding: "6px 10px",
-          borderRadius: "var(--radius-md)",
+          gap: "var(--spacing-4)",
+          height: 32,
+          minWidth: 172,
+          padding: "0 6px 0 var(--spacing-5)",
+          marginRight: "var(--spacing-2)",
+          borderRadius: "var(--radius-lg)",
           cursor: "pointer",
-          background: "transparent",
-          border: "none",
-          color: "var(--color-text-secondary)",
+          background: "var(--color-bg-subtle)",
+          border: "var(--border-width-1) solid var(--color-border-subtle)",
           fontFamily: "inherit",
+          transition: "background .14s, border-color .14s",
+        }}
+        onMouseEnter={(e) => {
+          const b = e.currentTarget as HTMLButtonElement;
+          b.style.background = "var(--color-bg-surface-raised)";
+          b.style.borderColor = "var(--color-border-default)";
+        }}
+        onMouseLeave={(e) => {
+          const b = e.currentTarget as HTMLButtonElement;
+          b.style.background = "var(--color-bg-subtle)";
+          b.style.borderColor = "var(--color-border-subtle)";
         }}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto" }} aria-hidden>
           <circle cx="11" cy="11" r="7" />
           <path d="M21 21l-4.3-4.3" />
         </svg>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-sm)", padding: "1px 5px", fontFamily: "var(--font-family-mono), monospace" }}>
-          ⌘K
+        <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: 500, color: "var(--color-text-tertiary)" }}>
+          Search
         </span>
+        <kbd style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 20, padding: "0 6px", borderRadius: "var(--radius-sm)", background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", fontSize: 11, fontWeight: 600, color: "var(--color-text-secondary)", fontFamily: "var(--font-family-mono), monospace", flex: "0 0 auto" }}>
+          ⌘K
+        </kbd>
       </button>
 
       {/* ⚙ Settings */}

@@ -132,6 +132,7 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
             else if (it.label === 'Export Kicad Designer') { exportKicadPcb(state, actions.flashToast); actions.closeAll(); }
             else if (it.label === 'Export Gerber') { exportGerberViaKicad(state, actions.flashToast); actions.closeAll(); }
             else if (it.label === 'Export Eagle Designer') actions.openModal('exportEagle');
+            else if (it.label === 'Export Netlist') { actions.exportNetlist(); actions.closeAll(); }
             else if (it.label === 'Array Objects') actions.openModal('array');
             else if (it.label === 'Find and Replace') actions.openModal('findReplace');
             else if (it.label === 'Table') actions.openModal('tableProps');
@@ -166,7 +167,8 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
               else actions.closeAll();
             }
             else if (it.label === 'Update/Conver Schematic to PCB') actions.setMode('pcb');
-            else if (it.label === 'Check DRC' || it.label === 'Electrical Rule Check') actions.clickBottomTab('drc');
+            else if (it.label === 'Electrical Rule Check') actions.runErcCheck();
+            else if (it.label === 'Check DRC') actions.clickBottomTab('drc');
             // Phase 3 — PCB-mode Tools menu → modals
             else if (it.label === 'Layer Manager') actions.openModal('layerManager');
             else if (it.label === 'Net Class Manager') actions.openModal('netClass');
@@ -256,6 +258,14 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             "Non-Electronic Flag…", "Reuse Block…", "Panel Lib…",
           ].map((n) => su(n, "", { icon: "page", onClick: () => actions.flashToast(`New ${n.replace(/…$/, "")} created`) })),
         }),
+        item("Load Sample Circuit", {
+          icon: "page",
+          onClick: () => {
+            actions.loadSampleSchematic();
+            actions.flashToast("Sample circuit loaded — current-sense amplifier");
+            actions.closeAll();
+          },
+        }),
         item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.openModal("openProject") }),
         item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
         item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
@@ -312,8 +322,8 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
           ],
         }),
         snapToggle(),
-        item("Find And Place", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
-        item("Array Object", { icon: "array", onClick: () => actions.openModal("array") }),
+        item("Find & replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
+        item("Duplicate in grid", { icon: "array", onClick: () => actions.openModal("array") }),
       ],
     },
     {
@@ -368,23 +378,31 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Place",
       key: "P",
       items: [
-        item("Device", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
+        item("Place a Part", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
         item("Wire", { k: "Alt+W", icon: "pWire", onClick: tool("wire") }),
-        item("Net", {
+        item("Power & Ground", {
           icon: "pNetFlag",
           sub: [
             su("VCC", "V", { icon: "power", onClick: tool("netFlag") }),
             su("+5V", "", { icon: "power", onClick: tool("vcc5v") }),
             su("-5V", "", { icon: "power", onClick: tool("netFlag") }),
             su("GND", "", { icon: "power", onClick: tool("netFlag") }),
-            su("AGND", "", { icon: "power", onClick: tool("agnd") }),
-            su("PGND", "", { icon: "power", onClick: tool("pgnd") }),
+            su("Analog GND", "", { icon: "power", onClick: tool("agnd") }),
+            su("Power GND", "", { icon: "power", onClick: tool("pgnd") }),
+            dv,
+            su("Port", "", { icon: "pNetLabel", onClick: tool("port") }),
+            su("Off-sheet link", "", { icon: "pNetLabel", onClick: tool("offPageConnector") }),
+            su("Short", "", { icon: "pNetLabel", onClick: tool("shortFlag") }),
           ],
         }),
         item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),
-        item("No Connection Flag", { icon: "pNoConnect", onClick: tool("noConnect") }),
-        item("Junction", { icon: "pTestPoint", onClick: () => actions.flashToast("Junction — click a wire crossing") }),
+        item("No-connect (Ã)", { icon: "pNoConnect", onClick: tool("noConnect") }),
+        item("Junction", { icon: "pTestPoint", onClick: tool("junction") }),
         item("Differential Pair", { icon: "tDiffPair", onClick: tool("diffPair") }),
+        item("Diff-pair tag", { icon: "tDiffPair", onClick: tool("diffPairFlag") }),
+        item("Keep-out area", { icon: "pPolyline", onClick: tool("maskRegion") }),
+        item("Part mask", { icon: "pPolyline", onClick: tool("componentMask") }),
+        item("Reusable block", { icon: "pChip", onClick: tool("reuseBlock") }),
         dv,
         item("Polyline", { k: "Alt+L", icon: "pPolyline", onClick: tool("polyline") }),
         item("Arc", { k: "Alt+A", icon: "pArc", onClick: tool("arc") }),
@@ -396,9 +414,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
         // Final list: "Board Shape" is flagged Remove but kept in scope,
         // clearly marked — confirm with team before dropping.
-        item("Board Shape", { icon: "tBoardOutline", flagged: true, onClick: () => actions.flashToast("Board Shape — coming soon") }),
         dv,
         item("Net Label", { k: "Alt+N", icon: "pNetLabel", onClick: tool("netLabel") }),
+        item("Attached net label", { icon: "pNetLabel", onClick: tool("netBusLabel") }),
       ],
     },
     {
@@ -406,22 +424,17 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Design",
       key: "D",
       items: [
-        item("Convert Schematic to PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.setMode("pcb") }),
+        item("Generate PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.convertSchematicToPcb() }),
         dv,
-        item("Design Rule", { icon: "dRule", onClick: () => actions.openModal("designRules") }),
-        item("Check DRC", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
-        item("Differential Pair Manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
+        item("Design rules", { icon: "dRule", onClick: () => actions.openModal("designRules") }),
+        item("Run design check (DRC)", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
+        item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Import GLTF", { icon: "cube", onClick: () => actions.flashToast("Import GLTF — pick a file") }),
-        item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+        item("Auto-number parts", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
         dv,
         // Final list: the items below are flagged Remove but kept in scope,
         // clearly marked (⚑) — confirm with team before dropping.
-        item("Reannotate", { icon: "dAnnotate", flagged: true, onClick: () => actions.flashToast("Reannotate — coming soon") }),
-        item("Convert to New Version", { icon: "repeat", flagged: true, onClick: () => actions.flashToast("Convert to New Version — coming soon") }),
-        item("Insert BOM Table", { icon: "pTable", flagged: true, onClick: () => actions.flashToast("Insert BOM Table — coming soon") }),
-        item("Generate Data From Chatbot", { icon: "chat", flagged: true, onClick: () => actions.flashToast("Generate Data From Chatbot — coming soon") }),
-        item("Import Image", { icon: "pImage", flagged: true, onClick: tool("image") }),
       ],
     },
     {
@@ -429,16 +442,16 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Layout",
       key: "L",
       items: [
-        item("Group", { icon: "group", onClick: () => actions.flashToast("Grouped") }),
+        item("Group", { icon: "group", onClick: () => actions.groupSelection() }),
         item("Align", {
           icon: "align",
           sub: [
-            su("Align Left", "", { icon: "alignLeft" }),
-            su("Align Right", "", { icon: "alignRight" }),
-            su("Align Top", "", { icon: "alignTop" }),
-            su("Align Bottom", "", { icon: "alignBottom" }),
-            su("Align Horizontal centers", "", { icon: "alignHCenter" }),
-            su("Align Vertical Center", "", { icon: "alignVCenter" }),
+            su("Align Left", "", { icon: "alignLeft", onClick: () => actions.alignSelected("left") }),
+            su("Align Right", "", { icon: "alignRight", onClick: () => actions.alignSelected("right") }),
+            su("Align Top", "", { icon: "alignTop", onClick: () => actions.alignSelected("top") }),
+            su("Align Bottom", "", { icon: "alignBottom", onClick: () => actions.alignSelected("bottom") }),
+            su("Align Horizontal centers", "", { icon: "alignHCenter", onClick: () => actions.alignSelected("hcenter") }),
+            su("Align Vertical Center", "", { icon: "alignVCenter", onClick: () => actions.alignSelected("vcenter") }),
           ],
         }),
         item("Distribute", {
@@ -462,7 +475,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             su("Flip Vertical", "", { icon: "flipV", onClick: () => actions.flipSelectedV() }),
           ],
         }),
-        item("Level", {
+        item("Order", {
           icon: "layer",
           sub: [
             su("Bring to Front", "]", { icon: "tBringFront", onClick: () => actions.bringFront() }),
@@ -476,6 +489,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Export",
       key: "R",
       items: [
+        item("Netlist", { icon: "wire", onClick: () => actions.exportNetlist() }),
         item("BOM (Bill of Materials)", { icon: "bom", onClick: () => actions.openModal("exportBom") }),
         item("DXF", { icon: "exp", onClick: () => actions.openModal("exportDxf2D") }),
         item("PDF", { icon: "pdf", onClick: () => actions.openModal("exportPdf2D") }),
@@ -657,7 +671,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ],
         }),
         snapToggle(),
-        item("Find And Place", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
+        item("Find & replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
         dv,
         item("Edit Outline", { icon: "draw", onClick: () => actions.openModal("editOutline") }),
         item("Cutout", { icon: "del", onClick: () => actions.openModal("cutout") }),
@@ -696,7 +710,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ],
         }),
         dv,
-        item("2D View", { icon: "board", onClick: () => actions.setMode("2d") }),
+        item("2D View", { icon: "board", onClick: () => actions.setMode("pcb") }),
         item("3D View", { icon: "cube", onClick: () => actions.setMode("3d") }),
         item("Normal View", { icon: "preview", onClick: () => actions.flashToast("Normal view") }),
         item("Outline View", { icon: "pRect", onClick: () => actions.flashToast("Outline view") }),
@@ -726,7 +740,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Place",
       key: "P",
       items: [
-        item("Device", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
+        item("Place a Part", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
         item("Vias", { icon: "tVia", onClick: () => actions.setTool("via") }),
         item("Suture Vias", { icon: "tSutureVias", onClick: () => actions.setTool("sutureVias") }),
         item("Pad", { icon: "tPad", onClick: () => actions.setTool("pad") }),
@@ -780,9 +794,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       key: "D",
       items: [
         item("Update PCB to Schematic", { k: "Alt+I", icon: "dConvert", onClick: () => actions.setMode("schematic") }),
-        item("Design Rule", { icon: "dRule", onClick: () => actions.openModal("pcbDrc") }),
-        item("Check DRC", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
-        item("Differential Pair Manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
+        item("Design rules", { icon: "dRule", onClick: () => actions.openModal("pcbDrc") }),
+        item("Run design check (DRC)", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
+        item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Add Mounting Hole", { icon: "pTestPoint", onClick: () => actions.setTool("mountingHole") }),
         item("Import DXF", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
@@ -794,26 +808,11 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Equal Length Group Manager", { icon: "tLengthTune", onClick: () => actions.openModal("equalLength") }),
         item("Pad Pair Group Manager", { icon: "tPad", onClick: () => actions.openModal("padPair") }),
         dv,
-        item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+        item("Auto-number parts", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
         dv,
         // Final list: the items below are flagged Remove but kept in scope,
         // clearly marked (⚑) — confirm with team before dropping. Ones with an
         // obvious existing action are wired; the rest are placeholders.
-        item("Polygon Pour", { icon: "tPolygon", flagged: true, onClick: () => actions.flashToast("Polygon Pour — coming soon") }),
-        item("Fill all Plane", { icon: "tFillRegion", flagged: true, onClick: () => actions.flashToast("Fill all Plane — coming soon") }),
-        item("Vias", { icon: "tVia", flagged: true, onClick: () => actions.setTool("via") }),
-        item("Export", { icon: "exp", flagged: true, onClick: () => actions.flashToast("Export — use the Export menu") }),
-        item("Rotate left", { icon: "tRotLeft", flagged: true, onClick: () => actions.rotateSelectedPlaced(-90) }),
-        item("Rotate Right", { icon: "tRotRight", flagged: true, onClick: () => actions.rotateSelectedPlaced(90) }),
-        item("Align Left", { icon: "alignLeft", flagged: true, onClick: () => actions.flashToast("Align Left — coming soon") }),
-        item("Align Right", { icon: "alignRight", flagged: true, onClick: () => actions.flashToast("Align Right — coming soon") }),
-        item("Align Top", { icon: "alignTop", flagged: true, onClick: () => actions.flashToast("Align Top — coming soon") }),
-        item("Align Bottom", { icon: "alignBottom", flagged: true, onClick: () => actions.flashToast("Align Bottom — coming soon") }),
-        item("Align Center", { icon: "alignHCenter", flagged: true, onClick: () => actions.flashToast("Align Center — coming soon") }),
-        item("Align Vertical Center", { icon: "alignVCenter", flagged: true, onClick: () => actions.flashToast("Align Vertical Center — coming soon") }),
-        item("Align Grid", { icon: "grid", flagged: true, onClick: () => actions.flashToast("Align Grid — coming soon") }),
-        item("Bring To Front", { icon: "tBringFront", flagged: true, onClick: () => actions.bringFront() }),
-        item("Send to Back", { icon: "tSendBack", flagged: true, onClick: () => actions.sendBack() }),
       ],
     },
     // Phase 7 — Route menu (IT-658).
@@ -830,7 +829,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),
         item("Differential Pair Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),
         dv,
-        item("Auto Routing", { icon: "tAutoRoute", onClick: () => actions.openModal("autoRoute") }),
+        item("Auto Routing", { icon: "tAutoRoute", onClick: () => actions.autoRoute() }),
         item("Routing Mode", {
           icon: "route",
           sub: [
@@ -860,16 +859,16 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Layout",
       key: "L",
       items: [
-        item("Group", { icon: "group", onClick: () => actions.flashToast("Grouped") }),
+        item("Group", { icon: "group", onClick: () => actions.groupSelection() }),
         item("Align", {
           icon: "align",
           sub: [
-            su("Align Left", "", { icon: "alignLeft" }),
-            su("Align Right", "", { icon: "alignRight" }),
-            su("Align Top", "", { icon: "alignTop" }),
-            su("Align Bottom", "", { icon: "alignBottom" }),
-            su("Align Horizontal centers", "", { icon: "alignHCenter" }),
-            su("Align Vertical Center", "", { icon: "alignVCenter" }),
+            su("Align Left", "", { icon: "alignLeft", onClick: () => actions.alignSelected("left") }),
+            su("Align Right", "", { icon: "alignRight", onClick: () => actions.alignSelected("right") }),
+            su("Align Top", "", { icon: "alignTop", onClick: () => actions.alignSelected("top") }),
+            su("Align Bottom", "", { icon: "alignBottom", onClick: () => actions.alignSelected("bottom") }),
+            su("Align Horizontal centers", "", { icon: "alignHCenter", onClick: () => actions.alignSelected("hcenter") }),
+            su("Align Vertical Center", "", { icon: "alignVCenter", onClick: () => actions.alignSelected("vcenter") }),
           ],
         }),
         item("Distribute", {
@@ -893,7 +892,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
             su("Flip Vertical", "", { icon: "flipV", onClick: () => actions.flipSelectedV() }),
           ],
         }),
-        item("Level", {
+        item("Order", {
           icon: "layer",
           sub: [
             su("Bring to Front", "", { icon: "tBringFront", onClick: () => actions.bringFront() }),
@@ -1201,69 +1200,130 @@ export function buildCompPills(state: PcbState, actions: PcbActions) {
 // Inspects the current selection and emits items + onClick handlers.
 // When there is no selection, only paste/select-all/zoom-fit show; with
 // selection, all transform/clipboard/delete items + kind-specific extras show.
+// Canvas right-click menu — matches the Ideeza "Right-Click Menu" spec.
+// Two mode-specific sets (Schematic = 11, PCB-2D = 7). Node shape read by
+// context-menu.tsx: { divider } | leaf { label,icon,k?,checked?,disabled?,title?,onClick? }
+// | submenu { label,icon,submenu:[…] }. `k` is the shortcut hint.
+// Item types map to fields: ACTION/DIALOG → onClick; TOGGLE → `checked`;
+// SUBMENU → `submenu`. Anything not yet wired renders disabled with a `title`
+// explaining what enables it (honest placeholder, not a fake toast).
 export function buildCtxItems(state: PcbState, actions: PcbActions) {
   const dv = { divider: true };
+  const close = actions.closeAll;
   const hasSel = (state.selectedIds || []).length > 0;
   const hasClip = (state.clipboardObjects || []).length > 0;
   const selObj = hasSel ? state.objects.find((o) => o.id === state.selectedIds[0]) : null;
   const selKind = selObj?.kind;
-  const inPcb = state.mode === 'pcb';
+  const inPcb = state.mode === 'pcb' || state.mode === '2d';
+  // ACTION/DIALOG helper — runs then closes; `disabled` greys it out; `title`
+  // is the hover tooltip (used to explain why an item is disabled).
+  const A = (label, icon, k, run, disabled?, title?) => ({
+    label, icon, k: k || '', title,
+    disabled: !!disabled,
+    onClick: disabled ? undefined : () => { run(); close(); },
+  });
+  // TOGGLE helper — shows a ✓ when `checked`; fires immediately.
+  const T = (label, icon, checked, run) => ({
+    label, icon, checked: !!checked,
+    onClick: () => { run(); close(); },
+  });
+  // Selection-filter submenu — one active category ("Only X") per scope, stored
+  // in boardSettings; the ✓ marks the current one; "Common" clears it.
+  const bag: any = state.boardSettings || {};
+  const filterSubmenu = (scope, cats) => {
+    const key = scope === 'schematic' ? 'selFilterSchematic' : 'selFilterPcb';
+    const cur = bag[key] || 'all';
+    const pick = (v) => () => { actions.setBoardSetting(key, v); close(); };
+    return cats.map(([v, label]) => ({ label, checked: cur === v, onClick: pick(v) }))
+      .concat([{ divider: true }, A('More…', 'filter', '', () => actions.setRightTab('filter'))]);
+  };
   const items: any[] = [];
 
-  if (hasSel) {
-    items.push({ label: 'Cut', k: 'Ctrl+X', icon: 'cut', onClick: () => { actions.cutSelection(); actions.closeAll(); } });
-    items.push({ label: 'Copy', k: 'Ctrl+C', icon: 'copy', onClick: () => { actions.copySelection(); actions.closeAll(); } });
-  }
-  if (hasClip) {
-    items.push({ label: 'Paste', k: 'Ctrl+V', icon: 'paste', onClick: () => { actions.pasteClipboard(); actions.closeAll(); } });
-  }
-  if (hasSel || hasClip) items.push(dv);
-
-  if (hasSel) {
-    items.push({ label: 'Duplicate', k: 'Ctrl+D', icon: 'dup', onClick: () => { actions.copySelection(); actions.pasteClipboard(); actions.closeAll(); } });
-    items.push({ label: 'Rotate 90°', k: 'Space', icon: 'rot', onClick: () => { actions.rotateSelectedPlaced(90); actions.closeAll(); } });
-    items.push({ label: 'Flip Horizontal', k: '', icon: 'rot', onClick: () => { actions.flipSelectedH(); actions.closeAll(); } });
-    items.push({ label: 'Flip Vertical', k: '', icon: 'rot', onClick: () => { actions.flipSelectedV(); actions.closeAll(); } });
+  if (!inPcb) {
+    // ─────────────── SCHEMATIC (spec: 11 items) ───────────────
+    items.push(A('Copy', 'copy', 'Ctrl+C', () => actions.copySelection(), !hasSel));
+    items.push(A('Paste', 'paste', 'Ctrl+V', () => actions.pasteClipboard(), !hasClip));
+    items.push(A('Delete', 'del', 'Del', () => actions.deleteSelected(), !hasSel));
     items.push(dv);
-    items.push({ label: 'Bring to Front', k: ']', icon: 'layer', onClick: () => { actions.bringFront(); actions.closeAll(); } });
-    items.push({ label: 'Send to Back', k: '[', icon: 'layer', onClick: () => { actions.sendBack(); actions.closeAll(); } });
+    items.push({
+      label: 'Group', icon: 'layer', disabled: !hasSel,
+      submenu: [
+        A('Group', 'layer', '', () => actions.groupSelection(), !hasSel),
+        A('Ungroup', 'layer', '', () => actions.ungroupSelection(), !hasSel),
+      ],
+    });
     items.push(dv);
-
-    // ── PCB kind-specific items ─────────────────────────────────────────
-    if (inPcb && selKind === 'track') {
-      items.push({ label: 'Add Tear Drop', k: '', icon: 'wire', onClick: () => actions.openModal('tearDrop') });
-      items.push({ label: 'Assign to Net Class…', k: '', icon: 'wire', onClick: () => actions.openModal('netClass') });
-      items.push(dv);
-    }
-    if (inPcb && (selKind === 'via' || selKind === 'pad')) {
-      items.push({ label: 'Add Tear Drop', k: '', icon: 'wire', onClick: () => actions.openModal('tearDrop') });
-      items.push({ label: 'Remove Unused Pad…', k: '', icon: 'del', onClick: () => actions.openModal('removeUnusedPad') });
-      items.push(dv);
-    }
-    if (inPcb && (selKind === 'polygon' || selKind === 'fillRegion')) {
-      items.push({ label: 'Edit Copper…', k: '', icon: 'foot', onClick: () => actions.openModal('copper') });
-      items.push(dv);
-    }
-    if (inPcb && selKind === 'component') {
-      items.push({ label: 'Footprint Manager…', k: '', icon: 'foot', onClick: () => actions.openManager('footprint') });
-      items.push({ label: 'Annotate Designator…', k: '', icon: 'prop', onClick: () => actions.openModal('annotate') });
-      items.push(dv);
-    }
-    if (!inPcb && (selKind === 'wire' || selKind === 'bus')) {
-      items.push({ label: 'Place Net Label', k: 'N', icon: 'pNetLabel', onClick: () => { actions.setTool('netLabel'); actions.closeAll(); } });
-      items.push(dv);
-    }
-
-    items.push({ label: 'Find Similar', k: '', icon: 'find', onClick: () => { actions.openModal('findReplace'); } });
-    items.push({ label: 'Properties', k: '', icon: 'prop', onClick: () => { actions.setRightTab('properties'); actions.closeAll(); } });
-    items.push({ label: 'Delete', k: 'Del', icon: 'del', onClick: () => { actions.deleteSelected(); actions.closeAll(); } });
+    const probeTarget = selObj ? state.objects.find((o) => o.sourceId === selObj.id) : null;
+    items.push(A('Cross Probe', 'find', '', () => selObj && actions.crossProbe(selObj.id), !probeTarget, !probeTarget ? 'Select a converted component to jump to its PCB footprint' : undefined));
+    items.push(A('Fit All in Window', 'fit', 'K', () => actions.zoomFit('all')));
+    items.push(dv);
+    const sheets = state.schematicSheets || [];
+    const si = sheets.findIndex((sh) => sh.id === state.activeSheetId);
+    items.push(A('Previous Page', 'page', '', () => actions.prevSheet(), si <= 0));
+    items.push(A('Next Page', 'page', '', () => actions.nextSheet(), si >= sheets.length - 1));
+    items.push({
+      label: 'Goto Page', icon: 'page',
+      submenu: sheets
+        .map((sh) => ({ label: sh.name, checked: sh.id === state.activeSheetId, onClick: () => { actions.gotoSheet(sh.id); close(); } }))
+        .concat([{ divider: true }, A('New Sheet', 'page', '', () => actions.addSheet())]),
+    });
+    items.push(dv);
+    items.push(T('Snap', 'tGridOptions', state.snapEnabled, () => actions.toggleSnap()));
+    items.push({ label: 'Filter', icon: 'filter', submenu: filterSubmenu('schematic', [
+      ['all', 'Common'], ['pin', 'Only Pin'], ['symbol', 'Only Symbol'],
+      ['wirebus', 'Only Wire and Bus'], ['pinpair', 'Only Pin Pair'], ['net', 'Only Net'],
+    ]) });
+    items.push(A('Property…', 'prop', '', () => actions.setRightTab('properties')));
   } else {
-    // No selection: defaults
-    items.push({ label: 'Select All', k: 'Ctrl+A', icon: 'blank', onClick: () => { actions.selectAll(); actions.closeAll(); } });
-    items.push({ label: 'Zoom Fit', k: 'Ctrl+0', icon: 'fit', onClick: () => { actions.zoomFit(); actions.closeAll(); } });
+    // ─────────────── PCB 2D (spec: 7 items) ───────────────
+    items.push(A('Paste', 'paste', 'Ctrl+V', () => actions.pasteClipboard(), !hasClip));
+    items.push({
+      label: 'Move', icon: 'move', disabled: !hasSel,
+      submenu: [
+        A('Move', 'move', '', () => actions.startMoveSelected(), !hasSel),
+        A('Rotate 90°', 'rot', 'Space', () => actions.rotateSelectedPlaced(90), !hasSel),
+        A('Flip Horizontal', 'rot', '', () => actions.flipSelectedH(), !hasSel),
+        A('Flip Vertical', 'rot', '', () => actions.flipSelectedV(), !hasSel),
+      ],
+    });
     items.push(dv);
-    items.push({ label: 'Settings…', k: '', icon: 'sys', onClick: () => actions.openSettings() });
+    items.push(A('Find…', 'find', 'Ctrl+F', () => actions.openModal('findReplace')));
+    items.push(A('Unhighlight All', 'wire', '', () => actions.unhighlightAll(), !state.highlightedNet, !state.highlightedNet ? 'Nothing is highlighted' : undefined));
+    items.push({ label: 'Filter', icon: 'filter', submenu: filterSubmenu('pcb', [
+      ['all', 'Common'], ['track', 'Only Track'], ['padvia', 'Only Pad / Via'], ['copper', 'Only Copper Region'],
+    ]) });
+    items.push(dv);
+    items.push(A('Fit All in Window', 'fit', 'K', () => actions.zoomFit('all')));
+    items.push(T('Snap', 'tGridOptions', state.snapEnabled, () => actions.toggleSnap()));
   }
+
+  // ── Contextual extras (kept from before) — only for the matching object
+  // kind; appended below a divider so the standard spec list stays clean.
+  const extras: any[] = [];
+  if (hasSel && inPcb && selKind === 'track') {
+    extras.push(A('Add Tear Drop', 'wire', '', () => actions.openModal('tearDrop')));
+    extras.push(A('Assign to Net Class…', 'wire', '', () => actions.openModal('netClass')));
+  }
+  if (hasSel && inPcb && (selKind === 'via' || selKind === 'pad')) {
+    extras.push(A('Add Tear Drop', 'wire', '', () => actions.openModal('tearDrop')));
+    extras.push(A('Remove Unused Pad…', 'del', '', () => actions.openModal('removeUnusedPad')));
+  }
+  if (hasSel && inPcb && (selKind === 'polygon' || selKind === 'fillRegion')) {
+    extras.push(A('Edit Copper…', 'foot', '', () => actions.openModal('copper')));
+  }
+  if (hasSel && inPcb && selKind === 'component') {
+    extras.push(A('Footprint Manager…', 'foot', '', () => actions.openManager('footprint')));
+    extras.push(A('Annotate Designator…', 'prop', '', () => actions.openModal('annotate')));
+  }
+  if (hasSel && !inPcb && (selKind === 'wire' || selKind === 'bus')) {
+    extras.push(A('Place Net Label', 'pNetLabel', 'N', () => actions.setTool('netLabel')));
+  }
+  // Highlight Net — entry point that makes "Unhighlight All" meaningful; shown
+  // whenever the selected object carries a net.
+  if (hasSel && selObj?.net) {
+    extras.push(A('Highlight Net', 'wire', '', () => actions.highlightNet(selObj.net)));
+  }
+  if (extras.length) { items.push(dv); items.push(...extras); }
 
   return items;
 }
@@ -1307,8 +1367,8 @@ export function buildLeftTabs(state: PcbState, actions: PcbActions) {
 export function buildSubTabs(state: PcbState, actions: PcbActions) {
   // 2D / 3D modes collapse the left panel to just the Page tree (Figma 433:251073/252704).
   const defs = state.mode === '2d' || state.mode === '3d'
-    ? ([['page', 'Page']] as const)
-    : ([['page', 'Page'], ['net', 'Net'], ['component', 'Component'], ['object', 'Object']] as const);
+    ? ([['page', 'Sheets']] as const)
+    : ([['page', 'Sheets'], ['net', 'Nets'], ['component', 'Parts'], ['object', 'Objects']] as const);
   return defs.map(([k, l]) => ({
     label: l,
     fg: state.leftSub === k ? C.text : 'var(--color-text-tertiary)',
@@ -1319,10 +1379,26 @@ export function buildSubTabs(state: PcbState, actions: PcbActions) {
 }
 
 export function buildModeTabs(state: PcbState, actions: PcbActions) {
-  const modeDefs = state.mode === 'schematic'
-    ? [['schematic', 'Schematic'], ['pcb', 'PCB']]
-    : [['schematic', 'Schematic'], ['pcb', 'PCB'], ['2d', '2D'], ['3d', '3D']];
-  return modeDefs.map(([k, l]) => ({
+  // Two top-level tabs. PCB stays active across both its sub-views (2D · 3D),
+  // so entering PCB lands on its 2D view by default.
+  const inPcb = state.mode === 'pcb' || state.mode === '3d';
+  const defs: Array<[string, string, boolean]> = [
+    ['schematic', 'Schematic', state.mode === 'schematic'],
+    ['pcb', 'PCB', inPcb],
+  ];
+  return defs.map(([k, l, active]) => ({
+    label: l,
+    bg: active ? C.primary : 'transparent',
+    fg: active ? '#fff' : 'var(--color-text-secondary)',
+    onClick: () => actions.setMode(k),
+  }));
+}
+
+// PCB sub-tabs (rendered only inside the PCB context): 2D = the layout editor
+// (mode "pcb"), 3D = the board preview (mode "3d"). PCB defaults to 2D.
+export function buildPcbViewTabs(state: PcbState, actions: PcbActions) {
+  const defs: Array<[string, string]> = [['pcb', '2D'], ['3d', '3D']];
+  return defs.map(([k, l]) => ({
     label: l,
     bg: state.mode === k ? C.primary : 'transparent',
     fg: state.mode === k ? '#fff' : 'var(--color-text-secondary)',
@@ -1346,9 +1422,10 @@ export function buildRightTabs(state: PcbState, actions: PcbActions) {
 
 const BOTTOM_DEFS = [
   ['logs', 'Logs', 'logs'],
-  ['device', 'Device Standardization', 'device'],
+  ['device', 'Parts Audit', 'device'],
   ['drc', 'DRC', 'drc'],
-  ['result', 'Final Result', 'result'],
+  ['find', 'Find Result', 'find'],
+  ['prop', 'Property List', 'prop'],
 ] as const;
 
 export function buildBottomTabs(state: PcbState, actions: PcbActions) {
