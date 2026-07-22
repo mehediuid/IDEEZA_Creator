@@ -168,8 +168,21 @@ function ColorSwatch({
   color: string;
   onChange: (hex: string) => void;
 }) {
+  // The swatch shows the value as-is (a token var() renders correctly), but the
+  // native <input type=color> needs a #hex, so resolve a var()/named color to
+  // its computed hex off the rendered swatch. Editing then stores a real hex.
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const [hex, setHex] = React.useState(/^#[0-9a-fA-F]{6}$/.test(color) ? color : "#000000");
+  React.useEffect(() => {
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) { setHex(color); return; }
+    const el = ref.current;
+    if (!el) return;
+    const m = getComputedStyle(el).backgroundColor.match(/\d+/g);
+    if (m) setHex("#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join(""));
+  }, [color]);
   return (
     <span
+      ref={ref}
       style={{
         position: "relative",
         display: "inline-block",
@@ -183,7 +196,7 @@ function ColorSwatch({
     >
       <input
         type="color"
-        value={color}
+        value={hex}
         onChange={(e) => onChange(e.target.value)}
         style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%", border: "none", padding: 0 }}
       />

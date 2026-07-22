@@ -9,7 +9,7 @@
 
 import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
-import type { CanvasObject } from "@/lib/pcb/types";
+import type { CanvasObject, ErcSeverity } from "@/lib/pcb/types";
 
 // ── shared atoms ─────────────────────────────────────────────────────────────
 const T = {
@@ -243,20 +243,12 @@ function DeviceTab() {
 }
 
 // ── DRC tab ──────────────────────────────────────────────────────────────────
-interface DrcRow { sev: Sev; title: string; loc: string }
-const DRC_ROWS: DrcRow[] = [
-  { sev: "fatal", title: "Clearance Violation", loc: "Track to Pad < 0.15mm near U3.2" },
-  { sev: "error", title: "Unrouted Net", loc: "Net VCC not fully routed (2 segments left)" },
-  { sev: "warn", title: "Silkscreen Overlap", loc: "R5 designator overlaps component pad" },
-  { sev: "warn", title: "Acute Angle", loc: "Track angle < 90° at junction J1.1" },
-  { sev: "info", title: "Hole Size Check", loc: "124 holes within tolerance — passed" },
-  { sev: "info", title: "Annular Ring", loc: "All vias meet minimum ring — passed" },
-];
+// Map an ERC/DRC severity (nets.ts / drc.ts) onto the 4-level filter chips.
+const sevKey = (s: ErcSeverity): Sev => (s === "warning" ? "warn" : s === "note" ? "info" : s);
 
 function DrcTab() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [ran, setRan] = React.useState(false);
   const [sev, setSev] = React.useState<Record<Sev, boolean>>({ fatal: true, error: true, warn: true, info: true });
 
   // Schematic → live ERC (Electrical Rule Check) from real connectivity.
@@ -294,32 +286,30 @@ function DrcTab() {
     );
   }
 
-  const shown = DRC_ROWS.filter((r) => sev[r.sev]);
+  // PCB → live DRC (Design Rule Check) from real board geometry (drc.ts).
+  const results = state.pcbDrcResults;
+  const shown = results.filter((r) => sev[sevKey(r.severity)]);
+  const count = (k: Sev) => results.filter((r) => sevKey(r.severity) === k).length;
   return (
     <Pane
       left={
         <>
           <div style={{ display: "flex", gap: 6 }}>
-            <Btn primary full onClick={() => { setRan(true); actions.flashToast("Design rule check complete"); }}>Check DRC</Btn>
-            <Btn onClick={() => actions.flashToast("DRC rule settings — coming soon")}>⚙</Btn>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={() => actions.flashToast("Exported DRC results")}>Export</Btn>
-            <Btn onClick={() => setRan(false)}>Clear</Btn>
+            <Btn primary full onClick={() => actions.runDrcCheck()}>Check DRC</Btn>
           </div>
           <div style={{ marginTop: 4 }}>
-            <Check label="All" count={DRC_ROWS.length} on={SEV_ORDER.every((k) => sev[k])} onToggle={() => { const all = SEV_ORDER.every((k) => sev[k]); setSev(SEV_ORDER.reduce((a, k) => ({ ...a, [k]: !all }), {} as Record<Sev, boolean>)); }} />
-            {SEV_ORDER.map((k) => <Check key={k} label={SEV[k].label} color={SEV[k].color} count={DRC_ROWS.filter((r) => r.sev === k).length} on={sev[k]} onToggle={() => setSev({ ...sev, [k]: !sev[k] })} />)}
+            <Check label="All" count={results.length} on={SEV_ORDER.every((k) => sev[k])} onToggle={() => { const all = SEV_ORDER.every((k) => sev[k]); setSev(SEV_ORDER.reduce((a, k) => ({ ...a, [k]: !all }), {} as Record<Sev, boolean>)); }} />
+            {SEV_ORDER.map((k) => <Check key={k} label={SEV[k].label} color={SEV[k].color} count={count(k)} on={sev[k]} onToggle={() => setSev({ ...sev, [k]: !sev[k] })} />)}
           </div>
         </>
       }
       right={
-        !ran ? <Empty text='Click "Check DRC" to run the design rule check' /> : shown.length === 0 ? <Empty text="No violations at these severities" /> : (
+        results.length === 0 ? <Empty text='Click "Check DRC" to run the design rule check' /> : shown.length === 0 ? <Empty text="No violations at these severities" /> : (
           <div style={{ padding: "4px 0" }}>
             {shown.map((r, i) => (
               <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 16px", borderBottom: `1px solid ${T.line}` }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV[r.sev].color, marginTop: 5, flex: "0 0 auto" }} />
-                <div><div style={{ fontSize: T.sm, fontWeight: 600, color: T.ink }}>{r.title}</div><div style={{ fontSize: T.sm, color: T.mut }}>{r.loc}</div></div>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV[sevKey(r.severity)].color, marginTop: 5, flex: "0 0 auto" }} />
+                <div><div style={{ fontSize: T.sm, fontWeight: 600, color: T.ink }}>{r.title}</div><div style={{ fontSize: T.sm, color: T.mut }}>{r.detail}</div></div>
               </div>
             ))}
           </div>

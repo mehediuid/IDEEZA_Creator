@@ -294,6 +294,25 @@
   --color-border-success: var(--color-green-500);
   --color-border-warning: var(--color-yellow-500);
 
+  /* PCB 2D canvas — layer + entity colors, sourced from the base palette so
+   * the whole board themes through the token system. Copper identity is a
+   * FIXED visual language (Top = red, Bottom = blue) and stays constant across
+   * light/dark; other layers each get a distinct, non-competing hue. */
+  --color-pcb-top-copper: var(--color-red-500);      /* Top Layer — red family (locked) */
+  --color-pcb-bottom-copper: var(--color-blue-500);  /* Bottom Layer — blue family (locked) */
+  --color-pcb-inner1: var(--color-green-500);
+  --color-pcb-inner2: var(--color-orange-500);
+  --color-pcb-silk-top: var(--color-gray-50);
+  --color-pcb-silk-bottom: var(--color-gray-400);
+  --color-pcb-paste-top: var(--color-violet-400);
+  --color-pcb-paste-bottom: var(--color-orange-400);
+  --color-pcb-mask: var(--color-green-800);
+  --color-pcb-drill: var(--color-gray-600);
+  --color-pcb-outline: var(--color-violet-600);
+  /* Canvas interaction states (shared schematic + PCB) */
+  --color-canvas-highlight: var(--color-yellow-500); /* net highlight / hover glow */
+  --color-canvas-select: var(--color-violet-600);    /* selection — reserved */
+
   /* Icons */
   --color-icon-default: var(--color-gray-600);
   --color-icon-secondary: var(--color-gray-400);

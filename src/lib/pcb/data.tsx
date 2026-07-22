@@ -168,7 +168,7 @@ export function buildMenus(state: PcbState, actions: PcbActions) {
             }
             else if (it.label === 'Update/Conver Schematic to PCB') actions.setMode('pcb');
             else if (it.label === 'Electrical Rule Check') actions.runErcCheck();
-            else if (it.label === 'Check DRC') actions.clickBottomTab('drc');
+            else if (it.label === 'Check DRC') actions.runDrcCheck();
             // Phase 3 — PCB-mode Tools menu → modals
             else if (it.label === 'Layer Manager') actions.openModal('layerManager');
             else if (it.label === 'Net Class Manager') actions.openModal('netClass');
@@ -267,8 +267,8 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
           },
         }),
         item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.openModal("openProject") }),
-        item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
-        item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
+        item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.saveDoc() }),
+        item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.saveDoc() }),
         dv,
         // PDF Part 1: per-format importer cascade.
         item("Import", {
@@ -427,7 +427,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Generate PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.convertSchematicToPcb() }),
         dv,
         item("Design rules", { icon: "dRule", onClick: () => actions.openModal("designRules") }),
-        item("Run design check (DRC)", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
+        item("Run design check (DRC)", { icon: "dCheck", onClick: () => actions.runDrcCheck() }),
         item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Import GLTF", { icon: "cube", onClick: () => actions.flashToast("Import GLTF — pick a file") }),
@@ -618,8 +618,8 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ),
         }),
         item("Open Project", { k: "Ctrl+O", icon: "folder", onClick: () => actions.openModal("openProject") }),
-        item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.flashToast("Saved") }),
-        item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.flashToast("All projects saved") }),
+        item("Save", { k: "Ctrl+S", icon: "save", onClick: () => actions.saveDoc() }),
+        item("Save All", { k: "Ctrl+Shift+S", icon: "save", onClick: () => actions.saveDoc() }),
         dv,
         // PDF Part 2: per-format importer cascade (PCB formats).
         item("Import", {
@@ -795,7 +795,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       items: [
         item("Update PCB to Schematic", { k: "Alt+I", icon: "dConvert", onClick: () => actions.setMode("schematic") }),
         item("Design rules", { icon: "dRule", onClick: () => actions.openModal("pcbDrc") }),
-        item("Run design check (DRC)", { icon: "dCheck", onClick: () => actions.clickBottomTab("drc") }),
+        item("Run design check (DRC)", { icon: "dCheck", onClick: () => actions.runDrcCheck() }),
         item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Add Mounting Hole", { icon: "pTestPoint", onClick: () => actions.setTool("mountingHole") }),
@@ -992,18 +992,18 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "View",
       key: "V",
       items: [
-        item("Full Screen", { k: "F11", icon: "fullscreen" }),
+        item("Full Screen", { k: "F11", icon: "fullscreen", onClick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch {} actions.closeAll(); } }),
         check("Top Toolbar"),
         check("Left-Side panel", "["),
         check("Right-Side Panel", "]"),
-        check("Bottom-Side Panel", "/", true),
+        check("Bottom-Side Panel", "\\", true),
         item("Window Arrangement", {
           icon: "window",
           sub: [
             su("Tile Horizontally (H)", "", { icon: "window" }),
             su("Tile Vertically (V)", "", { icon: "window" }),
-            su("Tile Vertically (V)", "", { icon: "window" }),
-            su("Marge All (M)", "", { icon: "window" }),
+            su("Tile All (T)", "", { icon: "window" }),
+            su("Merge All (M)", "", { icon: "window" }),
           ],
         }),
         check("Floating Tool"),
@@ -1024,26 +1024,26 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "Setting",
       key: "I",
       items: [
-        item("System", { icon: "sys", sub: [su("General", "", { icon: "sys" }), su("Common", "", { icon: "prop" }), su("Common Library", "", { icon: "doc" })] }),
-        item("Schematic/Symbol", { icon: "symbol", sub: [su("General", "", { icon: "sys" }), su("Theme", "", { icon: "appearance" })] }),
+        item("System", { icon: "sys", sub: [su("General", "", { icon: "sys", onClick: () => actions.openModal("set3dSysGeneral") }), su("Common", "", { icon: "prop", onClick: () => actions.openModal("set3dSysCommon") }), su("Common Library", "", { icon: "doc", onClick: () => actions.openModal("set3dSysLib") })] }),
+        item("Schematic/Symbol", { icon: "symbol", sub: [su("General", "", { icon: "sys", onClick: () => actions.openSettings("symbol") }), su("Theme", "", { icon: "appearance", onClick: () => actions.openSettings("symbol") })] }),
         item("PCB/Footprint", {
           icon: "foot",
           sub: [
-            su("General", "", { icon: "sys" }),
-            su("Theme", "", { icon: "appearance" }),
-            su("Common Grid/Snap Sie setting", "", { icon: "grid" }),
-            su("Common Track Width Setting", "", { icon: "wire" }),
-            su("Common Via Size Setting", "", { icon: "tVia" }),
-            su("Snap", "", { icon: "snap" }),
+            su("General", "", { icon: "sys", onClick: () => actions.openSettings("footprint") }),
+            su("Theme", "", { icon: "appearance", onClick: () => actions.openSettings("footprint") }),
+            su("Common Grid/Snap Size setting", "", { icon: "grid", onClick: () => actions.openSettings("footprint") }),
+            su("Common Track Width Setting", "", { icon: "wire", onClick: () => actions.openSettings("footprint") }),
+            su("Common Via Size Setting", "", { icon: "tVia", onClick: () => actions.openSettings("footprint") }),
+            su("Snap", "", { icon: "snap", onClick: () => actions.toggleSnap() }),
           ],
         }),
-        item("Panel/Panel Lib", { icon: "panel", sub: [su("General", "", { icon: "sys" }), su("Theme", "", { icon: "appearance" })] }),
-        item("Common Font Family", { icon: "font" }),
-        item("Drawing", { icon: "draw", onClick: () => actions.openSettings("drawing") }),
-        item("Property", { icon: "prop", onClick: () => actions.openSettings("property") }),
-        item("Hotkey", { icon: "key", onClick: () => actions.openSettings("hotkey") }),
-        item("Top toolbar", { icon: "grid" }),
-        item("Save", { icon: "save", onClick: () => actions.openSettings("save") }),
+        item("Panel/Panel Lib", { icon: "panel", sub: [su("General", "", { icon: "sys", onClick: () => actions.openModal("set3dPanelGeneral") }), su("Theme", "", { icon: "appearance", onClick: () => actions.openModal("set3dPanelTheme") })] }),
+        item("Common Font Family", { icon: "font", onClick: () => actions.openModal("set3dFont") }),
+        item("Drawing", { icon: "draw", onClick: () => actions.openModal("set3dDrawing") }),
+        item("Property", { icon: "prop", onClick: () => actions.openModal("set3dProperty") }),
+        item("Hotkey", { icon: "key", onClick: () => actions.openModal("set3dHotkey") }),
+        item("Top toolbar", { icon: "grid", onClick: () => actions.openModal("set3dTopToolbar") }),
+        item("Save", { icon: "save", onClick: () => actions.saveDoc() }),
       ],
     },
     {
@@ -1051,11 +1051,11 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       label: "Help",
       key: "H",
       items: [
-        item("community", { icon: "community" }),
+        item("Community", { icon: "community" }),
         item("Tutorials", { k: "F1", icon: "tutorial" }),
         item("Contact", { icon: "contact" }),
-        item("Online chat", { icon: "chat" }),
-        item("About..", { icon: "about" }),
+        item("Online Chat", { icon: "chat", onClick: () => actions.toggleChat() }),
+        item("About...", { icon: "about" }),
         dv,
         item("Video Capture...", { icon: "video" }),
         item("Performance Diagnostic...", { icon: "diagnostic" }),

@@ -36,6 +36,9 @@ export interface InspectorField {
   // Binding token — "obj:<field>" (selected CanvasObject), "wire:*", "doc:*".
   // Absent → read-only display.
   bind?: string;
+  // Colour fields only: an optional boolean binding whose eye toggle (rendered
+  // beside the swatch) shows/hides the coloured element (e.g. "prop:lineOn").
+  visBind?: string;
   // Fallback display value for read-only fields with no live source.
   display?: string;
   // Conditional visibility: render this field only when the selected object's
@@ -511,15 +514,12 @@ const SCHEMATIC: Record<string, InspectorType> = {
         fields: [
           { key: "lineWidth", label: "Line Width", kind: "number", unit: "mm", bind: "obj:width", display: "0.15" },
           { key: "lineStyle", label: "Line Style", kind: "dropdown", options: LINE_STYLES, bind: "prop:lineStyle", display: "Solid" },
-          { key: "strokeColor", label: "Outline color", kind: "color", bind: "obj:color", display: "#1E1E1E" },
-          { key: "fillColor", label: "Fill Color", kind: "color", bind: "prop:fillColor", display: "#FFFFFF" },
-          { key: "fillColor2", label: "Fill Color", kind: "color", bind: "prop:fillColor2", display: "#FFFFFF" },
+          { key: "strokeColor", label: "Outline color", kind: "color", bind: "obj:color", visBind: "prop:lineOn", display: "#1E1E1E" },
+          { key: "fillColor", label: "Fill Color", kind: "color", bind: "prop:fillColor", visBind: "prop:fillOn", display: "#FFFFFF" },
           { key: "roundRadius", label: "Corner radius", kind: "number", unit: "mm", bind: "prop:roundRadius", display: "0" },
           { key: "rectWidth", label: "Width (Rectangle)", kind: "number", unit: "mm", bind: "prop:rectWidth", display: "0" },
           { key: "rectHeight", label: "Height (Rectangle)", kind: "number", unit: "mm", bind: "prop:rectHeight", display: "0" },
           { key: "circleRadius", label: "Radius (Circle)", kind: "number", unit: "mm", bind: "prop:circleRadius", display: "0" },
-          { key: "xLocation", label: "X Location (Circle/Ellipse)", kind: "number", unit: "in", bind: "prop:xLocation", display: "0" },
-          { key: "yLocation", label: "Y Location (Circle/Ellipse)", kind: "number", unit: "in", bind: "prop:yLocation", display: "0" },
           { key: "xRadius", label: "X Radius (Ellipse)", kind: "number", unit: "in", bind: "prop:xRadius", display: "0.15" },
           { key: "yRadius", label: "Y Radius (Ellipse)", kind: "number", unit: "in", bind: "prop:yRadius", display: "0.15" },
           { key: "resetStyle", label: "Reset style", kind: "action", display: "Reset" },
@@ -629,6 +629,7 @@ const TWOD: Record<string, InspectorType> = {
         fields: [
           { key: "name", label: "Name", kind: "checkText", bind: "obj:comment", display: "—" },
           { key: "id", label: "ID", kind: "readonly", bind: "obj:id", display: "—" },
+          { key: "uniqueId", label: "Unique ID", kind: "checkText", bind: "prop:uniqueId", display: "—" },
           { key: "designator", label: "Reference (R1)", kind: "checkText", bind: "obj:text", display: "U?" },
           { key: "devices", label: "Symbol", kind: "readonly", display: "—" },
           { key: "footprint", label: "Footprint", kind: "checkText", bind: "obj:footprint", display: "—" },

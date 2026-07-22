@@ -41,7 +41,7 @@ const POWER: Record<string, string> = {
 };
 // Pad centre offsets (canvas px, relative to footprint centre) — must match the
 // land-pattern glyphs drawn in placed-objects.tsx so airwires land on pads.
-const PAD_OFFSETS: Record<string, Pt[]> = {
+export const PAD_OFFSETS: Record<string, Pt[]> = {
   fp0805: [{ x: -10, y: 0 }, { x: 10, y: 0 }],
   fpSOD123: [{ x: -10, y: 0 }, { x: 10, y: 0 }],
   fpSOT23: [{ x: -8.5, y: 8.5 }, { x: 8.5, y: 8.5 }, { x: 0, y: -8.5 }],

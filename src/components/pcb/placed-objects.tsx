@@ -372,7 +372,7 @@ export function PlacedObjects() {
   // Net highlight — objects on the highlighted net glow amber over everything.
   // Schematic nets are computed live (no stored `net`), so members come from the
   // id list the store resolved when the net was highlighted; PCB uses `o.net`.
-  const HIGHLIGHT = "#f5a623";
+  const HIGHLIGHT = "var(--color-canvas-highlight)";
   const hotSet = React.useMemo(() => new Set(state.highlightedMembers), [state.highlightedMembers]);
   const isHot = (o: CanvasObject) => hotSet.has(o.id) || (!!state.highlightedNet && o.net === state.highlightedNet);
 
@@ -471,7 +471,7 @@ export function PlacedObjects() {
                 stroke={stroke}
                 strokeWidth={w}
                 strokeLinecap="round"
-                style={{ pointerEvents: "stroke", cursor: "move", filter: hot ? "drop-shadow(0 0 3px #f5a623)" : undefined }}
+                style={{ pointerEvents: "stroke", cursor: "move", filter: hot ? "drop-shadow(0 0 3px var(--color-canvas-highlight))" : undefined }}
                 onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
               />
             );
@@ -536,7 +536,9 @@ function CombineShape({ obj, selected, highlighted }: { obj: CanvasObject; selec
   const d = rings
     .map((r) => (r.length ? `M ${r[0].x} ${r[0].y} ` + r.slice(1).map((p) => `L ${p.x} ${p.y}`).join(" ") + " Z" : ""))
     .join(" ");
-  const color = selected ? "var(--color-violet-600)" : highlighted ? "#f5a623" : (obj.color || "var(--color-text-primary)");
+  // Keep the shape's own colour when selected (selection shown by the dashed
+  // outline + heavier fill below), so colour edits are visible immediately.
+  const color = highlighted ? "var(--color-canvas-highlight)" : (obj.color || "var(--color-text-primary)");
   const rot = obj.rotation ?? 0;
   return (
     <div
@@ -634,9 +636,23 @@ function PlacedGlyph({
   // visibly mirrors, not just its position within a multi-selection.
   const fx = (obj.props as Record<string, unknown> | undefined)?.flipX ? -1 : 1;
   const fy = (obj.props as Record<string, unknown> | undefined)?.flipY ? -1 : 1;
-  // Priority: selection → net-highlight → explicit color → PCB layer → theme.
+  // Priority: net-highlight → explicit color → PCB layer → theme. Selection is
+  // shown by the dashed outline + background tint below (NOT by recolouring the
+  // glyph) so an object keeps its own colour while selected — otherwise editing
+  // its colour in the inspector shows no change until it's deselected.
   const normalColor = obj.color || layerColor || "var(--color-text-primary)";
-  const glyphColor = selected ? "var(--color-violet-600)" : highlighted ? "#f5a623" : normalColor;
+  const glyphColor = highlighted ? "var(--color-canvas-highlight)" : normalColor;
+  // Fillable shapes (rectangle/circle/ellipse) render their real outline colour
+  // (obj.color via currentColor) + fill colour (props.fillColor), each with an
+  // on/off toggle — so the inspector's colour + Fill/Outline controls do real
+  // work instead of the static outline-only glyph.
+  const sp = (obj.props ?? {}) as Record<string, unknown>;
+  const fillable = obj.kind === "rectangle" || obj.kind === "circle" || obj.kind === "ellipse";
+  const lineOn = sp.lineOn !== false;
+  const fillOn = sp.fillOn === true;
+  const fillCol = fillOn ? String(sp.fillColor ?? "#FFFFFF") : "none";
+  const strokeCol = lineOn ? "currentColor" : "none";
+  const rx = Math.max(0, Math.min(Number(sp.roundRadius) || 0, 10));
   if (obj.kind === "text") {
     return (
       <div
@@ -656,7 +672,7 @@ function PlacedGlyph({
           fontSize: 12,
           fontFamily: "var(--font-family-body)",
           color: glyphColor,
-          textShadow: highlighted && !selected ? "0 0 6px #f5a623" : undefined,
+          textShadow: highlighted && !selected ? "0 0 6px var(--color-canvas-highlight)" : undefined,
           border: selected ? "1px dashed var(--color-violet-600)" : "1px dashed transparent",
           background: "transparent",
           cursor: editing ? "text" : "move",
@@ -702,7 +718,7 @@ function PlacedGlyph({
         transform: `rotate(${rotation}deg) scale(${fx}, ${fy})`,
         transformOrigin: "50% 50%",
         color: glyphColor,
-        filter: highlighted && !selected ? "drop-shadow(0 0 4px #f5a623)" : undefined,
+        filter: highlighted && !selected ? "drop-shadow(0 0 4px var(--color-canvas-highlight))" : undefined,
         cursor: "move",
         display: "flex",
         alignItems: "center",
@@ -715,7 +731,17 @@ function PlacedGlyph({
       title={obj.kind}
     >
       <svg viewBox="-24 -24 48 48" width="48" height="48">
-        {GLYPHS[obj.kind] ?? <circle cx={0} cy={0} r={6} fill="currentColor" />}
+        {fillable ? (
+          obj.kind === "rectangle" ? (
+            <rect x={-14} y={-10} width={28} height={20} rx={rx} stroke={strokeCol} strokeWidth={1.7} fill={fillCol} />
+          ) : obj.kind === "circle" ? (
+            <circle cx={0} cy={0} r={12} stroke={strokeCol} strokeWidth={1.7} fill={fillCol} />
+          ) : (
+            <ellipse cx={0} cy={0} rx={14} ry={9} stroke={strokeCol} strokeWidth={1.7} fill={fillCol} />
+          )
+        ) : (
+          GLYPHS[obj.kind] ?? <circle cx={0} cy={0} r={6} fill="currentColor" />
+        )}
       </svg>
       {obj.text && obj.kind !== "vcc5v" && (() => {
         const isDesig = DESIGNATOR_KINDS.has(obj.kind);

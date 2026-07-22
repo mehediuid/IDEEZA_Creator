@@ -80,6 +80,17 @@ export type ModalId =
   // All-Popups spec — File / Place dialogs
   | "openProject"
   | "devicePicker"
+  // 3D-view standalone Setting dialogs (Ideeza_PCB3D_Dialogs spec)
+  | "set3dSysGeneral"
+  | "set3dSysCommon"
+  | "set3dSysLib"
+  | "set3dPanelGeneral"
+  | "set3dPanelTheme"
+  | "set3dFont"
+  | "set3dDrawing"
+  | "set3dProperty"
+  | "set3dHotkey"
+  | "set3dTopToolbar"
   | null;
 
 // Tools-menu manager overlays.
@@ -222,18 +233,20 @@ export interface PcbLayer {
 }
 
 export const DEFAULT_PCB_LAYERS: PcbLayer[] = [
-  { id: "top",        name: "Top Layer",        color: "#E34C4C", type: "signal",     visible: true, locked: false, transparency: 0 },
-  { id: "inner1",     name: "Inner 1",          color: "#3BB56F", type: "signal",     visible: true, locked: false, transparency: 0 },
-  { id: "inner2",     name: "Inner 2",          color: "#2F7AD6", type: "signal",     visible: true, locked: false, transparency: 0 },
-  { id: "bottom",     name: "Bottom Layer",     color: "#E3B23B", type: "signal",     visible: true, locked: false, transparency: 0 },
-  { id: "topSilk",    name: "Top Silkscreen",   color: "#F5F5F5", type: "silkscreen", visible: true, locked: false, transparency: 0 },
-  { id: "bottomSilk", name: "Bottom Silkscreen",color: "#BFBFBF", type: "silkscreen", visible: true, locked: false, transparency: 0 },
-  { id: "topPaste",   name: "Top Paste Mask",   color: "#C060C0", type: "paste",      visible: true, locked: false, transparency: 30 },
-  { id: "bottomPaste",name: "Bottom Paste Mask",color: "#3BB5B5", type: "paste",      visible: true, locked: false, transparency: 30 },
-  { id: "topMask",    name: "Top Solder Mask",  color: "#1B6B43", type: "soldermask", visible: false, locked: false, transparency: 60 },
-  { id: "bottomMask", name: "Bottom Solder Mask", color: "#1B6B43", type: "soldermask", visible: false, locked: false, transparency: 60 },
-  { id: "drill",      name: "Drill Layer",      color: "#555555", type: "drill",      visible: true, locked: false, transparency: 0 },
-  { id: "outline",    name: "Board Outline",    color: "#7C2DB9", type: "mechanical", visible: true, locked: false, transparency: 0 },
+  // Colors reference design tokens (see tokens.css --color-pcb-*). Copper hue
+  // is a locked identity: Top = red, Bottom = blue.
+  { id: "top",        name: "Top Layer",        color: "var(--color-pcb-top-copper)",    type: "signal",     visible: true, locked: false, transparency: 0 },
+  { id: "inner1",     name: "Inner1",           color: "var(--color-pcb-inner1)",        type: "signal",     visible: true, locked: false, transparency: 0 },
+  { id: "inner2",     name: "Inner2",           color: "var(--color-pcb-inner2)",        type: "signal",     visible: true, locked: false, transparency: 0 },
+  { id: "bottom",     name: "Bottom Layer",     color: "var(--color-pcb-bottom-copper)", type: "signal",     visible: true, locked: false, transparency: 0 },
+  { id: "topSilk",    name: "Top Silkscreen",   color: "var(--color-pcb-silk-top)",      type: "silkscreen", visible: true, locked: false, transparency: 0 },
+  { id: "bottomSilk", name: "Bottom Silkscreen",color: "var(--color-pcb-silk-bottom)",   type: "silkscreen", visible: true, locked: false, transparency: 0 },
+  { id: "topPaste",   name: "Top Paste Mask",   color: "var(--color-pcb-paste-top)",     type: "paste",      visible: true, locked: false, transparency: 30 },
+  { id: "bottomPaste",name: "Bottom Paste Mask",color: "var(--color-pcb-paste-bottom)",  type: "paste",      visible: true, locked: false, transparency: 30 },
+  { id: "topMask",    name: "Top Solder Mask",  color: "var(--color-pcb-mask)",          type: "soldermask", visible: false, locked: false, transparency: 60 },
+  { id: "bottomMask", name: "Bottom Solder Mask", color: "var(--color-pcb-mask)",        type: "soldermask", visible: false, locked: false, transparency: 60 },
+  { id: "drill",      name: "Drill Layer",      color: "var(--color-pcb-drill)",         type: "drill",      visible: true, locked: false, transparency: 0 },
+  { id: "outline",    name: "Board Outline",    color: "var(--color-pcb-outline)",       type: "mechanical", visible: true, locked: false, transparency: 0 },
 ];
 
 // Tool keys that place a one-shot object on click (no draft).
@@ -386,6 +399,16 @@ export interface PcbState {
   ctxX: string;
   ctxY: string;
   settingsOpen: boolean;
+  chatOpen: boolean;
+  // 3D-view controls (session-only) — driven by the 3D top toolbar cluster and
+  // consumed by the three.js viewer (camera preset/fit, projection, explode).
+  pcb3d: {
+    projection: "perspective" | "orthographic";
+    explode: boolean;
+    preset: "iso" | "top" | "bottom";
+    fitNonce: number;
+    presetNonce: number;
+  };
   settingsPage: SettingsPage;
   notif: number;
   tool: string;
@@ -442,6 +465,8 @@ export interface PcbState {
   highlightedMembers: string[];
   // Electrical Rule Check results (schematic); shown in the bottom DRC/ERC tab.
   ercResults: ErcIssue[];
+  // Design Rule Check results (PCB); shown in the bottom DRC tab.
+  pcbDrcResults: ErcIssue[];
   // Design Rules config (per-rule enable+severity, pin-conflict matrix, master
   // toggle) — edited in the Design Rules dialog, read by the ERC engine.
   designRules: SchRulesConfig;
@@ -500,9 +525,9 @@ export interface PcbState {
     bgColor: string;
     boardColor: string;
     padColor: string;
-    stackMaterial: string;
     pcbHeightFromTop: string;
     boardThickness: string;
+    layerExpose: string;
     layers: Array<{ name: string; thickness: string }>;
   };
   // Right panel — Schematic Properties (default-no-selection view)
@@ -1400,6 +1425,8 @@ export const initialState: PcbState = {
   ctxX: "0px",
   ctxY: "0px",
   settingsOpen: false,
+  chatOpen: false,
+  pcb3d: { projection: "perspective", explode: false, preset: "iso", fitNonce: 0, presetNonce: 0 },
   settingsPage: "system",
   notif: 3,
   tool: "select",
@@ -1466,6 +1493,7 @@ export const initialState: PcbState = {
   highlightedNet: null,
   highlightedMembers: [],
   ercResults: [],
+  pcbDrcResults: [],
   designRules: defaultSchRulesConfig(),
   schematicSheets: [
     { id: "sheet-1", name: "Sheet 1" },
@@ -1507,7 +1535,7 @@ export const initialState: PcbState = {
     silkTech: "Standard silkscreen",
     bgColor: "#1E1E1E",
     boardColor: "Blue",
-    padColor: "Goldsmith",
+    padColor: "Gold",
     silkscreen: "Visible",
   },
   threeD: {
@@ -1515,15 +1543,16 @@ export const initialState: PcbState = {
     silkTech: "Standard silkscreen",
     bgColor: "#1E1E1E",
     boardColor: "Blue",
-    padColor: "Goldsmith",
-    stackMaterial: "0mm",
+    padColor: "Gold",
     pcbHeightFromTop: "0mm",
     boardThickness: "1.2mm",
+    layerExpose: "0.5mm",
     layers: [
-      { name: "Top solder mask layer", thickness: "0.0010" },
-      { name: "Dielectric 1", thickness: "0.0010" },
-      { name: "Bottom Layer", thickness: "0.0010" },
-      { name: "Bottom solder mask", thickness: "0.0010" },
+      { name: "Top Solder Mask", thickness: "0.01" },
+      { name: "Top Layer", thickness: "0.035" },
+      { name: "Dielectric1", thickness: "1.13" },
+      { name: "Bottom Layer", thickness: "0.035" },
+      { name: "Bottom Solder Mask", thickness: "0.01" },
     ],
   },
   schemBasic: { name: "Main MCU", template: "A4 Landscape" },

@@ -15,6 +15,7 @@ export const BOARD_COLOR_HEX: Record<string, string> = {
   Purple: "#5a2d82",
 };
 export const PAD_COLOR_HEX: Record<string, string> = {
+  Gold: "#e0b24a",
   Goldsmith: "#d9a441",
   HASL: "#c7ccd1",
   ENIG: "#e8c66a",

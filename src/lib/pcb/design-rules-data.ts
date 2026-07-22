@@ -205,3 +205,27 @@ export function defaultClearanceRows(): ClearanceRow[] {
     { name: "Hole", values: [0.176, 0.176, 0.176, 0.176, 0.176, 0.176, 0.176, 0.254, 0.176, 0.176, 0.176, 0.176] },
   ];
 }
+
+// Physics rules (Popup 4 → Track / Via Size / Net Length Range). Values (mm)
+// verbatim from the parameter list, so the DRC engine and the dialog defaults
+// stay in lock-step. The engine reads these to flag under/over-sized tracks and
+// vias and out-of-range net lengths.
+export interface PcbPhysicsRules {
+  trackWidthMin: number; // mm — Track ▸ Stroke Width ▸ Min
+  trackWidthMax: number; // mm — Track ▸ Stroke Width ▸ Max
+  viaOuterMin: number;   // mm — Via Size ▸ Outer Diameter ▸ Min
+  viaOuterMax: number;   // mm — Via Size ▸ Outer Diameter ▸ Max
+  viaInnerMin: number;   // mm — Via Size ▸ Inner Diameter ▸ Min
+  viaInnerMax: number;   // mm — Via Size ▸ Inner Diameter ▸ Max
+  netLengthMin: number;  // mm — Net Length Range ▸ Minimum
+  netLengthMax: number;  // mm — Net Length Range ▸ Maximum
+}
+
+export function defaultPcbPhysicsRules(): PcbPhysicsRules {
+  return {
+    trackWidthMin: 0.102, trackWidthMax: 10,
+    viaOuterMin: 0.4, viaOuterMax: 6,
+    viaInnerMin: 0.2, viaInnerMax: 3,
+    netLengthMin: 0, netLengthMax: 100,
+  };
+}

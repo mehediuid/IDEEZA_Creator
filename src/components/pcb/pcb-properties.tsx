@@ -225,7 +225,7 @@ export function TwoDProperties() {
             <Select value={v.boardColor} options={sel(["Green", "Blue", "Red", "Black", "White", "Yellow", "Purple"])} onChange={(x) => actions.setTwoD({ boardColor: x })} minWidth={140} />
           </Row>
           <Row label="Pad Plating Color">
-            <Select value={v.padColor} options={sel(["Goldsmith", "HASL", "ENIG", "OSP"])} onChange={(x) => actions.setTwoD({ padColor: x })} minWidth={140} />
+            <Select value={v.padColor} options={sel(["Gold", "HASL", "ENIG", "OSP"])} onChange={(x) => actions.setTwoD({ padColor: x })} minWidth={140} />
           </Row>
           <Row label="Silkscreen">
             <Select value={v.silkscreen} options={sel(["Visible", "Hidden"])} onChange={(x) => actions.setTwoD({ silkscreen: x })} minWidth={140} />
@@ -268,7 +268,7 @@ export function ThreeDProperties() {
               <Select value={v.boardColor} options={sel(["Green", "Blue", "Red", "Black", "White", "Yellow", "Purple"])} onChange={(x) => actions.setThreeD({ boardColor: x })} minWidth={140} />
             </Row>
             <Row label="Pad Plating Color">
-              <Select value={v.padColor} options={sel(["Goldsmith", "HASL", "ENIG", "OSP"])} onChange={(x) => actions.setThreeD({ padColor: x })} minWidth={140} />
+              <Select value={v.padColor} options={sel(["Gold", "HASL", "ENIG", "OSP"])} onChange={(x) => actions.setThreeD({ padColor: x })} minWidth={140} />
             </Row>
           </>
         )}
@@ -279,14 +279,17 @@ export function ThreeDProperties() {
         <SectionHeader title="Layer Stacking" open={open.stack} onToggle={() => setOpen((s) => ({ ...s, stack: !s.stack }))} />
         {open.stack && (
           <>
-            <Row label="Board Material">
-              <TextValue value={v.stackMaterial} onChange={(x) => actions.setThreeD({ stackMaterial: x })} minWidth={110} />
-            </Row>
-            <Row label="PCB Height from top">
+            <Row label="PCB Height from Bottom">
               <TextValue value={v.pcbHeightFromTop} onChange={(x) => actions.setThreeD({ pcbHeightFromTop: x })} minWidth={110} />
             </Row>
+            {/* Read-only — computed as the sum of the layer-stack thicknesses. */}
             <Row label="Board Thickness">
-              <TextValue value={v.boardThickness} onChange={(x) => actions.setThreeD({ boardThickness: x })} minWidth={110} />
+              <span title="Computed from the layer stackup" style={{ minWidth: 110, display: "inline-block", textAlign: "right", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {`${v.layers.reduce((a, l) => a + (parseFloat(l.thickness) || 0), 0).toFixed(2)}mm`}
+              </span>
+            </Row>
+            <Row label="Layer Expose (mm)">
+              <TextValue value={v.layerExpose} onChange={(x) => actions.setThreeD({ layerExpose: x })} minWidth={110} />
             </Row>
           </>
         )}
@@ -337,6 +340,10 @@ export function PcbDefaultProperties() {
   const topSilkLayer = state.pcbLayers.find((l) => l.id === "topSilk");
   const bottomSilkLayer = state.pcbLayers.find((l) => l.id === "bottomSilk");
   const outlineLayer = state.pcbLayers.find((l) => l.id === "outline");
+  // Per-side board (solder-mask) colors — doc §01 Colorful Silkscreen pairs each
+  // side's board color with its silkscreen color (JLCPCB colored-print).
+  const topMaskLayer = state.pcbLayers.find((l) => l.id === "topMask");
+  const bottomMaskLayer = state.pcbLayers.find((l) => l.id === "bottomMask");
 
   return (
     <div>
@@ -595,16 +602,32 @@ export function PcbDefaultProperties() {
                 />
               </Row>
             )}
+            {topMaskLayer && (
+              <Row label="Top Side Board Color">
+                <ColorPicker
+                  value={topMaskLayer.color}
+                  onChange={(v) => actions.setPcbLayerColor("topMask", v)}
+                />
+              </Row>
+            )}
             {topSilkLayer && (
-              <Row label="Top Silkscreen">
+              <Row label="Top Side Silkscreen Color">
                 <ColorPicker
                   value={topSilkLayer.color}
                   onChange={(v) => actions.setPcbLayerColor("topSilk", v)}
                 />
               </Row>
             )}
+            {bottomMaskLayer && (
+              <Row label="Bottom Side Board Color">
+                <ColorPicker
+                  value={bottomMaskLayer.color}
+                  onChange={(v) => actions.setPcbLayerColor("bottomMask", v)}
+                />
+              </Row>
+            )}
             {bottomSilkLayer && (
-              <Row label="Bottom Silkscreen">
+              <Row label="Bottom Side Silkscreen Color">
                 <ColorPicker
                   value={bottomSilkLayer.color}
                   onChange={(v) => actions.setPcbLayerColor("bottomSilk", v)}

@@ -1,11 +1,11 @@
 "use client";
 
-// PcbThreeView — the PCB module's 3D tab. A real three.js viewer (replaces
-// the old CSS-transform mockup): the actual board dimensions + physically
-// placed components from the store, orbitable, lit, on a grid floor.
-//
-// Derivation is shared with the Product Preview (derivePcb3D + PcbBoardMesh /
-// PcbComponentMesh) so this tab and /preview can never show different boards.
+// PcbThreeView — the PCB module's 3D tab. A real three.js viewer that mirrors
+// the 2D PCB layout 1:1: the board slab plus every physical object placed on
+// the canvas (copper tracks, vias, footprint pads, component bodies, copper
+// regions) mapped into a single centred, normalized scene (derivePcbScene +
+// PcbSceneMeshes). This is a faithful engineering 3D of the PCB, distinct from
+// the coarser Product Preview board (derivePcb3D), which stays as-is.
 // Properties still drive it live: Board Color tints the board, Background
 // Color paints the canvas, Board Thickness drives the slab depth, and the
 // Material shows in the footer label.

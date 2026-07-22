@@ -320,7 +320,12 @@ function Dropdown({
   ariaLabel?: string;
 }) {
   const [open, setOpen] = React.useState(false);
+  // The essentials row is `overflow: hidden`, so an absolutely-positioned popup
+  // would be clipped and invisible. Position it `fixed` off the button rect
+  // (measured on open) so it escapes the clip, and clamp into the viewport.
+  const [pos, setPos] = React.useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
   const ref = React.useRef<HTMLDivElement>(null);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
@@ -329,14 +334,26 @@ function Dropdown({
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
+  const toggle = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const menuW = Math.max(r.width, 76), menuH = options.length * 32 + 8;
+      const left = Math.min(r.left, window.innerWidth - menuW - 8);
+      const top = r.bottom + 4 + menuH > window.innerHeight - 8 ? r.top - menuH - 4 : r.bottom + 4;
+      setPos({ top, left, width: menuW });
+    }
+    setOpen((o) => !o);
+  };
 
   return (
     <div ref={ref} style={{ position: "relative", flex: "0 0 auto" }}>
       <button
+        ref={btnRef}
         type="button"
         className="ix-tool"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         aria-label={ariaLabel}
+        aria-expanded={open}
         style={{
           display: "flex",
           alignItems: "center",
@@ -358,15 +375,15 @@ function Dropdown({
       {open && (
         <div
           style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            minWidth: "100%",
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            minWidth: pos.width,
             background: "var(--color-bg-surface)",
             border: "var(--border-width-1) solid var(--color-border-default)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--elevation-3)",
-            zIndex: 50,
+            zIndex: 62,
             padding: "var(--spacing-2)",
           }}
         >
@@ -484,6 +501,50 @@ const SCHEM_ESSENTIAL: Item[] = [
   { kind: "div" },
   { kind: "icon", key: "find", action: "openFindSim", label: "Find / Search" },
 ];
+
+// PCB / 2D / 3D essentials — the inline set (user-approved). Every control here
+// has NO other home: Undo/Redo, view Fit, quick Grid/Snap toggles, and the
+// grid-size/unit dropdowns. Deliberately absent (each lives elsewhere, so the
+// toolbar never duplicates them): Save (Ctrl+S / File menu), DRC (bottom bar),
+// Rotate + all arrange ops (right-sidebar Position panel), draw/place/route
+// tools (left ToolPalette).
+const PCB_ESSENTIAL: Item[] = [
+  { kind: "icon", key: "undo", action: "undo", label: "Undo" },
+  { kind: "icon", key: "redo", action: "redo", label: "Redo" },
+  { kind: "div" },
+  { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit all in window" },
+  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid Style" },
+  { kind: "icon", key: "snap", action: "toggleSnap", label: "Snap" },
+  { kind: "div" },
+  // Insert actions pulled from the Insert (Place) menu — not modal tools.
+  { kind: "icon", key: "tDevReuse", action: "openDevicePicker", label: "Place a Part" },
+  { kind: "icon", key: "pTable", action: "openTable", label: "Table" },
+  { kind: "div" },
+  // User-picked workflow actions (each duplication-free — no other home).
+  { kind: "icon", key: "tAutoRoute", action: "openAutoRoute", label: "Auto Route" },
+  { kind: "icon", key: "gerber", action: "openGerber", label: "Gerber" },
+  { kind: "icon", key: "tFootMgr", action: "openFootMgr", label: "Footprint Manager" },
+  { kind: "div" },
+  { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
+  { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
+];
+
+// The "…" overflow carries only a few genuinely-useful secondary actions. Every
+// key here is excluded because it is already homed elsewhere and would only
+// duplicate that home in the toolbar:
+//   • arrange/distribute/rotate/flip/z-order/boolean-combine → right-sidebar Position + Combine panel
+//   • DRC → bottom bar · Save/Save-All → Ctrl+S + File menu · 2D/3D → mode tabs
+//   • Open/Copy/Paste/Array/Find/Zoom/Settings → menu bar + standard Ctrl-shortcuts
+// (Modal draw/place/route TOOLS are already excluded — they bind `tool`, not
+// `action` — and live in the left ToolPalette.) What survives in the overflow:
+// Fit-Section · Fit-Area · Flip-Board · Device Manager · Pick&Place · Export PDF.
+const HOMED_KEYS = new Set([
+  "alignLeft", "alignRight", "alignTop", "alignBottom", "tAlignGrid",
+  "tDistH", "tDistV", "tRotLeft", "tRotRight", "tFlipH", "tFlipV", "tBringFront", "tSendBack",
+  "tBoolPreserve", "tBoolMerge", "tBoolSubtract", "tBoolExclude", "tBoolSplit",
+  "dCheck", "save", "tSaveAll", "board", "cube",
+  "imp", "copy", "paste", "array", "findSim", "zoomin", "zoomout", "tSettings",
+]);
 // No schematic overflow: every other toolbar action is already reachable from
 // the menu bar (File/Edit/View) or the always-visible essentials, so a "…"
 // menu here would only repeat them. Fit-to-Selection — the one unique control —
@@ -586,13 +647,40 @@ export function Toolbar() {
     return <ToolIcon key={i} iconKey={it.key} active={active} label={it.label} onClick={onClick} />;
   };
 
-  // Compact single-row bar: the primary tools stay inline; the rest fold into
-  // a "…" overflow. PRIMARY_INLINE is tuned so the row never wraps.
-  const PRIMARY_INLINE = 15;
-  const iconItems = items.filter((it) => it.kind === "icon"); // dividers handled by grouping below
-  const inline = iconItems.slice(0, PRIMARY_INLINE);
-  const overflow = iconItems.slice(PRIMARY_INLINE);
-  const dropdowns = items.filter((it) => it.kind === "dd");
+  // "…" overflow row — a vertical menu item (icon + name), mirroring the left
+  // palette's flyout rows so the two read the same.
+  const renderMenuRow = (it: Item, i: number) => {
+    if (it.kind !== "icon") return null;
+    const onClick = it.action ? handlers[it.action] : it.tool ? () => actions.setTool(it.tool!) : undefined;
+    return (
+      <div
+        key={i}
+        className="ix-row"
+        onClick={onClick}
+        style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer" }}
+      >
+        <span style={{ width: 24, height: 24, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-secondary)" }}>
+          <DsIcon name={it.key} size={18} strokeWidth={1.7} />
+        </span>
+        <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>{it.label}</span>
+      </div>
+    );
+  };
+
+  // Non-schematic bar: PCB_ESSENTIAL (inline) + secondary ACTIONS in the "…"
+  // overflow. Tools (palette), the inline essentials, and everything homed
+  // elsewhere (HOMED_KEYS) are excluded, so nothing is duplicated across
+  // surfaces.
+  const essentialKeys = new Set(
+    PCB_ESSENTIAL.flatMap((it) => (it.kind === "icon" ? [it.key] : [])),
+  );
+  const overflow = items.filter(
+    (it) =>
+      it.kind === "icon" &&
+      !!it.action &&
+      !essentialKeys.has(it.key) &&
+      !HOMED_KEYS.has(it.key),
+  );
 
   // The toolbar is a bar that sits over the canvas column only — the side
   // panels run full-height under the TopBar and flank it. Its left/right
@@ -675,7 +763,7 @@ export function Toolbar() {
       )}
 
       {/* leading rule: 12px each side (outer gap is --spacing-2 = 4px → +8) */}
-      <Divider gutter={state.mode === "schematic" ? 8 : undefined} />
+      <Divider gutter={8} />
 
       {state.mode === "schematic" ? (
         <>
@@ -687,15 +775,34 @@ export function Toolbar() {
             )}
           </div>
         </>
+      ) : state.mode === "3d" ? (
+        <>
+          {/* 3D view is read-only inspection — no 2D editing tools. This cluster
+              is the real 3D view-control set: each drives the three.js camera /
+              render (fit · view presets · projection · explode). */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
+            <ToolIcon iconKey="fit" label="Fit board in view" onClick={actions.pcb3dFit} />
+            <Divider gutter={-8} />
+            <ToolIcon iconKey="v3dTop" active={state.pcb3d.preset === "top"} label="Top view" onClick={() => actions.pcb3dPreset("top")} />
+            <ToolIcon iconKey="cube" active={state.pcb3d.preset === "iso"} label="Isometric view" onClick={() => actions.pcb3dPreset("iso")} />
+            <ToolIcon iconKey="v3dBottom" active={state.pcb3d.preset === "bottom"} label="Bottom view" onClick={() => actions.pcb3dPreset("bottom")} />
+            <Divider gutter={-8} />
+            <ToolIcon
+              iconKey={state.pcb3d.projection === "orthographic" ? "v3dOrtho" : "v3dPersp"}
+              label={state.pcb3d.projection === "orthographic" ? "Orthographic — click for Perspective" : "Perspective — click for Orthographic"}
+              onClick={actions.pcb3dToggleProjection}
+            />
+            <ToolIcon iconKey="v3dExplode" active={state.pcb3d.explode} label="Explode view" onClick={actions.pcb3dToggleExplode} />
+          </div>
+        </>
       ) : (
         <>
-          {/* other modes: primary tools inline, the rest fold into "…" */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "var(--spacing-1)", overflow: "hidden" }}>
-            {inline.map((it, i) => renderItem(it, i))}
-            {dropdowns.length > 0 && <Divider />}
-            {dropdowns.map((it, i) => renderItem(it, 1000 + i))}
+          {/* other modes: same 20px icon-to-icon rhythm + −8 group dividers as
+              the schematic; the rest folds into "…". */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
+            {PCB_ESSENTIAL.map((it, i) => (it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i)))}
           </div>
-          {overflow.length > 0 && <OverflowMenu items={overflow} render={renderItem} />}
+          {overflow.length > 0 && <OverflowMenu items={overflow} render={renderMenuRow} />}
         </>
       )}
     </div>
@@ -735,7 +842,7 @@ function OverflowMenu({ items, render }: { items: Item[]; render: (it: Item, i: 
       {open && (
         <div
           role="menu"
-          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 62, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-xl)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-4)", display: "grid", gridTemplateColumns: "repeat(6, 30px)", gap: "var(--spacing-2)", maxWidth: 260 }}
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 62, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-2)", display: "flex", flexDirection: "column", gap: "var(--spacing-1, 2px)", minWidth: 190 }}
           onClick={() => setOpen(false)}
         >
           {items.map((it, i) => render(it, 5000 + i))}

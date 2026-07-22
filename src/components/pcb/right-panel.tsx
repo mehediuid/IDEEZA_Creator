@@ -208,19 +208,52 @@ function ToggleCtl({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   );
 }
 
-function ColorCtl({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [open, setOpen] = React.useState(false);
+// Eye (visible) / eye-off (hidden) glyph for the colour-visibility toggle.
+function EyeIcon({ on }: { on: boolean }) {
   return (
-    <div style={{ position: "relative" }}>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="2.6" />
+      {!on && <path d="M4 4l16 16" />}
+    </svg>
+  );
+}
+
+function ColorCtl({ value, onChange, vis }: { value: string; onChange: (v: string) => void; vis?: { on: boolean; toggle: () => void } }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Close the picker on an outside click (or Escape).
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const hidden = vis && !vis.on;
+  return (
+    <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center", gap: "var(--spacing-2)" }}>
       <div
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-        style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-2) var(--spacing-3)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", cursor: "pointer", minWidth: 130, boxSizing: "border-box", justifyContent: "space-between" }}
+        style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-2) var(--spacing-3)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", cursor: "pointer", flex: 1, minWidth: 104, boxSizing: "border-box", opacity: hidden ? 0.45 : 1 }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-          <Swatch color={value} />
-          <span style={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-family-mono)", color: "var(--color-text-primary)" }}>{(value || "").toUpperCase()}</span>
-        </span>
+        <Swatch color={value} />
+        <span style={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-family-mono)", color: "var(--color-text-primary)" }}>{(value || "").toUpperCase()}</span>
       </div>
+      {vis && (
+        <button
+          type="button"
+          className="ix-tool"
+          onClick={(e) => { e.stopPropagation(); vis.toggle(); }}
+          title={vis.on ? "Hide" : "Show"}
+          aria-label={vis.on ? "Hide" : "Show"}
+          aria-pressed={vis.on}
+          style={{ flex: "0 0 auto", width: 26, height: 26, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", borderRadius: "var(--radius-md)", cursor: "pointer", color: vis.on ? "var(--color-violet-600)" : "var(--color-text-tertiary)" }}
+        >
+          <EyeIcon on={vis.on} />
+        </button>
+      )}
       {open && (
         <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 90 }} onClick={(e) => e.stopPropagation()}>
           <ColorPicker value={value} onChange={(c) => { onChange(c); }} />
@@ -466,9 +499,18 @@ function FieldRow({ field, obj, objs }: { field: InspectorField; obj: import("@/
       case "dropdown":
         control = <div style={{ minWidth: 130 }}><Select value={String(bound.value ?? options[0] ?? "")} onChange={bound.set} options={options.map((o) => ({ label: o, value: o }))} /></div>;
         break;
-      case "color":
-        control = <ColorCtl value={String(bound.value ?? field.display ?? "#000000")} onChange={bound.set} />;
+      case "color": {
+        // Optional eye toggle beside the swatch (show/hide the coloured element).
+        let vis: { on: boolean; toggle: () => void } | undefined;
+        const vb = field.visBind;
+        if (vb?.startsWith("prop:") && obj) {
+          const vk = vb.slice(5);
+          const on = ((obj.props ?? {}) as Record<string, BindVal>)[vk] === true;
+          vis = { on, toggle: () => actions.setObjectProp(obj.id, vk, !on) };
+        }
+        control = <ColorCtl value={String(bound.value ?? field.display ?? "#000000")} onChange={bound.set} vis={vis} />;
         break;
+      }
       case "toggle":
         control = <ToggleCtl on={!!bound.value} onToggle={() => bound!.set(!bound!.value)} />;
         break;
@@ -949,11 +991,24 @@ const FILTER_GROUPS: FilterGroupDef[] = [
   },
 ];
 
-function FilterGroupHeader({ title }: { title: string }) {
+// Per-group header with an "All" master checkbox (doc §01b lists "All" as the
+// first row of each group) — reflects whether every row in the group is on and
+// toggles them together.
+function FilterGroupHeader({ group }: { group: FilterGroupDef }) {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const bag = (state.boardSettings ?? {}) as Record<string, unknown>;
+  const isOn = (r: FilterRowDef) => (r.off ? bag[r.key] === true : bag[r.key] !== false);
+  const allOn = group.rows.every(isOn);
+  const toggleAll = () => group.rows.forEach((r) => actions.setBoardSetting(r.key, !allOn));
   return (
-    <div style={{ padding: "var(--spacing-5) var(--spacing-0) var(--spacing-2)" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-0) var(--spacing-2)" }}>
       <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>
-        {title}
+        {group.title}
+      </span>
+      <span onClick={toggleAll} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", fontWeight: 600 }}>All</span>
+        <Checkbox checked={allOn} onChange={toggleAll} />
       </span>
     </div>
   );
@@ -1094,7 +1149,7 @@ function PcbFilterTab() {
       </div>
       {FILTER_GROUPS.map((g) => (
         <div key={g.title}>
-          <FilterGroupHeader title={g.title} />
+          <FilterGroupHeader group={g} />
           {g.rows.map((r) => (
             <FilterRow key={r.key} row={r} />
           ))}
@@ -1133,6 +1188,32 @@ function groupOf(layer: { id: string; type: string }): string {
 const FILTERS = ["All", "Copper", "Non Copper"] as const;
 type LayerFilter = (typeof FILTERS)[number];
 const PRESETS = ["Common (Default)", "All visible", "Signal only", "Outline only"];
+
+// Layer-tab-only sections (spec) that are NOT placeable copper layers — shown
+// as display/visibility rows so they never pollute the object layer pickers.
+// Visibility/lock persist in boardSettings under lyr_<key>_vis / lyr_<key>_lock.
+const EXTRA_LAYER_SECTIONS: { id: string; title: string; rows: { key: string; label: string; color: string }[] }[] = [
+  { id: "component", title: "Component", rows: [
+    { key: "compShape", label: "Component Shape Layer", color: "var(--color-gray-400)" },
+    { key: "compMarking", label: "Component Marking Layer", color: "var(--color-gray-500)" },
+    { key: "pinSoldering", label: "Pin Soldering Layer", color: "var(--color-yellow-500)" },
+    { key: "pinFloating", label: "Pin Floating Layer", color: "var(--color-orange-500)" },
+  ] },
+  { id: "shell3d", title: "3D Shell", rows: [
+    { key: "shellOutline", label: "Outline Layer", color: "var(--color-violet-600)" },
+    { key: "shellTop", label: "Top Layer", color: "var(--color-violet-400)" },
+    { key: "shellBottom", label: "Bottom Layer", color: "var(--color-blue-500)" },
+  ] },
+  { id: "dielectric", title: "Dielectric", rows: [
+    { key: "diel1", label: "Dielectric1", color: "var(--color-green-500)" },
+    { key: "diel2", label: "Dielectric2", color: "var(--color-green-500)" },
+  ] },
+  { id: "docs", title: "Documentation", rows: [
+    { key: "multiLayer", label: "MultiLayer", color: "var(--color-gray-500)" },
+    { key: "documentLayer", label: "Document Layer", color: "var(--color-gray-400)" },
+    { key: "model3d", label: "3D Model", color: "var(--color-violet-500)" },
+  ] },
+];
 
 function LayerTab() {
   const state = usePcbState();
@@ -1243,6 +1324,25 @@ function LayerTab() {
         })}
       </div>
 
+      {/* Master 'All' row — visibility + lock for every layer at once (spec) */}
+      {(() => {
+        const layers = state.pcbLayers;
+        const allVis = layers.length > 0 && layers.every((l) => l.visible);
+        const allLock = layers.length > 0 && layers.every((l) => l.locked);
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-8)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", background: "var(--color-bg-subtle)" }}>
+            <span style={{ width: 16, flex: "0 0 auto" }} />
+            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>All</span>
+            <span title="Show/hide all layers" onClick={() => { const target = !allVis; layers.forEach((l) => { if (l.visible !== target) actions.togglePcbLayerVis(l.id); }); }} style={{ color: allVis ? "var(--color-violet-600)" : "var(--color-border-strong)", display: "inline-flex", cursor: "pointer" }}>
+              <Icon html={allVis ? EYE : EYE_OFF} size={16} />
+            </span>
+            <span title="Lock/unlock all layers" onClick={() => { const target = !allLock; layers.forEach((l) => { if (l.locked !== target) actions.togglePcbLayerLock(l.id); }); }} style={{ color: allLock ? "var(--color-violet-600)" : "var(--color-border-strong)", display: "inline-flex", cursor: "pointer" }}>
+              <Icon html={allLock ? LOCK : LOCK_OPEN} size={15} />
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Groups */}
       {LAYER_GROUPS.map((g) => {
         const groupLayers = state.pcbLayers.filter(
@@ -1352,7 +1452,7 @@ function LayerTab() {
                         cursor: "pointer",
                       }}
                     >
-                      <Icon html={on ? EYE : EYE_OFF} />
+                      <Icon html={on ? EYE : EYE_OFF} size={16} />
                     </span>
                     <span
                       onClick={(e) => {
@@ -1365,11 +1465,47 @@ function LayerTab() {
                         cursor: "pointer",
                       }}
                     >
-                      <Icon html={l.locked ? LOCK : LOCK_OPEN} />
+                      <Icon html={l.locked ? LOCK : LOCK_OPEN} size={15} />
                     </span>
                   </div>
                 );
               })}
+          </div>
+        );
+      })}
+
+      {/* Display-only sections (spec): Component / 3D Shell / Dielectric / Documentation */}
+      {EXTRA_LAYER_SECTIONS.map((sec) => {
+        const bag = (state.boardSettings ?? {}) as Record<string, unknown>;
+        const isOpen = openGroups[sec.id] !== false;
+        return (
+          <div key={sec.id}>
+            <div
+              onClick={() => setOpenGroups((s) => ({ ...s, [sec.id]: !(s[sec.id] !== false) }))}
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-8)", cursor: "pointer", background: "var(--color-bg-subtle)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", userSelect: "none" }}
+            >
+              <span style={{ display: "inline-flex", width: 12, height: 12, color: "var(--color-violet-600)", transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }}>
+                <Icon html={CHEV_DOWN_SVG} />
+              </span>
+              <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>{sec.title}</span>
+              <span style={{ marginLeft: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>{sec.rows.length}</span>
+            </div>
+            {isOpen && sec.rows.map((r) => {
+              const vis = bag[`lyr_${r.key}_vis`] !== false;
+              const lock = bag[`lyr_${r.key}_lock`] === true;
+              return (
+                <div key={r.key} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-8) var(--spacing-3) calc(var(--spacing-8) + 18px)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                  <span style={{ width: 16, height: 16, borderRadius: "var(--radius-sm)", background: r.color, flex: "0 0 auto", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.12)" }} />
+                  <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", opacity: vis ? 1 : 0.45 }}>{r.label}</span>
+                  <span onClick={() => actions.setBoardSetting(`lyr_${r.key}_vis`, !vis)} style={{ color: vis ? "var(--color-violet-600)" : "var(--color-border-strong)", display: "inline-flex", cursor: "pointer" }}>
+                    <Icon html={vis ? EYE : EYE_OFF} size={16} />
+                  </span>
+                  <span onClick={() => actions.setBoardSetting(`lyr_${r.key}_lock`, !lock)} style={{ color: lock ? "var(--color-violet-600)" : "var(--color-border-strong)", display: "inline-flex", cursor: "pointer" }}>
+                    <Icon html={lock ? LOCK : LOCK_OPEN} size={15} />
+                  </span>
+                </div>
+              );
+            })}
           </div>
         );
       })}

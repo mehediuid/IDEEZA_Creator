@@ -20,6 +20,7 @@ import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useManualProjects } from "@/lib/manual/projects";
 import { downloadTextFile, exportGerberViaKicad } from "@/lib/pcb/kicad-export";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
+import { SettingDialog, HotkeyDialog, TopToolbarDialog } from "@/components/pcb/settings-dialogs";
 import {
   ModalTabBar,
   SeverityChip,
@@ -1202,87 +1203,82 @@ function TextModal() {
 // (local state) but Export/Cancel just close — no real file generation.
 function Export3DModal({ shell }: { shell?: boolean }) {
   const actions = usePcbActions();
-  const [fileName, setFileName] = React.useState("3D shell_PCB1");
+  const [fileName, setFileName] = React.useState("3D_shell_PCB1");
   const [type, setType] = React.useState<"STL" | "STEP" | "OBJ">("STL");
-  const [opt, setOpt] = React.useState(true);
-  const [obj, setObj] = React.useState<Record<string, boolean>>({
-    PCB: true,
-    "Silk screen": true,
-    "Component Model": true,
-    "Component Via": false,
-    "Signal layer circuits": true,
-    "Signal Via": false,
-  });
-  const toggle = (k: string) => setObj((s) => ({ ...s, [k]: !s[k] }));
+  const [autoGen, setAutoGen] = React.useState(true);
+  const INCLUDE = ["PCB Board", "Component Models", "Silkscreen", "Signal Layer Circuits", "Vias"];
+  const [inc, setInc] = React.useState<Record<string, boolean>>({ "PCB Board": true, "Component Models": true, Silkscreen: true, "Signal Layer Circuits": true, Vias: false });
 
-  const labelCss: React.CSSProperties = { fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
-  const groupCss: React.CSSProperties = { ...labelCss, marginBottom: "var(--spacing-4)", fontWeight: 600, color: "var(--color-text-primary)" };
+  const groupCss: React.CSSProperties = { fontSize: "var(--font-size-xs)", fontWeight: 700, letterSpacing: ".4px", textTransform: "uppercase", color: "var(--color-text-tertiary)", marginBottom: "var(--spacing-4)" };
+  const inputCss: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-primary)", fontSize: "var(--font-size-sm)", outline: "none", fontFamily: "inherit" };
+  const noteCss: React.CSSProperties = { padding: "var(--spacing-4) var(--spacing-5)", borderLeft: "3px solid var(--color-violet-600)", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 };
 
   return (
     <Overlay>
-      <Card width={460}>
+      <Card width={480}>
         <Header title={shell ? "Export 3D Shell File" : "Export 3D File"} onClose={actions.closeModal} padding="18px 22px" />
         <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-8)" }}>
           {/* File name */}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={{ ...labelCss, width: 84, flex: "0 0 auto" }}>File Name</span>
-            <input
-              value={fileName}
-              onChange={(e) => setFileName(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "var(--spacing-3) var(--spacing-5)",
-                border: "var(--border-width-1) solid var(--color-border-default)",
-                borderRadius: "var(--radius-md)",
-                background: "var(--color-bg-surface)",
-                color: "var(--color-text-primary)",
-                fontSize: "var(--font-size-sm)",
-                outline: "none",
-                fontFamily: "inherit",
-              }}
-            />
+          <div>
+            <div style={groupCss}>File Name</div>
+            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={inputCss} />
           </div>
 
-          {/* Export 3D Type */}
+          {/* Export format — segmented pills */}
           <div>
-            <div style={groupCss}>Export 3D Type</div>
-            <div style={{ display: "flex", gap: "var(--spacing-12)" }}>
+            <div style={groupCss}>Export Format</div>
+            <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
               {(["STL", "STEP", "OBJ"] as const).map((t) => (
-                <div key={t} onClick={() => setType(t)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                  <Radio on={type === t} />
-                  <span style={labelCss}>{t}</span>
-                </div>
+                <button key={t} type="button" onClick={() => setType(t)}
+                  style={{ flex: 1, padding: "var(--spacing-4)", borderRadius: "var(--radius-md)", border: `var(--border-width-1) solid ${type === t ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: type === t ? "var(--color-violet-600)" : "transparent", color: type === t ? "#fff" : "var(--color-text-secondary)", fontWeight: 700, fontSize: "var(--font-size-sm)", cursor: "pointer", fontFamily: "inherit" }}>
+                  {t}
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Export Object (full file export only) */}
+          {/* Include in export — multi-select pills (full file only) */}
           {!shell && (
             <div>
-              <div style={groupCss}>Export Object</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4) var(--spacing-6)" }}>
-                {Object.keys(obj).map((k) => (
-                  <div key={k} onClick={() => toggle(k)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                    <Check on={obj[k]} />
-                    <span style={labelCss}>{k}</span>
-                  </div>
-                ))}
+              <div style={groupCss}>Include in Export</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-3)" }}>
+                {INCLUDE.map((k) => {
+                  const on = inc[k];
+                  return (
+                    <button key={k} type="button" onClick={() => setInc((s) => ({ ...s, [k]: !s[k] }))}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "var(--spacing-2)", padding: "var(--spacing-3) var(--spacing-5)", borderRadius: "var(--radius-full)", border: `var(--border-width-1) solid ${on ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: on ? "var(--color-bg-brand-subtle)" : "transparent", color: on ? "var(--color-text-brand)" : "var(--color-text-secondary)", fontSize: "var(--font-size-sm)", fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: "inherit" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: on ? "var(--color-violet-600)" : "var(--color-border-strong, #888)" }} />
+                      {k}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Export option note */}
-          <div onClick={() => setOpt((o) => !o)} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-3)", cursor: "pointer" }}>
-            <Check on={opt} />
-            <span style={{ ...labelCss, lineHeight: 1.5 }}>
-              For Components Whiteout bound 3D models, 3D models will be automatically generated (based on the height, property.
-            </span>
-          </div>
+          {!shell ? (
+            <>
+              {/* Auto-generate toggle */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--spacing-6)" }}>
+                <div>
+                  <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Auto-generate missing 3D models</div>
+                  <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>Components without a bound 3D model will be built from footprint height data</div>
+                </div>
+                <button type="button" role="switch" aria-checked={autoGen} onClick={() => setAutoGen((v) => !v)}
+                  style={{ width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer", background: autoGen ? "var(--color-violet-600)" : "var(--color-border-default)", position: "relative", flex: "0 0 auto", transition: "background .15s" }}>
+                  <span style={{ position: "absolute", top: 2, left: autoGen ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                </button>
+              </div>
+              <div style={noteCss}>Estimated file size: ~4.2 MB · Last exported 3 days ago</div>
+            </>
+          ) : (
+            <div style={noteCss}>Shell-only export includes board outline + mounting holes. For full component geometry, use &ldquo;3D File&rdquo; instead.</div>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Order 3D shell</Button>
-          <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Export</Button>
+          <Button hierarchy="secondary" size="md" onClick={() => { actions.flashToast("Order placed — 3D shell"); actions.closeModal(); }}>Order 3D Shell</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`Exporting ${fileName}.${type.toLowerCase()}`); actions.closeModal(); }}>Export</Button>
         </div>
       </Card>
     </Overlay>
@@ -1968,6 +1964,19 @@ export function Modals() {
       return <Export3DModal />;
     case "export3dShell":
       return <Export3DModal shell />;
+    case "set3dSysGeneral":
+    case "set3dSysCommon":
+    case "set3dSysLib":
+    case "set3dPanelGeneral":
+    case "set3dPanelTheme":
+    case "set3dFont":
+    case "set3dDrawing":
+    case "set3dProperty":
+      return <SettingDialog id={state.modal} />;
+    case "set3dHotkey":
+      return <HotkeyDialog />;
+    case "set3dTopToolbar":
+      return <TopToolbarDialog />;
     case "convertConfirm":
       return <ConvertConfirmModal />;
     case "reannotate":

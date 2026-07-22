@@ -113,7 +113,52 @@ const SCHEM_TOOLS: SchemTool[] = [
   { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
 ];
 
-function SchemToolPalette() {
+// PCB 2D left tool palette — same split-button flyout structure as the
+// schematic one, but the board tool set: Select · Route · Pad · Via · Region ·
+// Line · Dimension · Text · Image · Eraser. Every option arms a real PCB tool.
+const PCB_TOOLS: SchemTool[] = [
+  { key: "select", label: "Select", options: [
+    { label: "Pointer", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
+    { label: "Lasso", tool: "lasso", svg: '<path d="M4 11a6 4 0 1 1 11 3M7 15c-2 1-3 3 0 4"/>' },
+    { label: "Area select", tool: "areaSelect", svg: '<path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>' },
+    { label: "Hand", tool: "hand", svg: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6 6 6 0 0 1-5-2.7L4.5 15a1.5 1.5 0 0 1 2.6-1.5L8 15"/>' },
+  ] },
+  { key: "route", label: "Route", options: [
+    { label: "Single Route", tool: "track", svg: '<path d="M4 18h6l4-8h6"/>' },
+    { label: "Differential Pair", tool: "diffPair", svg: '<path d="M4 9h16M4 15h16"/>' },
+    { label: "Stretch Track", tool: "stretchTrack", svg: '<path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/>' },
+    { label: "Routing Corner", tool: "routingCorner", svg: '<path d="M5 19h7a2 2 0 0 0 2-2V5"/>' },
+    { label: "Length Tuning", tool: "lengthTune", svg: '<path d="M3 12h3l2-5 3 10 2-6 2 3h6"/>' },
+  ] },
+  { key: "pad", label: "Pad", options: [
+    { label: "Pad", tool: "pad", svg: '<rect x="5.5" y="5.5" width="13" height="13" rx="1"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
+    { label: "Test Point", tool: "testPoint", svg: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.4"/>' },
+    { label: "Shaped Pad", tool: "shapedPad", svg: '<path d="M6 7h8l4 5-4 5H6z"/><circle cx="11" cy="12" r="2" fill="currentColor" stroke="none"/>' },
+  ] },
+  { key: "via", label: "Via", options: [
+    { label: "Via", tool: "via", svg: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
+    { label: "Suture vias", tool: "sutureVias", svg: '<circle cx="8" cy="8" r="2.2"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/><circle cx="16" cy="16" r="2.2"/>' },
+    { label: "Via Fence", tool: "viaFence", svg: '<circle cx="6" cy="8" r="1.8"/><circle cx="12" cy="8" r="1.8"/><circle cx="18" cy="8" r="1.8"/><circle cx="6" cy="16" r="1.8"/><circle cx="12" cy="16" r="1.8"/><circle cx="18" cy="16" r="1.8"/>' },
+  ] },
+  { key: "region", label: "Region", options: [
+    { label: "Copper Region", tool: "polygon", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z"/>' },
+    { label: "Fill Region", tool: "fillRegion", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z" fill="currentColor" fill-opacity="0.3"/>' },
+    { label: "Slot Region", tool: "slot", svg: '<rect x="4" y="9" width="16" height="6" rx="3"/>' },
+    { label: "Prohibited Region", tool: "prohibitedRegion", svg: '<circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/>' },
+    { label: "Board Outline", tool: "boardOutline", svg: '<rect x="4" y="5.5" width="16" height="13" rx="1"/>' },
+    { label: "Constraint Region", tool: "constraintRegion", svg: '<rect x="4" y="6" width="16" height="12" rx="1" stroke-dasharray="3 2"/>' },
+    { label: "FPC Stiffener", tool: "fpcStiffener", svg: '<rect x="4" y="6" width="16" height="12" rx="1"/><path d="M8 6v12M12 6v12M16 6v12" opacity="0.5"/>' },
+  ] },
+  { key: "line", label: "Line", options: [
+    { label: "Line", tool: "line", svg: '<path d="M5 19L19 5"/>' },
+    { label: "Polyline", tool: "polyline", svg: '<path d="M4 15l5-6 4 3 7-8"/>' },
+  ] },
+  { key: "dimension", label: "Dimension", tool: "dimension", svg: '<path d="M4 8v8M20 8v8M4 12h16M7 10l-3 2 3 2M17 10l3 2-3 2"/>' },
+  { key: "text", label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
+  { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
+];
+
+function ToolPalette({ tools }: { tools: SchemTool[] }) {
   const state = usePcbState();
   const actions = usePcbActions();
   const [openKey, setOpenKey] = React.useState<string | null>(null);
@@ -156,7 +201,7 @@ function SchemToolPalette() {
         zIndex: 13,
       }}
     >
-      {SCHEM_TOOLS.map((t) => {
+      {tools.map((t) => {
         // Grouped row → primary icon/action is the last-chosen variant (falls
         // back to the first); standalone row → the row itself carries the
         // tool/action + glyph.
@@ -753,9 +798,13 @@ export function CanvasArea() {
         )}
       </div>
 
-      {/* schematic tool palette — vertical, docked at the left of the canvas */}
+      {/* left tool palette — vertical, docked at the left of the canvas.
+          Schematic and PCB 2D each get their own tool set, same UI. */}
       {state.mode === "schematic" && v["Floating Tool"] !== false && (
-        <SchemToolPalette />
+        <ToolPalette tools={SCHEM_TOOLS} />
+      )}
+      {state.mode === "pcb" && v["Floating Tool"] !== false && (
+        <ToolPalette tools={PCB_TOOLS} />
       )}
 
       {/* floating tools (2D editor · View ▸ Floating Tool) — Drawing / Wiring / Preview */}
@@ -768,13 +817,6 @@ export function CanvasArea() {
         </>
       )}
 
-      {/* floating tools (3D editor · View ▸ Floating Tool) */}
-      {state.mode === "3d" && v["Floating Tool"] !== false && (
-        <>
-          <Tool2DPanel title="Floating Tools" initial={{ x: 70, y: 60 }} />
-          <Tool2DPanel title="Floating Tools" initial={{ x: 268, y: 60 }} />
-        </>
-      )}
 
       {/* Zoom indicator */}
       <ZoomBadge zoom={state.zoom} />

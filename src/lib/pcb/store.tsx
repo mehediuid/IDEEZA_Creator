@@ -9,6 +9,7 @@ import * as React from "react";
 import { convertSchematicToPcb, routeRatsnest } from "./schematic-to-pcb";
 import { booleanRings, shapeToPolygon, isCombinable, ringArea } from "./shape-boolean";
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
+import { runDrc, defaultPcbDrcConfig } from "./drc";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import {
   DEFAULT_SCHEM_OBJECTS,
@@ -58,6 +59,14 @@ export interface PcbActions {
   openSettings: (page?: SettingsPage) => void;
   closeSettings: () => void;
   setSettingsPage: (page: SettingsPage) => void;
+  /** Help ▸ Online Chat — the floating support widget (expanded vs bubble). */
+  setChatOpen: (v: boolean) => void;
+  toggleChat: () => void;
+  // 3D-view controls — drive the three.js camera / render (real, no stubs).
+  pcb3dFit: () => void;
+  pcb3dPreset: (view: "iso" | "top" | "bottom") => void;
+  pcb3dToggleProjection: () => void;
+  pcb3dToggleExplode: () => void;
   openModal: (m: Exclude<ModalId, null>) => void;
   closeModal: () => void;
   toggleDelObj: (n: string) => void;
@@ -121,6 +130,8 @@ export interface PcbActions {
   unhighlightAll: () => void;
   /** Electrical Rule Check (schematic) — compute issues + show in the ERC/DRC tab. */
   runErcCheck: () => void;
+  /** Design Rule Check (PCB) — compute clearance violations + show in the DRC tab. */
+  runDrcCheck: () => void;
   setDesignRules: (cfg: SchRulesConfig) => void;
   /** Auto-number component designators (R1, C1, U1…) in reading order. */
   reannotate: () => void;
@@ -589,6 +600,19 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge({ settingsOpen: true, settingsPage: page ?? "system", openMenu: null }),
       closeSettings: () => merge({ settingsOpen: false }),
       setSettingsPage: (page) => merge({ settingsPage: page }),
+      setChatOpen: (v) => merge({ chatOpen: v, openMenu: null }),
+      toggleChat: () => merge((s) => ({ chatOpen: !s.chatOpen, openMenu: null })),
+      pcb3dFit: () => merge((s) => ({ pcb3d: { ...s.pcb3d, fitNonce: s.pcb3d.fitNonce + 1 } })),
+      pcb3dPreset: (view) =>
+        merge((s) => ({ pcb3d: { ...s.pcb3d, preset: view, presetNonce: s.pcb3d.presetNonce + 1 } })),
+      pcb3dToggleProjection: () =>
+        merge((s) => ({
+          pcb3d: {
+            ...s.pcb3d,
+            projection: s.pcb3d.projection === "perspective" ? "orthographic" : "perspective",
+          },
+        })),
+      pcb3dToggleExplode: () => merge((s) => ({ pcb3d: { ...s.pcb3d, explode: !s.pcb3d.explode } })),
       openModal: (m) => merge({ modal: m, openMenu: null, ctx: null }),
       closeModal: () => merge({ modal: null }),
       toggleDelObj: (n) =>
@@ -816,6 +840,18 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         const issues = runErc(objs, s.designRules);
         merge({ ercResults: issues, bottomTab: "drc", bottomOpen: true });
         actions.flashToast(issues.length ? `ERC: ${issues.length} issue(s) found` : "ERC passed — no issues");
+      },
+      runDrcCheck: () => {
+        const s = stateRef.current;
+        const objs = s.objects.filter((o) => o.scope === "pcb");
+        // Diff-pair rules run against the live pcbDiffPairs. Netlist-mismatch is
+        // gated off: the Schematic→PCB convert renames nets to N1…, so a name
+        // comparison against the schematic would flood every net as "missing"
+        // until the convert preserves net names.
+        const cfg = { ...defaultPcbDrcConfig(), diffPairs: s.pcbDiffPairs, netlistEnabled: false };
+        const issues = runDrc(objs, cfg);
+        merge({ pcbDrcResults: issues, bottomTab: "drc", bottomOpen: true });
+        actions.flashToast(issues.length ? `DRC: ${issues.length} violation(s) found` : "DRC passed — no violations");
       },
       setDesignRules: (cfg) => merge({ designRules: cfg }),
       reannotate: () =>
@@ -1321,6 +1357,10 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
               : inPcb && kind === "polygon"
               // doc §08: copper regions get an auto name (POUR1, POUR2, …)
               ? { props: { name: `POUR${s.objects.filter((o) => o.kind === "polygon").length + 1}` } }
+              // Shapes: outline on, fill off by default — so the inspector's
+              // Outline/Fill toggles reflect real state from the start.
+              : kind === "rectangle" || kind === "circle" || kind === "ellipse"
+              ? { props: { lineOn: true, fillOn: false, fillColor: "#FFFFFF" } }
               : {};
           const obj: CanvasObject = {
             id,
