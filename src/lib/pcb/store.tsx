@@ -11,6 +11,7 @@ import { booleanRings, shapeToPolygon, isCombinable, ringArea } from "./shape-bo
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
 import { runDrc, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
 import { downloadDataUrl } from "./exporters";
+import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import {
   DEFAULT_SCHEM_OBJECTS,
@@ -183,6 +184,7 @@ export interface PcbActions {
   selectMany: (ids: string[]) => void;
   selectAll: () => void;
   deleteSelected: () => void;
+  deleteObjectsByCategory: () => void;
   /** Replace the schematic sheet with the built-in current-sense-amp sample. */
   loadSampleSchematic: () => void;
   /** Derive footprints + ratsnest from the schematic and switch to PCB 2D. */
@@ -1527,6 +1529,21 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             objects: s.objects.filter((o) => !drop.has(o.id)),
             selectedIds: [],
           };
+        }),
+      // Delete-Objects dialog: remove every object (in the active scope) whose
+      // dialog category is checked. Undoable.
+      deleteObjectsByCategory: () =>
+        mergeWithHistory((s) => {
+          const scope = s.mode === "schematic" ? "schematic" : "pcb";
+          const before = s.objects.length;
+          const objects = s.objects.filter((o) => {
+            if ((o.scope ?? "schematic") !== scope) return true;
+            const cat = delCategoryOf(o.kind);
+            return !(cat && s.delObj[cat]);
+          });
+          const removed = before - objects.length;
+          actions.flashToast(removed ? `Deleted ${removed} object${removed > 1 ? "s" : ""}` : "No matching objects to delete");
+          return { objects, selectedIds: [] };
         }),
       groupSelection: () => {
         const s = stateRef.current;

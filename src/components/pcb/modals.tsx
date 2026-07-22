@@ -196,7 +196,7 @@ function DeleteObjectsModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-8) var(--spacing-10) var(--spacing-10)" }}>
           <Pill onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-12)" }}>Cancel</Pill>
-          <PrimaryBtn onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-16)" }}>Confirm</PrimaryBtn>
+          <PrimaryBtn onClick={() => { actions.deleteObjectsByCategory(); actions.closeModal(); }} style={{ padding: "var(--spacing-5) var(--spacing-16)" }}>Confirm</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
