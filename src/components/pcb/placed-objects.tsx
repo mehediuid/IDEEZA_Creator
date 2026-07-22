@@ -490,6 +490,16 @@ export function PlacedObjects() {
               pointerEvents="none"
             />
           )}
+          {state.lasso && state.lasso.length > 1 && (
+            <polygon
+              points={state.lasso.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="rgba(124,45,185,.08)"
+              stroke="var(--color-violet-600)"
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              pointerEvents="none"
+            />
+          )}
         </g>
       </svg>
 

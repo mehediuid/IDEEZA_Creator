@@ -495,6 +495,8 @@ export interface PcbState {
   clipboardObjects: CanvasObject[];
   draftWire: { startX: number; startY: number; kind: string } | null;
   rubberBand: { x1: number; y1: number; x2: number; y2: number } | null;
+  // Freeform lasso selection path (canvas coords) while the Lasso tool drags.
+  lasso: { x: number; y: number }[] | null;
   // PCB layer stack — Phase 1 foundation
   pcbLayers: PcbLayer[];
   activePcbLayer: string;
@@ -1520,6 +1522,7 @@ export const initialState: PcbState = {
   clipboardObjects: [],
   draftWire: null,
   rubberBand: null,
+  lasso: null,
   pcbLayers: DEFAULT_PCB_LAYERS,
   activePcbLayer: "top",
   pcbBoard: { width: 720, height: 480 },

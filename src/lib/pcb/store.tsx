@@ -211,6 +211,10 @@ export interface PcbActions {
   updateRubberBand: (x: number, y: number) => void;
   commitRubberBand: (additive: boolean) => void;
   cancelRubberBand: () => void;
+  startLasso: (x: number, y: number) => void;
+  updateLasso: (x: number, y: number) => void;
+  commitLasso: (additive: boolean) => void;
+  cancelLasso: () => void;
   // PCB layer stack management
   setActivePcbLayer: (id: string) => void;
   togglePcbLayerVis: (id: string) => void;
@@ -1768,6 +1772,34 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           };
         }),
       cancelRubberBand: () => merge({ rubberBand: null }),
+      startLasso: (x, y) => merge({ lasso: [{ x, y }] }),
+      updateLasso: (x, y) => merge((s) => (s.lasso ? { lasso: [...s.lasso, { x, y }] } : {})),
+      commitLasso: (additive) =>
+        merge((s) => {
+          const poly = s.lasso;
+          if (!poly || poly.length < 3) return { lasso: null };
+          // Ray-casting point-in-polygon on each object's centre.
+          const inside = (px: number, py: number) => {
+            let c = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+              const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+              if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) c = !c;
+            }
+            return c;
+          };
+          const ids = s.objects
+            .filter((o) => {
+              const ox = o.endX != null ? (o.x + o.endX) / 2 : o.x;
+              const oy = o.endY != null ? (o.y + o.endY) / 2 : o.y;
+              return inside(ox, oy) && isSelectable(o.kind, s.boardSettings ?? {}, s.mode);
+            })
+            .map((o) => o.id);
+          return {
+            lasso: null,
+            selectedIds: additive ? Array.from(new Set([...s.selectedIds, ...ids])) : ids,
+          };
+        }),
+      cancelLasso: () => merge({ lasso: null }),
       setActivePcbLayer: (id) => merge({ activePcbLayer: id }),
       togglePcbLayerVis: (id) =>
         merge((s) => ({

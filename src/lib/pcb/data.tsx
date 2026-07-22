@@ -823,7 +823,6 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       items: [
         item("Single Routing", { k: "T", icon: "tTrack", onClick: () => actions.setTool("track") }),
         item("Differential Routing", { k: "D", icon: "tDiffPair", onClick: () => actions.setTool("diffPair") }),
-        item("Stretch Track", { icon: "pWire", onClick: () => actions.setTool("stretchTrack") }),
         item("Gloss Selected Track", { icon: "wire", onClick: () => actions.flashToast("Glossed selected tracks") }),
         dv,
         item("Equal Length Tuning", { icon: "measure", onClick: () => actions.openModal("equalLength") }),

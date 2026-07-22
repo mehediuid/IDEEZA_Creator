@@ -126,8 +126,6 @@ const PCB_TOOLS: SchemTool[] = [
   { key: "route", label: "Route", options: [
     { label: "Single Route", tool: "track", svg: '<path d="M4 18h6l4-8h6"/>' },
     { label: "Differential Pair", tool: "diffPair", svg: '<path d="M4 9h16M4 15h16"/>' },
-    { label: "Stretch Track", tool: "stretchTrack", svg: '<path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/>' },
-    { label: "Routing Corner", tool: "routingCorner", svg: '<path d="M5 19h7a2 2 0 0 0 2-2V5"/>' },
     { label: "Length Tuning", tool: "lengthTune", svg: '<path d="M3 12h3l2-5 3 10 2-6 2 3h6"/>' },
   ] },
   { key: "pad", label: "Pad", options: [
@@ -340,6 +338,7 @@ export function CanvasArea() {
       } else if (e.key === "Escape") {
         if (state.draftWire) actions.cancelDraft();
         else if (state.rubberBand) actions.cancelRubberBand();
+        else if (state.lasso) actions.cancelLasso();
         else if (state.selectedIds.length > 0) actions.selectPlaced(null);
         else actions.setTool("select");
       } else if (mod && (e.key === "c" || e.key === "C")) {
@@ -380,7 +379,7 @@ export function CanvasArea() {
       window.removeEventListener("keydown", handler);
       window.removeEventListener("keyup", release);
     };
-  }, [state.selectedIds, state.draftWire, state.rubberBand, state.tool, actions]);
+  }, [state.selectedIds, state.draftWire, state.rubberBand, state.lasso, state.tool, actions]);
 
   // Grab-move (right-click ▸ Move): the picked-up selection follows the cursor;
   // the next mousedown drops it (committing one undo step), Escape cancels.
@@ -473,8 +472,15 @@ export function CanvasArea() {
       clickedObjectId != null &&
       interactiveMode &&
       clickedIsSelectable;
+    // Rubber-band marquee: the Pointer tool on empty canvas, OR the Area-select
+    // tool on any drag (it always boxes, even starting over an object).
     const intentRubber =
-      isLeft && !handMode && state.tool === "select" && !clickedObjectId && interactiveMode && canvasStart != null;
+      isLeft && !handMode && interactiveMode && canvasStart != null &&
+      (state.tool === "areaSelect" || (state.tool === "select" && !clickedObjectId));
+    // Freeform lasso: the Lasso tool traces a polygon; objects whose centre
+    // falls inside it are selected on release.
+    const intentLasso =
+      isLeft && !handMode && interactiveMode && canvasStart != null && state.tool === "lasso";
     // A drawing tool is armed: dragging must never pan the board out from
     // under the cursor (the #1 "tool doesn't work" trap). Draft tools also
     // support press-drag-release as a single gesture.
@@ -482,7 +488,7 @@ export function CanvasArea() {
       isLeft && !handMode && interactiveMode &&
       (DRAFT_TOOLS.includes(state.tool) || PLACE_TOOLS.includes(state.tool));
 
-    let mode: "idle" | "pan" | "rubber" | "moveObj" | "tool" = "idle";
+    let mode: "idle" | "pan" | "rubber" | "lasso" | "moveObj" | "tool" = "idle";
     let draftStartedInDrag = false;
     let movePivot = { ...start };
     let movedObjects: { id: string; origX: number; origY: number; origEndX?: number; origEndY?: number }[] = [];
@@ -524,6 +530,9 @@ export function CanvasArea() {
         } else if (intentRubber && canvasStart) {
           mode = "rubber";
           actions.startRubberBand(canvasStart.x, canvasStart.y);
+        } else if (intentLasso && canvasStart) {
+          mode = "lasso";
+          actions.startLasso(canvasStart.x, canvasStart.y);
         } else if (intentTool) {
           // Drawing tool armed: never hijack the drag into a pan. For draft
           // tools the press point starts the segment so press-drag-release
@@ -551,6 +560,10 @@ export function CanvasArea() {
         const cx = (ev.clientX - rect.left - state.pan.x) / state.zoom;
         const cy = (ev.clientY - rect.top - state.pan.y) / state.zoom;
         actions.updateRubberBand(cx, cy);
+      } else if (mode === "lasso" && rect) {
+        const cx = (ev.clientX - rect.left - state.pan.x) / state.zoom;
+        const cy = (ev.clientY - rect.top - state.pan.y) / state.zoom;
+        actions.updateLasso(cx, cy);
       } else if (mode === "moveObj") {
         // delta in canvas space (account for zoom)
         const dx = (ev.clientX - movePivot.x) / state.zoom;
@@ -570,6 +583,9 @@ export function CanvasArea() {
         actions.commitRubberBand(ev.shiftKey);
         // Swallow the trailing click — otherwise the canvas onClick clears the
         // just-committed marquee selection.
+        suppressClickRef.current = true;
+      } else if (mode === "lasso") {
+        actions.commitLasso(ev.shiftKey);
         suppressClickRef.current = true;
       } else if (
         mode === "tool" &&
