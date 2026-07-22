@@ -9,7 +9,8 @@ import * as React from "react";
 import { convertSchematicToPcb, routeRatsnest } from "./schematic-to-pcb";
 import { booleanRings, shapeToPolygon, isCombinable, ringArea } from "./shape-boolean";
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
-import { runDrc, defaultPcbDrcConfig } from "./drc";
+import { runDrc, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
+import { downloadDataUrl } from "./exporters";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import {
   DEFAULT_SCHEM_OBJECTS,
@@ -67,6 +68,7 @@ export interface PcbActions {
   pcb3dPreset: (view: "iso" | "top" | "bottom") => void;
   pcb3dToggleProjection: () => void;
   pcb3dToggleExplode: () => void;
+  export3dPng: () => void;
   openModal: (m: Exclude<ModalId, null>) => void;
   closeModal: () => void;
   toggleDelObj: (n: string) => void;
@@ -133,6 +135,7 @@ export interface PcbActions {
   /** Design Rule Check (PCB) — compute clearance violations + show in the DRC tab. */
   runDrcCheck: () => void;
   setDesignRules: (cfg: SchRulesConfig) => void;
+  setPcbDrcConfig: (cfg: PcbDrcConfig) => void;
   /** Auto-number component designators (R1, C1, U1…) in reading order. */
   reannotate: () => void;
   /** Export a project netlist (.net) — nets → component pins, merged across sheets. */
@@ -403,7 +406,19 @@ function pcbDocKey(): string {
 
 type PcbDoc = Pick<
   PcbState,
-  "objects" | "pcbBoard" | "twoD" | "threeD" | "gridSize" | "unit" | "snapEnabled" | "designRules"
+  | "objects"
+  | "pcbBoard"
+  | "twoD"
+  | "threeD"
+  | "gridSize"
+  | "unit"
+  | "snapEnabled"
+  | "designRules"
+  | "pcbDrcConfig"
+  | "pcbLayers"
+  | "pcbNets"
+  | "pcbDefaults"
+  | "boardSettings"
 >;
 
 // Rebuild a safe document from persisted storage — stale or hand-edited data
@@ -450,6 +465,31 @@ function sanitizePcbDoc(raw: unknown): Partial<PcbDoc> | null {
   const dr = r.designRules as Partial<SchRulesConfig> | undefined;
   if (dr && typeof dr === "object" && Array.isArray(dr.Net) && Array.isArray(dr.pinMatrix) && typeof dr.pinCheckEnabled === "boolean") {
     out.designRules = { ...defaultSchRulesConfig(), ...(dr as SchRulesConfig) };
+  }
+  // Tuned PCB DRC config — a well-formed config (clearance array) or null.
+  if (r.pcbDrcConfig === null) out.pcbDrcConfig = null;
+  else if (typeof r.pcbDrcConfig === "object" && Array.isArray((r.pcbDrcConfig as { clearance?: unknown }).clearance)) {
+    out.pcbDrcConfig = r.pcbDrcConfig as PcbState["pcbDrcConfig"];
+  }
+  // Layer stack, net colors, place defaults, board settings — keep in-session
+  // edits (colors / visibility / lock / track width …) across reloads.
+  if (Array.isArray(r.pcbLayers)) {
+    const ls = r.pcbLayers.filter(
+      (l): l is PcbState["pcbLayers"][number] =>
+        typeof l === "object" && l !== null && typeof (l as { id?: unknown }).id === "string" && typeof (l as { name?: unknown }).name === "string",
+    );
+    if (ls.length) out.pcbLayers = ls;
+  }
+  if (Array.isArray(r.pcbNets)) {
+    out.pcbNets = r.pcbNets.filter(
+      (n): n is PcbState["pcbNets"][number] => typeof n === "object" && n !== null && typeof (n as { name?: unknown }).name === "string",
+    );
+  }
+  if (typeof r.pcbDefaults === "object" && r.pcbDefaults !== null) {
+    out.pcbDefaults = { ...initialState.pcbDefaults, ...(r.pcbDefaults as Partial<PcbState["pcbDefaults"]>) };
+  }
+  if (typeof r.boardSettings === "object" && r.boardSettings !== null) {
+    out.boardSettings = { ...(initialState.boardSettings ?? {}), ...(r.boardSettings as Record<string, unknown>) };
   }
   return out;
 }
@@ -512,6 +552,11 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           unit: state.unit,
           snapEnabled: state.snapEnabled,
           designRules: state.designRules,
+          pcbDrcConfig: state.pcbDrcConfig,
+          pcbLayers: state.pcbLayers,
+          pcbNets: state.pcbNets,
+          pcbDefaults: state.pcbDefaults,
+          boardSettings: state.boardSettings,
         };
         window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
       } catch {}
@@ -527,6 +572,11 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
     state.unit,
     state.snapEnabled,
     state.designRules,
+    state.pcbDrcConfig,
+    state.pcbLayers,
+    state.pcbNets,
+    state.pcbDefaults,
+    state.boardSettings,
   ]);
 
   const merge = React.useCallback<Merge>((patch) => {
@@ -613,6 +663,18 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           },
         })),
       pcb3dToggleExplode: () => merge((s) => ({ pcb3d: { ...s.pcb3d, explode: !s.pcb3d.explode } })),
+      export3dPng: () => {
+        // Capture the WebGL 3D canvas (preserveDrawingBuffer is on) → PNG.
+        const cvs = Array.from(document.querySelectorAll("canvas")) as HTMLCanvasElement[];
+        const c = cvs.sort((a, b) => b.width * b.height - a.width * a.height)[0];
+        if (!c) { actions.flashToast("3D view not ready"); return; }
+        try {
+          downloadDataUrl("pcb-3d.png", c.toDataURL("image/png"));
+          actions.flashToast("Exported pcb-3d.png");
+        } catch {
+          actions.flashToast("PNG capture blocked by the browser");
+        }
+      },
       openModal: (m) => merge({ modal: m, openMenu: null, ctx: null }),
       closeModal: () => merge({ modal: null }),
       toggleDelObj: (n) =>
@@ -788,6 +850,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           const doc: PcbDoc = {
             objects: s.objects, pcbBoard: s.pcbBoard, twoD: s.twoD, threeD: s.threeD,
             gridSize: s.gridSize, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
+            pcbDrcConfig: s.pcbDrcConfig, pcbLayers: s.pcbLayers, pcbNets: s.pcbNets,
+            pcbDefaults: s.pcbDefaults, boardSettings: s.boardSettings,
           };
           window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
           actions.flashToast("Saved");
@@ -848,12 +912,17 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         // gated off: the Schematic→PCB convert renames nets to N1…, so a name
         // comparison against the schematic would flood every net as "missing"
         // until the convert preserves net names.
-        const cfg = { ...defaultPcbDrcConfig(), diffPairs: s.pcbDiffPairs, netlistEnabled: false };
+        // Base config = the tuned PCB Design Rules dialog config (state.pcbDrcConfig)
+        // when the user has applied it; else the engine defaults. Diff-pairs are
+        // always the live pairs; netlist-mismatch stays gated off (see above).
+        const base = s.pcbDrcConfig ?? defaultPcbDrcConfig();
+        const cfg = { ...base, diffPairs: s.pcbDiffPairs, netlistEnabled: false };
         const issues = runDrc(objs, cfg);
         merge({ pcbDrcResults: issues, bottomTab: "drc", bottomOpen: true });
         actions.flashToast(issues.length ? `DRC: ${issues.length} violation(s) found` : "DRC passed — no violations");
       },
       setDesignRules: (cfg) => merge({ designRules: cfg }),
+      setPcbDrcConfig: (cfg) => merge({ pcbDrcConfig: cfg }),
       reannotate: () =>
         mergeWithHistory((s) => {
           const prefix: Record<string, string> = { resistor: "R", resistorBox: "R", capacitor: "C", inductor: "L", diode: "D", crystal: "Y", opamp: "U", ic: "U", component: "U", currentSource: "I", transistor: "Q" };

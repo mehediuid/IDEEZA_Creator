@@ -2,6 +2,7 @@
 // Mirrors the prototype's class `state` shape exactly.
 
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
+import type { PcbDrcConfig } from "./drc";
 
 export type Mode = "schematic" | "pcb" | "2d" | "3d";
 export type LeftMain = "project" | "library";
@@ -470,6 +471,8 @@ export interface PcbState {
   // Design Rules config (per-rule enable+severity, pin-conflict matrix, master
   // toggle) — edited in the Design Rules dialog, read by the ERC engine.
   designRules: SchRulesConfig;
+  // Tuned PCB DRC config from the PCB Design Rules dialog; null = engine defaults.
+  pcbDrcConfig: PcbDrcConfig | null;
   // Multi-sheet schematic — the sheet list + which one is showing. Schematic
   // objects filter by activeSheetId; PCB is a single board (unaffected).
   schematicSheets: { id: string; name: string }[];
@@ -1495,6 +1498,7 @@ export const initialState: PcbState = {
   ercResults: [],
   pcbDrcResults: [],
   designRules: defaultSchRulesConfig(),
+  pcbDrcConfig: null,
   schematicSheets: [
     { id: "sheet-1", name: "Sheet 1" },
     { id: "sheet-2", name: "Sheet 2" },

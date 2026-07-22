@@ -19,6 +19,18 @@ import { DEL_OBJ_NAMES } from "@/lib/pcb/types";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useManualProjects } from "@/lib/manual/projects";
 import { downloadTextFile, exportGerberViaKicad } from "@/lib/pcb/kicad-export";
+import {
+  collectPcbModel,
+  buildPickPlace,
+  buildDxf,
+  buildSvg,
+  buildPdf,
+  rasterizeSvgToPng,
+  buildStl,
+  buildObj,
+  downloadBlob,
+  downloadDataUrl,
+} from "@/lib/pcb/exporters";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
 import { SettingDialog, HotkeyDialog, TopToolbarDialog } from "@/components/pcb/settings-dialogs";
 import {
@@ -1203,8 +1215,9 @@ function TextModal() {
 // (local state) but Export/Cancel just close — no real file generation.
 function Export3DModal({ shell }: { shell?: boolean }) {
   const actions = usePcbActions();
+  const state = usePcbState();
   const [fileName, setFileName] = React.useState("3D_shell_PCB1");
-  const [type, setType] = React.useState<"STL" | "STEP" | "OBJ">("STL");
+  const [type, setType] = React.useState<"STL" | "OBJ">("STL");
   const [autoGen, setAutoGen] = React.useState(true);
   const INCLUDE = ["PCB Board", "Component Models", "Silkscreen", "Signal Layer Circuits", "Vias"];
   const [inc, setInc] = React.useState<Record<string, boolean>>({ "PCB Board": true, "Component Models": true, Silkscreen: true, "Signal Layer Circuits": true, Vias: false });
@@ -1228,7 +1241,7 @@ function Export3DModal({ shell }: { shell?: boolean }) {
           <div>
             <div style={groupCss}>Export Format</div>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
-              {(["STL", "STEP", "OBJ"] as const).map((t) => (
+              {(["STL", "OBJ"] as const).map((t) => (
                 <button key={t} type="button" onClick={() => setType(t)}
                   style={{ flex: 1, padding: "var(--spacing-4)", borderRadius: "var(--radius-md)", border: `var(--border-width-1) solid ${type === t ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: type === t ? "var(--color-violet-600)" : "transparent", color: type === t ? "#fff" : "var(--color-text-secondary)", fontWeight: 700, fontSize: "var(--font-size-sm)", cursor: "pointer", fontFamily: "inherit" }}>
                   {t}
@@ -1278,7 +1291,15 @@ function Export3DModal({ shell }: { shell?: boolean }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
           <Button hierarchy="secondary" size="md" onClick={() => { actions.flashToast("Order placed — 3D shell"); actions.closeModal(); }}>Order 3D Shell</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`Exporting ${fileName}.${type.toLowerCase()}`); actions.closeModal(); }}>Export</Button>
+          <Button hierarchy="primary" size="md" onClick={() => {
+            const m = collectPcbModel(state);
+            const include = shell ? { board: true, comps: false } : { board: inc["PCB Board"] !== false, comps: inc["Component Models"] !== false };
+            const base = fileName.replace(/\.(stl|obj)$/i, "");
+            if (type === "OBJ") downloadBlob(`${base}.obj`, buildObj(m, include), "text/plain;charset=utf-8");
+            else downloadBlob(`${base}.stl`, buildStl(m, include), "model/stl");
+            actions.flashToast(`Exported ${base}.${type.toLowerCase()}`);
+            actions.closeModal();
+          }}>Export</Button>
         </div>
       </Card>
     </Overlay>
@@ -1301,7 +1322,7 @@ function ExportFormatModal({
   formats: string[];
   extraOpts: string[];
   // Optional real export action; falls back to the toast placeholder.
-  onExport?: (fileName: string) => void;
+  onExport?: (fileName: string, format: string, opts: Record<string, boolean>) => void;
 }) {
   const actions = usePcbActions();
   const [fileName, setFileName] = React.useState(defaultName);
@@ -1361,7 +1382,7 @@ function ExportFormatModal({
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { if (onExport) onExport(fileName); else actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { if (onExport) onExport(fileName, format, opts); else actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</Button>
         </div>
       </Card>
     </Overlay>
@@ -1693,6 +1714,7 @@ function BomModal() {
 // ── Export DXF (Popup 12) ────────────────────────────────────────────────────
 function DxfModal() {
   const actions = usePcbActions();
+  const state = usePcbState();
   const [range, setRange] = React.useState("Board1:Gigabit Eth to USB Controller");
   const [fileName, setFileName] = React.useState("board.dxf");
   const [containPages, setContainPages] = React.useState(false);
@@ -1716,7 +1738,7 @@ function DxfModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <PrimaryBtn onClick={() => { actions.flashToast(`Exported ${fileName}`); actions.closeModal(); }}>Export</PrimaryBtn>
+          <PrimaryBtn onClick={() => { const m = collectPcbModel(state); downloadBlob(`${fileName.replace(/\.dxf$/i, "")}.dxf`, buildDxf(m), "application/dxf"); actions.flashToast(`Exported ${fileName.replace(/\.dxf$/i, "")}.dxf`); actions.closeModal(); }}>Export</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
@@ -1741,6 +1763,7 @@ function RowRadios({ label, opts, val, set }: { label: string; opts: string[]; v
 
 function DocumentModal() {
   const actions = usePcbActions();
+  const state = usePcbState();
   const [fileType, setFileType] = React.useState("PDF");
   const [theme, setTheme] = React.useState("Default");
   const [lineWidth, setLineWidth] = React.useState("Default");
@@ -1759,8 +1782,14 @@ function DocumentModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <Pill style={{ marginLeft: "auto" }} onClick={() => actions.flashToast("Print")}>Print</Pill>
-          <PrimaryBtn onClick={() => { actions.flashToast(`Exported ${fileType}`); actions.closeModal(); }}>Export</PrimaryBtn>
+          <Pill style={{ marginLeft: "auto" }} onClick={() => { const m = collectPcbModel(state); const url = URL.createObjectURL(buildPdf(m)); window.open(url, "_blank"); window.setTimeout(() => URL.revokeObjectURL(url), 8000); }}>Print</Pill>
+          <PrimaryBtn onClick={async () => {
+            const m = collectPcbModel(state);
+            if (fileType === "SVG") downloadBlob("board.svg", buildSvg(m), "image/svg+xml");
+            else if (fileType === "PNG") { try { const png = await rasterizeSvgToPng(buildSvg(m), m.boardWmm + 8, m.boardHmm + 8); downloadDataUrl("board.png", png); } catch { actions.flashToast("PNG export failed"); } }
+            else downloadBlob("board.pdf", buildPdf(m), "application/pdf");
+            actions.flashToast(`Exported ${fileType}`); actions.closeModal();
+          }}>Export</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
@@ -1993,7 +2022,13 @@ export function Modals() {
       // Real pipeline: server-side kicad-cli (graceful 501 hint if not installed).
       return <ExportFormatModal title="Export Gerber" defaultName="board.gbr" formats={["RS-274X (Extended)", "RS-274D"]} extraOpts={["Generate drill file", "Include silk", "Include solder mask", "Compress as ZIP"]} onExport={() => { exportGerberViaKicad(state, actions.flashToast); }} />;
     case "exportPickPlace":
-      return <ExportFormatModal title="Export Pick and Place" defaultName="board-pnp.csv" formats={["CSV", "TXT", "JSON"]} extraOpts={["Include top side", "Include bottom side", "Use metric units"]} />;
+      return <ExportFormatModal title="Export Pick and Place" defaultName="board-pnp" formats={["CSV", "TXT", "JSON"]} extraOpts={["Include top side", "Include bottom side", "Use metric units"]} onExport={(name, fmt) => {
+        const m = collectPcbModel(state);
+        const f = fmt === "TXT" ? "TXT" : fmt === "JSON" ? "JSON" : "CSV";
+        const { text, ext, mime } = buildPickPlace(m, f);
+        downloadBlob(`${name.replace(/\.(csv|txt|json)$/i, "").slice(0, 60)}.${ext}`, text, mime);
+        actions.flashToast(m.comps.length ? `Exported ${m.comps.length} placement${m.comps.length > 1 ? "s" : ""} (${ext.toUpperCase()})` : "Export Pick & Place — no components placed yet");
+      }} />;
     case "exportBom":
       return <BomModal />;
     case "chamferFillet":

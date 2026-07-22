@@ -19,6 +19,7 @@ import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { ModalId } from "@/lib/pcb/types";
 import { ListPanel, EmptyResults, TransferArrows, ModalTabBar, FilterInput } from "@/components/pcb/modal-kit";
 import { PCB_RULE_TREE, CLEARANCE_COLS, defaultClearanceRows, type ClearanceRow } from "@/lib/pcb/design-rules-data";
+import { rulesToDrcConfig } from "@/lib/pcb/drc-rules-map";
 
 const CLOSE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -1445,7 +1446,8 @@ function PcbDrcModal() {
   };
 
   const save = () => {
-    savedPcbRulesConfig = cfg;
+    savedPcbRulesConfig = cfg; // session UI cache (re-open shows the same edits)
+    actions.setPcbDrcConfig(rulesToDrcConfig(cfg.rules)); // drives runDrcCheck for real
   };
   const applyPreset = (name: string) => {
     setCfg((c) => applyCapabilityPreset(c, name));

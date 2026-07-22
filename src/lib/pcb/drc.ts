@@ -252,8 +252,10 @@ export function runDrc(
   cfg: PcbDrcConfig = defaultPcbDrcConfig(),
 ): ErcIssue[] {
   const issues: ErcIssue[] = [];
-  if (!cfg.clearanceEnabled) return issues;
 
+  // Clearance is one phase among several — gating it must NOT skip the rest
+  // (physics / connectivity / diff-pair / netlist), so wrap it, don't return.
+  if (cfg.clearanceEnabled) {
   const items = objects
     .filter((o) => o.scope !== "schematic")
     .map((o) => ({ o, type: clearanceType(o), geom: geomOf(o) }))
@@ -279,6 +281,7 @@ export function runDrc(
         });
       }
     }
+  }
   }
 
   if (cfg.physicsEnabled) runPhysics(objects, cfg, issues);

@@ -1016,7 +1016,7 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       items: [
         item("3D File", { icon: "cube", onClick: () => actions.openModal("export3dFile") }),
         item("3D Shell File", { icon: "cube", onClick: () => actions.openModal("export3dShell") }),
-        item("PNG", { icon: "png" }),
+        item("PNG", { icon: "png", onClick: () => actions.export3dPng() }),
       ],
     },
     {
