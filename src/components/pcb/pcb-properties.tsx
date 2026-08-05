@@ -243,6 +243,8 @@ export function ThreeDProperties() {
   const state = usePcbState();
   const actions = usePcbActions();
   const [open, setOpen] = React.useState({ props: true, stack: true, layer: true });
+  // #135 — which stack row is being edited (double-click opens it).
+  const [editLayer, setEditLayer] = React.useState<number | null>(null);
   const v = state.threeD;
   const sel = (opts: string[]) => opts.map((o) => ({ label: o, value: o }));
   const setLayerThickness = (idx: number, val: string) =>
@@ -255,20 +257,22 @@ export function ThreeDProperties() {
         <SectionHeader title="Properties" open={open.props} onToggle={() => setOpen((s) => ({ ...s, props: !s.props }))} />
         {open.props && (
           <>
-            <Row label="Board Material">
+            {/* #134 — our own words for what each control really changes; the
+                behaviour is unchanged (every row drives the live 3D scene). */}
+            <Row label="Substrate">
               <Select value={v.material} options={sel(["FR-4", "FR-2", "Aluminum", "Rogers", "Flex"])} onChange={(x) => actions.setThreeD({ material: x })} minWidth={140} />
             </Row>
-            <Row label="Silkscreen Technology">
-              <Select value={v.silkTech} options={sel(["Standard silkscreen", "UV printing"])} onChange={(x) => actions.setThreeD({ silkTech: x })} minWidth={140} />
-            </Row>
-            <Row label="Background Color">
-              <ColorPicker value={v.bgColor} onChange={(x) => actions.setThreeD({ bgColor: x })} />
-            </Row>
-            <Row label="Board Color">
+            <Row label="Solder mask colour">
               <Select value={v.boardColor} options={sel(["Green", "Blue", "Red", "Black", "White", "Yellow", "Purple"])} onChange={(x) => actions.setThreeD({ boardColor: x })} minWidth={140} />
             </Row>
-            <Row label="Pad Plating Color">
+            <Row label="Silkscreen finish">
+              <Select value={v.silkTech} options={sel(["Standard silkscreen", "UV printing"])} onChange={(x) => actions.setThreeD({ silkTech: x })} minWidth={140} />
+            </Row>
+            <Row label="Pad plating">
               <Select value={v.padColor} options={sel(["Gold", "HASL", "ENIG", "OSP"])} onChange={(x) => actions.setThreeD({ padColor: x })} minWidth={140} />
+            </Row>
+            <Row label="Scene background">
+              <ColorPicker value={v.bgColor} onChange={(x) => actions.setThreeD({ bgColor: x })} />
             </Row>
           </>
         )}
@@ -279,16 +283,16 @@ export function ThreeDProperties() {
         <SectionHeader title="Layer Stacking" open={open.stack} onToggle={() => setOpen((s) => ({ ...s, stack: !s.stack }))} />
         {open.stack && (
           <>
-            <Row label="PCB Height from Bottom">
+            <Row label="Board height above origin">
               <TextValue value={v.pcbHeightFromTop} onChange={(x) => actions.setThreeD({ pcbHeightFromTop: x })} minWidth={110} />
             </Row>
             {/* Read-only — computed as the sum of the layer-stack thicknesses. */}
-            <Row label="Board Thickness">
+            <Row label="Total thickness">
               <span title="Computed from the layer stackup" style={{ minWidth: 110, display: "inline-block", textAlign: "right", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
                 {`${v.layers.reduce((a, l) => a + (parseFloat(l.thickness) || 0), 0).toFixed(2)}mm`}
               </span>
             </Row>
-            <Row label="Layer Expose (mm)">
+            <Row label="Copper proudness (mm)">
               <TextValue value={v.layerExpose} onChange={(x) => actions.setThreeD({ layerExpose: x })} minWidth={110} />
             </Row>
           </>
@@ -300,25 +304,72 @@ export function ThreeDProperties() {
         <SectionHeader title="Layer" open={open.layer} onToggle={() => setOpen((s) => ({ ...s, layer: !s.layer }))} />
         {open.layer && (
           <>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: `var(--spacing-2) ${PAD_X}`,
-                fontSize: "var(--font-size-xs)",
-                fontWeight: 700,
-                color: "var(--color-text-tertiary)",
-              }}
-            >
-              <span>Layer</span>
-              <span>Thickness(mm)</span>
+            {/* #135 — the stack is a table you READ: layer · material · mm,
+                in stack order, with the total in the footer. Editing is still
+                one double-click away, so nothing is lost. */}
+            <div style={{ padding: `var(--spacing-2) ${PAD_X}` }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--font-size-xs)" }}>
+                <thead>
+                  <tr>
+                    {["Layer", "Material", "mm"].map((h, hi) => (
+                      <th key={h} style={{ textAlign: hi === 2 ? "right" : "left", fontWeight: 700, color: "var(--color-text-tertiary)", padding: "4px 6px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {v.layers.map((l, i) => {
+                    const dielectric = /dielectric|core|prepreg/i.test(l.name);
+                    const mask = /mask/i.test(l.name);
+                    const material = dielectric ? (v.material || "FR-4") : mask ? "Solder mask" : "Copper";
+                    return (
+                      <tr
+                        key={i}
+                        onDoubleClick={() => setEditLayer(i)}
+                        title="Double-click to change this thickness"
+                        style={{ cursor: "default" }}
+                      >
+                        <td style={{ padding: "4px 6px", color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>{l.name}</td>
+                        <td style={{ padding: "4px 6px", color: "var(--color-text-secondary)", whiteSpace: "nowrap" }}>{material}</td>
+                        <td style={{ padding: "2px 6px", textAlign: "right" }}>
+                          {editLayer === i ? (
+                            <input
+                              autoFocus
+                              defaultValue={l.thickness}
+                              onBlur={(e) => { setLayerThickness(i, e.target.value); setEditLayer(null); }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { setLayerThickness(i, (e.target as HTMLInputElement).value); setEditLayer(null); }
+                                if (e.key === "Escape") setEditLayer(null);
+                              }}
+                              style={{ width: 62, textAlign: "right", padding: "1px 4px", border: "var(--border-width-1) solid var(--color-violet-600)", borderRadius: "var(--radius-sm)", background: "var(--color-bg-surface)", color: "var(--color-text-primary)", fontFamily: "inherit", fontSize: "var(--font-size-xs)", outline: "none" }}
+                            />
+                          ) : (
+                            // A double-click is mouse-only, so the value is a
+                            // real button: Tab reaches it, Enter/Space edits.
+                            <button
+                              type="button"
+                              className="ix-tool"
+                              onClick={() => setEditLayer(i)}
+                              aria-label={`Thickness of ${l.name}, ${l.thickness} mm — edit`}
+                              style={{ padding: "1px 5px", minHeight: 20, border: "none", background: "transparent", color: "var(--color-text-primary)", fontFamily: "inherit", fontSize: "var(--font-size-xs)", fontVariantNumeric: "tabular-nums", cursor: "text" }}
+                            >
+                              {l.thickness}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={2} style={{ padding: "5px 6px", color: "var(--color-text-secondary)", fontWeight: 700, borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>Total</td>
+                    <td style={{ padding: "5px 6px", textAlign: "right", color: "var(--color-text-primary)", fontWeight: 700, borderTop: "var(--border-width-1) solid var(--color-border-subtle)", fontVariantNumeric: "tabular-nums" }}>
+                      {v.layers.reduce((a, l) => a + (parseFloat(l.thickness) || 0), 0).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            {v.layers.map((l, i) => (
-              <Row key={i} label={l.name}>
-                <TextValue value={l.thickness} onChange={(x) => setLayerThickness(i, x)} minWidth={90} />
-              </Row>
-            ))}
           </>
         )}
       </div>
@@ -482,14 +533,6 @@ export function PcbDefaultProperties() {
                 value={d.viaDrill}
                 onChange={(v) => actions.setPcbDefaults({ viaDrill: v })}
                 suffix="mil"
-              />
-            </Row>
-            <Row label="Routing Mode">
-              <Select
-                value={String(bs.routingMode ?? "Around")}
-                options={["Around", "Free angle", "Curved"].map((v) => ({ label: v, value: v }))}
-                onChange={(v) => setBoardSetting("routingMode", v)}
-                minWidth={140}
               />
             </Row>
             <Row label="Current Track Path Optimization">

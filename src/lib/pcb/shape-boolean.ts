@@ -173,3 +173,86 @@ export function ringArea(r: Pt[]): number {
   for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j].x + r[i].x) * (r[j].y - r[i].y);
   return a / 2;
 }
+
+// ── Corner operations (Edit ▸ Add Chamfer / Add Fillet) ──────────────────────
+// Both walk a closed ring and replace each corner with either a straight bevel
+// (chamfer) or a true tangent arc (fillet). The trim distance is clamped to half
+// of each adjacent edge, so a size larger than the shape can't fold it inside
+// out — the caller reports how many corners were clamped.
+
+export type CornerResult = { ring: Pt[]; clamped: number };
+
+const EPS = 1e-6;
+
+/** Trim distance at a corner, clamped by the two adjacent edge halves. */
+function trimAt(want: number, lenPrev: number, lenNext: number): number {
+  return Math.max(0, Math.min(want, lenPrev / 2, lenNext / 2));
+}
+
+/** Bevel every corner of a closed ring by `size` (same units as the ring). */
+export function chamferRing(ring: Pt[], size: number): CornerResult {
+  const n = ring.length;
+  if (n < 3 || size <= 0) return { ring, clamped: 0 };
+  const out: Pt[] = [];
+  let clamped = 0;
+  for (let i = 0; i < n; i++) {
+    const v = ring[i], p = ring[(i - 1 + n) % n], q = ring[(i + 1) % n];
+    const d1 = Math.hypot(p.x - v.x, p.y - v.y);
+    const d2 = Math.hypot(q.x - v.x, q.y - v.y);
+    if (d1 < EPS || d2 < EPS) { out.push(v); continue; }
+    const u1 = { x: (p.x - v.x) / d1, y: (p.y - v.y) / d1 };
+    const u2 = { x: (q.x - v.x) / d2, y: (q.y - v.y) / d2 };
+    // Collinear vertex — nothing to cut.
+    if (Math.abs(u1.x * u2.y - u1.y * u2.x) < 1e-4) { out.push(v); continue; }
+    const d = trimAt(size, d1, d2);
+    if (d < size - EPS) clamped++;
+    if (d < EPS) { out.push(v); continue; }
+    out.push({ x: v.x + u1.x * d, y: v.y + u1.y * d });
+    out.push({ x: v.x + u2.x * d, y: v.y + u2.y * d });
+  }
+  return { ring: out, clamped };
+}
+
+/** Round every corner of a closed ring with a real arc of `radius`. */
+export function filletRing(ring: Pt[], radius: number, segments = 8): CornerResult {
+  const n = ring.length;
+  if (n < 3 || radius <= 0) return { ring, clamped: 0 };
+  const out: Pt[] = [];
+  let clamped = 0;
+  for (let i = 0; i < n; i++) {
+    const v = ring[i], p = ring[(i - 1 + n) % n], q = ring[(i + 1) % n];
+    const d1 = Math.hypot(p.x - v.x, p.y - v.y);
+    const d2 = Math.hypot(q.x - v.x, q.y - v.y);
+    if (d1 < EPS || d2 < EPS) { out.push(v); continue; }
+    const u1 = { x: (p.x - v.x) / d1, y: (p.y - v.y) / d1 };
+    const u2 = { x: (q.x - v.x) / d2, y: (q.y - v.y) / d2 };
+    const cross = u1.x * u2.y - u1.y * u2.x;
+    if (Math.abs(cross) < 1e-4) { out.push(v); continue; }
+    // Half-angle between the two edges: tangent distance = r / tan(θ/2).
+    const cosT = Math.max(-1, Math.min(1, u1.x * u2.x + u1.y * u2.y));
+    const half = Math.acos(cosT) / 2;
+    if (half < 1e-4 || Math.abs(Math.tan(half)) < EPS) { out.push(v); continue; }
+    let r = radius;
+    let d = r / Math.tan(half);
+    const dMax = trimAt(d, d1, d2);
+    if (dMax < d - EPS) { clamped++; d = dMax; r = d * Math.tan(half); }
+    if (d < EPS || r < EPS) { out.push(v); continue; }
+    const t1 = { x: v.x + u1.x * d, y: v.y + u1.y * d };
+    const t2 = { x: v.x + u2.x * d, y: v.y + u2.y * d };
+    // Arc centre sits along the angle bisector, r / sin(θ/2) from the corner.
+    const bis = { x: u1.x + u2.x, y: u1.y + u2.y };
+    const bl = Math.hypot(bis.x, bis.y);
+    if (bl < EPS) { out.push(v); continue; }
+    const c = { x: v.x + (bis.x / bl) * (r / Math.sin(half)), y: v.y + (bis.y / bl) * (r / Math.sin(half)) };
+    const a1 = Math.atan2(t1.y - c.y, t1.x - c.x);
+    const a2 = Math.atan2(t2.y - c.y, t2.x - c.x);
+    let sweep = a2 - a1;
+    while (sweep > Math.PI) sweep -= Math.PI * 2;
+    while (sweep < -Math.PI) sweep += Math.PI * 2;
+    for (let k = 0; k <= segments; k++) {
+      const a = a1 + (sweep * k) / segments;
+      out.push({ x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) });
+    }
+  }
+  return { ring: out, clamped };
+}

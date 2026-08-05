@@ -48,9 +48,13 @@ function findValue(
 // When the user hasn't picked a custom color we render with the theme-aware
 // text-primary token so the border + title block stay legible in both light
 // and dark mode. Any non-default hex is rendered verbatim.
-const DEFAULT_STROKE = "#1E1E1E";
+// An empty colour means "follow the theme" — the border then uses the ink token
+// and stays legible in light and dark. `#1E1E1E` is still accepted for documents
+// saved when that hex was the stored default, but nothing writes it any more, so
+// a user who deliberately picks near-black now gets near-black.
+const LEGACY_DEFAULT_STROKE = "#1e1e1e";
 function resolveStroke(color: string): string {
-  if (!color || color.trim().toLowerCase() === DEFAULT_STROKE.toLowerCase()) {
+  if (!color || color.trim().toLowerCase() === LEGACY_DEFAULT_STROKE) {
     return "var(--color-text-primary)";
   }
   return color;
@@ -109,7 +113,7 @@ export function SchematicCanvas() {
           height: innerH,
           background: "var(--color-bg-surface)",
           backgroundImage:
-            "linear-gradient(color-mix(in srgb, var(--color-text-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--color-text-primary) 7%, transparent) 1px, transparent 1px)",
+            "linear-gradient(var(--color-canvas-grid) 1px, transparent 1px), linear-gradient(90deg, var(--color-canvas-grid) 1px, transparent 1px)",
           backgroundSize: "24px 24px",
           borderRadius: "var(--radius-md)",
           pointerEvents: "none",
@@ -193,8 +197,7 @@ export function SchematicCanvas() {
           width={titleW}
           right={titleRight}
           bottom={titleBottom}
-          fields={tFields}
-        />
+          fields={tFields} sheetSize={`${b.size} ${b.orientation}`}/>
       )}
     </div>
   );
@@ -224,11 +227,13 @@ function TitleBlock({
   right,
   bottom,
   fields,
+  sheetSize,
 }: {
   width: number;
   right: boolean;
   bottom: boolean;
   fields: Array<{ key: string; on: boolean; valueOn: boolean; value: string }>;
+  sheetSize?: string;
 }) {
   const title = findValue(fields, "title", "") || "Untitled Board";
   const docNo = findValue(fields, "docNo", "");
@@ -237,11 +242,15 @@ function TitleBlock({
   const author = findValue(fields, "author", "");
   const sheetNo = findValue(fields, "sheetNo", "");
   const company = findValue(fields, "company", "");
+  const project = findValue(fields, "project", "");
+  // Sheet size is not stored on the field — it *is* the border's paper size.
+  const sizeOn = fields.some((f) => f.key === "sheetSize" && f.on);
 
   const meta: string[] = [];
   if (rev && rev !== "—") meta.push(`Rev ${rev}`);
   if (sheetNo && sheetNo !== "—") meta.push(sheetNo);
   if (docNo && docNo !== "—") meta.push(docNo);
+  if (sizeOn && sheetSize) meta.push(sheetSize);
   if (date && date !== "—") meta.push(date);
 
   return (
@@ -251,9 +260,9 @@ function TitleBlock({
         ...(right ? { right: 34 } : { left: 34 }),
         ...(bottom ? { bottom: 34 } : { top: 34 }),
         width: Math.min(width, 320),
-        border: "var(--border-width-1) solid var(--color-border-default)",
+        border: "var(--border-width-1) solid var(--color-canvas-card-border)",
         borderRadius: "var(--radius-lg)",
-        background: "var(--color-bg-surface)",
+        background: "var(--color-canvas-card)",
         boxShadow: "var(--elevation-3)",
         padding: "var(--spacing-6) var(--spacing-7)",
         display: "flex",
@@ -277,7 +286,9 @@ function TitleBlock({
           {title}
         </div>
         <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {author && author !== "—" ? `${author} · schematic` : "schematic"}
+          {[project && project !== "—" ? project : null, author && author !== "—" ? author : null, "schematic"]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       </div>
 

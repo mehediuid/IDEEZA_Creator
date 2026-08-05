@@ -303,18 +303,36 @@ export interface RouteResult {
   routed: number;
 }
 
+/** What the Auto Routing dialog actually changes about a run. */
+export interface RouteOpts {
+  /** Route only these nets (undefined = every airwire on the board). */
+  nets?: Set<string>;
+  /** Per-net width in the board's own units — net-class widths. Falls back to
+   *  the `trackWidth` argument when it returns 0/undefined. */
+  widthForNet?: (net: string | undefined) => number | undefined;
+  /** Mitre the L corner into a 45° diagonal instead of a right angle. */
+  mitre?: boolean;
+}
+
+/** How long a 45° mitre leg is, as a fraction of the shorter L leg. */
+const MITRE_RATIO = 0.35;
+
 /**
  * Auto-route: turn every ratsnest airwire into an orthogonal (L-shaped) copper
  * track on the top layer, and drop the airwires. Simplified direct routing (no
  * collision avoidance) — the grid placement keeps most routes clean.
  */
-export function routeRatsnest(objects: CanvasObject[], trackWidth: number): RouteResult {
-  const kept = objects.filter((o) => o.kind !== "ratsnest");
-  const rats = objects.filter((o) => o.kind === "ratsnest");
+export function routeRatsnest(objects: CanvasObject[], trackWidth: number, opts: RouteOpts = {}): RouteResult {
+  // Airwires outside the run's scope stay airwires — they are not "kept" copper
+  // and must not be dropped, or an unrouted net would silently disappear.
+  const inScope = (r: CanvasObject) => !opts.nets || opts.nets.has(r.net ?? "");
+  const kept = objects.filter((o) => o.kind !== "ratsnest" || !inScope(o));
+  const rats = objects.filter((o) => o.kind === "ratsnest" && inScope(o));
   let routed = 0;
   const tracks: CanvasObject[] = [];
   for (const r of rats) {
     const x1 = r.x, y1 = r.y, x2 = r.endX ?? r.x, y2 = r.endY ?? r.y;
+    const w = opts.widthForNet?.(r.net) || trackWidth;
     const seg = (ax: number, ay: number, bx: number, by: number) => {
       if (ax === bx && ay === by) return;
       tracks.push({
@@ -322,16 +340,61 @@ export function routeRatsnest(objects: CanvasObject[], trackWidth: number): Rout
         kind: "track",
         x: ax, y: ay, endX: bx, endY: by,
         net: r.net,
-        width: trackWidth,
+        width: w,
         layer: "top",
         scope: "pcb",
         props: { gen: "route" },
       });
     };
-    // L-route: horizontal then vertical (a straight line when aligned).
-    seg(x1, y1, x2, y1);
-    seg(x2, y1, x2, y2);
+    const dx = x2 - x1, dy = y2 - y1;
+    // Mitred corner: stop the horizontal leg short, cut across at 45°, then
+    // finish vertically — real geometry, not a cosmetic flag.
+    const m = opts.mitre ? Math.min(Math.abs(dx), Math.abs(dy)) * MITRE_RATIO : 0;
+    if (m > 0.5) {
+      const sx = Math.sign(dx), sy = Math.sign(dy);
+      seg(x1, y1, x2 - sx * m, y1);
+      seg(x2 - sx * m, y1, x2, y1 + sy * m);
+      seg(x2, y1 + sy * m, x2, y2);
+    } else {
+      // L-route: horizontal then vertical (a straight line when aligned).
+      seg(x1, y1, x2, y1);
+      seg(x2, y1, x2, y2);
+    }
     routed++;
   }
   return { objects: [...kept, ...tracks], routed };
+}
+
+/**
+ * Turn the tracks a previous auto-route generated back into airwires, so a
+ * re-route can redo them with the current settings. Segments of one airwire
+ * share the `pcb-trk-<airwire>-<n>` id prefix the router stamps, so the pair of
+ * endpoints is recovered exactly.
+ */
+export function unrouteGenerated(objects: CanvasObject[], nets?: Set<string>): { objects: CanvasObject[]; freed: number } {
+  const isGen = (o: CanvasObject) =>
+    o.kind === "track" && (o.props as Record<string, unknown> | undefined)?.gen === "route" &&
+    (!nets || nets.has(o.net ?? ""));
+  const gen = objects.filter(isGen);
+  if (!gen.length) return { objects, freed: 0 };
+  const groups = new Map<string, CanvasObject[]>();
+  for (const t of gen) {
+    const key = t.id.replace(/-(\d+)$/, "");
+    (groups.get(key) ?? groups.set(key, []).get(key)!).push(t);
+  }
+  const rats: CanvasObject[] = [];
+  let n = 0;
+  for (const [key, segs] of groups) {
+    const first = segs[0], last = segs[segs.length - 1];
+    rats.push({
+      id: `pcb-rats-re${n++}-${key}`,
+      kind: "ratsnest",
+      x: first.x, y: first.y,
+      endX: last.endX ?? last.x, endY: last.endY ?? last.y,
+      net: first.net,
+      scope: "pcb",
+      props: { gen: "route" },
+    });
+  }
+  return { objects: [...objects.filter((o) => !isGen(o)), ...rats], freed: rats.length };
 }

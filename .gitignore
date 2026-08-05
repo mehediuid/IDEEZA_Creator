@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local claude tooling
 /.claude/
+
+# /impeccable critique snapshots — local tool output, not product code
+.impeccable/

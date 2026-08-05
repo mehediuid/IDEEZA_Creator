@@ -20,6 +20,33 @@ const MODULE_LABEL: Record<AiModule, string> = {
   pcb: "PCB Design", code: "Code", "3d": "3D Module", preview: "Product Preview",
 };
 
+// The panel names the module it knows about, so it isn't a second copy of the
+// host's own "AI Assistant" label — and you can tell which editor you're asking.
+const PANEL_TITLE: Record<ChatContext, string> = {
+  pcb: "Board assistant",
+  blockly: "Blocks assistant",
+  code: "Firmware assistant",
+  "3d": "Model assistant",
+  preview: "Assembly assistant",
+};
+
+const PLACEHOLDER: Record<ChatContext, string> = {
+  pcb: "Ask about your board…",
+  blockly: "Ask about your blocks…",
+  code: "Ask about your firmware…",
+  "3d": "Ask about your model…",
+  preview: "Ask about the assembly…",
+};
+
+// Openers that the reply engine really answers — a chip must never dead-end.
+const SUGGESTIONS: Record<ChatContext, string[]> = {
+  pcb: ["How do I route a track?", "How do I place a via?", "Why can't I select this?"],
+  blockly: ["How do I use a loop?", "How do I store a value?", "How do I read a sensor?"],
+  code: ["How do I use a loop?", "How do I blink an LED?", "How do I read a sensor?"],
+  "3d": ["How do I add a shape?", "How do I rotate a part?", "How do I change material?"],
+  preview: ["How do mates work?", "Why does the PCB exceed the enclosure?", "How do I hide the cover?"],
+};
+
 // Cross-tab handoff: the offer button stores the user's message here and
 // navigates; the target module's chat consumes it on mount and auto-sends.
 const HANDOFF_KEY = "ideeza:ai:handoff";
@@ -60,6 +87,8 @@ type Msg = {
   text: string;
   // Cross-module suggestion: button that jumps to the right tab with the message.
   offer?: { module: AiModule; carryText: string };
+  /** This turn changed the editor — shown as a receipt, not as more prose. */
+  applied?: string[];
 };
 
 const INTRO: Record<ChatContext, string> = {
@@ -164,6 +193,26 @@ export const AI_BOT_ICON = (
   </svg>
 );
 
+// Motion lives with the component because it is mounted from both the PCB and
+// the Code module, which don't share a stylesheet.
+const AI_CSS = `
+.ai-turn { animation: ai-rise .18s ease-out both; }
+.ai-dots { display: inline-flex; gap: 3px; }
+.ai-dots i {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: currentColor; display: block;
+  animation: ai-blink 1s ease-in-out infinite;
+}
+.ai-dots i:nth-child(2) { animation-delay: .16s; }
+.ai-dots i:nth-child(3) { animation-delay: .32s; }
+@keyframes ai-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes ai-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .ai-turn { animation: none; }
+  .ai-dots i { animation: none; opacity: .55; }
+}
+`;
+
 // Full-height chat panel — the host provides the tab chrome; this fills it.
 export function AiChatPanel({
   context,
@@ -222,18 +271,16 @@ export function AiChatPanel({
         ...m,
         {
           role: "assistant",
-          text: `${say ? say + " " : ""}এটা ${MODULE_LABEL[mod]} tab-এর কাজ।`,
+          text: `${say ? say + " " : ""}That's the ${MODULE_LABEL[mod]} module's job.`,
           offer: { module: mod, carryText: text },
         },
       ]);
       return;
     }
     const done = actions.length && runActions ? runActions(actions) : [];
-    setMsgs((m) => [
-      ...m,
-      { role: "assistant", text: say },
-      ...(done.length ? [{ role: "assistant" as const, text: `✔ ${done.join(" · ")}` }] : []),
-    ]);
+    // A turn that really changed the board carries its receipt, so "said" and
+    // "did" can't be mistaken for each other.
+    setMsgs((m) => [...m, { role: "assistant", text: say, applied: done.length ? done : undefined }]);
   }, [busy, context, input, msgs, myModule, runActions]);
 
   // Consume a cross-tab handoff: auto-send the carried message once.
@@ -252,96 +299,219 @@ export function AiChatPanel({
     return () => clearTimeout(t);
   }, [busy, myModule, send]);
 
+  const empty = msgs.length === 1 && !busy;
+  const canSend = input.trim().length > 0 && !busy;
+
   return (
-    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-5)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-        <span style={{ color: "var(--color-violet-600)", display: "inline-flex" }}>{AI_BOT_ICON}</span>
-        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>AI assistant</span>
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--color-bg-surface)" }}>
+      <style>{AI_CSS}</style>
+
+      {/* Header — the module this assistant knows, plus a way back to a blank
+          thread. It does not repeat the host's own "AI Assistant" label. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4) var(--spacing-5)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+        <span
+          aria-hidden
+          style={{ width: 22, height: 22, flex: "0 0 auto", borderRadius: "var(--radius-md)", background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+        >
+          {AI_BOT_ICON}
+        </span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {PANEL_TITLE[context]}
+        </span>
+        <button
+          type="button"
+          className="ix-tool"
+          disabled={empty}
+          title={empty ? "The thread is already new" : "Start a new thread"}
+          aria-label="New thread"
+          onClick={() => { setMsgs([{ role: "assistant", text: INTRO[context] }]); setInput(""); }}
+          style={{ width: 24, height: 24, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", border: "none", background: "transparent", color: "var(--color-text-secondary)", cursor: empty ? "default" : "pointer", opacity: empty ? 0.4 : 1 }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
       </div>
 
-      <div ref={listRef} style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4)", display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
-        {msgs.map((m, i) => (
-          <div
-            key={i}
-            style={{
-              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "88%",
-              padding: "var(--spacing-3) var(--spacing-4)",
-              borderRadius: "var(--radius-lg)",
-              fontSize: "var(--font-size-sm)",
-              lineHeight: 1.45,
-              background: m.role === "user" ? "var(--color-violet-600)" : "var(--color-bg-subtle)",
-              color: m.role === "user" ? "var(--color-text-on-brand)" : "var(--color-text-primary)",
-            }}
-          >
-            {m.text}
-            {m.offer && (
-              <button
-                onClick={() => goToModule(m.offer!.module, m.offer!.carryText)}
+      {/* Thread. Asymmetric on purpose: what you asked is a tinted block on the
+          right, what the assistant said is plain prose across the panel — two
+          columns of bubbles waste half the width of a 270px rail. */}
+      <div
+        ref={listRef}
+        role="log"
+        aria-live="polite"
+        aria-label={`${PANEL_TITLE[context]} conversation`}
+        style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "var(--spacing-5)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}
+      >
+        {msgs.map((m, i) =>
+          m.role === "user" ? (
+            <div key={i} className="ai-turn" style={{ alignSelf: "flex-end", maxWidth: "88%" }}>
+              <div
                 style={{
-                  display: "block",
-                  marginTop: "var(--spacing-3)",
-                  padding: "var(--spacing-2) var(--spacing-4)",
-                  borderRadius: "var(--radius-md)",
+                  padding: "var(--spacing-3) var(--spacing-4)",
+                  borderRadius: "var(--radius-lg)",
                   border: "var(--border-width-1) solid var(--color-border-brand)",
                   background: "var(--color-bg-brand-subtle)",
                   color: "var(--color-text-brand)",
                   fontSize: "var(--font-size-sm)",
                   fontWeight: 600,
-                  cursor: "pointer",
+                  lineHeight: 1.45,
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
                 }}
               >
-                {MODULE_LABEL[m.offer.module]} tab-এ যান →
+                {m.text}
+              </div>
+            </div>
+          ) : (
+            <div key={i} className="ai-turn" style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+              <div style={{ fontSize: "var(--font-size-sm)", lineHeight: 1.55, color: "var(--color-text-primary)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                {m.text}
+              </div>
+
+              {/* It changed the editor — say exactly what, and mark it as done
+                  rather than as one more sentence. */}
+              {m.applied && (
+                <div
+                  style={{
+                    display: "flex", gap: "var(--spacing-3)", alignItems: "flex-start",
+                    padding: "var(--spacing-3) var(--spacing-4)",
+                    borderRadius: "var(--radius-md)",
+                    border: "var(--border-width-1) solid var(--color-border-success)",
+                    background: "var(--color-bg-success-subtle)",
+                    color: "var(--color-text-success)",
+                    fontSize: "var(--font-size-xs)",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flex: "0 0 auto" }} aria-hidden>
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                  <span>{m.applied.join(" · ")}</span>
+                </div>
+              )}
+
+              {m.offer && (
+                <button
+                  type="button"
+                  className="ix-pill"
+                  onClick={() => goToModule(m.offer!.module, m.offer!.carryText)}
+                  style={{
+                    alignSelf: "flex-start",
+                    padding: "var(--spacing-3) var(--spacing-4)",
+                    borderRadius: "var(--radius-md)",
+                    border: "var(--border-width-1) solid var(--color-border-brand)",
+                    background: "var(--color-bg-surface)",
+                    color: "var(--color-text-brand)",
+                    fontSize: "var(--font-size-xs)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                  }}
+                >
+                  Open {MODULE_LABEL[m.offer.module]} with this →
+                </button>
+              )}
+            </div>
+          ),
+        )}
+
+        {/* First run teaches with openers the engine really answers. */}
+        {empty && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-3)" }}>
+            {SUGGESTIONS[context].map((q) => (
+              <button
+                key={q}
+                type="button"
+                className="ix-pill"
+                onClick={() => void send(q)}
+                style={{
+                  padding: "var(--spacing-3) var(--spacing-4)",
+                  borderRadius: "var(--radius-full)",
+                  border: "var(--border-width-1) solid var(--color-border-default)",
+                  background: "var(--color-bg-surface)",
+                  color: "var(--color-text-secondary)",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                }}
+              >
+                {q}
               </button>
-            )}
+            ))}
           </div>
-        ))}
+        )}
+
         {busy && (
-          <div style={{ alignSelf: "flex-start", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-sm)", background: "var(--color-bg-subtle)", color: "var(--color-text-tertiary)" }}>
-            …
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", color: "var(--color-text-tertiary)", fontSize: "var(--font-size-xs)" }}>
+            <span className="ai-dots" aria-hidden>
+              <i /><i /><i />
+            </span>
+            <span>Thinking…</span>
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--spacing-2)", padding: "var(--spacing-3)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
-          placeholder="Ask about your program…"
+      {/* Composer — a textarea, because a question about a board is often two
+          lines. Enter sends, Shift+Enter breaks; the hint says so. */}
+      <div style={{ flex: "0 0 auto", padding: "var(--spacing-4)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+        <div
           style={{
-            flex: 1,
-            minWidth: 0,
-            padding: "var(--spacing-3) var(--spacing-4)",
+            display: "flex", alignItems: "flex-end", gap: "var(--spacing-3)",
+            padding: "var(--spacing-3)",
             border: "var(--border-width-1) solid var(--color-border-default)",
-            borderRadius: "var(--radius-md)",
+            borderRadius: "var(--radius-lg)",
             background: "var(--color-bg-page)",
-            color: "var(--color-text-primary)",
-            fontSize: "var(--font-size-sm)",
-            outline: "none",
-            fontFamily: "inherit",
-          }}
-        />
-        <button
-          onClick={() => send()}
-          aria-label="Send"
-          style={{
-            width: 34,
-            flex: "0 0 34px",
-            borderRadius: "var(--radius-md)",
-            border: "none",
-            background: "var(--color-violet-600)",
-            color: "var(--color-text-on-brand)",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
-          </svg>
-        </button>
+          <textarea
+            value={input}
+            rows={1}
+            aria-label={PLACEHOLDER[context]}
+            onChange={(e) => {
+              setInput(e.target.value);
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(96, el.scrollHeight)}px`;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+            }}
+            placeholder={PLACEHOLDER[context]}
+            style={{
+              flex: 1, minWidth: 0, resize: "none", maxHeight: 96,
+              border: "none", outline: "none", background: "transparent",
+              color: "var(--color-text-primary)", fontSize: "var(--font-size-sm)",
+              lineHeight: 1.45, fontFamily: "inherit", padding: "var(--spacing-2)",
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={!canSend}
+            aria-label="Send"
+            title={canSend ? "Send (Enter)" : "Type a question first"}
+            style={{
+              width: 28, height: 28, flex: "0 0 28px",
+              borderRadius: "var(--radius-md)", border: "none",
+              background: canSend ? "var(--color-violet-600)" : "var(--color-bg-subtle)",
+              color: canSend ? "var(--color-text-on-brand)" : "var(--color-text-tertiary)",
+              cursor: canSend ? "pointer" : "default",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              transition: "background .14s ease-out, color .14s ease-out",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+            </svg>
+          </button>
+        </div>
+        <div style={{ marginTop: "var(--spacing-2)", fontSize: "var(--font-size-2xs, 10px)", color: "var(--color-text-tertiary)" }}>
+          Enter sends · Shift+Enter for a new line
+        </div>
       </div>
     </div>
   );

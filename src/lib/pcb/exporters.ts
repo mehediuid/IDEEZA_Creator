@@ -43,6 +43,44 @@ export interface ExportPad {
 export interface ExportVia {
   x: number; y: number; outer: number; hole: number; // mm, Y down
 }
+export interface ExportCutout {
+  x: number; y: number; w: number; h: number; // mm, Y down
+}
+/** The board's own edge when the user drew one (#122). Without it the board is
+ *  the `pcbBoard` rectangle — which is what every export used to assume, so a
+ *  circular or polygon board shipped as a rectangle. */
+export interface ExportOutline {
+  shape: "rect" | "circle" | "poly";
+  x: number; y: number; w: number; h: number; r: number; // mm, Y down
+  pts: Array<{ x: number; y: number }>;
+}
+/** What a DXF / document export should contain. Every flag is honoured by the
+ *  builders below, so a checkbox in the dialog changes the file. */
+export interface ExportInclude {
+  outline?: boolean;
+  tracks?: boolean;
+  pads?: boolean;
+  vias?: boolean;
+  comps?: boolean;
+  side?: "both" | "top" | "bottom";
+}
+export interface DxfOptions {
+  unit?: "mm" | "inch";
+  scale?: number;
+  include?: ExportInclude;
+}
+export interface DocOptions {
+  theme?: "default" | "whiteOnBlack" | "blackOnWhite";
+  hairline?: boolean;
+  include?: ExportInclude;
+}
+const ALL_IN: Required<Omit<ExportInclude, "side">> & { side: "both" } = {
+  outline: true, tracks: true, pads: true, vias: true, comps: true, side: "both",
+};
+const inc = (o?: ExportInclude) => ({ ...ALL_IN, ...(o ?? {}) });
+const onSide = (layer: string, side: ExportInclude["side"]) =>
+  side === "both" || !side ? true : side === "bottom" ? layer === "bottom" : layer !== "bottom";
+
 export interface ExportModel {
   boardWmm: number;
   boardHmm: number;
@@ -51,11 +89,13 @@ export interface ExportModel {
   tracks: ExportSeg[];
   pads: ExportPad[];
   vias: ExportVia[];
+  cutouts: ExportCutout[];
+  outline: ExportOutline | null;
 }
 
 // Build a unit-normalised (mm) model of the live board, origin at the board's
 // top-left corner. Y is screen-down here; Y-up formats flip via (boardH - y).
-export function collectPcbModel(state: PcbState): ExportModel {
+export function collectPcbModel(state: PcbState, opts?: { onlySelected?: boolean }): ExportModel {
   const W = state.pcbBoard?.width && state.pcbBoard.width > 0 ? state.pcbBoard.width : 720;
   const H = state.pcbBoard?.height && state.pcbBoard.height > 0 ? state.pcbBoard.height : 480;
   const mm = (px: number) => px / PX_PER_MM;
@@ -65,14 +105,34 @@ export function collectPcbModel(state: PcbState): ExportModel {
   const thicknessMm =
     (state.threeD?.layers ?? []).reduce((a, l) => a + (parseFloat(l.thickness) || 0), 0) || 1.6;
 
-  const objs: CanvasObject[] = (state.objects ?? []).filter((o) => (o.scope ?? "schematic") === "pcb");
+  let objs: CanvasObject[] = (state.objects ?? []).filter((o) => (o.scope ?? "schematic") === "pcb");
+  if (opts?.onlySelected && state.selectedIds.length) {
+    objs = objs.filter((o) => state.selectedIds.includes(o.id));
+  }
 
   const comps: ExportComp[] = [];
   const tracks: ExportSeg[] = [];
   const pads: ExportPad[] = [];
   const vias: ExportVia[] = [];
+  const cutouts: ExportCutout[] = [];
+  let outline: ExportOutline | null = null;
 
   for (const o of objs) {
+    if (o.kind === "boardOutline" && (o.props as Record<string, unknown> | undefined)?.shape) {
+      const shape = String((o.props as Record<string, unknown>).shape);
+      if (shape === "polygon" && (o.points?.[0]?.length ?? 0) > 2) {
+        outline = { shape: "poly", x: 0, y: 0, w: 0, h: 0, r: 0, pts: o.points![0].map((p) => ({ x: rx(o.x + p.x), y: ry(o.y + p.y) })) };
+      } else if (shape === "circle" && (o.width ?? 0) > 1) {
+        outline = { shape: "circle", x: rx(o.x), y: ry(o.y), w: mm(o.width!), h: mm(o.width!), r: mm(o.width! / 2), pts: [] };
+      } else if ((o.width ?? 0) > 1 && (o.height ?? 0) > 1) {
+        outline = { shape: "rect", x: rx(o.x), y: ry(o.y), w: mm(o.width!), h: mm(o.height!), r: 0, pts: [] };
+      }
+      continue;
+    }
+    if (o.kind === "cutout") {
+      cutouts.push({ x: rx(o.x), y: ry(o.y), w: mm(o.width ?? 0), h: mm(o.height ?? 0) });
+      continue;
+    }
     if (o.kind === "track") {
       tracks.push({
         x1: rx(o.x), y1: ry(o.y), x2: rx(o.endX ?? o.x), y2: ry(o.endY ?? o.y),
@@ -102,7 +162,7 @@ export function collectPcbModel(state: PcbState): ExportModel {
       }
     }
   }
-  return { boardWmm: mm(W), boardHmm: mm(H), thicknessMm, comps, tracks, pads, vias };
+  return { boardWmm: mm(W), boardHmm: mm(H), thicknessMm, comps, tracks, pads, vias, cutouts, outline };
 }
 
 // ── downloads ────────────────────────────────────────────────────────────────
@@ -149,39 +209,100 @@ export function buildPickPlace(m: ExportModel, fmt: "CSV" | "TXT" | "JSON"): { t
 }
 
 // ── DXF (AutoCAD R12 ASCII) ───────────────────────────────────────────────────
-export function buildDxf(m: ExportModel): string {
-  const yf = (y: number) => m.boardHmm - y; // DXF is Y-up
+export function buildDxf(m: ExportModel, opts?: DxfOptions): string {
+  const want = inc(opts?.include);
+  // mm is the model's unit; inch divides by 25.4. `scale` multiplies on top.
+  const k = (opts?.unit === "inch" ? 1 / 25.4 : 1) * (opts?.scale && opts.scale > 0 ? opts.scale : 1);
+  const yf = (y: number) => (m.boardHmm - y) * k;
+  const xf = (x: number) => x * k;
   const out: string[] = ["0", "SECTION", "2", "ENTITIES"];
   const line = (x1: number, y1: number, x2: number, y2: number, layer: string) =>
-    out.push("0", "LINE", "8", layer, "10", x1.toFixed(4), "20", yf(y1).toFixed(4), "11", x2.toFixed(4), "21", yf(y2).toFixed(4));
+    out.push("0", "LINE", "8", layer, "10", xf(x1).toFixed(4), "20", yf(y1).toFixed(4), "11", xf(x2).toFixed(4), "21", yf(y2).toFixed(4));
   const circle = (cx: number, cy: number, r: number, layer: string) =>
-    out.push("0", "CIRCLE", "8", layer, "10", cx.toFixed(4), "20", yf(cy).toFixed(4), "40", r.toFixed(4));
-  // board outline
-  line(0, 0, m.boardWmm, 0, "OUTLINE");
-  line(m.boardWmm, 0, m.boardWmm, m.boardHmm, "OUTLINE");
-  line(m.boardWmm, m.boardHmm, 0, m.boardHmm, "OUTLINE");
-  line(0, m.boardHmm, 0, 0, "OUTLINE");
-  for (const t of m.tracks) line(t.x1, t.y1, t.x2, t.y2, t.layer === "bottom" ? "BOTTOM" : "TOP");
-  for (const p of m.pads) circle(p.x, p.y, Math.max(p.w, p.h) / 2, "PADS");
-  for (const v of m.vias) { circle(v.x, v.y, v.outer / 2, "VIAS"); circle(v.x, v.y, v.hole / 2, "DRILL"); }
+    out.push("0", "CIRCLE", "8", layer, "10", xf(cx).toFixed(4), "20", yf(cy).toFixed(4), "40", (r * k).toFixed(4));
+  const rect = (x: number, y: number, w: number, h: number, layer: string) => {
+    line(x, y, x + w, y, layer); line(x + w, y, x + w, y + h, layer);
+    line(x + w, y + h, x, y + h, layer); line(x, y + h, x, y, layer);
+  };
+  if (want.outline) {
+    const o = m.outline;
+    if (o?.shape === "circle") circle(o.x, o.y, o.r, "OUTLINE");
+    else if (o?.shape === "poly" && o.pts.length > 2) {
+      for (let i = 0; i < o.pts.length; i++) {
+        const a = o.pts[i], b = o.pts[(i + 1) % o.pts.length];
+        line(a.x, a.y, b.x, b.y, "OUTLINE");
+      }
+    } else if (o?.shape === "rect") rect(o.x, o.y, o.w, o.h, "OUTLINE");
+    else rect(0, 0, m.boardWmm, m.boardHmm, "OUTLINE");
+    // Cutouts are board edges too — a fab reads them off the outline layer.
+    for (const c of m.cutouts) rect(c.x, c.y, c.w, c.h, "OUTLINE");
+  }
+  if (want.tracks) {
+    for (const t of m.tracks) {
+      if (!onSide(t.layer, want.side)) continue;
+      line(t.x1, t.y1, t.x2, t.y2, t.layer === "bottom" ? "BOTTOM" : "TOP");
+    }
+  }
+  if (want.pads) for (const p of m.pads) circle(p.x, p.y, Math.max(p.w, p.h) / 2, "PADS");
+  if (want.vias) for (const v of m.vias) { circle(v.x, v.y, v.outer / 2, "VIAS"); circle(v.x, v.y, v.hole / 2, "DRILL"); }
+  if (want.comps) {
+    for (const c of m.comps) {
+      if (!onSide(c.side, want.side)) continue;
+      rect(c.xmm - c.wmm / 2, c.ymm - c.dmm / 2, c.wmm, c.dmm, "COMPONENTS");
+    }
+  }
   out.push("0", "ENDSEC", "0", "EOF");
   return out.join("\n");
 }
 
 // ── SVG ───────────────────────────────────────────────────────────────────────
-export function buildSvg(m: ExportModel): string {
+export function buildSvg(m: ExportModel, opts?: DocOptions): string {
+  const want = inc(opts?.include);
+  // Theme is a real paint swap, not a label: the board, the copper and the
+  // page all change together so the sheet stays readable either way.
+  const theme = opts?.theme ?? "default";
+  const paint = theme === "blackOnWhite"
+    ? { page: "#ffffff", board: "#ffffff", edge: "#141414", top: "#141414", bottom: "#5a5a5a", pad: "#141414", via: "#141414", hole: "#ffffff", comp: "#141414" }
+    : theme === "whiteOnBlack"
+    ? { page: "#000000", board: "#000000", edge: "#ffffff", top: "#ffffff", bottom: "#b4b4b4", pad: "#ffffff", via: "#ffffff", hole: "#000000", comp: "#ffffff" }
+    : { page: "#ffffff", board: "#0d3b24", edge: "#c9c9c9", top: "#d05a5a", bottom: "#3b7dd8", pad: "#e0b24a", via: "#c9902f", hole: "#141414", comp: "#e6e6e6" };
+  const hair = (w: number) => (opts?.hairline ? 0.1 : w);
   const pad = 4;
   const W = (m.boardWmm + pad * 2).toFixed(2);
   const Ht = (m.boardHmm + pad * 2).toFixed(2);
   const parts: string[] = [];
-  parts.push(`<rect x="${pad}" y="${pad}" width="${m.boardWmm}" height="${m.boardHmm}" fill="#0d3b24" stroke="#c9c9c9" stroke-width="0.15"/>`);
-  for (const t of m.tracks) {
-    const col = t.layer === "bottom" ? "#3b7dd8" : "#d05a5a";
-    parts.push(`<line x1="${(t.x1 + pad).toFixed(3)}" y1="${(t.y1 + pad).toFixed(3)}" x2="${(t.x2 + pad).toFixed(3)}" y2="${(t.y2 + pad).toFixed(3)}" stroke="${col}" stroke-width="${Math.max(0.1, t.width).toFixed(3)}" stroke-linecap="round"/>`);
+  parts.push(`<rect x="0" y="0" width="${W}" height="${Ht}" fill="${paint.page}"/>`);
+  if (want.outline) {
+    const o = m.outline;
+    if (o?.shape === "circle") {
+      parts.push(`<circle cx="${(pad + o.x).toFixed(3)}" cy="${(pad + o.y).toFixed(3)}" r="${o.r.toFixed(3)}" fill="${paint.board}" stroke="${paint.edge}" stroke-width="${hair(0.15)}"/>`);
+    } else if (o?.shape === "poly" && o.pts.length > 2) {
+      parts.push(`<polygon points="${o.pts.map((q) => `${(pad + q.x).toFixed(3)},${(pad + q.y).toFixed(3)}`).join(" ")}" fill="${paint.board}" stroke="${paint.edge}" stroke-width="${hair(0.15)}"/>`);
+    } else if (o?.shape === "rect") {
+      parts.push(`<rect x="${(pad + o.x).toFixed(3)}" y="${(pad + o.y).toFixed(3)}" width="${o.w.toFixed(3)}" height="${o.h.toFixed(3)}" fill="${paint.board}" stroke="${paint.edge}" stroke-width="${hair(0.15)}"/>`);
+    } else {
+      parts.push(`<rect x="${pad}" y="${pad}" width="${m.boardWmm}" height="${m.boardHmm}" fill="${paint.board}" stroke="${paint.edge}" stroke-width="${hair(0.15)}"/>`);
+    }
+    // Cutouts: the board substrate is gone there, so paint the page through.
+    for (const c of m.cutouts) {
+      parts.push(`<rect x="${(pad + c.x).toFixed(3)}" y="${(pad + c.y).toFixed(3)}" width="${c.w.toFixed(3)}" height="${c.h.toFixed(3)}" fill="${paint.page}" stroke="${paint.edge}" stroke-width="${hair(0.15)}"/>`);
+    }
   }
-  for (const p of m.pads) parts.push(`<rect x="${(p.x - p.w / 2 + pad).toFixed(3)}" y="${(p.y - p.h / 2 + pad).toFixed(3)}" width="${p.w}" height="${p.h}" fill="#e0b24a"/>`);
-  for (const v of m.vias) { parts.push(`<circle cx="${(v.x + pad).toFixed(3)}" cy="${(v.y + pad).toFixed(3)}" r="${(v.outer / 2).toFixed(3)}" fill="#c9902f"/>`); parts.push(`<circle cx="${(v.x + pad).toFixed(3)}" cy="${(v.y + pad).toFixed(3)}" r="${(v.hole / 2).toFixed(3)}" fill="#141414"/>`); }
-  for (const c of m.comps) parts.push(`<rect x="${(c.xmm - c.wmm / 2 + pad).toFixed(3)}" y="${(c.ymm - c.dmm / 2 + pad).toFixed(3)}" width="${c.wmm}" height="${c.dmm}" fill="none" stroke="#e6e6e6" stroke-width="0.12"/>`);
+  if (want.tracks) {
+    for (const t of m.tracks) {
+      if (!onSide(t.layer, want.side)) continue;
+      const col = t.layer === "bottom" ? paint.bottom : paint.top;
+      parts.push(`<line x1="${(t.x1 + pad).toFixed(3)}" y1="${(t.y1 + pad).toFixed(3)}" x2="${(t.x2 + pad).toFixed(3)}" y2="${(t.y2 + pad).toFixed(3)}" stroke="${col}" stroke-width="${Math.max(0.1, hair(t.width)).toFixed(3)}" stroke-linecap="round"/>`);
+    }
+  }
+  if (want.pads) for (const p of m.pads) parts.push(`<rect x="${(p.x - p.w / 2 + pad).toFixed(3)}" y="${(p.y - p.h / 2 + pad).toFixed(3)}" width="${p.w}" height="${p.h}" fill="${paint.pad}"/>`);
+  if (want.vias) for (const v of m.vias) { parts.push(`<circle cx="${(v.x + pad).toFixed(3)}" cy="${(v.y + pad).toFixed(3)}" r="${(v.outer / 2).toFixed(3)}" fill="${paint.via}"/>`); parts.push(`<circle cx="${(v.x + pad).toFixed(3)}" cy="${(v.y + pad).toFixed(3)}" r="${(v.hole / 2).toFixed(3)}" fill="${paint.hole}"/>`); }
+  if (want.comps) {
+    for (const c of m.comps) {
+      if (!onSide(c.side, want.side)) continue;
+      parts.push(`<rect x="${(c.xmm - c.wmm / 2 + pad).toFixed(3)}" y="${(c.ymm - c.dmm / 2 + pad).toFixed(3)}" width="${c.wmm}" height="${c.dmm}" fill="none" stroke="${paint.comp}" stroke-width="${hair(0.12)}"/>`);
+    }
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${Ht}mm" viewBox="0 0 ${W} ${Ht}">${parts.join("")}</svg>`;
 }
 
@@ -208,21 +329,71 @@ export function rasterizeSvgToPng(svg: string, wMm: number, hMm: number, scale =
 }
 
 // ── PDF (hand-rolled single-page vector) ──────────────────────────────────────
-export function buildPdf(m: ExportModel): Blob {
+export function buildPdf(m: ExportModel, opts?: DocOptions): Blob {
+  const want = inc(opts?.include);
+  const theme = opts?.theme ?? "default";
+  // PDF paint per theme (RG = stroke, rg = fill).
+  const P = theme === "whiteOnBlack"
+    ? { edge: "1 1 1", top: "1 1 1", bottom: "0.7 0.7 0.7", pad: "1 1 1", comp: "1 1 1", bg: "0 0 0" }
+    : theme === "blackOnWhite"
+    ? { edge: "0.1 0.1 0.1", top: "0.1 0.1 0.1", bottom: "0.4 0.4 0.4", pad: "0.1 0.1 0.1", comp: "0.1 0.1 0.1", bg: null as string | null }
+    : { edge: "0.15 0.15 0.15", top: "0.82 0.35 0.35", bottom: "0.23 0.49 0.85", pad: "0.88 0.70 0.29", comp: "0.45 0.45 0.45", bg: null as string | null };
   const S = 2.834645; // pt per mm
   const margin = 20;
   const wPt = m.boardWmm * S + margin * 2;
   const hPt = m.boardHmm * S + margin * 2;
   const X = (x: number) => (margin + x * S).toFixed(2);
   const Y = (y: number) => (margin + (m.boardHmm - y) * S).toFixed(2); // flip to Y-up
-  let c = "0.6 w\n0.15 0.15 0.15 RG\n";
-  c += `${margin} ${margin} ${(m.boardWmm * S).toFixed(2)} ${(m.boardHmm * S).toFixed(2)} re S\n`;
-  for (const t of m.tracks) {
-    const col = t.layer === "bottom" ? "0.23 0.49 0.85" : "0.82 0.35 0.35";
-    c += `${col} RG\n${Math.max(0.4, t.width * S).toFixed(2)} w\n${X(t.x1)} ${Y(t.y1)} m ${X(t.x2)} ${Y(t.y2)} l S\n`;
+  const lw = (w: number) => (opts?.hairline ? 0.4 : Math.max(0.4, w * S)).toFixed(2);
+  let c = "";
+  if (P.bg) c += `${P.bg} rg\n0 0 ${wPt.toFixed(2)} ${hPt.toFixed(2)} re f\n`;
+  c += `0.6 w\n${P.edge} RG\n`;
+  if (want.outline) {
+    const o = m.outline;
+    if (o?.shape === "poly" && o.pts.length > 2) {
+      c += `${X(o.pts[0].x)} ${Y(o.pts[0].y)} m\n`;
+      for (const q of o.pts.slice(1)) c += `${X(q.x)} ${Y(q.y)} l\n`;
+      c += "h S\n";
+    } else if (o?.shape === "circle") {
+      // four Béziers make a circle in PDF content streams
+      const k = 0.5523 * o.r;
+      c += `${X(o.x - o.r)} ${Y(o.y)} m\n`;
+      c += `${X(o.x - o.r)} ${Y(o.y + k)} ${X(o.x - k)} ${Y(o.y + o.r)} ${X(o.x)} ${Y(o.y + o.r)} c\n`;
+      c += `${X(o.x + k)} ${Y(o.y + o.r)} ${X(o.x + o.r)} ${Y(o.y + k)} ${X(o.x + o.r)} ${Y(o.y)} c\n`;
+      c += `${X(o.x + o.r)} ${Y(o.y - k)} ${X(o.x + k)} ${Y(o.y - o.r)} ${X(o.x)} ${Y(o.y - o.r)} c\n`;
+      c += `${X(o.x - k)} ${Y(o.y - o.r)} ${X(o.x - o.r)} ${Y(o.y - k)} ${X(o.x - o.r)} ${Y(o.y)} c\nS\n`;
+    } else if (o?.shape === "rect") {
+      c += `${X(o.x)} ${Y(o.y + o.h)} ${(o.w * S).toFixed(2)} ${(o.h * S).toFixed(2)} re S\n`;
+    } else {
+      c += `${margin} ${margin} ${(m.boardWmm * S).toFixed(2)} ${(m.boardHmm * S).toFixed(2)} re S\n`;
+    }
+    // Cutout edges are board edges — same stroke as the outline.
+    for (const cut of m.cutouts) {
+      c += `${X(cut.x)} ${Y(cut.y + cut.h)} ${(cut.w * S).toFixed(2)} ${(cut.h * S).toFixed(2)} re S\n`;
+    }
   }
-  c += "0.88 0.70 0.29 rg\n";
-  for (const p of m.pads) c += `${X(p.x - p.w / 2)} ${Y(p.y + p.h / 2)} ${(p.w * S).toFixed(2)} ${(p.h * S).toFixed(2)} re f\n`;
+  if (want.tracks) {
+    for (const t of m.tracks) {
+      if (!onSide(t.layer, want.side)) continue;
+      const col = t.layer === "bottom" ? P.bottom : P.top;
+      c += `${col} RG\n${lw(t.width)} w\n${X(t.x1)} ${Y(t.y1)} m ${X(t.x2)} ${Y(t.y2)} l S\n`;
+    }
+  }
+  if (want.comps) {
+    c += `${P.comp} RG\n0.5 w\n`;
+    for (const cm of m.comps) {
+      if (!onSide(cm.side, want.side)) continue;
+      c += `${X(cm.xmm - cm.wmm / 2)} ${Y(cm.ymm + cm.dmm / 2)} ${(cm.wmm * S).toFixed(2)} ${(cm.dmm * S).toFixed(2)} re S\n`;
+    }
+  }
+  if (want.pads) {
+    c += `${P.pad} rg\n`;
+    for (const p of m.pads) c += `${X(p.x - p.w / 2)} ${Y(p.y + p.h / 2)} ${(p.w * S).toFixed(2)} ${(p.h * S).toFixed(2)} re f\n`;
+  }
+  if (want.vias) {
+    c += `${P.pad} rg\n`;
+    for (const v of m.vias) c += `${X(v.x - v.outer / 2)} ${Y(v.y + v.outer / 2)} ${(v.outer * S).toFixed(2)} ${(v.outer * S).toFixed(2)} re f\n`;
+  }
 
   const objs = [
     "<</Type/Catalog/Pages 2 0 R>>",
@@ -299,4 +470,130 @@ export function buildObj(m: ExportModel, include?: { board?: boolean; comps?: bo
     base += 8;
   }
   return out.join("\n");
+}
+
+// ── Schematic image (SVG / PNG) ───────────────────────────────────────────────
+// The board exporters above work off the PCB model; a schematic sheet has no
+// such model — its symbols are drawn by `placed-objects.tsx`. Rather than
+// re-describing every glyph here (two copies of the same geometry would drift),
+// this captures the live sheet: each placed object's rendered <svg> is cloned
+// into a standalone document, with computed colours baked in so `currentColor`
+// and CSS variables survive outside the app. What you see is what you export.
+type SchemCapture = { svg: string; width: number; height: number };
+
+export function captureSchematicSvg(): SchemCapture | null {
+  if (typeof document === "undefined") return null;
+  const root = document.querySelector(".pcb-app [data-canvas-wrapper]") as HTMLElement | null;
+  if (!root) return null;
+  const nodes = Array.from(root.querySelectorAll("[data-object-id]")) as (HTMLElement | SVGGraphicsElement)[];
+  if (nodes.length === 0) return null;
+
+  // Bake computed paint onto a clone so the markup is self-contained.
+  const bake = (live: Element, clone: Element) => {
+    const cs = window.getComputedStyle(live);
+    for (const prop of ["fill", "stroke"] as const) {
+      const v = cs.getPropertyValue(prop);
+      if (v && v !== "none") clone.setAttribute(prop, v);
+    }
+    const lk = Array.from(live.children);
+    const ck = Array.from(clone.children);
+    for (let i = 0; i < Math.min(lk.length, ck.length); i++) bake(lk[i], ck[i]);
+  };
+
+  const rb = root.getBoundingClientRect();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const items: string[] = [];
+
+  for (const node of nodes) {
+    const r = node.getBoundingClientRect();
+    // A horizontal wire has zero height and a vertical one zero width, so only
+    // a node with no extent at all is skipped.
+    if (r.width === 0 && r.height === 0) continue;
+    const x = r.left - rb.left;
+    const y = r.top - rb.top;
+    minX = Math.min(minX, x); minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + r.width); maxY = Math.max(maxY, y + r.height);
+
+    // Wires / buses / tracks are <line> elements living inside one overlay
+    // <svg>, so they carry no inner <svg> of their own. Their screen CTM maps
+    // overlay user-space straight into the exported picture, zoom and pan
+    // included.
+    if (node instanceof SVGGraphicsElement && !(node instanceof SVGSVGElement)) {
+      const ctm = node.getScreenCTM();
+      if (ctm) {
+        const clone = node.cloneNode(true) as SVGGraphicsElement;
+        bake(node, clone);
+        items.push(
+          `<g transform="matrix(${ctm.a},${ctm.b},${ctm.c},${ctm.d},${(ctm.e - rb.left).toFixed(2)},${(ctm.f - rb.top).toFixed(2)})">${clone.outerHTML}</g>`,
+        );
+      }
+      continue;
+    }
+
+    const liveSvg = node.querySelector("svg");
+    if (liveSvg) {
+      const clone = liveSvg.cloneNode(true) as SVGSVGElement;
+      bake(liveSvg, clone);
+      clone.setAttribute("x", x.toFixed(2));
+      clone.setAttribute("y", y.toFixed(2));
+      clone.setAttribute("width", r.width.toFixed(2));
+      clone.setAttribute("height", r.height.toFixed(2));
+      items.push(clone.outerHTML);
+    }
+    // Labels / designators render as plain spans next to the glyph.
+    for (const span of Array.from(node.querySelectorAll("span"))) {
+      const text = (span.textContent ?? "").trim();
+      if (!text) continue;
+      const sr = span.getBoundingClientRect();
+      if (sr.width === 0) continue;
+      const cs = window.getComputedStyle(span);
+      items.push(
+        `<text x="${(sr.left - rb.left + sr.width / 2).toFixed(2)}" y="${(sr.top - rb.top + sr.height * 0.78).toFixed(2)}"` +
+          ` text-anchor="middle" font-family="${cs.fontFamily.replace(/"/g, "'")}" font-size="${cs.fontSize}"` +
+          ` font-weight="${cs.fontWeight}" fill="${cs.color}">${text.replace(/[<&>]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string))}</text>`,
+      );
+    }
+  }
+  if (!items.length || minX === Infinity) return null;
+
+  const pad = 24;
+  const width = Math.ceil(maxX - minX + pad * 2);
+  const height = Math.ceil(maxY - minY + pad * 2);
+  const shift = `translate(${(pad - minX).toFixed(2)}, ${(pad - minY).toFixed(2)})`;
+  // The sheet itself is transparent — the paint comes from an ancestor. Walk up
+  // for the first opaque colour, otherwise the baked (theme-coloured) strokes
+  // would land on white and vanish.
+  const bg = (() => {
+    let n: HTMLElement | null = root;
+    while (n) {
+      const c = window.getComputedStyle(n).backgroundColor;
+      if (c && !/^rgba\(0,\s*0,\s*0,\s*0\)$|^transparent$/.test(c)) return c;
+      n = n.parentElement;
+    }
+    return "#ffffff";
+  })();
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    `<rect width="${width}" height="${height}" fill="${bg}"/><g transform="${shift}">${items.join("")}</g></svg>`;
+  return { svg, width, height };
+}
+
+/** Raster a captured sheet at `scale`× its on-screen size. */
+export function rasterizeToPng(svg: string, width: number, height: number, scale = 2): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("no 2d context")); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(blobUrl);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("svg raster failed")); };
+    img.src = blobUrl;
+  });
 }

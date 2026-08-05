@@ -383,15 +383,35 @@ function trackLenMm(tracks: CanvasObject[]): number {
   return px / PX_PER_MM;
 }
 
+/** Routing state of one differential pair — shared by the DRC phase and the
+ *  Differential Pairs dialog, so the numbers a user reads are the numbers the
+ *  check enforces. */
+export function diffPairStats(
+  objects: CanvasObject[],
+  dp: { netA: string; netB: string; width: number },
+) {
+  const tracks = objects.filter((o) => o.scope !== "schematic" && o.kind === "track");
+  const a = tracks.filter((o) => o.net === dp.netA);
+  const b = tracks.filter((o) => o.net === dp.netB);
+  const la = trackLenMm(a);
+  const lb = trackLenMm(b);
+  return {
+    a,
+    b,
+    la,
+    lb,
+    skew: Math.abs(la - lb),
+    widthOffender: [...a, ...b].find((t) => Math.abs((t.width ?? 0) - dp.width) > 0.5) ?? null,
+  };
+}
+
 function runDiffPairs(objects: CanvasObject[], cfg: PcbDrcConfig, issues: ErcIssue[]) {
   const sev = cfg.diffPairSeverity;
-  const tracks = objects.filter((o) => o.scope !== "schematic" && o.kind === "track");
   const push = (d: string, x: number, y: number) =>
     issues.push({ severity: sev, title: "Diff-pair", detail: d, rule: "diff-pair", x, y });
   for (const dp of cfg.diffPairs) {
     if (!dp.netA || !dp.netB) continue;
-    const a = tracks.filter((o) => o.net === dp.netA);
-    const b = tracks.filter((o) => o.net === dp.netB);
+    const { a, b, la, lb, skew, widthOffender: off } = diffPairStats(objects, dp);
     if (a.length === 0 && b.length === 0) continue; // unrouted pair — nothing to check yet
     if (a.length === 0 || b.length === 0) {
       const missing = a.length === 0 ? dp.netA : dp.netB;
@@ -399,9 +419,7 @@ function runDiffPairs(objects: CanvasObject[], cfg: PcbDrcConfig, issues: ErcIss
       push(`${dp.name}: ${missing} has no routing`, seed.x, seed.y);
       continue;
     }
-    const off = [...a, ...b].find((t) => Math.abs((t.width ?? 0) - dp.width) > 0.5);
     if (off) push(`${dp.name}: track width ${off.width}mil ≠ target ${dp.width}mil`, off.x, off.y);
-    const la = trackLenMm(a), lb = trackLenMm(b), skew = Math.abs(la - lb);
     if (skew > cfg.diffPairSkewMax + EPS)
       push(`${dp.name}: length skew ${skew.toFixed(2)}mm > tol ${cfg.diffPairSkewMax}mm (${dp.netA}=${la.toFixed(2)}, ${dp.netB}=${lb.toFixed(2)})`, a[0].x, a[0].y);
   }
@@ -423,4 +441,113 @@ function runNetlist(objects: CanvasObject[], cfg: PcbDrcConfig, issues: ErcIssue
     if (!schem.has(n))
       issues.push({ severity: cfg.netlistExtraSeverity, title: "Netlist mismatch", detail: `net ${n} on PCB not in schematic`, rule: "netlist", x: 0, y: 0 });
   }
+}
+
+// ── Net classes · equal-length groups · pad-pair groups (#99) ────────────────
+// These three lists were managed in their dialogs and read by nothing. They are
+// real rules now: a class states the copper it wants, a length group states how
+// closely its nets must match, a pad-pair group states its target spacing.
+
+export type NetClassRule = { name: string; nets?: string[]; trackWidth: number; viaSize: number };
+export type EqualLengthRule = { name: string; nets?: string[]; target: number; tolerance: number };
+export type PadPairRule = { name: string; pads: string; spacing: number };
+
+const trackLenPx = (o: CanvasObject) => Math.hypot((o.endX ?? o.x) - o.x, (o.endY ?? o.y) - o.y);
+
+/** Per-net length in mil, from the copper actually on the board. */
+export function netLengthsMil(objects: CanvasObject[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const o of objects) {
+    if (o.scope === "schematic" || o.kind !== "track" || !o.net) continue;
+    const mil = trackLenPx(o) / MIL_TO_PX;
+    out.set(o.net, (out.get(o.net) ?? 0) + mil);
+  }
+  return out;
+}
+
+/** Track width / via size a net class asks for vs the copper on the board. */
+export function runNetClasses(objects: CanvasObject[], classes: NetClassRule[]): ErcIssue[] {
+  const issues: ErcIssue[] = [];
+  for (const c of classes) {
+    if (!c.nets?.length) continue;
+    const want = new Set(c.nets);
+    for (const o of objects) {
+      if (o.scope === "schematic" || !o.net || !want.has(o.net)) continue;
+      if (o.kind === "track" && c.trackWidth > 0 && (o.width ?? 8) < c.trackWidth - 0.01) {
+        issues.push({
+          severity: "warning", title: "Net class width",
+          detail: `${o.net} track ${(o.width ?? 8).toFixed(1)} mil is under ${c.name}'s ${c.trackWidth} mil`,
+          rule: "netClass", x: o.x, y: o.y,
+        });
+      }
+      if ((o.kind === "via" || o.kind === "sutureVias") && c.viaSize > 0 && (o.width ?? 24) < c.viaSize - 0.01) {
+        issues.push({
+          severity: "warning", title: "Net class via size",
+          detail: `${o.net} via ${(o.width ?? 24).toFixed(1)} mil is under ${c.name}'s ${c.viaSize} mil`,
+          rule: "netClass", x: o.x, y: o.y,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+/** Every net in a length group must land inside target ± tolerance (mil). */
+export function runEqualLength(objects: CanvasObject[], groups: EqualLengthRule[]): ErcIssue[] {
+  const issues: ErcIssue[] = [];
+  const lens = netLengthsMil(objects);
+  for (const g of groups) {
+    if (!g.nets?.length) continue;
+    const tol = Math.max(0, g.tolerance);
+    for (const net of g.nets) {
+      const len = lens.get(net);
+      if (len === undefined) {
+        issues.push({ severity: "warning", title: "Equal length group", detail: `${net} in ${g.name} isn't routed yet`, rule: "equalLength" });
+        continue;
+      }
+      const off = len - g.target;
+      if (Math.abs(off) > tol) {
+        issues.push({
+          severity: "warning", title: "Equal length group",
+          detail: `${net} is ${len.toFixed(0)} mil — ${off > 0 ? "over" : "under"} ${g.name}'s ${g.target} ±${tol} mil`,
+          rule: "equalLength",
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+/** A pad-pair group states the spacing its pairs should keep (mil). */
+export function runPadPairs(objects: CanvasObject[], groups: PadPairRule[]): ErcIssue[] {
+  const issues: ErcIssue[] = [];
+  // Identify a pad by something stable. `P1`/`P2` used to mean "the 1st/2nd pad
+  // in state.objects order", which any add / delete / z-order change rewrites —
+  // a group set up as P3-P4 then silently measured two other pads.
+  const pads = objects.filter((o) => o.scope !== "schematic" && o.kind === "pad");
+  const byName = new Map<string, CanvasObject>();
+  pads.forEach((p, i) => {
+    byName.set(p.id, p);                       // stable key the dialog stores
+    if (p.text) byName.set(p.text, p);         // designator, when it has one
+    byName.set(`P${i + 1}`, p);                // legacy groups keep working
+  });
+  for (const g of groups) {
+    for (const pair of (g.pads ?? "").split(";").map((x) => x.trim()).filter(Boolean)) {
+      const [a, b] = pair.split("-").map((x) => x.trim());
+      const pa = byName.get(a), pb = byName.get(b);
+      if (!pa || !pb) {
+        issues.push({ severity: "warning", title: "Pad pair group", detail: `${g.name}: ${pair} — pad not on the board`, rule: "padPair" });
+        continue;
+      }
+      const mil = Math.hypot(pb.x - pa.x, pb.y - pa.y) / MIL_TO_PX;
+      if (g.spacing > 0 && Math.abs(mil - g.spacing) > g.spacing * 0.1) {
+        issues.push({
+          severity: "warning", title: "Pad pair spacing",
+          detail: `${g.name}: ${pair} is ${mil.toFixed(0)} mil, target ${g.spacing} mil (±10%)`,
+          rule: "padPair", x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2,
+        });
+      }
+    }
+  }
+  return issues;
 }

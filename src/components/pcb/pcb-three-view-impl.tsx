@@ -11,8 +11,9 @@ import { OrbitControls, Grid, PerspectiveCamera, OrthographicCamera } from "@rea
 import { usePcbState } from "@/lib/pcb/store";
 import { derivePcbScene } from "@/lib/pcb/pcb-scene";
 import { PcbSceneMeshes } from "./pcb-meshes";
+import { getImportedGroup } from "@/lib/pcb/gltf-import";
 
-type Preset = "iso" | "top" | "bottom";
+type Preset = "iso" | "top" | "bottom" | "front" | "back" | "left" | "right";
 
 // Ref to the drei OrbitControls instance (we drive its .target / .update()).
 type OrbitRef = React.ComponentRef<typeof OrbitControls>;
@@ -22,6 +23,12 @@ type OrbitRef = React.ComponentRef<typeof OrbitControls>;
 function presetPos(preset: Preset, m: number): [number, number, number] {
   if (preset === "top") return [0, m * 1.5, 0.0001];
   if (preset === "bottom") return [0, -m * 1.5, 0.0001];
+  // #136 — the four elevations: straight-on views along X and Z, a hair above
+  // the board so the slab reads as a plate rather than a line.
+  if (preset === "front") return [0, m * 0.12, m * 1.6];
+  if (preset === "back") return [0, m * 0.12, -m * 1.6];
+  if (preset === "left") return [-m * 1.6, m * 0.12, 0];
+  if (preset === "right") return [m * 1.6, m * 0.12, 0];
   return [m * 0.8, m * 0.75, m * 0.95];
 }
 
@@ -159,6 +166,29 @@ export function PcbThreeViewImpl() {
       />
 
       <PcbSceneMeshes scene={scene} explode={p3d.explode} />
+
+      {/* Imported glTF/GLB models — normalised to a fifth of the board's
+          longest side so a model authored in metres isn't a wall, and parked on
+          the board origin or on the part it was imported onto. */}
+      {state.importedModels.map((m) => {
+        const group = getImportedGroup(m.id);
+        if (!group) return null;
+        const fit = m.size > 0 ? (boardMax / 5) / m.size : 1;
+        const part = m.target === "board" ? null : state.objects.find((o) => o.id === m.target);
+        // Same mapping `derivePcbScene` uses — the previous arithmetic dropped
+        // the board's 60 px canvas origin, so a model imported onto a part
+        // landed 60 px / scale away from it on both axes.
+        const px = part ? (part.x - scene.center.x) / scene.scale : 0;
+        const pz = part ? (part.y - scene.center.y) / scene.scale : 0;
+        return (
+          <primitive
+            key={m.id}
+            object={group}
+            scale={[fit, fit, fit]}
+            position={[px, scene.board.yOffset + scene.board.thickness / 2, pz]}
+          />
+        );
+      })}
     </Canvas>
   );
 }

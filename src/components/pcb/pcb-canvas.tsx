@@ -11,10 +11,10 @@
 import * as React from "react";
 import { usePcbState } from "@/lib/pcb/store";
 
-// FR-4 style board base — slightly darker than schematic page background
-// so copper/silkscreen layers read against it without losing dark mode.
-const BOARD_FILL = "#0d3b24";
-const BOARD_BORDER_FALLBACK = "#7C2DB9";
+// #127 — the board's substrate and its edge come from tokens, so the 2D board
+// is themed like everything else (and the 3D solder-mask colour has one home).
+const BOARD_FILL = "var(--color-pcb-substrate)";
+const BOARD_BORDER_FALLBACK = "var(--color-pcb-substrate-edge)";
 
 export function PcbCanvas() {
   const state = usePcbState();
@@ -33,24 +33,31 @@ export function PcbCanvas() {
         background: BOARD_FILL,
         border: `2px solid ${stroke}`,
         borderRadius: 4,
-        boxShadow: "0 8px 30px rgba(0,0,0,.25)",
+        boxShadow: "var(--elevation-4, 0 8px 30px rgba(0,0,0,.25))",
         overflow: "hidden",
       }}
       data-pcb-board
     >
-      {/* Copper-trace style grid background — subtle green dots */}
-      <svg
-        width="100%"
-        height="100%"
-        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
-      >
-        <defs>
-          <pattern id="ix-pcb-grid" width={24} height={24} patternUnits="userSpaceOnUse">
-            <circle cx="0.5" cy="0.5" r="0.8" fill="#2ebe69" opacity="0.18" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#ix-pcb-grid)" />
-      </svg>
+      {/* Board grid — same three styles as the schematic sheet (View ▸ Grid),
+          in the copper green that reads on the FR-4 base. */}
+      {state.gridType !== "none" && (
+        <svg
+          width="100%"
+          height="100%"
+          style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+        >
+          <defs>
+            <pattern id="ix-pcb-grid" width={24} height={24} patternUnits="userSpaceOnUse">
+              {state.gridType === "dots" ? (
+                <circle cx="0.5" cy="0.5" r="0.8" fill="var(--color-pcb-grid)" opacity="0.18" />
+              ) : (
+                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="var(--color-pcb-grid)" strokeOpacity="0.16" strokeWidth="1" />
+              )}
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#ix-pcb-grid)" />
+        </svg>
+      )}
 
       {/* Inner safe-area dashed outline so the board edge reads clearly */}
       <div

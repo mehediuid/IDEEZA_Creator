@@ -64,6 +64,25 @@ const ERC_TO_DIALOG: Record<string, { cat: "Net" | "Component" | "Reuse Block"; 
   designatorFormat: { cat: "Component", idx: 9 }, notAnnotated: { cat: "Component", idx: 10 }, dupDesignator: { cat: "Component", idx: 11 },
 };
 
+// Inverse of the map above: which Design-Rules rows the checker actually
+// enforces, and which rule id sits behind each row. The dialog reads these so
+// it can say plainly which toggles change the check and which are listed for
+// completeness (library-guaranteed or feature-blocked rules).
+export const ERC_ENFORCED_ROWS: Record<"Net" | "Component" | "Reuse Block", Set<number>> = {
+  Net: new Set(),
+  Component: new Set(),
+  "Reuse Block": new Set(),
+};
+export const ERC_RULE_AT: Record<"Net" | "Component" | "Reuse Block", Record<number, string>> = {
+  Net: {},
+  Component: {},
+  "Reuse Block": {},
+};
+for (const [rule, at] of Object.entries(ERC_TO_DIALOG)) {
+  ERC_ENFORCED_ROWS[at.cat].add(at.idx);
+  ERC_RULE_AT[at.cat][at.idx] = rule;
+}
+
 const CLUSTER_TOL = 13; // px — nodes this close are the same electrical node
 
 // Pin offsets (symbol-local) for multi-terminal parts, from the glyph lead tips.

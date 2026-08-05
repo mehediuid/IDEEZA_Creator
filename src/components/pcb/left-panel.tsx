@@ -5,20 +5,28 @@
 // Top row: Project Design / Library segmented tabs + the AI/add button.
 
 import * as React from "react";
-import { DsIcon, Icon } from "@/lib/pcb/icons";
+import { DsIcon } from "@/lib/pcb/icons";
 import { SearchInput } from "@/components/ideeza";
 import { AllLibraryFlyout, LibraryPanel } from "@/components/pcb/library-panel";
 import { ProjectNavigator } from "@/components/pcb/project-navigator";
-import { AiChatPanel, hasAiHandoff, MODULE_OF_CONTEXT, type ChatContext } from "@/components/code/ai-chat";
+import { AiChatPanel, AI_BOT_ICON, hasAiHandoff, MODULE_OF_CONTEXT, type ChatContext } from "@/components/code/ai-chat";
 import { dispatchThreeAction, type ThreeAction } from "@/components/3d/three-menu-bar";
 import { PLACE_TOOLS } from "@/lib/pcb/types";
 import { buildCompPills, buildLeftTabs, buildNetPills, buildSubTabs, buildTree } from "@/lib/pcb/data";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { Splitter } from "@/components/pcb/splitter";
+
+// One box, four tabs — so it says what *this* tab searches. It used to read
+// "Search parts & compo.." on all four, i.e. a lie on three of them.
+const SEARCH_HINT: Record<string, string> = {
+  page: "Search sheets",
+  net: "Search nets",
+  component: "Search parts",
+  object: "Search objects",
+};
 
 const CARET_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>';
-const ADD_SVG =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-on-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 8V5M9 3h6"/><circle cx="9" cy="13" r="1.1" fill="var(--color-text-on-brand)" stroke="none"/><circle cx="15" cy="13" r="1.1" fill="var(--color-text-on-brand)" stroke="none"/></svg>';
 
 type TreeNode = {
   label: string;
@@ -39,6 +47,45 @@ type TreeNode = {
 // with their own chrome pass topOffset; modules with their own tree pass a
 // moduleSlot that renders inside the Project Design scroll area, under the
 // project tree, so everything lives in ONE navigator.
+// The assistant's entry point is the one accented control in this panel, so it
+// carries the brand's own gradient (`--gradient-ai`) and a violet glow that
+// lifts it off the panel surface — that is what makes the eye land on it. There
+// is deliberately **no pulsing halo**: motion here would signal a state that
+// isn't changing, and this register bans decorative motion. Motion is on
+// interaction only (hover lift, press) and stops under reduced motion.
+const AI_ORB_CSS = `
+.ai-orb {
+  position: relative;
+  overflow: hidden;
+  background: var(--gradient-ai);
+  box-shadow: var(--glow-ai);
+  transition: box-shadow .18s ease-out, transform .18s ease-out;
+}
+/* A 1px lit edge along the top: the difference between a gradient tile and a
+   surface with a light on it. */
+.ai-orb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.34), inset 0 -1px 0 0 rgba(0, 0, 0, 0.14);
+}
+.ai-orb:hover { box-shadow: var(--glow-ai-strong); transform: translateY(-1px); }
+.ai-orb:active { box-shadow: var(--glow-ai); transform: translateY(0) scale(0.96); }
+/* Open: the glow retracts and the surface presses in, so "the assistant is
+   showing" never looks like "the assistant is available". */
+.ai-orb[aria-pressed="true"] {
+  box-shadow: inset 0 1px 3px 0 rgba(0, 0, 0, 0.34);
+  transform: none;
+}
+.ai-orb[aria-pressed="true"]::before { box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16); }
+@media (prefers-reduced-motion: reduce) {
+  .ai-orb { transition: none; }
+  .ai-orb:hover, .ai-orb:active { transform: none; }
+}
+`;
+
 export function LeftPanel({
   topOffset,
   bottomOffset = 36,
@@ -115,7 +162,7 @@ export function LeftPanel({
         top: topOffset ?? (62),
         bottom: bottomOffset,
         left: 74,
-        width: 292,
+        width: state.panelSizes.left,
         background: "var(--color-bg-surface)",
         borderRight: "var(--border-width-1) solid var(--color-border-default)",
         display: "flex",
@@ -123,14 +170,21 @@ export function LeftPanel({
         zIndex: 15,
       }}
     >
-      {/* tab row + add button */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-7) var(--spacing-5)" }}>
+      <Splitter side="left" size={state.panelSizes.left} label="Resize the left panel" />
+      {/* tab row — the panel's three destinations plus #113's collapse chevron.
+          The AI assistant sits with the tabs (it swaps the same panel body), so
+          there is one row of "what am I looking at" instead of a full-width
+          button above a tab strip. */}
+      <style>{AI_ORB_CSS}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-7) var(--spacing-5)" }}>
         <div style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-lg)", padding: "var(--spacing-1)", flex: 1 }}>
           {leftTabs.map((t) => (
             <div
               key={t.label}
               className="ix-tab"
-              onClick={t.onClick}
+              // Picking a tab while the AI view is open used to change the tab
+              // invisibly behind the chat — so it closes the chat and shows it.
+              onClick={() => { setAiOpen(false); t.onClick?.(); }}
               style={{
                 flex: 1,
                 textAlign: "center",
@@ -147,27 +201,34 @@ export function LeftPanel({
             </div>
           ))}
         </div>
-        <div
-          className="ix-btn"
+        <button
+          type="button"
+          className="ai-orb"
           onClick={() => setAiOpen((v) => !v)}
-          title="AI assistant"
-          aria-label="AI assistant"
-          role="button"
+          aria-pressed={aiOpen}
+          aria-label={aiOpen ? "Close AI assistant" : "Open AI assistant"}
+          title={aiOpen ? "Close the AI assistant" : "Ask the AI assistant about this module"}
           style={{
-            width: 34,
-            height: 34,
-            borderRadius: "var(--radius-lg)",
-            background: aiOpen ? "var(--color-violet-800, #5b21b6)" : "var(--color-violet-600)",
-            outline: aiOpen ? "2px solid var(--color-border-brand)" : "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            flex: "0 0 auto",
+            width: 32, height: 30, flex: "0 0 auto", borderRadius: "var(--radius-lg)",
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontFamily: "inherit", padding: 0, border: "none",
+            // On the gradient the glyph is always the on-brand light ink.
+            color: "var(--color-text-on-brand)",
           }}
         >
-          <Icon html={ADD_SVG} size={20} />
-        </div>
+          {AI_BOT_ICON}
+        </button>
+        <button
+          className="ix-tool"
+          aria-label="Collapse left panel"
+          title="Collapse the navigator ([)"
+          onClick={() => actions.toggleView("Left-Side panel")}
+          style={{ width: 24, height: 24, flex: "0 0 auto", borderRadius: "var(--radius-md)", background: "transparent", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-text-secondary)" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+        </button>
       </div>
 
       {/* AI assistant view — the robot button swaps the panel body for the
@@ -200,7 +261,7 @@ export function LeftPanel({
 
           {/* search */}
           <div style={{ padding: "var(--spacing-0) var(--spacing-7) var(--spacing-6)" }}>
-            <SearchInput value={query} onValueChange={setQuery} placeholder="Search parts & compo.." />
+            <SearchInput value={query} onValueChange={setQuery} placeholder={SEARCH_HINT[state.leftSub] ?? "Search"} />
           </div>
 
           </>)}

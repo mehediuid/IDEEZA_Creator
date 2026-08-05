@@ -82,6 +82,12 @@ export type Pcb3DScene = {
   board: {
     width: number;
     depth: number;
+    /** Board cutouts — real holes in the slab, scene units, centred coords. */
+    cutouts: Array<{ x: number; z: number; w: number; d: number }>;
+    /** The board's own edge when the user drew one (Board Outline tool):
+     *  `rect` uses width/depth, `circle` uses `r`, `poly` its ring. Without one
+     *  the slab stays the `pcbBoard` rectangle. */
+    outline: null | { shape: "rect" | "circle" | "poly"; x: number; z: number; w: number; d: number; r: number; pts: Array<[number, number]> };
     thickness: number;
     color: string;
     material: string;
@@ -100,6 +106,10 @@ export type Pcb3DScene = {
   silkGlossy: boolean; // UV printing → glossier silk
   expose: number; // Layer Expose (mm → scene) — copper proudness above the mask
   scale: number; // px per scene unit
+  /** Canvas px of the scene's centre. Anything positioned from canvas coords
+   *  must map through this rather than re-derive it — the 3D view used to drop
+   *  the board's 60 px origin and park imported models off their part. */
+  center: { x: number; y: number };
 };
 
 const TRACK_KINDS = new Set(["track"]);
@@ -128,9 +138,41 @@ export function derivePcbScene(state: PcbState): Pcb3DScene {
   const material = t3?.material ?? "FR-4";
   const look = MATERIAL_LOOK[material] ?? MATERIAL_LOOK["FR-4"];
   const yOffset = parseMm(t3?.pcbHeightFromTop) * MM_TO_SCENE;
+  const cutouts = (state.objects ?? [])
+    .filter((o) => o.kind === "cutout" && (o.scope ?? "schematic") === "pcb")
+    .map((o) => {
+      const w = o.width ?? 0, h = o.height ?? 0;
+      return { x: px(o.x + w / 2), z: pz(o.y + h / 2), w: sz(w), d: sz(h) };
+    })
+    .filter((c) => c.w > 0.001 && c.d > 0.001);
+  // #122 — a drawn board outline is the real board edge, so the slab follows it
+  // (it used to be ignored: a circular board still rendered as a rectangle).
+  const outlineObj = (state.objects ?? []).find(
+    (o) => o.kind === "boardOutline" && (o.scope ?? "schematic") === "pcb" && (o.props as Record<string, unknown> | undefined)?.shape,
+  );
+  const outline = ((): Pcb3DScene["board"]["outline"] => {
+    if (!outlineObj) return null;
+    const shape = String((outlineObj.props as Record<string, unknown>).shape);
+    if (shape === "polygon") {
+      const ring = outlineObj.points?.[0] ?? [];
+      if (ring.length < 3) return null;
+      return {
+        shape: "poly", x: 0, z: 0, w: 0, d: 0, r: 0,
+        pts: ring.map((p) => [px(outlineObj.x + p.x), pz(outlineObj.y + p.y)] as [number, number]),
+      };
+    }
+    const w = outlineObj.width ?? 0, h = outlineObj.height ?? 0;
+    if (w < 1 || h < 1) return null;
+    if (shape === "circle") {
+      return { shape: "circle", x: px(outlineObj.x), z: pz(outlineObj.y), w: sz(w), d: sz(w), r: sz(w / 2), pts: [] };
+    }
+    return { shape: "rect", x: px(outlineObj.x + w / 2), z: pz(outlineObj.y + h / 2), w: sz(w), d: sz(h), r: 0, pts: [] };
+  })();
   const board = {
     width: W / scale,
     depth: H / scale,
+    cutouts,
+    outline,
     thickness,
     color,
     material,
@@ -249,7 +291,7 @@ export function derivePcbScene(state: PcbState): Pcb3DScene {
     }
   }
 
-  return { board, tracks, vias, pads, bodies, regions, silk, padColor, silkColor, silkGlossy, expose, scale };
+  return { board, tracks, vias, pads, bodies, regions, silk, padColor, silkColor, silkGlossy, expose, scale, center: { x: cx, y: cy } };
 }
 
 export { PAD_GOLD, VIA_COPPER, VIA_HOLE };

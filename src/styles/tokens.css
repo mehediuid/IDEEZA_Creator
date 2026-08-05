@@ -18,6 +18,8 @@
   --color-violet-50: #f8f5ff;
   --color-violet-100: #ede5ff;
   --color-violet-200: #d9cafe;
+  --color-cyan-400: #22d3ee;
+  --color-teal-400: #2dd4bf;
   --color-violet-300: #bb96fc;
   --color-violet-400: #ab60f7;
   --color-violet-500: #9126d9;
@@ -127,6 +129,7 @@
   --spacing-6: 12px;
   --spacing-7: 14px;
   --spacing-8: 16px;
+  --spacing-9: 18px;
   --spacing-10: 20px;
   --spacing-12: 24px;
   --spacing-16: 32px;
@@ -267,6 +270,16 @@
   --color-bg-ai: var(--color-violet-600);
   --color-bg-ai-subtle: var(--color-violet-50);
 
+  /* Gradients — the product has exactly one, the brand's. It was hand-written
+     as `linear-gradient(135deg,#b06be0,#7c2db9)` at each call site (avatar,
+     profile menu), so it could not follow the theme. `--gradient-ai` is the
+     same ramp for the assistant's entry points, plus the glow that lifts them
+     off a panel. */
+  --gradient-brand: linear-gradient(135deg, var(--color-violet-400) 0%, var(--color-violet-600) 100%);
+  --gradient-ai: var(--gradient-brand);
+  --glow-ai: 0 2px 9px -1px color-mix(in srgb, var(--color-violet-500) 46%, transparent);
+  --glow-ai-strong: 0 3px 14px -1px color-mix(in srgb, var(--color-violet-500) 62%, transparent);
+
   /* Text */
   --color-text-primary: var(--color-gray-900);
   --color-text-secondary: var(--color-gray-600);
@@ -309,9 +322,55 @@
   --color-pcb-mask: var(--color-green-800);
   --color-pcb-drill: var(--color-gray-600);
   --color-pcb-outline: var(--color-violet-600);
-  /* Canvas interaction states (shared schematic + PCB) */
-  --color-canvas-highlight: var(--color-yellow-500); /* net highlight / hover glow */
-  --color-canvas-select: var(--color-violet-600);    /* selection — reserved */
+  /* #127 — the board itself in 2D: substrate under the copper, plus the bed the
+   * board sits on. Two adjacent surfaces can only carry ~1.1:1 of fill
+   * contrast, so the board edge does the separating (see --color-pcb-outline). */
+  --color-pcb-substrate: var(--color-green-900);
+  --color-pcb-substrate-edge: color-mix(in srgb, var(--color-pcb-outline) 70%, transparent);
+  --color-pcb-bed: var(--color-bg-page);
+  /* The board's own grid — ink on the substrate, not on the page. */
+  --color-pcb-grid: color-mix(in srgb, var(--color-green-400) 55%, transparent);
+  /* #130 — documentation / drawing objects: one standard colour per meaning, so
+   * a board's non-copper marks read as a family instead of per-object accidents.
+   * A colour the user sets on an object still wins. */
+  --color-draw-line: var(--color-gray-300);
+  --color-draw-shape: var(--color-cyan-400, var(--color-blue-300));
+  --color-draw-arc: var(--color-teal-400, var(--color-blue-400));
+  --color-draw-dimension: var(--color-yellow-400);
+  --color-draw-text: var(--color-gray-100);
+  --color-draw-keepout: var(--color-orange-400);
+  /* #126 — board-only interaction states on top of the shared canvas ones:
+   * copper being routed right now, and copper a DRC finding points at. */
+  --color-pcb-routing: var(--color-violet-400);
+  --color-pcb-routing-glow: color-mix(in srgb, var(--color-pcb-routing) 45%, transparent);
+  --color-pcb-violation: var(--color-red-400);
+  --color-pcb-violation-fill: color-mix(in srgb, var(--color-pcb-violation) 18%, transparent);
+  /* How far a non-active layer fades when Focus is on — one number, read by
+   * the canvas so the strip's toggle and the drawing can't disagree. */
+  --pcb-dim-opacity: 0.3;
+  /* Canvas interaction states (shared schematic + PCB).
+     One vocabulary for every object kind: hover = "this is what you'd pick",
+     select = "this is picked", highlight = "this net is traced". The fills are
+     per-theme because the same alpha reads far weaker on a white sheet. */
+  --color-canvas-highlight: var(--color-yellow-700); /* net highlight — dark amber, readable on the light sheet */
+  --color-canvas-select: var(--color-violet-600);    /* selection */
+  --color-canvas-select-fill: color-mix(in srgb, var(--color-canvas-select) 16%, transparent);
+  --color-canvas-hover: var(--color-violet-400);
+  --color-canvas-hover-fill: color-mix(in srgb, var(--color-canvas-hover) 12%, transparent);
+  --color-canvas-marquee-fill: color-mix(in srgb, var(--color-canvas-select) 12%, transparent);
+  --color-canvas-highlight-fill: color-mix(in srgb, var(--color-canvas-highlight) 18%, transparent);
+  /* Crosshair guides — a neutral hairline, deliberately NOT the accent: it must
+     not read as a selection. */
+  --color-canvas-crosshair: color-mix(in srgb, var(--color-text-primary) 26%, transparent);
+  /* Sheet grid — 7% of ink vanished on a white sheet; 12% reads in both. */
+  --color-canvas-grid: color-mix(in srgb, var(--color-text-primary) 12%, transparent);
+  /* The title block must separate from the sheet it sits on: a white card on a
+     white sheet measured 1.05:1, i.e. only its border was doing any work. */
+  --color-canvas-card: var(--color-bg-surface-raised);
+  /* Two adjacent surfaces can't carry much fill contrast (a raised card on a
+     white sheet measures ~1.1:1), so the *boundary* does the separating — WCAG
+     1.4.11 asks 3:1 for a UI edge, and 38% ink clears it in both themes. */
+  --color-canvas-card-border: color-mix(in srgb, var(--color-text-primary) 50%, transparent);
 
   /* Icons */
   --color-icon-default: var(--color-gray-600);
@@ -381,6 +440,16 @@
  * Dark theme — overrides
  * ============================================================ */
 [data-theme="dark"] {
+  /* Review fix — dark theme: selection has to outrank hover (violet-400 reads
+   * 5.1:1 here, so violet-600 at 2.6:1 inverted the hierarchy), and the net
+   * highlight can go back to the brighter amber. */
+  --color-canvas-select: var(--color-violet-300);
+  --color-canvas-highlight: var(--color-yellow-500);
+
+  /* The board keeps one substrate across themes (see the light block); only
+   * the bed under it changes. */
+  --color-pcb-bed: var(--color-bg-page);
+
   color-scheme: dark;
 
   /* Backgrounds */
@@ -406,6 +475,10 @@
   --color-bg-info-subtle: var(--color-blue-950);
   --color-bg-ai: var(--color-violet-500);
   --color-bg-ai-subtle: var(--color-violet-950);
+  --gradient-brand: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-600) 100%);
+  --gradient-ai: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-500) 100%);
+  --glow-ai: 0 2px 10px -1px color-mix(in srgb, var(--color-violet-400) 44%, transparent);
+  --glow-ai-strong: 0 3px 16px -1px color-mix(in srgb, var(--color-violet-400) 62%, transparent);
 
   /* Text */
   --color-text-primary: var(--color-gray-50);
@@ -471,6 +544,16 @@
 /* Honor system preference when no explicit theme is set */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
+  /* Review fix — dark theme: selection has to outrank hover (violet-400 reads
+   * 5.1:1 here, so violet-600 at 2.6:1 inverted the hierarchy), and the net
+   * highlight can go back to the brighter amber. */
+  --color-canvas-select: var(--color-violet-300);
+  --color-canvas-highlight: var(--color-yellow-500);
+
+  /* The board keeps one substrate across themes (see the light block); only
+   * the bed under it changes. */
+  --color-pcb-bed: var(--color-bg-page);
+
     color-scheme: dark;
 
     --color-bg-page: var(--color-gray-950);
@@ -481,6 +564,10 @@
     --color-bg-brand-hover: var(--color-violet-400);
     --color-bg-brand-pressed: var(--color-violet-300);
     --color-bg-brand-subtle: var(--color-violet-950);
+    --gradient-brand: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-600) 100%);
+    --gradient-ai: linear-gradient(135deg, var(--color-violet-300) 0%, var(--color-violet-500) 100%);
+    --glow-ai: 0 2px 10px -1px color-mix(in srgb, var(--color-violet-400) 44%, transparent);
+    --glow-ai-strong: 0 3px 16px -1px color-mix(in srgb, var(--color-violet-400) 62%, transparent);
 
     --color-text-primary: var(--color-gray-50);
     --color-text-secondary: var(--color-gray-300);

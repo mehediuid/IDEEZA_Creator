@@ -9,11 +9,52 @@
 import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { CanvasObject } from "@/lib/pcb/types";
-import { isSelectable } from "@/lib/pcb/types";
+import { isSelectable, PLACE_TOOLS, DRAFT_TOOLS } from "@/lib/pcb/types";
+import { planTrackPath } from "@/lib/pcb/route-path";
+
+// Supply rail (VCC / +5V / -5V / any named rail). The arrow is drawn 20 units
+// wide — the same span as the GND bar below — so a rail no longer reads as the
+// smallest thing on the sheet, and the name it carries is part of the symbol.
+// One source: the placed object renders this with its own text, and GLYPHS
+// holds the default, so the two can't drift apart.
+function supplyGlyph(label: string) {
+  return (
+    <g stroke="currentColor" strokeWidth={1.9} fill="currentColor" strokeLinejoin="round" strokeLinecap="round">
+      <path d="M0 -15l-10 8h20z" />
+      <path d="M0 -7v16" fill="none" />
+      <text x="0" y="-17.5" textAnchor="middle" fontSize={9} stroke="none" fontWeight={700}>{label}</text>
+    </g>
+  );
+}
+
+// #130 — standard colours for the drawing / documentation kinds (tokens, so
+// both themes are covered and the Layer Manager can still override per layer).
+const DRAW_COLOR: Record<string, string> = {
+  line: "var(--color-draw-line)",
+  polyline: "var(--color-draw-line)",
+  rectangle: "var(--color-draw-shape)",
+  circle: "var(--color-draw-shape)",
+  ellipse: "var(--color-draw-shape)",
+  arc: "var(--color-draw-arc)",
+  bezier: "var(--color-draw-arc)",
+  dimension: "var(--color-draw-dimension)",
+  text: "var(--color-draw-text)",
+  note: "var(--color-draw-text)",
+  table: "var(--color-draw-text)",
+  maskRegion: "var(--color-draw-keepout)",
+  componentMask: "var(--color-draw-keepout)",
+  prohibitedRegion: "var(--color-draw-keepout)",
+};
+
+/** The symbol a place tool will drop, drawn from the same geometry the placed
+ *  object uses — the ghost preview must never be a second copy. */
+export function glyphFor(kind: string): React.ReactNode {
+  return GLYPHS[kind] ?? <circle cx={0} cy={0} r={6} fill="currentColor" />;
+}
 
 // Each glyph is centered on (0, 0) in its own local coords. The wrapper
 // translates and rotates it.
-const GLYPHS: Record<string, React.ReactNode> = {
+export const GLYPHS: Record<string, React.ReactNode> = {
   resistor: (
     <g stroke="currentColor" strokeWidth={1.7} fill="none" strokeLinecap="round" strokeLinejoin="round">
       <path d="M-26 0h6l3-8 6 16 6-16 3 8h6" />
@@ -69,13 +110,7 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="M0 6 V-5 M-4 -1 L0 -6 L4 -1" />
     </g>
   ),
-  vcc5v: (
-    <g stroke="currentColor" strokeWidth={1.8} fill="currentColor">
-      <path d="M0 -14l-6 6h12z" />
-      <path d="M0 -8v14" fill="none" />
-      <text x="0" y="-18" textAnchor="middle" fontSize={9} stroke="none" fontWeight={700}>+5V</text>
-    </g>
-  ),
+  vcc5v: supplyGlyph("+5V"),
   pgnd: (
     <g stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" fill="none">
       <path d="M0 -8v8" />
@@ -305,40 +340,10 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="M0 -13v-3M0 13v3M-13 0h-3M13 0h3" strokeLinecap="round" />
     </g>
   ),
-  viaFence: (
-    <g stroke="currentColor" strokeWidth={1.4} fill="none">
-      {[-14, -7, 0, 7, 14].map((cx) => (
-        <React.Fragment key={cx}>
-          <circle cx={cx} cy={0} r={3} />
-          <circle cx={cx} cy={0} r={1} fill="currentColor" stroke="none" />
-        </React.Fragment>
-      ))}
-    </g>
-  ),
   shapedPad: (
     <g stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="currentColor" fillOpacity={0.25}>
       <path d="M-14 -6q4 -8 12 -6l10 3q6 2 4 9l-3 8q-2 6 -9 4l-11 -3q-7 -2 -5 -9z" />
       <circle cx={0} cy={0} r={2.5} fillOpacity={1} stroke="none" />
-    </g>
-  ),
-  fpcStiffener: (
-    <g stroke="currentColor" strokeWidth={1.5} fill="none">
-      <rect x={-15} y={-10} width={30} height={20} rx={2} />
-      <path d="M-9 -10v20M-3 -10v20M3 -10v20M9 -10v20" opacity={0.6} />
-    </g>
-  ),
-  stackTable: (
-    <g stroke="currentColor" strokeWidth={1.4} fill="none">
-      <rect x={-15} y={-11} width={30} height={22} />
-      <path d="M-15 -4h30M-15 3h30M-3 -11v22" />
-    </g>
-  ),
-  drillTable: (
-    <g stroke="currentColor" strokeWidth={1.4} fill="none">
-      <rect x={-15} y={-11} width={30} height={22} />
-      <path d="M-15 -3h30M-3 -11v22" />
-      <circle cx={-9} cy={3.5} r={2.2} />
-      <circle cx={5} cy={3.5} r={1.4} />
     </g>
   ),
   canvasOrigin: (
@@ -352,9 +357,16 @@ const GLYPHS: Record<string, React.ReactNode> = {
 const WIRE_KINDS = new Set(["wire", "bus", "track", "dimension", "diffPair", "lengthTune", "polyline", "line", "ratsnest"]);
 
 export function PlacedObjects() {
+  // With a place/draft tool armed the canvas owns the click, so objects must
+  // not swallow it — otherwise a net label can't be dropped on a wire or part.
   const state = usePcbState();
   const actions = usePcbActions();
-  const SELECTED = "var(--color-violet-600)";
+  const toolArmed = PLACE_TOOLS.includes(state.tool) || DRAFT_TOOLS.includes(state.tool);
+  // One state vocabulary, from tokens, for every kind (see tokens.css
+  // "Canvas interaction states") — the colours used to be hardcoded rgba(), so
+  // they could not differ per theme and drifted between object types.
+  const SELECTED = "var(--color-canvas-select)";
+  const HOVERED = "var(--color-canvas-hover)";
   const NORMAL = "var(--color-text-primary)";
   const selectedSet = React.useMemo(() => new Set(state.selectedIds), [state.selectedIds]);
 
@@ -366,6 +378,8 @@ export function PlacedObjects() {
   const firstSheetId = state.schematicSheets[0]?.id;
   const inScope = (o: CanvasObject) => {
     if (o.scope && o.scope !== modeScope) return false;
+    // #110 — the toolbar's Ratsnest toggle really hides the airwires.
+    if (o.kind === "ratsnest" && state.showRatsnest === false) return false;
     if (state.mode === "schematic" && (o.sheetId ?? firstSheetId) !== state.activeSheetId) return false;
     return true;
   };
@@ -373,11 +387,52 @@ export function PlacedObjects() {
   // Schematic nets are computed live (no stored `net`), so members come from the
   // id list the store resolved when the net was highlighted; PCB uses `o.net`.
   const HIGHLIGHT = "var(--color-canvas-highlight)";
+  // Hover — "this is the object your click would take". Only while a selection
+  // tool is active: with a place/draft tool armed the click belongs to the tool,
+  // so highlighting what is underneath would be a lie.
+  const [hoverId, setHoverId] = React.useState<string | null>(null);
+  const probe = state.probe;
+  const hoverOn = !toolArmed && !state.moveMode;
+  const hoverProps = (id: string) =>
+    hoverOn
+      ? {
+          onMouseEnter: () => setHoverId(id),
+          onMouseLeave: () => setHoverId((h) => (h === id ? null : h)),
+        }
+      : {};
+  const isHovered = (id: string) => hoverOn && hoverId === id;
   const hotSet = React.useMemo(() => new Set(state.highlightedMembers), [state.highlightedMembers]);
   const isHot = (o: CanvasObject) => hotSet.has(o.id) || (!!state.highlightedNet && o.net === state.highlightedNet);
 
   // PCB mode: look up layer color + visibility per object. Schematic mode
   // ignores `obj.layer` entirely.
+  // #140 — draw in stack order (bottom copper first, documentation last) so a
+  // bottom track can't sit on top of a top track, and the 2D view matches the
+  // 3D stack. Objects with no layer keep their document order at the end.
+  const layerOrder = React.useMemo(() => {
+    const ids = (state.pcbLayers ?? []).map((l) => l.id);
+    const rank = new Map<string, number>();
+    const order = ["bottom", "bottomSilk", "bottomPaste", "bottomMask", "inner2", "inner1", "top", "topMask", "topPaste", "topSilk", "outline", "drill", "multi", "document"];
+    order.forEach((idv, i) => rank.set(idv, i));
+    ids.forEach((idv) => { if (!rank.has(idv)) rank.set(idv, order.length); });
+    return rank;
+  }, [state.pcbLayers]);
+  const ordered = React.useMemo(() => {
+    if (state.mode === "schematic") return state.objects;
+    return [...state.objects].sort(
+      (a, b) => (layerOrder.get(a.layer ?? "") ?? 99) - (layerOrder.get(b.layer ?? "") ?? 99),
+    );
+  }, [state.objects, layerOrder, state.mode]);
+
+  // #140 — one predicate for "not the layer you're working on", used by every
+  // renderer below (glyphs, wires/tracks, cutouts, outlines, poured copper).
+  // It used to reach only PlacedGlyph, so the toast said "Other layers dimmed"
+  // while every track stayed at full strength.
+  const isDim = React.useCallback(
+    (o: CanvasObject) =>
+      state.focusActiveLayer && state.mode !== "schematic" && !!o.layer && o.layer !== state.activePcbLayer,
+    [state.focusActiveLayer, state.mode, state.activePcbLayer],
+  );
   const layerMap = React.useMemo(() => {
     const m = new Map<string, { color: string; visible: boolean; transparency: number }>();
     state.pcbLayers.forEach((l) => m.set(l.id, { color: l.color, visible: l.visible, transparency: l.transparency }));
@@ -394,7 +449,7 @@ export function PlacedObjects() {
     if (state.mode !== "pcb" || !obj.layer) return true;
     return layerMap.get(obj.layer)?.visible ?? true;
   };
-  const colorFor = (obj: { layer?: string; color?: string; net?: string }) => {
+  const colorFor = (obj: { kind?: string; layer?: string; color?: string; net?: string }) => {
     if (obj.color) return obj.color;
     if (state.mode === "pcb" && obj.net) {
       const nc = netMap.get(obj.net);
@@ -404,6 +459,9 @@ export function PlacedObjects() {
       const l = layerMap.get(obj.layer);
       if (l) return l.color;
     }
+    // #130 — documentation strokes (line · polyline · dimension) take their
+    // standard colour rather than plain ink, so they read as one family.
+    if (obj.kind && DRAW_COLOR[obj.kind]) return DRAW_COLOR[obj.kind];
     return NORMAL;
   };
 
@@ -458,33 +516,74 @@ export function PlacedObjects() {
             const isBus = o.kind === "bus";
             const isTrack = o.kind === "track";
             const hot = isHot(o);
-            const stroke = sel ? SELECTED : hot ? HIGHLIGHT : colorFor(o);
+            const hov = isHovered(o.id) && !sel;
+            const stroke = sel ? SELECTED : hov ? HOVERED : hot ? HIGHLIGHT : colorFor(o);
+            const dim = isDim(o) && !sel && !hot;
             const w = (isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : sel ? 2.6 : 1.7) + (hot ? 1.2 : 0);
+            const x2 = o.endX ?? o.x;
+            const y2 = o.endY ?? o.y;
             return (
-              <line
-                key={o.id}
-                data-object-id={o.id}
-                x1={o.x}
-                y1={o.y}
-                x2={o.endX ?? o.x}
-                y2={o.endY ?? o.y}
-                stroke={stroke}
-                strokeWidth={w}
-                strokeLinecap="round"
-                style={{ pointerEvents: "stroke", cursor: "move", filter: hot ? "drop-shadow(0 0 3px var(--color-canvas-highlight))" : undefined }}
-                onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
-              />
+              <React.Fragment key={o.id}>
+                {/* Hit line — a 1.7px stroke is a pixel-hunt to point at, so the
+                    pickable band is wider than the ink. It carries the object id
+                    (the canvas mousedown reads it) and the hover handlers; the
+                    visible line above it takes no pointer events. */}
+                <line
+                  data-object-id={o.id}
+                  x1={o.x}
+                  y1={o.y}
+                  x2={x2}
+                  y2={y2}
+                  stroke="transparent"
+                  strokeWidth={Math.max(9, w + 6)}
+                  strokeLinecap="round"
+                  style={{ pointerEvents: "stroke", cursor: "move" }}
+                  {...hoverProps(o.id)}
+                  onClick={toolArmed ? undefined : (e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+                />
+                <line
+                  x1={o.x}
+                  y1={o.y}
+                  x2={x2}
+                  y2={y2}
+                  stroke={stroke}
+                  strokeWidth={w}
+                  strokeLinecap="round"
+                  pointerEvents="none"
+                  style={{
+                    // A CSS variable only resolves in `style`; as the SVG
+                    // `opacity` attribute it is simply ignored, which is why
+                    // dimming a track silently did nothing.
+                    opacity: dim ? "var(--pcb-dim-opacity, 0.3)" : undefined,
+                    filter: hot
+                      ? "drop-shadow(0 0 3px var(--color-canvas-highlight))"
+                      : sel
+                      ? "drop-shadow(0 0 3px var(--color-canvas-select))"
+                      : undefined,
+                  }}
+                />
+              </React.Fragment>
             );
           })}
           {state.draftWire && <DraftLine />}
+          {state.draftPoly && state.draftPoly.points.length > 0 && (
+            <polyline
+              points={state.draftPoly.points.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke="var(--color-pcb-outline)"
+              strokeWidth={1.6}
+              strokeDasharray="5 3"
+              pointerEvents="none"
+            />
+          )}
           {state.rubberBand && (
             <rect
               x={Math.min(state.rubberBand.x1, state.rubberBand.x2)}
               y={Math.min(state.rubberBand.y1, state.rubberBand.y2)}
               width={Math.abs(state.rubberBand.x2 - state.rubberBand.x1)}
               height={Math.abs(state.rubberBand.y2 - state.rubberBand.y1)}
-              fill="rgba(124,45,185,.08)"
-              stroke="var(--color-violet-600)"
+              fill="var(--color-canvas-marquee-fill)"
+              stroke="var(--color-canvas-select)"
               strokeWidth={1}
               strokeDasharray="3 3"
               pointerEvents="none"
@@ -493,8 +592,8 @@ export function PlacedObjects() {
           {state.lasso && state.lasso.length > 1 && (
             <polygon
               points={state.lasso.map((p) => `${p.x},${p.y}`).join(" ")}
-              fill="rgba(124,45,185,.08)"
-              stroke="var(--color-violet-600)"
+              fill="var(--color-canvas-marquee-fill)"
+              stroke="var(--color-canvas-select)"
               strokeWidth={1}
               strokeDasharray="4 3"
               pointerEvents="none"
@@ -503,13 +602,61 @@ export function PlacedObjects() {
         </g>
       </svg>
 
-      {state.objects.filter((o) => !WIRE_KINDS.has(o.kind) && isVisible(o) && inScope(o)).map((o) =>
-        o.points && o.points.length ? (
-          <CombineShape key={o.id} obj={o} selected={selectedSet.has(o.id)} highlighted={isHot(o)} />
+      {/* cross-probe arrival ring — keyed by nonce so a repeat probe restarts it */}
+      {probe && (() => {
+        const t = state.objects.find((o) => o.id === probe.id);
+        if (!t || !inScope(t)) return null;
+        const cx = WIRE_KINDS.has(t.kind) ? ((t.x + (t.endX ?? t.x)) / 2) : t.x;
+        const cy = WIRE_KINDS.has(t.kind) ? ((t.y + (t.endY ?? t.y)) / 2) : t.y;
+        return <div key={probe.nonce} className="ix-probe" style={{ left: cx - 34, top: cy - 34, width: 68, height: 68, zIndex: 7 }} />;
+      })()}
+
+      {ordered.filter((o) => !WIRE_KINDS.has(o.kind) && isVisible(o) && inScope(o)).map((o) =>
+        o.kind === "boardOutline" && (o.props as Record<string, unknown> | undefined)?.shape ? (
+          <BoardOutlineShape
+            key={o.id}
+            obj={o}
+            dimmed={isDim(o)}
+            selected={selectedSet.has(o.id)}
+            toolArmed={toolArmed}
+            hovered={isHovered(o.id) && !selectedSet.has(o.id)}
+            hoverProps={hoverProps(o.id)}
+          />
+        ) : o.kind === "image" && (o.props as Record<string, unknown> | undefined)?.src ? (
+          <ImageObject
+            key={o.id}
+            obj={o}
+            selected={selectedSet.has(o.id)}
+            toolArmed={toolArmed}
+            hovered={isHovered(o.id) && !selectedSet.has(o.id)}
+            hoverProps={hoverProps(o.id)}
+          />
+        ) : o.kind === "cutout" ? (
+          <CutoutArea
+            key={o.id}
+            obj={o}
+            dimmed={isDim(o)}
+            selected={selectedSet.has(o.id)}
+            toolArmed={toolArmed}
+            hovered={isHovered(o.id) && !selectedSet.has(o.id)}
+            hoverProps={hoverProps(o.id)}
+          />
+        ) : o.points && o.points.length ? (
+          <CombineShape
+            key={o.id}
+            obj={o}
+            dimmed={isDim(o)}
+            selected={selectedSet.has(o.id)}
+            highlighted={isHot(o)}
+            toolArmed={toolArmed}
+            hovered={isHovered(o.id) && !selectedSet.has(o.id)}
+            hoverProps={hoverProps(o.id)}
+          />
         ) : (
         <PlacedGlyph
           key={o.id}
           obj={o}
+          dimmed={isDim(o)}
           selected={selectedSet.has(o.id)}
           highlighted={isHot(o)}
           editing={editingId === o.id}
@@ -519,6 +666,9 @@ export function PlacedObjects() {
               : undefined
           }
           designatorActive={selectedSet.has(o.id) && state.selSub === "designator"}
+          toolArmed={toolArmed}
+          hovered={isHovered(o.id) && !selectedSet.has(o.id)}
+          hoverProps={hoverProps(o.id)}
           onSelect={(additive) => {
             if (!isSelectable(o.kind, state.boardSettings ?? {}, state.mode)) return;
             actions.selectPlaced(o.id, additive);
@@ -534,9 +684,154 @@ export function PlacedObjects() {
   );
 }
 
+// An imported image — the real bitmap, not the picture-frame placeholder the
+// `image` glyph used to draw. Size comes from the object (set at import, and
+// editable in Properties like any other width/height).
+function ImageObject({
+  obj, selected, toolArmed, hovered, hoverProps,
+}: {
+  obj: CanvasObject;
+  selected: boolean;
+  toolArmed?: boolean;
+  hovered?: boolean;
+  hoverProps?: { onMouseEnter?: () => void; onMouseLeave?: () => void };
+}) {
+  const p = (obj.props ?? {}) as Record<string, unknown>;
+  const w = Math.max(4, obj.width ?? 120);
+  const h = Math.max(4, obj.height ?? 90);
+  const edge = selected
+    ? "var(--color-canvas-select)"
+    : hovered
+    ? "var(--color-canvas-hover)"
+    : "transparent";
+  return (
+    <div
+      data-object-id={obj.id}
+      onClick={toolArmed ? undefined : (e) => e.stopPropagation()}
+      {...hoverProps}
+      title={`${String(p.name || "Image")} · ${Math.round(w)} × ${Math.round(h)} px`}
+      style={{
+        position: "absolute",
+        left: obj.x - w / 2,
+        top: obj.y - h / 2,
+        width: w,
+        height: h,
+        boxSizing: "border-box",
+        border: `1.4px ${selected || hovered ? "dashed" : "solid"} ${edge}`,
+        transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
+        zIndex: 3,
+        cursor: toolArmed ? "inherit" : "pointer",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI the user just imported; next/image can't optimise it */}
+      <img
+        src={String(p.src)}
+        alt={String(p.name || "Imported image")}
+        draggable={false}
+        style={{ width: "100%", height: "100%", objectFit: "fill", pointerEvents: "none", display: "block" }}
+      />
+    </div>
+  );
+}
+
+// #122 — the board's edge in its real shape. Rect and circle carry their size
+// in width/height (so Properties can edit them); the polygon carries its ring.
+function BoardOutlineShape({
+  obj, selected, toolArmed, hovered, hoverProps, dimmed,
+}: {
+  obj: CanvasObject;
+  selected: boolean;
+  dimmed?: boolean;
+  toolArmed?: boolean;
+  hovered?: boolean;
+  hoverProps?: { onMouseEnter?: () => void; onMouseLeave?: () => void };
+}) {
+  const p = (obj.props ?? {}) as Record<string, unknown>;
+  const shape = String(p.shape ?? "rect");
+  const edge = selected ? "var(--color-canvas-select)" : hovered ? "var(--color-canvas-hover)" : "var(--color-pcb-outline)";
+  const ring = obj.points?.[0] ?? [];
+  const w = Math.max(2, obj.width ?? 0), h = Math.max(2, obj.height ?? 0);
+  const box = shape === "polygon"
+    ? (() => {
+        const xs = ring.map((q) => q.x), ys = ring.map((q) => q.y);
+        return { left: obj.x + Math.min(...xs, 0), top: obj.y + Math.min(...ys, 0), w: Math.max(...xs, 0) - Math.min(...xs, 0), h: Math.max(...ys, 0) - Math.min(...ys, 0) };
+      })()
+    : shape === "circle"
+    ? { left: obj.x - w / 2, top: obj.y - w / 2, w, h: w }
+    : { left: obj.x, top: obj.y, w, h };
+  return (
+    <div
+      data-object-id={obj.id}
+      onClick={toolArmed ? undefined : (e) => e.stopPropagation()}
+      {...hoverProps}
+      title={`Board outline · ${shape}`}
+      style={{ position: "absolute", left: box.left, top: box.top, width: Math.max(2, box.w), height: Math.max(2, box.h), zIndex: 2, opacity: dimmed ? "var(--pcb-dim-opacity, 0.3)" : undefined, cursor: toolArmed ? "inherit" : "pointer" }}
+    >
+      <svg width="100%" height="100%" viewBox={`0 0 ${Math.max(2, box.w)} ${Math.max(2, box.h)}`} style={{ display: "block", overflow: "visible" }}>
+        {shape === "circle" ? (
+          <circle cx={box.w / 2} cy={box.h / 2} r={Math.max(1, box.w / 2 - 1)} fill="none" stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined} />
+        ) : shape === "polygon" ? (
+          <polygon
+            points={ring.map((q) => `${q.x - Math.min(...ring.map((r) => r.x), 0)},${q.y - Math.min(...ring.map((r) => r.y), 0)}`).join(" ")}
+            fill="none" stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined}
+          />
+        ) : (
+          <rect x={0.8} y={0.8} width={Math.max(1, box.w - 1.6)} height={Math.max(1, box.h - 1.6)} fill="none" stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined} />
+        )}
+      </svg>
+    </div>
+  );
+}
+
+// A board cutout — the area is gone from the board, so it is drawn as removed
+// material (hatched, on the Board Outline colour) rather than as an object
+// sitting on top. Corner-normalised at commit, so w/h are always positive.
+function CutoutArea({
+  obj, selected, toolArmed, hovered, hoverProps, dimmed,
+}: {
+  obj: CanvasObject;
+  selected: boolean;
+  dimmed?: boolean;
+  toolArmed?: boolean;
+  hovered?: boolean;
+  hoverProps?: { onMouseEnter?: () => void; onMouseLeave?: () => void };
+}) {
+  const w = Math.max(1, obj.width ?? 0);
+  const h = Math.max(1, obj.height ?? 0);
+  const edge = selected
+    ? "var(--color-canvas-select)"
+    : hovered
+    ? "var(--color-canvas-hover)"
+    : "var(--color-pcb-outline)";
+  return (
+    <div
+      data-object-id={obj.id}
+      onClick={toolArmed ? undefined : (e) => e.stopPropagation()}
+      {...hoverProps}
+      title={`Cutout · ${Math.round(w)} × ${Math.round(h)} px`}
+      style={{
+        position: "absolute",
+        left: obj.x,
+        top: obj.y,
+        width: w,
+        height: h,
+        boxSizing: "border-box",
+        opacity: dimmed ? "var(--pcb-dim-opacity, 0.3)" : undefined,
+        border: `var(--border-width-1-5, 1.5px) dashed ${edge}`,
+        borderRadius: 2,
+        // Hatch = removed material; the canvas colour shows through between
+        // the strokes, which is exactly what a hole looks like from above.
+        background: `repeating-linear-gradient(45deg, color-mix(in srgb, var(--color-pcb-outline) 26%, transparent) 0 2px, transparent 2px 7px)`,
+        cursor: toolArmed ? "inherit" : "pointer",
+        zIndex: 3,
+      }}
+    />
+  );
+}
+
 // A boolean/Combine result — a real filled polygon (rings in LOCAL coords,
 // evenodd fill so holes show). Positioned like a glyph at its centroid (x,y).
-function CombineShape({ obj, selected, highlighted }: { obj: CanvasObject; selected: boolean; highlighted?: boolean }) {
+function CombineShape({ obj, selected, highlighted, toolArmed, hovered, hoverProps, dimmed }: { obj: CanvasObject; selected: boolean; highlighted?: boolean; toolArmed?: boolean; hovered?: boolean; dimmed?: boolean; hoverProps?: { onMouseEnter?: () => void; onMouseLeave?: () => void } }) {
   const rings = obj.points ?? [];
   const all = rings.flat();
   if (!all.length) return null;
@@ -553,7 +848,8 @@ function CombineShape({ obj, selected, highlighted }: { obj: CanvasObject; selec
   return (
     <div
       data-object-id={obj.id}
-      onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+      onClick={toolArmed ? undefined : (e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+      {...hoverProps}
       title={`Combined shape (${String((obj.props as Record<string, unknown> | undefined)?.combineOp ?? "")})`}
       style={{
         position: "absolute",
@@ -565,13 +861,18 @@ function CombineShape({ obj, selected, highlighted }: { obj: CanvasObject; selec
         transformOrigin: "center",
         color,
         cursor: "move",
-        outline: selected ? "1px dashed var(--color-violet-600)" : "none",
+        outline: selected
+          ? "1px dashed var(--color-canvas-select)"
+          : hovered
+          ? "1px solid var(--color-canvas-hover)"
+          : "none",
         outlineOffset: 2,
+        opacity: dimmed && !selected && !highlighted ? "var(--pcb-dim-opacity, 0.3)" : undefined,
         zIndex: 2,
       }}
     >
       <svg width={w} height={h} viewBox={`${minX} ${minY} ${w} ${h}`} style={{ overflow: "visible", display: "block" }}>
-        <path d={d} fill="currentColor" fillOpacity={selected ? 0.24 : 0.16} stroke="currentColor" strokeWidth={1.6} fillRule="evenodd" strokeLinejoin="round" />
+        <path d={d} fill="currentColor" fillOpacity={selected ? 0.28 : hovered ? 0.22 : 0.16} stroke="currentColor" strokeWidth={1.6} fillRule="evenodd" strokeLinejoin="round" />
       </svg>
     </div>
   );
@@ -595,6 +896,51 @@ function DraftLine() {
   if (!state.draftWire) return null;
   const tx = mouse?.x ?? state.draftWire.startX;
   const ty = mouse?.y ?? state.draftWire.startY;
+  // A cutout is an area — previewing it as a line would promise the wrong
+  // gesture, so it rubber-bands as the rectangle it will actually cut.
+  // A track preview shows the path it will really take — corner style and the
+  // obstacle policy included, from the same planner the commit uses.
+  if (state.draftWire.kind === "track") {
+    const plan = planTrackPath(state, { x: state.draftWire.startX, y: state.draftWire.startY }, { x: tx, y: ty });
+    return (
+      <polyline
+        points={plan.points.map((p) => `${p.x},${p.y}`).join(" ")}
+        fill="none"
+        stroke="var(--color-pcb-routing)"
+        strokeWidth={2}
+        strokeDasharray="4 3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pointerEvents="none"
+        style={{ filter: "drop-shadow(0 0 5px var(--color-pcb-routing-glow))" }}
+      />
+    );
+  }
+  // #122 — a dragged board outline previews as the shape it will become.
+  if (state.draftWire.kind === "boardOutlineRect" || state.draftWire.kind === "boardOutlineCircle") {
+    const sx = state.draftWire.startX, sy = state.draftWire.startY;
+    const common = { fill: "none", stroke: "var(--color-pcb-outline)", strokeWidth: 1.6, strokeDasharray: "5 3", pointerEvents: "none" as const };
+    return state.draftWire.kind === "boardOutlineRect" ? (
+      <rect x={Math.min(sx, tx)} y={Math.min(sy, ty)} width={Math.abs(tx - sx)} height={Math.abs(ty - sy)} {...common} />
+    ) : (
+      <circle cx={sx} cy={sy} r={Math.hypot(tx - sx, ty - sy)} {...common} />
+    );
+  }
+  if (state.draftWire.kind === "cutout") {
+    return (
+      <rect
+        x={Math.min(state.draftWire.startX, tx)}
+        y={Math.min(state.draftWire.startY, ty)}
+        width={Math.abs(tx - state.draftWire.startX)}
+        height={Math.abs(ty - state.draftWire.startY)}
+        fill="var(--color-canvas-marquee-fill)"
+        stroke="var(--color-pcb-outline)"
+        strokeWidth={1.4}
+        strokeDasharray="5 3"
+        pointerEvents="none"
+      />
+    );
+  }
   return (
     <line
       x1={state.draftWire.startX}
@@ -621,8 +967,12 @@ function PlacedGlyph({
   selected,
   highlighted,
   editing,
+  dimmed,
   layerColor,
   designatorActive,
+  toolArmed,
+  hovered,
+  hoverProps,
   onSelect,
   onSelectDesignator,
   onEditStart,
@@ -633,8 +983,12 @@ function PlacedGlyph({
   selected: boolean;
   highlighted?: boolean;
   editing: boolean;
+  dimmed?: boolean;
   layerColor?: string;
   designatorActive?: boolean;
+  toolArmed?: boolean;
+  hovered?: boolean;
+  hoverProps?: { onMouseEnter?: () => void; onMouseLeave?: () => void };
   onSelect: (additive: boolean) => void;
   onSelectDesignator?: () => void;
   onEditStart: () => void;
@@ -650,7 +1004,10 @@ function PlacedGlyph({
   // shown by the dashed outline + background tint below (NOT by recolouring the
   // glyph) so an object keeps its own colour while selected — otherwise editing
   // its colour in the inspector shows no change until it's deselected.
-  const normalColor = obj.color || layerColor || "var(--color-text-primary)";
+  // #130 — a documentation object without its own colour takes the standard
+  // colour for its meaning (line · shape · arc · dimension · text · keep-out),
+  // so the board's non-copper marks read as one family. User colour still wins.
+  const normalColor = obj.color || layerColor || DRAW_COLOR[obj.kind] || "var(--color-text-primary)";
   const glyphColor = highlighted ? "var(--color-canvas-highlight)" : normalColor;
   // Fillable shapes (rectangle/circle/ellipse) render their real outline colour
   // (obj.color via currentColor) + fill colour (props.fillColor), each with an
@@ -667,7 +1024,7 @@ function PlacedGlyph({
     return (
       <div
         data-object-id={obj.id}
-        onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+        onClick={toolArmed ? undefined : (e) => e.stopPropagation() /* selection handled by canvas mousedown */}
         onDoubleClick={(e) => {
           e.stopPropagation();
           onEditStart();
@@ -683,8 +1040,12 @@ function PlacedGlyph({
           fontFamily: "var(--font-family-body)",
           color: glyphColor,
           textShadow: highlighted && !selected ? "0 0 6px var(--color-canvas-highlight)" : undefined,
-          border: selected ? "1px dashed var(--color-violet-600)" : "1px dashed transparent",
-          background: "transparent",
+          border: selected
+            ? "1px dashed var(--color-canvas-select)"
+            : hovered
+            ? "1px solid var(--color-canvas-hover)"
+            : "1px dashed transparent",
+          background: hovered && !selected ? "var(--color-canvas-hover-fill)" : "transparent",
           cursor: editing ? "text" : "move",
           userSelect: editing ? "text" : "none",
           zIndex: 2,
@@ -718,7 +1079,8 @@ function PlacedGlyph({
   return (
     <div
       data-object-id={obj.id}
-      onClick={(e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+      onClick={toolArmed ? undefined : (e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+      {...hoverProps}
       style={{
         position: "absolute",
         left: obj.x - 24,
@@ -729,16 +1091,32 @@ function PlacedGlyph({
         transformOrigin: "50% 50%",
         color: glyphColor,
         filter: highlighted && !selected ? "drop-shadow(0 0 4px var(--color-canvas-highlight))" : undefined,
+        // #140 — Focus-active-layer dims what isn't on the layer you're working
+        // on, without hiding it: the stack stays readable, the work stands out.
+        opacity: dimmed && !selected && !highlighted ? "var(--pcb-dim-opacity, 0.3)" : 1,
         cursor: "move",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: selected ? "rgba(124,45,185,.10)" : highlighted ? "rgba(245,166,35,.12)" : "transparent",
-        outline: selected ? "1px dashed var(--color-violet-600)" : "none",
+        // Same three states, same tokens, every kind: hover reads as a lighter
+        // echo of selection so the two can never be confused.
+        background: selected
+          ? "var(--color-canvas-select-fill)"
+          : highlighted
+          ? "var(--color-canvas-highlight-fill)"
+          : hovered
+          ? "var(--color-canvas-hover-fill)"
+          : "transparent",
+        outline: selected
+          ? "1px dashed var(--color-canvas-select)"
+          : hovered
+          ? "1px solid var(--color-canvas-hover)"
+          : "none",
         borderRadius: 4,
+        transition: "background .12s ease-out, outline-color .12s ease-out",
         zIndex: 2,
       }}
-      title={obj.kind}
+      title={obj.text ? `${obj.text} · ${obj.kind}` : obj.kind}
     >
       <svg viewBox="-24 -24 48 48" width="48" height="48">
         {fillable ? (
@@ -749,6 +1127,10 @@ function PlacedGlyph({
           ) : (
             <ellipse cx={0} cy={0} rx={14} ry={9} stroke={strokeCol} strokeWidth={1.7} fill={fillCol} />
           )
+        ) : obj.kind === "vcc5v" ? (
+          // Supply rail — the name sits above the arrow, so it is drawn inside
+          // the symbol (not by the generic label below) and follows obj.text.
+          supplyGlyph(obj.text || "+5V")
         ) : (
           GLYPHS[obj.kind] ?? <circle cx={0} cy={0} r={6} fill="currentColor" />
         )}

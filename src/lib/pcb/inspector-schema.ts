@@ -74,7 +74,6 @@ const PIN_SHAPES = ["Line", "Inverted", "Clock", "Inverted Clock", "Input Low", 
 const FONT_STYLES = ["Normal", "Bold", "Italic", "Bold Italic"];
 const ORIGINS = ["Top Left", "Top Center", "Center", "Bottom Left", "Bottom Center"];
 const GRID_TYPES = ["Grid Dot", "Grid", "None"];
-const ROUTING_MODES = ["45° Diagonal", "90° Orthogonal", "Curved"];
 const PAD_SHAPES = ["Round", "Rectangle", "Oval"];
 const EXP_MODES = ["General", "Custom"];
 
@@ -598,7 +597,6 @@ const TWOD: Record<string, InspectorType> = {
           { key: "startViaSize", label: "Start Via size", kind: "number", bind: "set:startViaSize", unit: "mil", display: "24" },
           { key: "viaOuter", label: "Via Outside diameter", kind: "number", bind: "set:viaOuter", unit: "mil", display: "24" },
           { key: "viaInner", label: "VIa Inside Diameter", kind: "number", bind: "set:viaInner", unit: "mil", display: "12" },
-          { key: "routingMode", label: "Routing Mode", kind: "dropdown", bind: "set:routingMode", options: ROUTING_MODES, display: "45° Diagonal" },
           { key: "trackOpt", label: "Current Track Path Optimization", kind: "toggle", bind: "set:trackOpt", display: "On" },
           { key: "removeLoop", label: "Remove Loop", kind: "toggle", bind: "set:removeLoop", display: "On" },
           { key: "hideCopper", label: "Hide Copper Region", kind: "toggle", bind: "set:hideCopper", display: "Off" },
@@ -1007,9 +1005,19 @@ const KIND_TO_TYPE: Record<string, string> = {
   mountingHole: "Via", image: "DrawingLike",
   // PDF §10 place-menu inventory — panels pending doc capture; mapped to the
   // closest captured panel so selection never falls back to Canvas.
-  testPoint: "Pad", shapedPad: "Pad", viaFence: "Via",
-  fpcStiffener: "Copper Fills",
-  table: "Table", stackTable: "Table", drillTable: "Table", canvasOrigin: "Text",
+  testPoint: "Pad", shapedPad: "Pad",
+  table: "Table", canvasOrigin: "Text", cutout: "Outline Object",
+  // #129 — every placeable board kind resolves to a real panel.
+  boardOutlineRect: "Outline Object", boardOutlineCircle: "Outline Object",
+  boardOutlinePoly: "Outline Object", lengthTune: "Track",
+  // Kinds that had no entry and therefore fell through to the *sheet's* panel —
+  // selecting a line or a note showed "Nothing selected" over Sheet border /
+  // Sheet info. Each one now maps to the doc type it belongs to.
+  line: "DrawingLike", dimension: "DrawingLike",
+  note: "Text", field: "Text",
+  busEntry: "Bus",
+  globalLabel: "Net Label", hierLabel: "Net Label",
+  netTie: "Nets",
 };
 
 // Vias key differs between resolver ("Via") and 2D schema ("Vias").
@@ -1035,6 +1043,10 @@ export function resolveInspectorType(
       typeKey = "Test Point";
     } else if (mapped) {
       typeKey = mapped;
+    } else {
+      // A kind nobody mapped yet still has an object selected, so the panel must
+      // not fall back to the sheet (which also prints "Nothing selected").
+      typeKey = schemaMode === "schematic" ? "Drawing Tools" : "Outline Object";
     }
   } else if (coarse === "comp") {
     typeKey = "Component";

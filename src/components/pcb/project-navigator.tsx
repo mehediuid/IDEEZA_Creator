@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { DsIcon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { computeNets } from "@/lib/pcb/nets";
+import { OBJECT_FAMILIES, familyOf, PART_PREFIX_GROUPS } from "@/lib/pcb/types";
 import type { CanvasObject } from "@/lib/pcb/types";
 
 type MenuItem = { divider: true } | { label: string; icon?: string; run: () => void; danger?: boolean };
@@ -121,46 +122,132 @@ export function ProjectNavigator({ query }: { query: string }) {
       objs.forEach((o) => { if (o.net) counts.set(o.net, (counts.get(o.net) ?? 0) + 1); });
       entries = [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count }));
     }
-    entries.filter((e) => match(e.name)).forEach((e) =>
+    // Groups the netlist already implies — no new stored state: a bus's own
+    // PREFIX[lo:hi] label claims its members, supplies are known by name, an
+    // auto-generated net is N<number>, everything else was named by a label.
+    const busPrefixes = objs
+      .filter((o) => o.kind === "bus" && o.text)
+      .map((o) => (o.text as string).match(/^([A-Za-z_][\w]*)\s*\[/)?.[1])
+      .filter(Boolean) as string[];
+    const POWERISH = /^(vcc|vdd|vss|gnd|agnd|pgnd|dgnd|vbat|[+-]?\d+(\.\d+)?v)/i;
+    const groupOf = (name: string): string => {
+      if (POWERISH.test(name)) return "Power & ground";
+      const bus = busPrefixes.find((b) => name.startsWith(b));
+      if (bus) return `Bus ${bus}`;
+      return /^N\d+$/.test(name) ? "Auto-named" : "Named nets";
+    };
+    const netGroups = new Map<string, { name: string; count: number }[]>();
+    entries.filter((e) => match(e.name)).forEach((e) => {
+      const g = groupOf(e.name);
+      (netGroups.get(g) ?? netGroups.set(g, []).get(g)!).push(e);
+    });
+    const NET_ORDER = ["Power & ground", "Named nets", "Auto-named"];
+    const sortedGroups = [...netGroups.keys()].sort((a, b) => {
+      const ia = NET_ORDER.indexOf(a), ib = NET_ORDER.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);   // buses, alphabetical
+      if (ia === -1) return -1;                                 // buses above the fixed three
+      if (ib === -1) return 1;
+      return ia - ib;
+    });
+    sortedGroups.forEach((g) => {
+      const list = netGroups.get(g)!;
+      const gk = "netgrp:" + g;
+      const open = isOpen(gk, true);
       rows.push({
-        id: "net:" + e.name, label: e.name, meta: `${e.count} obj`, icon: "wire", depth: 0,
-        active: state.highlightedNet === e.name,
-        onClick: () => actions.highlightNet(state.highlightedNet === e.name ? null : e.name),
-        menu: [
-          { label: "Highlight net", icon: "wire", run: () => actions.highlightNet(e.name) },
-          { label: "Unhighlight all", icon: "wire", run: () => actions.unhighlightAll() },
-          { label: "Select all on net", icon: "copy", run: () => actions.selectByNet(e.name) },
-        ],
-      }),
-    );
+        id: gk, label: g, meta: String(list.length), icon: "wire", depth: 0,
+        hasCaret: true, open, onToggle: () => toggle(gk),
+        menu: [{ label: "Highlight every net in this group", icon: "wire", run: () => list.forEach((e) => actions.highlightNet(e.name)) }],
+      });
+      if (!open) return;
+      list.sort((a, b) => a.name.localeCompare(b.name)).forEach((e) =>
+        rows.push({
+          id: "net:" + e.name, label: e.name, meta: `${e.count} obj`, icon: "wire", depth: 1,
+          active: state.highlightedNet === e.name,
+          onClick: () => actions.highlightNet(state.highlightedNet === e.name ? null : e.name),
+          menu: [
+            { label: "Highlight net", icon: "wire", run: () => actions.highlightNet(e.name) },
+            { label: "Unhighlight all", icon: "wire", run: () => actions.unhighlightAll() },
+            { label: "Select all on net", icon: "copy", run: () => actions.selectByNet(e.name) },
+          ],
+        }),
+      );
+    });
   } else if (state.leftSub === "component") {
-    objs.filter(isPart).filter((o) => match(designator(o), o.footprint, o.comment)).forEach((o) =>
+    // Designator prefix → package → part. The prefix is what an engineer reads
+    // first (R, C, U…), the package is what the BOM buys.
+    const parts = objs.filter(isPart).filter((o) => match(designator(o), o.footprint, o.comment));
+    const prefixOf = (o: CanvasObject) => (designator(o).match(/^([A-Za-z]+)/)?.[1] ?? "?").toUpperCase();
+    const byPrefix = new Map<string, CanvasObject[]>();
+    parts.forEach((o) => { const k = prefixOf(o); (byPrefix.get(k) ?? byPrefix.set(k, []).get(k)!).push(o); });
+    [...byPrefix.keys()].sort().forEach((prefix) => {
+      const list = byPrefix.get(prefix)!;
+      const gk = "partgrp:" + prefix;
+      const gOpen = isOpen(gk, true);
+      const gLabel = PART_PREFIX_GROUPS[prefix] ?? `${prefix} parts`;
       rows.push({
-        id: o.id, label: designator(o), meta: o.footprint || (o.props as Record<string, unknown> | undefined)?.value as string || o.kind,
-        icon: "foot", depth: 0, active: state.selectedIds.includes(o.id),
-        onClick: () => { actions.selectPlaced(o.id, false); actions.zoomFit("selection"); },
-        menu: [
-          { label: "Select", icon: "copy", run: () => { actions.selectPlaced(o.id, false); actions.zoomFit("selection"); } },
-          { label: "Properties", icon: "prop", run: () => { actions.selectPlaced(o.id, false); actions.setRightTab("properties"); } },
-          ...(objs.some((t) => t.sourceId === o.id) ? [{ label: "Cross probe to PCB", icon: "find", run: () => actions.crossProbe(o.id) } as MenuItem] : []),
-          { divider: true },
-          { label: "Delete", icon: "del", danger: true, run: () => actions.removeObjects([o.id]) },
-        ],
-      }),
-    );
+        id: gk, label: `${gLabel} · ${prefix}`, meta: String(list.length), icon: "foot", depth: 0,
+        hasCaret: true, open: gOpen, onToggle: () => toggle(gk),
+        menu: [{ label: "Select all in this group", icon: "copy", run: () => actions.selectMany(list.map((o) => o.id)) }],
+      });
+      if (!gOpen) return;
+      const byPkg = new Map<string, CanvasObject[]>();
+      list.forEach((o) => { const k = o.footprint || "No package"; (byPkg.get(k) ?? byPkg.set(k, []).get(k)!).push(o); });
+      [...byPkg.keys()].sort().forEach((pkg) => {
+        const items = byPkg.get(pkg)!;
+        const pk = gk + ":" + pkg;
+        const pOpen = isOpen(pk, true);
+        // A single package under a prefix adds a hop for nothing, so it collapses
+        // into the parts themselves.
+        const flat = byPkg.size === 1;
+        if (!flat) {
+          rows.push({
+            id: pk, label: pkg, meta: String(items.length), icon: "foot", depth: 1,
+            hasCaret: true, open: pOpen, onToggle: () => toggle(pk),
+            menu: [{ label: "Select all with this package", icon: "copy", run: () => actions.selectMany(items.map((o) => o.id)) }],
+          });
+          if (!pOpen) return;
+        }
+        items.sort((a, b) => designator(a).localeCompare(designator(b), undefined, { numeric: true })).forEach((o) =>
+          rows.push({
+            id: o.id, label: designator(o),
+            // don't echo the designator back as its own meta
+            meta: (() => {
+              const v = (o.props as Record<string, unknown> | undefined)?.value as string | undefined;
+              const m = v && v !== designator(o) ? v : flat ? o.footprint : "";
+              return m || "";
+            })(),
+            icon: "foot", depth: flat ? 1 : 2, active: state.selectedIds.includes(o.id),
+            onClick: () => { actions.selectPlaced(o.id, false); actions.zoomFit("selection"); },
+            menu: [
+              { label: "Select", icon: "copy", run: () => { actions.selectPlaced(o.id, false); actions.zoomFit("selection"); } },
+              { label: "Properties", icon: "prop", run: () => { actions.selectPlaced(o.id, false); actions.setRightTab("properties"); } },
+              ...(objs.some((t) => t.sourceId === o.id) ? [{ label: "Cross probe to PCB", icon: "find", run: () => actions.crossProbe(o.id) } as MenuItem] : []),
+              { divider: true },
+              { label: "Delete", icon: "del", danger: true, run: () => actions.removeObjects([o.id]) },
+            ],
+          }),
+        );
+      });
+    });
   } else {
-    // Objects — grouped by kind
-    const byKind = new Map<string, CanvasObject[]>();
-    objs.forEach((o) => { (byKind.get(o.kind) ?? byKind.set(o.kind, []).get(o.kind)!).push(o); });
-    [...byKind.keys()].sort().forEach((kind) => {
-      const items = byKind.get(kind)!.filter((o) => match(designator(o), o.net, kind));
+    // Objects — grouped by family (Component · Wire · Net flag · Net label …),
+    // not by raw kind: `resistor`, `resistorBox` and `capacitor` used to be three
+    // separate groups labelled in code vocabulary.
+    const byFamily = new Map<string, CanvasObject[]>();
+    objs.forEach((o) => { const f = familyOf(o.kind); (byFamily.get(f) ?? byFamily.set(f, []).get(f)!).push(o); });
+    const famOrder = OBJECT_FAMILIES.map((f) => f.label);
+    [...byFamily.keys()].sort((a, b) => {
+      const ia = famOrder.indexOf(a), ib = famOrder.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    }).forEach((fam) => {
+      const items = byFamily.get(fam)!.filter((o) => match(designator(o), o.net, o.kind, fam));
       if (!items.length) return;
-      const gk = "grp:" + kind;
-      rows.push({ id: gk, label: kind, meta: String(byKind.get(kind)!.length), icon: iconForKind(kind), depth: 0, hasCaret: true, open: isOpen(gk, false), onToggle: () => toggle(gk) });
+      const gk = "grp:" + fam;
+      rows.push({ id: gk, label: fam, meta: String(byFamily.get(fam)!.length), icon: iconForKind(items[0].kind), depth: 0, hasCaret: true, open: isOpen(gk, false), onToggle: () => toggle(gk) });
       if (isOpen(gk, false)) {
         items.forEach((o) =>
           rows.push({
-            id: o.id, label: designator(o), meta: o.net, icon: iconForKind(kind), depth: 1,
+            id: o.id, label: designator(o), meta: o.net || o.kind, icon: iconForKind(o.kind), depth: 1,
             active: state.selectedIds.includes(o.id),
             onClick: () => { actions.selectPlaced(o.id, false); actions.zoomFit("selection"); },
             menu: [

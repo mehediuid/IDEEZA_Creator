@@ -14,6 +14,8 @@
 
 import * as React from "react";
 import { DsIcon } from "@/lib/pcb/icons";
+import { toolCommandList } from "@/components/pcb/canvas-area";
+import { saveStatus } from "@/components/pcb/toolbar";
 import {
   buildMenus2D,
   buildMenus3D,
@@ -30,6 +32,7 @@ type MenuSub = {
   icon?: string;
   fg?: string;
   flagged?: boolean;
+  disabled?: boolean;
   note?: string;
   onClick?: () => void;
 };
@@ -42,6 +45,7 @@ type MenuItem = {
   hasSub?: boolean;
   sub?: MenuSub[];
   flagged?: boolean;
+  disabled?: boolean;
   note?: string;
   onClick?: () => void;
 };
@@ -70,9 +74,15 @@ const chevron = (
   </svg>
 );
 
+type SaveState = { color: string; spin: boolean; text: string; tip: string } | null;
+/** A Save row shows the same state the toolbar's save button does. */
+const saveFor = (label: string | undefined, st: SaveState): SaveState =>
+  st && /^save\b/i.test(label ?? "") ? st : null;
+
 // One dropdown leaf / submenu row — shared by top-level items and their
 // hover flyouts. Pure: every handler is already baked into the item.
-function renderMenuItem(it: MenuItem, idx: number) {
+function renderMenuItem(it: MenuItem, idx: number, saveState: SaveState) {
+  const save = saveFor(it.label, saveState);
   if (it.divider) {
     return (
       <div
@@ -85,17 +95,26 @@ function renderMenuItem(it: MenuItem, idx: number) {
     <div
       key={idx}
       role="menuitem"
-      className="ix-mi"
-      onClick={it.onClick}
-      title={it.flagged ? it.note || FLAG_NOTE : undefined}
-      style={{ position: "relative", display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-4) var(--spacing-6)", borderRadius: "var(--radius-lg)", cursor: "pointer" }}
+      aria-disabled={it.disabled || undefined}
+      className={it.disabled ? undefined : "ix-mi"}
+      onClick={it.disabled ? undefined : it.onClick}
+      title={it.disabled ? it.note : it.flagged ? it.note || FLAG_NOTE : undefined}
+      style={{ position: "relative", display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-4) var(--spacing-6)", borderRadius: "var(--radius-lg)", cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
     >
-      <span style={{ width: 17, height: 17, flex: "0 0 auto", color: "var(--color-text-secondary)", display: "inline-flex" }}>
+      <span style={{ position: "relative", width: 17, height: 17, flex: "0 0 auto", color: "var(--color-text-secondary)", display: "inline-flex" }}>
         <DsIcon name={it.icon} size={16} />
+        {/* A Save row says whether the document is written, like the toolbar's
+            save button — one vocabulary for the state, wherever Save appears. */}
+        {save && (
+          <span aria-hidden style={{ position: "absolute", right: -2, bottom: -1, width: 6, height: 6, borderRadius: "50%", background: save.color, boxShadow: "0 0 0 1.5px var(--color-bg-surface)" }} />
+        )}
       </span>
-      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: it.flagged ? "var(--color-text-tertiary)" : "var(--color-text-primary)", fontStyle: it.flagged ? "italic" : undefined, fontWeight: 500 }}>
+      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: it.flagged || it.disabled ? "var(--color-text-tertiary)" : "var(--color-text-primary)", fontStyle: it.flagged ? "italic" : undefined, fontWeight: 500 }}>
         {it.label}
       </span>
+      {save && !it.submenu && (
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>{save.text}</span>
+      )}
       {it.flagged && flagGlyph}
       {it.submenu && chevron}
       <span className="ix-mi-k" style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
@@ -113,15 +132,19 @@ function renderMenuItem(it: MenuItem, idx: number) {
             ) : (
               <div
                 key={j}
-                className="ix-mi"
-                onClick={su.onClick}
-                title={su.flagged ? su.note || FLAG_NOTE : undefined}
-                style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-4) var(--spacing-6)", borderRadius: "var(--radius-lg)", cursor: "pointer" }}
+                aria-disabled={su.disabled || undefined}
+                className={su.disabled ? undefined : "ix-mi"}
+                onClick={su.disabled ? undefined : su.onClick}
+                title={su.disabled ? su.note : su.flagged ? su.note || FLAG_NOTE : undefined}
+                style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-4) var(--spacing-6)", borderRadius: "var(--radius-lg)", cursor: su.disabled ? "default" : "pointer", opacity: su.disabled ? 0.45 : 1 }}
               >
-                <span style={{ width: 17, height: 17, flex: "0 0 auto", color: "var(--color-text-secondary)", display: "inline-flex" }}>
+                <span style={{ position: "relative", width: 17, height: 17, flex: "0 0 auto", color: "var(--color-text-secondary)", display: "inline-flex" }}>
                   <DsIcon name={su.icon} size={16} />
+                  {saveFor(su.label, saveState) && (
+                    <span aria-hidden style={{ position: "absolute", right: -2, bottom: -1, width: 6, height: 6, borderRadius: "50%", background: saveFor(su.label, saveState)!.color, boxShadow: "0 0 0 1.5px var(--color-bg-surface)" }} />
+                  )}
                 </span>
-                <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: su.flagged ? "var(--color-text-tertiary)" : su.fg, fontStyle: su.flagged ? "italic" : undefined, fontWeight: 500, whiteSpace: "nowrap" }}>
+                <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: su.flagged || su.disabled ? "var(--color-text-tertiary)" : su.fg, fontStyle: su.flagged ? "italic" : undefined, fontWeight: 500, whiteSpace: "nowrap" }}>
                   {su.label}
                 </span>
                 {su.flagged && flagGlyph}
@@ -140,7 +163,7 @@ function renderMenuItem(it: MenuItem, idx: number) {
 // The floating panel for an open menu. `alignRight` opens it flush to the
 // trigger's right edge (used by the Settings / Help icon cluster near the
 // window edge) instead of the left.
-function MenuPanel({ m, alignRight }: { m: MenuGroup; alignRight?: boolean }) {
+function MenuPanel({ m, alignRight, saveState }: { m: MenuGroup; alignRight?: boolean; saveState: SaveState }) {
   return (
     <div
       role="menu"
@@ -158,7 +181,7 @@ function MenuPanel({ m, alignRight }: { m: MenuGroup; alignRight?: boolean }) {
         animation: "ideeza-pop .16s cubic-bezier(.2,.9,.3,1.2)",
       }}
     >
-      {m.items.map((it, idx) => renderMenuItem(it, idx))}
+      {m.items.map((it, idx) => renderMenuItem(it, idx, saveState))}
     </div>
   );
 }
@@ -166,6 +189,13 @@ function MenuPanel({ m, alignRight }: { m: MenuGroup; alignRight?: boolean }) {
 export function MenuBar() {
   const state = usePcbState();
   const actions = usePcbActions();
+  // The document's save state, so a Save row reads the same as the toolbar's
+  // save button instead of being a command with no feedback.
+  const savedAt = React.useMemo(
+    () => (state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null),
+    [state.lastSavedAt],
+  );
+  const saveState = React.useMemo(() => saveStatus(state.saveState, savedAt), [state.saveState, savedAt]);
   // PCB tab (mode "pcb") now shares the finalized 2D/PCB menu with the 2D
   // render mode — the "2D" tab was merged into PCB, so both use buildMenus2D.
   const raw = (state.mode === "3d"
@@ -178,7 +208,26 @@ export function MenuBar() {
     settings: MenuGroup | null;
     help: MenuGroup | null;
   };
-  const commands = flattenCommands({ primary, settings, help }) as Command[];
+  const menuCommands = flattenCommands({ primary, settings, help }) as Command[];
+  // Menus + the left palette's tools = one searchable index of what the editor
+  // can do (the palette is a finder, not a second home for these controls).
+  const commands = React.useMemo(() => {
+    if (state.mode === "3d") return menuCommands;
+    const tools = toolCommandList(state.mode).map((t) => ({
+      group: t.group,
+      trail: "",
+      label: t.label,
+      icon: "blank",
+      onClick: () => {
+        if (t.action === "devicePicker") actions.openPicker("Parts");
+        else if (t.action === "erase") actions.deleteSelected();
+        else if (t.tool && t.railText) actions.setToolAs(t.tool, t.railText);
+        else if (t.tool) actions.setTool(t.tool);
+      },
+    })) as Command[];
+    return [...menuCommands, ...tools];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuCommands, state.mode]);
 
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -253,7 +302,7 @@ export function MenuBar() {
           >
             {m.label}
           </button>
-          {m.open && <MenuPanel m={m} />}
+          {m.open && <MenuPanel m={m} saveState={saveState} />}
         </div>
       ))}
 
@@ -323,7 +372,7 @@ export function MenuBar() {
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
           </button>
-          {settings.open && <MenuPanel m={settings} alignRight />}
+          {settings.open && <MenuPanel m={settings} alignRight saveState={saveState} />}
         </div>
       )}
 
@@ -346,7 +395,7 @@ export function MenuBar() {
               <path d="M12 17h.01" />
             </svg>
           </button>
-          {help.open && <MenuPanel m={help} alignRight />}
+          {help.open && <MenuPanel m={help} alignRight saveState={saveState} />}
         </div>
       )}
 
@@ -405,11 +454,14 @@ function CommandPalette({ commands, onClose }: { commands: Command[]; onClose: (
   const [focused, setFocused] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement>(null);
 
+  // Spotlight-style: the field alone until something is typed. Dumping every
+  // command on open buried the point of searching.
+  const typed = query.trim();
   const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return commands;
+    const q = typed.toLowerCase();
+    if (!q) return [];
     return commands.filter((c) => `${c.group} ${c.trail} ${c.label}`.toLowerCase().includes(q));
-  }, [commands, query]);
+  }, [commands, typed]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -466,8 +518,12 @@ function CommandPalette({ commands, onClose }: { commands: Command[]; onClose: (
         </div>
 
         {/* results */}
-        <div ref={listRef} role="listbox" aria-label="Commands" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "var(--spacing-3) var(--spacing-3) var(--spacing-4)" }}>
-          {filtered.length === 0 ? (
+        <div ref={listRef} role="listbox" aria-label="Commands" style={{ flex: typed ? 1 : "0 0 auto", minHeight: 0, overflowY: "auto", padding: typed ? "var(--spacing-3) var(--spacing-3) var(--spacing-4)" : 0 }}>
+          {!typed ? (
+            <div style={{ padding: "var(--spacing-6) var(--spacing-7)", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+              Type to search {commands.length} actions — menus, tools and dialogs.
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--spacing-4)", padding: "48px 20px", textAlign: "center" }}>
               <span style={{ display: "inline-flex", width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-full)", background: "var(--color-bg-subtle)", color: "var(--color-text-tertiary)" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg>

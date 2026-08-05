@@ -9,6 +9,19 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/** A control that carries `role="checkbox"`/`"radio"` must be reachable: Tab
+ *  gets to it and Space/Enter activates it. Without this the box was mouse-only
+ *  while announcing itself as a control. */
+function keyProps(onChange?: () => void, disabled?: boolean, decorative?: boolean) {
+  if (decorative || disabled || !onChange) return {};
+  return {
+    tabIndex: 0,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); onChange(); }
+    },
+  };
+}
+
 const SIZES: Record<string, { box: number; radius: number; glyph: number; dot: number }> = {
   sm: { box: 16, radius: 4, glyph: 10, dot: 8 },
   md: { box: 18, radius: 5, glyph: 11, dot: 9 },
@@ -23,16 +36,22 @@ export interface CheckboxProps {
   size?: Size;
   disabled?: boolean;
   className?: string;
+  /** The box is only the picture — a labelled control around it already
+   *  carries `role="checkbox"`, and two nested checkbox roles announce the
+   *  same state twice. */
+  decorative?: boolean;
 }
 
-export function Checkbox({ checked, onChange, size = "md", disabled, className }: CheckboxProps) {
+export function Checkbox({ checked, onChange, size = "md", disabled, className, decorative }: CheckboxProps) {
   const s = SIZES[size];
   return (
     <span
-      role="checkbox"
-      aria-checked={checked}
-      aria-disabled={disabled}
+      role={decorative ? undefined : "checkbox"}
+      aria-checked={decorative ? undefined : checked}
+      aria-hidden={decorative || undefined}
+      aria-disabled={decorative ? undefined : disabled}
       onClick={disabled ? undefined : onChange}
+      {...keyProps(onChange, disabled, decorative)}
       className={cn("inline-flex items-center justify-center shrink-0 transition-colors", className)}
       style={{
         width: s.box,
@@ -59,16 +78,20 @@ export interface RadioProps {
   size?: Size;
   disabled?: boolean;
   className?: string;
+  /** The dot is only the picture — the labelled row around it owns the role. */
+  decorative?: boolean;
 }
 
-export function Radio({ checked, onChange, size = "md", disabled, className }: RadioProps) {
+export function Radio({ checked, onChange, size = "md", disabled, className, decorative }: RadioProps) {
   const s = SIZES[size];
   return (
     <span
-      role="radio"
-      aria-checked={checked}
-      aria-disabled={disabled}
+      role={decorative ? undefined : "radio"}
+      aria-checked={decorative ? undefined : checked}
+      aria-hidden={decorative || undefined}
+      aria-disabled={decorative ? undefined : disabled}
       onClick={disabled ? undefined : onChange}
+      {...keyProps(onChange, disabled, decorative)}
       className={cn("inline-flex items-center justify-center shrink-0 transition-colors", className)}
       style={{
         width: s.box,

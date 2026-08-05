@@ -81,9 +81,21 @@ src/lib/pcb/
 ├─ types.ts             PcbState, PcbActions, CanvasObject, initialState, constants, DEMO objects
 ├─ data.tsx             (@ts-nocheck) builders: menus, toolbar, tree, context-menu — pure data
 ├─ schematic-to-pcb.ts  Native Schematic→PCB: footprints + ratsnest + auto-place + auto-route
+│                       (`routeRatsnest(objs, w, RouteOpts)` — scope / net-class width / 45° mitre;
+│                        `unrouteGenerated` turns routed copper back into airwires for a re-route)
 ├─ shape-boolean.ts     Boolean/Combine geometry (rasterize + marching-squares → polygon rings)
+├─ suture-vias.ts       Stitching-via lattice planner (dialog preview + placement share it)
+├─ pour.ts              Copper pour — region outline minus other-net copper (boolean)
+├─ route-path.ts        Track path planner — corner style + obstacle policy
 ├─ inspector-schema.ts  Schema-driven Properties inspector (panels + typed fields)
 ├─ icons.tsx · hicons.ts  DsIcon + Hugeicon/raw-SVG dictionaries
+├─ part-catalog.ts      Parts + Agile-Module catalogue; rail queries, favourites/recents,
+│                       user-authored parts (`readPersonalParts`) + captured modules
+│                       (`readPersonalModules` / `allModules`)
+├─ tool-labels.ts       Armed-tool names (from the palette's labels) + next-step hints
+├─ glb-export.ts        Board → three.js scene → glTF/GLB (GLTFExporter)
+├─ gltf-import.ts       glTF/GLB import: GLTFLoader parse + session-only model registry
+├─ dxf-import.ts        ASCII-DXF parser (LINE/POLYLINE/CIRCLE/ARC/TEXT) → CanvasObjects
 ├─ kicad-export.ts      KiCad/Gerber export
 ├─ design-rules-data.ts · colors.ts · content.ts · markup.ts · pcb-3d.ts
 
@@ -91,13 +103,18 @@ src/components/pcb/
 ├─ pcb-app.tsx          Shell composition (editor-shell + all panels)
 ├─ editor-shell.tsx     Full-viewport `.pcb-app` root (fixed, theme-aware)
 ├─ canvas-area.tsx      Canvas: pan/zoom, selection authority (mousedown), place/draft, grab-move
+│                       + the left ToolPalette (SCHEM_TOOLS / PCB_TOOLS) and its portalled ToolFlyout
+│                       + Crosshair guides (schematic) and the Ruler (board modes)
 ├─ placed-objects.tsx   Renders every CanvasObject (glyphs, wires, combine polygons)
+├─ drc-markers.tsx      ERC/DRC findings as canvas markers (hover detail, panel pairing)
+├─ splitter.tsx         Draggable panel edges (left/right/bottom → state.panelSizes)
 ├─ schem-canvas.tsx · pcb-canvas.tsx           schematic / PCB backdrops
 ├─ pcb-three-view*.tsx · pcb-meshes.tsx        3D board view (three.js)
 ├─ left-rail.tsx        module switcher (PCB/Code/3D/Preview/Wiring/Brief)
 ├─ left-panel.tsx + project-navigator.tsx      Sheets/Nets/Parts/Objects + Library
 ├─ library-panel.tsx    Common Library + All Library marketplace
 ├─ right-panel.tsx + schem-properties.tsx / pcb-properties.tsx   Properties/Filter/Layer
+│                       right-panel: InspectorPanel · MixedPanel · PositionPanel · Schematic/Pcb FilterTab · LayerTab
 ├─ toolbar.tsx (top) · menu-bar.tsx · top-bar.tsx
 ├─ context-menu.tsx     Canvas right-click (typed, portalled + clamped submenus)
 ├─ bottom-bar.tsx + bottom-content.tsx         Logs/Parts Audit/DRC/Find/Property List

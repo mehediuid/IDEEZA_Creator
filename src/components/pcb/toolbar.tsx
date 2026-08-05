@@ -6,13 +6,16 @@
 // from explicit { kind: "div" } items.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { DsIcon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { buildModeTabs, buildPcbViewTabs } from "@/lib/pcb/data";
+import type { GridType, PcbState } from "@/lib/pcb/types";
 
 type ToolbarAction =
   | "undo"
   | "redo"
+  | "openAgileModule"
   | "zoomIn"
   | "zoomOut"
   | "fitAll"
@@ -22,6 +25,8 @@ type ToolbarAction =
   | "openSettings"
   | "openDeviceMgr"
   | "openFootMgr"
+  | "runDrc"
+  | "toggleRatsnest"
   | "convertPcb"
   | "openJlcpcb"
   | "openGenBlock"
@@ -39,6 +44,7 @@ type ToolbarAction =
   | "save"
   | "saveAll"
   | "openFindSim"
+  | "openFindReplace"
   | "openTable"
   | "convert2D"
   | "alignGrid"
@@ -78,8 +84,18 @@ type Item =
       action?: ToolbarAction;
       label?: string;
       modes?: Mode[];
+      /** Short text beside the glyph + a quiet brand tint. For the one check the
+       *  sheet is built around (ERC) — deliberately weaker than `cta`, since a
+       *  screen gets one primary action and that is Convert to PCB. */
+      tint?: boolean;
+      text?: string;
     }
   | { kind: "div" }
+  // Save feedback — reads state.saveState / lastSavedAt.
+  // Grid style picker — Grid · Dot Grid · No Grid, checked against state.gridType.
+  | { kind: "grid" }
+  // Emphasised action: icon + label in a tinted pill (Convert to PCB).
+  | { kind: "cta"; key: string; action: ToolbarAction; label: string }
   | { kind: "dd"; field: "gridSize" | "unit"; options: string[]; label?: string };
 
 const GRID_SIZES = ["0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1"];
@@ -480,12 +496,313 @@ function ToolIcon({
   );
 }
 
+/** Save state, in words. The document auto-saves to this browser; there is no
+ *  backend yet, so the chip says where it saved rather than showing a cloud that
+ *  does nothing. Clicking writes immediately. */
+/** The save state as one colour + one sentence. The dot used to live only in
+ *  the chip beside the button, so a bar without the chip (the PCB overflow row)
+ *  showed a save control with no idea whether the document was written. */
+export function saveStatus(st: PcbState["saveState"], at: string | null) {
+  if (st === "failed") {
+    return { color: "var(--color-bg-error)", spin: false, text: "Save failed", tip: "The last save failed — click to try again" };
+  }
+  if (st === "saving") {
+    // A write is in flight, so the dot becomes a spinner: the state is "working",
+    // and a still dot can't say that.
+    return { color: "var(--color-bg-warning)", spin: true, text: "Saving…", tip: "Saving…" };
+  }
+  if (st === "dirty") {
+    return { color: "var(--color-bg-warning)", spin: false, text: "Unsaved changes", tip: "Unsaved changes — click to save now" };
+  }
+  // No text anywhere on the bar — the dot answers "is my work safe", which is a
+  // yes/no. The clock time is in the tooltip, where it can be read on purpose.
+  return {
+    color: "var(--color-bg-success)",
+    spin: false,
+    text: "Saved",
+    tip: `Saved in this browser${at ? ` at ${at}` : ""} · click to save now`,
+  };
+}
+
+/** The spinner the dot becomes while a write is in flight. */
+const SAVE_SPIN_CSS = `
+.save-dot--spin {
+  background: none !important;
+  border: 1.5px solid color-mix(in srgb, var(--color-bg-warning) 30%, transparent);
+  border-top-color: var(--color-bg-warning);
+  animation: save-dot-spin .7s linear infinite;
+}
+@keyframes save-dot-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .save-dot--spin { animation-duration: 0s; border-color: var(--color-bg-warning); }
+}
+`;
+
+/** Clock time of the last write — not a ticking "x ago" (see SaveChip). */
+function useSavedAt() {
+  const state = usePcbState();
+  return React.useMemo(
+    () => (state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null),
+    [state.lastSavedAt],
+  );
+}
+
+/** The save button itself, with the state on it: green when the document is
+ *  written, amber while it isn't, red when the last write failed. */
+function SaveTool({ label }: { label?: string }) {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const st = saveStatus(state.saveState, useSavedAt());
+  return (
+    <button
+      className="ix-tool"
+      onClick={() => actions.saveDoc()}
+      title={`${label ?? "Save"} — ${st.text}. ${st.tip}`}
+      aria-label={`${label ?? "Save"} — ${st.text}`}
+      style={{
+        position: "relative", width: 30, height: 30, borderRadius: "var(--radius-md)",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", border: "none", background: "transparent",
+        color: "var(--color-text-primary)", flex: "0 0 auto", padding: 0,
+      }}
+    >
+      <style>{SAVE_SPIN_CSS}</style>
+      <DsIcon name="save" size={18} strokeWidth={1.7} />
+      <span
+        aria-hidden
+        className={st.spin ? "save-dot--spin" : undefined}
+        style={{
+          position: "absolute", right: 2, bottom: 2,
+          width: 8, height: 8, borderRadius: "50%",
+          background: st.color,
+          // A ring in the bar's own colour keeps the dot readable on top of the
+          // glyph it sits over.
+          boxShadow: st.spin ? undefined : "0 0 0 1.5px var(--color-bg-surface)",
+          transition: "background .16s ease-out",
+        }}
+      />
+    </button>
+  );
+}
+
+// (The `SaveChip` that used to sit beside the button — "Saved 01:16 AM" — is
+// gone. The dot on the button is the whole readout; a word plus a timestamp
+// beside it was the same fact twice, in the row where space is scarcest.)
+
+/** Icon + short label in a quietly tinted pill — findable without competing
+ *  with the page's one solid CTA. */
+function LabelledTool({
+  iconKey, text, label, tint, onClick,
+}: {
+  iconKey: string;
+  text: string;
+  label?: string;
+  tint?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="ix-tool"
+      title={label}
+      aria-label={label ?? text}
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "var(--spacing-3)",
+        height: 30,
+        padding: "0 var(--spacing-6) 0 var(--spacing-5)",
+        border: tint ? "var(--border-width-1) solid var(--color-border-brand)" : "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-full)",
+        background: tint ? "var(--color-bg-brand-subtle)" : "transparent",
+        color: tint ? "var(--color-text-brand)" : "var(--color-text-primary)",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        fontSize: "var(--font-size-sm)",
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <DsIcon name={iconKey} size={15} />
+      {text}
+    </button>
+  );
+}
+
+// Emphasised toolbar action — tinted violet pill with a label. Used for the
+// one step that hands the design to the next stage (Convert to PCB); the page
+// keeps its single solid CTA ("Continue to Code"), so this stays tinted.
+function CtaButton({ iconKey, label, onClick }: { iconKey: string; label: string; onClick?: () => void }) {
+  return (
+    <button
+      className="ix-btn"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      style={{
+        height: 30,
+        padding: "0 var(--spacing-5)",
+        borderRadius: "var(--radius-full)",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "var(--spacing-3)",
+        cursor: "pointer",
+        border: "var(--border-width-1) solid var(--color-border-brand, var(--color-violet-600))",
+        background: "var(--color-bg-brand-subtle)",
+        color: "var(--color-violet-600)",
+        fontSize: "var(--font-size-sm)",
+        fontWeight: 700,
+        fontFamily: "inherit",
+        whiteSpace: "nowrap",
+        flex: "0 0 auto",
+        transition: "background .14s, color .14s",
+      }}
+      onMouseEnter={(e) => {
+        const b = e.currentTarget;
+        b.style.background = "var(--color-violet-600)";
+        b.style.color = "#fff";
+      }}
+      onMouseLeave={(e) => {
+        const b = e.currentTarget;
+        b.style.background = "var(--color-bg-brand-subtle)";
+        b.style.color = "var(--color-violet-600)";
+      }}
+    >
+      <DsIcon name={iconKey} size={17} strokeWidth={1.8} />
+      {label}
+    </button>
+  );
+}
+
+// Grid style split-button — the three real grid modes, checked against
+// state.gridType. Portalled to <body> and clamped, like every other flyout in
+// the editor, so the toolbar's overflow can't clip it.
+const GRID_OPTIONS: { value: GridType; label: string; icon: string }[] = [
+  { value: "lines", label: "Grid", icon: "tGridOptions" },
+  { value: "dots", label: "Dot Grid", icon: "tGridDots" },
+  { value: "none", label: "No Grid", icon: "tGridOff" },
+];
+
+function GridPicker() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const [open, setOpen] = React.useState(false);
+  const [pos, setPos] = React.useState<{ left: number; top: number } | null>(null);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const current = GRID_OPTIONS.find((o) => o.value === state.gridType) ?? GRID_OPTIONS[0];
+
+  React.useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("mousedown", close);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ left: Math.min(r.left, window.innerWidth - 188), top: r.bottom + 6 });
+    setOpen((v) => !v);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="ix-tool"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={toggle}
+        title={`Grid: ${current.label}`}
+        aria-label="Grid style"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        style={{
+          height: 30,
+          padding: "0 4px 0 5px",
+          borderRadius: "var(--radius-md)",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 1,
+          cursor: "pointer",
+          border: "none",
+          background: open ? "var(--color-bg-brand-subtle)" : "transparent",
+          color: state.gridType === "none" ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
+          flex: "0 0 auto",
+        }}
+      >
+        <DsIcon name={current.icon} size={20} strokeWidth={1.7} />
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && pos &&
+        createPortal(
+          <div
+            role="menu"
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              left: pos.left,
+              top: pos.top,
+              minWidth: 176,
+              zIndex: 200,
+              padding: "var(--spacing-2)",
+              background: "var(--color-bg-surface)",
+              border: "var(--border-width-1) solid var(--color-border-default)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))",
+            }}
+          >
+            {GRID_OPTIONS.map((o) => (
+              <div
+                key={o.value}
+                role="menuitemradio"
+                aria-checked={state.gridType === o.value}
+                className="ix-row"
+                onClick={() => { actions.setGridType(o.value); setOpen(false); }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--spacing-4)",
+                  padding: "var(--spacing-3) var(--spacing-4)",
+                  borderRadius: "var(--radius-md)",
+                  cursor: "pointer",
+                  color: state.gridType === o.value ? "var(--color-violet-600)" : "var(--color-text-primary)",
+                  fontWeight: state.gridType === o.value ? 600 : 500,
+                }}
+              >
+                <DsIcon name={o.icon} size={17} strokeWidth={1.7} />
+                <span style={{ flex: 1, fontSize: "var(--font-size-sm)" }}>{o.label}</span>
+                {state.gridType === o.value && <DsIcon name="check" size={15} strokeWidth={2} />}
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 // Schematic top toolbar — a fixed set of the 12 essential controls (the rest
 // live in the "…" overflow). Icons render at 20px with a 20px icon-to-icon gap.
 const SCHEM_ESSENTIAL: Item[] = [
-  { kind: "icon", key: "dRule", action: "openDesignRules", label: "Design Rule" },
+  // Find leads the row: it used to sit last, right after four lens/frame zoom
+  // glyphs, where it read as one more zoom button.
+  { kind: "icon", key: "find", action: "openFindReplace", label: "Find & Replace (Ctrl+F)" },
+  { kind: "icon", key: "save", action: "save", label: "Save (Ctrl+S)" },
+  { kind: "div" },
+  // ERC, not "Design Rule" — the schematic's own term (the menu and the dialog
+  // both say ERC), and it carries a label so the sheet's main check is findable.
+  { kind: "icon", key: "dErc", action: "openDesignRules", label: "ERC Rules", tint: true, text: "ERC" },
   { kind: "icon", key: "dAnnotate", action: "openAnnotate", label: "Annotate Designator" },
-  { kind: "icon", key: "tConvertPcb", action: "convertPcb", label: "Convert to PCB" },
+  // Agile Module (component library) — a primary IDEEZA workflow, so it sits
+  // on the bar rather than only in Insert.
+  { kind: "icon", key: "tDevReuse", action: "openAgileModule", label: "Agile Module" },
   { kind: "div" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
@@ -495,11 +812,13 @@ const SCHEM_ESSENTIAL: Item[] = [
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit to Screen" },
   { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit to Selection" },
   { kind: "div" },
-  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid" },
+  { kind: "grid" },
+  { kind: "icon", key: "snap", action: "toggleSnap", label: "Snap to Grid" },
   { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
   { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
-  { kind: "div" },
-  { kind: "icon", key: "find", action: "openFindSim", label: "Find / Search" },
+  // Hand-off to the board — the one step that leaves this editor, so it reads
+  // as an action, not another glyph in the row.
+  { kind: "cta", key: "tConvertPcb", action: "convertPcb", label: "Convert to PCB" },
 ];
 
 // PCB / 2D / 3D essentials — the inline set (user-approved). Every control here
@@ -513,17 +832,24 @@ const PCB_ESSENTIAL: Item[] = [
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
   { kind: "div" },
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit all in window" },
-  { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Grid Style" },
+  { kind: "grid" },
   { kind: "icon", key: "snap", action: "toggleSnap", label: "Snap" },
   { kind: "div" },
-  // Insert actions pulled from the Insert (Place) menu — not modal tools.
-  { kind: "icon", key: "tDevReuse", action: "openDevicePicker", label: "Place a Part" },
-  { kind: "icon", key: "pTable", action: "openTable", label: "Table" },
+  // #110 — the board's five quick controls live HERE and nowhere else: the left
+  // palette lost Pad / Via / Fill Region, Insert lost its Pad and Vias rows, the
+  // Design menu lost Run-design-check, and View lost Ratline, so none of them is
+  // duplicated. (Board Outline is NOT in this row — #122 gave it three shape
+  // variants, which only the palette's flyout can carry.)
+  { kind: "icon", key: "tPad", tool: "pad", label: "Pad" },
+  { kind: "icon", key: "tVia", tool: "via", label: "Via" },
+  { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Fill Region" },
+  { kind: "icon", key: "dCheck", action: "runDrc", label: "Run DRC" },
+  { kind: "icon", key: "tRatsnest", action: "toggleRatsnest", label: "Ratsnest" },
   { kind: "div" },
-  // User-picked workflow actions (each duplication-free — no other home).
   { kind: "icon", key: "tAutoRoute", action: "openAutoRoute", label: "Auto Route" },
-  { kind: "icon", key: "gerber", action: "openGerber", label: "Gerber" },
-  { kind: "icon", key: "tFootMgr", action: "openFootMgr", label: "Footprint Manager" },
+  { kind: "div" },
+  // #109 — the same save chip the schematic bar carries: it reads the real write.
+  { kind: "icon", key: "save", action: "save", label: "Save" },
   { kind: "div" },
   { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
   { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
@@ -542,7 +868,15 @@ const HOMED_KEYS = new Set([
   "alignLeft", "alignRight", "alignTop", "alignBottom", "tAlignGrid",
   "tDistH", "tDistV", "tRotLeft", "tRotRight", "tFlipH", "tFlipV", "tBringFront", "tSendBack",
   "tBoolPreserve", "tBoolMerge", "tBoolSubtract", "tBoolExclude", "tBoolSplit",
-  "dCheck", "save", "tSaveAll", "board", "cube",
+  // `save` stays here for the PCB overflow; the schematic row lists it
+  // explicitly, next to the save-state chip that gives it a reason to be there.
+  "tSaveAll", "board", "cube",
+  // #107/#108 — these left the bar for their real homes (2D Library · Insert ·
+  // Design · Export), so the overflow must not smuggle them back in.
+  "tDevReuse", "pTable", "gerber", "tFootMgr",
+  // #122 — Board Outline needs three shape variants, which only the palette
+  // flyout can carry, so the palette is its home now.
+  "tBoardOutline",
   "imp", "copy", "paste", "array", "findSim", "zoomin", "zoomout", "tSettings",
 ]);
 // No schematic overflow: every other toolbar action is already reachable from
@@ -566,6 +900,8 @@ export function Toolbar() {
     openSettings: () => actions.openSettings(),
     openDeviceMgr: () => actions.openManager("device"),
     openFootMgr: () => actions.openManager("footprint"),
+    runDrc: () => actions.runDrcCheck(),
+    toggleRatsnest: () => actions.toggleRatsnest(),
     convertPcb: () => actions.openModal("convertConfirm"),
     openJlcpcb: () => actions.openModal("jlcpcb"),
     openGenBlock: () => actions.openModal("genBlock"),
@@ -587,6 +923,7 @@ export function Toolbar() {
     save: () => actions.saveDoc(),
     saveAll: () => actions.saveDoc(),
     openFindSim: () => actions.openModal("findReplace"),
+    openFindReplace: () => actions.openModal("findReplace"),
     openTable: () => actions.openModal("tableProps"),
     convert2D: () => actions.setMode("pcb"),
     alignGrid: () => actions.alignSelectedToGrid(),
@@ -604,7 +941,8 @@ export function Toolbar() {
     paste: () => actions.pasteClipboard(),
     toggleSnap: () => actions.toggleSnap(),
     openPdf: () => actions.openModal("exportPdf2D"),
-    openDevicePicker: () => actions.openModal("devicePicker"),
+    openDevicePicker: () => actions.openPicker("Parts"),
+    openAgileModule: () => actions.openPicker("Agile Module"),
     openAutoRoute: () => actions.openModal("autoRoute"),
     openDesignRules: () => actions.openModal("designRules"),
     openAnnotate: () => actions.openModal("annotate"),
@@ -634,16 +972,31 @@ export function Toolbar() {
       : null,
   );
 
+  const savedAt = React.useMemo(
+    () => (state.lastSavedAt ? new Date(state.lastSavedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null),
+    [state.lastSavedAt],
+  );
+
   // Render a single toolbar entry (icon / divider / dropdown).
   const renderItem = (it: Item, i: number) => {
     if (it.kind === "div") return <Divider key={i} />;
+    if (it.kind === "grid") return <GridPicker key={i} />;
+    // The save control carries its own state dot wherever it renders.
+    if (it.kind === "icon" && it.key === "save") return <SaveTool key={i} label={it.label} />;
+    if (it.kind === "cta") return <CtaButton key={i} iconKey={it.key} label={it.label} onClick={handlers[it.action]} />;
     if (it.kind === "dd") {
       const v = it.field === "gridSize" ? state.gridSize : state.unit;
       const set = it.field === "gridSize" ? actions.setGridSize : actions.setUnit;
       return <Dropdown key={i} value={v} options={it.options} onChange={set} ariaLabel={it.label} />;
     }
-    const active = it.tool ? state.tool === it.tool : false;
+    // Toggles light up from their own state, not from the active tool.
+    const active = it.tool
+      ? state.tool === it.tool
+      : it.action === "toggleSnap"
+      ? state.snapEnabled !== false
+      : false;
     const onClick = it.action ? handlers[it.action] : it.tool ? () => actions.setTool(it.tool!) : undefined;
+    if (it.text) return <LabelledTool key={i} iconKey={it.key} text={it.text} label={it.label} tint={it.tint} onClick={onClick} />;
     return <ToolIcon key={i} iconKey={it.key} active={active} label={it.label} onClick={onClick} />;
   };
 
@@ -652,17 +1005,23 @@ export function Toolbar() {
   const renderMenuRow = (it: Item, i: number) => {
     if (it.kind !== "icon") return null;
     const onClick = it.action ? handlers[it.action] : it.tool ? () => actions.setTool(it.tool!) : undefined;
+    const save = it.key === "save" || it.key === "tSaveAll" ? saveStatus(state.saveState, savedAt) : null;
     return (
       <div
         key={i}
         className="ix-row"
         onClick={onClick}
+        title={save?.tip}
         style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer" }}
       >
-        <span style={{ width: 24, height: 24, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-secondary)" }}>
+        <span style={{ position: "relative", width: 24, height: 24, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-secondary)" }}>
           <DsIcon name={it.key} size={18} strokeWidth={1.7} />
+          {save && (
+            <span aria-hidden style={{ position: "absolute", right: 0, bottom: 1, width: 7, height: 7, borderRadius: "50%", background: save.color, boxShadow: "0 0 0 1.5px var(--color-bg-surface)" }} />
+          )}
         </span>
         <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>{it.label}</span>
+        {save && <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>{save.text}</span>}
       </div>
     );
   };
@@ -686,8 +1045,8 @@ export function Toolbar() {
   // panels run full-height under the TopBar and flank it. Its left/right
   // insets mirror the canvas so it aligns exactly with the drawing area.
   const v = state.viewTog;
-  const leftInset = v["Left-Side panel"] !== false ? 366 : 74;
-  const rightInset = v["Right-Side Panel"] !== false ? 292 : 0;
+  const leftInset = v["Left-Side panel"] !== false ? 74 + state.panelSizes.left : 74;
+  const rightInset = v["Right-Side Panel"] !== false ? state.panelSizes.right : 0;
 
   return (
     <div
@@ -767,13 +1126,20 @@ export function Toolbar() {
 
       {state.mode === "schematic" ? (
         <>
-          {/* schematic: fixed 12 essentials — 20px icon-to-icon; each divider
-              nets 12px per side (row gap 20 + −8 margin). */}
+          {/* schematic essentials — 20px icon-to-icon; each divider nets 12px
+              per side (row gap 20 + −8 margin). The row can overflow, so the
+              hand-off CTA is pinned outside it and never clips. */}
           <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
-            {SCHEM_ESSENTIAL.map((it, i) =>
+            {SCHEM_ESSENTIAL.filter((it) => it.kind !== "cta").map((it, i) =>
               it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i),
             )}
           </div>
+          {SCHEM_ESSENTIAL.filter((it) => it.kind === "cta").map((it, i) => (
+            <React.Fragment key={i}>
+              <Divider gutter={8} />
+              {renderItem(it, i)}
+            </React.Fragment>
+          ))}
         </>
       ) : state.mode === "3d" ? (
         <>
@@ -786,6 +1152,11 @@ export function Toolbar() {
             <ToolIcon iconKey="v3dTop" active={state.pcb3d.preset === "top"} label="Top view" onClick={() => actions.pcb3dPreset("top")} />
             <ToolIcon iconKey="cube" active={state.pcb3d.preset === "iso"} label="Isometric view" onClick={() => actions.pcb3dPreset("iso")} />
             <ToolIcon iconKey="v3dBottom" active={state.pcb3d.preset === "bottom"} label="Bottom view" onClick={() => actions.pcb3dPreset("bottom")} />
+            {/* #136 — the four elevations a board is actually reviewed from. */}
+            <ToolIcon iconKey="v3dFront" active={state.pcb3d.preset === "front"} label="Front view" onClick={() => actions.pcb3dPreset("front")} />
+            <ToolIcon iconKey="v3dBack" active={state.pcb3d.preset === "back"} label="Back view" onClick={() => actions.pcb3dPreset("back")} />
+            <ToolIcon iconKey="v3dLeft" active={state.pcb3d.preset === "left"} label="Left view" onClick={() => actions.pcb3dPreset("left")} />
+            <ToolIcon iconKey="v3dRight" active={state.pcb3d.preset === "right"} label="Right view" onClick={() => actions.pcb3dPreset("right")} />
             <Divider gutter={-8} />
             <ToolIcon
               iconKey={state.pcb3d.projection === "orthographic" ? "v3dOrtho" : "v3dPersp"}

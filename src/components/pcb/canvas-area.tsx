@@ -7,6 +7,7 @@
 // zooms in/out at the cursor; middle-mouse or space-drag pans the viewport.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useStepNav } from "@/components/manual/use-step-nav";
 import { Icon } from "@/lib/pcb/icons";
 import { buildCanvas } from "@/lib/pcb/content";
@@ -16,32 +17,51 @@ import { SchematicCanvas } from "@/components/pcb/schem-canvas";
 import { PcbCanvas } from "@/components/pcb/pcb-canvas";
 import { PcbThreeView } from "@/components/pcb/pcb-three-view";
 import { PlacedObjects } from "@/components/pcb/placed-objects";
+import { DrcMarkers } from "@/components/pcb/drc-markers";
 import { BOARD_COLOR_HEX, PAD_COLOR_HEX } from "@/lib/pcb/pcb-3d";
-import { PLACE_TOOLS, DRAFT_TOOLS, isSelectable } from "@/lib/pcb/types";
+import { PLACE_TOOLS, DRAFT_TOOLS, isSelectable, type GridType } from "@/lib/pcb/types";
 import { pinsOf } from "@/lib/pcb/nets";
+import { glyphFor } from "@/components/pcb/placed-objects";
+import { buildToolLabels, toolLabel, toolHint } from "@/lib/pcb/tool-labels";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 
 const DRAG_THRESHOLD = 4;
 
+// Net-naming symbols that should hug the conductor they label.
+const LABEL_TOOLS = new Set(["netLabel", "globalLabel", "hierLabel", "netBusLabel", "netFlag"]);
+const LABEL_LIFT = 10; // px above the node — must stay < nets.ts CLUSTER_TOL (13)
+
+
 const GRID_MINOR = 24;
 const GRID_MAJOR = 120;
 
-function GridPattern() {
-  // Faint neutral square-line grid (two scales), tiling infinitely. Lines are
-  // a low-alpha mix of the primary ink, so they stay theme-adaptive (dark on a
-  // light sheet, light on a dark sheet) and read as quiet engineering
-  // scaffolding — never the brand violet, which is reserved for content + UI
-  // accents so it can actually stand out against the grid.
-  const minor = "color-mix(in srgb, var(--color-text-primary) 6%, transparent)";
-  const major = "color-mix(in srgb, var(--color-text-primary) 11%, transparent)";
+function GridPattern({ type }: { type: GridType }) {
+  // Faint neutral grid (two scales), tiling infinitely. Ink is a low-alpha mix
+  // of the primary text colour, so it stays theme-adaptive (dark on a light
+  // sheet, light on a dark sheet) and reads as quiet engineering scaffolding —
+  // never the brand violet, which is reserved for content + UI accents.
+  // "dots" marks the same lattice with intersection dots instead of rules.
+  // Grid ink from the shared token so the sheet grid and the canvas grid can't
+  // drift; the major lines are the same colour at full strength.
+  const minor = "color-mix(in srgb, var(--color-canvas-grid) 55%, transparent)";
+  const major = "var(--color-canvas-grid)";
+  const dots = type === "dots";
   return (
     <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       <defs>
         <pattern id="ix-grid-minor" width={GRID_MINOR} height={GRID_MINOR} patternUnits="userSpaceOnUse">
-          <path d={`M ${GRID_MINOR} 0 L 0 0 0 ${GRID_MINOR}`} fill="none" stroke={minor} strokeWidth="1" />
+          {dots ? (
+            <circle cx={0} cy={0} r={1} fill={major} />
+          ) : (
+            <path d={`M ${GRID_MINOR} 0 L 0 0 0 ${GRID_MINOR}`} fill="none" stroke={minor} strokeWidth="1" />
+          )}
         </pattern>
         <pattern id="ix-grid-major" width={GRID_MAJOR} height={GRID_MAJOR} patternUnits="userSpaceOnUse">
-          <path d={`M ${GRID_MAJOR} 0 L 0 0 0 ${GRID_MAJOR}`} fill="none" stroke={major} strokeWidth="1" />
+          {dots ? (
+            <circle cx={0} cy={0} r={1.9} fill={major} />
+          ) : (
+            <path d={`M ${GRID_MAJOR} 0 L 0 0 0 ${GRID_MAJOR}`} fill="none" stroke={major} strokeWidth="1" />
+          )}
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#ix-grid-minor)" />
@@ -50,13 +70,14 @@ function GridPattern() {
   );
 }
 
-// Schematic left tool palette — the full tool set (as before), with the
-// variant dropdowns from the design spec layered on top. Grouped rows show a
-// default icon + a caret that opens the variant list; standalone rows
-// (No Connect · Junction · Eraser) are a single icon button. Hand lives inside
-// Select. Every option arms a real tool, places a symbol, opens the device
-// picker, or erases the selection.
-type SchemOpt = { label: string; tool?: string; action?: "devicePicker"; svg: string };
+// Schematic left tool palette — the full tool set, with the variant dropdowns
+// from the design spec layered on top. Grouped rows show a default icon + a
+// caret that opens the variant list; standalone rows (Net Label · No Connect ·
+// Junction) are a single icon button. Hand lives inside Select. Every option
+// arms a real tool, places a symbol or opens the device picker.
+// `railText` stamps the placed object's name when several options share one
+// symbol kind (VCC / +5V / -5V are all supply rails; DGND rides GND).
+type SchemOpt = { label: string; tool?: string; railText?: string; action?: "devicePicker"; svg: string };
 type SchemTool = {
   key: string;
   label: string;
@@ -67,9 +88,8 @@ type SchemTool = {
   // grouped row (dropdown of variants; the primary icon = options[0])
   options?: SchemOpt[];
 };
-const SCHEM_TOOLS: SchemTool[] = [
-  { key: "select", label: "Select", options: [
-    { label: "Pointer", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
+export const SCHEM_TOOLS: SchemTool[] = [
+  { key: "select", label: "Selection tools (Esc returns to the pointer)", options: [
     { label: "Lasso", tool: "lasso", svg: '<path d="M4 11a6 4 0 1 1 11 3M7 15c-2 1-3 3 0 4"/>' },
     { label: "Area select", tool: "areaSelect", svg: '<path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>' },
     { label: "Hand", tool: "hand", svg: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6 6 6 0 0 1-5-2.7L4.5 15a1.5 1.5 0 0 1 2.6-1.5L8 15"/>' },
@@ -77,7 +97,21 @@ const SCHEM_TOOLS: SchemTool[] = [
   { key: "wire", label: "Wire", options: [
     { label: "Wire", tool: "wire", svg: '<path d="M5 19L19 5"/>' },
     { label: "Bus", tool: "bus", svg: '<path d="M5 18c4 0 3-12 7-12M12 6"/><path d="M6 18h12" opacity="0"/>' },
-    { label: "Bus entry", tool: "busEntry", svg: '<path d="M6 18c5 0 7-2 7-7"/>' },
+  ] },
+  // Supply rails and grounds — same glyph family as Insert ▸ Power & Ground,
+  // and GND places the GND symbol (it used to place Power GND). Sits directly
+  // under Wire: a supply is the next thing you reach for after a connection.
+  // DGND rides the GND symbol under its own name — the netlist reads the
+  // stamped text, so it really is its own net (same trick as VCC / +5V / -5V,
+  // which all place `vcc5v`).
+  { key: "power", label: "Power", options: [
+    { label: "VCC", tool: "vcc5v", railText: "VCC", svg: '<path d="M12 20V8M5 8h14"/>' },
+    { label: "+5V", tool: "vcc5v", railText: "+5V", svg: '<path d="M12 20V9"/><path d="M12 3.5L6.5 9.5h11z" fill="currentColor"/>' },
+    { label: "-5V", tool: "vcc5v", railText: "-5V", svg: '<path d="M12 4v11"/><path d="M12 20.5L6.5 14.5h11z" fill="currentColor"/>' },
+    { label: "GND", tool: "gnd", svg: '<path d="M12 4v9M4.5 13h15M7.5 16.5h9M10 20h4"/>' },
+    { label: "DGND", tool: "gnd", railText: "DGND", svg: '<path d="M12 6v7M4.5 13h15M7.5 16.5h9M10 20h4"/><path d="M3.6 3.2v6.4h1.7a3.2 3.2 0 0 0 0-6.4z" stroke-width="1.5"/>' },
+    { label: "Analog GND", tool: "agnd", svg: '<path d="M12 4v7"/><path d="M4 11l8 9 8-9z" fill="currentColor"/>' },
+    { label: "Power GND", tool: "pgnd", svg: '<path d="M12 4v9M4.5 13h15"/><path d="M7 13l-2.5 5M12 13l-2.5 5M17 13l-2.5 5"/>' },
   ] },
   // Shapes — the drawing primitives a schematic needs to sketch symbols,
   // outlines and annotations. Rectangle/Circle/Ellipse/Arc/Bezier place a
@@ -92,33 +126,23 @@ const SCHEM_TOOLS: SchemTool[] = [
     { label: "Arc", tool: "arc", svg: '<path d="M4 17a8 8 0 0 1 16 0"/>' },
     { label: "Bezier curve", tool: "bezier", svg: '<path d="M4 18C4 9 20 15 20 6"/>' },
   ] },
-  { key: "netLabel", label: "Net Label", options: [
-    { label: "Local label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
-    { label: "Global label", tool: "globalLabel", svg: '<rect x="3" y="9" width="18" height="6" rx="3"/>' },
-    { label: "Hierarchical", tool: "hierLabel", svg: '<path d="M8 6h8l4 6-4 6H8l-4-6z"/>' },
-  ] },
-  { key: "power", label: "Power", options: [
-    { label: "VCC", tool: "vcc5v", svg: '<path d="M12 20V8M8 8h8M10 5h4"/>' },
-    { label: "GND", tool: "pgnd", svg: '<path d="M12 4v9M6 13h12M9 17h6M11 20h2"/>' },
-    { label: "+5V", tool: "vcc5v", svg: '<path d="M12 20V9M6 9h12M9 5h6"/>' },
-    { label: "Earth / AGND", tool: "agnd", svg: '<path d="M12 4v9M6 13h12M9 16l3 4 3-4"/>' },
-  ] },
+  // Net naming — one tool, no flyout. The other four label kinds (global,
+  // hierarchical, port, off-sheet link) live in Insert ▸ Net Label so they
+  // stay placeable without turning this row back into a menu.
+  { key: "netLabel", label: "Net Label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
   { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
   { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
   { key: "text", label: "Text", options: [
     { label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
     { label: "Note", tool: "note", svg: '<path d="M5 5h14v10H9l-4 4z"/>' },
-    { label: "Field", tool: "field", svg: '<path d="M9 5c-2 0-2 3-3 4 1 1 1 6 3 6M15 5c2 0 2 3 3 4-1 1-1 6-3 6"/>' },
   ] },
-  { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
 ];
 
 // PCB 2D left tool palette — same split-button flyout structure as the
 // schematic one, but the board tool set: Select · Route · Pad · Via · Region ·
 // Line · Dimension · Text · Image · Eraser. Every option arms a real PCB tool.
-const PCB_TOOLS: SchemTool[] = [
-  { key: "select", label: "Select", options: [
-    { label: "Pointer", tool: "select", svg: '<path d="M5 3l6 15 2-6 6-2z"/>' },
+export const PCB_TOOLS: SchemTool[] = [
+  { key: "select", label: "Selection tools (Esc returns to the pointer)", options: [
     { label: "Lasso", tool: "lasso", svg: '<path d="M4 11a6 4 0 1 1 11 3M7 15c-2 1-3 3 0 4"/>' },
     { label: "Area select", tool: "areaSelect", svg: '<path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>' },
     { label: "Hand", tool: "hand", svg: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6 6 6 0 0 1-5-2.7L4.5 15a1.5 1.5 0 0 1 2.6-1.5L8 15"/>' },
@@ -128,61 +152,307 @@ const PCB_TOOLS: SchemTool[] = [
     { label: "Differential Pair", tool: "diffPair", svg: '<path d="M4 9h16M4 15h16"/>' },
     { label: "Length Tuning", tool: "lengthTune", svg: '<path d="M3 12h3l2-5 3 10 2-6 2 3h6"/>' },
   ] },
-  { key: "pad", label: "Pad", options: [
-    { label: "Pad", tool: "pad", svg: '<rect x="5.5" y="5.5" width="13" height="13" rx="1"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
+  { key: "pad", label: "Test points, shaped pads & holes", options: [
     { label: "Test Point", tool: "testPoint", svg: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.4"/>' },
     { label: "Shaped Pad", tool: "shapedPad", svg: '<path d="M6 7h8l4 5-4 5H6z"/><circle cx="11" cy="12" r="2" fill="currentColor" stroke="none"/>' },
+    { label: "Mounting Hole", tool: "mountingHole", svg: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/>' },
   ] },
-  { key: "via", label: "Via", options: [
-    { label: "Via", tool: "via", svg: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
-    { label: "Suture vias", tool: "sutureVias", svg: '<circle cx="8" cy="8" r="2.2"/><circle cx="16" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/><circle cx="16" cy="16" r="2.2"/>' },
-    { label: "Via Fence", tool: "viaFence", svg: '<circle cx="6" cy="8" r="1.8"/><circle cx="12" cy="8" r="1.8"/><circle cx="18" cy="8" r="1.8"/><circle cx="6" cy="16" r="1.8"/><circle cx="12" cy="16" r="1.8"/><circle cx="18" cy="16" r="1.8"/>' },
+  // #122 — the board's own edge, with the three shapes it can take.
+  { key: "boardOutline", label: "Board Outline", options: [
+    { label: "Rectangle", tool: "boardOutlineRect", svg: '<rect x="3.5" y="6" width="17" height="12" rx="1"/>' },
+    { label: "Circle", tool: "boardOutlineCircle", svg: '<circle cx="12" cy="12" r="8"/>' },
+    { label: "Polygon", tool: "boardOutlinePoly", svg: '<path d="M12 3.5l8 5.5-3 9.5H7L4 9z"/>' },
   ] },
   { key: "region", label: "Region", options: [
     { label: "Copper Region", tool: "polygon", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z"/>' },
-    { label: "Fill Region", tool: "fillRegion", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z" fill="currentColor" fill-opacity="0.3"/>' },
     { label: "Slot Region", tool: "slot", svg: '<rect x="4" y="9" width="16" height="6" rx="3"/>' },
     { label: "Prohibited Region", tool: "prohibitedRegion", svg: '<circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/>' },
-    { label: "Board Outline", tool: "boardOutline", svg: '<rect x="4" y="5.5" width="16" height="13" rx="1"/>' },
     { label: "Constraint Region", tool: "constraintRegion", svg: '<rect x="4" y="6" width="16" height="12" rx="1" stroke-dasharray="3 2"/>' },
-    { label: "FPC Stiffener", tool: "fpcStiffener", svg: '<rect x="4" y="6" width="16" height="12" rx="1"/><path d="M8 6v12M12 6v12M16 6v12" opacity="0.5"/>' },
   ] },
-  { key: "line", label: "Line", options: [
+  { key: "line", label: "Shapes", options: [
     { label: "Line", tool: "line", svg: '<path d="M5 19L19 5"/>' },
     { label: "Polyline", tool: "polyline", svg: '<path d="M4 15l5-6 4 3 7-8"/>' },
+    { label: "Rectangle", tool: "rectangle", svg: '<rect x="4.5" y="6.5" width="15" height="11" rx="1"/>' },
+    { label: "Circle", tool: "circle", svg: '<circle cx="12" cy="12" r="7.5"/>' },
+    { label: "Ellipse", tool: "ellipse", svg: '<ellipse cx="12" cy="12" rx="9" ry="6"/>' },
+    { label: "Arc", tool: "arc", svg: '<path d="M4 17a8 8 0 0 1 16 0"/>' },
   ] },
   { key: "dimension", label: "Dimension", tool: "dimension", svg: '<path d="M4 8v8M20 8v8M4 12h16M7 10l-3 2 3 2M17 10l3 2-3 2"/>' },
   { key: "text", label: "Text", tool: "text", svg: '<path d="M5 6h14M12 6v13M9 19h6"/>' },
-  { key: "eraser", label: "Eraser (delete selection)", action: "erase", svg: '<path d="M4 15l7-7 6 6-4 4H8zM14 20h6"/>' },
 ];
+
+// The variant list opens from the bottom strip of a tool button (or a
+// right-click anywhere on it), so it needs a real hit target — 14px tall
+// across the full 38px cell instead of the old 14×14 corner square.
+const TOOL_CELL = 38;
+const VARIANT_STRIP = 14;
+
+/** The variant list itself: portalled out of the clipping canvas frame and
+ *  clamped into the viewport (flips left near the right edge, lifts near the
+ *  bottom), per the editor's flyout rule. */
+function ToolFlyout({
+  outerRef, anchor, title, options, chosenIdx, onPick,
+}: {
+  outerRef: React.RefObject<HTMLDivElement | null>;
+  anchor: DOMRect;
+  title: string;
+  options: SchemOpt[];
+  chosenIdx: number;
+  onPick: (index: number) => void;
+}) {
+  const GAP = 10;
+  const EDGE = 8;
+  const [pos, setPos] = React.useState({ left: anchor.right + GAP, top: anchor.top - 2 });
+
+  React.useLayoutEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    let left = anchor.right + GAP;
+    if (left + width > window.innerWidth - EDGE) left = Math.max(EDGE, anchor.left - width - GAP);
+    let top = anchor.top - 2;
+    if (top + height > window.innerHeight - EDGE) top = Math.max(EDGE, window.innerHeight - EDGE - height);
+    setPos({ left, top });
+  }, [outerRef, anchor, options.length]);
+
+  return createPortal(
+    <div
+      ref={outerRef}
+      role="menu"
+      aria-label={title}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        position: "fixed", left: pos.left, top: pos.top, minWidth: 178,
+        background: "var(--color-bg-surface)",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--elevation-6)",
+        padding: "var(--spacing-2)",
+        zIndex: 60,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", padding: "var(--spacing-2) var(--spacing-3) var(--spacing-3)" }}>{title}</div>
+      {options.map((o, oi) => {
+        // Mark the variant currently shown on the palette button.
+        const optChosen = oi === chosenIdx;
+        return (
+          <div
+            key={o.label}
+            className="ix-row"
+            role="menuitem"
+            onClick={() => onPick(oi)}
+            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optChosen ? "var(--color-bg-brand-subtle)" : "transparent" }}
+          >
+            <span style={{ width: 28, height: 28, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", background: optChosen ? "var(--color-violet-600)" : "var(--color-bg-subtle)", color: optChosen ? "#fff" : "var(--color-text-secondary)" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: o.svg }} />
+            </span>
+            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optChosen ? 700 : 500, color: optChosen ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
+            {optChosen && (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
+            )}
+          </div>
+        );
+      })}
+    </div>,
+    document.body,
+  );
+}
+
+/** Crosshair guides — two hairlines that follow the pointer across the whole
+ *  sheet, so a pin far to the left is visibly in line (or not) with one on the
+ *  right. Schematic only: the board modes carry rulers for the same job.
+ *  Updated by writing `transform` straight to the two lines — a React state
+ *  update per mouse move would re-render the entire canvas at pointer rate. */
+function Crosshair({ hostRef }: { hostRef: React.RefObject<HTMLDivElement | null> }) {
+  const vRef = React.useRef<HTMLDivElement>(null);
+  const hRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    let raf = 0;
+    let x = 0;
+    let y = 0;
+    const paint = () => {
+      raf = 0;
+      if (vRef.current) vRef.current.style.transform = `translateX(${x}px)`;
+      if (hRef.current) hRef.current.style.transform = `translateY(${y}px)`;
+    };
+    const show = (on: boolean) => {
+      if (vRef.current) vRef.current.style.opacity = on ? "1" : "0";
+      if (hRef.current) hRef.current.style.opacity = on ? "1" : "0";
+    };
+    const onMove = (e: MouseEvent) => {
+      const r = host.getBoundingClientRect();
+      x = Math.round(e.clientX - r.left);
+      y = Math.round(e.clientY - r.top);
+      show(true);
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const onLeave = () => show(false);
+    host.addEventListener("mousemove", onMove);
+    host.addEventListener("mouseleave", onLeave);
+    return () => {
+      host.removeEventListener("mousemove", onMove);
+      host.removeEventListener("mouseleave", onLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [hostRef]);
+
+  const line: React.CSSProperties = {
+    position: "absolute",
+    background: "var(--color-canvas-crosshair)",
+    pointerEvents: "none",
+    opacity: 0,
+    zIndex: 8,
+  };
+  return (
+    <>
+      <div ref={vRef} data-crosshair="v" style={{ ...line, top: 0, bottom: 0, left: 0, width: 1 }} />
+      <div ref={hRef} data-crosshair="h" style={{ ...line, left: 0, right: 0, top: 0, height: 1 }} />
+    </>
+  );
+}
+
+/** Ghost preview — the symbol a place tool will drop, following the pointer at
+ *  the position it would actually land on (snapping included), so you can see
+ *  the result before committing. Draft tools (wire/line/polyline) already show
+ *  their own rubber line, so they get no ghost. Moved by direct DOM writes for
+ *  the same reason as the crosshair. */
+function GhostPreview({
+  hostRef, kind, snap, pan, zoom,
+}: {
+  hostRef: React.RefObject<HTMLDivElement | null>;
+  kind: string;
+  snap: (x: number, y: number) => { x: number; y: number; snapped: boolean };
+  pan: { x: number; y: number };
+  zoom: number;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    let raf = 0;
+    let tx = 0;
+    let ty = 0;
+    const paint = () => {
+      raf = 0;
+      if (ref.current) ref.current.style.transform = `translate(${tx}px, ${ty}px)`;
+    };
+    const onMove = (e: MouseEvent) => {
+      const r = host.getBoundingClientRect();
+      const cx = (e.clientX - r.left - pan.x) / zoom;
+      const cy = (e.clientY - r.top - pan.y) / zoom;
+      const sp = snap(cx, cy);
+      tx = Math.round(sp.x * zoom + pan.x - 24);
+      ty = Math.round(sp.y * zoom + pan.y - 24);
+      if (ref.current) ref.current.style.opacity = "1";
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const onLeave = () => { if (ref.current) ref.current.style.opacity = "0"; };
+    host.addEventListener("mousemove", onMove);
+    host.addEventListener("mouseleave", onLeave);
+    return () => {
+      host.removeEventListener("mousemove", onMove);
+      host.removeEventListener("mouseleave", onLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [hostRef, snap, pan, zoom]);
+
+  return (
+    <div
+      ref={ref}
+      data-ghost={kind}
+      style={{
+        position: "absolute", left: 0, top: 0, width: 48, height: 48,
+        opacity: 0, pointerEvents: "none", zIndex: 9,
+        color: "var(--color-canvas-select)",
+      }}
+    >
+      <svg viewBox="-24 -24 48 48" width="48" height="48" style={{ opacity: 0.55 }}>{glyphFor(kind)}</svg>
+    </div>
+  );
+}
+
+/** Hint chip — names the armed tool and says what the next click does. The
+ *  status bar names the tool too, but it sits in the far corner at 11px; this
+ *  sits where the work is. */
+function ToolHint({ label, hint }: { label: string; hint: string }) {
+  return (
+    <div
+      role="status"
+      data-tool-hint={label}
+      style={{
+        position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
+        display: "flex", alignItems: "center", gap: "var(--spacing-4)",
+        padding: "var(--spacing-3) var(--spacing-7)",
+        background: "var(--color-bg-surface)",
+        border: "var(--border-width-1) solid var(--color-border-brand)",
+        borderRadius: "var(--radius-full)",
+        boxShadow: "var(--elevation-3)",
+        fontSize: "var(--font-size-sm)",
+        whiteSpace: "nowrap",
+        pointerEvents: "none",
+        zIndex: 12,
+      }}
+    >
+      <span style={{ fontWeight: 700, color: "var(--color-text-brand)" }}>{label}</span>
+      <span style={{ width: 1, height: 12, background: "var(--color-border-default)" }} />
+      <span style={{ color: "var(--color-text-secondary)" }}>{hint}</span>
+    </div>
+  );
+}
 
 function ToolPalette({ tools }: { tools: SchemTool[] }) {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [openKey, setOpenKey] = React.useState<string | null>(null);
+  // The open group plus the screen rect it opened from — the flyout is
+  // portalled, so it needs its anchor in viewport coordinates.
+  const [open, setOpen] = React.useState<{ key: string; at: DOMRect } | null>(null);
   // Per-group chosen variant index — the palette shows whatever was last
   // picked from that group's dropdown (split-button behaviour), not always
   // the first option.
   const [chosen, setChosen] = React.useState<Record<string, number>>({});
   const ref = React.useRef<HTMLDivElement>(null);
+  const flyRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (!openKey) return;
-    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpenKey(null); };
+    if (!open) return;
+    // The flyout lives outside this subtree (portal), so it has to be part of
+    // the "inside" test or its own rows would dismiss it before they fire.
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || flyRef.current?.contains(t)) return;
+      setOpen(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(null); };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [openKey]);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
 
-  const run = (o: { tool?: string; action?: "devicePicker" | "erase" }) => {
+  const openFrom = (key: string, el: HTMLElement | null) => {
+    const cell = el?.closest("[data-tool-cell]") as HTMLElement | null;
+    if (!cell) return;
+    setOpen((o) => (o?.key === key ? null : { key, at: cell.getBoundingClientRect() }));
+  };
+
+  const run = (o: { tool?: string; railText?: string; action?: "devicePicker" | "erase" }) => {
     if (o.action === "devicePicker") actions.openModal("devicePicker");
     else if (o.action === "erase") actions.deleteSelected();
+    else if (o.tool && o.railText) actions.setToolAs(o.tool, o.railText);
     else if (o.tool) actions.setTool(o.tool);
-    setOpenKey(null);
+    setOpen(null);
   };
+
+  const openTool = open ? tools.find((t) => t.key === open.key) : undefined;
 
   return (
     <div
       ref={ref}
+      // Right-clicking a toolbar is a toolbar gesture — it must never fall
+      // through to the canvas context menu underneath.
+      onContextMenu={(e) => e.preventDefault()}
       style={{
         position: "absolute",
         left: 40,
@@ -206,92 +476,100 @@ function ToolPalette({ tools }: { tools: SchemTool[] }) {
         const chosenIdx = t.options ? Math.min(chosen[t.key] ?? 0, t.options.length - 1) : 0;
         const primary = t.options ? t.options[chosenIdx] : t;
         const primarySvg = t.options ? t.options[chosenIdx].svg : (t.svg ?? "");
-        const open = openKey === t.key;
+        const isOpen = open?.key === t.key;
         const active = t.options
           ? t.options.some((o) => o.tool && state.tool === o.tool)
           : !!t.tool && state.tool === t.tool;
         return (
           // One uniform 38px cell per tool — no second caret button, so the
           // column reads as a clean, evenly-aligned strip of icons.
-          <div key={t.key} style={{ position: "relative", width: 38, height: 38 }}>
-            {/* the icon itself — a single click arms the chosen tool (fast path) */}
+          <div key={t.key} data-tool-cell={t.key} style={{ position: "relative", width: TOOL_CELL, height: TOOL_CELL }}>
+            {/* the icon itself — a single click arms the chosen tool (fast path).
+                Right-click opens the variant list without arming anything, so
+                the list is reachable without aiming at the strip below. */}
             <button
               type="button"
               className="ix-tool"
-              title={t.label}
+              title={t.options ? `${t.label} — right-click for options` : t.label}
               aria-label={t.label}
               onClick={() => run(primary)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (t.options) openFrom(t.key, e.currentTarget);
+              }}
               style={{
-                width: 38,
-                height: 38,
+                width: TOOL_CELL,
+                height: TOOL_CELL,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 borderRadius: "var(--radius-lg)",
                 border: "none", cursor: "pointer",
                 background: active ? "var(--color-bg-brand-subtle)" : "transparent",
                 color: active ? "var(--color-violet-600)" : "var(--color-text-primary)",
-                boxShadow: open ? "inset 0 0 0 1.5px var(--color-border-brand)" : "none",
+                boxShadow: isOpen ? "inset 0 0 0 1.5px var(--color-border-brand)" : "none",
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: primarySvg }} />
             </button>
 
-            {/* corner triangle — the recognised "this tool has variants" flyout
-                cue (Figma / Illustrator). Clicking it opens the list only; it
-                never arms the tool, so the icon click stays the fast path. */}
+            {/* variant strip — the whole bottom edge of the cell, not a 14×14
+                corner square: the corner triangle stayed too small to aim at.
+                The triangle is still the recognised "has variants" cue
+                (Figma / Illustrator); clicking here only opens the list, so
+                the icon click above stays the fast path. */}
             {t.options && (
               <button
                 type="button"
                 className="ix-tool"
-                aria-label={`${t.label} variants`}
-                aria-expanded={open}
-                title={`${t.label} — more`}
-                onClick={(e) => { e.stopPropagation(); setOpenKey((k) => (k === t.key ? null : t.key)); }}
+                aria-label={`${t.label} options`}
+                aria-expanded={isOpen}
+                aria-haspopup="menu"
+                title={`${t.label} — options`}
+                onClick={(e) => { e.stopPropagation(); openFrom(t.key, e.currentTarget); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openFrom(t.key, e.currentTarget); }}
                 style={{
-                  position: "absolute", right: 1, bottom: 1, width: 14, height: 14,
+                  position: "absolute", left: 0, right: 0, bottom: 0, height: VARIANT_STRIP,
                   display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
-                  padding: 2, border: "none", background: "transparent", cursor: "pointer",
-                  borderRadius: "var(--radius-sm)",
-                  color: active || open ? "var(--color-violet-600)" : "var(--color-text-tertiary)",
+                  padding: "0 3px 3px 0", border: "none", cursor: "pointer",
+                  background: isOpen ? "var(--color-bg-brand-subtle)" : "transparent",
+                  borderRadius: "0 0 var(--radius-lg) var(--radius-lg)",
+                  color: active || isOpen ? "var(--color-violet-600)" : "var(--color-text-tertiary)",
                 }}
               >
                 <svg width="6" height="6" viewBox="0 0 6 6" aria-hidden><path d="M6 0V6H0Z" fill="currentColor" /></svg>
               </button>
             )}
-
-            {/* variant flyout — floats to the right, aligned to this tool */}
-            {t.options && open && (
-              <div
-                role="menu"
-                style={{ position: "absolute", left: "calc(100% + 10px)", top: -2, minWidth: 178, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "0 12px 32px -10px rgba(0,0,0,.35)", padding: "var(--spacing-2)", zIndex: 40 }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", padding: "var(--spacing-2) var(--spacing-3) var(--spacing-3)" }}>{t.label}</div>
-                {t.options.map((o, oi) => {
-                  // Mark the variant currently shown on the palette button.
-                  const optChosen = oi === chosenIdx;
-                  return (
-                    <div
-                      key={o.label}
-                      className="ix-row"
-                      onClick={() => { setChosen((c) => ({ ...c, [t.key]: oi })); run(o); }}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optChosen ? "var(--color-bg-brand-subtle)" : "transparent" }}
-                    >
-                      <span style={{ width: 28, height: 28, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", background: optChosen ? "var(--color-violet-600)" : "var(--color-bg-subtle)", color: optChosen ? "#fff" : "var(--color-text-secondary)" }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: o.svg }} />
-                      </span>
-                      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optChosen ? 700 : 500, color: optChosen ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
-                      {optChosen && (
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         );
       })}
+
+      {/* variant flyout — portalled to <body> and clamped into the viewport.
+          The palette sits inside the canvas frame, which clips overflow, so an
+          absolutely-positioned list was cut off for the longer tool groups. */}
+      {open && openTool?.options && (
+        <ToolFlyout
+          outerRef={flyRef}
+          anchor={open.at}
+          title={openTool.label}
+          options={openTool.options}
+          chosenIdx={Math.min(chosen[openTool.key] ?? 0, openTool.options.length - 1)}
+          onPick={(oi) => { setChosen((c) => ({ ...c, [openTool.key]: oi })); run(openTool.options![oi]); }}
+        />
+      )}
     </div>
   );
+}
+
+/** Left-palette tools as searchable commands (⌘K), so the palette really covers
+ *  "every feature" and not just the menu bar. */
+export function toolCommandList(mode: string): Array<{ group: string; label: string; tool?: string; railText?: string; action?: string }> {
+  const set = mode === "schematic" ? SCHEM_TOOLS : PCB_TOOLS;
+  const out: Array<{ group: string; label: string; tool?: string; railText?: string; action?: string }> = [];
+  for (const t of set) {
+    if (t.options) for (const o of t.options) out.push({ group: "Tools", label: `${t.label}: ${o.label}`, tool: o.tool, railText: o.railText, action: o.action });
+    else out.push({ group: "Tools", label: t.label, tool: t.tool, action: t.action });
+  }
+  return out;
 }
 
 export function CanvasArea() {
@@ -304,9 +582,20 @@ export function CanvasArea() {
   // Breadcrumb + old MenuBar strips removed; everything that used to sit at
   // 225/142 now starts at 145/62 (just below the TopBar, optionally below the
   // toolbar). Same 80px delta as left-panel / left-rail / right-panel.
+  const showRulers = state.mode !== "schematic";
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  // Tool feedback: the palette's own labels name the tool, and the armed tool
+  // gets a hint chip + (for one-click placers) a ghost of what will land.
+  const toolLabels = React.useMemo(() => buildToolLabels(SCHEM_TOOLS, PCB_TOOLS), []);
+  const armedPlace = PLACE_TOOLS.includes(state.tool);
+  const armedDraft = DRAFT_TOOLS.includes(state.tool);
+  const showHint = state.tool !== "select" && (state.mode === "schematic" || state.mode === "pcb");
   const top = v["Top Toolbar"] !== false ? 108 : 62;
-  const left = v["Left-Side panel"] !== false ? 366 : 74;
-  const right = v["Right-Side Panel"] !== false ? 292 : 0;
+  // 74 = the module rail; the panel's own width is draggable (state.panelSizes).
+  const left = v["Left-Side panel"] !== false ? 74 + state.panelSizes.left : 74;
+  // Same number the panel and the toolbar use — a hardcoded 292 here meant a
+  // dragged right panel either covered the canvas or left a dead strip.
+  const right = v["Right-Side Panel"] !== false ? state.panelSizes.right : 0;
 
   const canvasRef = React.useRef<HTMLDivElement>(null);
   const panRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -330,12 +619,19 @@ export function CanvasArea() {
         setSpaceHeld(true);
         return;
       }
+      // #122 — Enter finishes a polygon board outline.
+      if (e.key === "Enter" && state.draftPoly) {
+        e.preventDefault();
+        actions.polyClose();
+        return;
+      }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (state.selectedIds.length > 0) {
           e.preventDefault();
           actions.deleteSelected();
         }
       } else if (e.key === "Escape") {
+        if (state.draftPoly) actions.polyCancel();
         if (state.draftWire) actions.cancelDraft();
         else if (state.rubberBand) actions.cancelRubberBand();
         else if (state.lasso) actions.cancelLasso();
@@ -379,7 +675,7 @@ export function CanvasArea() {
       window.removeEventListener("keydown", handler);
       window.removeEventListener("keyup", release);
     };
-  }, [state.selectedIds, state.draftWire, state.rubberBand, state.lasso, state.tool, actions]);
+  }, [state.selectedIds, state.draftWire, state.draftPoly, state.rubberBand, state.lasso, state.tool, actions]);
 
   // Grab-move (right-click ▸ Move): the picked-up selection follows the cursor;
   // the next mousedown drops it (committing one undo step), Escape cancels.
@@ -408,8 +704,8 @@ export function CanvasArea() {
 
   // Snap a wire point to the nearest symbol pin / wire endpoint (so wires land
   // exactly on pins → clean connectivity), else to the grid when Snap is on.
-  const snapWire = (cx: number, cy: number) => {
-    if (state.mode !== "schematic") return { x: cx, y: cy };
+  const snapPoint = (cx: number, cy: number) => {
+    if (state.mode !== "schematic") return { x: cx, y: cy, snapped: false };
     const TOL = 12;
     let best: { x: number; y: number } | null = null;
     let bd = TOL * TOL;
@@ -421,9 +717,13 @@ export function CanvasArea() {
       if (o.kind === "wire" || o.kind === "bus") cands.push({ x: o.x, y: o.y }, { x: o.endX ?? o.x, y: o.endY ?? o.y });
       for (const p of cands) { const d = (p.x - cx) ** 2 + (p.y - cy) ** 2; if (d < bd) { bd = d; best = p; } }
     }
-    if (best) return best;
-    if (state.snapEnabled) return { x: Math.round(cx / 10) * 10, y: Math.round(cy / 10) * 10 };
-    return { x: cx, y: cy };
+    if (best) return { ...best, snapped: true };
+    if (state.snapEnabled) return { x: Math.round(cx / 10) * 10, y: Math.round(cy / 10) * 10, snapped: false };
+    return { x: cx, y: cy, snapped: false };
+  };
+  const snapWire = (cx: number, cy: number) => {
+    const p = snapPoint(cx, cy);
+    return { x: p.x, y: p.y };
   };
 
   // Ctrl/Cmd + wheel zooms at the cursor; plain wheel scrolls inside flow (no-op here).
@@ -616,11 +916,14 @@ export function CanvasArea() {
 
   return (
     <div
+      ref={frameRef}
       onContextMenu={actions.openCanvasCtx}
       style={{
         position: "absolute",
         top,
-        bottom: 36,
+        // #141 — the layer strip lives between the canvas and the status bar in
+        // board modes, so the canvas gives it its 30px rather than sitting under it.
+        bottom: state.mode === "schematic" || state.mode === "3d" ? 36 : 66,
         left,
         right,
         background: "var(--color-bg-page)",
@@ -628,25 +931,43 @@ export function CanvasArea() {
         zIndex: 10,
       }}
     >
-      {/* corner cap (top-left ruler intersection) */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: 30,
-          height: 22,
-          background: "var(--color-bg-page)",
-          borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
-          borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-          zIndex: 11,
-        }}
-      />
+      {/* Rulers — board modes only. The schematic sheet carries its own zone
+          reference (A-D / 1-4) on the frame and measures in sheet space, so px
+          rulers there were noise; the status bar still shows live X/Y. */}
+      {/* crosshair guides — the schematic's answer to the board's rulers */}
+      {state.mode === "schematic" && <Crosshair hostRef={frameRef} />}
 
-      {/* top ruler */}
-      <Ruler axis="x" zoom={state.zoom} offset={state.pan.x} />
-      {/* left ruler */}
-      <Ruler axis="y" zoom={state.zoom} offset={state.pan.y} />
+      {/* armed-tool feedback */}
+      {showHint && (
+        <ToolHint
+          label={toolLabel(state.tool, toolLabels, state.placeText)}
+          hint={toolHint(state.tool)}
+        />
+      )}
+      {armedPlace && !armedDraft && (
+        <GhostPreview hostRef={frameRef} kind={state.tool} snap={snapPoint} pan={state.pan} zoom={state.zoom} />
+      )}
+
+      {showRulers && (
+        <>
+          {/* corner cap (top-left ruler intersection) */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: 30,
+              height: 22,
+              background: "var(--color-bg-page)",
+              borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
+              borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+              zIndex: 11,
+            }}
+          />
+          <Ruler axis="x" zoom={state.zoom} offset={state.pan.x} />
+          <Ruler axis="y" zoom={state.zoom} offset={state.pan.y} />
+        </>
+      )}
 
       {/* mode segmented control — the Schematic|PCB toggle now lives in the
           top toolbar; only fall back to this centered control when the top
@@ -734,7 +1055,24 @@ export function CanvasArea() {
           if (handMode) return; // hand tool never places or selects
           const interactiveMode = state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d";
           if (interactiveMode && PLACE_TOOLS.includes(state.tool)) {
+            // Labels name a node, so they snap onto the nearest pin / wire end /
+            // junction and sit just above it. The lift stays under the netlist's
+            // cluster tolerance (13px in nets.ts), so the label still joins the
+            // net it points at.
+            if (LABEL_TOOLS.has(state.tool)) {
+              const sp = snapPoint(cx, cy);
+              actions.placeObject(state.tool, sp.x, sp.snapped ? sp.y - LABEL_LIFT : sp.y);
+              return;
+            }
             actions.placeObject(state.tool, cx, cy);
+            return;
+          }
+          if (interactiveMode && state.tool === "boardOutlinePoly") {
+            const sp = snapPoint(cx, cy);
+            // A double-click closes the ring; so does clicking the first vertex
+            // again, or pressing Enter — three ways out, no pixel hunt.
+            if (e.detail >= 2) { actions.polyClose(); return; }
+            actions.polyAddPoint(sp.x, sp.y);
             return;
           }
           if (interactiveMode && DRAFT_TOOLS.includes(state.tool)) {
@@ -754,8 +1092,8 @@ export function CanvasArea() {
         }}
         style={{
           position: "absolute",
-          top: 22,
-          left: 30,
+          top: showRulers ? 22 : 0,
+          left: showRulers ? 30 : 0,
           right: 0,
           bottom: 0,
           overflow: "hidden",
@@ -777,7 +1115,7 @@ export function CanvasArea() {
             : "default",
         }}
       >
-        {state.gridVisible && state.mode !== "3d" && <GridPattern />}
+        {state.gridType !== "none" && state.mode !== "3d" && <GridPattern type={state.gridType} />}
         {state.mode === "3d" ? (
           // Real three.js viewer — lives OUTSIDE the pan/zoom transform (its
           // OrbitControls own the camera; CSS pan/zoom must not double-apply).
@@ -810,6 +1148,8 @@ export function CanvasArea() {
               <div dangerouslySetInnerHTML={{ __html: buildCanvas(state.mode) }} />
             )}
             {(state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d") && <PlacedObjects />}
+            {/* ERC/DRC findings sit above the objects they point at. */}
+            {(state.mode === "schematic" || state.mode === "pcb" || state.mode === "2d") && <DrcMarkers />}
           </div>
         )}
       </div>

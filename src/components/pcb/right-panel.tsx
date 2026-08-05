@@ -18,6 +18,8 @@ import {
   resolveInspectorType,
   type InspectorField,
 } from "@/lib/pcb/inspector-schema";
+import { SCHEM_FILTER_ROWS, SCHEM_FILTER_KEY_FOR_KIND } from "@/lib/pcb/types";
+import { Splitter } from "@/components/pcb/splitter";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 
 export function RightPanel() {
@@ -32,7 +34,7 @@ export function RightPanel() {
         top: 62,
         bottom: 36,
         right: 0,
-        width: 292,
+        width: state.panelSizes.right,
         background: "var(--color-bg-surface)",
         borderLeft: "var(--border-width-1) solid var(--color-border-default)",
         display: "flex",
@@ -41,6 +43,7 @@ export function RightPanel() {
         userSelect: "text",
       }}
     >
+      <Splitter side="right" size={state.panelSizes.right} label="Resize the right panel" />
       <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", padding: "var(--spacing-7) var(--spacing-8) var(--spacing-0)" }}>
         <button
           className="ix-tool"
@@ -131,12 +134,21 @@ const DD_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>';
 
 // Collapsible section for the schema-driven inspector.
+// Collapse state lives in `boardSettings` (persisted, no undo entry) keyed by
+// section title, so folding "Advanced" away stays folded when you pick the next
+// object — it used to be local state that sprang back open on every re-render.
 function InspSection({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = React.useState(true);
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const key = `insp_${title}`;
+  const closed = ((state.boardSettings ?? {}) as Record<string, unknown>)[key] === true;
+  const open = !closed;
   return (
     <div>
       <div
-        onClick={() => setOpen((o) => !o)}
+        role="button"
+        aria-expanded={open}
+        onClick={() => actions.setBoardSetting(key, open)}
         style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-8)", cursor: "pointer", userSelect: "none" }}
       >
         <span style={{ display: "inline-flex", width: 13, height: 13, color: "var(--color-violet-600)", transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }}>
@@ -263,12 +275,19 @@ function ColorCtl({ value, onChange, vis }: { value: string; onChange: (v: strin
   );
 }
 
-function ActionCtl({ label, onClick }: { label: string; onClick: () => void }) {
+function ActionCtl({ label, onClick, reason }: { label: string; onClick?: () => void; reason?: string }) {
+  // An action with no engine behind it is greyed with the reason, per the
+  // editor's "contextual disable, not stubs" rule — it used to fire a
+  // "<label> — coming soon" toast, which looks like it did something.
+  const off = !onClick;
   return (
     <button
       type="button"
+      disabled={off}
+      title={reason}
       onClick={onClick}
-      style={{ minWidth: 130, padding: "var(--spacing-3) var(--spacing-4)", border: "var(--border-width-1) solid var(--color-border-brand)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-brand)", background: "var(--color-bg-brand-subtle)", cursor: "pointer", fontFamily: "inherit" }}
+      className={off ? undefined : "ix-pill"}
+      style={{ minWidth: 130, padding: "var(--spacing-3) var(--spacing-4)", border: `var(--border-width-1) solid ${off ? "var(--color-border-default)" : "var(--color-border-brand)"}`, borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontWeight: 600, color: off ? "var(--color-text-tertiary)" : "var(--color-text-brand)", background: off ? "var(--color-bg-subtle)" : "var(--color-bg-brand-subtle)", cursor: off ? "not-allowed" : "pointer", fontFamily: "inherit" }}
     >
       {label}
     </button>
@@ -476,17 +495,21 @@ function FieldRow({ field, obj, objs }: { field: InspectorField; obj: import("@/
       </span>
     );
   } else if (field.kind === "action") {
-    // Wire actions that have a real implementation; the rest are placeholders.
     const grouped = !!(obj?.props as Record<string, BindVal> | undefined)?.groupId;
+    // `undefined` = no engine behind it yet, and the control says so.
     const run =
-      field.key === "convertPcb" ? () => { actions.setMode("pcb"); actions.flashToast("Converted to PCB"); }
-      : field.key === "sutureVias" ? () => { actions.setTool("sutureVias"); actions.flashToast("Suture vias — click the copper region"); }
+      // Send to PCB really converts (it used to only switch the mode and toast
+      // "Converted to PCB", so the board came up empty).
+      field.key === "convertPcb" ? () => actions.convertSchematicToPcb()
+      : field.key === "sutureVias" ? () => actions.openModal("sutureVias")
       : field.key === "group" ? () => (grouped ? actions.ungroupSelection() : actions.groupSelection())
       : field.key === "resetStyle" ? () => actions.resetObjectStyle()
       : field.key === "addProperty" ? () => actions.addCustomProp()
-      : () => actions.flashToast(`${field.label} — coming soon`);
+      // Rebuild Copper Region = re-pour, which the pour engine already does.
+      : field.key === "rebuild" ? () => actions.pourRegions()
+      : undefined;
     const actionLabel = field.key === "group" ? (grouped ? "Ungroup" : "Group") : (field.display ?? "Apply");
-    control = <ActionCtl label={actionLabel} onClick={run} />;
+    control = <ActionCtl label={actionLabel} onClick={run} reason={run ? undefined : `${field.label} isn't built yet`} />;
   } else if (bound) {
     switch (field.kind) {
       case "text":
@@ -814,6 +837,75 @@ function PositionPanel() {
   );
 }
 
+// Mixed selection — objects of different inspector types are selected, so no
+// single type panel is the truth. Shows what is in the selection, lets you
+// narrow it to one kind (then the full panel for that kind appears), and edits
+// the properties every selected type actually shares.
+function MixedPanel({
+  schemaMode, groups, objs,
+}: {
+  schemaMode: "schematic" | "2d";
+  groups: { typeKey: string; ids: string[] }[];
+  objs: import("@/lib/pcb/types").CanvasObject[];
+}) {
+  const actions = usePcbActions();
+  // Common editable properties: a field counts as shared when every selected
+  // type has a field with the same binding and control kind.
+  const common = React.useMemo(() => {
+    const types = groups.map((g) => INSPECTOR_SCHEMA[schemaMode][g.typeKey]).filter(Boolean);
+    if (types.length < 2) return [] as InspectorField[];
+    const fieldsOf = (t: (typeof types)[number]) => t.sections.flatMap((s) => s.fields).filter((f) => !!f.bind);
+    const first = fieldsOf(types[0]);
+    return first.filter((f) => types.slice(1).every((t) => fieldsOf(t).some((g) => g.bind === f.bind && g.kind === f.kind)));
+  }, [groups, schemaMode]);
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+          <span style={{ width: 15, height: 15, color: "var(--color-violet-600)", display: "inline-flex" }}>
+            <DsIcon name="array" size={15} />
+          </span>
+          <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>Mixed selection</span>
+        </span>
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Selected {objs.length}</span>
+      </div>
+      <PositionPanel />
+      <InspSection title="In this selection">
+        {groups.map((g) => {
+          const t = INSPECTOR_SCHEMA[schemaMode][g.typeKey];
+          return (
+            <div
+              key={g.typeKey}
+              className="ix-row"
+              onClick={() => actions.selectMany(g.ids)}
+              title={`Select only the ${g.ids.length === 1 ? "" : `${g.ids.length} `}${t?.label ?? g.typeKey}`}
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", margin: "var(--spacing-0) var(--spacing-6)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-md)", cursor: "pointer" }}
+            >
+              <span style={{ width: 15, height: 15, color: "var(--color-text-secondary)", display: "inline-flex", flex: "0 0 auto" }}>
+                <DsIcon name={t?.icon ?? "pChip"} size={15} />
+              </span>
+              <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{t?.label ?? g.typeKey}</span>
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{g.ids.length}</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </div>
+          );
+        })}
+      </InspSection>
+      <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-8)" }} />
+      <InspSection title="Shared properties">
+        {common.length ? (
+          common.map((f) => <FieldRow key={f.key} field={f} obj={objs[0] ?? null} objs={objs} />)
+        ) : (
+          <div style={{ padding: "var(--spacing-2) var(--spacing-8) var(--spacing-5)", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            These object types have no property in common. Pick one kind above to edit it on its own panel.
+          </div>
+        )}
+      </InspSection>
+    </div>
+  );
+}
+
 // Schema-driven Property Inspector — the single Properties-tab renderer for
 // schematic + 2D. Resolves the selection type from the sheet schema and draws
 // its collapsible sections and typed fields.
@@ -849,6 +941,21 @@ function InspectorPanel() {
   const selObjs = state.selectedIds
     .map((id) => state.objects.find((o) => o.id === id))
     .filter(Boolean) as import("@/lib/pcb/types").CanvasObject[];
+
+  // Multi-selection of different types: the panel above resolves from the FIRST
+  // selected object, which would claim a wire is a Component. Group the
+  // selection by inspector type instead and hand it to MixedPanel.
+  const typeGroups = (() => {
+    const map = new Map<string, string[]>();
+    for (const o of selObjs) {
+      const tk = resolveInspectorType(state.mode, o.kind, state.selected).typeKey;
+      (map.get(tk) ?? map.set(tk, []).get(tk)!).push(o.id);
+    }
+    return [...map.entries()].map(([typeKey, ids]) => ({ typeKey, ids }));
+  })();
+  if (typeGroups.length > 1) {
+    return <MixedPanel schemaMode={schemaMode} groups={typeGroups} objs={selObjs} />;
+  }
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-2)" }}>
@@ -1042,72 +1149,107 @@ function FilterRow({ row }: { row: FilterRowDef }) {
   );
 }
 
-// Dispatcher: schematic keeps its own (untouched) filter; PCB/2D use the
-// EasyEDA PCB(2D) Selection Filter (PDF §01b). The two never share a list.
+// Dispatcher: the two modes never share a list — a sheet has wires and net
+// labels, a board has pads and copper. Schematic → SCHEM_FILTER_ROWS, PCB/2D →
+// the board Selection Filter (PDF §01b).
 function FilterTab() {
   const state = usePcbState();
   return state.mode === "schematic" ? <SchematicFilterTab /> : <PcbFilterTab />;
 }
 
-// Schematic-side object filter — restored unchanged from before the PCB(2D)
-// filter rebuild, so the schematic editor's Filter tab behaves exactly as it
-// always did (cosmetic per-category list; schematic selection is never gated).
-const FILTER_CATS: [string, boolean, string][] = [
-  ["All Objects", true, "248"],
-  ["Components", true, "42"],
-  ["Pads", true, "168"],
-  ["Vias", true, "31"],
-  ["Tracks", true, "96"],
-  ["Arcs", false, "12"],
-  ["Fills", false, "4"],
-  ["Text", true, "18"],
-  ["Nets", true, "27"],
-  ["Dimensions", false, "3"],
-];
-
+// Schematic Selection Filter — real: each row gates what the pointer can pick
+// (`isSelectable` reads the same boardSettings keys), the counts are the live
+// objects on the active sheet, and the state persists with the document. The
+// old version was a cosmetic list of board categories (Pads / Vias / Tracks)
+// with fixed counts and local state that gated nothing.
 function SchematicFilterTab() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [checked, setChecked] = React.useState<Record<string, boolean>>(() =>
-    Object.fromEntries(FILTER_CATS.map(([n, on]) => [n, on])),
-  );
-  const [scope, setScope] = React.useState("All Objects");
+  const bag = (state.boardSettings ?? {}) as Record<string, unknown>;
+  const on = (key: string) => bag[key] !== false;
+
+  // Objects the filter can act on: this sheet, schematic scope (same rule the
+  // canvas uses to decide what it draws).
+  const firstSheetId = state.schematicSheets[0]?.id;
+  const counts = React.useMemo(() => {
+    const out: Record<string, number> = {};
+    let total = 0;
+    for (const o of state.objects) {
+      if (o.scope && o.scope !== "schematic") continue;
+      if ((o.sheetId ?? firstSheetId) !== state.activeSheetId) continue;
+      const key = SCHEM_FILTER_KEY_FOR_KIND[o.kind];
+      if (!key) continue;
+      out[key] = (out[key] ?? 0) + 1;
+      total++;
+    }
+    return { out, total };
+  }, [state.objects, state.activeSheetId, firstSheetId]);
+
+  const offRows = SCHEM_FILTER_ROWS.filter((r) => !on(r.key));
+  const allOn = offRows.length === 0;
+  const selectable = SCHEM_FILTER_ROWS.reduce((n, r) => n + (on(r.key) ? (counts.out[r.key] ?? 0) : 0), 0);
+  const setAll = (v: boolean) => SCHEM_FILTER_ROWS.forEach((r) => actions.setBoardSetting(r.key, v));
 
   return (
     <div style={{ padding: "var(--spacing-6) var(--spacing-8)" }}>
-      <div style={{ marginBottom: "var(--spacing-6)" }}>
-        <Select
-          value={scope}
-          onChange={(v) => {
-            setScope(v);
-            actions.toggleFilterDropdown(false);
-          }}
-          options={["All Objects", "Selected Only", "Visible Only"].map((v) => ({ label: v, value: v }))}
-        />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--spacing-4)" }}>
-        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>Object Filter</span>
-        <span onClick={actions.toggleFilterExpanded} style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-brand)", fontWeight: 600, cursor: "pointer" }}>
-          {state.filterExpanded ? "Collapse" : "Expand"}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", marginBottom: "var(--spacing-5)" }}>
+        <span style={{ flex: 1, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>
+          Selectable objects
         </span>
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          disabled={allOn}
+          style={{
+            padding: "var(--spacing-2) var(--spacing-4)",
+            border: "var(--border-width-1) solid var(--color-border-default)",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-bg-surface)",
+            color: allOn ? "var(--color-text-disabled)" : "var(--color-text-secondary)",
+            cursor: allOn ? "default" : "pointer",
+            fontSize: "var(--font-size-xs)",
+            fontWeight: 600,
+            fontFamily: "inherit",
+            opacity: allOn ? 0.55 : 1,
+          }}
+        >
+          Reset
+        </button>
       </div>
-      {FILTER_CATS.map(([name, , count]) => (
-        <div key={name}>
+
+      {/* master row — one switch for every category, like the Layer tab's All */}
+      <div
+        onClick={() => setAll(!allOn)}
+        style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-0)", cursor: "pointer", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}
+      >
+        <Checkbox checked={allOn} />
+        <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>All objects</span>
+        <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{counts.total}</span>
+      </div>
+
+      {SCHEM_FILTER_ROWS.map((r) => {
+        const n = counts.out[r.key] ?? 0;
+        const isOn = on(r.key);
+        return (
           <div
-            onClick={() => setChecked((c) => ({ ...c, [name]: !c[name] }))}
+            key={r.key}
+            onClick={() => actions.setBoardSetting(r.key, !isOn)}
             style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-0)", cursor: "pointer" }}
           >
-            <Checkbox checked={!!checked[name]} />
-            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{name}</span>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>{count}</span>
+            <Checkbox checked={isOn} />
+            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: isOn ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>{r.label}</span>
+            {/* an empty category says so plainly instead of showing a 0 that
+                reads like a filtered-out count */}
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{n || "—"}</span>
           </div>
-          {state.filterExpanded && (
-            <div style={{ paddingLeft: 35, paddingBottom: "var(--spacing-3)", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>
-              Layer: All · Net: Any
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
+
+      <div style={{ marginTop: "var(--spacing-5)", paddingTop: "var(--spacing-4)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+        {allOn
+          ? `Everything on this sheet can be picked — ${counts.total} object${counts.total === 1 ? "" : "s"}.`
+          : `${selectable} of ${counts.total} objects can be picked · ${offRows.length} categor${offRows.length === 1 ? "y" : "ies"} off (${offRows.map((r) => r.label).join(", ")}).`}
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@
 import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { CanvasObject, ErcSeverity } from "@/lib/pcb/types";
+import { SEV_META, SEV_ORDER, sevKeyOf, type SevKey } from "@/lib/pcb/colors";
 
 // ── shared atoms ─────────────────────────────────────────────────────────────
 const T = {
@@ -55,7 +56,14 @@ function Btn({ children, onClick, primary, full }: { children: React.ReactNode; 
 
 function Check({ label, count, color, on, onToggle }: { label: string; count: number; color?: string; on: boolean; onToggle: () => void }) {
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "3px 0", fontSize: T.sm }}>
+    // The handler used to be accepted and dropped, which left every severity
+    // filter (and anything else built on this row) inert.
+    <label
+      role="checkbox"
+      aria-checked={on}
+      onClick={onToggle}
+      style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "3px 0", fontSize: T.sm }}
+    >
       <span style={{ width: 15, height: 15, borderRadius: 4, flex: "0 0 auto", border: `1.5px solid ${on ? T.brand : "var(--color-border-strong)"}`, background: on ? T.brand : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {on && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-on-brand)" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>}
       </span>
@@ -97,15 +105,9 @@ function Empty({ text }: { text: string }) {
   return <div style={{ height: "100%", minHeight: 160, display: "flex", alignItems: "center", justifyContent: "center", color: T.mut, fontSize: T.sm }}>{text}</div>;
 }
 
-// ── severity model (shared by Log + DRC) ─────────────────────────────────────
-type Sev = "fatal" | "error" | "warn" | "info";
-const SEV: Record<Sev, { label: string; color: string }> = {
-  fatal: { label: "Fatal Error", color: "var(--color-text-error)" },
-  error: { label: "Error", color: "#e0742e" },
-  warn: { label: "Warn", color: "var(--color-text-warning)" },
-  info: { label: "Info", color: "var(--color-text-secondary)" },
-};
-const SEV_ORDER: Sev[] = ["fatal", "error", "warn", "info"];
+// ── severity model (shared by Log + DRC + the canvas markers) ────────────────
+type Sev = SevKey;
+const SEV = SEV_META;
 
 function SevControls({ rows, sev, setSev, onExport, onClear }: {
   rows: Array<{ sev: Sev }>; sev: Record<Sev, boolean>;
@@ -244,7 +246,7 @@ function DeviceTab() {
 
 // ── DRC tab ──────────────────────────────────────────────────────────────────
 // Map an ERC/DRC severity (nets.ts / drc.ts) onto the 4-level filter chips.
-const sevKey = (s: ErcSeverity): Sev => (s === "warning" ? "warn" : s === "note" ? "info" : s);
+const sevKey = (s: ErcSeverity): Sev => sevKeyOf(s);
 
 function DrcTab() {
   const state = usePcbState();
@@ -262,6 +264,7 @@ function DrcTab() {
             <div style={{ display: "flex", gap: 6 }}>
               <Btn primary full onClick={() => actions.runErcCheck()}>Run ERC</Btn>
             </div>
+            <Check label="Show on canvas" count={issues.filter((i) => typeof i.x === "number").length} on={state.drcMarkers} onToggle={actions.toggleDrcMarkers} />
             <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ fontSize: T.sm, color: T.mut }}>Fatal: {issues.filter((i) => i.severity === "fatal").length}</div>
               <div style={{ fontSize: T.sm, color: T.mut }}>Errors: {issues.filter((i) => i.severity === "error").length}</div>
@@ -274,7 +277,12 @@ function DrcTab() {
           issues.length === 0 ? <Empty text='Click "Run ERC" to check the schematic connectivity' /> : (
             <div style={{ padding: "4px 0" }}>
               {issues.map((r, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 16px", borderBottom: `1px solid ${T.line}` }}>
+                <div
+                  key={i}
+                  onClick={() => actions.focusIssue(state.focusedIssue === i ? null : i)}
+                  title={typeof r.x === "number" ? "Show on the canvas" : "This finding has no position"}
+                  style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 16px", borderBottom: `1px solid ${T.line}`, cursor: typeof r.x === "number" ? "pointer" : "default", background: state.focusedIssue === i ? "var(--color-bg-brand-subtle)" : "transparent" }}
+                >
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: col[r.severity], marginTop: 5, flex: "0 0 auto" }} />
                   <div><div style={{ fontSize: T.sm, fontWeight: 600, color: T.ink }}>{r.title}</div><div style={{ fontSize: T.sm, color: T.mut }}>{r.detail}</div></div>
                 </div>
@@ -294,9 +302,7 @@ function DrcTab() {
     <Pane
       left={
         <>
-          <div style={{ display: "flex", gap: 6 }}>
-            <Btn primary full onClick={() => actions.runDrcCheck()}>Check DRC</Btn>
-          </div>
+          <Check label="Show on canvas" count={results.filter((r) => typeof r.x === "number").length} on={state.drcMarkers} onToggle={actions.toggleDrcMarkers} />
           <div style={{ marginTop: 4 }}>
             <Check label="All" count={results.length} on={SEV_ORDER.every((k) => sev[k])} onToggle={() => { const all = SEV_ORDER.every((k) => sev[k]); setSev(SEV_ORDER.reduce((a, k) => ({ ...a, [k]: !all }), {} as Record<Sev, boolean>)); }} />
             {SEV_ORDER.map((k) => <Check key={k} label={SEV[k].label} color={SEV[k].color} count={count(k)} on={sev[k]} onToggle={() => setSev({ ...sev, [k]: !sev[k] })} />)}
@@ -304,14 +310,22 @@ function DrcTab() {
         </>
       }
       right={
-        results.length === 0 ? <Empty text='Click "Check DRC" to run the design rule check' /> : shown.length === 0 ? <Empty text="No violations at these severities" /> : (
+        results.length === 0 ? <Empty text="No check run yet — Design ▸ Run design check (DRC), or the DRC button on the toolbar" /> : shown.length === 0 ? <Empty text="No violations at these severities" /> : (
           <div style={{ padding: "4px 0" }}>
-            {shown.map((r, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 16px", borderBottom: `1px solid ${T.line}` }}>
+            {shown.map((r, i) => {
+              const idx = results.indexOf(r);
+              return (
+              <div
+                key={i}
+                onClick={() => actions.focusIssue(state.focusedIssue === idx ? null : idx)}
+                title={typeof r.x === "number" ? "Show on the canvas" : "This finding has no position"}
+                style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "9px 16px", borderBottom: `1px solid ${T.line}`, cursor: typeof r.x === "number" ? "pointer" : "default", background: state.focusedIssue === idx ? "var(--color-bg-brand-subtle)" : "transparent" }}
+              >
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: SEV[sevKey(r.severity)].color, marginTop: 5, flex: "0 0 auto" }} />
                 <div><div style={{ fontSize: T.sm, fontWeight: 600, color: T.ink }}>{r.title}</div><div style={{ fontSize: T.sm, color: T.mut }}>{r.detail}</div></div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )
       }

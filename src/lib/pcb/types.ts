@@ -33,7 +33,18 @@ export type MenuId =
   | "import"
   | "setting"
   | "help";
+import type { ImportedModel } from "./gltf-import";
+
+export type GridType = "lines" | "dots" | "none";
+
 export type ModalId =
+  | "newProject"
+  | "sutureVias"
+  | "importImage"
+  | "moveStep"
+  | "newPart"
+  | "newModule"
+  | "importGltf"
   | "deleteObjects"
   | "array"
   | "findReplace"
@@ -296,11 +307,7 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
   "constraintRegion",
   // PDF §10 Place-menu inventory (panels pending doc capture)
   "testPoint",
-  "viaFence",
   "shapedPad",
-  "fpcStiffener",
-  "stackTable",
-  "drillTable",
   "canvasOrigin",
   // Schematic objects with dedicated property panels — now placeable.
   "offPageConnector",
@@ -313,6 +320,11 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
 
 // Tool keys that need two clicks (start + end) — wire-like.
 export const DRAFT_TOOLS: ReadonlyArray<string> = [
+  // Board cutout — drag the two corners of the area to remove.
+  "cutout",
+  // #122 — board outline shapes: drag a rectangle, or drag a circle's radius.
+  "boardOutlineRect",
+  "boardOutlineCircle",
   "wire",
   "bus",
   "busEntry",
@@ -338,8 +350,7 @@ export const FILTER_KEY_FOR_KIND: Record<string, string> = {
   net: "fNet", netLabel: "fNet", netFlag: "fNet",
   boardOutline: "fOutline",
   // PDF §10 place-menu objects
-  testPoint: "fTestPoint", shapedPad: "fPad", viaFence: "fVia",
-  fpcStiffener: "fFpcStiffener",
+  testPoint: "fTestPoint", shapedPad: "fPad",
 };
 
 // Filter keys whose default state is OFF (must be explicitly enabled via
@@ -356,6 +367,70 @@ const SCHEM_SYMBOL_KINDS = new Set<string>([
   "resistor", "resistorBox", "capacitor", "inductor", "diode", "opamp",
   "currentSource", "ic", "component", "transistor", "vcc5v", "gnd", "agnd", "pgnd",
 ]);
+// ── Schematic Selection Filter ──────────────────────────────────────────────
+// The schematic's own category list, in its own vocabulary — the board filter
+// (FILTER_KEY_FOR_KIND) speaks of pads and copper, which never appear on a
+// sheet. Each row gates what the pointer can pick, and the panel counts come
+// from the live objects. Categories the app has no object for (hierarchical
+// sheet symbols / sheet entries) are deliberately absent rather than shipped as
+// rows that can never match; "Agile modules" is IDEEZA's reusable block.
+export const PANEL_LIMITS = {
+  left: { min: 208, max: 520 },
+  right: { min: 232, max: 560 },
+  bottom: { min: 120, max: 620 },
+} as const;
+
+export const SCHEM_FILTER_ROWS: ReadonlyArray<{ key: string; label: string; kinds: readonly string[] }> = [
+  { key: "fsPart", label: "Components", kinds: ["resistor", "resistorBox", "capacitor", "inductor", "diode", "crystal", "opamp", "currentSource", "ic", "component", "transistor"] },
+  { key: "fsWire", label: "Wires", kinds: ["wire"] },
+  { key: "fsBus", label: "Buses", kinds: ["bus", "busEntry"] },
+  { key: "fsPower", label: "Power & ground", kinds: ["vcc5v", "power", "gnd", "agnd", "pgnd"] },
+  { key: "fsNetLabel", label: "Net labels", kinds: ["netLabel", "globalLabel", "hierLabel", "netBusLabel", "net"] },
+  { key: "fsPort", label: "Ports & flags", kinds: ["port", "offPageConnector", "netFlag", "shortFlag", "diffPairFlag"] },
+  { key: "fsPin", label: "Pins", kinds: ["pin", "netTie"] },
+  { key: "fsJunction", label: "Junctions & no-connect", kinds: ["junction", "noConnect"] },
+  { key: "fsAgile", label: "Agile modules", kinds: ["reuseBlock"] },
+  { key: "fsText", label: "Text, tables & images", kinds: ["text", "note", "field", "table", "image"] },
+  { key: "fsDrawing", label: "Drawing objects", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "polygon", "maskRegion", "componentMask"] },
+];
+
+// Object families for the navigator tree — the vocabulary the Objects tab groups
+// by. Finer than SCHEM_FILTER_ROWS on purpose: a filter is a control surface
+// (fewer rows = fewer decisions), a tree is a list you scan, so "Net flag" and
+// "Net label" earn separate branches there while the filter keeps them together.
+export const OBJECT_FAMILIES: ReadonlyArray<{ label: string; kinds: readonly string[] }> = [
+  { label: "Component", kinds: ["resistor", "resistorBox", "capacitor", "inductor", "diode", "crystal", "opamp", "currentSource", "ic", "component", "transistor"] },
+  { label: "Wire", kinds: ["wire"] },
+  { label: "Bus", kinds: ["bus", "busEntry"] },
+  { label: "Net label", kinds: ["netLabel", "globalLabel", "hierLabel", "netBusLabel", "net"] },
+  { label: "Net flag", kinds: ["netFlag", "vcc5v", "power", "gnd", "agnd", "pgnd", "shortFlag", "diffPairFlag"] },
+  { label: "Port", kinds: ["port", "offPageConnector"] },
+  { label: "Pin", kinds: ["pin", "netTie"] },
+  { label: "Junction", kinds: ["junction", "noConnect"] },
+  { label: "Agile module", kinds: ["reuseBlock"] },
+  { label: "Text & table", kinds: ["text", "note", "field", "table"] },
+  { label: "Drawing", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "polygon", "image", "maskRegion", "componentMask", "dimension"] },
+  // board side
+  { label: "Track", kinds: ["track", "diffPair", "ratsnest"] },
+  { label: "Pad & via", kinds: ["pad", "via", "sutureVias", "testPoint", "shapedPad", "mountingHole"] },
+  { label: "Copper", kinds: ["fillRegion", "prohibitedRegion", "constraintRegion"] },
+  { label: "Outline", kinds: ["boardOutline", "slot"] },
+  { label: "Footprint", kinds: ["fp0805", "fpSOD123", "fpSOT23", "fpSOIC8"] },
+];
+export const familyOf = (kind: string): string =>
+  OBJECT_FAMILIES.find((f) => f.kinds.includes(kind))?.label ?? "Other";
+
+// Designator prefix → the group name the Parts tree shows.
+export const PART_PREFIX_GROUPS: Record<string, string> = {
+  R: "Resistors", C: "Capacitors", L: "Inductors", D: "Diodes", U: "ICs",
+  Q: "Transistors", Y: "Crystals", J: "Connectors", SW: "Switches", TP: "Test points",
+  F: "Fuses", K: "Relays", M: "Modules", T: "Transformers",
+};
+
+export const SCHEM_FILTER_KEY_FOR_KIND: Record<string, string> = Object.fromEntries(
+  SCHEM_FILTER_ROWS.flatMap((r) => r.kinds.map((k) => [k, r.key])),
+);
+
 export const SEL_FILTER_KINDS: Record<string, (kind: string) => boolean> = {
   // schematic
   pin: (k) => k === "pin",
@@ -378,7 +453,12 @@ export function isSelectable(kind: string, bag: Record<string, unknown>, mode?: 
     const test = SEL_FILTER_KINDS[cat];
     if (test && !test(kind)) return false;      // "Only X" active and kind is not X
   }
-  if (mode === "schematic") return true;        // schematic has no PCB key filter
+  if (mode === "schematic") {
+    // Schematic has its own key filter (SCHEM_FILTER_ROWS); unmapped kinds stay
+    // selectable, and every category defaults ON.
+    const sk = SCHEM_FILTER_KEY_FOR_KIND[kind];
+    return !sk || bag[sk] !== false;
+  }
   const key = FILTER_KEY_FOR_KIND[kind];
   if (!key) return true;                        // unmapped kinds always selectable
   const on = DEFAULT_OFF_FILTERS.has(key) ? bag[key] === true : bag[key] !== false;
@@ -406,7 +486,7 @@ export interface PcbState {
   pcb3d: {
     projection: "perspective" | "orthographic";
     explode: boolean;
-    preset: "iso" | "top" | "bottom";
+    preset: "iso" | "top" | "bottom" | "front" | "back" | "left" | "right";
     fitNonce: number;
     presetNonce: number;
   };
@@ -426,6 +506,38 @@ export interface PcbState {
   frMatch: boolean;
   frExt: boolean;
   floatPos: { x: number; y: number };
+  /** Name stamped on the next placed object, overriding the per-kind default
+   *  (Insert ▸ Power & Ground places one supply kind under several names). */
+  placeText: string | null;
+  /** Tab the part library opens on (Parts · Agile Module). */
+  pickerTab: string | null;
+  /** Draw ERC/DRC findings on the canvas (the DRC tab owns the toggle). */
+  drcMarkers: boolean;
+  /** Index of the finding the user picked, highlighted in both places. */
+  focusedIssue: number | null;
+  /** Cross Probe — the object just jumped to, pulsed briefly so the eye finds
+   *  it in the other view. `nonce` restarts the pulse on a repeat probe. */
+  probe: { id: string; nonce: number } | null;
+  /** Save feedback. The document auto-saves (debounced) to this browser; the
+   *  chip in the toolbar reads these, so "saved" is never a guess. */
+  /** Draggable panel sizes (px). One source: the panels use them, and the canvas
+   *  and toolbar derive their insets from them, so nothing goes out of step. */
+  panelSizes: { left: number; right: number; bottom: number };
+  /** Projects created in the manual flow, newest first — feeds the
+   *  Project ▸ Open Project submenu. Session-only, read from
+   *  `ideeza:manual:projects` on mount. */
+  /** #140 — dim everything that isn't on the active layer. */
+  focusActiveLayer: boolean;
+  /** #122 — click-click polygon draft: the vertices placed so far. */
+  draftPoly: { tool: string; points: { x: number; y: number }[] } | null;
+  /** #110 — Ratsnest (airwire) visibility, driven from the top toolbar. */
+  showRatsnest: boolean;
+  recentProjects: { id: string; slug: string; name: string; updatedAt: number }[];
+  saveState: "saved" | "saving" | "dirty" | "failed";
+  lastSavedAt: number | null;
+  /** Imported glTF/GLB models shown in the 3D view (session-only — the parsed
+   *  geometry lives in the gltf-import registry, never in the saved doc). */
+  importedModels: ImportedModel[];
   viewTog: Record<string, boolean>;
   expanded: Record<string, boolean>;
   selectedTree?: string;
@@ -483,7 +595,9 @@ export interface PcbState {
   // Toolbar — grid, unit, visibility
   gridSize: string;
   unit: string;
-  gridVisible: boolean;
+  /** Canvas grid rendering: ruled lines, dots, or off. Single source of
+   *  truth — "none" is how the grid is hidden. */
+  gridType: GridType;
   // Selected canvas object transform (U12 in CanvasObjects)
   compRot: number;
   compFlipV: boolean;
@@ -584,8 +698,10 @@ export interface PcbState {
   snapEnabled: boolean;
   cornerOp: { mode: "chamfer" | "fillet"; radius: number };
   // Phase 7 — Route options
-  routingMode: "45deg" | "90deg" | "curved";
-  routingCorner: "miter" | "round" | "chamfer";
+  /** Route ▸ Routing Mode — what a drafted track does about copper in the way. */
+  routingMode: "ignore" | "walkaround" | "push";
+  /** Route ▸ Routing Corner — the shape of a corner (any angle · 45° · 90°). */
+  routingCorner: "any" | "45" | "90";
   routingWidth: number;
   // Task 4 — board-wide settings bag (2D Canvas Document / Common Setting / Selection Filter fields)
   boardSettings: Record<string, unknown>;
@@ -1068,7 +1184,6 @@ export const TOOLBAR_CATALOGS: Record<ToolbarScope, ToolbarCatalogItem[]> = {
     { id: "bringFront",     label: "Bring to Front" },
     { id: "sendBack",       label: "Send to Back" },
     { id: "drc",            label: "Design Rule Check" },
-    { id: "drillTable",     label: "Drill Table" },
     { id: "layerStack",     label: "Layer Stack" },
     { id: "netClass",       label: "Net Class" },
     { id: "settings",       label: "Settings" },
@@ -1166,6 +1281,10 @@ export const DEFAULT_SCHEM_TITLE_FIELDS: Array<{ key: string; label: string; on:
   { key: "author", label: "Author", on: true, valueOn: true, value: "Ayaan K." },
   { key: "company", label: "Company", on: false, valueOn: true, value: "IDEEZA" },
   { key: "sheetNo", label: "Sheet No.", on: true, valueOn: true, value: "1 / 2" },
+  { key: "project", label: "Project", on: true, valueOn: true, value: "" },
+  // Sheet size follows the border's paper size (the panel shows it read-only) —
+  // two places claiming the sheet's size would be one place too many.
+  { key: "sheetSize", label: "Sheet size", on: true, valueOn: true, value: "" },
 ];
 
 // ── Default schematic showcase ───────────────────────────────────────────────
@@ -1484,6 +1603,19 @@ export const initialState: PcbState = {
   filterDropdownOpen: false,
   layerVis: {},
   layerLock: {},
+  placeText: null,
+  pickerTab: null,
+  drcMarkers: true,
+  focusedIssue: null,
+  probe: null,
+  panelSizes: { left: 292, right: 292, bottom: 248 },
+  focusActiveLayer: false,
+  draftPoly: null,
+  showRatsnest: true,
+  recentProjects: [],
+  saveState: "saved",
+  lastSavedAt: null,
+  importedModels: [],
   viewTog: {
     "Top Toolbar": true,
     "Left-Side panel": true,
@@ -1509,7 +1641,7 @@ export const initialState: PcbState = {
   moveMode: null,
   gridSize: "0.05",
   unit: "Inch",
-  gridVisible: true,
+  gridType: "lines",
   compRot: 0,
   compFlipV: false,
   compFlipH: false,
@@ -1575,7 +1707,9 @@ export const initialState: PcbState = {
     zoneRefOn: true,
     xRegion: "4",
     yRegion: "4",
-    color: "#1E1E1E",
+    // empty = follow the theme's ink (see resolveStroke); a hex here is a real
+    // user choice
+    color: "",
   },
   schemTitleShow: true,
   schemTitleFields: DEFAULT_SCHEM_TITLE_FIELDS,
@@ -1607,8 +1741,8 @@ export const initialState: PcbState = {
   toast: null,
   snapEnabled: true,
   cornerOp: { mode: "fillet", radius: 5 },
-  routingMode: "45deg",
-  routingCorner: "miter",
+  routingMode: "walkaround",
+  routingCorner: "45",
   routingWidth: 10,
   boardSettings: {},
 };

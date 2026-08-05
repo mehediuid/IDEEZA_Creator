@@ -72,3 +72,20 @@
 .pcb-app .ix-seg { transition: all 0.18s var(--motion-easing-standard); }
 .pcb-app .ix-cover-enter { transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
 .pcb-app .ix-cover-enter:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(124, 45, 185, 0.45); }
+
+/* Cross-probe arrival pulse — "the linked object is here". Two rings, then it
+   is gone; reduced motion gets a steady ring instead. */
+@keyframes ix-probe-ring {
+  from { transform: scale(0.55); opacity: 0.85; }
+  to   { transform: scale(1.7);  opacity: 0; }
+}
+.pcb-app .ix-probe {
+  position: absolute;
+  border-radius: var(--radius-full);
+  border: var(--border-width-2) solid var(--color-canvas-select);
+  pointer-events: none;
+  animation: ix-probe-ring 950ms var(--motion-easing-decelerate) 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pcb-app .ix-probe { animation: none; opacity: 0.9; transform: scale(1.15); }
+}

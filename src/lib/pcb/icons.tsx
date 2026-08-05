@@ -41,12 +41,16 @@ export const ic: Record<string, string> = {
   del: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
   dup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><rect x="4" y="4" width="12" height="12" rx="2"/></svg>',
   rot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',
-  find: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3" stroke-linecap="round"/><path d="M8 11h6M11 8v6" stroke-linecap="round"/></svg>',
+  // Find & Replace — searching *content*, so the glyph is text lines under a
+  // lens. Deliberately unlike `zoomin` (lens + plus), which changes the view.
+  find: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h15M4 10.5h9M4 15h5"/><circle cx="16" cy="16" r="4"/><path d="M19 19l2.4 2.4"/></svg>',
   findSim: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3" stroke-linecap="round"/></svg>',
   undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>',
   redo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>',
-  array: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  // Duplicate in grid — one real object (solid) repeated into ghost copies.
+  // A plain 2×2 of equal squares reads as "grid", which is a different control.
+  array: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke-dasharray="2.6 2.2"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke-dasharray="2.6 2.2"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke-dasharray="2.6 2.2"/></svg>',
   zoomin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6" stroke-linecap="round"/></svg>',
   zoomout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6" stroke-linecap="round"/></svg>',
   fit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
@@ -54,6 +58,27 @@ export const ic: Record<string, string> = {
   ruler: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 7v3M10 7v4M14 7v3M18 7v4" stroke-linecap="round"/></svg>',
   wire: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>',
   power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v8M8 12h8M9 16h6M10 19h4"/></svg>',
+  // Supply / ground family — each row of Insert ▸ Power & Ground gets the
+  // schematic symbol it actually places, not one shared "power" glyph.
+  pwrVcc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 20V8M5 8h14"/></svg>',
+  pwr5v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V9"/><path d="M12 3.5L6.5 9.5h11z" fill="currentColor"/></svg>',
+  pwrN5v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M12 20.5L6.5 14.5h11z" fill="currentColor"/></svg>',
+  pwrGnd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v9M4.5 13h15M7.5 16.5h9M10 20h4"/></svg>',
+  // Digital ground — the ground stack with a D mark, so it can't be mistaken
+  // for plain GND in a list where both appear.
+  pwrDgnd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 6v7M4.5 13h15M7.5 16.5h9M10 20h4"/><path d="M3.6 3.2v6.4h1.7a3.2 3.2 0 0 0 0-6.4z" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  pwrAgnd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v7"/><path d="M4 11l8 9 8-9z" fill="currentColor"/></svg>',
+  pwrPgnd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v9M4.5 13h15"/><path d="M7 13l-2.5 5M12 13l-2.5 5M17 13l-2.5 5"/></svg>',
+  // Diff-pair *tag* — the pair plus the flag that names it (the pair tool keeps
+  // the plain two-rail glyph).
+  pDiffFlag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h10M3 18h10"/><path d="M13 16V4h8l-3 3.5L21 11h-8"/></svg>',
+  // Keep-out — an area routing may not enter.
+  pKeepout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5" stroke-dasharray="3 2.4"/><path d="M8 15l8-6" stroke-linecap="round"/></svg>',
+  // Part mask — a masked-off component body.
+  pPartMask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="7" y="8" width="10" height="9" rx="1.2"/><path d="M9.5 8V5.5M14.5 8V5.5M9.5 17v2.5M14.5 17v2.5" stroke-linecap="round"/><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" stroke-dasharray="3 2.4"/></svg>',
+  // ERC — the schematic's own check: a sheet with a wire on it and a tick.
+  // `dRule` (the rule checklist) stays the PCB-side design-rule glyph.
+  dErc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h9l4.5 4.5V14"/><path d="M14 3.5V8h4.5"/><path d="M5 3.5V17a1.5 1.5 0 0 0 1.5 1.5H10"/><path d="M7.5 11h4l1.5-2.5"/><circle cx="7.5" cy="11" r="1" fill="currentColor"/><path d="M13.5 18.5l2 2 4-4.5" stroke-width="2"/></svg>',
   layer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
   measure: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 8l5-5 13 13-5 5z"/><path d="M8 8l2 2M11 5l2 2M14 8l2 2M5 11l2 2"/></svg>',
   pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
@@ -73,15 +98,28 @@ export const ic: Record<string, string> = {
   fitarea: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3.4 2.6"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>',
   fullscreen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg>',
   pWire: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V9a2 2 0 0 1 2-2h12"/><circle cx="5" cy="18" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="7" r="1.7" fill="currentColor" stroke="none"/></svg>',
-  pBus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  // Bus — a thick trunk with member wires branching in, so it can't be read
+  // as a plain wire.
+  pBus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 18h18" stroke-width="2.8"/><path d="M8 18l4-6M13 18l4-6" stroke-width="1.6"/><path d="M12 12h8" stroke-width="1.6"/></svg>',
   pNetLabel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h6"/><path d="M9 7h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9l-3.2-5z"/></svg>',
+  // Label family — each kind draws the outline it actually places, matching the
+  // left palette's glyphs: local = tag, global = stadium, hierarchical =
+  // hexagon, off-sheet = arrow into the sheet edge.
+  pGlobalLabel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 12h3.5"/><rect x="5.5" y="8.5" width="15" height="7" rx="3.5"/></svg>',
+  pHierLabel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3.5"/><path d="M9 7h7.5l3.5 5-3.5 5H9l-3.5-5z"/></svg>',
+  // Attached net label — a tag hanging off the wire it names (the plain net
+  // label sits on its own lead), so the two rows no longer share one glyph.
+  pAttachedLabel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M12 6v3"/><path d="M8 9h8.5l2.5 4-2.5 4H8l-2.5-4z"/></svg>',
+  pOffPage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h8"/><path d="M11 8l5 4-5 4z" fill="currentColor"/><path d="M19.5 5v14"/></svg>',
   pShortFlag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 12h12"/><circle cx="4" cy="12" r="1.8" fill="currentColor" stroke="none"/><path d="M16 9v6"/></svg>',
   pNetFlag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4h11l-2.5 3.5L17 11H6"/></svg>',
   pPort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h7v8H4z"/><path d="M11 12h6M15 9l3 3-3 3"/></svg>',
   pNoConnect: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   pTestPoint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
   pChip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.6"/><path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3" stroke-linecap="round"/></svg>',
-  pPolyline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16 9 9l4 4 7-9"/></svg>',
+  // Polyline — segments plus the vertices you click; the bare zig-zag alone
+  // was indistinguishable from a plotted path.
+  pPolyline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-7 4 4 7-9"/><circle cx="4" cy="17" r="1.9" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r="1.9" fill="currentColor" stroke="none"/><circle cx="13" cy="14" r="1.9" fill="currentColor" stroke="none"/><circle cx="20" cy="5" r="1.9" fill="currentColor" stroke="none"/></svg>',
   pArc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 17a9 9 0 0 1 16 0"/></svg>',
   pBezier: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19C5 9 19 15 19 5"/><rect x="3" y="17" width="4" height="4" rx="1"/><rect x="17" y="3" width="4" height="4" rx="1"/></svg>',
   pCircle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/></svg>',
@@ -93,9 +131,21 @@ export const ic: Record<string, string> = {
   dConvert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/></svg>',
   dLayout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>',
   dImport: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5 12 16l2.5-2.5"/></svg>',
+  // Board design rules are about the GAP between copper, not a checklist —
+  // `dRule`/`dCheck` were two ticks side by side in the Design menu (#96).
+  // Move = grab and drag it; Move by step = advance by a fixed grid step.
+  tMoveGrab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><path d="M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>',
+  tMoveStep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M4 20V4" stroke-opacity="0.45"/><path d="M7 16h4v-4h4V8h4" /><path d="M17 5l3 3-3 3"/></svg>',
+  dDrc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h7M3 6v12M3 18h7"/><path d="M21 6h-7M21 6v12M21 18h-7"/><path d="M12 8v8"/><path d="M9.5 12h5M10.7 10.6L9.4 12l1.3 1.4M13.3 10.6l1.3 1.4-1.3 1.4"/></svg>',
+  // Length tuning: one net gains length by meandering …
+  tLenTune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-5 3 10 3-10 2 5h7"/></svg>',
+  // … a differential pair matches its two rails, so the glyph shows both.
+  tDiffLenTune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h4l1.6-3.5L9.2 10l1.6-3H22"/><path d="M2 17h20"/></svg>',
   dRule: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3V2h6v1M8.5 11l1.5 1.5L13 9M8.5 16h6"/></svg>',
   dCheck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
-  dAnnotate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7-4-4-7 7v4z"/><path d="M15 8l3-3"/></svg>',
+  // Annotate designators — a part that gets numbered: component body plus a
+  // numbered badge. Nothing to do with the text tool it used to borrow.
+  dAnnotate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="12" height="12" rx="1.6"/><path d="M6 12h6M6 16h4"/><circle cx="18" cy="6" r="4"/><path d="M17 5.2l1.3-1V9"/></svg>',
   dCross: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>',
   dTransfer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M11 7h4a2 2 0 0 1 2 2v4" stroke-linecap="round"/></svg>',
   dReset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',
@@ -109,6 +159,10 @@ export const ic: Record<string, string> = {
   tFitSection: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3.4 2.6"/><path d="M8 8h8v8H8z" stroke-dasharray="0"/></svg>',
   tFitArea: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3.4 2.6"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>',
   tGridOptions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>',
+  // Grid styles — the same frame, marked three ways, so the picker's options
+  // read as one family (ruled · dotted · off).
+  tGridDots: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><g fill="currentColor" stroke="none"><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/><circle cx="15" cy="15" r="1.2"/></g></svg>',
+  tGridOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 17L17 7" /></svg>',
   tDevReuse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.4"/><path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3" stroke-linecap="round"/><path d="M9.5 13l2 2 3-4" stroke-linecap="round" fill="none"/></svg>',
   tWire: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 18V9a2 2 0 0 1 2-2h12"/><circle cx="5" cy="18" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="7" r="1.8" fill="currentColor" stroke="none"/></svg>',
   tBus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 8h16M4 12h16M4 16h16"/></svg>',
@@ -156,7 +210,16 @@ export const ic: Record<string, string> = {
   tComponent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/></svg>',
   tDiffPair: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9h18M3 15h18"/></svg>',
   tLengthTune: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-5 3 10 2-7 2 4 2-2h4"/></svg>',
-  tAutoRoute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/><path d="M8 6l1.6 1.6M14.4 14.4 16 16M6 16l1.6-1.6M14.4 7.6 16 6"/></svg>',
+  // Auto Route — a track that finds its own way between two pads (the old
+  // glyph was a gear-like circle with spokes: it read as settings/loading).
+  // Ratsnest — the airwires between pads (dashed, before copper exists).
+  // #136 — board elevations: the slab seen edge-on from each side.
+  v3dFront: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="11" width="18" height="3.5" rx="1"/><path d="M8 8.5h3M13 8.5h3"/><path d="M12 19v-3M9.5 17.5L12 20l2.5-2.5"/></svg>',
+  v3dBack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="11" width="18" height="3.5" rx="1"/><path d="M8 17h3M13 17h3"/><path d="M12 5v3M9.5 6.5L12 4l2.5 2.5"/></svg>',
+  v3dLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="9.5" y="3" width="3.5" height="18" rx="1"/><path d="M16 8v3M16 13v3"/><path d="M5 12h3M6.5 9.5L4 12l2.5 2.5"/></svg>',
+  v3dRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="11" y="3" width="3.5" height="18" rx="1"/><path d="M8 8v3M8 13v3"/><path d="M19 12h-3M17.5 9.5L20 12l-2.5 2.5"/></svg>',
+  tRatsnest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="6" r="1.8" fill="currentColor"/><circle cx="19" cy="9" r="1.8" fill="currentColor"/><circle cx="8" cy="18" r="1.8" fill="currentColor"/><path d="M5 6l14 3M19 9L8 18M8 18L5 6" stroke-dasharray="3 2.5"/></svg>',
+  tAutoRoute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="9" width="4" height="6" rx="1"/><rect x="17.5" y="9" width="4" height="6" rx="1"/><path d="M6.5 12h4l3-4h4"/><path d="M15.5 5.6l1 1.6 1.8.3-1.3 1.3.3 1.8-1.8-.9-1.8.9.3-1.8-1.3-1.3 1.8-.3z" stroke-width="1.2"/></svg>',
   tNoConn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   blank: '',
 };

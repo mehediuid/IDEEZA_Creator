@@ -19,7 +19,18 @@ const CHEV_SVG =
 const PAD_X = "var(--spacing-8)";
 const DIVIDER = "var(--border-width-1) solid var(--color-border-subtle)";
 
-const TEMPLATES = ["A4 Landscape", "A4 Portrait", "A3 Landscape", "A3 Portrait", "US Letter", "Custom"];
+// Sheet templates are just (paper size + orientation) pairs, so the dropdown is
+// derived from those two — picking one sets them, and changing either shows
+// "Custom". It used to write `schemBasic.template`, which nothing ever read.
+const TEMPLATES: Array<{ label: string; size: string; orientation: string }> = [
+  { label: "A4 Landscape", size: "A4", orientation: "Landscape" },
+  { label: "A4 Portrait", size: "A4", orientation: "Portrait" },
+  { label: "A3 Landscape", size: "A3", orientation: "Landscape" },
+  { label: "A3 Portrait", size: "A3", orientation: "Portrait" },
+  { label: "US Letter", size: "Letter", orientation: "Landscape" },
+];
+const templateOf = (size: string, orientation: string) =>
+  TEMPLATES.find((t) => t.size === size && t.orientation === orientation)?.label ?? "Custom";
 const PAPER_SIZES: { label: string; value: string }[] = [
   { label: "A5 · 210×148", value: "A5" },
   { label: "A4 · 297×210", value: "A4" },
@@ -44,10 +55,24 @@ const FIELD_STYLE: React.CSSProperties = {
   fontFamily: "inherit",
 };
 
-function CaretHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
+// One group header for every section: the caret on the left collapses the view,
+// and the optional checkbox on the right is the feature's own on/off. They used
+// to be the same control — the checkbox both hid the rows and switched the
+// border/title block off — so there was no way to fold a group away without
+// changing the drawing, or to keep a group open while its feature was off.
+function GroupHeader({
+  title, open, onToggle, check,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  check?: { on: boolean; toggle: () => void; label: string };
+}) {
   return (
     <div
       onClick={onToggle}
+      role="button"
+      aria-expanded={open}
       style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: `var(--spacing-5) ${PAD_X}`, cursor: "pointer", userSelect: "none" }}
     >
       <span
@@ -55,16 +80,35 @@ function CaretHeader({ title, open, onToggle }: { title: string; open: boolean; 
       >
         <Icon html={CHEV_SVG} />
       </span>
-      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+      <span style={{ flex: 1, fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+      {check && (
+        // The toggle must not also collapse the group, so the click stops here
+        // (Checkbox fires its own onChange).
+        <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center" }} title={check.label}>
+          <Checkbox checked={check.on} onChange={check.toggle} />
+        </span>
+      )}
     </div>
   );
 }
 
-function CheckHeader({ title, checked, onToggle }: { title: string; checked: boolean; onToggle: () => void }) {
+// A group whose feature is switched off keeps its rows on screen but inert, so
+// you can still read the values you set — and it says why they are inert.
+function OffNotice({ text }: { text: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: `var(--spacing-5) ${PAD_X}` }}>
-      <Checkbox checked={checked} onChange={onToggle} />
-      <span style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+    <div style={{ padding: `var(--spacing-0) ${PAD_X} var(--spacing-4)`, fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>
+      {text}
+    </div>
+  );
+}
+
+function GroupBody({ on, children }: { on: boolean; children: React.ReactNode }) {
+  // `inert`, not `pointer-events: none` — the latter only stops the mouse, so a
+  // switched-off group could still be tabbed into and edited from the keyboard
+  // while the panel showed it as inactive.
+  return (
+    <div inert={!on} aria-disabled={!on} style={{ opacity: on ? 1 : 0.45 }}>
+      {children}
     </div>
   );
 }
@@ -118,19 +162,29 @@ function Sheet() {
   const state = usePcbState();
   const actions = usePcbActions();
   const open = state.schemSectionOpen.basic;
+  const b = state.schemBorder;
+  const activeSheet = state.schematicSheets.find((sh) => sh.id === state.activeSheetId) ?? state.schematicSheets[0];
   return (
     <div style={{ borderBottom: DIVIDER }}>
-      <CaretHeader title="Sheet" open={open} onToggle={() => actions.toggleSchemSection("basic")} />
+      <GroupHeader title="Sheet" open={open} onToggle={() => actions.toggleSchemSection("basic")} />
       {open && (
         <>
+          {/* Name edits the active sheet — the same name the Sheets tree and the
+              page tabs show. It used to write a field nothing read. */}
           <Row label="Name">
-            <TextValue value={state.schemBasic.name} onChange={(v) => actions.setSchemBasic({ name: v })} />
+            <TextValue
+              value={activeSheet?.name ?? ""}
+              onChange={(v) => activeSheet && actions.renameSheet(activeSheet.id, v)}
+            />
           </Row>
           <Row label="Template">
             <Select
-              value={state.schemBasic.template}
-              options={TEMPLATES.map((t) => ({ label: t, value: t }))}
-              onChange={(v) => actions.setSchemBasic({ template: v })}
+              value={templateOf(b.size, b.orientation)}
+              options={[...TEMPLATES.map((t) => ({ label: t.label, value: t.label })), { label: "Custom", value: "Custom" }]}
+              onChange={(v) => {
+                const t = TEMPLATES.find((x) => x.label === v);
+                if (t) actions.setSchemBorder({ size: t.size, orientation: t.orientation });
+              }}
               size="sm"
             />
           </Row>
@@ -164,9 +218,15 @@ function SheetBorder() {
   const b = state.schemBorder;
   return (
     <div style={{ borderBottom: DIVIDER }}>
-      <CheckHeader title="Sheet Border" checked={b.show} onToggle={() => actions.setSchemBorder({ show: !b.show })} />
-      {b.show && (
-        <>
+      <GroupHeader
+        title="Sheet Border"
+        open={state.schemSectionOpen.border}
+        onToggle={() => actions.toggleSchemSection("border")}
+        check={{ on: b.show, toggle: () => actions.setSchemBorder({ show: !b.show }), label: b.show ? "Border is drawn — click to hide it" : "Border is hidden — click to draw it" }}
+      />
+      {state.schemSectionOpen.border && (
+        <GroupBody on={b.show}>
+          {!b.show && <OffNotice text="The border is switched off, so these settings aren't applied to the sheet." />}
           <Row label="Paper size">
             <Select
               value={b.size}
@@ -190,7 +250,7 @@ function SheetBorder() {
           >
             <ZoneReference />
           </Row>
-        </>
+        </GroupBody>
       )}
     </div>
   );
@@ -199,20 +259,36 @@ function SheetBorder() {
 function TitleBlock() {
   const state = usePcbState();
   const actions = usePcbActions();
+  const on = state.schemTitleShow;
   return (
     <div style={{ borderBottom: DIVIDER }}>
-      <CheckHeader title="Sheet Info" checked={state.schemTitleShow} onToggle={actions.toggleSchemTitleShow} />
-      {state.schemTitleShow &&
-        state.schemTitleFields.map((f) => (
-          <Row
-            key={f.key}
-            check={<Checkbox checked={f.on} onChange={() => actions.toggleSchemTitleField(f.key, "on")} />}
-            label={f.label}
-            labelOn={f.on}
-          >
-            <TextValue value={f.value} onChange={(v) => actions.setSchemTitleFieldValue(f.key, v)} />
-          </Row>
-        ))}
+      <GroupHeader
+        title="Sheet Info"
+        open={state.schemSectionOpen.title}
+        onToggle={() => actions.toggleSchemSection("title")}
+        check={{ on, toggle: actions.toggleSchemTitleShow, label: on ? "Title block is shown — click to hide it" : "Title block is hidden — click to show it" }}
+      />
+      {state.schemSectionOpen.title && (
+        <GroupBody on={on}>
+          {!on && <OffNotice text="The title block is hidden, so these fields aren't drawn on the sheet." />}
+          {state.schemTitleFields.map((f) => (
+            <Row
+              key={f.key}
+              check={<Checkbox checked={f.on} onChange={() => actions.toggleSchemTitleField(f.key, "on")} />}
+              label={f.label}
+              labelOn={f.on}
+            >
+              {f.key === "sheetSize" ? (
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                  {state.schemBorder.size} · {state.schemBorder.orientation}
+                </span>
+              ) : (
+                <TextValue value={f.value} onChange={(v) => actions.setSchemTitleFieldValue(f.key, v)} />
+              )}
+            </Row>
+          ))}
+        </GroupBody>
+      )}
     </div>
   );
 }

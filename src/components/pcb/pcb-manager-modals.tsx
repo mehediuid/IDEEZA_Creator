@@ -20,6 +20,7 @@ import type { ModalId } from "@/lib/pcb/types";
 import { ListPanel, EmptyResults, TransferArrows, ModalTabBar, FilterInput } from "@/components/pcb/modal-kit";
 import { PCB_RULE_TREE, CLEARANCE_COLS, defaultClearanceRows, type ClearanceRow } from "@/lib/pcb/design-rules-data";
 import { rulesToDrcConfig } from "@/lib/pcb/drc-rules-map";
+import { diffPairStats, defaultPcbDrcConfig } from "@/lib/pcb/drc";
 
 const CLOSE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -422,10 +423,17 @@ function TransferManagerBody({
           <TransferArrows onRight={moveRight} onLeft={moveLeft} />
           <ListPanel title="Selected" items={assigned} selected={pickRight} onSelect={setPickRight} height={256} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <Button hierarchy="secondary" size="md" onClick={() => actions.flashToast(`${title} applied`)}>Apply</Button>
-          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`${title} saved`); actions.closeModal(); }}>Confirm</Button>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          {/* Assignment is live (each move writes the store), so there is no
+              "Apply" to fake — what the dialog offers instead is running the
+              check that now reads these lists. */}
+          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            {group ? `${group.name}: ${assigned.length} net${assigned.length === 1 ? "" : "s"} assigned · saved as you go` : "Pick a class to assign nets"}
+          </span>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-5)" }}>
+            <Button hierarchy="secondary" size="md" onClick={() => { actions.closeModal(); actions.runDrcCheck(); }}>Check now</Button>
+            <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Done</Button>
+          </div>
         </div>
       </Card>
     </Overlay>
@@ -509,55 +517,152 @@ function DiffPairManagerModal() {
   const [selId, setSelId] = React.useState<string | null>(pairs[0]?.id ?? null);
   const [autoOpen, setAutoOpen] = React.useState(false);
   const sel = pairs.find((p) => p.id === selId) ?? null;
+  // Tolerance comes from the tuned rules when the user has confirmed them,
+  // else from the engine defaults — the same order runDrcCheck uses.
+  const skewMax = (state.pcbDrcConfig ?? defaultPcbDrcConfig()).diffPairSkewMax;
 
-  const pickFromCanvas = (which: "P" | "N") => {
-    actions.flashToast(`Click a ${which === "P" ? "positive" : "negative"} net on the canvas (canvas pick coming with net highlighting)`);
+  // Routing state per pair, from the same helper the DRC phase uses.
+  const stats = React.useMemo(
+    () => new Map(pairs.map((p) => [p.id, diffPairStats(state.objects, p)])),
+    [pairs, state.objects],
+  );
+
+  const verdict = (id: string) => {
+    const st = stats.get(id);
+    const p = pairs.find((x) => x.id === id);
+    if (!st || !p) return { text: "—", tone: "muted" as const };
+    if (!p.netA || !p.netB) return { text: "Nets not set", tone: "muted" as const };
+    if (st.a.length === 0 && st.b.length === 0) return { text: "Not routed", tone: "muted" as const };
+    if (st.a.length === 0 || st.b.length === 0) return { text: "One rail missing", tone: "bad" as const };
+    if (st.widthOffender) return { text: `Width ≠ ${p.width} mil`, tone: "bad" as const };
+    if (st.skew > skewMax) return { text: `Skew ${st.skew.toFixed(2)} mm`, tone: "bad" as const };
+    return { text: `Matched ±${st.skew.toFixed(2)} mm`, tone: "good" as const };
+  };
+
+  const TONE = {
+    good: { color: "var(--color-text-success, #1c7a52)", bg: "var(--color-bg-success-subtle, rgba(28,122,82,.12))" },
+    bad: { color: "var(--color-text-warning, #96600a)", bg: "var(--color-bg-warning-subtle, rgba(150,96,10,.12))" },
+    muted: { color: "var(--color-text-tertiary)", bg: "var(--color-bg-subtle)" },
+  };
+
+  // The net carried by the current canvas selection — replaces the old
+  // "Click To Select Network" toast with something that actually reads the board.
+  const selectionNet = React.useMemo(() => {
+    const picked = state.objects.filter((o) => state.selectedIds.includes(o.id) && o.net);
+    return picked.length ? (picked[0].net as string) : null;
+  }, [state.objects, state.selectedIds]);
+
+  const label = (t: string) => (
+    <label style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>{t}</label>
+  );
+
+  const applySelectionNet = (which: "netA" | "netB") => {
+    if (!sel || !selectionNet) return;
+    actions.setDiffPairField(sel.id, { [which]: selectionNet });
+    actions.flashToast(`${which === "netA" ? "Positive" : "Negative"} net set to ${selectionNet}`);
   };
 
   return (
     <Overlay>
-      <Card width={760}>
+      <Card width={780}>
         <Header title="Differential Pairs" onClose={actions.closeModal} />
-        <div style={{ flex: 1, display: "flex", gap: 16, padding: "16px 24px", minHeight: 340 }}>
-          {/* Left — pair list + filter; header +Add / ×Delete */}
-          <div style={{ width: 250, flex: "0 0 auto", display: "flex" }}>
-            <ListPanel
-              title="Pairs"
-              items={pairs.map((p) => p.name)}
-              selected={sel?.name ?? null}
-              onSelect={(name) => setSelId(pairs.find((p) => p.name === name)?.id ?? null)}
-              height={252}
-              headerRight={
-                <span style={{ display: "inline-flex", gap: 4 }}>
-                  <RowBtn onClick={() => { actions.addDiffPair(); actions.flashToast("Pair added"); }} icon={PLUS_SVG} title="Add pair" />
-                  <RowBtn onClick={() => { if (sel) { actions.removeDiffPair(sel.id); setSelId(null); } }} icon={MINUS_SVG} title="Delete selected pair" />
-                </span>
-              }
-            />
+        <div style={{ flex: 1, display: "flex", gap: 18, padding: "16px 24px", minHeight: 340 }}>
+          {/* Pairs — each row states its live routing verdict */}
+          <div style={{ width: 292, flex: "0 0 auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: "var(--spacing-3)" }}>
+              <span style={{ flex: 1, fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                Pairs ({pairs.length})
+              </span>
+              <span style={{ display: "inline-flex", gap: 4 }}>
+                <RowBtn onClick={() => { actions.addDiffPair(); actions.flashToast("Pair added"); }} icon={PLUS_SVG} title="Add pair" />
+                <RowBtn onClick={() => { if (sel) { actions.removeDiffPair(sel.id); setSelId(null); } }} icon={MINUS_SVG} title="Delete selected pair" />
+              </span>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", padding: "var(--spacing-2)", minHeight: 252 }}>
+              {pairs.map((p) => {
+                const v = verdict(p.id);
+                const on = p.id === selId;
+                return (
+                  <div
+                    key={p.id}
+                    className="ix-row"
+                    onClick={() => setSelId(p.id)}
+                    style={{ padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", background: on ? "var(--color-bg-brand-subtle)" : "transparent" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
+                      <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: on ? 700 : 500, color: on ? "var(--color-text-brand)" : "var(--color-text-primary)" }}>{p.name}</span>
+                      <span style={{ padding: "1px 7px", borderRadius: "var(--radius-full)", fontSize: 10.5, fontWeight: 700, color: TONE[v.tone].color, background: TONE[v.tone].bg, whiteSpace: "nowrap" }}>{v.text}</span>
+                    </div>
+                    <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                      {p.netA || "—"} ⇄ {p.netB || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+              {pairs.length === 0 && (
+                <div style={{ padding: "var(--spacing-8)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+                  No pairs yet — add one with +, or match them automatically.
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right — net pickers for the selected pair */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Selected pair */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
             {sel ? (
               <>
-                <label style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-                  Positive Net
-                </label>
-                <NetSelect ariaLabel="Positive net" value={sel.netA} options={nets} onChange={(v) => actions.setDiffPairField(sel.id, { netA: v })} />
-                <Button hierarchy="secondary" size="sm" onClick={() => pickFromCanvas("P")}>Click To Select Network</Button>
+                {label("Pair name")}
+                <CompactInput value={sel.name} width={240} onChange={(v) => actions.setDiffPairField(sel.id, { name: v })} />
 
-                <label style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 10 }}>
-                  Negative Net
-                </label>
-                <NetSelect ariaLabel="Negative net" value={sel.netB} options={nets} onChange={(v) => actions.setDiffPairField(sel.id, { netB: v })} />
-                <Button hierarchy="secondary" size="sm" onClick={() => pickFromCanvas("N")}>Click To Select Network</Button>
-
-                <div style={{ marginTop: 10 }}>
-                  <label style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-                    Pair Name
-                  </label>
-                  <CompactInput value={sel.name} width={220} onChange={(v) => actions.setDiffPairField(sel.id, { name: v })} />
+                <div style={{ display: "flex", gap: "var(--spacing-6)", marginTop: "var(--spacing-4)" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {label("Positive net")}
+                    <NetSelect ariaLabel="Positive net" value={sel.netA} options={nets} onChange={(v) => actions.setDiffPairField(sel.id, { netA: v })} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {label("Negative net")}
+                    <NetSelect ariaLabel="Negative net" value={sel.netB} options={nets} onChange={(v) => actions.setDiffPairField(sel.id, { netB: v })} />
+                  </div>
                 </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
+                  <Button hierarchy="secondary" size="sm" disabled={!selectionNet} onClick={() => applySelectionNet("netA")}>
+                    Positive from selection
+                  </Button>
+                  <Button hierarchy="secondary" size="sm" disabled={!selectionNet} onClick={() => applySelectionNet("netB")}>
+                    Negative from selection
+                  </Button>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                    {selectionNet ? `Canvas selection: ${selectionNet}` : "Select a track or pad on the board to use its net"}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: "var(--spacing-8)", marginTop: "var(--spacing-5)" }}>
+                  <div>
+                    {label("Track width (mil)")}
+                    <CompactInput value={String(sel.width)} width={110} onChange={(v) => actions.setDiffPairField(sel.id, { width: Number(v) || 0 })} />
+                  </div>
+                  <div>
+                    {label("Gap (mil)")}
+                    <CompactInput value={String(sel.gap)} width={110} onChange={(v) => actions.setDiffPairField(sel.id, { gap: Number(v) || 0 })} />
+                  </div>
+                </div>
+
+                {/* Live measurement — what DRC will report */}
+                {(() => {
+                  const st = stats.get(sel.id);
+                  const v = verdict(sel.id);
+                  return (
+                    <div style={{ marginTop: "auto", padding: "var(--spacing-5) var(--spacing-6)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                      <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: TONE[v.tone].color }}>{v.text}</div>
+                      <div style={{ marginTop: 4, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", fontFamily: "var(--font-family-mono), monospace" }}>
+                        {sel.netA || "—"} {st ? `${st.la.toFixed(2)} mm (${st.a.length} track${st.a.length === 1 ? "" : "s"})` : ""} · {sel.netB || "—"} {st ? `${st.lb.toFixed(2)} mm (${st.b.length})` : ""}
+                      </div>
+                      <div style={{ marginTop: 2, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                        Skew tolerance {skewMax} mm — set in Design Rules. Track width is enforced by DRC; gap is used when routing the pair.
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             ) : (
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-tertiary)", fontSize: "var(--font-size-sm)" }}>
@@ -566,12 +671,13 @@ function DiffPairManagerModal() {
             )}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <Button hierarchy="secondary" size="md" onClick={() => setAutoOpen(true)}>Automatic Generation…</Button>
+        {/* Edits apply as you make them (they live in the document), so the
+            footer carries the one real extra action and a way out. */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Button hierarchy="secondary" size="md" onClick={() => setAutoOpen(true)}>Match pairs automatically…</Button>
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-5)" }}>
-            <Button hierarchy="secondary" size="md" onClick={() => actions.flashToast("Differential pairs applied")}>Apply</Button>
-            <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-            <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Differential pairs saved"); actions.closeModal(); }}>Confirm</Button>
+            <Button hierarchy="secondary" size="md" onClick={() => actions.runDrcCheck()}>Run DRC</Button>
+            <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Done</Button>
           </div>
         </div>
       </Card>
@@ -736,7 +842,9 @@ function PadPairManagerModal() {
     () =>
       state.objects
         .filter((o) => o.kind === "pad")
-        .map((o, i) => ({ name: `P${i + 1}`, net: o.net ?? "" })),
+        // `name` is what the user reads, `key` is what gets stored — the DRC
+        // resolves the key, so reordering the board can't repoint a pair.
+        .map((o, i) => ({ name: o.text || `P${i + 1}`, key: o.id, net: o.net ?? "" })),
     [state.objects],
   );
   const nets = ["All nets", ...new Set(pads.map((p) => p.net).filter(Boolean))];
@@ -749,8 +857,8 @@ function PadPairManagerModal() {
       return;
     }
     const cur = which === 1 ? pad1 : pad2;
-    const idx = (visiblePads.findIndex((p) => p.name === cur) + 1) % visiblePads.length;
-    (which === 1 ? setPad1 : setPad2)(visiblePads[idx].name);
+    const idx = (visiblePads.findIndex((p) => p.key === cur) + 1) % visiblePads.length;
+    (which === 1 ? setPad1 : setPad2)(visiblePads[idx].key);
   };
 
   const addPair = () => {
@@ -790,7 +898,7 @@ function PadPairManagerModal() {
         >
           <option value="">— pick pad —</option>
           {visiblePads.map((p) => (
-            <option key={p.name} value={p.name}>{p.name}{p.net ? ` (${p.net})` : ""}</option>
+            <option key={p.key} value={p.key}>{p.name}{p.net ? ` (${p.net})` : ""}</option>
           ))}
         </select>
         {value && <RowBtn onClick={() => setValue("")} icon={MINUS_SVG} title={`Clear ${label}`} />}
@@ -863,9 +971,14 @@ function PadPairManagerModal() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <Button hierarchy="secondary" size="md" onClick={() => actions.flashToast("Pad pair groups applied")}>Apply</Button>
-          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Pad pair groups saved"); actions.closeModal(); }}>Confirm</Button>
+          {/* Adding and removing a pair already writes the group, so there is
+              nothing for an Apply to apply and nothing for a Cancel to revert.
+              What the user still needs is to see the rule bite. */}
+          <span style={{ marginRight: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            Groups save as you edit them.
+          </span>
+          <Button hierarchy="secondary" size="md" onClick={() => { actions.runDrcCheck(); actions.closeModal(); }}>Check now</Button>
+          <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Done</Button>
         </div>
       </Card>
     </Overlay>
@@ -1411,10 +1524,23 @@ function applyCapabilityPreset(cfg: PcbRulesConfig, presetName: string): PcbRule
 
 const PCB_RULE_TABS = ["Rule Management", "Net Rule", "Net-Net Rule", "Region Rule"];
 
+// Rule types `runDrc` really enforces today (drc.ts phases 1–4). Everything
+// else is editable but carries a "not checked yet" badge, so a rule can never
+// pretend to matter.
+const DRC_ENFORCED_LEAVES = new Set([
+  "Safe Spacing",       // phase 1 — clearance matrix
+  "Track",              // phase 2 — min/max track width
+  "Via Size",           // phase 2 — outer + hole diameter
+  "Net Length Range",   // phase 2 — per-net length
+  "Differential Pair",  // phase 4 — width + skew
+]);
+
 function PcbDrcModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const [tab, setTab] = React.useState("Rule Management");
+  const [onlyChecked, setOnlyChecked] = React.useState(false);
+  const [query, setQuery] = React.useState("");
   const [cfg, setCfg] = React.useState<PcbRulesConfig>(() =>
     savedPcbRulesConfig ? hydratePcbRulesConfig(savedPcbRulesConfig) : defaultPcbRulesConfig(),
   );
@@ -1496,20 +1622,53 @@ function PcbDrcModal() {
   return (
     <Overlay>
       <Card width={1040} maxHeight="90%">
-        <Header title="Design Rules" onClose={actions.closeModal} />
+        <Header title="Board design rules" onClose={actions.closeModal} />
+        {/* One honest line about the whole config, then the tabs. */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "10px 24px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 600 }}>
+            {cfg.rules.length} named rule{cfg.rules.length === 1 ? "" : "s"}
+          </span>
+          <span style={{ fontSize: "var(--font-size-xs)", padding: "2px 8px", borderRadius: 999, background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)", fontWeight: 600 }}>
+            {DRC_ENFORCED_LEAVES.size} of {PCB_RULE_TREE.reduce((a, c) => a + c.leaves.length, 0)} rule types checked by the engine
+          </span>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", cursor: "pointer" }}>
+            <input type="checkbox" checked={onlyChecked} onChange={() => setOnlyChecked((v) => !v)} />
+            Only rules the engine checks
+          </label>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter rules"
+            aria-label="Filter rules"
+            style={{ marginLeft: "auto", width: 170, padding: "5px 9px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-xs)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+          />
+        </div>
         <ModalTabBar tabs={PCB_RULE_TABS} active={tab} onChange={setTab} />
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 380 }}>
           {tab === "Rule Management" && (
             <>
-              {/* Rule tree — every leaf is clickable and owns ≥1 named rule */}
-              <div style={{ width: 230, flex: "0 0 auto", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", padding: "12px 10px" }}>
-                {PCB_RULE_TREE.map((cat) => (
+              {/* Category rail — each row says how many rules it holds and
+                  whether the engine checks that type at all. */}
+              <div style={{ width: 250, flex: "0 0 auto", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", padding: "12px 10px" }}>
+                {PCB_RULE_TREE.map((cat) => {
+                  const shownLeaves = cat.leaves.filter((leaf) =>
+                    (!onlyChecked || DRC_ENFORCED_LEAVES.has(leaf)) &&
+                    (!query.trim() || leaf.toLowerCase().includes(query.trim().toLowerCase()) ||
+                      cfg.rules.some((r) => r.leaf === leaf && r.name.toLowerCase().includes(query.trim().toLowerCase()))));
+                  if (!shownLeaves.length) return null;
+                  const checked = cat.leaves.filter((l) => DRC_ENFORCED_LEAVES.has(l)).length;
+                  return (
                   <div key={cat.category} style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4, padding: "4px 8px" }}>
-                      {cat.category}
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, padding: "4px 8px" }}>
+                      <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        {cat.category}
+                      </span>
+                      <span style={{ fontSize: "var(--font-size-2xs, 10px)", color: "var(--color-text-tertiary)" }}>
+                        {checked}/{cat.leaves.length} checked
+                      </span>
                     </div>
-                    {cat.leaves.map((leaf) => {
+                    {shownLeaves.map((leaf) => {
                       const leafRules = cfg.rules.filter((r) => r.leaf === leaf);
                       const leafActive = leafRules.some((r) => r.name === cfg.selected);
                       return (
@@ -1520,9 +1679,17 @@ function PcbDrcModal() {
                               if (leafRules[0]) setCfg((c) => ({ ...c, selected: leafRules[0].name }));
                             }}
                             className="ix-mi"
+                            title={DRC_ENFORCED_LEAVES.has(leaf) ? `${leaf} — checked by Run design check` : `${leaf} — editable, but the DRC engine doesn't check this type yet`}
                             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "4px 8px 4px 16px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", cursor: "pointer", color: "var(--color-text-primary)", fontWeight: leafActive ? 600 : 500 }}
                           >
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{leaf}</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{leaf}</span>
+                              {!DRC_ENFORCED_LEAVES.has(leaf) && (
+                                <span style={{ flex: "0 0 auto", fontSize: 9, lineHeight: 1.4, padding: "1px 5px", borderRadius: 999, background: "var(--color-bg-subtle)", color: "var(--color-text-tertiary)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                                  not checked yet
+                                </span>
+                              )}
+                            </span>
                             {/* PDF #3: + beside each rule-type heading — adds a named rule of this type */}
                             <button
                               type="button"
@@ -1559,7 +1726,8 @@ function PcbDrcModal() {
                       );
                     })}
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Rule pane */}
@@ -1708,9 +1876,15 @@ function PcbDrcModal() {
           }}>Restore Default</Button>
           <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f); e.target.value = ""; }} />
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
-            <Button hierarchy="secondary" size="md" onClick={() => { save(); actions.flashToast("PCB design rules applied"); }}>Apply</Button>
             <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-            <Button hierarchy="primary" size="md" onClick={() => { save(); actions.flashToast("PCB design rules saved"); actions.closeModal(); }}>Confirm</Button>
+            <Button hierarchy="secondary" size="md" onClick={() => { save(); actions.flashToast("Board design rules saved"); actions.closeModal(); }}>Save</Button>
+            <Button hierarchy="primary" size="md" onClick={() => {
+              // Save, then really run the check and open the results — the old
+              // primary just closed and left you to find the DRC yourself.
+              save();
+              actions.closeModal();
+              actions.runDrcCheck();
+            }}>Save &amp; check now</Button>
           </div>
         </div>
       </Card>

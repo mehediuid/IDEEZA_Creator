@@ -10,6 +10,7 @@ import * as React from "react";
 import { Icon } from "@/lib/pcb/icons";
 import { Button, SearchInput } from "@/components/ideeza";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+import { glyphFor } from "@/components/pcb/placed-objects";
 import type { LibCommonTab, LibFilter, LibPrice } from "@/lib/pcb/types";
 
 // ── module-scope pure data + helpers ──
@@ -30,21 +31,8 @@ type LibCard = { name: string; kind: string; symbol: SymbolKind; variants: strin
 type CommonGroup = { name: string; cards: LibCard[] };
 
 // Schematic symbols drawn on a 48×32 canvas, centered, stroked in currentColor.
-const SYMBOLS: Record<SymbolKind, React.ReactNode> = {
-  resistor: <><path d="M2 16h8M38 16h8" /><rect x="10" y="10" width="28" height="12" rx="1" /></>,
-  capacitor: <><path d="M2 16h18M20 6v20M28 6v20M28 16h18" /></>,
-  power: <><path d="M24 28V10M14 10h20" /><path d="M24 10l-3 -5M24 10l3 -5" /></>,
-  ground: <><path d="M24 4v14M14 18h20M18 23h12M21 28h6" /></>,
-  inductor: <path d="M2 18h6a5 5 0 0 1 10 0 5 5 0 0 1 10 0 5 5 0 0 1 10 0h6" />,
-  diode: <><path d="M2 16h14M32 16h14M32 8v16" /><path d="M16 8l16 8-16 8z" fill="currentColor" stroke="none" /></>,
-  connector: <><rect x="14" y="6" width="20" height="20" rx="2" /><path d="M6 11h8M6 21h8M14 11v10" /></>,
-  ic: <><rect x="12" y="6" width="24" height="20" rx="2" /><path d="M6 11h6M6 16h6M6 21h6M36 11h6M36 16h6M36 21h6" /></>,
-  via: <><circle cx="24" cy="16" r="9" /><circle cx="24" cy="16" r="3.5" fill="currentColor" stroke="none" /></>,
-  pad: <rect x="12" y="8" width="24" height="16" rx="2" fill="currentColor" stroke="none" opacity="0.85" />,
-  frame: <rect x="6" y="5" width="36" height="22" rx="1" strokeDasharray="3 3" />,
-  fiducial: <><circle cx="24" cy="16" r="7" fill="currentColor" stroke="none" opacity="0.85" /><circle cx="24" cy="16" r="11" /></>,
-  hole: <><circle cx="24" cy="16" r="9" /><circle cx="24" cy="16" r="4" /></>,
-};
+// (the old hand-drawn SYMBOLS map is gone: cards preview the real placed
+// geometry via `glyphFor`, so there is only one source for a symbol.)
 
 const R_PKGS = ["0402", "0603", "0805", "1206"];
 const C_PKGS = ["0402", "0603", "0805", "1210"];
@@ -73,17 +61,24 @@ const COMMON_GROUPS: Record<LibCommonTab, CommonGroup[]> = {
       { name: "IC (SOIC)", kind: "component", symbol: "ic", variants: ["SOIC-8", "SOIC-14", "TSSOP-20"] },
     ] },
   ],
+  // #112 — the board set: real land patterns (the same glyphs Convert places),
+  // pads, vias and the copper/outline objects, so a click drops board copper.
   pcb: [
     { name: "Footprints", cards: [
-      { name: "R 0402", kind: "component", symbol: "pad", variants: R_PKGS },
-      { name: "C 0603", kind: "component", symbol: "pad", variants: C_PKGS },
+      { name: "Chip 0805 (R/C/L)", kind: "fp0805", symbol: "pad", variants: R_PKGS },
+      { name: "SOD-123 diode", kind: "fpSOD123", symbol: "pad", variants: ["SOD-123", "SOD-323"] },
+      { name: "SOT-23", kind: "fpSOT23", symbol: "pad", variants: ["SOT-23", "SOT-23-5"] },
+      { name: "SOIC-8", kind: "fpSOIC8", symbol: "pad", variants: ["SOIC-8", "SOIC-14"] },
     ] },
-    { name: "Vias", cards: [
-      { name: "Via", kind: "via", symbol: "via", variants: ["0.3/0.6", "0.2/0.45", "0.25/0.5"] },
+    // Pad · Via · Board Outline · Fill Region are the top toolbar's (#110), so
+    // they are deliberately absent here — no control lives in two places.
+    // Test points, shaped pads and mounting holes are the palette's (#119/#120).
+    { name: "Land patterns", cards: [
+      { name: "Fiducial", kind: "pad", symbol: "fiducial", variants: ["1.0mm", "1.5mm"] },
     ] },
-    { name: "Pads", cards: [
-      { name: "SMD Pad", kind: "pad", symbol: "pad", variants: ["Round", "Rect", "Oval"] },
-      { name: "TH Pad", kind: "pad", symbol: "hole", variants: ["0.8mm", "1.0mm"] },
+    { name: "Copper", cards: [
+      { name: "Copper region", kind: "polygon", symbol: "pad", variants: ["Top", "Bottom"] },
+      { name: "Slot region", kind: "slot", symbol: "pad", variants: ["Rounded"] },
     ] },
   ],
   panel: [
@@ -183,13 +178,23 @@ export function LibraryPanel() {
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({ "0": true, "0.0": true });
   const [treeSel, setTreeSel] = React.useState("0.0.0");
 
-  const groups = COMMON_GROUPS[state.libCommonTab];
+  // #112 — board mode gets the board library (the pcb set existed but the panel
+  // always showed the schematic one). The segmented control below still lets you
+  // browse the other sets on purpose.
+  const modeTab: LibCommonTab = state.mode === "schematic" ? "schematic" : "pcb";
+  const [pickedTab, setPickedTab] = React.useState<LibCommonTab | null>(null);
+  const commonTab: LibCommonTab = pickedTab ?? modeTab;
+  const groups = COMMON_GROUPS[commonTab];
   const cq = commonQuery.trim().toLowerCase();
 
   const toggle = (k: string) => setExpanded((e) => ({ ...e, [k]: !e[k] }));
 
   // Cascading placement: each click drops the part at a slightly offset spot
   // so successive clicks don't stack objects directly on top of each other.
+  // #123 — card density, and #125 — which card is open in the detail strip.
+  const [big, setBig] = React.useState(true);
+  const [variantOf, setVariantOf] = React.useState<Record<string, string>>({});
+  const [picked, setPicked] = React.useState<{ key: string; card: LibCard; group: string } | null>(null);
   const placeCount = React.useRef(0);
   const placeFromLib = (kind: string) => {
     const n = placeCount.current++;
@@ -225,8 +230,46 @@ export function LibraryPanel() {
 
       {state.libView === "common" && (
         <>
-          <div style={{ padding: "var(--spacing-5) var(--spacing-7) var(--spacing-6)" }}>
-            <SearchInput value={commonQuery} onValueChange={setCommonQuery} placeholder="Search parts & compo.." />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-7) var(--spacing-3)" }}>
+            <div style={{ display: "flex", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-lg)", padding: 2, gap: 2, flex: 1 }}>
+              {([["schematic", "Symbols"], ["pcb", "Board"], ["panel", "Panel"]] as const).map(([v, label]) => {
+                const on = commonTab === v;
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setPickedTab(v)}
+                    style={{ flex: 1, padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "var(--font-size-xs)", fontWeight: 600, background: on ? "var(--color-violet-600)" : "transparent", color: on ? "var(--color-text-on-brand)" : "var(--color-text-secondary)" }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              aria-pressed={big}
+              title={big ? "Smaller cards" : "Bigger cards"}
+              onClick={() => setBig((v) => !v)}
+              style={{ flex: "0 0 auto", padding: "var(--spacing-2) var(--spacing-4)", borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-default)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", fontSize: "var(--font-size-xs)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {big ? "S" : "L"}
+            </button>
+          </div>
+          <div style={{ padding: "var(--spacing-0) var(--spacing-7) var(--spacing-5)" }}>
+            <SearchInput value={commonQuery} onValueChange={setCommonQuery} placeholder={commonTab === "pcb" ? "Search footprints & pads" : "Search parts & components"} />
+          </div>
+          {/* #107 — Place a Part left the top toolbar; the library is its home. */}
+          <div style={{ padding: "var(--spacing-0) var(--spacing-7) var(--spacing-5)" }}>
+            <button
+              type="button"
+              className="ix-btn"
+              onClick={() => actions.openPicker(commonTab === "pcb" ? "Parts" : "Parts")}
+              style={{ width: "100%", padding: "var(--spacing-4)", borderRadius: "var(--radius-lg)", border: "var(--border-width-1) solid var(--color-violet-600)", background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)", fontWeight: 600, fontSize: "var(--font-size-sm)", cursor: "pointer", fontFamily: "inherit" }}
+            >
+              Place a Part…
+            </button>
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-0) var(--spacing-6) var(--spacing-6)" }}>
@@ -240,10 +283,24 @@ export function LibraryPanel() {
                   <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, letterSpacing: 0.3, color: "var(--color-text-secondary)", padding: "var(--spacing-2) var(--spacing-1) var(--spacing-3)" }}>
                     {g.name}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--spacing-4)" }}>
-                    {cards.map((c, i) => (
-                      <PartCard key={`${g.name}-${c.name}-${i}`} card={c} onPlace={() => placeFromLib(c.kind)} />
-                    ))}
+                  {/* #123 — auto-fit: a wider panel gives bigger cards, so the
+                      symbol/footprint is actually readable. */}
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(${big ? 150 : 108}px, 1fr))`, gap: "var(--spacing-4)" }}>
+                    {cards.map((c, i) => {
+                      const key = `${g.name}-${c.name}-${i}`;
+                      return (
+                        <PartCard
+                          key={key}
+                          card={c}
+                          tall={big}
+                          variant={variantOf[key] ?? c.variants[0]}
+                          onVariant={(v) => setVariantOf((m) => ({ ...m, [key]: v }))}
+                          selected={picked?.key === key}
+                          onSelect={() => setPicked({ key, card: c, group: g.name })}
+                          onPlace={() => placeFromLib(c.kind)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -254,6 +311,44 @@ export function LibraryPanel() {
               </div>
             )}
           </div>
+
+          {/* #125 — what a click is about to add: a bigger preview of the real
+              symbol, the numbers that matter, and the Place button. */}
+          {picked && (
+            <div style={{ flex: "0 0 auto", borderTop: "var(--border-width-1) solid var(--color-border-default)", background: "var(--color-bg-surface)", padding: "var(--spacing-5) var(--spacing-7)", display: "flex", gap: "var(--spacing-6)", alignItems: "center" }}>
+              <div style={{ width: 92, height: 66, flex: "0 0 auto", borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-subtle)", background: "var(--color-bg-page)", display: "grid", placeItems: "center", color: "var(--color-violet-600)" }}>
+                <svg width="86" height="60" viewBox="-36 -24 72 48" style={{ overflow: "visible" }}>
+                  <g stroke="currentColor" fill="none">{glyphFor(picked.card.kind)}</g>
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {picked.card.name}
+                </div>
+                <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", marginTop: 2 }}>
+                  {picked.group} · {variantOf[picked.key] ?? picked.card.variants[0]} · places a <b>{picked.card.kind}</b>
+                </div>
+                <div style={{ fontSize: "var(--font-size-2xs, 10px)", color: "var(--color-text-tertiary)", marginTop: 2 }}>
+                  {picked.card.variants.length > 1 ? `${picked.card.variants.length} variants — pick one on the card` : "single variant"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => placeFromLib(picked.card.kind)}
+                style={{ flex: "0 0 auto", padding: "var(--spacing-3) var(--spacing-7)", borderRadius: "var(--radius-lg)", border: "none", background: "var(--color-violet-600)", color: "var(--color-text-on-brand)", fontWeight: 700, fontSize: "var(--font-size-sm)", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Place
+              </button>
+              <button
+                type="button"
+                aria-label="Close details"
+                onClick={() => setPicked(null)}
+                style={{ flex: "0 0 auto", width: 24, height: 24, borderRadius: "var(--radius-md)", border: "none", background: "transparent", color: "var(--color-text-tertiary)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -312,40 +407,86 @@ export function LibraryPanel() {
 }
 
 // A single library card: symbol preview (click to place) + variant dropdown.
-function PartCard({ card, onPlace }: { card: LibCard; onPlace: () => void }) {
-  const [variant, setVariant] = React.useState(card.variants[0]);
+// #123/#124/#125 — one card: it previews the REAL symbol that will be placed
+// (`glyphFor`, the same geometry the canvas draws, so the two can't drift), it
+// says on hover what a click does, and a click selects it for the detail strip
+// instead of dropping a part on the board behind your back. Double-click still
+// places straight away for people who know what they want.
+function PartCard({
+  card, variant, onVariant, selected, onSelect, onPlace, tall,
+}: {
+  card: LibCard;
+  variant: string;
+  onVariant: (v: string) => void;
+  selected: boolean;
+  onSelect: () => void;
+  onPlace: () => void;
+  tall: boolean;
+}) {
   const [hover, setHover] = React.useState(false);
+  // Keyboard focus has to light the card the way hover does, or the Place
+  // affordance below is mouse-only.
+  const [focus, setFocus] = React.useState(false);
+  const lit = hover || selected || focus;
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        border: `var(--border-width-1) solid ${hover ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
+        border: `var(--border-width-1) solid ${selected ? "var(--color-violet-600)" : lit ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
         borderRadius: "var(--radius-lg)",
         overflow: "hidden",
         background: "var(--color-bg-surface)",
-        transition: "border-color .14s, box-shadow .14s",
-        boxShadow: hover ? "var(--elevation-2)" : "none",
+        transition: "border-color .14s, box-shadow .14s, transform .14s",
+        boxShadow: lit ? "var(--elevation-2)" : "none",
+        transform: hover ? "translateY(-1px)" : "none",
       }}
     >
-      <button
-        type="button"
-        onClick={onPlace}
-        title={`Place ${card.name} (${variant})`}
-        aria-label={`Place ${card.name} ${variant}`}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onDoubleClick={onPlace}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setFocus(false)}
+        // A role="button" owes both keys, and Space would otherwise scroll.
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPlace(); }
+        }}
+        title={`${card.name} · ${variant} — click for details, double-click to place`}
+        aria-label={`${card.name} ${variant}`}
         style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-          height: 58, background: "var(--color-bg-page)", border: "none",
+          position: "relative", width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+          height: tall ? 96 : 62, background: "var(--color-bg-page)",
           borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-          cursor: "pointer", color: hover ? "var(--color-violet-600)" : "var(--color-text-secondary)",
+          cursor: "pointer", color: lit ? "var(--color-violet-600)" : "var(--color-text-secondary)",
+          // The card clips its overflow, so the focus ring has to sit inside it.
+          outlineOffset: -3,
           transition: "color .14s",
         }}
       >
-        <svg width="52" height="34" viewBox="0 0 48 32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          {SYMBOLS[card.symbol]}
+        {/* the real placed geometry, scaled into the card */}
+        <svg width="100%" height={tall ? 86 : 54} viewBox="-34 -22 68 44" style={{ display: "block", overflow: "visible" }}>
+          <g stroke="currentColor" fill="none">{glyphFor(card.kind)}</g>
         </svg>
-      </button>
-      <VariantDropdown name={card.name} variant={variant} variants={card.variants} onChange={setVariant} />
+        {/* #124 — hover says what a click will do, before it happens */}
+        {lit && (
+          <button
+            type="button"
+            className="ix-tool"
+            onClick={(e) => { e.stopPropagation(); onPlace(); }}
+            style={{
+              position: "absolute", right: 6, bottom: 6, padding: "3px 9px", borderRadius: 999,
+              border: "var(--border-width-1) solid var(--color-violet-600)",
+              background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)",
+              fontSize: "var(--font-size-2xs, 10px)", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Place
+          </button>
+        )}
+      </div>
+      <VariantDropdown name={card.name} variant={variant} variants={card.variants} onChange={onVariant} />
     </div>
   );
 }

@@ -6,14 +6,18 @@
 // partial or updater-function), so the ported handlers read identically.
 
 import * as React from "react";
-import { convertSchematicToPcb, routeRatsnest } from "./schematic-to-pcb";
-import { booleanRings, shapeToPolygon, isCombinable, ringArea } from "./shape-boolean";
+import { convertSchematicToPcb, routeRatsnest, unrouteGenerated } from "./schematic-to-pcb";
+import { booleanRings, shapeToPolygon, isCombinable, ringArea, chamferRing, filletRing } from "./shape-boolean";
+import { planSutureVias, type SutureConfig } from "./suture-vias";
+import { planTrackPath } from "./route-path";
+import { pourCopper, POURABLE } from "./pour";
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
-import { runDrc, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
-import { downloadDataUrl } from "./exporters";
+import { runDrc, runNetClasses, runEqualLength, runPadPairs, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
+import { captureSchematicSvg, downloadBlob, downloadDataUrl, rasterizeToPng } from "./exporters";
+import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
-import {
+import { PANEL_LIMITS,
   DEFAULT_SCHEM_OBJECTS,
   DEL_OBJ_NAMES,
   TOOLBAR_CATALOGS,
@@ -33,6 +37,7 @@ import {
   type LibCommonTab,
   type LibFilter,
   type LibPrice,
+  type GridType,
   type LibView,
   type ManagerId,
   type MenuId,
@@ -53,6 +58,17 @@ type Merge = (
   patch: Partial<PcbState> | ((s: PcbState) => Partial<PcbState>),
 ) => void;
 
+/** What the Auto Routing dialog decides about a run. */
+export type AutoRouteOpts = {
+  /** `unrouted` (default) routes the remaining airwires, `selected` only the
+   *  nets in the selection, `all` gives back previously routed copper first. */
+  scope?: "unrouted" | "selected" | "all";
+  /** Use each net's class track width instead of the board default. */
+  respectClass?: boolean;
+  /** 45° mitred corners instead of right angles. */
+  mitre?: boolean;
+};
+
 export interface PcbActions {
   merge: Merge;
   toggleMenu: (id: MenuId) => void;
@@ -66,11 +82,24 @@ export interface PcbActions {
   toggleChat: () => void;
   // 3D-view controls — drive the three.js camera / render (real, no stubs).
   pcb3dFit: () => void;
-  pcb3dPreset: (view: "iso" | "top" | "bottom") => void;
+  pcb3dPreset: (view: PcbState["pcb3d"]["preset"]) => void;
   pcb3dToggleProjection: () => void;
   pcb3dToggleExplode: () => void;
   export3dPng: () => void;
+  /** Board 3D model as binary glTF (.glb). */
+  exportGlb: () => void;
+  /** The visible schematic sheet as PNG or SVG. */
+  exportSheetImage: (fmt: "PNG" | "SVG") => void;
+  /** Add objects as one undoable step (bulk import). */
+  addObjects: (objs: CanvasObject[]) => void;
+  toggleDrcMarkers: () => void;
+  /** Focus a finding: highlight it and centre the canvas on it. */
+  focusIssue: (i: number | null) => void;
+  addImportedModel: (m: ImportedModel) => void;
+  removeImportedModel: (id: string) => void;
   openModal: (m: Exclude<ModalId, null>) => void;
+  /** Open the part library on a specific tab (Parts · Agile Module). */
+  openPicker: (tab: string) => void;
   closeModal: () => void;
   toggleDelObj: (n: string) => void;
   toggleDelAll: () => void;
@@ -89,6 +118,8 @@ export interface PcbActions {
   closeBottom: () => void;
   toggleBottom: () => void;
   setTool: (t: string) => void;
+  /** Arm a place tool whose object carries a specific name (VCC / -5V / …). */
+  setToolAs: (t: string, text: string) => void;
   setSelectedTree: (label: string) => void;
   toggleExpanded: (label: string) => void;
   toggleExpandedKey: (key: string) => void;
@@ -125,6 +156,8 @@ export interface PcbActions {
   /** Fit the view to all in-scope objects, or just the current selection. */
   zoomFit: (target?: "all" | "selection") => void;
   /** Force-write the current document to localStorage now (toolbar Save). */
+  /** Drag a panel edge. Clamped by PANEL_LIMITS; view state, so no undo entry. */
+  setPanelSize: (which: "left" | "right" | "bottom", px: number) => void;
   saveDoc: () => void;
   /** Mirror the PCB view to inspect the board from the bottom (Flip Board). */
   toggleBoardFlip: () => void;
@@ -156,6 +189,12 @@ export interface PcbActions {
   crossProbe: (id: string) => void;
   /** Boolean/Combine on 2+ selected shapes/regions → one real polygon result. */
   combineSelected: (op: "union" | "intersect" | "difference" | "xor") => void;
+  /** Edit ▸ Add Chamfer / Add Fillet — real corner geometry on the selection. */
+  applyCornerOp: (mode: "chamfer" | "fillet", size: number) => void;
+  /** Insert ▸ Suture Vias — stitch a real via lattice into a region / the board. */
+  generateSutureVias: (cfg: SutureConfig) => void;
+  /** Remove the stitching vias of a region (or every one on the board). */
+  removeSutureVias: (groupId: string) => void;
   /** Grab-move: pick up the selection so it follows the cursor (right-click Move). */
   startMoveSelected: () => void;
   translateMove: (dx: number, dy: number) => void;
@@ -166,6 +205,8 @@ export interface PcbActions {
   // Toolbar — grid / unit / visibility / transforms / z-order / undo-redo
   setGridSize: (s: string) => void;
   setUnit: (u: string) => void;
+  setGridType: (t: GridType) => void;
+  /** Grid button click — steps lines → dots → off → lines. */
   toggleGridVisible: () => void;
   rotateSelBy: (deg: number) => void;
   flipSelV: () => void;
@@ -189,11 +230,34 @@ export interface PcbActions {
   loadSampleSchematic: () => void;
   /** Derive footprints + ratsnest from the schematic and switch to PCB 2D. */
   convertSchematicToPcb: () => void;
+  /** #93 — pull schematic changes into the existing board, keeping placement. */
+  importChangesFromSchematic: () => void;
+  /** #86 — nudge the selection by an exact offset (Move by step). */
+  moveSelectedBy: (dx: number, dy: number) => void;
+  /** #79 — create the board document for a project that has none yet. */
+  createPcbDoc: () => void;
+  /** #122 — polygon board outline: add a vertex / close / cancel. */
+  polyAddPoint: (x: number, y: number) => void;
+  polyClose: () => void;
+  polyCancel: () => void;
+  /** #140 — dim the layers that aren't active, so the active one reads. */
+  toggleFocusActiveLayer: () => void;
+  /** #110 — show/hide the ratsnest airwires (top toolbar). */
+  toggleRatsnest: () => void;
+  /** #94/95 — pour every copper region (or the selection) for real. */
+  pourRegions: (onlySelected?: boolean) => void;
+  /** #94/95 — throw the poured copper away, keeping the outlines. */
+  clearPours: () => void;
   /** Turn the ratsnest airwires into copper tracks (simple L-route). */
-  autoRoute: () => void;
+  /** Auto Routing — the dialog's options, or defaults when called from a menu. */
+  autoRoute: (opts?: AutoRouteOpts) => void;
   /** Assign the current selection to a new group (selects together after). */
   groupSelection: () => void;
   ungroupSelection: () => void;
+  /** Widen the selection to every object sharing a group with the current one. */
+  selectGroupMembers: () => void;
+  /** Activate a manual project and open its PCB editor (Project ▸ Open Project). */
+  openManualProject: (id: string, slug: string, newWindow?: boolean) => void;
   /** Clear style props on the selection back to defaults. */
   resetObjectStyle: () => void;
   /** Add an empty custom property row to the primary selected object. */
@@ -363,6 +427,12 @@ type Snapshot = Pick<
   | "schemTitleFields"
   | "objects"
   | "selectedIds"
+  // Rule sets are model data — an accidental delete in the Net-Class or
+  // Pad-Pair dialog has to be undoable like anything else on the board.
+  | "pcbNetClasses"
+  | "pcbEqualLength"
+  | "pcbPadPairs"
+  | "pcbDiffPairs"
 >;
 
 const SNAP_KEYS: (keyof Snapshot)[] = [
@@ -383,6 +453,10 @@ const SNAP_KEYS: (keyof Snapshot)[] = [
   "schemTitleFields",
   "objects",
   "selectedIds",
+  "pcbNetClasses",
+  "pcbEqualLength",
+  "pcbPadPairs",
+  "pcbDiffPairs",
 ];
 
 function snap(s: PcbState): Snapshot {
@@ -410,6 +484,9 @@ function pcbDocKey(): string {
   return PCB_DOC_PREFIX + pid;
 }
 
+/** The only clock read in this module — save stamps. */
+const stamp = () => Date.now();
+
 type PcbDoc = Pick<
   PcbState,
   | "objects"
@@ -417,6 +494,7 @@ type PcbDoc = Pick<
   | "twoD"
   | "threeD"
   | "gridSize"
+  | "gridType"
   | "unit"
   | "snapEnabled"
   | "designRules"
@@ -425,6 +503,17 @@ type PcbDoc = Pick<
   | "pcbNets"
   | "pcbDefaults"
   | "boardSettings"
+  | "panelSizes"
+  // Rule sets that really drive the DRC (net classes, length groups, pad pairs,
+  // diff pairs) plus the routing policy that changes what geometry a draft
+  // commits. These were session-only while the dialogs said "saved as you go",
+  // so a reload silently cleared the rules and the board reported clean.
+  | "pcbNetClasses"
+  | "pcbEqualLength"
+  | "pcbPadPairs"
+  | "pcbDiffPairs"
+  | "routingMode"
+  | "routingCorner"
 >;
 
 // Rebuild a safe document from persisted storage — stale or hand-edited data
@@ -463,7 +552,28 @@ function sanitizePcbDoc(raw: unknown): Partial<PcbDoc> | null {
   if (typeof r.threeD === "object" && r.threeD !== null) {
     out.threeD = { ...initialState.threeD, ...(r.threeD as Partial<PcbState["threeD"]>) };
   }
+  // Panel sizes: clamp on the way in, so a hand-edited document can't hide a
+  // panel or push the canvas off screen.
+  if (typeof r.panelSizes === "object" && r.panelSizes !== null) {
+    const ps = r.panelSizes as Record<string, unknown>;
+    const clamp = (v: unknown, k: "left" | "right" | "bottom") =>
+      typeof v === "number" && Number.isFinite(v)
+        ? Math.round(Math.min(PANEL_LIMITS[k].max, Math.max(PANEL_LIMITS[k].min, v)))
+        : initialState.panelSizes[k];
+    out.panelSizes = { left: clamp(ps.left, "left"), right: clamp(ps.right, "right"), bottom: clamp(ps.bottom, "bottom") };
+  }
+  // Rule sets: keep only well-formed rows, so a hand-edited document can't
+  // crash the DRC phases that now read them.
+  const named = (v: unknown) =>
+    Array.isArray(v) ? v.filter((x) => !!x && typeof (x as { name?: unknown }).name === "string") : null;
+  const nc = named(r.pcbNetClasses); if (nc) out.pcbNetClasses = nc as PcbState["pcbNetClasses"];
+  const el = named(r.pcbEqualLength); if (el) out.pcbEqualLength = el as PcbState["pcbEqualLength"];
+  const pp = named(r.pcbPadPairs); if (pp) out.pcbPadPairs = pp as PcbState["pcbPadPairs"];
+  const dp = named(r.pcbDiffPairs); if (dp) out.pcbDiffPairs = dp as PcbState["pcbDiffPairs"];
+  if (r.routingMode === "ignore" || r.routingMode === "walkaround" || r.routingMode === "push") out.routingMode = r.routingMode;
+  if (r.routingCorner === "any" || r.routingCorner === "45" || r.routingCorner === "90") out.routingCorner = r.routingCorner;
   if (typeof r.gridSize === "string") out.gridSize = r.gridSize;
+  if (r.gridType === "lines" || r.gridType === "dots" || r.gridType === "none") out.gridType = r.gridType;
   if (typeof r.unit === "string") out.unit = r.unit;
   if (typeof r.snapEnabled === "boolean") out.snapEnabled = r.snapEnabled;
   // Design rules: accept a well-formed config, else fall back to defaults so a
@@ -521,15 +631,18 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
   const moveOrigRef = React.useRef<Snapshot | null>(null);
 
   // Hydrate the persisted document once on mount (client only), then bump the
-  // id counter past any restored ids so new placements never collide.
+  // id counter past any restored ids so new placements never collide. The
+  // project list (Project ▸ Open Project) is read in the same pass — one
+  // state write on mount instead of two.
   const [docHydrated, setDocHydrated] = React.useState(false);
   React.useEffect(() => {
+    const patch: Partial<PcbState> = {};
     try {
       const raw = window.localStorage.getItem(pcbDocKey());
       if (raw) {
         const doc = sanitizePcbDoc(JSON.parse(raw));
         if (doc) {
-          setState((s) => ({ ...s, ...doc }));
+          Object.assign(patch, doc);
           let maxId = 0;
           for (const o of doc.objects ?? []) {
             const m = /^obj_(\d+)$/.exec(o.id);
@@ -539,6 +652,20 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {}
+    try {
+      // Same key the manual-projects provider writes, so the menu lists the
+      // projects that actually exist.
+      const arr = JSON.parse(window.localStorage.getItem("ideeza:manual:projects") || "null");
+      if (Array.isArray(arr)) {
+        const list = arr
+          .filter((p): p is { id: string; slug: string; name: string; updatedAt?: number } =>
+            !!p && typeof p.id === "string" && typeof p.slug === "string" && typeof p.name === "string")
+          .map((p) => ({ id: p.id, slug: p.slug, name: p.name, updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : 0 }))
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        if (list.length) patch.recentProjects = list;
+      }
+    } catch {}
+    if (Object.keys(patch).length) setState((s) => ({ ...s, ...patch }));
     setDocHydrated(true);
   }, []);
 
@@ -555,26 +682,44 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           twoD: state.twoD,
           threeD: state.threeD,
           gridSize: state.gridSize,
+          gridType: state.gridType,
           unit: state.unit,
           snapEnabled: state.snapEnabled,
           designRules: state.designRules,
           pcbDrcConfig: state.pcbDrcConfig,
           pcbLayers: state.pcbLayers,
+          pcbNetClasses: state.pcbNetClasses,
+          pcbEqualLength: state.pcbEqualLength,
+          pcbPadPairs: state.pcbPadPairs,
+          pcbDiffPairs: state.pcbDiffPairs,
+          routingMode: state.routingMode,
+          routingCorner: state.routingCorner,
           pcbNets: state.pcbNets,
           pcbDefaults: state.pcbDefaults,
           boardSettings: state.boardSettings,
+          panelSizes: state.panelSizes,
         };
         window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
-      } catch {}
+        setState((s) => ({ ...s, saveState: "saved", lastSavedAt: stamp() }));
+      } catch {
+        setState((s) => ({ ...s, saveState: "failed" }));
+      }
     }, 300);
     return () => window.clearTimeout(t);
   }, [
     docHydrated,
     state.objects,
+    state.pcbNetClasses,
+    state.pcbEqualLength,
+    state.pcbPadPairs,
+    state.pcbDiffPairs,
+    state.routingMode,
+    state.routingCorner,
     state.pcbBoard,
     state.twoD,
     state.threeD,
     state.gridSize,
+    state.gridType,
     state.unit,
     state.snapEnabled,
     state.designRules,
@@ -583,11 +728,27 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
     state.pcbNets,
     state.pcbDefaults,
     state.boardSettings,
+    state.panelSizes,
   ]);
 
+  // Keys the persisted document is made of — a patch touching one of these means
+  // a write is pending, which is how the save chip knows to say "Saving…".
+  const DOC_KEY_SET = React.useMemo(
+    () => new Set<string>([
+      "objects", "pcbBoard", "twoD", "threeD", "gridSize", "gridType", "unit",
+      "snapEnabled", "designRules", "pcbDrcConfig", "pcbLayers", "pcbNets",
+      "pcbDefaults", "boardSettings", "panelSizes",
+    ]),
+    [],
+  );
+
   const merge = React.useCallback<Merge>((patch) => {
-    setState((s) => ({ ...s, ...(typeof patch === "function" ? patch(s) : patch) }));
-  }, []);
+    setState((s) => {
+      const part = typeof patch === "function" ? patch(s) : patch;
+      const dirty = Object.keys(part).some((k) => DOC_KEY_SET.has(k));
+      return { ...s, ...part, ...(dirty ? { saveState: "saving" as const } : null) };
+    });
+  }, [DOC_KEY_SET]);
 
   // Capture the *current* state into history.past before applying a model-changing
   // patch. Clears future (standard undo behavior).
@@ -596,7 +757,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       const before = stateRef.current;
       const beforeSnap = snap(before);
       setState((s) => {
-        const next = { ...s, ...(typeof patch === "function" ? patch(s) : patch) };
+        const part = typeof patch === "function" ? patch(s) : patch;
+        const dirty = Object.keys(part).some((k) => DOC_KEY_SET.has(k));
+        const next = { ...s, ...part, ...(dirty ? { saveState: "saving" as const } : null) };
         const changed = SNAP_KEYS.some((k) => beforeSnap[k] !== snap(next)[k]);
         if (changed) {
           historyRef.current.past.push(beforeSnap);
@@ -608,7 +771,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
     },
-    [],
+    [DOC_KEY_SET],
   );
 
   const actions = React.useMemo<PcbActions>(() => {
@@ -681,7 +844,66 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           actions.flashToast("PNG capture blocked by the browser");
         }
       },
+      exportGlb: () => {
+        const s = stateRef.current;
+        if (!s.objects.some((o) => o.scope === "pcb")) {
+          actions.flashToast("No board yet — generate the PCB first");
+          return;
+        }
+        actions.flashToast("Building 3D model…");
+        import("./glb-export")
+          .then(({ exportBoardGltf }) => exportBoardGltf(s, true))
+          .then((buf) => {
+            downloadBlob("board.glb", buf as ArrayBuffer, "model/gltf-binary");
+            actions.flashToast("Exported board.glb");
+          })
+          .catch(() => actions.flashToast("GLB export failed"));
+      },
+      exportSheetImage: (fmt) => {
+        const cap = captureSchematicSvg();
+        if (!cap) { actions.flashToast("Nothing on this sheet to export"); return; }
+        if (fmt === "SVG") {
+          downloadBlob("schematic.svg", cap.svg, "image/svg+xml");
+          actions.flashToast("Exported schematic.svg");
+          return;
+        }
+        rasterizeToPng(cap.svg, cap.width, cap.height, 2)
+          .then((png) => { downloadDataUrl("schematic.png", png); actions.flashToast("Exported schematic.png"); })
+          .catch(() => actions.flashToast("PNG export failed"));
+      },
+      addObjects: (objs) => {
+        if (objs.length === 0) return;
+        mergeWithHistory((s) => ({ objects: [...s.objects, ...objs], selectedIds: objs.map((o) => o.id) }));
+      },
+      toggleDrcMarkers: () => merge((s) => ({ drcMarkers: !s.drcMarkers })),
+      focusIssue: (i) => {
+        const s = stateRef.current;
+        if (i === null) { merge({ focusedIssue: null }); return; }
+        const list = s.mode === "schematic" ? s.ercResults : s.pcbDrcResults;
+        const it = list[i];
+        // Show the results next to the marker. (clickBottomTab toggles when the
+        // tab is already active, which would close the panel here.)
+        merge({ focusedIssue: i, drcMarkers: true, bottomTab: "drc", bottomOpen: true });
+        // Centre the viewport on the finding when it carries a position. The
+        // canvas measures itself — the old `innerWidth - 660` / `innerHeight -
+        // 200` guesses assumed fixed panels, so a dragged panel or an open
+        // bottom drawer put the finding off-centre or off-screen.
+        if (it && typeof it.x === "number" && typeof it.y === "number") {
+          const el = typeof document !== "undefined" ? document.querySelector("[data-canvas-wrapper]") : null;
+          const box = el?.getBoundingClientRect();
+          const vw = box?.width ?? 780;
+          const vh = box?.height ?? 700;
+          merge({ pan: { x: vw / 2 - it.x * s.zoom, y: vh / 2 - it.y * s.zoom } });
+        }
+      },
+      addImportedModel: (m) =>
+        merge((s) => ({ importedModels: [...s.importedModels, m] })),
+      removeImportedModel: (id) => {
+        dropImportedGroup(id);
+        merge((s) => ({ importedModels: s.importedModels.filter((m) => m.id !== id) }));
+      },
       openModal: (m) => merge({ modal: m, openMenu: null, ctx: null }),
+      openPicker: (tab) => merge({ modal: "devicePicker", pickerTab: tab, openMenu: null, ctx: null }),
       closeModal: () => merge({ modal: null }),
       toggleDelObj: (n) =>
         merge((s) => ({ delObj: { ...s.delObj, [n]: !s.delObj[n as keyof typeof s.delObj] } })),
@@ -729,7 +951,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       clearFind: () => merge({ findResults: [] }),
       closeBottom: () => merge({ bottomOpen: false }),
       toggleBottom: () => merge((s) => ({ bottomOpen: !s.bottomOpen })),
-      setTool: (t) => merge({ tool: t }),
+      setTool: (t) => merge({ tool: t, placeText: null }),
+      setToolAs: (t, text) => merge({ tool: t, placeText: text }),
       setSelectedTree: (label) => merge({ selectedTree: label }),
       toggleExpanded: (label) =>
         merge((s) => ({ expanded: { ...s.expanded, [label]: !s.expanded[label] } })),
@@ -850,18 +1073,28 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           const bcx = (minX + maxX) / 2, bcy = (minY + maxY) / 2;
           return { zoom, pan: { x: W / 2 - bcx * zoom, y: H / 2 - bcy * zoom } };
         }),
+      setPanelSize: (which, px) => {
+        const lim = PANEL_LIMITS[which];
+        const v = Math.round(Math.min(lim.max, Math.max(lim.min, px)));
+        merge((s) => ({ panelSizes: { ...s.panelSizes, [which]: v } }));
+      },
       saveDoc: () => {
         try {
           const s = stateRef.current;
           const doc: PcbDoc = {
             objects: s.objects, pcbBoard: s.pcbBoard, twoD: s.twoD, threeD: s.threeD,
-            gridSize: s.gridSize, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
+            gridSize: s.gridSize, gridType: s.gridType, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
             pcbDrcConfig: s.pcbDrcConfig, pcbLayers: s.pcbLayers, pcbNets: s.pcbNets,
-            pcbDefaults: s.pcbDefaults, boardSettings: s.boardSettings,
+            pcbDefaults: s.pcbDefaults, boardSettings: s.boardSettings, panelSizes: s.panelSizes,
+            pcbNetClasses: s.pcbNetClasses, pcbEqualLength: s.pcbEqualLength,
+            pcbPadPairs: s.pcbPadPairs, pcbDiffPairs: s.pcbDiffPairs,
+            routingMode: s.routingMode, routingCorner: s.routingCorner,
           };
           window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
+          merge({ saveState: "saved", lastSavedAt: stamp() });
           actions.flashToast("Saved");
         } catch {
+          merge({ saveState: "failed" });
           actions.flashToast("Save failed");
         }
       },
@@ -923,7 +1156,15 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         // always the live pairs; netlist-mismatch stays gated off (see above).
         const base = s.pcbDrcConfig ?? defaultPcbDrcConfig();
         const cfg = { ...base, diffPairs: s.pcbDiffPairs, netlistEnabled: false };
-        const issues = runDrc(objs, cfg);
+        // #99 — the manager lists are rules now, not just stored data: a net
+        // class states the copper it wants, a length group its match window, a
+        // pad-pair group its spacing. All three feed the same results panel.
+        const issues = [
+          ...runDrc(objs, cfg),
+          ...runNetClasses(objs, s.pcbNetClasses),
+          ...runEqualLength(objs, s.pcbEqualLength),
+          ...runPadPairs(objs, s.pcbPadPairs),
+        ];
         merge({ pcbDrcResults: issues, bottomTab: "drc", bottomOpen: true });
         actions.flashToast(issues.length ? `DRC: ${issues.length} violation(s) found` : "DRC passed — no violations");
       },
@@ -1009,11 +1250,30 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       // it, fit the view. Falls back to a toast when there's no link yet.
       crossProbe: (id) => {
         const s = stateRef.current;
-        const target = s.objects.find((o) => o.sourceId === id || (o.scope === "pcb" && o.sourceId === id));
+        const from = s.objects.find((o) => o.id === id);
+        // Both directions: a schematic symbol finds the footprint Convert linked
+        // to it (footprint.sourceId === symbol.id); a footprint walks its own
+        // sourceId back to the symbol.
+        const forward = s.objects.find((o) => o.sourceId === id);
+        const back = from?.sourceId ? s.objects.find((o) => o.id === from.sourceId) : undefined;
+        const target = forward ?? back;
         actions.closeAll();
-        if (!target) { actions.flashToast("No linked PCB object — run Convert to PCB first"); return; }
-        actions.setMode("pcb");
-        setTimeout(() => { actions.selectPlaced(target.id, false); actions.zoomFit("selection"); }, 60);
+        if (!target) {
+          actions.flashToast("No linked object — run Convert to PCB first");
+          return;
+        }
+        const toMode = target.scope === "pcb" ? "pcb" : "schematic";
+        actions.setMode(toMode);
+        setTimeout(() => {
+          actions.selectPlaced(target.id, false);
+          actions.zoomFit("selection");
+          // Selection alone doesn't answer "which one?" in a dense board, so the
+          // arrival pulses; it clears itself so nothing stays lit.
+          merge((st) => ({ probe: { id: target.id, nonce: (st.probe?.nonce ?? 0) + 1 } }));
+          setTimeout(() => {
+            if (stateRef.current.probe?.id === target.id) merge({ probe: null });
+          }, 1900);
+        }, 60);
       },
       combineSelected: (op) => {
         const s = stateRef.current;
@@ -1037,6 +1297,77 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         const gone = new Set(sel.map((o) => o.id));
         mergeWithHistory((st) => ({ objects: [...st.objects.filter((o) => !gone.has(o.id)), result], selectedIds: [id] }));
         actions.flashToast(`Combined ${sel.length} shapes (${op})`);
+      },
+      applyCornerOp: (mode, size) => {
+        const s = stateRef.current;
+        const sel = s.objects.filter((o) => s.selectedIds.includes(o.id) && isCombinable(o));
+        if (!sel.length) { actions.flashToast("Select a shape, region or outline first"); return; }
+        if (!(size > 0)) { actions.flashToast(`${mode === "chamfer" ? "Chamfer" : "Fillet"} size must be greater than 0`); return; }
+        let clamped = 0;
+        let changed = 0;
+        const patched = new Map<string, CanvasObject>();
+        for (const o of sel) {
+          const abs = shapeToPolygon(o);
+          const res = mode === "chamfer" ? chamferRing(abs, size) : filletRing(abs, size);
+          clamped += res.clamped;
+          if (res.ring.length === abs.length && res.clamped === 0 && mode === "chamfer") continue;
+          if (res.ring.length < 3) continue;
+          // Re-centre on the result's own bbox and store LOCAL rings, exactly
+          // like a Combine result — one geometry path for real polygons.
+          const xs = res.ring.map((pt) => pt.x), ys = res.ring.map((pt) => pt.y);
+          const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+          const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+          patched.set(o.id, {
+            ...o,
+            x: cx,
+            y: cy,
+            rotation: 0, // rotation is baked into the ring by shapeToPolygon
+            points: [res.ring.map((pt) => ({ x: pt.x - cx, y: pt.y - cy }))],
+            props: { ...(o.props ?? {}), cornerOp: mode, cornerSize: size },
+          });
+          changed++;
+        }
+        if (!changed) { actions.flashToast("Nothing to round — those corners are already flat"); return; }
+        mergeWithHistory((st) => ({ objects: st.objects.map((o) => patched.get(o.id) ?? o) }));
+        const what = mode === "chamfer" ? "Chamfered" : "Filleted";
+        actions.flashToast(
+          `${what} ${changed} shape${changed > 1 ? "s" : ""}${clamped ? ` · ${clamped} corner${clamped > 1 ? "s" : ""} clamped to fit` : ""}`,
+        );
+      },
+      generateSutureVias: (cfg) => {
+        const s = stateRef.current;
+        const plan = planSutureVias(s, cfg);
+        if (!plan.points.length) { actions.flashToast(plan.reason ?? "Nothing to stitch"); return; }
+        // Real vias — the same kind the Via tool places, so DRC, the 3D view
+        // and the exporters all see them without a special case.
+        const vias: CanvasObject[] = plan.points.map((p) => ({
+          id: `obj_${objIdCounter.current++}`,
+          kind: "via",
+          x: Math.round(p.x),
+          y: Math.round(p.y),
+          rotation: 0,
+          scope: "pcb",
+          layer: "multi",
+          net: cfg.net || undefined,
+          width: cfg.size,
+          drill: cfg.drill,
+          startLayer: "top",
+          endLayer: "bottom",
+          props: { suture: true, sutureGroup: plan.groupId },
+        }));
+        mergeWithHistory((st) => ({ objects: [...st.objects, ...vias] }));
+        actions.flashToast(`Stitched ${vias.length} via${vias.length > 1 ? "s" : ""}${cfg.net ? ` on ${cfg.net}` : ""}`);
+      },
+      removeSutureVias: (groupId) => {
+        const s = stateRef.current;
+        const isSuture = (o: CanvasObject) => {
+          const pr = o.props as Record<string, unknown> | undefined;
+          return !!pr?.suture && (groupId === "all" || pr.sutureGroup === groupId);
+        };
+        const gone = s.objects.filter(isSuture).length;
+        if (!gone) { actions.flashToast("No stitching vias to remove"); return; }
+        mergeWithHistory((st) => ({ objects: st.objects.filter((o) => !isSuture(o)) }));
+        actions.flashToast(`Removed ${gone} stitching via${gone > 1 ? "s" : ""}`);
       },
       startMoveSelected: () => {
         const s = stateRef.current;
@@ -1359,7 +1690,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         }),
       setGridSize: (v) => mergeWithHistory({ gridSize: v }),
       setUnit: (v) => mergeWithHistory({ unit: v }),
-      toggleGridVisible: () => merge((s) => ({ gridVisible: !s.gridVisible })),
+      setGridType: (t) => merge({ gridType: t }),
+      toggleGridVisible: () =>
+        merge((s) => ({ gridType: s.gridType === "lines" ? "dots" : s.gridType === "dots" ? "none" : "lines" })),
       rotateSelBy: (deg) =>
         mergeWithHistory((s) => ({ compRot: (s.compRot + deg) % 360 })),
       flipSelV: () => mergeWithHistory((s) => ({ compFlipV: !s.compFlipV })),
@@ -1407,8 +1740,6 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           diode: "D?",
           inductor: "L?",
           testPoint: "TP",
-          stackTable: "Stack Table",
-          drillTable: "Drill Table",
           offPageConnector: "PORT",
           diffPairFlag: "DP",
           reuseBlock: "REUSE",
@@ -1442,14 +1773,15 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             kind,
             x,
             y,
-            text: defaultText[kind],
+            text: s.placeText ?? defaultText[kind],
             rotation: 0,
+            scope: inPcb ? "pcb" : undefined,
             layer: inPcb ? s.activePcbLayer : undefined,
             // Schematic placements belong to the active sheet (multi-sheet).
             sheetId: inPcb ? undefined : s.activeSheetId,
             ...pcbExtras,
           };
-          return { objects: [...s.objects, obj], selectedIds: [id] };
+          return { objects: [...s.objects, obj], selectedIds: [id], placeText: null };
         });
       },
       startWire: (kind, x, y) =>
@@ -1459,24 +1791,89 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           if (!s.draftWire) return {};
           const id = `obj_${objIdCounter.current++}`;
           const isTrack = s.draftWire.kind === "track";
+          // #103/#104 — the corner style and the obstacle policy are real: the
+          // planner decides the polyline (and any copper to shove aside), and
+          // the same planner draws the preview, so they can't disagree.
+          if (isTrack) {
+            const plan = planTrackPath(s, { x: s.draftWire.startX, y: s.draftWire.startY }, { x, y });
+            const segs: CanvasObject[] = [];
+            for (let i = 0; i + 1 < plan.points.length; i++) {
+              const a = plan.points[i], b = plan.points[i + 1];
+              if (Math.hypot(b.x - a.x, b.y - a.y) < 0.5) continue;
+              segs.push({
+                id: i === 0 ? id : `obj_${objIdCounter.current++}`,
+                kind: "track",
+                x: a.x, y: a.y, endX: b.x, endY: b.y,
+                scope: "pcb",
+                layer: s.activePcbLayer,
+                width: s.pcbDefaults.trackWidth,
+              });
+            }
+            if (!segs.length) return { draftWire: null };
+            const pushed = new Map(plan.pushes.map((p) => [p.id, p]));
+            const objects = s.objects.map((o) => {
+              const mv = pushed.get(o.id);
+              return mv ? { ...o, x: o.x + mv.dx, y: o.y + mv.dy, endX: (o.endX ?? o.x) + mv.dx, endY: (o.endY ?? o.y) + mv.dy } : o;
+            });
+            if (plan.note) actions.flashToast(plan.note);
+            return { objects: [...objects, ...segs], draftWire: null, selectedIds: segs.map((o) => o.id) };
+          }
+          const inPcb = s.mode === "pcb" || s.mode === "2d";
+          // A cutout is an area, not a segment: store it corner-normalised so
+          // width/height are always positive downstream (2D, 3D, exports).
+          const isCutout = s.draftWire.kind === "cutout";
+          // #122 — the board's own edge: a dragged rectangle or circle.
+          if (s.draftWire.kind === "boardOutlineRect" || s.draftWire.kind === "boardOutlineCircle") {
+            const isRect = s.draftWire.kind === "boardOutlineRect";
+            const dx = Math.abs(x - s.draftWire.startX), dy = Math.abs(y - s.draftWire.startY);
+            if ((isRect && (dx < 8 || dy < 8)) || (!isRect && Math.hypot(dx, dy) < 8)) {
+              actions.flashToast("Board outline too small — drag further");
+              return { draftWire: null };
+            }
+            const obj: CanvasObject = isRect
+              ? {
+                  id, kind: "boardOutline", rotation: 0, scope: "pcb", layer: "outline",
+                  x: Math.min(s.draftWire.startX, x), y: Math.min(s.draftWire.startY, y),
+                  width: dx, height: dy, props: { shape: "rect" },
+                }
+              : {
+                  id, kind: "boardOutline", rotation: 0, scope: "pcb", layer: "outline",
+                  x: s.draftWire.startX, y: s.draftWire.startY,
+                  width: Math.hypot(dx, dy) * 2, height: Math.hypot(dx, dy) * 2,
+                  props: { shape: "circle" },
+                };
+            actions.flashToast(isRect ? "Board outline — rectangle" : "Board outline — circle");
+            return { objects: [...s.objects, obj], draftWire: null, selectedIds: [id] };
+          }
+          if (isCutout && (Math.abs(x - s.draftWire.startX) < 4 || Math.abs(y - s.draftWire.startY) < 4)) {
+            actions.flashToast("Cutout too small — drag a larger area");
+            return { draftWire: null };
+          }
           const obj: CanvasObject = {
             id,
             kind: s.draftWire.kind,
-            x: s.draftWire.startX,
-            y: s.draftWire.startY,
-            endX: x,
-            endY: y,
+            x: isCutout ? Math.min(s.draftWire.startX, x) : s.draftWire.startX,
+            y: isCutout ? Math.min(s.draftWire.startY, y) : s.draftWire.startY,
+            // A cutout is an area: x/y is its top-left corner and the extent
+            // lives in width/height — the same pair the Properties panel's
+            // Rectangle Outline binds to, so the panel can resize it.
+            endX: isCutout ? undefined : x,
+            endY: isCutout ? undefined : y,
+            height: isCutout ? Math.abs(y - s.draftWire.startY) : undefined,
+            // Board-mode drafts belong to the board, so the 3D view and the
+            // exporters (which read `scope === "pcb"`) actually see them.
+            scope: inPcb ? "pcb" : undefined,
             // Tracks always live on the active PCB layer; wires/buses
             // (schematic) leave layer undefined.
-            layer: isTrack ? s.activePcbLayer : undefined,
+            layer: isCutout ? "outline" : isTrack ? s.activePcbLayer : undefined,
             // Track width from PCB defaults; nets attach via the property panel.
-            width: isTrack ? s.pcbDefaults.trackWidth : undefined,
+            width: isCutout ? Math.abs(x - s.draftWire.startX) : isTrack ? s.pcbDefaults.trackWidth : undefined,
             sheetId: isTrack ? undefined : s.activeSheetId,
           };
           // Schematic auto-junction: drop a junction dot where an endpoint of the
           // new wire lands on the INTERIOR of an existing wire (a T-connection).
           const extra: CanvasObject[] = [];
-          if (!isTrack) {
+          if (!isTrack && !isCutout) {
             const first = s.schematicSheets[0]?.id;
             const others = s.objects.filter((o) => (o.kind === "wire" || o.kind === "bus") && (!o.scope || o.scope === "schematic") && (o.sheetId ?? first) === s.activeSheetId);
             const already = (px: number, py: number) => s.objects.some((o) => o.kind === "junction" && Math.hypot(o.x - px, o.y - py) < 8);
@@ -1569,6 +1966,26 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         }));
         actions.flashToast("Ungrouped");
       },
+      selectGroupMembers: () => {
+        const s = stateRef.current;
+        const gidOf = (o: (typeof s.objects)[number]) =>
+          (o.props as Record<string, unknown> | undefined)?.groupId as string | undefined;
+        const gids = new Set(
+          s.objects.filter((o) => s.selectedIds.includes(o.id)).map(gidOf).filter(Boolean) as string[],
+        );
+        if (!gids.size) { actions.flashToast("Selection isn't in a group"); return; }
+        const ids = s.objects.filter((o) => { const g = gidOf(o); return !!g && gids.has(g); }).map((o) => o.id);
+        merge({ selectedIds: ids });
+        actions.flashToast(`Selected ${ids.length} object${ids.length > 1 ? "s" : ""} in ${gids.size > 1 ? `${gids.size} groups` : "the group"}`);
+      },
+      openManualProject: (id, slug, newWindow) => {
+        // The doc is keyed by the active project, so switching it means a real
+        // navigation — the editor rehydrates that project's board on load.
+        try { window.localStorage.setItem(ACTIVE_PROJECT_KEY, id); } catch {}
+        const url = `/project/${slug}/pcb`;
+        if (newWindow) window.open(url, "_blank");
+        else window.location.href = url;
+      },
       resetObjectStyle: () => {
         const ids = new Set(stateRef.current.selectedIds);
         const STYLE_KEYS = ["lineStyle", "fillColor", "fillColor2", "fontSize", "style", "roundRadius", "font", "strokeColor"];
@@ -1624,11 +2041,194 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           `Converted to PCB — ${parts} footprints · ${nets} nets · ${airwires} airwires`,
         );
       },
-      autoRoute: () => {
+      // #93 — Import Changes From Schematic: re-run the converter, but keep
+      // where the user already put each part (matched by `sourceId`), add the
+      // new ones, drop the ones whose symbol is gone, and rebuild the ratsnest.
+      importChangesFromSchematic: () => {
+        const src = stateRef.current.objects;
+        const { objects: generated } = convertSchematicToPcb(src);
+        const genFoot = generated.filter((o) => o.props?.gen === "convert" && o.sourceId);
+        const genOther = generated.filter((o) => !(o.props?.gen === "convert" && o.sourceId));
+        const existing = src.filter((o) => o.props?.gen === "convert" && o.sourceId);
+        const bySource = new Map(existing.map((o) => [o.sourceId as string, o]));
+        let added = 0, kept = 0;
+        const merged = genFoot.map((g) => {
+          const old = bySource.get(g.sourceId as string);
+          if (!old) { added++; return g; }
+          kept++;
+          // keep placement + rotation + side, take the fresh designator/footprint
+          return { ...g, x: old.x, y: old.y, rotation: old.rotation, side: old.side, layer: old.layer };
+        });
+        const liveSources = new Set(genFoot.map((g) => g.sourceId));
+        const removed = existing.filter((o) => !liveSources.has(o.sourceId)).length;
+        mergeWithHistory((st) => ({
+          objects: [
+            // hand-placed board work (tracks, vias, regions…) survives; only the
+            // previous convert output is replaced.
+            ...st.objects.filter((o) => o.props?.gen !== "convert" && o.props?.gen !== "route"),
+            ...merged,
+            ...genOther,
+          ],
+          mode: "pcb",
+          openMenu: null,
+          selectedIds: [],
+          draftWire: null,
+        }));
+        actions.flashToast(
+          added || removed
+            ? `Imported changes — ${added} new part${added === 1 ? "" : "s"} · ${removed} removed · ${kept} kept in place`
+            : `Board already matches the schematic — ${kept} part${kept === 1 ? "" : "s"} unchanged`,
+        );
+      },
+      moveSelectedBy: (dx, dy) => {
         const s = stateRef.current;
-        const { objects: routedObjs, routed } = routeRatsnest(s.objects, s.pcbDefaults.trackWidth);
+        if (!s.selectedIds.length) { actions.flashToast("Nothing selected to move"); return; }
+        if (!dx && !dy) return;
+        const ids = new Set(s.selectedIds);
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) =>
+            ids.has(o.id)
+              ? { ...o, x: o.x + dx, y: o.y + dy, ...(o.endX !== undefined ? { endX: o.endX + dx } : null), ...(o.endY !== undefined ? { endY: o.endY + dy } : null) }
+              : o,
+          ),
+        }));
+        actions.flashToast(`Moved ${ids.size} object${ids.size > 1 ? "s" : ""} by ${Math.round(dx)}, ${Math.round(dy)}`);
+      },
+      createPcbDoc: () => {
+        const s = stateRef.current;
+        if (s.objects.some((o) => o.scope === "pcb")) {
+          actions.flashToast("This project already has a PCB — use Design ▸ Import Changes From Schematic");
+          actions.setMode("pcb");
+          return;
+        }
+        // A board document is the slab plus its outline; the parts arrive from
+        // the schematic through Convert / Import Changes.
+        const id = `obj_${objIdCounter.current++}`;
+        const w = s.pcbBoard?.width ?? 720;
+        const h = s.pcbBoard?.height ?? 480;
+        mergeWithHistory((st) => ({
+          objects: [...st.objects, { id, kind: "boardOutline", x: 60, y: 60, width: w, height: h, rotation: 0, scope: "pcb", layer: "outline" }],
+          mode: "pcb",
+          openMenu: null,
+        }));
+        actions.flashToast("PCB created — convert the schematic to bring the parts across");
+      },
+      // #94/95 — real copper pour: region outline minus other-net copper grown
+      // by the clearance rule, via the app's own boolean engine.
+      polyAddPoint: (x, y) => {
+        const s = stateRef.current;
+        const tool = s.tool;
+        const pts = s.draftPoly?.points ?? [];
+        // Clicking back on the first vertex closes the ring.
+        if (pts.length > 2 && Math.hypot(pts[0].x - x, pts[0].y - y) < 10) { actions.polyClose(); return; }
+        merge({ draftPoly: { tool, points: [...pts, { x, y }] } });
+      },
+      polyClose: () => {
+        const s = stateRef.current;
+        const pts = s.draftPoly?.points ?? [];
+        if (pts.length < 3) { actions.flashToast("A polygon outline needs at least 3 points"); return; }
+        const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+        const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const id = `obj_${objIdCounter.current++}`;
+        mergeWithHistory((st) => ({
+          objects: [...st.objects, {
+            id, kind: "boardOutline", x: cx, y: cy, rotation: 0, scope: "pcb", layer: "outline",
+            points: [pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))],
+            props: { shape: "polygon" },
+          }],
+          draftPoly: null,
+          selectedIds: [id],
+        }));
+        actions.flashToast(`Board outline — ${pts.length}-point polygon`);
+      },
+      polyCancel: () => merge({ draftPoly: null }),
+      toggleFocusActiveLayer: () => {
+        const on = !stateRef.current.focusActiveLayer;
+        merge({ focusActiveLayer: on });
+        actions.flashToast(on ? "Other layers dimmed" : "All layers at full strength");
+      },
+      toggleRatsnest: () => {
+        const on = !stateRef.current.showRatsnest;
+        merge({ showRatsnest: on });
+        actions.flashToast(on ? "Ratsnest shown" : "Ratsnest hidden");
+      },
+      pourRegions: (onlySelected) => {
+        const s = stateRef.current;
+        const ids = onlySelected ? s.selectedIds : undefined;
+        const res = pourCopper(s, ids);
+        if (!res.regions.length) { actions.flashToast(res.note ?? "Nothing to pour"); return; }
+        const byId = new Map(res.regions.map((r) => [r.id, r]));
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) => {
+            const r = byId.get(o.id);
+            if (!r) return o;
+            const props = { ...(o.props ?? {}) } as Record<string, unknown>;
+            // Keep the original outline so re-pouring never shrinks the region.
+            if (!props.pourOutline) {
+              const src = shapeToPolygon({ ...o, points: undefined });
+              props.pourOutline = src.map((p) => ({ x: p.x - o.x, y: p.y - o.y }));
+            }
+            props.poured = true;
+            return { ...o, x: r.cx, y: r.cy, rotation: 0, points: r.rings, props };
+          }),
+        }));
+        actions.flashToast(
+          `Poured ${res.regions.length} region${res.regions.length > 1 ? "s" : ""}${res.cleared ? ` · ${res.cleared} clearance cut${res.cleared > 1 ? "s" : ""}` : ""}`,
+        );
+      },
+      clearPours: () => {
+        const s = stateRef.current;
+        const poured = s.objects.filter((o) => POURABLE.has(o.kind) && (o.props as Record<string, unknown> | undefined)?.poured);
+        if (!poured.length) { actions.flashToast("No poured copper to remove"); return; }
+        mergeWithHistory((st) => ({
+          objects: st.objects.map((o) => {
+            if (!POURABLE.has(o.kind)) return o;
+            const props = { ...(o.props ?? {}) } as Record<string, unknown>;
+            if (!props.poured) return o;
+            delete props.poured;
+            return { ...o, points: undefined, props };
+          }),
+        }));
+        actions.flashToast(`Removed the pour from ${poured.length} region${poured.length > 1 ? "s" : ""}`);
+      },
+      autoRoute: (opts) => {
+        const s = stateRef.current;
+        // Scope: which nets this run is allowed to touch.
+        const selNets = new Set(
+          s.objects.filter((o) => s.selectedIds.includes(o.id) && o.net).map((o) => o.net as string),
+        );
+        const nets = opts?.scope === "selected" ? selNets : undefined;
+        if (opts?.scope === "selected" && selNets.size === 0) {
+          actions.flashToast("Select objects on the nets you want routed first");
+          return;
+        }
+        // "All nets (re-route)": give the existing auto-routed copper back as
+        // airwires so this run redoes it with the current settings.
+        let base = s.objects;
+        let freed = 0;
+        if (opts?.scope === "all") {
+          const un = unrouteGenerated(s.objects, nets);
+          base = un.objects; freed = un.freed;
+        }
+        // Net-class widths, when the dialog asks for them.
+        const classOf = new Map<string, number>();
+        if (opts?.respectClass) {
+          for (const c of s.pcbNetClasses) for (const n of c.nets ?? []) classOf.set(n, c.trackWidth);
+        }
+        const { objects: routedObjs, routed } = routeRatsnest(base, s.pcbDefaults.trackWidth, {
+          nets,
+          widthForNet: opts?.respectClass ? (n) => (n ? classOf.get(n) : undefined) : undefined,
+          mitre: !!opts?.mitre,
+        });
         if (routed === 0) {
-          actions.flashToast("No ratsnest to route — run Convert Schematic to PCB first");
+          actions.flashToast(
+            freed > 0
+              ? "Nothing to re-route on those nets"
+              : opts?.scope === "selected"
+              ? "No unrouted connections on the selected nets"
+              : "No ratsnest to route — run Convert Schematic to PCB first",
+          );
           return;
         }
         mergeWithHistory(() => ({
@@ -1639,7 +2239,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           selSub: "none",
           draftWire: null,
         }));
-        actions.flashToast(`Auto-routed ${routed} connections → copper tracks`);
+        actions.flashToast(
+          `Auto-routed ${routed} connection${routed > 1 ? "s" : ""} → copper tracks${opts?.mitre ? " (45° corners)" : ""}`,
+        );
       },
       moveObject: (id, x, y) =>
         mergeWithHistory((s) => ({

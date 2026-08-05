@@ -15,10 +15,39 @@ import {
   NumberInput,
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
-import { DEL_OBJ_NAMES } from "@/lib/pcb/types";
+import { DEL_OBJ_NAMES, SEL_FILTER_KINDS, type CanvasObject } from "@/lib/pcb/types";
+import { ERC_ENFORCED_ROWS } from "@/lib/pcb/nets";
+import { isCombinable } from "@/lib/pcb/shape-boolean";
+import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
+import { parseGltfFile } from "@/lib/pcb/gltf-import";
+import { dxfToObjects, parseDxf, pxPerUnit, summariseDxf, type DxfDoc } from "@/lib/pcb/dxf-import";
+import {
+  MODULE_CATALOG,
+  NO_FILTERS,
+  PICKER_RAILS,
+  RAIL_EMPTY,
+  featureOptions,
+  filterModules,
+  filterParts,
+  manufacturerOptions,
+  packageOptions,
+  partsForRail,
+  projectPartIds,
+  pushRecent,
+  readFavorites,
+  readPersonal,
+  readPersonalModules,
+  type PersonalModule,
+  readRecents,
+  toggleFavorite,
+  type AgileModule,
+  type CatalogPart,
+  type PartFilters,
+  type PickerRail,
+} from "@/lib/pcb/part-catalog";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useManualProjects } from "@/lib/manual/projects";
-import { downloadTextFile, exportGerberViaKicad } from "@/lib/pcb/kicad-export";
+import { exportGerberViaKicad } from "@/lib/pcb/kicad-export";
 import {
   collectPcbModel,
   buildPickPlace,
@@ -31,6 +60,7 @@ import {
   downloadBlob,
   downloadDataUrl,
 } from "@/lib/pcb/exporters";
+import { ProjectInfoModal } from "@/components/dashboard/project-info-modal";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
 import { SettingDialog, HotkeyDialog, TopToolbarDialog } from "@/components/pcb/settings-dialogs";
 import {
@@ -130,12 +160,45 @@ function Header({ title, onClose, padding }: { title: string; onClose: () => voi
 
 // Thin adapters onto the IDEEZA DS atoms (A08). Keep the prototype's px-sized
 // `on` API at the call sites; map to the DS size scale underneath.
-function Check({ on, size = 18 }: { on: boolean; size?: number; radius?: number; checkSize?: number }) {
-  return <DsCheckbox checked={on} size={size >= 22 ? "lg" : "md"} />;
+function Check({ on, size = 18, decorative }: { on: boolean; size?: number; radius?: number; checkSize?: number; decorative?: boolean }) {
+  return <DsCheckbox checked={on} size={size >= 22 ? "lg" : "md"} decorative={decorative} />;
 }
 
 function Radio({ on }: { on: boolean }) {
   return <DsRadio checked={on} size="md" />;
+}
+
+/** A checkbox + label that Tab reaches and Space/Enter toggles. A `<span
+ *  onClick>` around a painted box is invisible to the keyboard, and these
+ *  toggles decide what the checker reports. */
+function CheckRow({
+  on, onToggle, children, hint, gap = 4, style,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  hint?: React.ReactNode;
+  gap?: number;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === " ") { e.preventDefault(); onToggle(); } }}
+      style={{
+        display: "flex", alignItems: "center", gap: `var(--spacing-${gap})`,
+        padding: 0, border: "none", background: "none", cursor: "pointer",
+        textAlign: "left", font: "inherit", color: "inherit", ...style,
+      }}
+    >
+      <Check on={on} size={17} decorative />
+      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{children}</span>
+      {hint}
+    </button>
+  );
 }
 
 // Forward only layout-affecting styles to the design-system Button; the DS owns
@@ -288,197 +351,228 @@ function ArrayModal() {
   );
 }
 
-// ── Find And Replace (Popup 7) ───────────────────────────────────────────────
-// Two tabs (Find / Replace). Find Content scope + Blur|Equal mode + text,
-// Replace As (replace tab), Search Range (6 opts), Search Objects, Input
-// Format, Find in Result. Tab-aware footer. Fields kept in local state — this
-// is a transient search dialog; actions flash a toast (no live index yet).
-const FR_CONTENT_SCOPES = [
-  "All",
-  "Basic Properties: ID",
-  "Basic Properties: Text",
-  "Basic Properties: Pin Name",
-  "Basic Properties: Pin Number",
-  "Basic Properties: Pin Type",
-  "Basic Properties: Name",
-  "Basic Properties: Symbol",
-  "Custom Properties: Device",
-  "Custom Properties: Description",
-  "Custom Properties: Supplier Part",
-  "Custom Properties: Manufacturer",
-  "Custom Properties: Datasheet",
+// ── Find & Replace ──────────────────────────────────────────────────────────
+// Reads like a find bar, not a form: the query leads, the match count answers
+// as you type, and every option is wired to the search (the old dialog carried
+// three dead controls — object kinds, search range and the regex flag never
+// reached the matcher).
+const FR_SCOPES = [
+  { label: "This sheet", value: "sheet" },
+  { label: "All sheets", value: "all" },
+  { label: "Current selection", value: "selection" },
 ];
-const FR_RANGES = [
-  "Current Schematic",
-  "Project",
-  "Board1",
-  "Board2",
-  "Current Page",
-  "Current Page Selected Objects",
-];
-const FR_OBJECTS = ["Components", "Net", "Pins", "Texts"];
 
-function FieldRowFR({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", marginBottom: "var(--spacing-6)" }}>
-      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{label}</span>
-      <div style={{ flex: 1, display: "flex", gap: "var(--spacing-4)", alignItems: "center" }}>{children}</div>
-    </div>
-  );
-}
-
-function TextField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      style={{ flex: 1, minWidth: 0, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
-    />
-  );
-}
+// Which object kinds each "search in" chip covers. Reuses the app's own
+// category predicates (SEL_FILTER_KINDS) so a new symbol kind can't silently
+// fall out of search — a hand-written list already missed `resistorBox`.
+const FR_KINDS: Record<string, (o: CanvasObject) => boolean> = {
+  Parts: (o) => SEL_FILTER_KINDS.symbol(o.kind) || o.kind === "reuseBlock",
+  Nets: (o) => SEL_FILTER_KINDS.net(o.kind) || SEL_FILTER_KINDS.wirebus(o.kind) || !!o.net,
+  Pins: (o) => SEL_FILTER_KINDS.pin(o.kind),
+  Text: (o) => ["text", "note", "field"].includes(o.kind),
+};
+const FR_OBJECTS = Object.keys(FR_KINDS);
 
 function FindReplaceModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const [tab, setTab] = React.useState("Find");
-  const [scope, setScope] = React.useState(FR_CONTENT_SCOPES[0]);
-  const [mode, setMode] = React.useState("Blur");
   const [findText, setFindText] = React.useState("");
   const [replaceText, setReplaceText] = React.useState("");
-  const [range, setRange] = React.useState(FR_RANGES[0]);
-  const [objects, setObjects] = React.useState<Record<string, boolean>>({ Components: true, Net: true, Pins: false, Texts: true });
-  const [fmt, setFmt] = React.useState<Record<string, boolean>>({ regex: false, matchCase: false, expr: false });
-  const [findInResult, setFindInResult] = React.useState(false);
+  const [scope, setScope] = React.useState("sheet");
+  const [objects, setObjects] = React.useState<Record<string, boolean>>({ Parts: true, Nets: true, Pins: true, Text: true });
+  const [matchCase, setMatchCase] = React.useState(false);
+  const [useRegex, setUseRegex] = React.useState(false);
+  const [wholeValue, setWholeValue] = React.useState(false);
   const cursor = React.useRef(-1);
   const isReplace = tab === "Replace";
-  const toast = (m: string) => { actions.flashToast(m); };
+  const toast = (m: string) => actions.flashToast(m);
 
-  // REAL search over the canvas objects (text / net / kind / comment /
-  // footprint fields), honoring Match case + Blur|Equal + Find in Result.
-  const matchIds = () => {
+  // One matcher for search, stepping, replace and the live count — so what the
+  // count promises is exactly what the buttons act on.
+  const tester = React.useMemo(() => {
     const raw = findText.trim();
     if (!raw) return null;
-    const q = fmt.matchCase ? raw : raw.toLowerCase();
-    const hits = (s?: string) => {
-      if (!s) return false;
-      const v = fmt.matchCase ? s : s.toLowerCase();
-      return mode === "Equal" ? v === q : v.includes(q);
-    };
-    const pool = findInResult && state.selectedIds.length
-      ? state.objects.filter((o) => state.selectedIds.includes(o.id))
-      : state.objects;
-    return pool
-      .filter((o) => hits(o.text) || hits(o.net) || hits(o.kind) || hits(o.comment) || hits(o.footprint))
-      .map((o) => o.id);
-  };
+    if (useRegex) {
+      try {
+        const re = new RegExp(wholeValue ? `^(?:${raw})$` : raw, matchCase ? "" : "i");
+        return { ok: true as const, test: (v: string) => re.test(v), re };
+      } catch {
+        return { ok: false as const, test: () => false, re: null };
+      }
+    }
+    const q = matchCase ? raw : raw.toLowerCase();
+    const norm = (v: string) => (matchCase ? v : v.toLowerCase());
+    return { ok: true as const, test: (v: string) => (wholeValue ? norm(v) === q : norm(v).includes(q)), re: null };
+  }, [findText, useRegex, matchCase, wholeValue]);
+
+  const pool = React.useMemo(() => {
+    const sheetOf = (o: CanvasObject) => o.sheetId ?? state.activeSheetId;
+    const base =
+      scope === "selection"
+        ? state.objects.filter((o) => state.selectedIds.includes(o.id))
+        : scope === "sheet"
+        ? state.objects.filter((o) => sheetOf(o) === state.activeSheetId)
+        : state.objects;
+    const on = FR_OBJECTS.filter((k) => objects[k]);
+    return base.filter((o) => on.some((k) => FR_KINDS[k](o)));
+  }, [state.objects, state.selectedIds, state.activeSheetId, scope, objects]);
+
+  const matches = React.useMemo(() => {
+    if (!tester?.ok) return [];
+    const fields = (o: CanvasObject) => [o.text, o.net, o.comment, o.footprint].filter(Boolean) as string[];
+    return pool.filter((o) => fields(o).some((v) => tester.test(v)));
+  }, [pool, tester]);
+
   const findAll = () => {
-    const ids = matchIds();
-    if (ids === null) { toast("Enter search text"); return; }
-    const byId = new Map(state.objects.map((o) => [o.id, o]));
-    const matches = ids.map((id) => {
-      const o = byId.get(id)!;
-      return {
+    if (!tester) { toast("Enter search text"); return; }
+    if (!tester.ok) { toast("That regular expression isn't valid"); return; }
+    actions.merge({ selectedIds: matches.map((o) => o.id) });
+    actions.runFind(
+      matches.map((o) => ({
         id: o.id,
         objectId: o.id,
-        page: "USB & Power",
+        page: state.schematicSheets.find((sh) => sh.id === (o.sheetId ?? state.activeSheetId))?.name ?? "Sheet",
         device: o.footprint || o.comment || o.kind,
         symbol: o.kind,
         name: o.text || o.net || "—",
         globalNet: o.net || "—",
-        pinName: o.kind === "pin" ? (o.text || "—") : "",
+        pinName: o.kind === "pin" ? o.text || "—" : "",
         kind: o.kind,
-      };
-    });
-    actions.merge({ selectedIds: ids });
-    actions.runFind(matches);       // populates + opens the Find Result tab
+      })),
+    );
     actions.closeModal();
-    toast(ids.length ? `Found ${ids.length} — see Find Result` : "No matches");
+    toast(matches.length ? `Found ${matches.length} — see Find Result` : "No matches");
   };
+
   const step = (dir: 1 | -1) => {
-    const ids = matchIds();
-    if (ids === null) { toast("Enter search text"); return; }
-    if (!ids.length) { toast("No matches"); return; }
-    cursor.current = (cursor.current + dir + ids.length) % ids.length;
-    actions.merge({ selectedIds: [ids[cursor.current]] });
-    toast(`Match ${cursor.current + 1} of ${ids.length}`);
+    if (!matches.length) { toast(tester ? "No matches" : "Enter search text"); return; }
+    cursor.current = (cursor.current + dir + matches.length) % matches.length;
+    actions.merge({ selectedIds: [matches[cursor.current].id] });
+    toast(`Match ${cursor.current + 1} of ${matches.length}`);
   };
-  const doReplace = (onlySelected: boolean) => {
+
+  const doReplace = (onlyCurrent: boolean) => {
+    if (!tester?.ok) { toast(tester ? "That regular expression isn't valid" : "Enter search text"); return; }
+    const targets = onlyCurrent
+      ? matches.filter((o) => state.selectedIds.includes(o.id))
+      : matches;
+    if (!targets.length) { toast(onlyCurrent ? "Select a match first" : "No matches to replace"); return; }
+    const ids = new Set(targets.map((o) => o.id));
     const raw = findText.trim();
-    if (!raw) { toast("Enter search text"); return; }
-    const re = new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), fmt.matchCase ? "g" : "gi");
-    let count = 0;
+    const re = useRegex
+      ? new RegExp(raw, matchCase ? "g" : "gi")
+      : new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), matchCase ? "g" : "gi");
+    let n = 0;
     const next = state.objects.map((o) => {
-      if (onlySelected && !state.selectedIds.includes(o.id)) return o;
-      if (!o.text || !re.test(o.text)) { re.lastIndex = 0; return o; }
-      re.lastIndex = 0;
-      count++;
-      return { ...o, text: mode === "Equal" ? replaceText : o.text.replace(re, replaceText) };
+      if (!ids.has(o.id) || !o.text) return o;
+      const text = wholeValue ? replaceText : o.text.replace(re, replaceText);
+      if (text === o.text) return o;
+      n++;
+      return { ...o, text };
     });
-    if (!count) { toast("No matches to replace"); return; }
+    if (!n) { toast("Nothing changed"); return; }
     actions.merge({ objects: next });
-    toast(`Replaced in ${count} object${count > 1 ? "s" : ""}`);
+    toast(`Replaced in ${n} object${n > 1 ? "s" : ""}`);
   };
+
+  const chip = (label: string, on: boolean, onClick: () => void, title?: string) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      title={title}
+      style={{
+        padding: "var(--spacing-2) var(--spacing-5)",
+        borderRadius: "var(--radius-full)",
+        border: `var(--border-width-1) solid ${on ? "var(--color-violet-600)" : "var(--color-border-default)"}`,
+        background: on ? "var(--color-bg-brand-subtle)" : "transparent",
+        color: on ? "var(--color-violet-600)" : "var(--color-text-secondary)",
+        fontSize: "var(--font-size-xs)",
+        fontWeight: 600,
+        fontFamily: "inherit",
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  const section = (label: string) => (
+    <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.5, margin: "var(--spacing-7) 0 var(--spacing-4)" }}>{label}</div>
+  );
+
+  const countText = !findText.trim()
+    ? "Type to search"
+    : !tester?.ok
+    ? "Invalid regular expression"
+    : `${matches.length} match${matches.length === 1 ? "" : "es"}`;
 
   return (
     <Overlay>
-      <Card width={640} maxHeight="90%" flexCol>
-        <Header title="Find And Replace" onClose={actions.closeModal} padding="16px 22px" />
+      <Card width={560} maxHeight="90%" flexCol>
+        <Header title="Find & Replace" onClose={actions.closeModal} padding="16px 22px" />
         <div style={{ padding: "var(--spacing-4) var(--spacing-8) 0", flex: "0 0 auto" }}>
           <ModalTabBar tabs={["Find", "Replace"]} active={tab} onChange={setTab} />
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-10) var(--spacing-4)" }}>
-          <FieldRowFR label="Find Content">
-            <div style={{ minWidth: 150 }}><DsSelect value={scope} options={FR_CONTENT_SCOPES.map((s) => ({ label: s, value: s }))} onChange={setScope} minWidth={150} /></div>
-            <div style={{ minWidth: 90 }}><DsSelect value={mode} options={["Blur", "Equal"].map((s) => ({ label: s, value: s }))} onChange={setMode} minWidth={90} /></div>
-          </FieldRowFR>
-          <FieldRowFR label=" ">
-            <TextField value={findText} onChange={setFindText} placeholder="Search text…" />
-          </FieldRowFR>
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-4)" }}>
+          <input
+            autoFocus
+            value={findText}
+            onChange={(e) => { setFindText(e.target.value); cursor.current = -1; }}
+            onKeyDown={(e) => e.key === "Enter" && (isReplace ? doReplace(false) : findAll())}
+            placeholder="Find text, designator, net or value…"
+            style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-5) var(--spacing-6)", border: `var(--border-width-1) solid ${tester && !tester.ok ? "var(--color-border-error, #c0392b)" : "var(--color-border-default)"}`, borderRadius: "var(--radius-md)", fontSize: "var(--font-size-md)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
+            {chip("Aa", matchCase, () => setMatchCase((v) => !v), "Match case")}
+            {chip(".*", useRegex, () => setUseRegex((v) => !v), "Regular expression")}
+            {chip("Whole value", wholeValue, () => setWholeValue((v) => !v), "Match the whole field, not part of it")}
+            <span style={{ marginLeft: "auto", fontSize: "var(--font-size-xs)", fontWeight: 600, color: tester && !tester.ok ? "var(--color-text-error, #c0392b)" : "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+              {countText}
+            </span>
+          </div>
+
           {isReplace && (
-            <FieldRowFR label="Replace As">
-              <TextField value={replaceText} onChange={setReplaceText} placeholder="Replacement text…" />
-            </FieldRowFR>
+            <>
+              {section("Replace with")}
+              <input
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+                placeholder="New text…"
+                style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-5) var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-md)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+              />
+            </>
           )}
-          <div style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-4) 0 var(--spacing-7)" }} />
-          <FieldRowFR label="Search Range">
-            <div style={{ minWidth: 220 }}><DsSelect value={range} options={FR_RANGES.map((s) => ({ label: s, value: s }))} onChange={setRange} minWidth={220} /></div>
-          </FieldRowFR>
-          <FieldRowFR label="Search Objects">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-8)" }}>
-              {FR_OBJECTS.map((o) => (
-                <div key={o} onClick={() => setObjects((s) => ({ ...s, [o]: !s[o] }))} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                  <Check on={!!objects[o]} size={18} />
-                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o}</span>
-                </div>
-              ))}
-            </div>
-          </FieldRowFR>
-          <FieldRowFR label="Input Format">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-8)" }}>
-              {([["Use Regular[*?]", "regex"], ["Match case", "matchCase"], ["Use expression", "expr"]] as const).map(([label, key]) => (
-                <div key={key} onClick={() => setFmt((s) => ({ ...s, [key]: !s[key] }))} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                  <Check on={!!fmt[key]} size={18} />
-                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
-                </div>
-              ))}
-            </div>
-          </FieldRowFR>
-          <FieldRowFR label="Filter objects">
-            <div onClick={() => setFindInResult((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-              <Check on={findInResult} size={18} />
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Find in Result</span>
-            </div>
-          </FieldRowFR>
+
+          {section("Search in")}
+          <div style={{ maxWidth: 240 }}>
+            <DsSelect value={scope} options={FR_SCOPES} onChange={setScope} minWidth={240} />
+          </div>
+          <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
+            {FR_OBJECTS.map((o) => chip(o, !!objects[o], () => setObjects((s) => ({ ...s, [o]: !s[o] }))))}
+          </div>
+          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: "var(--spacing-4)" }}>
+            {pool.length} object{pool.length === 1 ? "" : "s"} in range · searches name, net, value and footprint
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
-            {isReplace && <Pill onClick={() => doReplace(true)}>Replace Current</Pill>}
-            {isReplace && <Pill onClick={() => doReplace(false)}>Replace…</Pill>}
-            <Pill onClick={() => step(-1)}>Find Previous</Pill>
-            <Pill onClick={() => step(1)}>Find Next</Pill>
-            <PrimaryBtn onClick={findAll}>Find All</PrimaryBtn>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
+            {isReplace ? (
+              <>
+                <Pill onClick={() => doReplace(true)}>Replace selected</Pill>
+                <PrimaryBtn onClick={() => doReplace(false)}>Replace all</PrimaryBtn>
+              </>
+            ) : (
+              <>
+                <Pill onClick={() => step(-1)}>‹ Previous</Pill>
+                <Pill onClick={() => step(1)}>Next ›</Pill>
+                <PrimaryBtn onClick={findAll}>Find all</PrimaryBtn>
+              </>
+            )}
           </div>
         </div>
       </Card>
@@ -517,50 +611,73 @@ function TableModal() {
   );
 }
 
-// ── Design Rules ───────────────────────────────────────────────────────────
-// Popup 1 (PDF Part 3) — Schematic Design Rules. Four category tabs (Net 20 ·
-// Component 12 · Reuse Block 3 · Connection pin-matrix); rows = enable
-// checkbox + number + text + severity chip; enable-all per category; overflow
-// (…) holds Import/Export Config; Connection tab = master toggle + 11×11
-// lower-triangular pin-conflict matrix (click a cell to cycle severity).
-// Config survives reopen within the session via a module-level cache.
+// ── Design Rules (schematic) ────────────────────────────────────────────────
+// Tunes the ERC: `state.designRules` is what `runErc` reads, so the *shape* of
+// the config is load-bearing — the engine looks rules up by category + row
+// index (ERC_TO_DIALOG). This dialog therefore never reorders or filters the
+// underlying arrays; the search box filters what is *displayed* and each row
+// keeps its true index. Rules the checker doesn't implement yet are labelled as
+// such instead of pretending the toggle does something.
 const SCH_RULE_SETS: Record<"Net" | "Component" | "Reuse Block", RuleDef[]> = {
   Net: SCH_NET_RULES,
   Component: SCH_COMPONENT_RULES,
   "Reuse Block": SCH_REUSE_RULES,
 };
-
-const SCH_RULE_TABS = ["Net", "Component", "Reuse Block", "Connection"] as const;
+type RuleCat = keyof typeof SCH_RULE_SETS;
+// Config keys stay as the engine knows them; only the labels are ours.
+const CAT_LABEL: Record<RuleCat, string> = {
+  Net: "Nets & connectivity",
+  Component: "Components",
+  "Reuse Block": "Agile Modules",
+};
+const SEV_TONE: Record<string, { fg: string; bg: string }> = {
+  "Fatal Error": { fg: "var(--color-text-error, #b3261e)", bg: "rgba(179,38,30,.12)" },
+  Error: { fg: "var(--color-text-error, #b3261e)", bg: "rgba(179,38,30,.09)" },
+  Warning: { fg: "var(--color-text-warning, #96600a)", bg: "rgba(150,96,10,.12)" },
+  Note: { fg: "var(--color-text-secondary)", bg: "var(--color-bg-subtle)" },
+  Ignore: { fg: "var(--color-text-tertiary)", bg: "var(--color-bg-subtle)" },
+};
 
 function DesignRulesModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [tab, setTab] = React.useState<(typeof SCH_RULE_TABS)[number]>("Net");
+  const [cat, setCat] = React.useState<RuleCat | "Connection">("Net");
   // Local edit buffer seeded from the store; committed on Save/Verify so Cancel
   // discards. The store copy is what the ERC engine actually reads.
   const [cfg, setCfg] = React.useState<SchRulesConfig>(() => state.designRules);
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [onlyEnforced, setOnlyEnforced] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
-  const openImportPicker = React.useCallback(() => {
-    fileRef.current?.click();
-  }, []);
+  const openImportPicker = React.useCallback(() => fileRef.current?.click(), []);
 
-  const catKey = tab === "Connection" ? null : tab;
+  const catKey = cat === "Connection" ? null : cat;
   const rows = catKey ? cfg[catKey] : [];
-  const allOn = catKey ? rows.every((r) => r.enabled) : cfg.pinCheckEnabled;
+
+  // Displayed subset — carries each rule's TRUE index so edits stay aligned
+  // with what the engine reads.
+  const shown = React.useMemo(() => {
+    if (!catKey) return [];
+    const q = query.trim().toLowerCase();
+    return SCH_RULE_SETS[catKey]
+      .map((def, idx) => ({ def, idx }))
+      .filter(({ def, idx }) =>
+        (!q || def.text.toLowerCase().includes(q)) &&
+        (!onlyEnforced || ERC_ENFORCED_ROWS[catKey].has(idx)),
+      );
+  }, [catKey, query, onlyEnforced]);
 
   const setRow = (i: number, patch: Partial<SchRuleState>) => {
     if (!catKey) return;
     setCfg((c) => ({ ...c, [catKey]: c[catKey].map((r, j) => (j === i ? { ...r, ...patch } : r)) }));
   };
-  const setAll = (enabled: boolean) => {
-    if (catKey) setCfg((c) => ({ ...c, [catKey]: c[catKey].map((r) => ({ ...r, enabled })) }));
-    else setCfg((c) => ({ ...c, pinCheckEnabled: enabled }));
+  const setAllShown = (enabled: boolean) => {
+    if (!catKey) { setCfg((c) => ({ ...c, pinCheckEnabled: enabled })); return; }
+    const ids = new Set(shown.map((s) => s.idx));
+    setCfg((c) => ({ ...c, [catKey]: c[catKey].map((r, j) => (ids.has(j) ? { ...r, enabled } : r)) }));
   };
 
-  const save = () => {
-    actions.setDesignRules(cfg);
-  };
+  const save = () => actions.setDesignRules(cfg);
+
   const exportConfig = () => {
     const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -589,98 +706,174 @@ function DesignRulesModal() {
     reader.readAsText(file);
   };
 
+  // Whole-config summary, so the dialog opens with its state stated.
+  const summary = React.useMemo(() => {
+    const cats: RuleCat[] = ["Net", "Component", "Reuse Block"];
+    let on = 0, total = 0, enforcedOn = 0;
+    const bySev: Record<string, number> = {};
+    for (const c of cats) {
+      cfg[c].forEach((r, idx) => {
+        total++;
+        if (!r.enabled) return;
+        on++;
+        bySev[r.severity] = (bySev[r.severity] ?? 0) + 1;
+        if (ERC_ENFORCED_ROWS[c].has(idx)) enforcedOn++;
+      });
+    }
+    return { on, total, enforcedOn, bySev };
+  }, [cfg]);
+
+  const catRow = (key: RuleCat | "Connection", label: string, meta: string) => {
+    const on = cat === key;
+    return (
+      <div
+        key={key}
+        className="ix-row"
+        onClick={() => setCat(key)}
+        style={{ padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", background: on ? "var(--color-bg-brand-subtle)" : "transparent" }}
+      >
+        <div style={{ fontSize: "var(--font-size-sm)", fontWeight: on ? 700 : 500, color: on ? "var(--color-text-brand)" : "var(--color-text-primary)" }}>{label}</div>
+        <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 1 }}>{meta}</div>
+      </div>
+    );
+  };
+
+  const enabledCount = (c: RuleCat) => cfg[c].filter((r) => r.enabled).length;
+
   return (
     <Overlay>
-      <Card width={980} maxHeight="88%" flexCol>
+      <Card width={1000} maxHeight="88%" flexCol>
         <Header title="Design Rules" onClose={actions.closeModal} padding="18px 24px" />
-        <ModalTabBar
-          tabs={[...SCH_RULE_TABS]}
-          active={tab}
-          onChange={(t) => setTab(t as typeof tab)}
-          badges={{ Net: SCH_NET_RULES.length, Component: SCH_COMPONENT_RULES.length, "Reuse Block": SCH_REUSE_RULES.length }}
-        />
 
-        {/* Enable-all + overflow row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 24px 0", flex: "0 0 auto" }}>
-          <div onClick={() => setAll(!allOn)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", cursor: "pointer" }}>
-            <Check on={allOn} size={18} radius={5} checkSize={11} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 600 }}>
-              {tab === "Connection" ? "Pin Conflicts Detection" : "Enable all rules in this category"}
-            </span>
+        {/* State of the whole config, before any detail */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "0 var(--spacing-12) var(--spacing-5)", flex: "0 0 auto", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            <b style={{ color: "var(--color-text-primary)" }}>{summary.on} of {summary.total}</b> rules on ·{" "}
+            <b style={{ color: "var(--color-text-primary)" }}>{summary.enforcedOn}</b> of them checked by the engine today
+          </span>
+          <span style={{ display: "flex", gap: "var(--spacing-3)", marginLeft: "auto", flexWrap: "wrap" }}>
+            {(["Fatal Error", "Error", "Warning", "Note"] as const).map((sv) =>
+              summary.bySev[sv] ? (
+                <span key={sv} style={{ padding: "2px 8px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, color: SEV_TONE[sv].fg, background: SEV_TONE[sv].bg }}>
+                  {summary.bySev[sv]} {sv === "Fatal Error" ? "fatal" : sv.toLowerCase()}
+                </span>
+              ) : null,
+            )}
+          </span>
+        </div>
+
+        <div style={{ flex: 1, display: "flex", minHeight: 0, borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          {/* Categories */}
+          <div style={{ width: 224, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-4)", overflowY: "auto" }}>
+            {(["Net", "Component", "Reuse Block"] as RuleCat[]).map((c) =>
+              catRow(c, CAT_LABEL[c], `${enabledCount(c)} / ${cfg[c].length} on · ${ERC_ENFORCED_ROWS[c].size} checked`),
+            )}
+            {catRow("Connection", "Pin conflicts", cfg.pinCheckEnabled ? "Matrix on" : "Matrix off")}
           </div>
-          <div style={{ position: "relative" }}>
-            <button
-              type="button"
-              aria-label="More options"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-              style={{ width: 30, height: 26, border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: "pointer", fontWeight: 700 }}
-            >
-              …
-            </button>
-            {menuOpen && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 40, minWidth: 160, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-lg)", boxShadow: "var(--elevation-6, 0 12px 30px -6px rgba(0,0,0,.3))", padding: "var(--spacing-2)" }}>
-                <div className="ix-mi" onClick={() => { openImportPicker(); setMenuOpen(false); }} style={{ padding: "7px 10px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}>
-                  Import Config
+
+          {/* Rules */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+            {catKey ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-4)", flex: "0 0 auto", flexWrap: "wrap" }}>
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Filter rules…"
+                    style={{ flex: 1, minWidth: 180, boxSizing: "border-box", padding: "var(--spacing-3) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+                  />
+                  <CheckRow on={onlyEnforced} onToggle={() => setOnlyEnforced((v) => !v)} gap={3}>
+                    Only rules the engine checks
+                  </CheckRow>
+                  <span style={{ display: "flex", gap: "var(--spacing-3)" }}>
+                    <Pill onClick={() => setAllShown(true)}>Enable shown</Pill>
+                    <Pill onClick={() => setAllShown(false)}>Disable shown</Pill>
+                  </span>
                 </div>
-                <div className="ix-mi" onClick={() => { exportConfig(); setMenuOpen(false); }} style={{ padding: "7px 10px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}>
-                  Export Config
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--spacing-8) var(--spacing-6)" }}>
+                  {shown.map(({ def, idx }) => {
+                    const r = rows[idx];
+                    const enforced = ERC_ENFORCED_ROWS[catKey].has(idx);
+                    return (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "9px 2px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", opacity: r.enabled ? 1 : 0.55 }}>
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={r.enabled}
+                          aria-label={`${def.text} — ${r.enabled ? "on" : "off"}`}
+                          onClick={() => setRow(idx, { enabled: !r.enabled })}
+                          onKeyDown={(e) => { if (e.key === " ") { e.preventDefault(); setRow(idx, { enabled: !r.enabled }); } }}
+                          style={{ display: "inline-flex", cursor: "pointer", flex: "0 0 auto", padding: 0, border: "none", background: "none" }}
+                        >
+                          <Check on={r.enabled} size={17} decorative />
+                        </button>
+                        <span style={{ width: 22, flex: "0 0 auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", lineHeight: 1.35 }}>
+                          {def.text}
+                          {!enforced && (
+                            <span title="Listed for completeness — the checker doesn't implement this rule yet, so the toggle won't change results." style={{ marginLeft: 8, padding: "1px 6px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 700, color: "var(--color-text-tertiary)", background: "var(--color-bg-subtle)", whiteSpace: "nowrap" }}>
+                              not checked yet
+                            </span>
+                          )}
+                        </span>
+                        <SeverityChip value={r.severity} onChange={(sv) => setRow(idx, { severity: sv })} disabled={!r.enabled} />
+                      </div>
+                    );
+                  })}
+                  {shown.length === 0 && (
+                    <div style={{ padding: "var(--spacing-12)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+                      No rule matches “{query}”{onlyEnforced ? " among the checked rules" : ""}.
+                    </div>
+                  )}
                 </div>
+              </>
+            ) : (
+              <div style={{ flex: 1, overflow: "auto", padding: "var(--spacing-5) var(--spacing-8) var(--spacing-6)" }}>
+                <CheckRow
+                  on={cfg.pinCheckEnabled}
+                  onToggle={() => setCfg((c) => ({ ...c, pinCheckEnabled: !c.pinCheckEnabled }))}
+                  style={{ marginBottom: "var(--spacing-5)" }}
+                  hint={
+                    <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                      Click a cell to cycle its severity. A No-Connect flag suppresses the net.
+                    </span>
+                  }
+                >
+                  Check pin-to-pin conflicts
+                </CheckRow>
+                <PinConflictMatrix
+                  matrix={cfg.pinMatrix}
+                  enabled={cfg.pinCheckEnabled}
+                  onCell={(r, c) =>
+                    setCfg((cf) => ({
+                      ...cf,
+                      pinMatrix: cf.pinMatrix.map((row, ri) =>
+                        ri === r ? row.map((sv, ci) => (ci === c ? nextSeverity(sv) : sv)) : row,
+                      ),
+                    }))
+                  }
+                />
               </div>
             )}
-            <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f); e.target.value = ""; }} />
           </div>
         </div>
 
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "10px 24px 16px" }}>
-          {catKey ? (
-            SCH_RULE_SETS[catKey].map((def, i) => {
-              const r = rows[i];
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "7px 4px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", opacity: r.enabled ? 1 : 0.55 }}>
-                  <span onClick={() => setRow(i, { enabled: !r.enabled })} style={{ display: "inline-flex", cursor: "pointer", flex: "0 0 auto" }}>
-                    <Check on={r.enabled} size={17} radius={4} checkSize={10} />
-                  </span>
-                  <span style={{ width: 24, flex: "0 0 auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{def.text}</span>
-                  <SeverityChip value={r.severity} onChange={(s) => setRow(i, { severity: s })} disabled={!r.enabled} />
-                </div>
-              );
-            })
-          ) : (
-            <PinConflictMatrix
-              matrix={cfg.pinMatrix}
-              enabled={cfg.pinCheckEnabled}
-              onCell={(r, c) =>
-                setCfg((cf) => ({
-                  ...cf,
-                  pinMatrix: cf.pinMatrix.map((row, ri) =>
-                    ri === r ? row.map((s, ci) => (ci === c ? nextSeverity(s) : s)) : row,
-                  ),
-                }))
-              }
-            />
-          )}
-        </div>
-
-        {/* Footer — exact spec button set */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
-          <Pill onClick={openImportPicker}>Import Config</Pill>
-          <Pill onClick={exportConfig}>Export Config</Pill>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
+          <Pill onClick={openImportPicker}>Import…</Pill>
+          <Pill onClick={exportConfig}>Export</Pill>
           <div onClick={() => { setCfg(defaultSchRulesConfig()); actions.flashToast("Design rules restored to defaults"); }} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", color: PRIMARY, fontSize: "var(--font-size-sm)", fontWeight: 600, cursor: "pointer" }}>
-            <span>Restore Default</span>
+            <span>Restore defaults</span>
             <Icon html={RESTORE_SVG} size={15} />
           </div>
+          <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f); e.target.value = ""; }} />
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
-            <div className="ix-pill" onClick={() => { save(); actions.clickBottomTab("drc"); actions.flashToast("Verifying design rules…"); }} style={{ padding: "var(--spacing-4) var(--spacing-9)", border: "var(--border-width-1-5) solid var(--color-border-brand)", borderRadius: "var(--radius-lg)", fontSize: "var(--font-size-sm)", fontWeight: 600, color: PRIMARY, cursor: "pointer" }}>
-              Verify Now
-            </div>
             <Pill onClick={actions.closeModal}>Cancel</Pill>
-            <PrimaryBtn onClick={() => { save(); actions.flashToast("Design rules saved"); actions.closeModal(); }} style={{ padding: "var(--spacing-4) var(--spacing-14)" }}>
-              Confirm
+            {/* Saves, then actually runs the check and shows the results tab. */}
+            <Pill onClick={() => { save(); actions.runErcCheck(); actions.closeModal(); }}>Save &amp; check now</Pill>
+            <PrimaryBtn onClick={() => { save(); actions.flashToast("Design rules saved"); actions.closeModal(); }} style={{ padding: "var(--spacing-4) var(--spacing-12)" }}>
+              Save
             </PrimaryBtn>
           </div>
         </div>
@@ -764,6 +957,11 @@ const PCB_RANGES = [
 // Kinds that carry designators, with their prefix letters.
 const ANNOT_PREFIX: Record<string, string> = {
   resistor: "R",
+  // resistorBox is the schematic's box-style resistor — it was missing here,
+  // so annotation silently skipped every one of them.
+  resistorBox: "R",
+  transistor: "Q",
+  opamp: "U",
   capacitor: "C",
   inductor: "L",
   diode: "D",
@@ -780,73 +978,80 @@ function AnnotateModal() {
   const ranges = isPcbSheet ? PCB_RANGES : SCH_RANGES;
   const range = ranges.includes(a.range) ? a.range : ranges[0];
   const order = ORDER_OPTIONS.some((o) => o.value === a.order) ? a.order : ORDER_OPTIONS[0].value;
+  const clearing = a.op === "Clear designators";
   const desRule = isPcbSheet
     ? "Custom starting number"
     : a.desRule === "Add page number" || a.desRule === "Custom starting number"
       ? a.desRule
       : "Custom starting number";
 
-  const radioRow = (label: string, on: boolean, onClick: () => void, sub?: string) => (
-    <div key={label} onClick={onClick} role="radio" aria-checked={on} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-5)", padding: "var(--spacing-3) 0", cursor: "pointer" }}>
-      <span style={{ marginTop: 1 }}><Radio on={on} /></span>
-      <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
-        {label}
-        {sub && <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>{sub}</div>}
-      </span>
-    </div>
-  );
-
-  // Real annotation — sweep the placed components in the chosen order and
-  // write designators into their `text` field (or reset to "<prefix>?").
-  const run = () => {
-    const clearing = a.op === "Clear designators";
+  // Dry run — the exact assignment the Annotate button will commit, so the
+  // preview can never disagree with the result.
+  const plan = React.useMemo(() => {
     const dirs: Record<string, (o1: { x: number; y: number }, o2: { x: number; y: number }) => number> = {
       "Across then down": (p, q) => p.y - q.y || p.x - q.x,
       "Across then up": (p, q) => q.y - p.y || p.x - q.x,
       "Down then across": (p, q) => p.x - q.x || p.y - q.y,
       "Up then across": (p, q) => p.x - q.x || q.y - p.y,
     };
-    const inRange = (o: (typeof state.objects)[number]) => {
+    const inRange = (o: CanvasObject) => {
       if (!(o.kind in ANNOT_PREFIX)) return false;
-      if (range === "Selected components at current page" || range === "Selected Components") {
-        return state.selectedIds.includes(o.id);
-      }
+      if (range === "Selected components at current page" || range === "Selected Components") return state.selectedIds.includes(o.id);
       if (range === "Top Layer Components") return (o.side ?? "top") === "top";
       if (range === "Bottom Layer Components") return o.side === "bottom";
-      return true; // Current schematic / Current page / All components
+      return true;
     };
     const targets = state.objects.filter(inRange).sort(dirs[order] ?? dirs["Across then down"]);
-    let n = Math.max(0, parseInt(a.customStart, 10) || 1) || 1;
+    // Each prefix counts independently from the start number — R1,R2 · C1,C2.
+    // (The old loop shared one running number, so a lone capacitor came out C2.)
+    const start = Math.max(1, parseInt(String(a.customStart), 10) || 1);
     const counters: Record<string, number> = {};
-    const nextText = new Map<string, string>();
+    const next = new Map<string, string>();
     for (const o of targets) {
       const prefix = ANNOT_PREFIX[o.kind];
       const hasDesignator = !!o.text && !o.text.includes("?");
-      if (clearing) {
-        nextText.set(o.id, `${prefix}?`);
-        continue;
-      }
-      if (hasDesignator && !a.existing) continue; // keep existing unless re-processing
-      counters[prefix] = counters[prefix] ?? n;
+      if (clearing) { next.set(o.id, `${prefix}?`); continue; }
+      if (hasDesignator && !a.existing) continue;
+      counters[prefix] = counters[prefix] ?? start;
       const pagePrefix = !isPcbSheet && desRule === "Add page number" ? "1-" : "";
-      nextText.set(o.id, `${prefix}${pagePrefix}${counters[prefix]++}`);
-      n = Math.max(n, counters[prefix]);
+      const assigned = `${prefix}${pagePrefix}${counters[prefix]++}`;
+      // A part that already carries the number it would get isn't a change.
+      if (assigned !== o.text) next.set(o.id, assigned);
     }
-    if (nextText.size === 0) {
-      actions.flashToast("No components in the selected range");
+    const sample = targets.filter((o) => next.has(o.id)).slice(0, 6).map((o) => `${o.text || "—"} → ${next.get(o.id)}`);
+    return { next, count: next.size, scanned: targets.length, sample };
+  }, [state.objects, state.selectedIds, range, order, a.customStart, a.existing, clearing, desRule, isPcbSheet]);
+
+  const run = () => {
+    if (plan.count === 0) {
+      actions.flashToast(plan.scanned ? "Nothing to change — every part already has a designator" : "No components in this range");
       return 0;
     }
-    actions.merge({
-      objects: state.objects.map((o) => (nextText.has(o.id) ? { ...o, text: nextText.get(o.id)! } : o)),
-    });
-    actions.flashToast(clearing ? `Cleared ${nextText.size} designators` : `Annotated ${nextText.size} components`);
-    return nextText.size;
+    actions.merge({ objects: state.objects.map((o) => (plan.next.has(o.id) ? { ...o, text: plan.next.get(o.id)! } : o)) });
+    actions.flashToast(clearing ? `Cleared ${plan.count} designators` : `Annotated ${plan.count} components`);
+    return plan.count;
   };
 
-  const section = (label: string, extra?: string) => (
-    <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.5, margin: "var(--spacing-7) 0 var(--spacing-3)" }}>
-      {label}
-      {extra && <span style={{ marginLeft: 8, textTransform: "none", fontWeight: 500, letterSpacing: 0, color: "var(--color-text-tertiary)" }}>{extra}</span>}
+  const section = (label: string) => (
+    <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.5, margin: "var(--spacing-7) 0 var(--spacing-4)" }}>{label}</div>
+  );
+
+  const seg = (options: { label: string; value: string }[], value: string, onChange: (v: string) => void) => (
+    <div style={{ display: "inline-flex", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-lg)", padding: 3, gap: 2 }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(o.value)}
+            style={{ padding: "var(--spacing-3) var(--spacing-6)", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "var(--font-size-sm)", fontWeight: 600, background: on ? "var(--color-violet-600)" : "transparent", color: on ? "var(--color-text-on-brand)" : "var(--color-text-secondary)", transition: "background .14s, color .14s" }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -854,131 +1059,399 @@ function AnnotateModal() {
     <Overlay>
       <Card width={560} maxHeight="88%" flexCol>
         <Header title="Annotate Designators" onClose={actions.closeModal} padding="18px 24px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--spacing-12) var(--spacing-8)" }}>
-          {/* OPERATION — radio pair + existing checkbox, one group */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-2) var(--spacing-12) var(--spacing-8)" }}>
           {section("Operation")}
-          {radioRow("Annotate designators", a.op !== "Clear designators", () => actions.setAnnot({ op: "Annotate designators" }))}
-          <div onClick={() => actions.setAnnot({ existing: !a.existing })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) 0 var(--spacing-3) 26px", cursor: "pointer", opacity: a.op === "Clear designators" ? 0.5 : 1 }}>
-            <Check on={a.existing} size={18} radius={5} checkSize={11} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Existing designators</span>
-          </div>
-          {radioRow("Clear designators", a.op === "Clear designators", () => actions.setAnnot({ op: "Clear designators" }))}
+          {seg(
+            [{ label: "Assign designators", value: "Annotate designators" }, { label: "Clear designators", value: "Clear designators" }],
+            clearing ? "Clear designators" : "Annotate designators",
+            (v) => actions.setAnnot({ op: v }),
+          )}
+          {!clearing && (
+            <div
+              onClick={() => actions.setAnnot({ existing: !a.existing })}
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", marginTop: "var(--spacing-5)", cursor: "pointer" }}
+            >
+              <Check on={a.existing} size={18} radius={5} checkSize={11} />
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
+                Renumber parts that already have a designator
+              </span>
+            </div>
+          )}
 
-          {/* RANGE — sheet-specific options */}
-          {section("Range", isPcbSheet ? undefined : undefined)}
-          <div role="radiogroup" aria-label="Range">
-            {ranges.map((v) => radioRow(v, range === v, () => actions.setAnnot({ range: v })))}
+          {section("Which parts")}
+          <div style={{ maxWidth: 300 }}>
+            <DsSelect value={range} options={ranges.map((r) => ({ label: r, value: r }))} onChange={(v) => actions.setAnnot({ range: v })} minWidth={300} />
           </div>
-
-          {/* Hierarchical — schematic only (PDF: no such option on PCB) */}
           {!isPcbSheet && (
-            <div onClick={() => actions.setAnnot({ hierarchical: !a.hierarchical })} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-5)", padding: "var(--spacing-4) 0 0", cursor: "pointer" }}>
+            <div onClick={() => actions.setAnnot({ hierarchical: !a.hierarchical })} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-4)", marginTop: "var(--spacing-5)", cursor: "pointer" }}>
               <span style={{ marginTop: 1 }}><Check on={a.hierarchical} size={18} radius={5} checkSize={11} /></span>
               <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
-                Assign instance Designator
+                Assign instance designators
                 <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>
-                  (overwrites the splice Designator from the template page)
+                  Overwrites designators inherited from a template page.
                 </div>
               </span>
             </div>
           )}
 
-          {/* ORDER — 4 direction tiles */}
-          {section("Order")}
+          {section("Numbering order")}
           <DirectionTiles value={order} onChange={(v) => actions.setAnnot({ order: v })} />
-          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 6 }}>
-            Across then down · Across then up · Down then across · Up then across
+
+          {section("Numbering")}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", flexWrap: "wrap" }}>
+            <div style={{ width: 130 }}>
+              <NumberInput
+                value={String(a.customStart)}
+                // Numbering starts at 1 at the lowest, so the field can't show a
+                // value the run would ignore (empty stays empty while typing).
+                onChange={(v) => actions.setAnnot({ customStart: v === "" ? v : String(Math.max(1, parseInt(v, 10) || 1)) })}
+                min={1}
+                placeholder="1"
+                size="sm"
+              />
+            </div>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Start counting from</span>
+            {!isPcbSheet && (
+              <div onClick={() => actions.setAnnot({ desRule: desRule === "Add page number" ? "Custom starting number" : "Add page number" })} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", marginLeft: "auto" }}>
+                <Check on={desRule === "Add page number"} size={18} radius={5} checkSize={11} />
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Prefix the page number</span>
+              </div>
+            )}
           </div>
 
-          {/* DESIGNATOR RULE — page-number option is schematic-only */}
-          {section("Designator Rule")}
-          <div role="radiogroup" aria-label="Designator rule">
-            {!isPcbSheet && radioRow("Add page number", desRule === "Add page number", () => actions.setAnnot({ desRule: "Add page number" }))}
-            {radioRow("Custom starting number", desRule === "Custom starting number", () => actions.setAnnot({ desRule: "Custom starting number" }))}
-          </div>
-          <div style={{ marginTop: "var(--spacing-3)", maxWidth: 180, opacity: desRule === "Custom starting number" ? 1 : 0.5, pointerEvents: desRule === "Custom starting number" ? "auto" : "none" }}>
-            <NumberInput value={String(a.customStart)} onChange={(v) => actions.setAnnot({ customStart: v })} min={1} placeholder="1" size="sm" />
+          {/* Live dry run — the same assignment the button commits. */}
+          <div style={{ marginTop: "var(--spacing-8)", padding: "var(--spacing-6)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: plan.count ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>
+              {plan.count === 0
+                ? plan.scanned
+                  ? "Nothing to change — every part in range already has a designator"
+                  : "No components in this range"
+                : clearing
+                  ? `${plan.count} designator${plan.count === 1 ? "" : "s"} will be cleared`
+                  : `${plan.count} of ${plan.scanned} part${plan.scanned === 1 ? "" : "s"} will be renumbered`}
+            </div>
+            {plan.sample.length > 0 && (
+              <div style={{ marginTop: "var(--spacing-4)", display: "flex", flexWrap: "wrap", gap: "var(--spacing-3) var(--spacing-6)", fontFamily: "var(--font-family-mono), monospace", fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+                {plan.sample.map((line, i) => <span key={i}>{line}</span>)}
+                {plan.count > plan.sample.length && <span style={{ color: "var(--color-text-tertiary)" }}>+{plan.count - plan.sample.length} more</span>}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer — Apply · Confirm · Cancel (spec order kept, Confirm primary) */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <Pill onClick={run} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Apply</Pill>
-          <Pill onClick={actions.closeModal} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Cancel</Pill>
-          <PrimaryBtn onClick={() => { run(); actions.closeModal(); }} style={{ flex: 1, textAlign: "center", padding: "var(--spacing-5)", borderRadius: "var(--radius-lg)" }}>Confirm</PrimaryBtn>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Pill onClick={actions.closeModal}>Cancel</Pill>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
+            <Pill onClick={run}>Apply</Pill>
+            <PrimaryBtn onClick={() => { run(); actions.closeModal(); }}>
+              {clearing ? "Clear designators" : "Annotate"}
+            </PrimaryBtn>
+          </div>
         </div>
       </Card>
     </Overlay>
   );
 }
 
-// ── Import DFX ───────────────────────────────────────────────────────────────
-function ImportDfxModal() {
+
+// ── Import 3D Model (glTF / GLB) ─────────────────────────────────────────────
+// Real import: the file is parsed by three's GLTFLoader, so what the dialog
+// reports (meshes, vertices, size) comes from the actual geometry and a bad file
+// fails with the loader's own message. Imported models show in the 3D view —
+// either at the board origin or riding a selected part.
+function ImportGltfModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
-  const [ref, setRef] = React.useState("origin");
-  const field = (label: string, control: React.ReactNode) => (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
-      <span style={{ width: 150, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{label}</span>
-      {control}
-    </div>
-  );
-  const input = (val: string, w = 1) => (
-    <input defaultValue={val} className="ix-arr-input" style={{ flex: w, padding: "var(--spacing-3) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontFamily: "var(--font-family-body)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none" }} />
-  );
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const parts = state.objects.filter((o) => o.scope === "pcb" && o.kind === "footprint" && state.selectedIds.includes(o.id));
+  const part = parts[0] ?? null;
+  const [target, setTarget] = React.useState<string>("board");
+  const targetOptions = [
+    { label: "Board origin", value: "board" },
+    ...(part ? [{ label: `On ${part.text || "selected part"}`, value: part.id }] : []),
+  ];
+
+  const take = (file: File) => {
+    setError(null);
+    setBusy(true);
+    parseGltfFile(file, target)
+      .then((m) => {
+        actions.addImportedModel(m);
+        actions.flashToast(`Imported ${m.name} — ${m.meshes} mesh${m.meshes === 1 ? "" : "es"}`);
+      })
+      .catch((e: Error) => setError(e.message || "Import failed"))
+      .finally(() => setBusy(false));
+  };
+
+  const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
   return (
     <Overlay>
-      <Card width={1000} maxHeight="90%" flexCol>
-        <Header title="Import DFX" onClose={actions.closeModal} padding="18px 24px" />
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-          {/* form */}
-          <div style={{ width: 400, flex: "0 0 auto", padding: "var(--spacing-8) var(--spacing-8)", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-            {field("File Name", input("DXF_P1_Schematic1_2025-12-2", 1))}
-            {field("File Unit", <Dropdown label="Project Name" minWidth={170} />)}
-            {field("DXF Size(Width) :", <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>17.89inch x 11.79inch</span>)}
-            {field("Import Size(W*H):", <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>17.89inch x 11.79inch</span>)}
-            {field(
-              "Reference Point",
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
-                {[["origin", "DXF Origin"], ["center", "Graphics Center"]].map(([k, l]) => (
-                  <div key={k} onClick={() => setRef(k)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                    <Radio on={ref === k} />
-                    <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{l}</span>
-                  </div>
-                ))}
-              </div>,
-            )}
-            {field("Scaling Ratio:", <>{input("1", 1)}<Icon html={REFRESH_DD} size={16} /></>)}
-            {field("Stroke Width", <><Dropdown label="1" minWidth={120} /><Icon html={REFRESH_DD} size={16} /></>)}
+      <Card width={560} flexCol>
+        <Header title="Import 3D Model" onClose={actions.closeModal} padding="18px 24px" />
+        <div style={{ padding: "var(--spacing-4) var(--spacing-12) var(--spacing-8)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            Accepts <b>.glb</b> and <b>.gltf</b>. The model appears in the PCB 3D view; it is kept for this
+            session only and is not written into the saved document.
           </div>
-          {/* preview */}
-          <div style={{ flex: 1, padding: "var(--spacing-8)", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg-subtle)" }}>
-            <div style={{ width: "100%", maxWidth: 560, aspectRatio: "1.4", border: "var(--border-width-2) solid #fbd5f3", borderRadius: "var(--radius-sm)", background: "var(--color-bg-surface)", position: "relative", overflow: "hidden" }}>
-              <svg width="100%" height="100%" viewBox="0 0 560 400" preserveAspectRatio="xMidYMid meet">
-                <rect x="14" y="14" width="532" height="372" fill="none" stroke="#c9c2d4" strokeWidth="1" />
-                {[[40, 40], [200, 40], [360, 40], [40, 160], [220, 160], [380, 160], [120, 270], [320, 270]].map(([x, y], i) => (
-                  <rect key={i} x={x} y={y} width={i % 2 ? 70 : 100} height={i % 2 ? 44 : 60} fill="none" stroke="#39b56f" strokeWidth="1.5" />
-                ))}
-                {[[140, 70, 200], [300, 70, 360], [140, 190, 220], [320, 190, 380]].map(([x1, y1, x2], i) => (
-                  <path key={"w" + i} d={`M${x1} ${y1} H${x2}`} stroke="#e34c4c" strokeWidth="1.5" fill="none" />
-                ))}
-                <rect x="360" y="300" width="180" height="74" fill="none" stroke="#1a1a1a" strokeWidth="1" />
-                <text x="450" y="342" textAnchor="middle" fontSize="11" fill="var(--color-text-secondary)">Universal Remote Controller</text>
-              </svg>
+
+          <div style={{ margin: "var(--spacing-7) 0 var(--spacing-4)", fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Place it
+          </div>
+          <div style={{ maxWidth: 280 }}>
+            <DsSelect value={target} options={targetOptions} onChange={setTarget} minWidth={280} />
+          </div>
+          {!part && (
+            <div style={{ marginTop: "var(--spacing-3)", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+              Select a part on the board first to ride it on that part.
+            </div>
+          )}
+
+          <div
+            onClick={() => !busy && fileRef.current?.click()}
+            style={{ marginTop: "var(--spacing-8)", padding: "var(--spacing-10)", textAlign: "center", borderRadius: "var(--radius-lg)", border: `var(--border-width-1-5) dashed ${error ? "var(--color-text-error, #b3261e)" : "var(--color-border-default)"}`, cursor: busy ? "progress" : "pointer", background: "var(--color-bg-subtle)" }}
+          >
+            <div style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              {busy ? "Reading model…" : "Choose a .glb / .gltf file"}
+            </div>
+            <div style={{ marginTop: 4, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+              Parsed on import — meshes and vertex counts below come from the file itself.
             </div>
           </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
+            style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) take(f); e.target.value = ""; }}
+          />
+          {error && (
+            <div style={{ marginTop: "var(--spacing-4)", fontSize: "var(--font-size-sm)", color: "var(--color-text-error, #b3261e)" }}>{error}</div>
+          )}
+
+          {state.importedModels.length > 0 && (
+            <>
+              <div style={{ margin: "var(--spacing-8) 0 var(--spacing-3)", fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                In this session
+              </div>
+              {state.importedModels.map((m) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) 0", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
+                    <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+                      {m.meshes} meshes · {m.vertices.toLocaleString()} vertices · {kb(m.bytes)} · {m.target === "board" ? "board origin" : "on part"}
+                    </div>
+                  </div>
+                  <Pill onClick={() => actions.removeImportedModel(m.id)}>Remove</Pill>
+                </div>
+              ))}
+            </>
+          )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-5) var(--spacing-8)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <PrimaryBtn onClick={actions.closeModal}>Replace</PrimaryBtn>
+        <div style={{ display: "flex", alignItems: "center", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            {state.mode === "3d" ? "Visible in this view" : "Switch to the PCB 3D view to see it"}
+          </span>
+          <PrimaryBtn style={{ marginLeft: "auto" }} onClick={actions.closeModal}>Done</PrimaryBtn>
         </div>
       </Card>
     </Overlay>
   );
 }
 
-const REFRESH_DD =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
+// ── Import DXF ───────────────────────────────────────────────────────────────
+// Real import: the file is parsed (dxf-import.ts), its entities are counted and
+// previewed from the parsed geometry, and Confirm places editable objects. The
+// unit / scale / reference-point controls change the result — the dialog used to
+// show a hard-coded preview and a Replace button that only closed it.
+function ImportDfxModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [name, setName] = React.useState("");
+  const [doc, setDoc] = React.useState<DxfDoc | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [unit, setUnit] = React.useState<"mm" | "inch">("mm");
+  const [scale, setScale] = React.useState("1");
+  const [reference, setReference] = React.useState<"origin" | "center">("origin");
+
+  const scaleNum = Math.max(0.001, Number(scale) || 1);
+  const summary = doc ? summariseDxf(doc) : null;
+  const skipped = doc ? Object.entries(doc.skipped) : [];
+
+  const take = (file: File) => {
+    setError(null);
+    const reader = new FileReader();
+    reader.onerror = () => setError("Could not read the file");
+    reader.onload = () => {
+      try {
+        const parsed = parseDxf(String(reader.result));
+        if (parsed.entities.length === 0) {
+          setDoc(null);
+          setError("No importable entities found (lines, polylines, circles, arcs or text).");
+          return;
+        }
+        setDoc(parsed);
+        setName(file.name);
+        if (parsed.units !== "unknown") setUnit(parsed.units);
+      } catch {
+        setDoc(null);
+        setError("That file isn't readable as ASCII DXF");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Preview straight off the parsed geometry, so it can't disagree with what
+  // Confirm will place.
+  const preview = React.useMemo(() => {
+    if (!doc?.bbox) return null;
+    const { minX, minY, maxX, maxY } = doc.bbox;
+    const w = Math.max(1e-6, maxX - minX), h = Math.max(1e-6, maxY - minY);
+    const pad = Math.max(w, h) * 0.04;
+    const parts: string[] = [];
+    const P = (x: number, y: number) => `${(x - minX + pad).toFixed(3)},${(maxY - y + pad).toFixed(3)}`;
+    for (const e of doc.entities) {
+      if (e.type === "LINE") parts.push(`<line x1="${P(e.x1, e.y1).split(",")[0]}" y1="${P(e.x1, e.y1).split(",")[1]}" x2="${P(e.x2, e.y2).split(",")[0]}" y2="${P(e.x2, e.y2).split(",")[1]}" />`);
+      else if (e.type === "POLYLINE") parts.push(`<polyline points="${e.pts.map((q) => P(q.x, q.y)).join(" ")}" fill="none" />`);
+      else if (e.type === "CIRCLE") parts.push(`<circle cx="${(e.cx - minX + pad).toFixed(3)}" cy="${(maxY - e.cy + pad).toFixed(3)}" r="${e.r.toFixed(3)}" fill="none" />`);
+      else if (e.type === "ARC") {
+        const a1 = (e.a1 * Math.PI) / 180, a2 = (e.a2 * Math.PI) / 180;
+        const pts: string[] = [];
+        const span = a2 <= a1 ? a2 + Math.PI * 2 - a1 : a2 - a1;
+        for (let i = 0; i <= 24; i++) {
+          const t = a1 + (span * i) / 24;
+          pts.push(P(e.cx + Math.cos(t) * e.r, e.cy + Math.sin(t) * e.r));
+        }
+        parts.push(`<polyline points="${pts.join(" ")}" fill="none" />`);
+      } else if (e.type === "TEXT") {
+        parts.push(`<circle cx="${(e.x - minX + pad).toFixed(3)}" cy="${(maxY - e.y + pad).toFixed(3)}" r="${(Math.max(w, h) * 0.006).toFixed(3)}" />`);
+      }
+    }
+    const vw = (w + pad * 2).toFixed(3), vh = (h + pad * 2).toFixed(3);
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" stroke="var(--color-violet-600)" stroke-width="${(Math.max(w, h) * 0.004).toFixed(4)}" vector-effect="non-scaling-stroke">${parts.join("")}</svg>`, w, h };
+  }, [doc]);
+
+  const sizePx = preview ? { w: preview.w * pxPerUnit(unit, scaleNum), h: preview.h * pxPerUnit(unit, scaleNum) } : null;
+
+  const doImport = () => {
+    if (!doc) return;
+    // Prefix from the board's own size, so a second import can't reissue the
+    // first one's ids.
+    const objs = dxfToObjects(doc, { unit, scale: scaleNum, reference, at: { x: 260, y: 220 } }, `dxf${state.objects.length}`);
+    if (objs.length === 0) { actions.flashToast("Nothing to import"); return; }
+    const scoped = objs.map((o) => ({ ...o, scope: state.mode === "schematic" ? ("schematic" as const) : ("pcb" as const), sheetId: state.mode === "schematic" ? state.activeSheetId : undefined }));
+    actions.addObjects(scoped);
+    actions.flashToast(`Imported ${scoped.length} object${scoped.length === 1 ? "" : "s"} from ${name}`);
+    actions.closeModal();
+  };
+
+  const field = (label: string, control: React.ReactNode) => (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-5)" }}>
+      <span style={{ width: 132, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{label}</span>
+      {control}
+    </div>
+  );
+  const val = (t: string) => <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontVariantNumeric: "tabular-nums" }}>{t}</span>;
+
+  return (
+    <Overlay>
+      <Card width={940} maxHeight="90%" flexCol>
+        <Header title="Import DXF" onClose={actions.closeModal} padding="18px 24px" />
+        <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 320 }}>
+          <div style={{ width: 400, flex: "0 0 auto", padding: "var(--spacing-7) var(--spacing-8)", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              style={{ width: "100%", padding: "var(--spacing-6)", borderRadius: "var(--radius-lg)", border: `var(--border-width-1-5) dashed ${error ? "var(--color-text-error, #b3261e)" : "var(--color-border-default)"}`, background: "var(--color-bg-subtle)", cursor: "pointer", fontFamily: "inherit", textAlign: "center" }}
+            >
+              <div style={{ fontSize: "var(--font-size-md)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                {name || "Choose a .dxf file"}
+              </div>
+              <div style={{ marginTop: 2, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                ASCII DXF · lines, polylines, circles, arcs, text
+              </div>
+            </button>
+            <input ref={fileRef} type="file" accept=".dxf,image/vnd.dxf,application/dxf" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) take(f); e.target.value = ""; }} />
+            {error && <div style={{ marginTop: "var(--spacing-4)", fontSize: "var(--font-size-sm)", color: "var(--color-text-error, #b3261e)" }}>{error}</div>}
+
+            {doc && summary && (
+              <div style={{ marginTop: "var(--spacing-7)" }}>
+                {field("Entities", val(Object.entries(summary.counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(" · ")))}
+                {field("File unit", (
+                  <div style={{ minWidth: 150 }}>
+                    <DsSelect
+                      value={unit}
+                      options={[{ label: "Millimetres", value: "mm" }, { label: "Inches", value: "inch" }]}
+                      onChange={(v) => setUnit(v as "mm" | "inch")}
+                      minWidth={150}
+                    />
+                  </div>
+                ))}
+                {doc.units !== "unknown" && (
+                  <div style={{ marginTop: -8, marginBottom: "var(--spacing-5)", marginLeft: 132, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                    File declares {doc.units === "mm" ? "millimetres" : "inches"} ($INSUNITS)
+                  </div>
+                )}
+                {field("DXF size", val(`${preview!.w.toFixed(2)} × ${preview!.h.toFixed(2)} ${unit}`))}
+                {field("Scale", (
+                  <input
+                    value={scale}
+                    onChange={(e) => setScale(e.target.value)}
+                    style={{ width: 110, padding: "var(--spacing-3) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontFamily: "inherit", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none" }}
+                  />
+                ))}
+                {field("Import size", val(sizePx ? `${Math.round(sizePx.w)} × ${Math.round(sizePx.h)} px` : "—"))}
+                {field("Reference point", (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+                    {([["origin", "DXF origin"], ["center", "Graphics centre"]] as const).map(([k, l]) => (
+                      <div key={k} onClick={() => setReference(k)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+                        <Radio on={reference === k} />
+                        <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{l}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {skipped.length > 0 && (
+                  <div style={{ marginTop: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", background: "var(--color-bg-subtle)", fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+                    Not imported: {skipped.map(([k, v]) => `${v} ${k.toLowerCase()}`).join(" · ")} — blocks, splines, dimensions and hatches aren&apos;t supported yet.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* preview — drawn from the parsed entities */}
+          <div style={{ flex: 1, padding: "var(--spacing-8)", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--color-bg-subtle)" }}>
+            {preview ? (
+              <div
+                style={{ width: "100%", height: "100%", maxHeight: 380, display: "flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", padding: "var(--spacing-5)" }}
+                dangerouslySetInnerHTML={{ __html: preview.svg }}
+              />
+            ) : (
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", textAlign: "center", maxWidth: 260 }}>
+                Pick a DXF to see what will be imported.
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-6) var(--spacing-8)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            {doc ? `Places ${summary!.total} entit${summary!.total === 1 ? "y" : "ies"} as editable objects on the current sheet` : ""}
+          </span>
+          <span style={{ display: "flex", gap: "var(--spacing-5)" }}>
+            <Pill onClick={actions.closeModal}>Cancel</Pill>
+            <PrimaryBtn onClick={doImport} style={{ opacity: doc ? 1 : 0.5, pointerEvents: doc ? "auto" : "none" }}>Import</PrimaryBtn>
+          </span>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 
 // ── Reannotate (Phase 5 — IT-575) ──────────────────────────────────────────
 // Re-runs designator annotation across the schematic with the chosen scope
@@ -1480,106 +1953,246 @@ function OpenProjectModal() {
   );
 }
 
-// ── Device / Reuse Block picker (Popup 10) — the parts-library dialog ─────────
-// Distinct from the Device *Standardization* manager. Source tabs, search,
-// left rail, filter row, result table + Place, sort/pagination. Sample parts.
-const SAMPLE_PARTS = [
-  { part: "AP4313KTR-G1", footprint: "SOT-23-6", brand: "DIODES", price: "$0.0829", stock: "LCSC 90080" },
-  { part: "INA180A2IDBVR", footprint: "SOT-23-5", brand: "TI", price: "$0.1805", stock: "LCSC 86910" },
-  { part: "LAN7800-I/9JX", footprint: "QFN-56", brand: "Microchip", price: "$4.9200", stock: "LCSC 218430" },
-  { part: "GRM155R71C104KA88D", footprint: "0402", brand: "Murata", price: "$0.0038", stock: "LCSC 15195" },
-  { part: "RC0402FR-0710KL", footprint: "0402", brand: "Yageo", price: "$0.0012", stock: "LCSC 51765" },
-];
-const DEVICE_TABS = ["LCSC Electronics", "EasyEDA", "Reuse Block"];
-const DEVICE_RAIL = ["System", "Recent", "Personal", "Favorite", "Project"];
+// ── Parts & Agile Module picker (Insert ▸ Place a Part) ──────────────────────
+// Every control here queries the catalogue for real: the left rail switches
+// between the built-in catalogue and lists derived from actual work (Recent
+// placements, parts already on this board) or owned by the user (Favourites,
+// Personal); the three attribute filters and the search box narrow the rows
+// live. Placing records a Recent and drops the real symbol on the canvas.
+const DEVICE_TABS = ["Parts", "Agile Module"];
 
 function DevicePickerModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [tab, setTab] = React.useState(DEVICE_TABS[0]);
-  const [rail, setRail] = React.useState(DEVICE_RAIL[0]);
-  const [search, setSearch] = React.useState("");
+  const [tab, setTab] = React.useState(
+    DEVICE_TABS.includes(state.pickerTab ?? "") ? (state.pickerTab as string) : DEVICE_TABS[0],
+  );
+  const [rail, setRail] = React.useState<PickerRail>("System");
+  const [filters, setFilters] = React.useState<PartFilters>(NO_FILTERS);
+  // localStorage-backed lists, read once when the dialog mounts (it only ever
+  // mounts client-side, after the user opens it).
+  const [favorites, setFavorites] = React.useState<string[]>(readFavorites);
+  const [recents, setRecents] = React.useState<string[]>(readRecents);
+  const [personal] = React.useState<string[]>(readPersonal);
+  // Modules the user captured from a selection — read once on mount, same as
+  // the other localStorage-backed lists.
+  const [ownModules] = React.useState<PersonalModule[]>(readPersonalModules);
 
-  // REAL place: drop a component object carrying the part number onto the
-  // canvas (near center, offset a little per placement) and select it.
-  const placePart = (p: (typeof SAMPLE_PARTS)[number]) => {
-    // Deterministic unique id — scan existing ids instead of a timestamp.
+  const projectIds = React.useMemo(() => projectPartIds(state.objects), [state.objects]);
+  const isModules = tab === "Agile Module";
+
+  const railRows = React.useMemo(
+    () => partsForRail(rail, { favorites, recents, personal, projectIds }),
+    [rail, favorites, recents, personal, projectIds],
+  );
+  const parts = React.useMemo(() => filterParts(railRows, filters), [railRows, filters]);
+  const modules = React.useMemo(
+    () => filterModules([...MODULE_CATALOG, ...ownModules], filters),
+    [filters, ownModules],
+  );
+
+  // Drop the object on the canvas near the centre, offset per placement.
+  const placeOn = (fields: Partial<CanvasObject> & { kind: string }, note: string) => {
     let n = state.objects.length + 1;
     while (state.objects.some((o) => o.id === `obj_dp${n}`)) n++;
     const id = `obj_dp${n}`;
     const offset = (state.objects.length % 5) * 30;
     actions.merge({
-      objects: [
-        ...state.objects,
-        { id, kind: "component", x: 420 + offset, y: 300 + offset, text: p.part, footprint: p.footprint, comment: p.brand },
-      ],
+      objects: [...state.objects, { id, x: 420 + offset, y: 300 + offset, ...fields } as CanvasObject],
       selectedIds: [id],
     });
-    actions.flashToast(`Placed ${p.part} (${p.footprint})`);
+    actions.flashToast(note);
     actions.closeModal();
   };
-  const q = search.trim().toLowerCase();
-  const rows = SAMPLE_PARTS.filter((p) => q.length < 2 || p.part.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q));
+
+  const placePart = (p: CatalogPart) => {
+    setRecents(pushRecent(p.id));
+    placeOn({ kind: p.kind, text: p.part, footprint: p.pkg, comment: p.mfr }, `Placed ${p.part} (${p.pkg})`);
+  };
+
+  // A captured module really re-creates its objects; a catalogue module (which
+  // has no geometry yet) lands as one reusable block carrying its name.
+  const placeModule = (m: AgileModule) => {
+    const own = ownModules.find((o) => o.id === m.id);
+    if (own?.objects.length) {
+      const base = state.objects.length;
+      const dx = 420 + (base % 5) * 30, dy = 300 + (base % 5) * 30;
+      const xs = own.objects.map((o) => Number(o.x) || 0), ys = own.objects.map((o) => Number(o.y) || 0);
+      const ox = Math.min(...xs), oy = Math.min(...ys);
+      const made = own.objects.map((o, i) => ({
+        ...(o as Partial<CanvasObject>),
+        id: `obj_mod${base + i + 1}`,
+        x: dx + ((Number(o.x) || 0) - ox),
+        y: dy + ((Number(o.y) || 0) - oy),
+        endX: typeof o.endX === "number" ? dx + (o.endX - ox) : undefined,
+        endY: typeof o.endY === "number" ? dy + (o.endY - oy) : undefined,
+      })) as CanvasObject[];
+      actions.merge({ objects: [...state.objects, ...made], selectedIds: made.map((o) => o.id) });
+      actions.flashToast(`Placed ${m.name} — ${made.length} object${made.length === 1 ? "" : "s"}`);
+      actions.closeModal();
+      return;
+    }
+    placeOn({ kind: "reuseBlock", text: m.name, comment: m.summary }, `Placed ${m.name} (${m.parts.length} parts)`);
+  };
+
+  const star = (id: string) => setFavorites(toggleFavorite(id));
+
+  const activeFilters = [filters.pkg, filters.mfr, filters.feature].filter(Boolean).length;
   const cellCss: React.CSSProperties = { padding: "var(--spacing-4) var(--spacing-5)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" };
   const headCss: React.CSSProperties = { ...cellCss, fontWeight: 700, color: "var(--color-text-secondary)", position: "sticky", top: 0, background: "var(--color-bg-surface)" };
+  const selCss: React.CSSProperties = { minWidth: 148 };
+
+  const filterSelect = (
+    label: string,
+    value: string,
+    options: string[],
+    onChange: (v: string) => void,
+  ) => (
+    <div key={label} style={selCss}>
+      <DsSelect
+        value={value}
+        placeholder={label}
+        options={[{ label: `All ${label.toLowerCase()}s`, value: "" }, ...options.map((o) => ({ label: o, value: o }))]}
+        onChange={onChange}
+        minWidth={148}
+      />
+    </div>
+  );
+
+  const emptyRow = (msg: string, cols: number) => (
+    <tr>
+      <td colSpan={cols} style={{ ...cellCss, textAlign: "center", color: "var(--color-text-tertiary)", padding: "var(--spacing-10)" }}>
+        {msg}
+      </td>
+    </tr>
+  );
 
   return (
     <Overlay>
       <Card width={980} maxHeight="88%" flexCol>
-        <Header title="Device / Reuse Block" onClose={actions.closeModal} padding="16px 22px" />
+        <Header title="Parts &amp; Agile Module" onClose={actions.closeModal} padding="16px 22px" />
         <div style={{ padding: "var(--spacing-4) var(--spacing-8) 0", flex: "0 0 auto" }}>
           <ModalTabBar tabs={DEVICE_TABS} active={tab} onChange={setTab} />
         </div>
         <div style={{ padding: "var(--spacing-6) var(--spacing-8) var(--spacing-4)", flex: "0 0 auto" }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search, at least 2 characters…" style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
-          <div style={{ display: "flex", gap: "var(--spacing-4)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
-            {["Package", "Manufacturer", "Features"].map((f) => (
-              <div key={f} style={{ minWidth: 130 }}><DsSelect value={f} options={[{ label: f, value: f }]} minWidth={130} /></div>
-            ))}
-            <Pill style={{ marginLeft: "auto" }} onClick={() => actions.flashToast("Filters cleared")}>Clear Filters</Pill>
-            <PrimaryBtn onClick={() => actions.flashToast("Filters applied")}>Apply Filters</PrimaryBtn>
+          <input
+            value={filters.query}
+            onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
+            placeholder={isModules ? "Search modules…" : "Search part, manufacturer or feature…"}
+            style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
+            {!isModules && filterSelect("Package", filters.pkg, packageOptions(), (v) => setFilters((f) => ({ ...f, pkg: v })))}
+            {!isModules && filterSelect("Manufacturer", filters.mfr, manufacturerOptions(), (v) => setFilters((f) => ({ ...f, mfr: v })))}
+            {filterSelect("Feature", filters.feature, featureOptions(), (v) => setFilters((f) => ({ ...f, feature: v })))}
+            <span style={{ marginLeft: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+              {activeFilters ? `${activeFilters} filter${activeFilters > 1 ? "s" : ""} on` : "Filters apply as you choose"}
+            </span>
+            <Pill onClick={() => setFilters(NO_FILTERS)}>Clear Filters</Pill>
           </div>
         </div>
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-          {/* left rail */}
+          {/* rail — real sources, not labels */}
           <div style={{ width: 150, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", overflowY: "auto", padding: "var(--spacing-3)" }}>
-            {DEVICE_RAIL.map((r) => (
-              <div key={r} onClick={() => setRail(r)} className="ix-row" style={{ padding: "var(--spacing-3) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", fontSize: "var(--font-size-sm)", fontWeight: rail === r ? 700 : 500, color: rail === r ? "var(--color-text-brand)" : "var(--color-text-primary)", background: rail === r ? "var(--color-bg-brand-subtle)" : "transparent" }}>{r}</div>
-            ))}
+            {PICKER_RAILS.map((r) => {
+              const count = partsForRail(r, { favorites, recents, personal, projectIds }).length;
+              const on = rail === r;
+              return (
+                <div
+                  key={r}
+                  onClick={() => setRail(r)}
+                  className="ix-row"
+                  style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-3) var(--spacing-5)", borderRadius: "var(--radius-md)", cursor: "pointer", fontSize: "var(--font-size-sm)", fontWeight: on ? 700 : 500, color: on ? "var(--color-text-brand)" : "var(--color-text-primary)", background: on ? "var(--color-bg-brand-subtle)" : "transparent", opacity: isModules ? 0.45 : 1, pointerEvents: isModules ? "none" : "auto" }}
+                >
+                  <span style={{ flex: 1 }}>{r}</span>
+                  <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{count}</span>
+                </div>
+              );
+            })}
           </div>
-          {/* result table */}
+
           <div style={{ flex: 1, overflowY: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ ...headCss, textAlign: "left" }}>Part</th>
-                  <th style={{ ...headCss, textAlign: "left" }}>Footprint / Brand</th>
-                  <th style={{ ...headCss, textAlign: "left" }}>Price (5+)</th>
-                  <th style={{ ...headCss, textAlign: "left" }}>Stock</th>
-                  <th style={{ ...headCss, textAlign: "right" }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <tr key={p.part}>
-                    <td style={cellCss}>{p.part}</td>
-                    <td style={cellCss}>{p.footprint} · {p.brand}</td>
-                    <td style={cellCss}>{p.price}</td>
-                    <td style={cellCss}>{p.stock}</td>
-                    <td style={{ ...cellCss, textAlign: "right" }}>
-                      <Button hierarchy="primary" size="sm" onClick={() => placePart(p)}>Place</Button>
-                    </td>
+            {isModules ? (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...headCss, textAlign: "left" }}>Module</th>
+                    <th style={{ ...headCss, textAlign: "left" }}>Contains</th>
+                    <th style={{ ...headCss, textAlign: "right" }}></th>
                   </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr><td colSpan={5} style={{ ...cellCss, textAlign: "center", color: "var(--color-text-tertiary)" }}>{q.length < 2 ? "Type at least 2 characters to search." : "No parts found."}</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {modules.map((m) => (
+                    <tr key={m.id}>
+                      <td style={cellCss}>
+                        <div style={{ fontWeight: 600 }}>{m.name}</div>
+                        <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>{m.summary}</div>
+                      </td>
+                      <td style={{ ...cellCss, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+                        {m.parts.join(" · ")}
+                      </td>
+                      <td style={{ ...cellCss, textAlign: "right" }}>
+                        <Button hierarchy="primary" size="sm" onClick={() => placeModule(m)}>Place</Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {modules.length === 0 && emptyRow("No modules match these filters.", 3)}
+                </tbody>
+              </table>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...headCss, width: 40 }}></th>
+                    <th style={{ ...headCss, textAlign: "left" }}>Part</th>
+                    <th style={{ ...headCss, textAlign: "left" }}>Package / Manufacturer</th>
+                    <th style={{ ...headCss, textAlign: "left" }}>Price (5+)</th>
+                    <th style={{ ...headCss, textAlign: "left" }}>Stock</th>
+                    <th style={{ ...headCss, textAlign: "right" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parts.map((p) => {
+                    const fav = favorites.includes(p.id);
+                    return (
+                      <tr key={p.id}>
+                        <td style={{ ...cellCss, textAlign: "center" }}>
+                          <span
+                            role="button"
+                            aria-label={fav ? `Remove ${p.part} from favourites` : `Add ${p.part} to favourites`}
+                            aria-pressed={fav}
+                            onClick={() => star(p.id)}
+                            style={{ cursor: "pointer", display: "inline-flex", color: fav ? "var(--color-violet-600)" : "var(--color-text-tertiary)" }}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden>
+                              <path d="M12 3.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.8l5.9-.9z" />
+                            </svg>
+                          </span>
+                        </td>
+                        <td style={cellCss}>
+                          <div>{p.part}</div>
+                          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>{p.features.join(" · ")}</div>
+                        </td>
+                        <td style={cellCss}>{p.pkg} · {p.mfr}</td>
+                        <td style={cellCss}>{p.price}</td>
+                        <td style={cellCss}>{p.stock}</td>
+                        <td style={{ ...cellCss, textAlign: "right" }}>
+                          <Button hierarchy="primary" size="sm" onClick={() => placePart(p)}>Place</Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {parts.length === 0 &&
+                    emptyRow(railRows.length === 0 ? RAIL_EMPTY[rail] : "No parts match these filters.", 6)}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-5) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Sort: Price / Stock / Sales · {rows.length} results</span>
+          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            {isModules ? `${modules.length} module${modules.length === 1 ? "" : "s"}` : `${parts.length} part${parts.length === 1 ? "" : "s"} in ${rail}`}
+          </span>
           <Pill style={{ marginLeft: "auto" }} onClick={actions.closeModal}>Cancel</Pill>
         </div>
       </Card>
@@ -1587,123 +2200,187 @@ function DevicePickerModal() {
   );
 }
 
-// ── Export BOM (Popup 11) ────────────────────────────────────────────────────
-// Device Standardization notice → BOM dialog with Filter-Option table.
-const BOM_ROWS: { title: string; property: string; sort: string; group: string }[] = [
-  { title: "No.", property: "Number", sort: "None", group: "None" },
-  { title: "Comment", property: "Comment", sort: "None", group: "Yes" },
-  { title: "Designator", property: "Designator", sort: "Ascending", group: "No" },
-  { title: "Footprint", property: "Footprint", sort: "None", group: "Yes" },
-  { title: "Manufacturer", property: "Manufacturer", sort: "None", group: "Yes" },
+// ── Export BOM ───────────────────────────────────────────────────────────────
+// The dialog's own configuration reaches the file: which columns, how they sort,
+// and whether identical parts collapse into one line with a quantity. Before,
+// the table was static decoration and the exporter always wrote the same five
+// columns (Manufacturer permanently "-"), while picking XLSX still wrote CSV.
+type BomColKey = "no" | "qty" | "designator" | "comment" | "value" | "footprint" | "package" | "layer" | "mpn" | "description";
+const BOM_COLUMNS: { key: BomColKey; label: string; of: (o: CanvasObject) => string }[] = [
+  { key: "no", label: "No.", of: () => "" },
+  { key: "qty", label: "Qty", of: () => "1" },
+  { key: "designator", label: "Designator", of: (o) => (o.text || "").trim() },
+  { key: "comment", label: "Comment", of: (o) => (o.comment || "").trim() },
+  { key: "value", label: "Value", of: (o) => String((o.props as Record<string, unknown> | undefined)?.value ?? (o.comment || "")).trim() },
+  { key: "footprint", label: "Footprint", of: (o) => (o.footprint || "").trim() },
+  { key: "package", label: "Package", of: (o) => String((o.props as Record<string, unknown> | undefined)?.package ?? o.footprint ?? "").trim() },
+  { key: "layer", label: "Side", of: (o) => ((o.side ?? o.layer) === "bottom" ? "Bottom" : "Top") },
+  { key: "mpn", label: "MPN / Supplier", of: (o) => String((o.props as Record<string, unknown> | undefined)?.mpn ?? "").trim() },
+  { key: "description", label: "Description", of: (o) => String((o.props as Record<string, unknown> | undefined)?.manufacturer ?? "").trim() },
 ];
-
-const BOM_COMPONENT_KINDS = new Set(["component", "resistor", "capacitor", "inductor", "diode", "ic", "connector"]);
+const BOM_COMPONENT_KINDS = new Set(["component", "resistor", "capacitor", "inductor", "diode", "ic", "connector", "resistorBox", "transistor", "opamp", "crystal", "fp0805", "fpSOD123", "fpSOT23", "fpSOIC8", "footprint"]);
 
 function BomModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [notice, setNotice] = React.useState(true);
+  const [cols, setCols] = React.useState<Record<BomColKey, boolean>>({
+    no: true, qty: true, designator: true, comment: true, value: false,
+    footprint: true, package: false, layer: true, mpn: false, description: false,
+  });
+  const [sortBy, setSortBy] = React.useState<BomColKey>("designator");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+  const [groupSame, setGroupSame] = React.useState(true);
+  const [fileName, setFileName] = React.useState("bom");
+  const [fileType, setFileType] = React.useState<"CSV" | "TSV" | "JSON">("CSV");
 
-  // REAL export: build a CSV from the components on the canvas and download
-  // it (XLSX choice still ships CSV content until a real workbook writer).
-  const exportBomFile = (fileName: string, fileType: string) => {
-    const comps = state.objects.filter((o) => BOM_COMPONENT_KINDS.has(o.kind));
-    const rows: string[][] = [
-      ["No.", "Comment", "Designator", "Footprint", "Manufacturer"],
-      ...comps.map((o, i) => [
-        String(i + 1),
-        o.comment || o.kind,
-        o.text || `U${i + 1}`,
-        o.footprint || "-",
-        "-",
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    downloadTextFile(`${fileName.slice(0, 60)}.csv`, csv);
-    actions.flashToast(comps.length ? `Exported BOM — ${comps.length} component${comps.length > 1 ? "s" : ""} (${fileType} as CSV)` : "Exported BOM — no components on canvas yet");
+  // One builder for the preview and the download, so the table on screen is
+  // exactly the file (the old dialog previewed a hardcoded five-row table).
+  const built = React.useMemo(() => {
+    // `scope` defaults to "schematic" everywhere else (see CanvasObject), so
+    // `(o.scope ?? "pcb") !== "schematic"` used to sweep unscoped schematic
+    // parts into a board BOM — the opposite default from `collectPcbModel`,
+    // which every other export uses. The BOM now lists the surface you're on:
+    // the board's footprints on the board, the sheet's parts in the schematic.
+    const wantPcb = state.mode !== "schematic";
+    const comps = state.objects.filter(
+      (o) => BOM_COMPONENT_KINDS.has(o.kind) && ((o.scope ?? "schematic") === "pcb") === wantPcb,
+    );
+    const active = BOM_COLUMNS.filter((c) => cols[c.key]);
+    const keyOf = (o: CanvasObject) =>
+      [BOM_COLUMNS.find((c) => c.key === "comment")!.of(o), o.footprint ?? "", BOM_COLUMNS.find((c) => c.key === "value")!.of(o)].join("|");
+    type Line = { cells: Record<string, string>; qty: number; designators: string[] };
+    const lines: Line[] = [];
+    if (groupSame) {
+      const byKey = new Map<string, Line>();
+      for (const o of comps) {
+        const k = keyOf(o);
+        const found = byKey.get(k);
+        const des = BOM_COLUMNS.find((c) => c.key === "designator")!.of(o);
+        if (found) { found.qty += 1; if (des) found.designators.push(des); continue; }
+        const cells: Record<string, string> = {};
+        for (const c of BOM_COLUMNS) cells[c.key] = c.of(o);
+        const line: Line = { cells, qty: 1, designators: des ? [des] : [] };
+        byKey.set(k, line);
+        lines.push(line);
+      }
+    } else {
+      for (const o of comps) {
+        const cells: Record<string, string> = {};
+        for (const c of BOM_COLUMNS) cells[c.key] = c.of(o);
+        const des = cells.designator;
+        lines.push({ cells, qty: 1, designators: des ? [des] : [] });
+      }
+    }
+    for (const l of lines) {
+      l.cells.qty = String(l.qty);
+      if (groupSame && l.designators.length) l.cells.designator = l.designators.sort().join(", ");
+    }
+    const dir = sortDir === "asc" ? 1 : -1;
+    lines.sort((a, b) => {
+      const av = a.cells[sortBy] ?? "", bv = b.cells[sortBy] ?? "";
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (Number.isFinite(an) && Number.isFinite(bn) && String(an) === av.trim() && String(bn) === bv.trim()) return (an - bn) * dir;
+      return av.localeCompare(bv, undefined, { numeric: true }) * dir;
+    });
+    lines.forEach((l, i) => { l.cells.no = String(i + 1); });
+    return { active, lines, parts: comps.length, from: wantPcb ? "board" : "schematic" };
+  }, [state.objects, state.mode, cols, sortBy, sortDir, groupSame]);
+
+  const download = () => {
+    const head = built.active.map((c) => c.label);
+    const rows = built.lines.map((l) => built.active.map((c) => l.cells[c.key] ?? ""));
+    const base = (fileName || "bom").replace(/\.(csv|tsv|json)$/i, "");
+    if (fileType === "JSON") {
+      const objs = built.lines.map((l) => Object.fromEntries(built.active.map((c) => [c.label, l.cells[c.key] ?? ""])));
+      downloadBlob(`${base}.json`, JSON.stringify(objs, null, 2), "application/json");
+    } else if (fileType === "TSV") {
+      downloadBlob(`${base}.tsv`, [head, ...rows].map((r) => r.join("\t")).join("\n"), "text/tab-separated-values");
+    } else {
+      const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      downloadBlob(`${base}.csv`, [head, ...rows].map((r) => r.map(esc).join(",")).join("\n"), "text/csv");
+    }
+    actions.flashToast(built.lines.length ? `Exported ${built.lines.length} BOM line${built.lines.length > 1 ? "s" : ""} (${fileType})` : "Exported BOM — no components on the board yet");
     actions.closeModal();
   };
-  const [range, setRange] = React.useState("Board1 : Gigabit Eth to USB Controller");
-  const [variant, setVariant] = React.useState("Basic");
-  const [fileName] = React.useState("BOM_Board1_Gigabit Eth to USB Controller_2026");
-  const [fileType, setFileType] = React.useState("XLSX");
-  const [template, setTemplate] = React.useState("None");
-  const cellCss: React.CSSProperties = { padding: "var(--spacing-3) var(--spacing-5)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", textAlign: "left" };
-  const labelCss: React.CSSProperties = { width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
 
-  if (notice) {
-    return (
-      <Overlay>
-        <Card width={460}>
-          <Header title="Notice" onClose={actions.closeModal} padding="16px 22px" />
-          <div style={{ padding: "var(--spacing-9) var(--spacing-10)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", lineHeight: 1.6 }}>
-            It is recommended to use Device Standardization before exporting the BOM, so every part maps to a consistent supplier / manufacturer entry.
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-            <Pill onClick={() => { actions.closeModal(); actions.openManager("device"); }}>Device Standardization</Pill>
-            <PrimaryBtn style={{ marginLeft: "auto" }} onClick={() => setNotice(false)}>Export BOM</PrimaryBtn>
-            <Pill onClick={actions.closeModal}>Cancel</Pill>
-          </div>
-        </Card>
-      </Overlay>
-    );
-  }
+  const cellCss: React.CSSProperties = { padding: "var(--spacing-3) var(--spacing-5)", fontSize: "var(--font-size-xs)", color: "var(--color-text-primary)", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", textAlign: "left", whiteSpace: "nowrap" };
+  const labelCss: React.CSSProperties = { width: 110, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const row = (n: string, node: React.ReactNode) => (
+    <div key={n} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+      <span style={labelCss}>{n}</span>
+      <div style={{ flex: 1 }}>{node}</div>
+    </div>
+  );
 
   return (
     <Overlay>
-      <Card width={820} maxHeight="88%" flexCol>
+      <Card width={860} maxHeight="90%" flexCol>
         <Header title="Export BOM" onClose={actions.closeModal} padding="16px 22px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-10) var(--spacing-4)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
-            <span style={labelCss}>Range</span>
-            <div style={{ flex: 1 }}><DsSelect value={range} options={[range, "Board2 : Panel"].map((s) => ({ label: s, value: s }))} onChange={setRange} /></div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-8) var(--spacing-10) var(--spacing-4)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            {built.parts
+              ? `${built.parts} part${built.parts > 1 ? "s" : ""} on the ${built.from} → ${built.lines.length} line${built.lines.length > 1 ? "s" : ""}${groupSame ? " (identical parts grouped)" : ""}.`
+              : built.from === "board"
+              ? "No components on the board yet — convert the schematic or place parts first."
+              : "No components on this schematic yet — place parts first."}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
-            <span style={labelCss}>Assembly Variant</span>
-            <div style={{ minWidth: 160 }}><DsSelect value={variant} options={["Basic", "Extended", "Custom"].map((s) => ({ label: s, value: s }))} onChange={setVariant} minWidth={160} /></div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-6)" }}>
-            <span style={labelCss}>File Name</span>
-            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName}</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", marginBottom: "var(--spacing-6)" }}>
-            <span style={labelCss}>File Type</span>
-            {["XLSX", "CSV"].map((t) => (
-              <div key={t} onClick={() => setFileType(t)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                <Radio on={fileType === t} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{t}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", marginBottom: "var(--spacing-8)" }}>
-            <span style={labelCss}>Template</span>
-            <div style={{ minWidth: 160 }}><DsSelect value={template} options={["None", "Standard", "JLCPCB"].map((s) => ({ label: s, value: s }))} onChange={setTemplate} minWidth={160} /></div>
-          </div>
-          <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Filter Option</div>
-          <table style={{ width: "100%", borderCollapse: "collapse", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-            <thead>
-              <tr>{["Title", "Property", "Sort", "Group"].map((h) => <th key={h} style={{ ...cellCss, fontWeight: 700, color: "var(--color-text-secondary)", background: "var(--color-bg-subtle)" }}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {BOM_ROWS.map((r) => (
-                <tr key={r.title}>
-                  <td style={cellCss}>{r.title}</td>
-                  <td style={cellCss}>{r.property}</td>
-                  <td style={cellCss}>{r.sort}</td>
-                  <td style={cellCss}>{r.group}</td>
-                </tr>
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Columns</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-4) var(--spacing-6)" }}>
+              {BOM_COLUMNS.map((c) => (
+                <div key={c.key} onClick={() => setCols((s) => ({ ...s, [c.key]: !s[c.key] }))} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", minWidth: 130 }}>
+                  <Check on={cols[c.key]} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{c.label}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
+          {row("Sort by", (
+            <div style={{ display: "flex", gap: "var(--spacing-5)" }}>
+              <div style={{ minWidth: 170 }}>
+                <DsSelect value={sortBy} options={BOM_COLUMNS.filter((c) => c.key !== "no").map((c) => ({ label: c.label, value: c.key }))} onChange={(v) => setSortBy(v as BomColKey)} minWidth={170} />
+              </div>
+              <div style={{ minWidth: 140 }}>
+                <DsSelect value={sortDir} options={[{ label: "Ascending", value: "asc" }, { label: "Descending", value: "desc" }]} onChange={(v) => setSortDir(v as "asc" | "desc")} minWidth={140} />
+              </div>
+            </div>
+          ))}
+          <div onClick={() => setGroupSame((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+            <Check on={groupSame} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Group identical parts into one line with a quantity</span>
+          </div>
+          {row("File Name", <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />)}
+          {row("Format", <DsSelect value={fileType} options={[{ label: "CSV", value: "CSV" }, { label: "TSV", value: "TSV" }, { label: "JSON", value: "JSON" }]} onChange={(v) => setFileType(v as "CSV" | "TSV" | "JSON")} />)}
+          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            XLSX is deliberately absent — writing a real workbook needs a library we don&#39;t bundle, and labelling CSV as XLSX would be a lie. CSV opens in Excel and Sheets.
+          </div>
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Preview — this is the file</div>
+            <div style={{ overflowX: "auto", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-md)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>{built.active.map((c) => <th key={c.key} style={{ ...cellCss, fontWeight: 700, color: "var(--color-text-secondary)", background: "var(--color-bg-subtle)" }}>{c.label}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {built.lines.slice(0, 8).map((l, i) => (
+                    <tr key={i}>{built.active.map((c) => <td key={c.key} style={cellCss}>{l.cells[c.key] || "—"}</td>)}</tr>
+                  ))}
+                  {built.lines.length === 0 && (
+                    <tr><td style={{ ...cellCss, color: "var(--color-text-tertiary)" }} colSpan={Math.max(1, built.active.length)}>Nothing to list yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {built.lines.length > 8 && (
+              <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: "var(--spacing-3)" }}>
+                + {built.lines.length - 8} more line{built.lines.length - 8 > 1 ? "s" : ""} in the file.
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
-          <Pill onClick={() => actions.flashToast("Import Config")}>Import Config</Pill>
-          <Pill onClick={() => actions.flashToast("Export Config")}>Export Config</Pill>
-          <Pill onClick={() => actions.flashToast("Restored defaults")}>Restore Default</Pill>
           <Pill onClick={() => { actions.closeModal(); actions.openManager("device"); }}>Device Standardization</Pill>
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
-            <Pill onClick={() => actions.flashToast("Order Parts")}>Order Parts</Pill>
-            <PrimaryBtn onClick={() => exportBomFile(fileName, fileType)}>Export BOM</PrimaryBtn>
-            <Pill onClick={actions.closeModal}>Cancel</Pill>
+            <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+            <Button hierarchy="primary" size="md" disabled={!built.active.length} onClick={download}>Export BOM</Button>
           </div>
         </div>
       </Card>
@@ -1715,30 +2392,70 @@ function BomModal() {
 function DxfModal() {
   const actions = usePcbActions();
   const state = usePcbState();
-  const [range, setRange] = React.useState("Board1:Gigabit Eth to USB Controller");
+  const sel = state.selectedIds.length;
+  const [range, setRange] = React.useState<"board" | "selection">("board");
   const [fileName, setFileName] = React.useState("board.dxf");
-  const [containPages, setContainPages] = React.useState(false);
-  const labelCss: React.CSSProperties = { width: 100, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const [unit, setUnit] = React.useState<"mm" | "inch">("mm");
+  const [scale, setScale] = React.useState("1");
+  const [inc, setInc] = React.useState({ outline: true, tracks: true, pads: true, vias: true, comps: true });
+  const [side, setSide] = React.useState<"both" | "top" | "bottom">("both");
+  const labelCss: React.CSSProperties = { width: 110, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const row = (n: string, node: React.ReactNode) => (
+    <div key={n} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+      <span style={labelCss}>{n}</span>
+      <div style={{ flex: 1 }}>{node}</div>
+    </div>
+  );
+  const check = (on: boolean, text: string, onClick: () => void) => (
+    <div key={text} onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer", minWidth: 118 }}>
+      <Check on={on} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{text}</span>
+    </div>
+  );
+  // What the file will hold, counted from the model the export will build.
+  const model = React.useMemo(
+    () => collectPcbModel(state, { onlySelected: range === "selection" }),
+    [state, range],
+  );
+  const counts = [
+    inc.outline ? `outline${model.cutouts.length ? ` + ${model.cutouts.length} cutout${model.cutouts.length > 1 ? "s" : ""}` : ""}` : null,
+    inc.tracks && model.tracks.length ? `${model.tracks.length} track${model.tracks.length > 1 ? "s" : ""}` : null,
+    inc.pads && model.pads.length ? `${model.pads.length} pad${model.pads.length > 1 ? "s" : ""}` : null,
+    inc.vias && model.vias.length ? `${model.vias.length} via${model.vias.length > 1 ? "s" : ""}` : null,
+    inc.comps && model.comps.length ? `${model.comps.length} component outline${model.comps.length > 1 ? "s" : ""}` : null,
+  ].filter(Boolean);
+  const nothing = counts.length === 0;
   return (
     <Overlay>
-      <Card width={480}>
+      <Card width={520} maxHeight="88%" flexCol>
         <Header title="Export DXF" onClose={actions.closeModal} padding="16px 22px" />
-        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={labelCss}>Range</span>
-            <div style={{ flex: 1 }}><DsSelect value={range} options={[range, "Board2 : Panel"].map((s) => ({ label: s, value: s }))} onChange={setRange} /></div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          {row("Range", <DsSelect value={range} options={[{ label: "Whole board", value: "board" }, { label: sel ? `Selection (${sel})` : "Selection — nothing selected", value: "selection" }]} onChange={(v) => setRange(v as "board" | "selection")} />)}
+          {row("File Name", <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />)}
+          {row("Units", <DsSelect value={unit} options={[{ label: "Millimetres", value: "mm" }, { label: "Inches", value: "inch" }]} onChange={(v) => setUnit(v as "mm" | "inch")} />)}
+          {row("Scale", <NumberInput value={scale} onChange={setScale} min={0.01} />)}
+          {row("Copper side", <DsSelect value={side} options={[{ label: "Both sides", value: "both" }, { label: "Top only", value: "top" }, { label: "Bottom only", value: "bottom" }]} onChange={(v) => setSide(v as "both" | "top" | "bottom")} />)}
+          <div>
+            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Include</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--spacing-5) var(--spacing-6)" }}>
+              {check(inc.outline, "Board outline", () => setInc((c) => ({ ...c, outline: !c.outline })))}
+              {check(inc.tracks, "Tracks", () => setInc((c) => ({ ...c, tracks: !c.tracks })))}
+              {check(inc.pads, "Pads", () => setInc((c) => ({ ...c, pads: !c.pads })))}
+              {check(inc.vias, "Vias + drills", () => setInc((c) => ({ ...c, vias: !c.vias })))}
+              {check(inc.comps, "Component outlines", () => setInc((c) => ({ ...c, comps: !c.comps })))}
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={labelCss}>File Name</span>
-            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
-          </div>
-          <div onClick={() => setContainPages((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-            <Check on={containPages} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Contain pages</span>
+          <div style={{ fontSize: "var(--font-size-sm)", color: nothing ? "var(--color-text-tertiary)" : "var(--color-text-secondary)", lineHeight: 1.5 }}>
+            {nothing ? "Nothing selected to export — tick at least one layer." : `Will write ${counts.join(" · ")} in ${unit === "inch" ? "inches" : "mm"}${Number(scale) !== 1 ? ` at ${scale}×` : ""}.`}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-          <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <PrimaryBtn onClick={() => { const m = collectPcbModel(state); downloadBlob(`${fileName.replace(/\.dxf$/i, "")}.dxf`, buildDxf(m), "application/dxf"); actions.flashToast(`Exported ${fileName.replace(/\.dxf$/i, "")}.dxf`); actions.closeModal(); }}>Export</PrimaryBtn>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" disabled={nothing} onClick={() => {
+            const name = fileName.replace(/\.dxf$/i, "") || "board";
+            downloadBlob(`${name}.dxf`, buildDxf(model, { unit, scale: Number(scale) || 1, include: { ...inc, side } }), "application/dxf");
+            actions.flashToast(`Exported ${name}.dxf — ${counts.join(" · ")}`);
+            actions.closeModal();
+          }}>Export</Button>
         </div>
       </Card>
     </Overlay>
@@ -1746,72 +2463,536 @@ function DxfModal() {
 }
 
 // ── Export Document / PDF·PNG·SVG (Popup 13) ─────────────────────────────────
-function RowRadios({ label, opts, val, set }: { label: string; opts: string[]; val: string; set: (v: string) => void }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
-      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{label}</span>
-      <div style={{ display: "flex", gap: "var(--spacing-8)", flexWrap: "wrap" }}>
-        {opts.map((o) => (
-          <div key={o} onClick={() => set(o)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-            <Radio on={val === o} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o}</span>
+function DocumentModal() {
+  const actions = usePcbActions();
+  const state = usePcbState();
+  const sel = state.selectedIds.length;
+  const [fileType, setFileType] = React.useState<"PDF" | "PNG" | "SVG">("PDF");
+  const [theme, setTheme] = React.useState<"default" | "whiteOnBlack" | "blackOnWhite">("default");
+  const [hairline, setHairline] = React.useState(false);
+  const [range, setRange] = React.useState<"board" | "selection">("board");
+  const [output, setOutput] = React.useState<"merged" | "perSide">("merged");
+  const [fileName, setFileName] = React.useState("board");
+  const model = React.useMemo(
+    () => collectPcbModel(state, { onlySelected: range === "selection" }),
+    [state, range],
+  );
+  const themeLabel = { default: "Board colours", whiteOnBlack: "White on black", blackOnWhite: "Black on white" } as const;
+
+  const write = async (side: "both" | "top" | "bottom", suffix: string) => {
+    const opts = { theme, hairline, include: { side } } as const;
+    const base = (fileName || "board").replace(/\.(pdf|png|svg)$/i, "") + suffix;
+    if (fileType === "SVG") downloadBlob(`${base}.svg`, buildSvg(model, opts), "image/svg+xml");
+    else if (fileType === "PNG") {
+      const png = await rasterizeSvgToPng(buildSvg(model, opts), model.boardWmm + 8, model.boardHmm + 8);
+      downloadDataUrl(`${base}.png`, png);
+    } else downloadBlob(`${base}.pdf`, buildPdf(model, opts), "application/pdf");
+  };
+
+  const rowSeg = <T extends string>(name: string, options: { label: string; value: T }[], value: T, onChange: (v: T) => void) => (
+    <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
+      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{name}</span>
+      <div style={{ display: "flex", gap: "var(--spacing-7)", flexWrap: "wrap" }}>
+        {options.map((o) => (
+          <div key={o.value} onClick={() => onChange(o.value)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+            <Radio on={value === o.value} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o.label}</span>
           </div>
         ))}
       </div>
     </div>
   );
-}
 
-function DocumentModal() {
-  const actions = usePcbActions();
-  const state = usePcbState();
-  const [fileType, setFileType] = React.useState("PDF");
-  const [theme, setTheme] = React.useState("Default");
-  const [lineWidth, setLineWidth] = React.useState("Default");
-  const [range, setRange] = React.useState("All");
-  const [output, setOutput] = React.useState("Merged sheet");
   return (
     <Overlay>
-      <Card width={560}>
+      <Card width={580} maxHeight="90%" flexCol>
         <Header title="Export Document" onClose={actions.closeModal} padding="16px 22px" />
-        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
-          <RowRadios label="File Type" opts={["PDF", "PNG", "SVG"]} val={fileType} set={setFileType} />
-          <RowRadios label="Theme" opts={["Default", "White on Black", "Black on White"]} val={theme} set={setTheme} />
-          <RowRadios label="Line Width" opts={["Default", "Always 1px", "Follow Zoom"]} val={lineWidth} set={setLineWidth} />
-          <RowRadios label="Range" opts={["All", "Custom"]} val={range} set={setRange} />
-          <RowRadios label="Output Method" opts={["Merged sheet", "Separated sheet"]} val={output} set={setOutput} />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          {rowSeg("File Type", [{ label: "PDF", value: "PDF" as const }, { label: "PNG", value: "PNG" as const }, { label: "SVG", value: "SVG" as const }], fileType, setFileType)}
+          {rowSeg("Theme", [{ label: "Board colours", value: "default" as const }, { label: "White on black", value: "whiteOnBlack" as const }, { label: "Black on white", value: "blackOnWhite" as const }], theme, setTheme)}
+          {rowSeg("Line Width", [{ label: "True widths", value: false as unknown as string }, { label: "Hairline", value: true as unknown as string }] as { label: string; value: string }[], (hairline ? true : false) as unknown as string, (v) => setHairline(Boolean(v)))}
+          {rowSeg("Range", [{ label: "Whole board", value: "board" as const }, { label: sel ? `Selection (${sel})` : "Selection — nothing selected", value: "selection" as const }], range, setRange)}
+          {rowSeg("Output", [{ label: "One sheet", value: "merged" as const }, { label: "One file per side", value: "perSide" as const }], output, setOutput)}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>File Name</span>
+            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+            {`${output === "perSide" ? "Two files" : "One file"} · ${themeLabel[theme]} · ${hairline ? "hairline strokes" : "true copper widths"} · ${model.tracks.length} track${model.tracks.length === 1 ? "" : "s"}, ${model.comps.length} component${model.comps.length === 1 ? "" : "s"}.`}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-          <Pill onClick={actions.closeModal}>Cancel</Pill>
-          <Pill style={{ marginLeft: "auto" }} onClick={() => { const m = collectPcbModel(state); const url = URL.createObjectURL(buildPdf(m)); window.open(url, "_blank"); window.setTimeout(() => URL.revokeObjectURL(url), 8000); }}>Print</Pill>
-          <PrimaryBtn onClick={async () => {
-            const m = collectPcbModel(state);
-            if (fileType === "SVG") downloadBlob("board.svg", buildSvg(m), "image/svg+xml");
-            else if (fileType === "PNG") { try { const png = await rasterizeSvgToPng(buildSvg(m), m.boardWmm + 8, m.boardHmm + 8); downloadDataUrl("board.png", png); } catch { actions.flashToast("PNG export failed"); } }
-            else downloadBlob("board.pdf", buildPdf(m), "application/pdf");
-            actions.flashToast(`Exported ${fileType}`); actions.closeModal();
-          }}>Export</PrimaryBtn>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Pill style={{ marginLeft: "auto" }} onClick={() => {
+            const url = URL.createObjectURL(buildPdf(model, { theme, hairline }));
+            window.open(url, "_blank");
+            window.setTimeout(() => URL.revokeObjectURL(url), 8000);
+          }}>Print</Pill>
+          <Button hierarchy="primary" size="md" onClick={async () => {
+            if (output === "perSide") { await write("top", "-top"); await write("bottom", "-bottom"); }
+            else await write("both", "");
+            actions.flashToast(`Exported ${fileType}${output === "perSide" ? " — top + bottom" : ""}`);
+            actions.closeModal();
+          }}>Export</Button>
         </div>
       </Card>
     </Overlay>
   );
 }
 
-// Chamfer / Fillet (IT-609 / IT-610) — single corner-radius input, mode read
-// from store so the menu sets it before opening.
+// Import Image — Project ▸ Import ▸ Image… had no dialog at all (a toast on the
+// schematic side, a picture-frame glyph on the board). This reads a real file,
+// optionally reduces it to 1-bit silkscreen ink, and places a real image object.
+function ImportImageModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [name, setName] = React.useState("");
+  const [src, setSrc] = React.useState<string | null>(null);
+  const [nat, setNat] = React.useState<{ w: number; h: number } | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [w, setW] = React.useState(160);
+  const [h, setH] = React.useState(120);
+  const [lock, setLock] = React.useState(true);
+  const [layer, setLayer] = React.useState("topSilk");
+  const [mono, setMono] = React.useState(false);
+  const [threshold, setThreshold] = React.useState(128);
+  const [invert, setInvert] = React.useState(false);
+
+  const layers = (state.pcbLayers ?? []).map((l) => ({ label: l.name, value: l.id }));
+  const label: React.CSSProperties = { width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const row = (n: string, node: React.ReactNode) => (
+    <div key={n} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+      <span style={label}>{n}</span>
+      <div style={{ flex: 1 }}>{node}</div>
+    </div>
+  );
+
+  const take = (file: File) => {
+    setError(null);
+    const reader = new FileReader();
+    reader.onerror = () => setError("Could not read that file");
+    reader.onload = () => {
+      const url = String(reader.result);
+      const img = new window.Image();
+      img.onload = () => {
+        setSrc(url);
+        setName(file.name);
+        setNat({ w: img.naturalWidth, h: img.naturalHeight });
+        // Land at a sane board size: 160 px wide, height from the real aspect.
+        const ratio = img.naturalHeight / Math.max(1, img.naturalWidth);
+        setW(160);
+        setH(Math.max(4, Math.round(160 * ratio)));
+      };
+      img.onerror = () => setError("That file isn't an image the browser can decode");
+      img.src = url;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const ratio = nat ? nat.h / Math.max(1, nat.w) : 0.75;
+  const setWidth = (v: number) => { setW(v); if (lock) setH(Math.max(4, Math.round(v * ratio))); };
+  const setHeight = (v: number) => { setH(v); if (lock) setW(Math.max(4, Math.round(v / (ratio || 0.75)))); };
+
+  // 1-bit reduction for silkscreen: luminance vs threshold, ink kept opaque and
+  // everything else transparent, so the board shows through.
+  const toMono = (url: string): Promise<string> =>
+    new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const cv = document.createElement("canvas");
+        cv.width = img.naturalWidth;
+        cv.height = img.naturalHeight;
+        const ctx = cv.getContext("2d");
+        if (!ctx) { resolve(url); return; }
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, cv.width, cv.height);
+        const px = data.data;
+        for (let i = 0; i < px.length; i += 4) {
+          const lum = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+          const ink = invert ? lum > threshold : lum <= threshold;
+          px[i] = px[i + 1] = px[i + 2] = 255;
+          px[i + 3] = ink ? 255 : 0;
+        }
+        ctx.putImageData(data, 0, 0);
+        resolve(cv.toDataURL("image/png"));
+      };
+      img.onerror = () => resolve(url);
+      img.src = url;
+    });
+
+  const place = async () => {
+    if (!src) return;
+    const finalSrc = mono ? await toMono(src) : src;
+    const bw = state.pcbBoard?.width && state.pcbBoard.width > 0 ? state.pcbBoard.width : 720;
+    const bh = state.pcbBoard?.height && state.pcbBoard.height > 0 ? state.pcbBoard.height : 480;
+    actions.addObjects([
+      {
+        id: `img_${Date.now().toString(36)}`,
+        kind: "image",
+        x: Math.round(60 + bw / 2),
+        y: Math.round(60 + bh / 2),
+        rotation: 0,
+        scope: "pcb",
+        layer,
+        width: w,
+        height: h,
+        props: { src: finalSrc, name, mono, threshold, invert, natW: nat?.w ?? 0, natH: nat?.h ?? 0 },
+      },
+    ]);
+    actions.flashToast(`Placed ${name || "image"} on ${layers.find((l) => l.value === layer)?.label ?? layer}`);
+    actions.closeModal();
+  };
+
+  return (
+    <Overlay>
+      <Card width={560} maxHeight="90%" flexCol>
+        <Header title="Import image" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+            style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) take(f); }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <Pill onClick={() => fileRef.current?.click()}>Choose file…</Pill>
+            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: src ? "var(--color-text-primary)" : "var(--color-text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {src ? `${name} · ${nat?.w ?? 0} × ${nat?.h ?? 0} px` : "PNG · JPG · SVG · WebP"}
+            </span>
+          </div>
+          {error && <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-error)" }}>{error}</div>}
+          {src && (
+            <div style={{ display: "flex", gap: "var(--spacing-8)" }}>
+              <div style={{ width: 150, height: 110, flex: "0 0 auto", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-md)", background: "var(--color-bg-subtle)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- local data: URI preview */}
+                <img src={src} alt="preview" style={{ maxWidth: "100%", maxHeight: "100%", display: "block" }} />
+              </div>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+                {row("Width (mil)", <NumberInput value={String(w)} onChange={(v) => setWidth(parseFloat(v) || 0)} min={4} />)}
+                {row("Height (mil)", <NumberInput value={String(h)} onChange={(v) => setHeight(parseFloat(v) || 0)} min={4} />)}
+                <div onClick={() => setLock((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+                  <Check on={lock} size={18} />
+                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Keep the original aspect ratio</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {row("Layer", <DsSelect value={layer} options={layers.length ? layers : [{ label: "Top Silkscreen", value: "topSilk" }]} onChange={setLayer} />)}
+          <div onClick={() => setMono((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+            <Check on={mono} size={18} />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Reduce to silkscreen ink (1-bit)</span>
+          </div>
+          {mono && (
+            <>
+              {row("Threshold", <NumberInput value={String(threshold)} onChange={(v) => setThreshold(Math.max(0, Math.min(255, parseFloat(v) || 0)))} min={0} />)}
+              <div onClick={() => setInvert((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+                <Check on={invert} size={18} />
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Invert — keep the light pixels as ink</span>
+              </div>
+            </>
+          )}
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            The image lands in the middle of the board and can be moved, resized and rotated like any object.
+            {mono ? " Ink pixels stay opaque and the rest becomes transparent, so the board shows through." : ""}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" disabled={!src} onClick={place}>Place image</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// #86 — Move by step: nudge the selection by an exact offset, or one grid step
+// at a time with the arrow buttons. The old Move rows armed a tool that had no
+// handler, so nothing moved at all.
+function MoveStepModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const step = Math.max(1, Math.round(parseFloat(String(state.gridSize)) * 100) || 10);
+  const [dx, setDx] = React.useState("0");
+  const [dy, setDy] = React.useState("0");
+  const n = state.selectedIds.length;
+  const label: React.CSSProperties = { width: 96, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const nudge = (ax: "x" | "y", dir: number) => {
+    actions.moveSelectedBy(ax === "x" ? step * dir : 0, ax === "y" ? step * dir : 0);
+  };
+  return (
+    <Overlay>
+      <Card width={430}>
+        <Header title="Move by step" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: n ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            {n ? `${n} object${n > 1 ? "s" : ""} selected. Type an offset, or step by the grid (${step} px per press).` : "Select something on the board first — this moves the selection."}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={label}>Step by grid</span>
+            <div style={{ display: "flex", gap: "var(--spacing-4)" }}>
+              {([["←", "x", -1], ["→", "x", 1], ["↑", "y", -1], ["↓", "y", 1]] as const).map(([t, ax, dir]) => (
+                <Button key={t} hierarchy="secondary" size="sm" disabled={!n} onClick={() => nudge(ax, dir)}>{t}</Button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={label}>Offset X</span>
+            <div style={{ flex: 1 }}><NumberInput value={dx} onChange={setDx} /></div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={label}>Offset Y</span>
+            <div style={{ flex: 1 }}><NumberInput value={dy} onChange={setDy} /></div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Close</Button>
+          <Button hierarchy="primary" size="md" disabled={!n} onClick={() => { actions.moveSelectedBy(parseFloat(dx) || 0, parseFloat(dy) || 0); actions.closeModal(); }}>Move</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// #79 — New ▸ Part: authors a part into the personal library, which the picker's
+// Personal rail lists and can place. (The rail was empty until now.)
+function NewPartModal() {
+  const actions = usePcbActions();
+  const [name, setName] = React.useState("");
+  const [mpn, setMpn] = React.useState("");
+  const [pkg, setPkg] = React.useState("0805");
+  const [maker, setMaker] = React.useState("");
+  const [symbol, setSymbol] = React.useState("resistor");
+  const SYMBOLS = ["resistor", "resistorBox", "capacitor", "inductor", "diode", "crystal", "opamp", "component"];
+  const label: React.CSSProperties = { width: 110, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const row = (n: string, node: React.ReactNode) => (
+    <div key={n} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+      <span style={label}>{n}</span><div style={{ flex: 1 }}>{node}</div>
+    </div>
+  );
+  const input = (v: string, set: (s: string) => void, ph = "") => (
+    <input value={v} placeholder={ph} onChange={(e) => set(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+  );
+  const save = () => {
+    const part = { name: name.trim(), mpn: mpn.trim(), pkg: pkg.trim(), maker: maker.trim(), symbol };
+    try {
+      const raw = window.localStorage.getItem("ideeza:pcb:personalParts");
+      const list = raw ? (JSON.parse(raw) as unknown[]) : [];
+      window.localStorage.setItem("ideeza:pcb:personalParts", JSON.stringify([...(Array.isArray(list) ? list : []), part]));
+    } catch {}
+    actions.flashToast(`Saved ${part.name || "part"} to your personal library`);
+    actions.closeModal();
+    actions.openPicker("Parts");
+  };
+  return (
+    <Overlay>
+      <Card width={470}>
+        <Header title="New part" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+          {row("Name", input(name, setName, "e.g. 10k 1% thin film"))}
+          {row("MPN", input(mpn, setMpn, "manufacturer part number"))}
+          {row("Package", input(pkg, setPkg))}
+          {row("Manufacturer", input(maker, setMaker))}
+          {row("Symbol", <DsSelect value={symbol} options={SYMBOLS.map((v) => ({ label: v, value: v }))} onChange={setSymbol} />)}
+          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            The part is stored in this browser and appears under <b>Personal</b> in Place a Part, ready to place with the symbol you picked. Drawing a brand-new symbol needs the symbol editor, which isn&#39;t built yet.
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" disabled={!name.trim()} onClick={save}>Save part</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// #79 — New ▸ Agile Module: captures the current selection as a reusable module.
+function NewModuleModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const [name, setName] = React.useState("");
+  const picked = state.objects.filter((o) => state.selectedIds.includes(o.id));
+  const save = () => {
+    const body = picked.map((o) => ({ ...o, id: undefined }));
+    try {
+      const raw = window.localStorage.getItem("ideeza:pcb:personalModules");
+      const list = raw ? (JSON.parse(raw) as unknown[]) : [];
+      window.localStorage.setItem("ideeza:pcb:personalModules", JSON.stringify([...(Array.isArray(list) ? list : []), { name: name.trim(), objects: body }]));
+    } catch {}
+    actions.flashToast(`Saved “${name.trim()}” — ${picked.length} object${picked.length > 1 ? "s" : ""} in the module`);
+    actions.closeModal();
+    actions.openPicker("Agile Module");
+  };
+  return (
+    <Overlay>
+      <Card width={460}>
+        <Header title="New agile module" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: picked.length ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            {picked.length
+              ? `A module is a block you can drop again later. ${picked.length} selected object${picked.length > 1 ? "s" : ""} will be captured.`
+              : "Select the objects that make up the block first — a module is captured from a selection."}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={{ width: 90, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. USB-C power input" style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+          </div>
+          {picked.length > 0 && (
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+              {[...new Set(picked.map((o) => o.kind))].slice(0, 8).join(" · ")}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" disabled={!name.trim() || !picked.length} onClick={save}>Save module</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// Suture (stitching) vias — Insert ▸ Suture Vias. The row used to arm a tool
+// that stamped a 5-via glyph, with nowhere to say pitch, net or where. This
+// dialog plans a real lattice with `planSutureVias` (the same function the
+// store action places from, so the count can't lie) and drops real vias.
+function SutureViasModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const regions = sutureRegions(state);
+  const [cfg, setCfg] = React.useState<SutureConfig>(() => ({
+    ...defaultSutureConfig(),
+    target: sutureRegions(state).length ? "region" : "board",
+  }));
+  const set = (patch: Partial<SutureConfig>) => setCfg((c) => ({ ...c, ...patch }));
+  const plan = React.useMemo(() => planSutureVias(state, cfg), [state, cfg]);
+  const nets = React.useMemo(() => {
+    const names = new Set<string>(state.pcbNets.map((n) => n.name));
+    for (const o of state.objects) if (o.net) names.add(o.net);
+    names.add("GND");
+    return [...names];
+  }, [state.pcbNets, state.objects]);
+  const existing = state.objects.filter((o) => (o.props as Record<string, unknown> | undefined)?.suture).length;
+
+  const label: React.CSSProperties = { width: 130, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const row = (name: string, node: React.ReactNode) => (
+    <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+      <span style={label}>{name}</span>
+      <div style={{ flex: 1 }}>{node}</div>
+    </div>
+  );
+  function seg<T extends string>(options: { label: string; value: T; disabled?: boolean }[], value: T, onChange: (v: T) => void) {
+    return (
+      <div style={{ display: "inline-flex", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-lg)", padding: 3, gap: 2 }}>
+        {options.map((o) => {
+          const on = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={on}
+              disabled={o.disabled}
+              title={o.disabled ? "Select a copper region first" : undefined}
+              onClick={() => onChange(o.value)}
+              style={{ padding: "var(--spacing-3) var(--spacing-6)", borderRadius: "var(--radius-md)", border: "none", cursor: o.disabled ? "default" : "pointer", fontFamily: "inherit", fontSize: "var(--font-size-sm)", fontWeight: 600, opacity: o.disabled ? 0.45 : 1, background: on ? "var(--color-violet-600)" : "transparent", color: on ? "var(--color-text-on-brand)" : "var(--color-text-secondary)" }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <Overlay>
+      <Card width={500} maxHeight="88%" flexCol>
+        <Header title="Stitch suture vias" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          {row("Where", seg([
+            { label: regions.length ? `Selected region (${regions.length})` : "Selected region", value: "region" as const, disabled: !regions.length },
+            { label: "Whole board", value: "board" as const },
+          ], cfg.target, (v) => set({ target: v })))}
+          {row("Net", <DsSelect value={cfg.net} options={nets.map((n) => ({ label: n, value: n }))} onChange={(v) => set({ net: v })} />)}
+          {row("Pattern", seg([
+            { label: "Staggered", value: "staggered" as const },
+            { label: "Grid", value: "grid" as const },
+          ], cfg.pattern, (v) => set({ pattern: v })))}
+          {row("Spacing (mil)", <NumberInput value={String(cfg.pitch)} onChange={(v) => set({ pitch: parseFloat(v) || 0 })} min={4} />)}
+          {row("Via size (mil)", <NumberInput value={String(cfg.size)} onChange={(v) => set({ size: parseFloat(v) || 0 })} min={1} />)}
+          {row("Drill (mil)", <NumberInput value={String(cfg.drill)} onChange={(v) => set({ drill: parseFloat(v) || 0 })} min={1} />)}
+          {row("Edge clearance", <NumberInput value={String(cfg.clearance)} onChange={(v) => set({ clearance: parseFloat(v) || 0 })} min={0} />)}
+          <div style={{ fontSize: "var(--font-size-sm)", lineHeight: 1.5, color: plan.points.length ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>
+            {plan.points.length
+              ? `Will stitch ${plan.points.length} via${plan.points.length > 1 ? "s" : ""} — real vias on ${cfg.net || "no net"}, so the DRC, the 3D view and the exports all see them.`
+              : plan.reason}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          {existing > 0 && (
+            <Pill onClick={() => { actions.removeSutureVias("all"); actions.closeModal(); }}>
+              Remove {existing} existing
+            </Pill>
+          )}
+          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-5)" }}>
+            <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+            <Button
+              hierarchy="primary"
+              size="md"
+              disabled={!plan.points.length}
+              onClick={() => { actions.generateSutureVias(cfg); actions.closeModal(); }}
+            >
+              Stitch vias
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// Add Chamfer / Add Fillet — real corner geometry. Apply used to be a toast:
+// the size went into the store and nothing ever read it. Now the dialog names
+// what it can act on (the same shapes Combine accepts) and Apply rewrites the
+// rings through `applyCornerOp`, so the change is on the canvas and undoable.
 function ChamferFilletModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const op = state.cornerOp;
   const isChamfer = op.mode === "chamfer";
+  const eligible = state.objects.filter((o) => state.selectedIds.includes(o.id) && isCombinable(o));
+  const skipped = state.selectedIds.length - eligible.length;
+  const size = Number(op.radius) || 0;
+  const can = eligible.length > 0 && size > 0;
+  const seg = (
+    <div style={{ display: "inline-flex", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-lg)", padding: 3, gap: 2 }}>
+      {([["chamfer", "Chamfer"], ["fillet", "Fillet"]] as const).map(([v, label]) => {
+        const on = op.mode === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={on}
+            onClick={() => actions.setCornerOp({ mode: v })}
+            style={{ padding: "var(--spacing-3) var(--spacing-7)", borderRadius: "var(--radius-md)", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "var(--font-size-sm)", fontWeight: 600, background: on ? "var(--color-violet-600)" : "transparent", color: on ? "var(--color-text-on-brand)" : "var(--color-text-secondary)", transition: "background .14s, color .14s" }}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
   return (
     <Overlay>
-      <Card width={420}>
-        <Header title={isChamfer ? "Add Chamfer" : "Add Fillet"} onClose={actions.closeModal} padding="18px 22px" />
+      <Card width={460}>
+        <Header title="Round board corners" onClose={actions.closeModal} padding="18px 22px" />
         <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          {seg}
           <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
             {isChamfer
-              ? "Replaces sharp corners on selected polygons or outlines with bevel cuts of the chosen size."
-              : "Replaces sharp corners on selected polygons or outlines with rounded arcs of the chosen radius."}
+              ? "Every corner of the selected shapes is cut back to a straight bevel of this size."
+              : "Every corner of the selected shapes is replaced with a real arc of this radius, tangent to both edges."}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
             <span style={{ width: 140, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
@@ -1821,10 +3002,20 @@ function ChamferFilletModal() {
               <NumberInput value={String(op.radius)} onChange={(v) => actions.setCornerOp({ radius: parseFloat(v) || 0 })} min={0} />
             </div>
           </div>
+          <div style={{ fontSize: "var(--font-size-sm)", color: eligible.length ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            {eligible.length
+              ? `Will apply to ${eligible.length} shape${eligible.length > 1 ? "s" : ""}${skipped ? ` · ${skipped} in the selection can't be rounded (only shapes, regions and outlines can)` : ""}. A size bigger than an edge is clamped to fit, and you'll be told how many corners were clamped.`
+              : "Select a shape, copper region or outline on the board first — those are the objects with corners to round."}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast(`${isChamfer ? "Chamfer" : "Fillet"} applied`); actions.closeModal(); }}>
+          <Button
+            hierarchy="primary"
+            size="md"
+            disabled={!can}
+            onClick={() => { actions.applyCornerOp(op.mode === "fillet" ? "fillet" : "chamfer", size); actions.closeModal(); }}
+          >
             Apply
           </Button>
         </div>
@@ -1835,11 +3026,25 @@ function ChamferFilletModal() {
 
 // Phase 7 — Auto Routing options + start button (IT-665).
 function AutoRouteModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
   const [scope, setScope] = React.useState<"all" | "selected" | "unrouted">("unrouted");
-  const [strategy, setStrategy] = React.useState<"fast" | "balanced" | "high">("balanced");
   const [respectClass, setRespectClass] = React.useState(true);
   const [smoothCorners, setSmoothCorners] = React.useState(true);
+  // What each scope would actually route, counted off the live board — so the
+  // dialog can't offer a run that has nothing to do.
+  const airwires = state.objects.filter((o) => o.kind === "ratsnest");
+  const selNets = new Set(
+    state.objects.filter((o) => state.selectedIds.includes(o.id) && o.net).map((o) => o.net),
+  );
+  const routedTracks = state.objects.filter(
+    (o) => o.kind === "track" && (o.props as Record<string, unknown> | undefined)?.gen === "route",
+  ).length;
+  const counts = {
+    unrouted: airwires.length,
+    selected: airwires.filter((o) => selNets.has(o.net)).length,
+    all: airwires.length + routedTracks,
+  };
   return (
     <Overlay>
       <Card width={500}>
@@ -1847,44 +3052,43 @@ function AutoRouteModal() {
         <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
           <div>
             <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Scope</div>
-            {[
-              ["unrouted", "Unrouted nets only"],
-              ["selected", "Selected nets"],
-              ["all", "All nets (re-route)"],
-            ].map(([v, label]) => (
-              <div key={v} onClick={() => setScope(v as typeof scope)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) 0", cursor: "pointer" }}>
+            {([
+              ["unrouted", "Unrouted nets only", `${counts.unrouted} airwire${counts.unrouted === 1 ? "" : "s"}`],
+              ["selected", "Selected nets", selNets.size ? `${counts.selected} on ${selNets.size} net${selNets.size === 1 ? "" : "s"}` : "nothing selected"],
+              ["all", "All nets (re-route)", `${counts.unrouted} airwire${counts.unrouted === 1 ? "" : "s"} + ${routedTracks} routed segment${routedTracks === 1 ? "" : "s"}`],
+            ] as const).map(([v, label, note]) => (
+              <div key={v} onClick={() => setScope(v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-3) 0", cursor: "pointer" }}>
                 <Radio on={scope === v} />
                 <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
+                <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>{note}</span>
               </div>
             ))}
           </div>
-          <div>
-            <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Strategy</div>
-            <div style={{ display: "flex", gap: "var(--spacing-8)" }}>
-              {[
-                ["fast", "Fast"],
-                ["balanced", "Balanced"],
-                ["high", "High quality"],
-              ].map(([v, label]) => (
-                <div key={v} onClick={() => setStrategy(v as typeof strategy)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-                  <Radio on={strategy === v} />
-                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
           <div onClick={() => setRespectClass(!respectClass)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
             <Check on={respectClass} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Respect Net Class widths and clearances</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Use each net&#39;s class track width</span>
           </div>
           <div onClick={() => setSmoothCorners(!smoothCorners)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
             <Check on={smoothCorners} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Smooth corners after routing</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Mitre corners to 45°</span>
+          </div>
+          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            The router lays an orthogonal track per airwire on the top layer. It does not yet push existing copper aside, so run the DRC afterwards.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { actions.flashToast("Auto routing started…"); actions.closeModal(); }}>Start Routing</Button>
+          <Button
+            hierarchy="primary"
+            size="md"
+            disabled={counts[scope] === 0}
+            onClick={() => {
+              actions.autoRoute({ scope, respectClass, mitre: smoothCorners });
+              actions.closeModal();
+            }}
+          >
+            Start Routing
+          </Button>
         </div>
       </Card>
     </Overlay>
@@ -1941,18 +3145,43 @@ function RoutingWidthModal() {
 }
 
 // Lightweight info + confirm dialog (Edit Outline, Cutout).
-function SimpleConfirmModal({ title, body, cta, onConfirm }: { title: string; body: string; cta: string; onConfirm: () => void }) {
+// Cut out board area — the old dialog described a gesture that did not exist
+// (the `cutout` tool was in neither PLACE_TOOLS nor DRAFT_TOOLS, so arming it
+// did nothing). Now it states the one real gesture and what it produces.
+function CutoutModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
+  const existing = state.objects.filter((o) => o.kind === "cutout");
+  const row: React.CSSProperties = { fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 };
   return (
     <Overlay>
-      <Card width={460}>
-        <Header title={title} onClose={actions.closeModal} padding="18px 22px" />
-        <div style={{ padding: "var(--spacing-9) var(--spacing-12)" }}>
-          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{body}</div>
+      <Card width={470}>
+        <Header title="Cut out board area" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+          <div style={{ ...row, color: "var(--color-text-primary)" }}>
+            Drag the two corners of the area on the board — that rectangle is removed from the board.
+          </div>
+          <div style={row}>
+            The hole is real: it shows through in the <b>3D view</b> and is written as a board edge into the
+            <b> DXF</b>, <b>PDF</b> and Gerber outline. The tool stays armed, so you can cut several areas;
+            <b> Esc</b> returns to Select.
+          </div>
+          {existing.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-5) var(--spacing-6)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}>
+              <span style={{ ...row, flex: 1 }}>
+                {existing.length} cutout{existing.length > 1 ? "s" : ""} already on this board.
+              </span>
+              <Pill onClick={() => {
+                actions.selectMany(existing.map((o) => o.id));
+                actions.deleteSelected();
+                actions.closeModal();
+              }}>Remove all</Pill>
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" onClick={() => { onConfirm(); actions.closeModal(); }}>{cta}</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.setTool("cutout"); actions.closeModal(); }}>Start cutting</Button>
         </div>
       </Card>
     </Overlay>
@@ -1963,6 +3192,10 @@ export function Modals() {
   const state = usePcbState();
   const actions = usePcbActions();
   switch (state.modal) {
+    // File ▸ New ▸ Project — the same "Project Information" dialog the manual
+    // create flow uses, so both entry points share one create path.
+    case "newProject":
+      return <ProjectInfoModal open onClose={actions.closeModal} />;
     case "textEdit":
       return <TextModal />;
     case "deleteObjects":
@@ -1979,6 +3212,8 @@ export function Modals() {
       return <AnnotateModal />;
     case "importDfx":
       return <ImportDfxModal />;
+    case "importGltf":
+      return <ImportGltfModal />;
     case "exportAltium":
     case "exportKicad":
     case "exportEagle":
@@ -2033,10 +3268,18 @@ export function Modals() {
       return <BomModal />;
     case "chamferFillet":
       return <ChamferFilletModal />;
-    case "editOutline":
-      return <SimpleConfirmModal title="Edit Board Outline" body="Click vertices on the board outline to move them, or drag edges to add new points. Click outside the outline to commit changes." cta="Enter Edit Mode" onConfirm={() => actions.setTool("editOutline")} />;
     case "cutout":
-      return <SimpleConfirmModal title="Cutout" body="Draw a rectangle, polygon, or circle on the board to define a cutout region. The selected area will be removed from the board." cta="Start Cutout" onConfirm={() => actions.setTool("cutout")} />;
+      return <CutoutModal />;
+    case "sutureVias":
+      return <SutureViasModal />;
+    case "importImage":
+      return <ImportImageModal />;
+    case "moveStep":
+      return <MoveStepModal />;
+    case "newPart":
+      return <NewPartModal />;
+    case "newModule":
+      return <NewModuleModal />;
     case "autoRoute":
       return <AutoRouteModal />;
     case "routingWidth":
