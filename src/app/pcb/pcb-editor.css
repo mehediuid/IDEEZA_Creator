@@ -68,7 +68,10 @@
 .pcb-app .ix-arr-input::-webkit-outer-spin-button,
 .pcb-app .ix-arr-input::-webkit-inner-spin-button { opacity: 1; }
 .pcb-app .ix-mi:hover .ix-mi-k { color: var(--color-violet-600) !important; }
-.pcb-app .ix-tab { transition: color 0.15s ease, background 0.15s ease; }
+.pcb-app .ix-tab { transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease; }
+/* An inactive segment answers the hover: it lifts to the ink of the active one
+   without borrowing its surface, so only one segment ever reads as current. */
+.pcb-app .ix-tab[aria-selected="false"]:hover { color: var(--color-text-primary) !important; }
 .pcb-app .ix-seg { transition: all 0.18s var(--motion-easing-standard); }
 .pcb-app .ix-cover-enter { transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
 .pcb-app .ix-cover-enter:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(124, 45, 185, 0.45); }

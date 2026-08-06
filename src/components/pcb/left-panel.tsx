@@ -53,6 +53,9 @@ type TreeNode = {
 // is deliberately **no pulsing halo**: motion here would signal a state that
 // isn't changing, and this register bans decorative motion. Motion is on
 // interaction only (hover lift, press) and stops under reduced motion.
+/** Everything in the tab row sits on one 28px baseline. */
+const ROW_H = 28;
+
 const AI_ORB_CSS = `
 .ai-orb {
   position: relative;
@@ -176,31 +179,62 @@ export function LeftPanel({
           there is one row of "what am I looking at" instead of a full-width
           button above a tab strip. */}
       <style>{AI_ORB_CSS}</style>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-5) var(--spacing-7) var(--spacing-5)" }}>
-        <div style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-lg)", padding: "var(--spacing-1)", flex: 1 }}>
+      <div
+        style={{
+          display: "flex", alignItems: "center", gap: "var(--spacing-3)",
+          padding: "var(--spacing-4) var(--spacing-7)",
+          borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+        }}
+      >
+        {/* One filled chip marks the current view; the other tab is just text.
+            There is no track: a bordered track holding a smaller bordered pill
+            put two rounded rectangles inside each other, and the pill (22 px)
+            no longer matched the 28 px controls beside it. Every box in this
+            row is now exactly ROW_H tall. The chip — not an underline — because
+            the sub-tab row right below is already underlined. */}
+        <div
+          role="tablist"
+          aria-label="Left panel view"
+          style={{ display: "flex", flex: "0 1 auto", minWidth: 0, gap: 2 }}
+        >
           {leftTabs.map((t) => (
-            <div
+            <button
               key={t.label}
+              type="button"
+              role="tab"
+              aria-selected={t.active}
               className="ix-tab"
+              title={t.label}
               // Picking a tab while the AI view is open used to change the tab
               // invisibly behind the chat — so it closes the chat and shows it.
               onClick={() => { setAiOpen(false); t.onClick?.(); }}
               style={{
-                flex: 1,
-                textAlign: "center",
-                padding: "var(--spacing-3) var(--spacing-2)",
+                flex: "0 1 auto", minWidth: 0, height: ROW_H, boxSizing: "border-box",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                padding: "0 var(--spacing-4)",
+                border: "none",
                 borderRadius: "var(--radius-lg)",
+                fontFamily: "inherit",
                 fontSize: "var(--font-size-sm)",
+                // One weight for both: a 700/500 swap changed the label's
+                // width, so the segments jumped as you switched.
                 fontWeight: 600,
                 cursor: "pointer",
-                background: t.bg,
-                color: t.fg,
+                // `--color-bg-subtle` steps the right way in both themes —
+                // lighter than the gray-900 panel in dark, greyer than white in
+                // light — so the current chip reads as raised without a border.
+                background: t.active ? "var(--color-bg-subtle)" : "transparent",
+                color: t.active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                // A tab label must never wrap: "Project Design" used to break
+                // onto two lines and push the row's height around.
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
               }}
             >
               {t.label}
-            </div>
+            </button>
           ))}
         </div>
+
         <button
           type="button"
           className="ai-orb"
@@ -209,7 +243,7 @@ export function LeftPanel({
           aria-label={aiOpen ? "Close AI assistant" : "Open AI assistant"}
           title={aiOpen ? "Close the AI assistant" : "Ask the AI assistant about this module"}
           style={{
-            width: 32, height: 30, flex: "0 0 auto", borderRadius: "var(--radius-lg)",
+            width: 34, height: ROW_H, flex: "0 0 auto", marginLeft: "auto", borderRadius: "var(--radius-lg)",
             display: "inline-flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", fontFamily: "inherit", padding: 0, border: "none",
             // On the gradient the glyph is always the on-brand light ink.
@@ -218,12 +252,21 @@ export function LeftPanel({
         >
           {AI_BOT_ICON}
         </button>
+
+        {/* Panel chrome, not a destination. A bare icon button beside a filled
+            one already reads as a different job, and at this width a hairline
+            plus its two gaps cost 13 px the tab labels need. */}
         <button
           className="ix-tool"
           aria-label="Collapse left panel"
           title="Collapse the navigator ([)"
           onClick={() => actions.toggleView("Left-Side panel")}
-          style={{ width: 24, height: 24, flex: "0 0 auto", borderRadius: "var(--radius-md)", background: "transparent", border: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--color-text-secondary)" }}
+          style={{
+            width: ROW_H, height: ROW_H, flex: "0 0 auto", borderRadius: "var(--radius-lg)",
+            background: "transparent", border: "none", display: "inline-flex",
+            alignItems: "center", justifyContent: "center", cursor: "pointer",
+            color: "var(--color-text-secondary)",
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M15 6l-6 6 6 6" />
@@ -239,7 +282,7 @@ export function LeftPanel({
         <>
           {/* sub tabs + search + pills — hidden with the project tree (3D module) */}
           {!hideProjectTree && (<>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", padding: "var(--spacing-1) var(--spacing-8) var(--spacing-5)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", padding: "var(--spacing-2) var(--spacing-7) var(--spacing-5)" }}>
             {subTabs.map((s) => (
               <div
                 key={s.label}

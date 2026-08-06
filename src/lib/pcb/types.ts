@@ -375,7 +375,7 @@ const SCHEM_SYMBOL_KINDS = new Set<string>([
 // sheet symbols / sheet entries) are deliberately absent rather than shipped as
 // rows that can never match; "Agile modules" is IDEEZA's reusable block.
 export const PANEL_LIMITS = {
-  left: { min: 208, max: 520 },
+  left: { min: 240, max: 520 },
   right: { min: 232, max: 560 },
   bottom: { min: 120, max: 620 },
 } as const;

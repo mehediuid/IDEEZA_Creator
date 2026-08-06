@@ -1225,11 +1225,17 @@ export function buildRail(_state: PcbState | null = null, activeKey: string = 'p
   });
 }
 
+// The panel's destinations. Only which one is current — the segmented control
+// in `left-panel.tsx` owns how that looks. It used to hand back `bg: '#fff'`
+// and a hardcoded violet, so the active tab was a pure-white slab that could
+// not follow the theme.
 export function buildLeftTabs(state: PcbState, actions: PcbActions) {
-  return ([['project', 'Project Design'], ['library', 'Library']] as const).map(([k, l]) => ({
+  // "Project", not "Project Design": at the panel's real width the longer label
+  // was truncated to "Project Desi…", and the sub-tab row right below already
+  // says "Project design", so the two read as the same word twice.
+  return ([['project', 'Project'], ['library', 'Library']] as const).map(([k, l]) => ({
     label: l,
-    bg: state.leftMain === k ? '#fff' : 'transparent',
-    fg: state.leftMain === k ? C.primary : 'var(--color-text-tertiary)',
+    active: state.leftMain === k,
     onClick: () => actions.setLeftMain(k),
   }));
 }
