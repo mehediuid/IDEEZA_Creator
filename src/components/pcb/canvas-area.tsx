@@ -993,14 +993,15 @@ export function CanvasArea() {
               key={mt.label}
               className="ix-seg"
               onClick={mt.onClick}
+              title={mt.title}
               style={{
                 padding: "var(--spacing-3) var(--spacing-10)",
                 borderRadius: "var(--radius-lg)",
                 fontSize: "var(--font-size-md)",
                 fontWeight: 600,
                 cursor: "pointer",
-                background: mt.bg,
-                color: mt.fg,
+                background: mt.active ? "var(--color-violet-600)" : "transparent",
+                color: mt.active ? "var(--color-text-on-brand)" : "var(--color-text-secondary)",
               }}
             >
               {mt.label}

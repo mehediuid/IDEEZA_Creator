@@ -467,6 +467,9 @@ export function isSelectable(kind: string, bag: Record<string, unknown>, mode?: 
 
 export interface PcbState {
   mode: Mode;
+  /** Where the Schematic→PCB confirm dialog should land on Confirm. Session-only:
+   *  it exists only while that dialog is open. */
+  pendingMode?: Mode;
   leftMain: LeftMain;
   leftSub: LeftSub;
   netSub: "net" | "component";

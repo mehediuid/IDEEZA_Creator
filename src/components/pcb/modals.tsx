@@ -17,6 +17,7 @@ import {
 import { Icon } from "@/lib/pcb/icons";
 import { DEL_OBJ_NAMES, SEL_FILTER_KINDS, type CanvasObject } from "@/lib/pcb/types";
 import { ERC_ENFORCED_ROWS } from "@/lib/pcb/nets";
+import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
 import { parseGltfFile } from "@/lib/pcb/gltf-import";
@@ -1505,21 +1506,94 @@ function ReannotateModal() {
 
 // ── Notice / confirm modal (EDA-format Export + Import flows) ─────────────────
 function ConvertConfirmModal() {
+  const state = usePcbState();
   const actions = usePcbActions();
+  // The dialog runs the converter as a dry run and lists what it found. Same
+  // function the Confirm executes, so the list can't promise something else.
+  const plan = React.useMemo(() => convertSchematicToPcb(state.objects), [state.objects]);
+  const p = plan.plan;
+  const cell: React.CSSProperties = {
+    padding: "var(--spacing-3) var(--spacing-5)",
+    fontSize: "var(--font-size-sm)",
+    color: "var(--color-text-primary)",
+    borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+    textAlign: "left",
+  };
+  const head: React.CSSProperties = {
+    ...cell,
+    fontWeight: 700,
+    color: "var(--color-text-secondary)",
+    position: "sticky",
+    top: 0,
+    background: "var(--color-bg-surface)",
+  };
+  const note = (text: React.ReactNode) => (
+    <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>{text}</div>
+  );
   return (
     <Overlay>
-      <Card width={460}>
-        <div style={{ padding: "var(--spacing-10)" }}>
-          <div style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-6)" }}>
-            Convert Schematic to PCB?
+      <Card width={560} maxHeight="86%" flexCol>
+        <Header title="Convert schematic to PCB" onClose={actions.closeModal} padding="18px 22px" />
+
+        <div style={{ padding: "var(--spacing-6) var(--spacing-12) var(--spacing-4)", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            <b style={{ color: "var(--color-text-primary)" }}>{plan.parts} part{plan.parts === 1 ? "" : "s"}</b> get a land pattern on the board,
+            connected by <b style={{ color: "var(--color-text-primary)" }}>{plan.airwires} airwire{plan.airwires === 1 ? "" : "s"}</b> across{" "}
+            <b style={{ color: "var(--color-text-primary)" }}>{plan.nets} signal net{plan.nets === 1 ? "" : "s"}</b>.
           </div>
-          <div style={{ fontSize: "var(--font-size-md)", color: "var(--color-text-secondary)", marginBottom: "var(--spacing-10)", lineHeight: 1.5 }}>
-            This will switch the canvas to PCB layout mode and place the current schematic components onto a board. You can switch back to the Schematic tab at any time.
-          </div>
-          <div style={{ display: "flex", gap: "var(--spacing-5)", justifyContent: "flex-end" }}>
-            <Button hierarchy="secondary" size="lg" onClick={actions.closeModal}>Cancel</Button>
-            <Button hierarchy="primary" size="lg" onClick={() => { actions.closeModal(); actions.setMode("pcb"); }}>Convert</Button>
-          </div>
+          {p.powerNets.length > 0 &&
+            note(<>Power nets stay off the ratsnest: {p.powerNets.join(" · ")}. Pour or route them deliberately.</>)}
+          {p.autoNamed > 0 &&
+            note(<>{p.autoNamed} part{p.autoNamed === 1 ? " has" : "s have"} no designator, so the converter names {p.autoNamed === 1 ? "it" : "them"}. Annotate first if you want your own.</>)}
+          {p.noFootprint.length > 0 &&
+            note(
+              <>
+                No land pattern yet for {p.noFootprint.map((m) => `${m.count}× ${m.symbol}`).join(" · ")} — {p.noFootprint.length === 1 ? "it stays" : "they stay"} on the sheet.
+              </>,
+            )}
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 var(--spacing-12)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={head}>Designator</th>
+                <th style={head}>Symbol</th>
+                <th style={head}>Footprint</th>
+              </tr>
+            </thead>
+            <tbody>
+              {p.rows.map((r, i) => (
+                <tr key={`${r.designator}-${i}`}>
+                  <td style={{ ...cell, fontWeight: 600 }}>{r.designator}</td>
+                  <td style={{ ...cell, color: "var(--color-text-secondary)" }}>{r.symbol}</td>
+                  <td style={{ ...cell, fontVariantNumeric: "tabular-nums" }}>{r.footprint}</td>
+                </tr>
+              ))}
+              {p.rows.length === 0 && (
+                <tr>
+                  <td colSpan={3} style={{ ...cell, textAlign: "center", color: "var(--color-text-tertiary)", padding: "var(--spacing-10)" }}>
+                    Nothing to place — draw parts on the sheet first.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          {note("Tracks are not routed yet — Auto Route does that on the board.")}
+          <span style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-5)" }}>
+            <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+            <Button
+              hierarchy="primary"
+              size="md"
+              disabled={p.rows.length === 0}
+              onClick={() => { actions.closeModal(); actions.convertSchematicToPcb(); }}
+            >
+              Convert
+            </Button>
+          </span>
         </div>
       </Card>
     </Overlay>

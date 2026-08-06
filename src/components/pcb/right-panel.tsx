@@ -1539,14 +1539,15 @@ function LayerTab() {
                 return (
                   <div
                     key={l.id}
-                    onClick={() => actions.setActivePcbLayer(l.id)}
+                    // Choosing the layer you draw on is the canvas strip's job;
+                    // this row shows which one that is and edits its properties.
+                    title={isActive ? `${l.name} — the layer you're drawing on` : l.name}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "var(--spacing-5)",
                       padding: "var(--spacing-3) var(--spacing-8) var(--spacing-3) calc(var(--spacing-8) + 18px)",
                       borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
-                      cursor: "pointer",
                       background: isActive ? "var(--color-bg-brand-subtle)" : "transparent",
                     }}
                   >
@@ -1583,19 +1584,10 @@ function LayerTab() {
                     >
                       {l.name}
                     </span>
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        actions.togglePcbLayerVis(l.id);
-                      }}
-                      style={{
-                        color: on ? "var(--color-violet-600)" : "var(--color-border-strong)",
-                        display: "inline-flex",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <Icon html={on ? EYE : EYE_OFF} size={16} />
-                    </span>
+                    {/* Per-layer visibility is the canvas strip's — this tab
+                        owns what a layer IS (colour · transparency · lock) and
+                        the bulk operations above. A hidden layer still reads as
+                        hidden here (the name dims), it just isn't toggled here. */}
                     <span
                       onClick={(e) => {
                         e.stopPropagation();

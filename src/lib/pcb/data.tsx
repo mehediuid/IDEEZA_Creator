@@ -1264,10 +1264,22 @@ export function buildModeTabs(state: PcbState, actions: PcbActions) {
     ['schematic', 'Schematic', state.mode === 'schematic'],
     ['pcb', 'PCB', inPcb],
   ];
+  // The PCB tab IS the Schematic→PCB hand-off: `setMode` converts on the first
+  // entry, which is why there is no "Convert to PCB" button on the bar. Say so,
+  // so the conversion isn't a surprise.
+  const hasLayout = (state.objects ?? []).some(
+    (o) => o.props?.gen === 'convert' || o.props?.gen === 'route',
+  );
+  const title: Record<string, string> = {
+    schematic: 'Draw the circuit',
+    pcb: hasLayout
+      ? 'Open the board layout'
+      : 'Lay out the board — the schematic is converted to footprints and a ratsnest on the way in',
+  };
   return defs.map(([k, l, active]) => ({
     label: l,
-    bg: active ? C.primary : 'transparent',
-    fg: active ? '#fff' : 'var(--color-text-secondary)',
+    active,
+    title: title[k],
     onClick: () => actions.setMode(k),
   }));
 }

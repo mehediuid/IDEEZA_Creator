@@ -18,20 +18,24 @@
 //                  angle) so airwires/tracks land on actual pads.
 //   6. ratsnest  — per signal net, an MST of pad-to-pad airwires.
 
-import type { CanvasObject } from "./types";
+import { SCHEM_FILTER_ROWS, type CanvasObject } from "./types";
 
 // Physical part kind → footprint reference + land-pattern glyph.
-const FOOTPRINT: Record<string, { fp: string; glyph: string }> = {
-  resistorBox: { fp: "R_0805", glyph: "fp0805" },
-  resistor: { fp: "R_0805", glyph: "fp0805" },
-  capacitor: { fp: "C_0805", glyph: "fp0805" },
-  inductor: { fp: "L_0805", glyph: "fp0805" },
-  diode: { fp: "D_SOD-123", glyph: "fpSOD123" },
-  currentSource: { fp: "SOT-23", glyph: "fpSOT23" },
-  opamp: { fp: "SOIC-8", glyph: "fpSOIC8" },
-  ic: { fp: "SOIC-8", glyph: "fpSOIC8" },
-  component: { fp: "SOIC-8", glyph: "fpSOIC8" },
+// `name` is what a person reads (the convert dialog lists it); `kind` keys are
+// the code's own symbol ids and never reach the UI.
+const FOOTPRINT: Record<string, { fp: string; glyph: string; name: string }> = {
+  resistorBox: { fp: "R_0805", glyph: "fp0805", name: "Resistor" },
+  resistor: { fp: "R_0805", glyph: "fp0805", name: "Resistor" },
+  capacitor: { fp: "C_0805", glyph: "fp0805", name: "Capacitor" },
+  inductor: { fp: "L_0805", glyph: "fp0805", name: "Inductor" },
+  diode: { fp: "D_SOD-123", glyph: "fpSOD123", name: "Diode" },
+  currentSource: { fp: "SOT-23", glyph: "fpSOT23", name: "Current source" },
+  opamp: { fp: "SOIC-8", glyph: "fpSOIC8", name: "Op-amp" },
+  ic: { fp: "SOIC-8", glyph: "fpSOIC8", name: "IC" },
+  component: { fp: "SOIC-8", glyph: "fpSOIC8", name: "Component" },
 };
+/** Part-like symbols with no land pattern yet — read out by the convert dialog. */
+const PART_NAME: Record<string, string> = { crystal: "Crystal", transistor: "Transistor" };
 // Symbols that name a power net (not physical footprints).
 const POWER: Record<string, string> = {
   gnd: "GND",
@@ -162,11 +166,32 @@ function autoPlace(n: number, edges: Array<[number, number]>): Pt[] {
   return pos;
 }
 
+/** One footprint the convert will place, for the confirm dialog's list. */
+export interface ConvertPlanRow {
+  designator: string;
+  /** The symbol it came from, in the app's own words (not a kind id). */
+  symbol: string;
+  footprint: string;
+}
+
+/** What a convert is about to do — built in the same pass that does it, so the
+ *  dialog's list can't drift from the result. */
+export interface ConvertPlan {
+  rows: ConvertPlanRow[];
+  /** Power nets, named from the supply symbols. Excluded from the ratsnest. */
+  powerNets: string[];
+  /** Part-like symbols with no land pattern yet, by kind. */
+  noFootprint: Array<{ symbol: string; count: number }>;
+  /** Parts the converter had to name itself (no designator on the symbol). */
+  autoNamed: number;
+}
+
 export interface ConvertResult {
   objects: CanvasObject[]; // footprints + ratsnest (scope: "pcb")
   parts: number;
   nets: number;
   airwires: number;
+  plan: ConvertPlan;
 }
 
 /**
@@ -245,9 +270,14 @@ export function convertSchematicToPcb(src: CanvasObject[]): ConvertResult {
   const out: CanvasObject[] = [];
   const padAbs: Pt[][] = [];      // per part → absolute pad positions
   const padNet: Array<Array<string | undefined>> = []; // per part → net per pad
+  const planRows: ConvertPlanRow[] = [];
+  let autoNamed = 0;
   parts.forEach((p, i) => {
     const info = FOOTPRINT[p.kind];
+    const named = !!(p.text && p.text.trim());
+    if (!named) autoNamed++;
     const desig = (p.text && p.text.trim()) || `${p.kind[0].toUpperCase()}${i + 1}`;
+    planRows.push({ designator: desig, symbol: info.name, footprint: info.fp });
     const pads = PAD_OFFSETS[info.glyph] ?? [];
     padNet.push(matchPinsToPads(partPins[i], pads));
     padAbs.push(pads.map((o) => ({ x: pos[i].x + o.x, y: pos[i].y + o.y })));
@@ -295,7 +325,29 @@ export function convertSchematicToPcb(src: CanvasObject[]): ConvertResult {
     }
   }
 
-  return { objects: out, parts: parts.length, nets: netNo, airwires };
+  // Part-like symbols the converter has no land pattern for — they stay on the
+  // sheet, so the dialog says so rather than losing them quietly.
+  const partKinds = new Set(SCHEM_FILTER_ROWS.find((r) => r.key === "fsPart")?.kinds ?? []);
+  const missing = new Map<string, number>();
+  for (const o of sch) {
+    if (partKinds.has(o.kind) && !FOOTPRINT[o.kind]) {
+      const name = PART_NAME[o.kind] ?? o.kind;
+      missing.set(name, (missing.get(name) ?? 0) + 1);
+    }
+  }
+
+  return {
+    objects: out,
+    parts: parts.length,
+    nets: netNo,
+    airwires,
+    plan: {
+      rows: planRows,
+      powerNets: [...new Set(rootPower.values())].sort(),
+      noFootprint: [...missing].map(([symbol, count]) => ({ symbol, count })),
+      autoNamed,
+    },
+  };
 }
 
 export interface RouteResult {

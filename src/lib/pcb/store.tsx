@@ -782,35 +782,19 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       closeAll: () => merge({ openMenu: null, ctx: null }),
       setMode: (m) => {
         const s = stateRef.current;
-        // Auto-convert on the first Schematic → PCB entry: if the board has no
-        // converted/routed layout yet, build footprints + ratsnest from the
-        // schematic automatically so the parts are there without a manual step.
-        // Once a layout exists (or the user has routed), leave it untouched —
-        // use Design ▸ Convert Schematic to PCB to re-sync deliberately.
+        // First Schematic → PCB entry: the tab IS the hand-off, but it does not
+        // convert behind your back — it opens the confirm dialog, which lists
+        // exactly what the convert will place. Confirm runs it and lands on the
+        // board; Cancel leaves the sheet alone. Once a layout exists the tab
+        // just switches (nothing to convert), and Design ▸ Generate PCB is the
+        // deliberate re-sync.
         if ((m === "pcb" || m === "2d") && s.mode === "schematic") {
           const hasLayout = s.objects.some(
             (o) => o.props?.gen === "convert" || o.props?.gen === "route",
           );
-          if (!hasLayout) {
-            const { objects: generated, parts, nets, airwires } = convertSchematicToPcb(s.objects);
-            if (generated.length > 0) {
-              mergeWithHistory((st) => ({
-                objects: [
-                  ...st.objects.filter((o) => o.props?.gen !== "convert" && o.props?.gen !== "route"),
-                  ...generated,
-                ],
-                mode: m,
-                openMenu: null,
-                ctx: null,
-                selectedIds: [],
-                selSub: "none",
-                draftWire: null,
-              }));
-              actions.flashToast(
-                `Auto-converted — ${parts} footprints · ${nets} nets · ${airwires} airwires`,
-              );
-              return;
-            }
+          if (!hasLayout && convertSchematicToPcb(s.objects).objects.length > 0) {
+            merge({ modal: "convertConfirm", pendingMode: m, openMenu: null, ctx: null });
+            return;
           }
         }
         merge({ mode: m, openMenu: null, ctx: null });
@@ -2030,7 +2014,10 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             ...s.objects.filter((o) => o.props?.gen !== "convert" && o.props?.gen !== "route"),
             ...generated,
           ],
-          mode: "pcb",
+          // Land where the click was headed (the PCB tab, or 2D when that was
+          // the pending target), then forget the pending target.
+          mode: s.pendingMode ?? "pcb",
+          pendingMode: undefined,
           openMenu: null,
           ctx: null,
           selectedIds: [],

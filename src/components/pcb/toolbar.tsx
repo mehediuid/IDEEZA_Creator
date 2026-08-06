@@ -94,8 +94,6 @@ type Item =
   // Save feedback — reads state.saveState / lastSavedAt.
   // Grid style picker — Grid · Dot Grid · No Grid, checked against state.gridType.
   | { kind: "grid" }
-  // Emphasised action: icon + label in a tinted pill (Convert to PCB).
-  | { kind: "cta"; key: string; action: ToolbarAction; label: string }
   | { kind: "dd"; field: "gridSize" | "unit"; options: string[]; label?: string };
 
 const GRID_SIZES = ["0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1"];
@@ -612,65 +610,23 @@ function LabelledTool({
         alignItems: "center",
         gap: "var(--spacing-3)",
         height: 30,
-        padding: "0 var(--spacing-6) 0 var(--spacing-5)",
-        border: tint ? "var(--border-width-1) solid var(--color-border-brand)" : "var(--border-width-1) solid var(--color-border-default)",
-        borderRadius: "var(--radius-full)",
-        background: tint ? "var(--color-bg-brand-subtle)" : "transparent",
+        padding: "0 var(--spacing-5)",
+        // A named toolbar control, not a call to action: no fill, no border, no
+        // pill. `tint` only warms the ink. A brand-tinted capsule read as a
+        // button and competed with the page's one real CTA.
+        border: "none",
+        borderRadius: "var(--radius-md)",
+        background: "transparent",
         color: tint ? "var(--color-text-brand)" : "var(--color-text-primary)",
         cursor: "pointer",
         fontFamily: "inherit",
         fontSize: "var(--font-size-sm)",
-        fontWeight: 700,
+        fontWeight: 600,
         whiteSpace: "nowrap",
       }}
     >
       <DsIcon name={iconKey} size={15} />
       {text}
-    </button>
-  );
-}
-
-// Emphasised toolbar action — tinted violet pill with a label. Used for the
-// one step that hands the design to the next stage (Convert to PCB); the page
-// keeps its single solid CTA ("Continue to Code"), so this stays tinted.
-function CtaButton({ iconKey, label, onClick }: { iconKey: string; label: string; onClick?: () => void }) {
-  return (
-    <button
-      className="ix-btn"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      style={{
-        height: 30,
-        padding: "0 var(--spacing-5)",
-        borderRadius: "var(--radius-full)",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "var(--spacing-3)",
-        cursor: "pointer",
-        border: "var(--border-width-1) solid var(--color-border-brand, var(--color-violet-600))",
-        background: "var(--color-bg-brand-subtle)",
-        color: "var(--color-violet-600)",
-        fontSize: "var(--font-size-sm)",
-        fontWeight: 700,
-        fontFamily: "inherit",
-        whiteSpace: "nowrap",
-        flex: "0 0 auto",
-        transition: "background .14s, color .14s",
-      }}
-      onMouseEnter={(e) => {
-        const b = e.currentTarget;
-        b.style.background = "var(--color-violet-600)";
-        b.style.color = "#fff";
-      }}
-      onMouseLeave={(e) => {
-        const b = e.currentTarget;
-        b.style.background = "var(--color-bg-brand-subtle)";
-        b.style.color = "var(--color-violet-600)";
-      }}
-    >
-      <DsIcon name={iconKey} size={17} strokeWidth={1.8} />
-      {label}
     </button>
   );
 }
@@ -818,7 +774,6 @@ const SCHEM_ESSENTIAL: Item[] = [
   { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
   // Hand-off to the board — the one step that leaves this editor, so it reads
   // as an action, not another glyph in the row.
-  { kind: "cta", key: "tConvertPcb", action: "convertPcb", label: "Convert to PCB" },
 ];
 
 // PCB / 2D / 3D essentials — the inline set (user-approved). Every control here
@@ -983,7 +938,6 @@ export function Toolbar() {
     if (it.kind === "grid") return <GridPicker key={i} />;
     // The save control carries its own state dot wherever it renders.
     if (it.kind === "icon" && it.key === "save") return <SaveTool key={i} label={it.label} />;
-    if (it.kind === "cta") return <CtaButton key={i} iconKey={it.key} label={it.label} onClick={handlers[it.action]} />;
     if (it.kind === "dd") {
       const v = it.field === "gridSize" ? state.gridSize : state.unit;
       const set = it.field === "gridSize" ? actions.setGridSize : actions.setUnit;
@@ -1068,11 +1022,13 @@ export function Toolbar() {
       {/* Schematic | PCB (+ 2D / 3D) mode toggle */}
       <div style={{ display: "flex", background: "var(--color-bg-brand-subtle)", borderRadius: "var(--radius-full)", padding: 3, flex: "0 0 auto" }}>
         {modeTabs.map((mt) => {
-          const active = mt.bg !== "transparent";
+          const active = mt.active;
           return (
             <button
               key={mt.label}
               onClick={mt.onClick}
+              title={mt.title}
+              aria-pressed={active}
               style={{
                 padding: "6px 16px",
                 borderRadius: "var(--radius-full)",
@@ -1127,19 +1083,16 @@ export function Toolbar() {
       {state.mode === "schematic" ? (
         <>
           {/* schematic essentials — 20px icon-to-icon; each divider nets 12px
-              per side (row gap 20 + −8 margin). The row can overflow, so the
-              hand-off CTA is pinned outside it and never clips. */}
+              per side (row gap 20 + −8 margin). The Schematic→PCB hand-off is
+              NOT here: clicking the `PCB` tab already converts on first entry
+              (`setMode`), so a "Convert to PCB" pill was a second door to the
+              same outcome, and it competed with the page's one solid CTA. The
+              deliberate re-sync lives in Design ▸ Convert schematic to PCB. */}
           <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
-            {SCHEM_ESSENTIAL.filter((it) => it.kind !== "cta").map((it, i) =>
+            {SCHEM_ESSENTIAL.map((it, i) =>
               it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i),
             )}
           </div>
-          {SCHEM_ESSENTIAL.filter((it) => it.kind === "cta").map((it, i) => (
-            <React.Fragment key={i}>
-              <Divider gutter={8} />
-              {renderItem(it, i)}
-            </React.Fragment>
-          ))}
         </>
       ) : state.mode === "3d" ? (
         <>
