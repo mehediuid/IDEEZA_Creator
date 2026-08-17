@@ -88,15 +88,15 @@ type SchemTool = {
   // grouped row (dropdown of variants; the primary icon = options[0])
   options?: SchemOpt[];
 };
+// UIUX-7/11 — the selection group left both palettes. Selecting is what the
+// pointer does by default (drag rubber-bands, Esc returns to it) and panning is
+// H / hold-Space, so the row was a tool for the thing that needs no tool.
 export const SCHEM_TOOLS: SchemTool[] = [
-  { key: "select", label: "Selection tools (Esc returns to the pointer)", options: [
-    { label: "Lasso", tool: "lasso", svg: '<path d="M4 11a6 4 0 1 1 11 3M7 15c-2 1-3 3 0 4"/>' },
-    { label: "Area select", tool: "areaSelect", svg: '<path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>' },
-    { label: "Hand", tool: "hand", svg: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6 6 6 0 0 1-5-2.7L4.5 15a1.5 1.5 0 0 1 2.6-1.5L8 15"/>' },
-  ] },
   { key: "wire", label: "Wire", options: [
     { label: "Wire", tool: "wire", svg: '<path d="M5 19L19 5"/>' },
-    { label: "Bus", tool: "bus", svg: '<path d="M5 18c4 0 3-12 7-12M12 6"/><path d="M6 18h12" opacity="0"/>' },
+    // A bus is a bundle: the trunk with branches, the same glyph Insert ▸ Bus
+    // uses (UIUX-48 — it used to read as a second wire).
+    { label: "Bus", tool: "bus", svg: '<path d="M3 18h18" stroke-width="2.8"/><path d="M8 18l4-6M13 18l4-6"/><path d="M12 12h8"/>' },
   ] },
   // Supply rails and grounds — same glyph family as Insert ▸ Power & Ground,
   // and GND places the GND symbol (it used to place Power GND). Sits directly
@@ -142,20 +142,17 @@ export const SCHEM_TOOLS: SchemTool[] = [
 // schematic one, but the board tool set: Select · Route · Pad · Via · Region ·
 // Line · Dimension · Text · Image · Eraser. Every option arms a real PCB tool.
 export const PCB_TOOLS: SchemTool[] = [
-  { key: "select", label: "Selection tools (Esc returns to the pointer)", options: [
-    { label: "Lasso", tool: "lasso", svg: '<path d="M4 11a6 4 0 1 1 11 3M7 15c-2 1-3 3 0 4"/>' },
-    { label: "Area select", tool: "areaSelect", svg: '<path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>' },
-    { label: "Hand", tool: "hand", svg: '<path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6 6 6 0 0 1-5-2.7L4.5 15a1.5 1.5 0 0 1 2.6-1.5L8 15"/>' },
-  ] },
   { key: "route", label: "Route", options: [
     { label: "Single Route", tool: "track", svg: '<path d="M4 18h6l4-8h6"/>' },
     { label: "Differential Pair", tool: "diffPair", svg: '<path d="M4 9h16M4 15h16"/>' },
     { label: "Length Tuning", tool: "lengthTune", svg: '<path d="M3 12h3l2-5 3 10 2-6 2 3h6"/>' },
   ] },
-  { key: "pad", label: "Test points, shaped pads & holes", options: [
-    { label: "Test Point", tool: "testPoint", svg: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.4"/>' },
+  // UIUX-12 — the group is pads and holes; "test point" was one name for the
+  // plain pad, and the mounting row is the hole itself.
+  { key: "pad", label: "Pads & holes", options: [
+    { label: "Pad", tool: "testPoint", svg: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.4"/>' },
     { label: "Shaped Pad", tool: "shapedPad", svg: '<path d="M6 7h8l4 5-4 5H6z"/><circle cx="11" cy="12" r="2" fill="currentColor" stroke="none"/>' },
-    { label: "Mounting Hole", tool: "mountingHole", svg: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/>' },
+    { label: "Mounting", tool: "mountingHole", svg: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/>' },
   ] },
   // #122 — the board's own edge, with the three shapes it can take.
   { key: "boardOutline", label: "Board Outline", options: [
