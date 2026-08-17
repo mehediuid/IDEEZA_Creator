@@ -17,8 +17,14 @@ capability in IDEEZA's own style, per the ticket's design example: an
   type (fixing the old caption's lie: `props.value` was named but never read).
   Symbol kind and Object ID are searchable only when picked explicitly — in
   the union they'd make "res" match every resistor by its internal kind.
-- **Replace writes the picked field** — Net renames the net, Value rewrites
-  `props.value`, etc.; *All fields* keeps the existing behaviour (writes
+- **Net name searches the live netlist** — schematic objects store no net (the
+  netlist derives it), so the Net field reads the stored `net` first and the
+  derived net (the Nets tab's own `computeNets`) otherwise. Searching "GND"
+  finds the members the Nets tab would highlight.
+- **Replace writes the picked field** — Value rewrites `props.value`, Net
+  rewrites stored nets (board objects); when the matches carry only derived
+  nets, the toast teaches the real rename path ("rename the net label or flag
+  text instead"). *All fields* keeps the existing behaviour (writes
   Designator / Text) and the caption says so. Symbol kind and Object ID are
   read-only — replace disables with the reason stated.
 - The caption under the chips names what is being searched, live. Everything

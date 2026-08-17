@@ -16,7 +16,7 @@ import {
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
 import { DEL_OBJ_NAMES, SEL_FILTER_KINDS, type CanvasObject } from "@/lib/pcb/types";
-import { ERC_ENFORCED_ROWS } from "@/lib/pcb/nets";
+import { ERC_ENFORCED_ROWS, computeNets } from "@/lib/pcb/nets";
 import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
@@ -378,6 +378,34 @@ const FR_KINDS: Record<string, (o: CanvasObject) => boolean> = {
 };
 const FR_OBJECTS = Object.keys(FR_KINDS);
 
+// UIUX-76 — the field picker. Only fields the model really carries; each knows
+// how to read itself and (when writable) write itself back, so search, count
+// and replace can't drift apart. Symbol kind and Object ID are read-only, and
+// they join the search only when picked explicitly — in the All-fields union
+// "res" would match every resistor by its internal kind name.
+const frProp = (o: CanvasObject, k: string) => String((o.props as Record<string, unknown> | undefined)?.[k] ?? "");
+type FrField = {
+  value: string;
+  label: string;
+  of: (o: CanvasObject) => string;
+  write?: (o: CanvasObject, v: string) => CanvasObject;
+};
+const FR_FIELDS: FrField[] = [
+  { value: "text", label: "Designator / Text", of: (o) => o.text ?? "", write: (o, v) => ({ ...o, text: v }) },
+  { value: "net", label: "Net name", of: (o) => o.net ?? "", write: (o, v) => ({ ...o, net: v }) },
+  { value: "value", label: "Value", of: (o) => frProp(o, "value"), write: (o, v) => ({ ...o, props: { ...o.props, value: v } }) },
+  { value: "footprint", label: "Footprint", of: (o) => o.footprint ?? "", write: (o, v) => ({ ...o, footprint: v }) },
+  { value: "comment", label: "Comment", of: (o) => o.comment ?? "", write: (o, v) => ({ ...o, comment: v }) },
+  { value: "pinType", label: "Pin type", of: (o) => frProp(o, "pinType"), write: (o, v) => ({ ...o, props: { ...o.props, pinType: v } }) },
+  { value: "package", label: "Package", of: (o) => frProp(o, "package"), write: (o, v) => ({ ...o, props: { ...o.props, package: v } }) },
+  { value: "mpn", label: "MPN", of: (o) => frProp(o, "mpn"), write: (o, v) => ({ ...o, props: { ...o.props, mpn: v } }) },
+  { value: "manufacturer", label: "Manufacturer", of: (o) => frProp(o, "manufacturer"), write: (o, v) => ({ ...o, props: { ...o.props, manufacturer: v } }) },
+  { value: "kind", label: "Symbol kind", of: (o) => o.kind },
+  { value: "id", label: "Object ID", of: (o) => o.id },
+];
+const FR_ALL_UNION = FR_FIELDS.filter((f) => f.value !== "kind" && f.value !== "id");
+const FR_FIELD_OPTIONS = [{ label: "All fields", value: "all" }, ...FR_FIELDS.map((f) => ({ label: f.label, value: f.value }))];
+
 function FindReplaceModal() {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -385,6 +413,7 @@ function FindReplaceModal() {
   const [findText, setFindText] = React.useState("");
   const [replaceText, setReplaceText] = React.useState("");
   const [scope, setScope] = React.useState("sheet");
+  const [field, setField] = React.useState("all");
   const [objects, setObjects] = React.useState<Record<string, boolean>>({ Parts: true, Nets: true, Pins: true, Text: true });
   const [matchCase, setMatchCase] = React.useState(false);
   const [useRegex, setUseRegex] = React.useState(false);
@@ -423,11 +452,38 @@ function FindReplaceModal() {
     return base.filter((o) => on.some((k) => FR_KINDS[k](o)));
   }, [state.objects, state.selectedIds, state.activeSheetId, scope, objects]);
 
+  // Schematic objects don't store a net — the netlist derives it live. So the
+  // Net-name field searches what the Nets tab shows (stored net first, derived
+  // net otherwise); board objects keep their stored net.
+  const derivedNet = React.useMemo(() => {
+    const map = new Map<string, string>();
+    const first = state.schematicSheets[0]?.id;
+    const bySheet = new Map<string, CanvasObject[]>();
+    for (const o of state.objects) {
+      if (o.scope === "pcb") continue;
+      const sid = String(o.sheetId ?? first ?? "s1");
+      if (!bySheet.has(sid)) bySheet.set(sid, []);
+      bySheet.get(sid)!.push(o);
+    }
+    for (const objs of bySheet.values())
+      for (const n of computeNets(objs).nets)
+        for (const id of n.memberIds) map.set(id, n.name);
+    return map;
+  }, [state.objects, state.schematicSheets]);
+
+  // The picked field decides what is read (and, in Replace, written). "All
+  // fields" is the union of the user-meaningful text fields — value included,
+  // which the old fixed list named in its caption but never actually read.
+  const pickedField = FR_FIELDS.find((f) => f.value === field);
+  const readField = React.useCallback(
+    (f: FrField, o: CanvasObject) => (f.value === "net" ? o.net || derivedNet.get(o.id) || "" : f.of(o)),
+    [derivedNet],
+  );
   const matches = React.useMemo(() => {
     if (!tester?.ok) return [];
-    const fields = (o: CanvasObject) => [o.text, o.net, o.comment, o.footprint].filter(Boolean) as string[];
-    return pool.filter((o) => fields(o).some((v) => tester.test(v)));
-  }, [pool, tester]);
+    const readers = field === "all" ? FR_ALL_UNION : pickedField ? [pickedField] : [];
+    return pool.filter((o) => readers.some((f) => { const v = readField(f, o); return v !== "" && tester.test(v); }));
+  }, [pool, tester, field, pickedField, readField]);
 
   const findAll = () => {
     if (!tester) { toast("Enter search text"); return; }
@@ -457,8 +513,14 @@ function FindReplaceModal() {
     toast(`Match ${cursor.current + 1} of ${matches.length}`);
   };
 
+  // Replace writes the picked field — Net renames the net, Value rewrites the
+  // value. "All fields" keeps the old behaviour (Designator / Text) and the
+  // caption says so; kind and id are read-only, so their writer is undefined.
+  const writeField = field === "all" ? FR_FIELDS[0] : pickedField;
+  const canReplace = !!writeField?.write;
   const doReplace = (onlyCurrent: boolean) => {
     if (!tester?.ok) { toast(tester ? "That regular expression isn't valid" : "Enter search text"); return; }
+    if (!writeField?.write) { toast(`${writeField?.label ?? "That field"} is read-only`); return; }
     const targets = onlyCurrent
       ? matches.filter((o) => state.selectedIds.includes(o.id))
       : matches;
@@ -470,15 +532,24 @@ function FindReplaceModal() {
       : new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), matchCase ? "g" : "gi");
     let n = 0;
     const next = state.objects.map((o) => {
-      if (!ids.has(o.id) || !o.text) return o;
-      const text = wholeValue ? replaceText : o.text.replace(re, replaceText);
-      if (text === o.text) return o;
+      if (!ids.has(o.id)) return o;
+      const cur = writeField.of(o);
+      if (!cur) return o;
+      const v = wholeValue ? replaceText : cur.replace(re, replaceText);
+      if (v === cur) return o;
       n++;
-      return { ...o, text };
+      return writeField.write!(o, v);
     });
-    if (!n) { toast("Nothing changed"); return; }
+    if (!n) {
+      // A schematic net is named by its labels/flags — the members carry it
+      // only derived, so there is nothing stored to rewrite on them.
+      toast(field === "net" && matches.length
+        ? "These objects take their net from the netlist — rename the net label or flag text instead"
+        : "Nothing changed");
+      return;
+    }
     actions.merge({ objects: next });
-    toast(`Replaced in ${n} object${n > 1 ? "s" : ""}`);
+    toast(`Replaced ${writeField.label} in ${n} object${n > 1 ? "s" : ""}`);
   };
 
   const chip = (label: string, on: boolean, onClick: () => void, title?: string) => (
@@ -522,14 +593,21 @@ function FindReplaceModal() {
           <ModalTabBar tabs={["Find", "Replace"]} active={tab} onChange={setTab} />
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-4)" }}>
-          <input
-            autoFocus
-            value={findText}
-            onChange={(e) => { setFindText(e.target.value); cursor.current = -1; }}
-            onKeyDown={(e) => e.key === "Enter" && (isReplace ? doReplace(false) : findAll())}
-            placeholder="Find text, designator, net or value…"
-            style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-5) var(--spacing-6)", border: `var(--border-width-1) solid ${tester && !tester.ok ? "var(--color-border-error, #c0392b)" : "var(--color-border-default)"}`, borderRadius: "var(--radius-md)", fontSize: "var(--font-size-md)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
-          />
+          {/* UIUX-76 — the field picker sits at the left of the search box, so
+              "where am I searching" reads before "what am I typing". */}
+          <div style={{ display: "flex", alignItems: "stretch", gap: "var(--spacing-4)" }}>
+            <div style={{ flex: "0 0 auto" }}>
+              <DsSelect value={field} options={FR_FIELD_OPTIONS} onChange={(v) => { setField(v); cursor.current = -1; }} minWidth={158} />
+            </div>
+            <input
+              autoFocus
+              value={findText}
+              onChange={(e) => { setFindText(e.target.value); cursor.current = -1; }}
+              onKeyDown={(e) => e.key === "Enter" && (isReplace ? doReplace(false) : findAll())}
+              placeholder={field === "all" ? "Find text, designator, net or value…" : `Find in ${pickedField?.label ?? "field"}…`}
+              style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "var(--spacing-5) var(--spacing-6)", border: `var(--border-width-1) solid ${tester && !tester.ok ? "var(--color-border-error, #c0392b)" : "var(--color-border-default)"}`, borderRadius: "var(--radius-md)", fontSize: "var(--font-size-md)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+            />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
             {chip("Aa", matchCase, () => setMatchCase((v) => !v), "Match case")}
             {chip(".*", useRegex, () => setUseRegex((v) => !v), "Regular expression")}
@@ -559,7 +637,10 @@ function FindReplaceModal() {
             {FR_OBJECTS.map((o) => chip(o, !!objects[o], () => setObjects((s) => ({ ...s, [o]: !s[o] }))))}
           </div>
           <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: "var(--spacing-4)" }}>
-            {pool.length} object{pool.length === 1 ? "" : "s"} in range · searches name, net, value and footprint
+            {pool.length} object{pool.length === 1 ? "" : "s"} in range · {field === "all"
+              ? "searches designator, net, value, footprint, comment, part fields and pin type"
+              : `searches ${pickedField?.label ?? "the picked field"} only`}
+            {isReplace ? (canReplace ? (field === "all" ? " · replaces in Designator / Text" : "") : ` · ${pickedField?.label} is read-only`) : ""}
           </div>
         </div>
 
@@ -568,8 +649,8 @@ function FindReplaceModal() {
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
             {isReplace ? (
               <>
-                <Pill onClick={() => doReplace(true)}>Replace selected</Pill>
-                <PrimaryBtn onClick={() => doReplace(false)}>Replace all</PrimaryBtn>
+                <Pill onClick={() => doReplace(true)} style={canReplace ? undefined : { opacity: 0.45, pointerEvents: "none" }}>Replace selected</Pill>
+                <PrimaryBtn onClick={() => doReplace(false)} style={canReplace ? undefined : { opacity: 0.45, pointerEvents: "none" }}>Replace all</PrimaryBtn>
               </>
             ) : (
               <>
