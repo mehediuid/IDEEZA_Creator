@@ -205,7 +205,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         // Each row places its own symbol under its own name — VCC, -5V and GND
         // used to arm a generic net flag ("F1"), which is not what they say.
         item("Power & Ground", {
-          icon: "pwrVcc",
+          icon: "pwrMenu",
           sub: [
             su("VCC", "V", { icon: "pwrVcc", onClick: rail("vcc5v", "VCC") }),
             su("+5V", "", { icon: "pwr5v", onClick: rail("vcc5v", "+5V") }),

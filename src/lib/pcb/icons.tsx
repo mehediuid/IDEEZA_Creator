@@ -60,6 +60,11 @@ export const ic: Record<string, string> = {
   power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v8M8 12h8M9 16h6M10 19h4"/></svg>',
   // Supply / ground family — each row of Insert ▸ Power & Ground gets the
   // schematic symbol it actually places, not one shared "power" glyph.
+  // The Insert ▸ Power & Ground parent row — a power bar over a ground fork,
+  // so the family reads as "supplies" without borrowing any child's own glyph
+  // (UIUX-70: it used to show the Text tool's T on the live build, and pwrVcc
+  // here would collide with the VCC child in the same list).
+  pwrMenu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 4.5h14M12 4.5v6.5M12 11v3.5"/><path d="M5.5 14.5h13M8.5 17.75h7M11 21h2"/></svg>',
   pwrVcc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 20V8M5 8h14"/></svg>',
   pwr5v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V9"/><path d="M12 3.5L6.5 9.5h11z" fill="currentColor"/></svg>',
   pwrN5v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M12 20.5L6.5 14.5h11z" fill="currentColor"/></svg>',
