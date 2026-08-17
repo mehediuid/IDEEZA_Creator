@@ -146,6 +146,20 @@ export function summariseDxf(doc: DxfDoc): { counts: Record<string, number>; tot
   return { counts, total: doc.entities.length };
 }
 
+/** The file's layers with entity counts, in first-seen order — the rows of the
+ *  dialog's layer-mapping table. */
+export function dxfLayers(doc: DxfDoc): Array<{ name: string; count: number }> {
+  const order: string[] = [];
+  const counts: Record<string, number> = {};
+  for (const e of doc.entities) {
+    if (!(e.layer in counts)) order.push(e.layer);
+    counts[e.layer] = (counts[e.layer] ?? 0) + 1;
+  }
+  return order.map((name) => ({ name, count: counts[name] }));
+}
+
+export type DxfLayerMap = Record<string, { include: boolean; target?: string }>;
+
 export type DxfPlaceOpts = {
   /** File units → canvas px. */
   unit: "mm" | "inch";
@@ -156,6 +170,10 @@ export type DxfPlaceOpts = {
   at: { x: number; y: number };
   /** Arc/circle flattening — segments per full turn. */
   segments?: number;
+  /** Per-DXF-layer include/target mapping; a layer absent from the map is included. */
+  layers?: DxfLayerMap;
+  /** Stroke width (canvas px) stamped on the imported line segments. */
+  strokeWidth?: number;
 };
 
 /** px per file unit — mm goes through the documented board scale; inch = 25.4 mm. */
@@ -183,10 +201,17 @@ export function dxfToObjects(doc: DxfDoc, opts: DxfPlaceOpts, idPrefix?: string)
   const out: CanvasObject[] = [];
   let n = 0;
   const id = () => `${prefix}_${++n}`;
+  // The current entity's mapping decides the emitted objects' layer; the
+  // stroke width is one dial for the whole import.
+  let target: string | undefined;
+  const width = opts.strokeWidth && opts.strokeWidth > 0 ? opts.strokeWidth : undefined;
   const seg = (x1: number, y1: number, x2: number, y2: number) =>
-    out.push({ id: id(), kind: "line", x: X(x1), y: Y(y1), endX: X(x2), endY: Y(y2) } as CanvasObject);
+    out.push({ id: id(), kind: "line", x: X(x1), y: Y(y1), endX: X(x2), endY: Y(y2), layer: target, width } as CanvasObject);
 
   for (const e of doc.entities) {
+    const map = opts.layers?.[e.layer];
+    if (map && !map.include) continue;
+    target = map?.target;
     if (e.type === "LINE") {
       seg(e.x1, e.y1, e.x2, e.y2);
     } else if (e.type === "POLYLINE") {
@@ -216,7 +241,7 @@ export function dxfToObjects(doc: DxfDoc, opts: DxfPlaceOpts, idPrefix?: string)
         px = nx; py = ny;
       }
     } else if (e.type === "TEXT") {
-      out.push({ id: id(), kind: "text", x: X(e.x), y: Y(e.y), text: e.text } as CanvasObject);
+      out.push({ id: id(), kind: "text", x: X(e.x), y: Y(e.y), text: e.text, layer: target } as CanvasObject);
     }
   }
   return out;

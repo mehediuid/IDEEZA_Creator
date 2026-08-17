@@ -519,7 +519,11 @@ export function PlacedObjects() {
             const hov = isHovered(o.id) && !sel;
             const stroke = sel ? SELECTED : hov ? HOVERED : hot ? HIGHLIGHT : colorFor(o);
             const dim = isDim(o) && !sel && !hot;
-            const w = (isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : sel ? 2.6 : 1.7) + (hot ? 1.2 : 0);
+            // Drawing kinds carry their own stroke width (the Properties panel's
+            // Line Width and the DXF importer's stroke width both write o.width —
+            // it used to be ignored here, so both fields were dead writes).
+            const drawW = (o.kind === "line" || o.kind === "polyline") && o.width && o.width > 0 ? o.width : null;
+            const w = (isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : drawW ? (sel ? drawW + 0.9 : drawW) : sel ? 2.6 : 1.7) + (hot ? 1.2 : 0);
             const x2 = o.endX ?? o.x;
             const y2 = o.endY ?? o.y;
             return (

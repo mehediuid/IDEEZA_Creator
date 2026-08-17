@@ -21,7 +21,7 @@ import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
 import { parseGltfFile } from "@/lib/pcb/gltf-import";
-import { dxfToObjects, parseDxf, pxPerUnit, summariseDxf, type DxfDoc } from "@/lib/pcb/dxf-import";
+import { dxfLayers, dxfToObjects, parseDxf, pxPerUnit, summariseDxf, type DxfDoc, type DxfLayerMap } from "@/lib/pcb/dxf-import";
 import {
   MODULE_CATALOG,
   NO_FILTERS,
@@ -1281,10 +1281,14 @@ function ImportDfxModal() {
   const [unit, setUnit] = React.useState<"mm" | "inch">("mm");
   const [scale, setScale] = React.useState("1");
   const [reference, setReference] = React.useState<"origin" | "center">("origin");
+  const [strokeW, setStrokeW] = React.useState("1.7");
+  const [layerMap, setLayerMap] = React.useState<DxfLayerMap>({});
 
   const scaleNum = Math.max(0.001, Number(scale) || 1);
   const summary = doc ? summariseDxf(doc) : null;
   const skipped = doc ? Object.entries(doc.skipped) : [];
+  const layerRows = doc ? dxfLayers(doc) : [];
+  const included = doc ? doc.entities.filter((e) => layerMap[e.layer]?.include !== false).length : 0;
 
   const take = (file: File) => {
     setError(null);
@@ -1301,6 +1305,11 @@ function ImportDfxModal() {
         setDoc(parsed);
         setName(file.name);
         if (parsed.units !== "unknown") setUnit(parsed.units);
+        // Every file layer starts included; the board's mechanical layer is the
+        // sensible landing place for a mechanical drawing.
+        const map: DxfLayerMap = {};
+        for (const l of dxfLayers(parsed)) map[l.name] = { include: true, target: "outline" };
+        setLayerMap(map);
       } catch {
         setDoc(null);
         setError("That file isn't readable as ASCII DXF");
@@ -1310,7 +1319,7 @@ function ImportDfxModal() {
   };
 
   // Preview straight off the parsed geometry, so it can't disagree with what
-  // Confirm will place.
+  // Confirm will place — excluded layers drop out of both together.
   const preview = React.useMemo(() => {
     if (!doc?.bbox) return null;
     const { minX, minY, maxX, maxY } = doc.bbox;
@@ -1319,6 +1328,7 @@ function ImportDfxModal() {
     const parts: string[] = [];
     const P = (x: number, y: number) => `${(x - minX + pad).toFixed(3)},${(maxY - y + pad).toFixed(3)}`;
     for (const e of doc.entities) {
+      if (layerMap[e.layer]?.include === false) continue;
       if (e.type === "LINE") parts.push(`<line x1="${P(e.x1, e.y1).split(",")[0]}" y1="${P(e.x1, e.y1).split(",")[1]}" x2="${P(e.x2, e.y2).split(",")[0]}" y2="${P(e.x2, e.y2).split(",")[1]}" />`);
       else if (e.type === "POLYLINE") parts.push(`<polyline points="${e.pts.map((q) => P(q.x, q.y)).join(" ")}" fill="none" />`);
       else if (e.type === "CIRCLE") parts.push(`<circle cx="${(e.cx - minX + pad).toFixed(3)}" cy="${(maxY - e.cy + pad).toFixed(3)}" r="${e.r.toFixed(3)}" fill="none" />`);
@@ -1337,15 +1347,22 @@ function ImportDfxModal() {
     }
     const vw = (w + pad * 2).toFixed(3), vh = (h + pad * 2).toFixed(3);
     return { svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vw} ${vh}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" stroke="var(--color-violet-600)" stroke-width="${(Math.max(w, h) * 0.004).toFixed(4)}" vector-effect="non-scaling-stroke">${parts.join("")}</svg>`, w, h };
-  }, [doc]);
+  }, [doc, layerMap]);
 
   const sizePx = preview ? { w: preview.w * pxPerUnit(unit, scaleNum), h: preview.h * pxPerUnit(unit, scaleNum) } : null;
 
   const doImport = () => {
     if (!doc) return;
+    // Targets only mean something on the board — schematic objects carry no layer.
+    const layers: DxfLayerMap = {};
+    for (const [k, v] of Object.entries(layerMap)) layers[k] = { include: v.include, target: state.mode === "schematic" ? undefined : v.target };
     // Prefix from the board's own size, so a second import can't reissue the
     // first one's ids.
-    const objs = dxfToObjects(doc, { unit, scale: scaleNum, reference, at: { x: 260, y: 220 } }, `dxf${state.objects.length}`);
+    const objs = dxfToObjects(
+      doc,
+      { unit, scale: scaleNum, reference, at: { x: 260, y: 220 }, layers, strokeWidth: Math.max(0.2, Math.min(20, Number(strokeW) || 1.7)) },
+      `dxf${state.objects.length}`,
+    );
     if (objs.length === 0) { actions.flashToast("Nothing to import"); return; }
     const scoped = objs.map((o) => ({ ...o, scope: state.mode === "schematic" ? ("schematic" as const) : ("pcb" as const), sheetId: state.mode === "schematic" ? state.activeSheetId : undefined }));
     actions.addObjects(scoped);
@@ -1409,6 +1426,16 @@ function ImportDfxModal() {
                   />
                 ))}
                 {field("Import size", val(sizePx ? `${Math.round(sizePx.w)} × ${Math.round(sizePx.h)} px` : "—"))}
+                {field("Stroke width", (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--spacing-3)" }}>
+                    <input
+                      value={strokeW}
+                      onChange={(e) => setStrokeW(e.target.value)}
+                      style={{ width: 110, padding: "var(--spacing-3) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontFamily: "inherit", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none" }}
+                    />
+                    <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>px</span>
+                  </span>
+                ))}
                 {field("Reference point", (
                   <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
                     {([["origin", "DXF origin"], ["center", "Graphics centre"]] as const).map(([k, l]) => (
@@ -1419,6 +1446,40 @@ function ImportDfxModal() {
                     ))}
                   </div>
                 ))}
+                {layerRows.length > 0 && (
+                  <div style={{ marginTop: "var(--spacing-6)" }}>
+                    <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>
+                      Layers <span style={{ fontWeight: 400, color: "var(--color-text-tertiary)" }}>— what to import{state.mode === "schematic" ? "" : " and where it lands"}</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+                      {layerRows.map((l) => {
+                        const m = layerMap[l.name] ?? { include: true, target: "outline" };
+                        return (
+                          <div key={l.name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", minHeight: 28 }}>
+                            <span
+                              onClick={() => setLayerMap((prev) => ({ ...prev, [l.name]: { ...m, include: !m.include } }))}
+                              style={{ display: "inline-flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer", flex: 1, minWidth: 0 }}
+                            >
+                              <Check on={m.include} size={16} />
+                              <span style={{ fontSize: "var(--font-size-sm)", color: m.include ? "var(--color-text-primary)" : "var(--color-text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</span>
+                              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{l.count}</span>
+                            </span>
+                            {state.mode !== "schematic" && (
+                              <span style={{ opacity: m.include ? 1 : 0.45, pointerEvents: m.include ? "auto" : "none" }}>
+                                <DsSelect
+                                  value={m.target ?? "outline"}
+                                  options={(state.pcbLayers ?? []).map((pl) => ({ label: pl.name, value: pl.id }))}
+                                  onChange={(v) => setLayerMap((prev) => ({ ...prev, [l.name]: { ...m, target: v } }))}
+                                  minWidth={140}
+                                />
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 {skipped.length > 0 && (
                   <div style={{ marginTop: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)", background: "var(--color-bg-subtle)", fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
                     Not imported: {skipped.map(([k, v]) => `${v} ${k.toLowerCase()}`).join(" · ")} — blocks, splines, dimensions and hatches aren&apos;t supported yet.
@@ -1444,11 +1505,15 @@ function ImportDfxModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-6) var(--spacing-8)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
-            {doc ? `Places ${summary!.total} entit${summary!.total === 1 ? "y" : "ies"} as editable objects on the current sheet` : ""}
+            {doc
+              ? included === 0
+                ? "Every layer is excluded — nothing would be imported"
+                : `Places ${included} of ${summary!.total} entit${summary!.total === 1 ? "y" : "ies"} as editable objects on the current ${state.mode === "schematic" ? "sheet" : "board"}`
+              : ""}
           </span>
           <span style={{ display: "flex", gap: "var(--spacing-5)" }}>
             <Pill onClick={actions.closeModal}>Cancel</Pill>
-            <PrimaryBtn onClick={doImport} style={{ opacity: doc ? 1 : 0.5, pointerEvents: doc ? "auto" : "none" }}>Import</PrimaryBtn>
+            <PrimaryBtn onClick={doImport} style={{ opacity: doc && included > 0 ? 1 : 0.5, pointerEvents: doc && included > 0 ? "auto" : "none" }}>Import</PrimaryBtn>
           </span>
         </div>
       </Card>
