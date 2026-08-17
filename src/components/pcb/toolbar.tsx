@@ -784,6 +784,10 @@ const SCHEM_ESSENTIAL: Item[] = [
 // Rotate + all arrange ops (right-sidebar Position panel), draw/place/route
 // tools (left ToolPalette).
 const PCB_ESSENTIAL: Item[] = [
+  // Save leads the row, where the schematic bar carries it, so the two toolbars
+  // line up on the one control you reach for by muscle memory (UIUX-13).
+  { kind: "icon", key: "save", action: "save", label: "Save" },
+  { kind: "div" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
   { kind: "div" },
@@ -803,9 +807,6 @@ const PCB_ESSENTIAL: Item[] = [
   { kind: "icon", key: "tRatsnest", action: "toggleRatsnest", label: "Ratsnest" },
   { kind: "div" },
   { kind: "icon", key: "tAutoRoute", action: "openAutoRoute", label: "Auto Route" },
-  { kind: "div" },
-  // #109 — the same save chip the schematic bar carries: it reads the real write.
-  { kind: "icon", key: "save", action: "save", label: "Save" },
   { kind: "div" },
   { kind: "dd", field: "gridSize", options: GRID_SIZES, label: "Grid size" },
   { kind: "dd", field: "unit", options: UNITS, label: "Unit" },
@@ -980,6 +981,13 @@ export function Toolbar() {
     );
   };
 
+  // What fits in each bar right now — the tail moves into the "…" menu rather
+  // than being clipped by the side panels (UIUX-45/74).
+  const schemRowRef = React.useRef<HTMLDivElement>(null);
+  const pcbRowRef = React.useRef<HTMLDivElement>(null);
+  const schemFit = useFitCount(schemRowRef, SCHEM_ESSENTIAL.length, 38);
+  const pcbFit = useFitCount(pcbRowRef, PCB_ESSENTIAL.length, 38);
+
   // Non-schematic bar: PCB_ESSENTIAL (inline) + secondary ACTIONS in the "…"
   // overflow. Tools (palette), the inline essentials, and everything homed
   // elsewhere (HOMED_KEYS) are excluded, so nothing is duplicated across
@@ -1088,11 +1096,14 @@ export function Toolbar() {
               (`setMode`), so a "Convert to PCB" pill was a second door to the
               same outcome, and it competed with the page's one solid CTA. The
               deliberate re-sync lives in Design ▸ Convert schematic to PCB. */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
-            {SCHEM_ESSENTIAL.map((it, i) =>
+          <div ref={schemRowRef} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
+            {SCHEM_ESSENTIAL.slice(0, schemFit).map((it, i) =>
               it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i),
             )}
           </div>
+          {schemFit < SCHEM_ESSENTIAL.length && (
+            <OverflowMenu items={SCHEM_ESSENTIAL.slice(schemFit).filter((it) => it.kind !== "div")} render={renderMenuRow} />
+          )}
         </>
       ) : state.mode === "3d" ? (
         <>
@@ -1123,14 +1134,63 @@ export function Toolbar() {
         <>
           {/* other modes: same 20px icon-to-icon rhythm + −8 group dividers as
               the schematic; the rest folds into "…". */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
-            {PCB_ESSENTIAL.map((it, i) => (it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i)))}
+          <div ref={pcbRowRef} style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 20, overflow: "hidden" }}>
+            {PCB_ESSENTIAL.slice(0, pcbFit).map((it, i) => (it.kind === "div" ? <Divider key={i} gutter={-8} /> : renderItem(it, i)))}
           </div>
-          {overflow.length > 0 && <OverflowMenu items={overflow} render={renderMenuRow} />}
+          {(overflow.length > 0 || pcbFit < PCB_ESSENTIAL.length) && (
+            <OverflowMenu
+              items={[...PCB_ESSENTIAL.slice(pcbFit).filter((it) => it.kind !== "div"), ...overflow]}
+              render={renderMenuRow}
+            />
+          )}
         </>
       )}
     </div>
   );
+}
+
+// UIUX-45/74 — how many of a row's items actually fit.
+//
+// The essentials row used to be `overflow: hidden`, so opening a side panel
+// silently clipped the tail of the bar (measured: 7 of 16 controls past the
+// right edge at 1280px with both panels open). The row now renders what fits
+// and hands the rest to the "…" menu, which is how a toolbar is expected to
+// behave. Item widths are static, so they're measured once on a full pass and
+// re-used on every resize.
+function useFitCount(rowRef: React.RefObject<HTMLDivElement | null>, total: number, reserve: number) {
+  const widths = React.useRef<number[]>([]);
+  const [fit, setFit] = React.useState<number>(total);
+  React.useEffect(() => { widths.current = []; setFit(total); }, [total]);
+  React.useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const measure = () => {
+      if (widths.current.length !== total) {
+        // Only trust a pass where every item is on screen.
+        const kids = Array.from(el.children);
+        if (kids.length !== total) return;
+        widths.current = kids.map((k) => (k as HTMLElement).getBoundingClientRect().width);
+      }
+      const gap = parseFloat(getComputedStyle(el).columnGap || "0") || 0;
+      const room = el.clientWidth;
+      let used = 0, n = 0;
+      for (const w of widths.current) {
+        const next = used + w + (n ? gap : 0);
+        if (next > room) break;
+        used = next; n++;
+      }
+      // Leave room for the "…" button when something has to move into it.
+      if (n < total) {
+        while (n > 0 && used + gap + reserve > room) { used -= widths.current[n - 1] + gap; n--; }
+      }
+      setFit(n);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rowRef, total, reserve]);
+  return fit;
 }
 
 // "…" overflow: opens a popover grid of the remaining tools. Uses position:

@@ -12,7 +12,6 @@ import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ArrowDown01Icon,
-  HelpCircleIcon,
   Notification03Icon,
   ShoppingCart01Icon,
   SidebarLeft01Icon,
@@ -178,9 +177,9 @@ export function TopBar() {
           notifications / profile / collapse icons. */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
         {onFlowPage && <PremiumPartsChip />}
-        <ToolBtn>
-          <HugeiconsIcon icon={HelpCircleIcon} size={21} color="currentColor" strokeWidth={1.8} />
-        </ToolBtn>
+        {/* The Help "?" lives in the editor's own menu row (⚙ Settings · ? Help),
+            where it opens a real menu. This cluster carried a second one that
+            answered to nothing — one Help, one home (UIUX-42). */}
         <ToolBtn>
           <HugeiconsIcon icon={ShoppingCart01Icon} size={21} color="currentColor" strokeWidth={1.8} />
         </ToolBtn>
