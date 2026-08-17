@@ -15,7 +15,7 @@ import {
   NumberInput,
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
-import { DEL_OBJ_NAMES, SEL_FILTER_KINDS, type CanvasObject } from "@/lib/pcb/types";
+import { ANNOT_PREFIX, DEL_OBJ_NAMES, SEL_FILTER_KINDS, nextDesignator, type CanvasObject } from "@/lib/pcb/types";
 import { ERC_ENFORCED_ROWS, computeNets } from "@/lib/pcb/nets";
 import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
@@ -1039,22 +1039,6 @@ const PCB_RANGES = [
   "Bottom Layer Components",
   "Selected Components",
 ];
-
-// Kinds that carry designators, with their prefix letters.
-const ANNOT_PREFIX: Record<string, string> = {
-  resistor: "R",
-  // resistorBox is the schematic's box-style resistor — it was missing here,
-  // so annotation silently skipped every one of them.
-  resistorBox: "R",
-  transistor: "Q",
-  opamp: "U",
-  capacitor: "C",
-  inductor: "L",
-  diode: "D",
-  connector: "J",
-  ic: "U",
-  component: "U",
-};
 
 function AnnotateModal() {
   const state = usePcbState();
@@ -2231,7 +2215,13 @@ function DevicePickerModal() {
 
   const placePart = (p: CatalogPart) => {
     setRecents(pushRecent(p.id));
-    placeOn({ kind: p.kind, text: p.part, footprint: p.pkg, comment: p.mfr }, `Placed ${p.part} (${p.pkg})`);
+    // The symbol shows its designator (R1, C2 …) like every other placement;
+    // the part number rides in props.mpn, which is where the BOM reads it.
+    const des = nextDesignator(state.objects, p.kind);
+    placeOn(
+      { kind: p.kind, text: des ?? p.part, footprint: p.pkg, comment: p.mfr, props: { mpn: p.part, package: p.pkg, manufacturer: p.mfr } },
+      des ? `Placed ${des} — ${p.part} (${p.pkg})` : `Placed ${p.part} (${p.pkg})`,
+    );
   };
 
   // A captured module really re-creates its objects; a catalogue module (which

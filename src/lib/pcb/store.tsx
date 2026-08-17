@@ -21,6 +21,7 @@ import { PANEL_LIMITS,
   DEFAULT_SCHEM_OBJECTS,
   DEL_OBJ_NAMES,
   TOOLBAR_CATALOGS,
+  nextDesignator,
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
@@ -1739,12 +1740,16 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
               : kind === "rectangle" || kind === "circle" || kind === "ellipse"
               ? { props: { lineOn: true, fillOn: false, fillColor: "#FFFFFF" } }
               : {};
+          // Parts number themselves as they land (R1, R2, C1 …) — the sheet
+          // shouldn't fill up with "R?" waiting for a manual pass. An explicit
+          // placeText (a named supply rail, say) still wins.
+          const auto = inPcb ? undefined : nextDesignator(s.objects, kind);
           const obj: CanvasObject = {
             id,
             kind,
             x,
             y,
-            text: s.placeText ?? defaultText[kind],
+            text: s.placeText ?? auto ?? defaultText[kind],
             rotation: 0,
             scope: inPcb ? "pcb" : undefined,
             layer: inPcb ? s.activePcbLayer : undefined,

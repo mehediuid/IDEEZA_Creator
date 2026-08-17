@@ -429,6 +429,41 @@ export const PART_PREFIX_GROUPS: Record<string, string> = {
   F: "Fuses", K: "Relays", M: "Modules", T: "Transformers",
 };
 
+/** Kinds that carry a designator, with their prefix letter. Shared by the
+ *  auto-designator (placement) and the Annotate dialog, so the two can't
+ *  disagree about which kinds get numbered. */
+export const ANNOT_PREFIX: Record<string, string> = {
+  resistor: "R",
+  // The schematic's box-style resistor — it was missing from the dialog's own
+  // copy of this map, so annotation silently skipped every one of them.
+  resistorBox: "R",
+  transistor: "Q",
+  opamp: "U",
+  capacitor: "C",
+  inductor: "L",
+  diode: "D",
+  connector: "J",
+  ic: "U",
+  component: "U",
+  crystal: "Y",
+};
+
+/** The next free designator for `kind` (R1, R2, C1 …), counted per prefix over
+ *  the whole schematic so two sheets can't both hold an R1. Returns undefined
+ *  for kinds that don't take a designator. */
+export function nextDesignator(objects: CanvasObject[], kind: string): string | undefined {
+  const prefix = ANNOT_PREFIX[kind];
+  if (!prefix) return undefined;
+  const re = new RegExp(`^${prefix}(\\d+)$`);
+  let max = 0;
+  for (const o of objects) {
+    if (o.scope === "pcb") continue;
+    const m = re.exec((o.text ?? "").trim());
+    if (m) max = Math.max(max, Number(m[1]) || 0);
+  }
+  return `${prefix}${max + 1}`;
+}
+
 export const SCHEM_FILTER_KEY_FOR_KIND: Record<string, string> = Object.fromEntries(
   SCHEM_FILTER_ROWS.flatMap((r) => r.kinds.map((k) => [k, r.key])),
 );

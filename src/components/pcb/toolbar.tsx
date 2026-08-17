@@ -65,7 +65,6 @@ type ToolbarAction =
   | "openDevicePicker"
   | "openAutoRoute"
   | "openDesignRules"
-  | "openAnnotate"
   | "alignLeft"
   | "alignRight"
   | "alignTop"
@@ -755,7 +754,9 @@ const SCHEM_ESSENTIAL: Item[] = [
   // ERC, not "Design Rule" — the schematic's own term (the menu and the dialog
   // both say ERC), and it carries a label so the sheet's main check is findable.
   { kind: "icon", key: "dErc", action: "openDesignRules", label: "ERC Rules", tint: true, text: "ERC" },
-  { kind: "icon", key: "dAnnotate", action: "openAnnotate", label: "Annotate Designator" },
+  // Annotate Designator left the bar and the Design menu (UIUX-3): parts number
+  // themselves as they land now. Re-numbering a whole sheet is the rare case,
+  // and it keeps its home on the component right-click menu.
   // Agile Module (component library) — a primary IDEEZA workflow, so it sits
   // on the bar rather than only in Insert.
   { kind: "icon", key: "tDevReuse", action: "openAgileModule", label: "Agile Module" },
@@ -900,7 +901,6 @@ export function Toolbar() {
     openAgileModule: () => actions.openPicker("Agile Module"),
     openAutoRoute: () => actions.openModal("autoRoute"),
     openDesignRules: () => actions.openModal("designRules"),
-    openAnnotate: () => actions.openModal("annotate"),
     // Align / distribute the multi-selection (needs 2+ objects; the store no-ops
     // otherwise). Wired to the same real bounding-box logic as the Position panel.
     alignLeft: () => actions.alignSelected("left"),

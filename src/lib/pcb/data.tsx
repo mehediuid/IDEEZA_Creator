@@ -276,7 +276,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Import 3D Model…", { icon: "cube", onClick: () => actions.openModal("importGltf") }),
-        item("Annotate Designator", { icon: "dAnnotate", onClick: () => actions.openModal("annotate") }),
+        // Annotate Designator is gone from here and from the toolbar (UIUX-3):
+        // parts number themselves as they land. Re-numbering a whole sheet
+        // stays available on a component's right-click menu.
       ],
     },
     // Arrange — ordered by what the geometry does: relate objects to each
