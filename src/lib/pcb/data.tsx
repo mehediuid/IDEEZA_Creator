@@ -201,6 +201,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       key: "P",
       items: [
         item("Place a Part", { icon: "pChip", onClick: () => actions.openModal("devicePicker") }),
+        // Agile Module rides directly under Place a Part — both drop a ready
+        // block on the sheet, and the module is a first-class way in (UIUX-4).
+        item("Agile Module", { icon: "tDevReuse", onClick: tool("reuseBlock") }),
         item("Wire", { k: "Alt+W", icon: "pWire", onClick: tool("wire") }),
         // Each row places its own symbol under its own name — VCC, -5V and GND
         // used to arm a generic net flag ("F1"), which is not what they say.
@@ -218,31 +221,11 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             su("Power GND", "", { icon: "pwrPgnd", onClick: tool("pgnd") }),
           ],
         }),
-        item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),
-        item("No Connect", { icon: "pNoConnect", onClick: tool("noConnect") }),
-        item("Junction", { icon: "pJunction", onClick: tool("junction") }),
-        // UIUX-31: Differential Pair, Keep-out area and Part mask are board
-        // work, not schematic insertions — diff-pair routing lives in the 2D
-        // Route menu and the PCB palette. The diff-pair *tag* stays: it marks
-        // a pair on the sheet, which is where that marking belongs.
-        item("Diff-pair tag", { icon: "pDiffFlag", onClick: tool("diffPairFlag") }),
-        item("Agile Module", { icon: "tDevReuse", onClick: tool("reuseBlock") }),
-        dv,
-        // Drawing primitives.
-        item("Polyline", { k: "Alt+L", icon: "pPolyline", onClick: tool("polyline") }),
-        item("Arc", { k: "Alt+A", icon: "pArc", onClick: tool("arc") }),
-        item("Bezier", { k: "Alt+Z", icon: "pBezier", onClick: tool("bezier") }),
-        item("Circle", { k: "Alt+C", icon: "pCircle", onClick: tool("circle") }),
-        item("Rectangle", { k: "Alt+R", icon: "pRect", onClick: tool("rectangle") }),
-        dv,
-        // Annotation objects — their own group, not drawing primitives.
-        item("Text", { k: "Alt+T", icon: "pText", onClick: tool("text") }),
-        item("Image", { icon: "pImage", onClick: tool("image") }),
-        item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
-        dv,
         // The left palette keeps one Net Label button (the local label you
         // reach for constantly); the rest of the label family lives here, so
         // every kind stays placeable without a five-deep flyout on the canvas.
+        // It sits right under the supplies — both name what a node *is*
+        // (UIUX-32).
         item("Net Label", {
           k: "Alt+N",
           icon: "pNetLabel",
@@ -256,6 +239,26 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             su("Off-sheet link", "", { icon: "pOffPage", onClick: tool("offPageConnector") }),
           ],
         }),
+        item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),
+        item("No Connect", { icon: "pNoConnect", onClick: tool("noConnect") }),
+        item("Junction", { icon: "pJunction", onClick: tool("junction") }),
+        // UIUX-31: Differential Pair, Keep-out area and Part mask are board
+        // work, not schematic insertions — diff-pair routing lives in the 2D
+        // Route menu and the PCB palette. The diff-pair *tag* stays: it marks
+        // a pair on the sheet, which is where that marking belongs.
+        item("Diff-pair tag", { icon: "pDiffFlag", onClick: tool("diffPairFlag") }),
+        dv,
+        // Drawing primitives.
+        item("Polyline", { k: "Alt+L", icon: "pPolyline", onClick: tool("polyline") }),
+        item("Arc", { k: "Alt+A", icon: "pArc", onClick: tool("arc") }),
+        item("Bezier", { k: "Alt+Z", icon: "pBezier", onClick: tool("bezier") }),
+        item("Circle", { k: "Alt+C", icon: "pCircle", onClick: tool("circle") }),
+        item("Rectangle", { k: "Alt+R", icon: "pRect", onClick: tool("rectangle") }),
+        dv,
+        // Annotation objects — their own group, not drawing primitives.
+        item("Text", { k: "Alt+T", icon: "pText", onClick: tool("text") }),
+        item("Image", { icon: "pImage", onClick: tool("image") }),
+        item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
       ],
     },
     {
@@ -265,7 +268,10 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       items: [
         item("Generate PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.convertSchematicToPcb() }),
         dv,
-        item("Design rules", { icon: "dRule", onClick: () => actions.openModal("designRules") }),
+        // The sheet's rules are electrical — "Design rules" pointed at the
+        // board's DRC, and the row now carries the toolbar's own ERC glyph so
+        // both doors to the same checker look alike (UIUX-6).
+        item("Electrical Rules", { icon: "dErc", onClick: () => actions.openModal("designRules") }),
         item("Run electrical check (ERC)", { icon: "dCheck", onClick: () => actions.runErcCheck() }),
         item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
@@ -320,9 +326,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             su("Top ↔ bottom", "", { icon: "flipV", onClick: () => actions.flipSelectedV() }),
           ],
         }),
-        dv,
-        item("Bring to Front", { k: "]", icon: "tBringFront", onClick: () => actions.bringFront() }),
-        item("Send to Back", { k: "[", icon: "tSendBack", onClick: () => actions.sendBack() }),
+        // Z-order left this menu to match the board's Arrange, where it went
+        // first; the right sidebar's Position panel is its one home (UIUX-5).
+        // The ] / [ shortcuts still work.
       ],
     },
     {
