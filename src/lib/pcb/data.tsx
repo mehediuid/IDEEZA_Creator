@@ -532,7 +532,6 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // #86 — Move grabs the selection for real (`setTool("move")` armed a
         // tool with no handler); Move by step nudges it by an exact offset.
         item("Move", { k: "M", icon: "tMoveGrab", onClick: () => actions.startMoveSelected() }),
-        item("Move by step…", { icon: "tMoveStep", onClick: () => actions.openModal("moveStep") }),
         snapToggle(),
         item("Find & replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
         dv,
@@ -705,7 +704,8 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Routing Width…", { icon: "wire", onClick: () => actions.openModal("routingWidth") }),
         dv,
         item("Unroute", { icon: "del", onClick: () => actions.flashToast("Unrouted") }),
-        item("Remove Loop", { icon: "del", onClick: () => actions.flashToast("Loop removed") }),
+        // "Remove Loop" left this menu (UIUX-19) — Unroute above it is the real
+        // command, and the row only toasted.
       ],
     },
     // Phase 8 — Layout menu (IT-513). Already-built primitives (Group / Align

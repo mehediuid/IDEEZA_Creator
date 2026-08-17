@@ -232,8 +232,6 @@ export interface PcbActions {
   convertSchematicToPcb: () => void;
   /** #93 — pull schematic changes into the existing board, keeping placement. */
   importChangesFromSchematic: () => void;
-  /** #86 — nudge the selection by an exact offset (Move by step). */
-  moveSelectedBy: (dx: number, dy: number) => void;
   /** #79 — create the board document for a project that has none yet. */
   createPcbDoc: () => void;
   /** #122 — polygon board outline: add a vertex / close / cancel. */
@@ -2058,20 +2056,6 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             ? `Imported changes — ${added} new part${added === 1 ? "" : "s"} · ${removed} removed · ${kept} kept in place`
             : `Board already matches the schematic — ${kept} part${kept === 1 ? "" : "s"} unchanged`,
         );
-      },
-      moveSelectedBy: (dx, dy) => {
-        const s = stateRef.current;
-        if (!s.selectedIds.length) { actions.flashToast("Nothing selected to move"); return; }
-        if (!dx && !dy) return;
-        const ids = new Set(s.selectedIds);
-        mergeWithHistory((st) => ({
-          objects: st.objects.map((o) =>
-            ids.has(o.id)
-              ? { ...o, x: o.x + dx, y: o.y + dy, ...(o.endX !== undefined ? { endX: o.endX + dx } : null), ...(o.endY !== undefined ? { endY: o.endY + dy } : null) }
-              : o,
-          ),
-        }));
-        actions.flashToast(`Moved ${ids.size} object${ids.size > 1 ? "s" : ""} by ${Math.round(dx)}, ${Math.round(dy)}`);
       },
       createPcbDoc: () => {
         const s = stateRef.current;

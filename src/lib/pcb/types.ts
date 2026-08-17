@@ -41,7 +41,6 @@ export type ModalId =
   | "newProject"
   | "sutureVias"
   | "importImage"
-  | "moveStep"
   | "newPart"
   | "newModule"
   | "importGltf"

@@ -177,6 +177,12 @@ function MenuPanel({ m, alignRight, saveState }: { m: MenuGroup; alignRight?: bo
         borderRadius: "var(--radius-xl)",
         boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))",
         padding: "var(--spacing-3)",
+        // A long menu (Insert) used to run off the bottom of the screen with no
+        // way to reach the rest of it — cap to what's left below the bar and
+        // scroll inside (UIUX-41). 62px top bar + 34px menu row + breathing room.
+        maxHeight: "calc(100vh - 118px)",
+        overflowY: "auto",
+        overscrollBehavior: "contain",
         zIndex: 60,
         animation: "ideeza-pop .16s cubic-bezier(.2,.9,.3,1.2)",
       }}

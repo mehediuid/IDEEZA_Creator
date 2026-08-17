@@ -3143,54 +3143,6 @@ function ImportImageModal() {
   );
 }
 
-// #86 — Move by step: nudge the selection by an exact offset, or one grid step
-// at a time with the arrow buttons. The old Move rows armed a tool that had no
-// handler, so nothing moved at all.
-function MoveStepModal() {
-  const state = usePcbState();
-  const actions = usePcbActions();
-  const step = Math.max(1, Math.round(parseFloat(String(state.gridSize)) * 100) || 10);
-  const [dx, setDx] = React.useState("0");
-  const [dy, setDy] = React.useState("0");
-  const n = state.selectedIds.length;
-  const label: React.CSSProperties = { width: 96, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
-  const nudge = (ax: "x" | "y", dir: number) => {
-    actions.moveSelectedBy(ax === "x" ? step * dir : 0, ax === "y" ? step * dir : 0);
-  };
-  return (
-    <Overlay>
-      <Card width={430}>
-        <Header title="Move by step" onClose={actions.closeModal} padding="18px 22px" />
-        <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
-          <div style={{ fontSize: "var(--font-size-sm)", color: n ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", lineHeight: 1.5 }}>
-            {n ? `${n} object${n > 1 ? "s" : ""} selected. Type an offset, or step by the grid (${step} px per press).` : "Select something on the board first — this moves the selection."}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={label}>Step by grid</span>
-            <div style={{ display: "flex", gap: "var(--spacing-4)" }}>
-              {([["←", "x", -1], ["→", "x", 1], ["↑", "y", -1], ["↓", "y", 1]] as const).map(([t, ax, dir]) => (
-                <Button key={t} hierarchy="secondary" size="sm" disabled={!n} onClick={() => nudge(ax, dir)}>{t}</Button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={label}>Offset X</span>
-            <div style={{ flex: 1 }}><NumberInput value={dx} onChange={setDx} /></div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={label}>Offset Y</span>
-            <div style={{ flex: 1 }}><NumberInput value={dy} onChange={setDy} /></div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Close</Button>
-          <Button hierarchy="primary" size="md" disabled={!n} onClick={() => { actions.moveSelectedBy(parseFloat(dx) || 0, parseFloat(dy) || 0); actions.closeModal(); }}>Move</Button>
-        </div>
-      </Card>
-    </Overlay>
-  );
-}
-
 // #79 — New ▸ Part: authors a part into the personal library, which the picker's
 // Personal rail lists and can place. (The rail was empty until now.)
 function NewPartModal() {
@@ -3713,8 +3665,6 @@ export function Modals() {
       return <SutureViasModal />;
     case "importImage":
       return <ImportImageModal />;
-    case "moveStep":
-      return <MoveStepModal />;
     case "newPart":
       return <NewPartModal />;
     case "newModule":

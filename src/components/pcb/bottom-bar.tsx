@@ -37,13 +37,40 @@ const EYE_OFF_SVG =
 function LayerStrip() {
   const state = usePcbState();
   const actions = usePcbActions();
+  // UIUX-55 — with the right panel open the strip runs out of room. Chips can't
+  // shrink (a half-word layer name is worse than a scroll), so the row scrolls
+  // and says so: it snaps chip-by-chip, so a gesture never leaves one cut in
+  // half, and the edge it can still scroll toward fades out.
+  const stripRef = React.useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = React.useState({ left: false, right: false });
+  React.useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const read = () => setEdges({
+      left: el.scrollLeft > 2,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+    });
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", read); ro.disconnect(); };
+    // `state.mode` is a dependency because the strip doesn't render at all in
+    // the schematic/3D views — without it the effect would keep the reading it
+    // took while the ref was still null.
+  }, [state.mode, state.pcbLayers, state.panelSizes.right, state.panelSizes.left, state.bottomOpen]);
   if (state.mode === "schematic" || state.mode === "3d") return null;
   const layers = state.pcbLayers ?? [];
   if (!layers.length) return null;
   const side = (id: string) => (id.startsWith("bottom") ? "bottom" : id.startsWith("inner") ? "inner" : "top");
+  const fade = (from: boolean, to: boolean) =>
+    from || to
+      ? `linear-gradient(to right, ${from ? "transparent" : "#000"} 0, #000 28px, #000 calc(100% - 28px), ${to ? "transparent" : "#000"} 100%)`
+      : undefined;
   return (
     <div
       data-layer-strip
+      ref={stripRef}
       style={{
         position: "absolute",
         bottom: 36 + (state.bottomOpen ? state.panelSizes.bottom : 0),
@@ -57,6 +84,10 @@ function LayerStrip() {
         background: "var(--color-bg-surface)",
         borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
         overflowX: "auto",
+        scrollbarWidth: "thin",
+        scrollSnapType: "x proximity",
+        maskImage: fade(edges.left, edges.right),
+        WebkitMaskImage: fade(edges.left, edges.right),
         zIndex: 13,
       }}
     >
@@ -80,7 +111,7 @@ function LayerStrip() {
       {layers.map((l) => {
         const active = l.id === state.activePcbLayer;
         return (
-          <span key={l.id} style={{ display: "inline-flex", alignItems: "center", flex: "0 0 auto" }}>
+          <span key={l.id} style={{ display: "inline-flex", alignItems: "center", flex: "0 0 auto", scrollSnapAlign: "start" }}>
             <button
               type="button"
               className="ix-tool"
