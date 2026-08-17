@@ -117,6 +117,13 @@ export type LibCommonTab = "schematic" | "pcb" | "panel";
 export type LibFilter = "all" | "verified" | "public" | "private";
 export type LibPrice = "all" | "free" | "premium";
 
+/**
+ * Grid presets for the board, in the document's unit. One list: the toolbar's
+ * grid-size dropdown and View ▸ Grid Size both read it, so the two surfaces
+ * can't offer different sizes (UIUX-57).
+ */
+export const GRID_PRESETS: string[] = ["0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1"];
+
 export type SettingsPage =
   | "system"
   | "drawing"

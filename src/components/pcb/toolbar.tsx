@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { DsIcon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { buildModeTabs, buildPcbViewTabs } from "@/lib/pcb/data";
+import { GRID_PRESETS } from "@/lib/pcb/types";
 import type { GridType, PcbState } from "@/lib/pcb/types";
 
 type ToolbarAction =
@@ -95,7 +96,7 @@ type Item =
   | { kind: "grid" }
   | { kind: "dd"; field: "gridSize" | "unit"; options: string[]; label?: string };
 
-const GRID_SIZES = ["0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1"];
+const GRID_SIZES = GRID_PRESETS;
 const UNITS = ["Inch", "Mil", "mm"];
 
 // Toolbar layout follows the Figma source order but every item is tagged with

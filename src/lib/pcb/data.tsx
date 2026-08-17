@@ -5,6 +5,7 @@
 import { ic } from "./icons";
 import { C } from "./colors";
 import { exportKicadPcb, exportGerberViaKicad } from "./kicad-export";
+import { GRID_PRESETS } from "./types";
 import type { PcbState } from "./types";
 import type { PcbActions } from "./store";
 
@@ -433,17 +434,49 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     };
   };
 
-  // Grid Size and Snap Size share an identical flyout in the source.
+  // UIUX-57/58 — this flyout was an EasyEDA transcription in which no row did
+  // anything: five identical placeholders ("0.015,0.051mm | 2.0,2,mil"), a
+  // keep-ratio row with no state behind it, and two settings rows that opened
+  // nothing. Every row is real now, and the presets are the same list the
+  // toolbar's grid-size dropdown offers, so the two can't drift apart.
+  const keepRatio = (state.boardSettings ?? {}).gridKeepRatio === true;
+  // The grid is in the document's unit; snap is stored in mil.
+  const gridToMil = (v) => {
+    const n = parseFloat(v);
+    if (!isFinite(n)) return null;
+    const u = String(state.unit || "Inch").toLowerCase();
+    return u === "mil" ? n : u === "mm" ? n / 0.0254 : n * 1000;
+  };
+  const pickGrid = (g) => {
+    actions.setGridSize(g);
+    // Keep Ratio means snap follows the grid rather than drifting from it.
+    if (keepRatio) {
+      const mil = gridToMil(g);
+      if (mil != null) actions.setBoardSetting("snapSize", Math.round(mil * 1000) / 1000);
+    }
+  };
+  // Grid and snap already live in the right panel's Document section — these
+  // rows open that, rather than a third copy of the same fields in a dialog.
+  // The Document panel is the nothing-selected panel, so the selection clears.
+  const openGridSettings = () => {
+    actions.selectMany([]);
+    actions.setRightTab("properties");
+    if (state.viewTog["Right-Side Panel"] === false) actions.toggleView("Right-Side Panel");
+  };
   const gridFlyout = [
-    su("0.015,0.051mm | 2.0,2,mil"),
-    su("0.015,0.051mm | 2.0,2,mil"),
-    su("0.015,0.051mm | 2.0,2,mil"),
-    su("0.015,0.051mm | 2.0,2,mil"),
-    su("0.015,0.051mm | 2.0,2,mil", "", { icon: "check" }),
+    ...GRID_PRESETS.map((g) =>
+      su(`${g} ${state.unit || "Inch"}`, "", {
+        icon: state.gridSize === g ? "check" : "blank",
+        onClick: () => pickGrid(g),
+      }),
+    ),
     dv,
-    su("Grid/Snap keep Ratio", "", { icon: "check" }),
-    su("Common Grid/Snap setting", "", { icon: "grid" }),
-    su("Grid Range setting (Po...", "", { icon: "fitarea" }),
+    su("Grid/Snap keep Ratio", "", {
+      icon: keepRatio ? "check" : "blank",
+      onClick: () => actions.setBoardSetting("gridKeepRatio", !keepRatio),
+    }),
+    su("Grid & snap settings…", "", { icon: "grid", onClick: openGridSettings }),
+    su("Grid range settings…", "", { icon: "fitarea", onClick: openGridSettings }),
   ];
 
   // Snap toggle reflects current `snapEnabled` flag (Phase 6, IT-604).
