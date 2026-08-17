@@ -63,6 +63,7 @@ import {
   captureSchematicSvg,
   rasterizeToPng,
   buildSheetPdf,
+  type SchemCapture,
 } from "@/lib/pcb/exporters";
 import { ProjectInfoModal } from "@/components/dashboard/project-info-modal";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
@@ -2681,10 +2682,13 @@ function DocumentModal() {
   );
 }
 
-// UIUX-67 — the schematic sheet's own export dialog. The board's DocumentModal
-// exports the PCB model; this one captures the live sheet (the same engine the
-// old one-click PNG/SVG rows used), so PDF · PNG · SVG all leave from one home,
-// with the frame + title block and a print-ink mode the capture now supports.
+// UIUX-67 + UIUX-65 — the schematic sheet's own export dialog. The board's
+// DocumentModal exports the PCB model; this one captures the live sheet, so
+// PDF · PNG · SVG all leave from one home. Two panes: calibration left, a live
+// preview right that renders the very capture the export writes. Range picks
+// this sheet, the current selection (content-cropped), or every sheet — the
+// all-sheets runner walks the real sheets (gotoSheet → render → capture) and
+// restores where you were.
 function SheetExportModal() {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -2692,92 +2696,209 @@ function SheetExportModal() {
   const [frame, setFrame] = React.useState(true);
   const [ink, setInk] = React.useState<"asDrawn" | "print">("asDrawn");
   const [detail, setDetail] = React.useState<1 | 2 | 3>(2);
+  const [range, setRange] = React.useState<"sheet" | "selection" | "all">("sheet");
+  const [busy, setBusy] = React.useState(false);
+  const [preview, setPreview] = React.useState<SchemCapture | null>(null);
 
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "sheet";
   const firstSheetId = state.schematicSheets[0]?.id;
   const sheet = state.schematicSheets.find((s) => s.id === state.activeSheetId) ?? state.schematicSheets[0];
-  const count = state.objects.filter(
-    (o) => o.scope !== "pcb" && (o.sheetId ?? firstSheetId) === (sheet?.id ?? firstSheetId),
-  ).length;
-  const [fileName, setFileName] = React.useState(
-    () => (sheet?.name ?? "sheet").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "sheet",
+  const onSheet = (sheetId: string | undefined) =>
+    state.objects.filter((o) => o.scope !== "pcb" && (o.sheetId ?? firstSheetId) === (sheetId ?? firstSheetId));
+  const sheetCount = onSheet(sheet?.id).length;
+  const selCount = state.selectedIds.length;
+  const allCount = state.objects.filter((o) => o.scope !== "pcb").length;
+  const sheetsN = state.schematicSheets.length;
+  const rangeCount = range === "selection" ? selCount : range === "all" ? allCount : sheetCount;
+  const { activeProject } = useManualProjects();
+  // The default filename names what the range exports — the sheet for a
+  // single-sheet export, the project for the all-sheets set (`sheet-1-sheet-1`
+  // was the default naming itself twice). A hand-edited name is left alone.
+  const [customName, setCustomName] = React.useState<string | null>(null);
+  const fileName = customName ?? (range === "all" ? slugify(activeProject?.name ?? "sheets") : slugify(sheet?.name ?? "sheet"));
+
+  // Selection export crops to the picked objects — a full sheet frame around a
+  // detail crop would be a lie about what the file contains.
+  const effFrame = frame && range !== "selection";
+  const capOpts = React.useMemo(
+    () => ({ includeFrame: effFrame, ink, onlyIds: range === "selection" && selCount > 0 ? state.selectedIds : undefined }),
+    [effFrame, ink, range, selCount, state.selectedIds],
   );
 
-  const rowSeg = <T extends string>(name: string, options: { label: string; value: T }[], value: T, onChange: (v: T) => void, muted?: boolean) => (
-    <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", opacity: muted ? 0.45 : 1, pointerEvents: muted ? "none" : "auto" }} aria-disabled={muted || undefined}>
-      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{name}</span>
-      <div style={{ display: "flex", gap: "var(--spacing-7)", flexWrap: "wrap" }}>
+  // The preview IS the capture the export writes (for All sheets: the active
+  // sheet, since the others aren't in the DOM until the runner visits them).
+  // Captured after paint (rAF) — the capture reads the live canvas DOM.
+  React.useEffect(() => {
+    let live = true;
+    const raf = requestAnimationFrame(() => {
+      if (live) setPreview(rangeCount === 0 ? null : captureSchematicSvg(capOpts));
+    });
+    return () => { live = false; cancelAnimationFrame(raf); };
+  }, [capOpts, rangeCount]);
+
+  const nextFrames = (n: number) =>
+    new Promise<void>((resolve) => {
+      const step = (left: number) => (left <= 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
+      step(n);
+    });
+
+  // Walk every sheet for real: switch, let the canvas render, capture, move on
+  // — then put the user back on their sheet with their selection.
+  const captureAllSheets = async (): Promise<Array<{ cap: SchemCapture; name: string }>> => {
+    const origSheet = state.activeSheetId;
+    const origSel = state.selectedIds;
+    const out: Array<{ cap: SchemCapture; name: string }> = [];
+    for (const sh of state.schematicSheets) {
+      actions.gotoSheet(sh.id);
+      await nextFrames(3);
+      const cap = captureSchematicSvg({ includeFrame: effFrame, ink });
+      if (cap) out.push({ cap, name: sh.name });
+    }
+    actions.gotoSheet(origSheet);
+    await nextFrames(2);
+    if (origSel.length) actions.selectMany(origSel);
+    return out;
+  };
+
+  const buildPdfBlob = async (): Promise<Blob | null> => {
+    if (range === "all") {
+      const pages = await captureAllSheets();
+      return pages.length ? buildSheetPdf(pages.map((p) => p.cap), detail) : null;
+    }
+    const cap = captureSchematicSvg(capOpts);
+    return cap ? buildSheetPdf([cap], detail) : null;
+  };
+
+  const doExport = async () => {
+    if (busy) return;
+    const base = (fileName || "sheet").replace(/\.(pdf|png|svg)$/i, "").slice(0, 60);
+    setBusy(true);
+    try {
+      if (range === "all" && fmt !== "PDF") {
+        // One file per sheet; a multi-page PNG/SVG doesn't exist.
+        const pages = await captureAllSheets();
+        if (!pages.length) { actions.flashToast("Nothing on any sheet to export"); return; }
+        for (const p of pages) {
+          const name = `${base}-${slugify(p.name)}`;
+          if (fmt === "SVG") downloadBlob(`${name}.svg`, p.cap.svg, "image/svg+xml");
+          else downloadDataUrl(`${name}.png`, await rasterizeToPng(p.cap.svg, p.cap.width, p.cap.height, detail));
+        }
+        const skipped = sheetsN - pages.length;
+        actions.flashToast(`Exported ${pages.length} sheet${pages.length === 1 ? "" : "s"} as ${fmt}${skipped ? ` — ${skipped} empty sheet${skipped === 1 ? "" : "s"} skipped` : ""}`);
+      } else if (fmt === "PDF") {
+        const blob = await buildPdfBlob();
+        if (!blob) { actions.flashToast("Nothing to export"); return; }
+        downloadBlob(`${base}.pdf`, blob, "application/pdf");
+        actions.flashToast(range === "all" ? `Exported ${base}.pdf — one page per sheet` : `Exported ${base}.pdf`);
+      } else {
+        const cap = captureSchematicSvg(capOpts);
+        if (!cap) { actions.flashToast("Nothing to export"); return; }
+        if (fmt === "SVG") downloadBlob(`${base}.svg`, cap.svg, "image/svg+xml");
+        else downloadDataUrl(`${base}.png`, await rasterizeToPng(cap.svg, cap.width, cap.height, detail));
+        actions.flashToast(`Exported ${base}.${fmt.toLowerCase()}`);
+      }
+      actions.closeModal();
+    } catch {
+      actions.flashToast(`${fmt} export failed`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rowSeg = <T extends string>(name: string, options: { label: string; value: T; off?: boolean }[], value: T, onChange: (v: T) => void, muted?: boolean) => (
+    <div key={name} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-8)", opacity: muted ? 0.45 : 1, pointerEvents: muted ? "none" : "auto" }} aria-disabled={muted || undefined}>
+      <span style={{ width: 104, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: "20px" }}>{name}</span>
+      <div style={{ display: "flex", gap: "var(--spacing-4) var(--spacing-7)", flexWrap: "wrap" }}>
         {options.map((o) => (
-          <div key={o.value} onClick={() => onChange(o.value)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
-            <Radio on={value === o.value} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o.label}</span>
+          <div key={o.value} onClick={o.off ? undefined : () => onChange(o.value)} aria-disabled={o.off || undefined} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: o.off ? "default" : "pointer", opacity: o.off ? 0.45 : 1 }}>
+            <Radio on={value === o.value} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
           </div>
         ))}
       </div>
     </div>
   );
 
-  const buildPdfBlob = async () => {
-    const cap = captureSchematicSvg({ includeFrame: frame, ink });
-    return cap ? { blob: await buildSheetPdf(cap.svg, cap.width, cap.height, detail), cap } : null;
-  };
+  const summary = rangeCount === 0
+    ? range === "selection"
+      ? "Nothing selected — select objects on the sheet to export a detail."
+      : "Nothing to export yet — place symbols or wires first."
+    : range === "all"
+    ? `All sheets · ${sheetsN} sheet${sheetsN === 1 ? "" : "s"} · ${allCount} objects · ${effFrame ? "frame & title block" : "content only"}${fmt === "PDF" ? " · one page per sheet" : ` · one ${fmt} per sheet`}`
+    : `${range === "selection" ? `Selection · ${selCount}` : `${sheet?.name ?? "Sheet"} · ${state.schemBorder.size} ${state.schemBorder.orientation} · ${sheetCount}`} object${rangeCount === 1 ? "" : "s"} · ${effFrame ? "frame & title block" : range === "selection" ? "cropped to the selection" : "content only"}${fmt !== "SVG" ? ` · ${detail}×` : ""}${ink === "print" ? " · black on white" : ""}`;
 
-  const doExport = async () => {
-    const base = (fileName || "sheet").replace(/\.(pdf|png|svg)$/i, "").slice(0, 60);
-    try {
-      if (fmt === "PDF") {
-        const r = await buildPdfBlob();
-        if (!r) { actions.flashToast("Nothing on this sheet to export"); return; }
-        downloadBlob(`${base}.pdf`, r.blob, "application/pdf");
-      } else {
-        const cap = captureSchematicSvg({ includeFrame: frame, ink });
-        if (!cap) { actions.flashToast("Nothing on this sheet to export"); return; }
-        if (fmt === "SVG") downloadBlob(`${base}.svg`, cap.svg, "image/svg+xml");
-        else downloadDataUrl(`${base}.png`, await rasterizeToPng(cap.svg, cap.width, cap.height, detail));
-      }
-      actions.flashToast(`Exported ${base}.${fmt.toLowerCase()}`);
-      actions.closeModal();
-    } catch {
-      actions.flashToast(`${fmt} export failed`);
-    }
-  };
-
-  const summary = count === 0
-    ? "Nothing on this sheet yet — place symbols or wires before exporting."
-    : `${sheet?.name ?? "Sheet"} · ${state.schemBorder.size} ${state.schemBorder.orientation} · ${count} object${count === 1 ? "" : "s"} · ${frame ? "frame & title block" : "content only"}${fmt !== "SVG" ? ` · ${detail}×` : ""}${ink === "print" ? " · black on white" : ""}`;
+  const previewUrl = preview ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview.svg)}` : null;
 
   return (
     <Overlay>
-      <Card width={580} maxHeight="90%" flexCol>
+      <Card width={960} maxHeight="90%" flexCol>
         <Header title="Export Sheet" onClose={actions.closeModal} padding="16px 22px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
-          {rowSeg("Format", [{ label: "PDF", value: "PDF" as const }, { label: "PNG", value: "PNG" as const }, { label: "SVG", value: "SVG" as const }], fmt, setFmt)}
-          {rowSeg("Ink", [{ label: "As drawn (editor colours)", value: "asDrawn" as const }, { label: "Black on white (print)", value: "print" as const }], ink, setInk)}
-          {rowSeg("Detail", [{ label: "1×", value: "1" as const }, { label: "2×", value: "2" as const }, { label: "3×", value: "3" as const }], String(detail) as "1" | "2" | "3", (v) => setDetail(Number(v) as 1 | 2 | 3), fmt === "SVG")}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
-            <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Sheet frame</span>
-            <div onClick={() => setFrame((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
-              <Check on={frame} size={18} />
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Include the frame & title block</span>
+        <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 340 }}>
+          <div style={{ width: 420, flex: "0 0 auto", padding: "var(--spacing-8) var(--spacing-9)", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+            {rowSeg("Format", [{ label: "PDF", value: "PDF" as const }, { label: "PNG", value: "PNG" as const }, { label: "SVG", value: "SVG" as const }], fmt, setFmt)}
+            {rowSeg("Range", [
+              { label: "This sheet", value: "sheet" as const },
+              { label: selCount ? `Selection (${selCount})` : "Selection — nothing selected", value: "selection" as const, off: selCount === 0 },
+              { label: `All sheets (${sheetsN})`, value: "all" as const },
+            ], range, setRange)}
+            {rowSeg("Ink", [{ label: "As drawn (editor colours)", value: "asDrawn" as const }, { label: "Black on white (print)", value: "print" as const }], ink, setInk)}
+            {rowSeg("Detail", [{ label: "1×", value: "1" as const }, { label: "2×", value: "2" as const }, { label: "3×", value: "3" as const }], String(detail) as "1" | "2" | "3", (v) => setDetail(Number(v) as 1 | 2 | 3), fmt === "SVG")}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", opacity: range === "selection" ? 0.45 : 1, pointerEvents: range === "selection" ? "none" : "auto" }} aria-disabled={range === "selection" || undefined}>
+              <span style={{ width: 104, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Sheet frame</span>
+              <div onClick={() => setFrame((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+                <Check on={effFrame} size={18} />
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Include the frame & title block</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+              <span style={{ width: 104, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>File Name</span>
+              <input value={fileName} onChange={(e) => setCustomName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+            </div>
+            <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{summary}</div>
+            {fmt === "SVG" && (
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>SVG is vector — Detail doesn&apos;t apply.</div>
+            )}
+            {range === "selection" && (
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>A selection exports as a crop — the sheet frame doesn&apos;t apply.</div>
+            )}
+          </div>
+
+          {/* live preview — rendered from the same capture the export writes */}
+          <div style={{ flex: 1, padding: "var(--spacing-8)", display: "flex", flexDirection: "column", gap: "var(--spacing-4)", background: "var(--color-bg-subtle)", minWidth: 0 }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", padding: "var(--spacing-5)", overflow: "hidden" }}>
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local data: URI preview
+                <img src={previewUrl} alt="Export preview" style={{ maxWidth: "100%", maxHeight: "100%", display: "block" }} />
+              ) : (
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", textAlign: "center", maxWidth: 280 }}>
+                  {range === "selection" ? "Select something on the sheet to preview the crop." : "Nothing to preview yet."}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", textAlign: "center" }}>
+              {preview
+                ? range === "all"
+                  ? `Previewing ${sheet?.name ?? "the open sheet"} — every sheet exports${busy ? " · exporting…" : ""}`
+                  : `${preview.width} × ${preview.height} px${fmt !== "SVG" ? ` · ${preview.width * detail} × ${preview.height * detail} at ${detail}×` : ""}`
+                : ""}
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>File Name</span>
-            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
-          </div>
-          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{summary}</div>
-          {fmt === "SVG" && (
-            <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>SVG is vector — Detail doesn&apos;t apply.</div>
-          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Pill style={{ marginLeft: "auto", ...(count === 0 ? { opacity: 0.45, pointerEvents: "none" } : null) }} onClick={async () => {
-            const r = await buildPdfBlob();
-            if (!r) { actions.flashToast("Nothing on this sheet to export"); return; }
-            const url = URL.createObjectURL(r.blob);
-            window.open(url, "_blank");
-            window.setTimeout(() => URL.revokeObjectURL(url), 8000);
+          <Pill style={{ marginLeft: "auto", ...(rangeCount === 0 || busy ? { opacity: 0.45, pointerEvents: "none" } : null) }} onClick={async () => {
+            if (busy) return;
+            setBusy(true);
+            try {
+              const blob = await buildPdfBlob();
+              if (!blob) { actions.flashToast("Nothing to export"); return; }
+              const url = URL.createObjectURL(blob);
+              window.open(url, "_blank");
+              window.setTimeout(() => URL.revokeObjectURL(url), 8000);
+            } finally {
+              setBusy(false);
+            }
           }}>Print</Pill>
-          <Button hierarchy="primary" size="md" disabled={count === 0} onClick={doExport}>Export</Button>
+          <Button hierarchy="primary" size="md" disabled={rangeCount === 0 || busy} onClick={doExport}>{busy ? "Exporting…" : "Export"}</Button>
         </div>
       </Card>
     </Overlay>

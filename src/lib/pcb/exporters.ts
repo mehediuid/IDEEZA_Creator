@@ -479,8 +479,13 @@ export function buildObj(m: ExportModel, include?: { board?: boolean; comps?: bo
 // this captures the live sheet: each placed object's rendered <svg> is cloned
 // into a standalone document, with computed colours baked in so `currentColor`
 // and CSS variables survive outside the app. What you see is what you export.
-type SchemCapture = { svg: string; width: number; height: number };
-export type SheetCaptureOptions = { includeFrame?: boolean; ink?: "asDrawn" | "print" };
+export type SchemCapture = { svg: string; width: number; height: number };
+export type SheetCaptureOptions = {
+  includeFrame?: boolean;
+  ink?: "asDrawn" | "print";
+  /** Restrict the capture to these object ids (the Range = Selection export). */
+  onlyIds?: string[];
+};
 
 // Computed colours arrive as "rgb(…)" / "rgba(…)" or "color(srgb …)" → [r,g,b,a] in 0–1.
 function parseColor(c: string): [number, number, number, number] | null {
@@ -539,6 +544,7 @@ export function captureSchematicSvg(opts: SheetCaptureOptions = {}): SchemCaptur
   };
 
   const rb = root.getBoundingClientRect();
+  const only = opts.onlyIds ? new Set(opts.onlyIds) : null;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const items: string[] = [];
 
@@ -621,6 +627,7 @@ export function captureSchematicSvg(opts: SheetCaptureOptions = {}): SchemCaptur
   }
 
   for (const node of nodes) {
+    if (only && !only.has(node.getAttribute("data-object-id") ?? "")) continue;
     const r = node.getBoundingClientRect();
     // A horizontal wire has zero height and a vertical one zero width, so only
     // a node with no extent at all is skipped.
@@ -713,51 +720,64 @@ export function rasterizeToPng(svg: string, width: number, height: number, scale
 
 // ── Sheet PDF ─────────────────────────────────────────────────────────────────
 // The sheet capture is an SVG of the live DOM; translating arbitrary SVG into
-// PDF vector operators would be a whole renderer, so the sheet is rasterized
+// PDF vector operators would be a whole renderer, so each sheet is rasterized
 // (like the PNG export, at the same `scale`) and embedded as one full-page
-// JPEG (DCTDecode) in a hand-rolled single-page PDF. Page size follows the
-// sheet's aspect at 96 px → 72 pt.
-export function buildSheetPdf(svg: string, width: number, height: number, scale = 2): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const blobUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(width * scale));
-      canvas.height = Math.max(1, Math.round(height * scale));
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("no 2d context")); return; }
-      // JPEG carries no alpha — pre-fill so nothing lands on black.
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(blobUrl);
-      const b64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1] ?? "";
-      const bin = atob(b64);
-      const jpeg = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
-      resolve(wrapJpegInPdf(jpeg, canvas.width, canvas.height, width * 0.75, height * 0.75));
-    };
-    img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("svg raster failed")); };
-    img.src = blobUrl;
-  });
+// JPEG (DCTDecode). One capture per page — the all-sheets export hands in one
+// capture per sheet. Page size follows each sheet's aspect at 96 px → 72 pt.
+export function buildSheetPdf(pages: SchemCapture[], scale = 2): Promise<Blob> {
+  const rasterOne = (page: SchemCapture) =>
+    new Promise<{ jpeg: Uint8Array<ArrayBuffer>; pxW: number; pxH: number; wPt: number; hPt: number }>((resolve, reject) => {
+      const img = new Image();
+      const blobUrl = URL.createObjectURL(new Blob([page.svg], { type: "image/svg+xml" }));
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(page.width * scale));
+        canvas.height = Math.max(1, Math.round(page.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("no 2d context")); return; }
+        // JPEG carries no alpha — pre-fill so nothing lands on black.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(blobUrl);
+        const b64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1] ?? "";
+        const bin = atob(b64);
+        const jpeg = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
+        resolve({ jpeg, pxW: canvas.width, pxH: canvas.height, wPt: page.width * 0.75, hPt: page.height * 0.75 });
+      };
+      img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("svg raster failed")); };
+      img.src = blobUrl;
+    });
+  return (async () => {
+    const rastered = [];
+    for (const p of pages) rastered.push(await rasterOne(p));
+    return wrapJpegsInPdf(rastered);
+  })();
 }
 
-// One JPEG on one page. All text parts are ASCII, so string length == byte
-// length and the xref offsets stay byte-accurate around the binary stream.
-function wrapJpegInPdf(jpeg: Uint8Array<ArrayBuffer>, pxW: number, pxH: number, wPt: number, hPt: number): Blob {
-  const content = `q ${wPt.toFixed(2)} 0 0 ${hPt.toFixed(2)} 0 0 cm /Im0 Do Q`;
+// One JPEG per page. All text parts are ASCII, so string length == byte length
+// and the xref offsets stay byte-accurate around the binary streams. Object
+// layout: 1 Catalog · 2 Pages · then per page k: page 3+3k · contents 4+3k ·
+// image 5+3k.
+function wrapJpegsInPdf(pages: Array<{ jpeg: Uint8Array<ArrayBuffer>; pxW: number; pxH: number; wPt: number; hPt: number }>): Blob {
+  const kids = pages.map((_, k) => `${3 + k * 3} 0 R`).join(" ");
   const objs: (string | Uint8Array<ArrayBuffer>)[][] = [
     ["<</Type/Catalog/Pages 2 0 R>>"],
-    ["<</Type/Pages/Kids[3 0 R]/Count 1>>"],
-    [`<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${wPt.toFixed(2)} ${hPt.toFixed(2)}]/Contents 4 0 R/Resources<</ProcSet[/PDF/ImageC]/XObject<</Im0 5 0 R>>>>>>`],
-    [`<</Length ${content.length}>>\nstream\n${content}\nendstream`],
-    [
-      `<</Type/XObject/Subtype/Image/Width ${pxW}/Height ${pxH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpeg.length}>>\nstream\n`,
-      jpeg,
-      "\nendstream",
-    ],
+    [`<</Type/Pages/Kids[${kids}]/Count ${pages.length}>>`],
   ];
+  pages.forEach((p, k) => {
+    const content = `q ${p.wPt.toFixed(2)} 0 0 ${p.hPt.toFixed(2)} 0 0 cm /Im${k} Do Q`;
+    objs.push(
+      [`<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${p.wPt.toFixed(2)} ${p.hPt.toFixed(2)}]/Contents ${4 + k * 3} 0 R/Resources<</ProcSet[/PDF/ImageC]/XObject<</Im${k} ${5 + k * 3} 0 R>>>>>>`],
+      [`<</Length ${content.length}>>\nstream\n${content}\nendstream`],
+      [
+        `<</Type/XObject/Subtype/Image/Width ${p.pxW}/Height ${p.pxH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${p.jpeg.length}>>\nstream\n`,
+        p.jpeg,
+        "\nendstream",
+      ],
+    );
+  });
   const parts: (string | Uint8Array<ArrayBuffer>)[] = ["%PDF-1.4\n"];
   let total = "%PDF-1.4\n".length;
   const push = (p: string | Uint8Array<ArrayBuffer>) => { parts.push(p); total += p.length; };
