@@ -202,6 +202,10 @@ export interface PcbActions {
   removeSutureVias: (groupId: string) => void;
   /** Grab-move: pick up the selection so it follows the cursor (right-click Move). */
   startMoveSelected: () => void;
+  /** Answer Move's pick-the-object prompt; true when it consumed the click. */
+  pickMoveTarget: (id: string) => boolean;
+  /** Drop Move's pick-the-object prompt without moving anything. */
+  cancelMovePick: () => void;
   translateMove: (dx: number, dy: number) => void;
   commitMove: () => void;
   cancelMove: () => void;
@@ -1349,7 +1353,14 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       },
       startMoveSelected: () => {
         const s = stateRef.current;
-        if (!s.selectedIds.length) { actions.closeAll(); return; }
+        // Nothing selected — Move used to close the menu and do nothing at all.
+        // Ask for the reference point instead; the next object click starts the
+        // move from there (UIUX-94).
+        if (!s.selectedIds.length) {
+          merge({ movePick: true, ctx: null, openMenu: null });
+          actions.flashToast("Nothing selected — click the object to move, Esc to cancel");
+          return;
+        }
         moveOrigRef.current = snap(s);            // for one-step undo / cancel
         merge({ moveMode: { ids: [...s.selectedIds] }, ctx: null, openMenu: null });
         actions.flashToast("Moving — click to drop, Esc to cancel");
@@ -1923,6 +1934,30 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           }
           return { selectedIds: [id], selSub: "none" };
         }),
+      cancelMovePick: () => {
+        if (!stateRef.current.movePick) return;
+        merge({ movePick: false });
+        actions.flashToast("Move cancelled");
+      },
+      /**
+       * The click that answers Move's "pick the object" prompt (UIUX-94).
+       * Selects and grabs in ONE update: selecting first and then calling
+       * startMoveSelected would read `stateRef` before React had applied the
+       * selection, so the move saw an empty selection and re-asked.
+       */
+      pickMoveTarget: (id) => {
+        const s = stateRef.current;
+        if (!s.movePick) return false;
+        // A grouped object moves with its group, as a normal click would.
+        const gid = (s.objects.find((o) => o.id === id)?.props as Record<string, unknown> | undefined)?.groupId;
+        const ids = gid
+          ? s.objects.filter((o) => (o.props as Record<string, unknown> | undefined)?.groupId === gid).map((o) => o.id)
+          : [id];
+        moveOrigRef.current = snap(s);           // one-step undo / cancel
+        merge({ movePick: false, selectedIds: ids, selSub: "none", moveMode: { ids }, ctx: null, openMenu: null });
+        actions.flashToast("Moving — click to drop, Esc to cancel");
+        return true;
+      },
       selectDesignator: (compId, sub) =>
         merge({ selectedIds: [compId], selSub: sub, selected: "comp" }),
       selectMany: (ids) => merge({ selectedIds: ids, selSub: "none" }),

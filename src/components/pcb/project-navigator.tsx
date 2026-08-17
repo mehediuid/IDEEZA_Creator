@@ -230,6 +230,18 @@ export function ProjectNavigator({ query }: { query: string }) {
     const byFamily = new Map<string, CanvasObject[]>();
     objs.forEach((o) => { const f = familyOf(o.kind); (byFamily.get(f) ?? byFamily.set(f, []).get(f)!).push(o); });
     const famOrder = OBJECT_FAMILIES.map((f) => f.label);
+    // A group isn't a kind — it's objects sharing a groupId — so it can't come
+    // from the family map and had no row at all (UIUX-35). One row per group,
+    // named as the Arrange menu named it, listing its members.
+    const groups = new Map<string, { name: string; items: CanvasObject[] }>();
+    objs.forEach((o) => {
+      const p = (o.props ?? {}) as Record<string, unknown>;
+      const gid = typeof p.groupId === "string" ? p.groupId : null;
+      if (!gid) return;
+      const g = groups.get(gid) ?? { name: typeof p.groupName === "string" ? p.groupName : "Group", items: [] };
+      g.items.push(o);
+      groups.set(gid, g);
+    });
     [...byFamily.keys()].sort((a, b) => {
       const ia = famOrder.indexOf(a), ib = famOrder.indexOf(b);
       return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
@@ -255,6 +267,28 @@ export function ProjectNavigator({ query }: { query: string }) {
         );
       }
     });
+    // Groups sit under the families, since a group is made of them.
+    [...groups.entries()]
+      .filter(([, g]) => g.items.some((o) => match(designator(o), o.net, o.kind, g.name)))
+      .forEach(([gid, g]) => {
+        const gk = "grpset:" + gid;
+        rows.push({
+          id: gk, label: g.name, meta: `${g.items.length}`, icon: "group", depth: 0, hasCaret: true,
+          open: isOpen(gk, false), onToggle: () => toggle(gk),
+          menu: [
+            { label: "Select group", icon: "copy", run: () => actions.selectMany(g.items.map((o) => o.id)) },
+            { label: "Ungroup", icon: "ungroup", run: () => { actions.selectMany(g.items.map((o) => o.id)); actions.ungroupSelection(); } },
+          ],
+        });
+        if (isOpen(gk, false))
+          g.items.forEach((o) =>
+            rows.push({
+              id: gid + ":" + o.id, label: designator(o), meta: o.net || o.kind, icon: iconForKind(o.kind), depth: 1,
+              active: state.selectedIds.includes(o.id),
+              onClick: () => { actions.selectPlaced(o.id, false); actions.zoomFit("selection"); },
+            }),
+          );
+      });
   }
 
   const emptyMsg =

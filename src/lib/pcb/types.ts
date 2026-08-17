@@ -453,12 +453,19 @@ export const OBJECT_FAMILIES: ReadonlyArray<{ label: string; kinds: readonly str
   { label: "No Connect", kinds: ["noConnect"] },
   { label: "Agile module", kinds: ["reuseBlock"] },
   { label: "Text & table", kinds: ["text", "note", "field", "table"] },
-  { label: "Drawing", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "polygon", "image", "maskRegion", "componentMask", "dimension"] },
+  { label: "Drawing", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "image", "maskRegion", "componentMask"] },
+  // A dimension is a measurement, not a drawn shape — it was counted as
+  // "Drawing", so a board full of them showed none by name (UIUX-35).
+  { label: "Dimension", kinds: ["dimension"] },
   // board side
   { label: "Track", kinds: ["track", "diffPair", "ratsnest"] },
   { label: "Pad & via", kinds: ["pad", "via", "sutureVias", "testPoint", "shapedPad", "mountingHole"] },
-  { label: "Copper", kinds: ["fillRegion", "prohibitedRegion", "constraintRegion"] },
-  { label: "Outline", kinds: ["boardOutline", "slot"] },
+  // Each area kind is its own row (UIUX-35). They were one "Copper" bucket, so
+  // a prohibited area and a poured plane were the same line in the tree. The
+  // list is derived from AREA_KINDS, the same source the menus and the drawing
+  // tools read, so the tree can't fall behind when an area kind is added.
+  ...AREA_KINDS.map((a) => ({ label: a.label, kinds: [a.kind] as readonly string[] })),
+  { label: "Outline", kinds: ["boardOutline"] },
   { label: "Footprint", kinds: ["fp0805", "fpSOD123", "fpSOT23", "fpSOIC8"] },
 ];
 export const familyOf = (kind: string): string =>
@@ -678,6 +685,11 @@ export interface PcbState {
   // Grab-move (right-click Move): the selected objects follow the cursor until
   // the next click; null = not moving.
   moveMode: { ids: string[] } | null;
+  /**
+   * Move was invoked with nothing selected, so the next canvas click picks what
+   * to move (UIUX-94). Session-only; Esc clears it.
+   */
+  movePick: boolean;
   // Toolbar — grid, unit, visibility
   gridSize: string;
   unit: string;
@@ -1726,6 +1738,7 @@ export const initialState: PcbState = {
   ],
   activeSheetId: "sheet-1",
   moveMode: null,
+  movePick: false,
   gridSize: "0.05",
   unit: "Inch",
   gridType: "lines",

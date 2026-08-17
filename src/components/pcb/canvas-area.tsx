@@ -689,6 +689,7 @@ export function CanvasArea() {
           actions.deleteSelected();
         }
       } else if (e.key === "Escape") {
+        if (state.movePick) actions.cancelMovePick();
         if (state.draftPoly) actions.polyCancel();
         if (state.draftWire) actions.cancelDraft();
         else if (state.rubberBand) actions.cancelRubberBand();
@@ -733,7 +734,7 @@ export function CanvasArea() {
       window.removeEventListener("keydown", handler);
       window.removeEventListener("keyup", release);
     };
-  }, [state.selectedIds, state.draftWire, state.draftPoly, state.rubberBand, state.lasso, state.tool, actions]);
+  }, [state.selectedIds, state.draftWire, state.draftPoly, state.rubberBand, state.lasso, state.tool, state.movePick, actions]);
 
   // Grab-move (right-click ▸ Move): the picked-up selection follows the cursor;
   // the next mousedown drops it (committing one undo step), Escape cancels.
@@ -815,6 +816,16 @@ export function CanvasArea() {
     const canvasStart = rect
       ? { x: (e.clientX - rect.left - state.pan.x) / state.zoom, y: (e.clientY - rect.top - state.pan.y) / state.zoom }
       : null;
+
+    // Move was invoked with nothing selected and is waiting to be told what to
+    // move (UIUX-94). This click answers that, so it is consumed here — before
+    // any pan / marquee / draw intent, which would otherwise swallow it.
+    if (isLeft && state.movePick) {
+      e.preventDefault();
+      if (clickedObjectId) { actions.pickMoveTarget(clickedObjectId); return; }
+      actions.flashToast("Click on the object you want to move — Esc to cancel");
+      return;
+    }
 
     // Decide intent.
     const intentPan =
@@ -996,7 +1007,11 @@ export function CanvasArea() {
       {state.mode === "schematic" && <Crosshair hostRef={frameRef} />}
 
       {/* armed-tool feedback */}
-      {showHint && (
+      {/* Move is waiting to be told what to move — the prompt stays on screen
+          until it is answered, rather than flashing past in a toast (UIUX-94). */}
+      {state.movePick ? (
+        <ToolHint label="Move" hint="Nothing selected — click the object to move · Esc cancels" />
+      ) : showHint && (
         <ToolHint
           label={toolLabel(state.tool, toolLabels, state.placeText)}
           hint={toolHint(state.tool)}
