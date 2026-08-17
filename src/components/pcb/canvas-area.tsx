@@ -114,12 +114,12 @@ export const SCHEM_TOOLS: SchemTool[] = [
   // stamped text, so it really is its own net (same trick as VCC / +5V / -5V,
   // which all place `vcc5v`).
   { key: "power", label: "Power", options: [
-    { label: "VCC", tool: "vcc5v", railText: "VCC", svg: '<path d="M12 20V8M5 8h14"/>' },
+    { label: "VCC", tool: "vcc5v", railText: "VCC", svg: '<path d="M12 20V9M5 9h14M8.5 5.5L12 9l3.5-3.5"/>' },
     { label: "+5V", tool: "vcc5v", railText: "+5V", svg: '<path d="M12 20V9"/><path d="M12 3.5L6.5 9.5h11z" fill="currentColor"/>' },
     { label: "-5V", tool: "vcc5v", railText: "-5V", svg: '<path d="M12 4v11"/><path d="M12 20.5L6.5 14.5h11z" fill="currentColor"/>' },
     { label: "GND", tool: "gnd", svg: '<path d="M12 4v9M4.5 13h15M7.5 16.5h9M10 20h4"/>' },
     { label: "DGND", tool: "gnd", railText: "DGND", svg: '<path d="M12 6v7M4.5 13h15M7.5 16.5h9M10 20h4"/><path d="M3.6 3.2v6.4h1.7a3.2 3.2 0 0 0 0-6.4z" stroke-width="1.5"/>' },
-    { label: "Analog GND", tool: "agnd", svg: '<path d="M12 4v7"/><path d="M4 11l8 9 8-9z" fill="currentColor"/>' },
+    { label: "Analog GND", tool: "agnd", svg: '<path d="M12 4v8M5 12h14"/><path d="M8 12l4 7 4-7z" fill="none"/>' },
     { label: "Power GND", tool: "pgnd", svg: '<path d="M12 4v9M4.5 13h15"/><path d="M7 13l-2.5 5M12 13l-2.5 5M17 13l-2.5 5"/>' },
   ] },
   // Shapes — the drawing primitives a schematic needs to sketch symbols,
@@ -138,7 +138,12 @@ export const SCHEM_TOOLS: SchemTool[] = [
   // Net naming — one tool, no flyout. The other four label kinds (global,
   // hierarchical, port, off-sheet link) live in Insert ▸ Net Label so they
   // stay placeable without turning this row back into a menu.
-  { key: "netLabel", label: "Net Label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
+  // Net Label carries the flag beside it (UIUX-8): both name a node, and the
+  // flag had no home on the canvas at all.
+  { key: "netLabel", label: "Net Label", options: [
+    { label: "Net Label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
+    { label: "Net Flag", tool: "netFlag", svg: '<path d="M6 20V5h10l-2.5 3.5L16 12H6"/>' },
+  ] },
   { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
   { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
   { key: "text", label: "Text", options: [
@@ -568,7 +573,6 @@ function ToolPalette({ tools }: { tools: SchemTool[] }) {
             {t.options && (
               <button
                 type="button"
-                className="ix-tool"
                 aria-label={`${t.label} options`}
                 aria-expanded={isOpen}
                 aria-haspopup="menu"
@@ -579,7 +583,10 @@ function ToolPalette({ tools }: { tools: SchemTool[] }) {
                   position: "absolute", left: 0, right: 0, bottom: 0, height: VARIANT_STRIP,
                   display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
                   padding: "0 3px 3px 0", border: "none", cursor: "pointer",
-                  background: isOpen ? "var(--color-bg-brand-subtle)" : "transparent",
+                  // No hover fill of its own: the cell's own highlight is the
+                  // hover state, and a second box under the glyph read as a
+                  // bottom-heavy highlight (UIUX-46).
+                  background: "transparent",
                   borderRadius: "0 0 var(--radius-lg) var(--radius-lg)",
                   color: active || isOpen ? "var(--color-violet-600)" : "var(--color-text-tertiary)",
                 }}

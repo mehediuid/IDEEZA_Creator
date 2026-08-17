@@ -2753,6 +2753,91 @@ function DocumentModal() {
   );
 }
 
+// UIUX-82 — Export ▸ Design files. The row used to write board.glb the instant
+// you clicked it; a project is three things, so it asks which of them you want
+// and writes exactly those: the sheet as SVG, the board as SVG, the 3D model as
+// GLB. Each line says what it will produce, and a part that isn't there yet
+// disables itself with the reason rather than writing an empty file.
+function DesignFilesModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const [busy, setBusy] = React.useState(false);
+  const firstSheet = state.schematicSheets[0]?.id;
+  const schemCount = state.objects.filter((o) => o.scope !== "pcb" && (o.sheetId ?? firstSheet) === state.activeSheetId).length;
+  const boardCount = state.objects.filter((o) => o.scope === "pcb").length;
+  const [want, setWant] = React.useState({ schematic: true, pcb: true, three: true });
+  const can = { schematic: schemCount > 0, pcb: boardCount > 0, three: boardCount > 0 };
+  const picked = (["schematic", "pcb", "three"] as const).filter((k) => want[k] && can[k]);
+
+  const rows: { key: "schematic" | "pcb" | "three"; label: string; note: string }[] = [
+    { key: "schematic", label: "Schematic", note: can.schematic ? `this sheet · ${schemCount} objects → .svg` : "nothing on the sheet yet" },
+    { key: "pcb", label: "PCB", note: can.pcb ? `board layout · ${boardCount} objects → .svg` : "no board yet — convert the schematic first" },
+    { key: "three", label: "3D", note: can.three ? "board model → .glb" : "no board yet — convert the schematic first" },
+  ];
+
+  const run = async () => {
+    if (!picked.length || busy) return;
+    setBusy(true);
+    const base = (state.schematicSheets.find((sh) => sh.id === state.activeSheetId)?.name ?? "design")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "design";
+    const written: string[] = [];
+    try {
+      if (picked.includes("schematic")) {
+        const cap = captureSchematicSvg({ includeFrame: true });
+        if (cap) { downloadBlob(`${base}-schematic.svg`, cap.svg, "image/svg+xml"); written.push("schematic"); }
+      }
+      if (picked.includes("pcb")) {
+        const m = collectPcbModel(state);
+        downloadBlob(`${base}-pcb.svg`, buildSvg(m), "image/svg+xml");
+        written.push("PCB");
+      }
+      if (picked.includes("three")) {
+        const { exportBoardGltf } = await import("@/lib/pcb/glb-export");
+        const buf = await exportBoardGltf(state, true);
+        downloadBlob(`${base}-3d.glb`, buf as ArrayBuffer, "model/gltf-binary");
+        written.push("3D");
+      }
+      actions.flashToast(written.length ? `Exported ${written.join(" · ")}` : "Nothing was exported");
+      actions.closeModal();
+    } catch {
+      actions.flashToast("Design files export failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Overlay>
+      <Card width={520} flexCol>
+        <Header title="Export design files" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+          {rows.map((r) => (
+            <div
+              key={r.key}
+              onClick={() => can[r.key] && setWant((w) => ({ ...w, [r.key]: !w[r.key] }))}
+              aria-disabled={!can[r.key] || undefined}
+              style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-5)", cursor: can[r.key] ? "pointer" : "default", opacity: can[r.key] ? 1 : 0.45 }}
+            >
+              <span style={{ marginTop: 1 }}><Check on={want[r.key] && can[r.key]} size={18} /></span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: "var(--font-size-md)", fontWeight: 600, color: "var(--color-text-primary)" }}>{r.label}</span>
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>{r.note}</span>
+              </span>
+            </div>
+          ))}
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+            {picked.length ? `${picked.length} file${picked.length === 1 ? "" : "s"} · one per part you picked.` : "Pick at least one part of the design."}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="primary" size="md" disabled={!picked.length || busy} onClick={run}>{busy ? "Exporting…" : "Export"}</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 // UIUX-67 + UIUX-65 — the schematic sheet's own export dialog. The board's
 // DocumentModal exports the PCB model; this one captures the live sheet, so
 // PDF · PNG · SVG all leave from one home. Two panes: calibration left, a live
@@ -3640,6 +3725,8 @@ export function Modals() {
       return <DocumentModal />;
     case "exportSheet":
       return <SheetExportModal />;
+    case "exportDesignFiles":
+      return <DesignFilesModal />;
     case "openProject":
       return <OpenProjectModal />;
     case "devicePicker":

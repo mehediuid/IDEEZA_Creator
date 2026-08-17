@@ -81,6 +81,8 @@ export type ModalId =
   | "exportPdf2D"
   // UIUX-67 — the schematic sheet's own export dialog (PDF · PNG · SVG)
   | "exportSheet"
+  // UIUX-82 — Design files: pick which of schematic / board / 3D to write
+  | "exportDesignFiles"
   | "exportGerber2D"
   | "exportPickPlace"
   | "exportBom"

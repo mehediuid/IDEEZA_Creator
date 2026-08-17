@@ -345,7 +345,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         // (frame + title block included); the board's PDF stays in the 2D menu.
         item("Sheet (PDF · PNG · SVG)…", { icon: "pdf", onClick: () => actions.openModal("exportSheet") }),
         dv,
-        item("Design files", { icon: "cube", onClick: () => actions.exportGlb() }),
+        item("Design files", { icon: "cube", onClick: () => actions.openModal("exportDesignFiles") }),
       ],
     },
     {
@@ -620,7 +620,16 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Prohibited Region", { icon: "pNoConnect", sub: areaSub("prohibitedRegion") }),
         item("Constraint Region", { icon: "rectIn", sub: areaSub("constraintRegion") }),
         dv,
-        item("Line", { icon: "pPolyline", onClick: () => actions.setTool("line") }),
+        // The palette's Shapes flyout and this row arm the same tools, so the
+        // menu carries the same list instead of only the first one (UIUX-9).
+        item("Line", { icon: "pPolyline", sub: [
+          su("Line", "", { icon: "pPolyline", onClick: () => actions.setTool("line") }),
+          su("Polyline", "", { icon: "pPolyline", onClick: () => actions.setTool("polyline") }),
+          su("Rectangle", "", { icon: "pRect", onClick: () => actions.setTool("rectangle") }),
+          su("Circle", "", { icon: "pCircle", onClick: () => actions.setTool("circle") }),
+          su("Ellipse", "", { icon: "pEllipse", onClick: () => actions.setTool("ellipse") }),
+          su("Arc", "", { icon: "pArc", onClick: () => actions.setTool("arc") }),
+        ] }),
         item("Dimension", { icon: "measure", onClick: () => actions.setTool("dimension") }),
         item("Text", { icon: "pText", onClick: () => actions.setTool("text") }),
         item("Image", { icon: "pImage", onClick: () => actions.setTool("image") }),
@@ -801,7 +810,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Gerber", { icon: "gerber", onClick: () => actions.openModal("exportGerber2D") }),
         item("Pick and Place", { icon: "bom", onClick: () => actions.openModal("exportPickPlace") }),
         item("3D", { icon: "cube", onClick: () => actions.openModal("export3dFile") }),
-        item("Design files", { icon: "cube", onClick: () => actions.exportGlb() }),
+        item("Design files", { icon: "cube", onClick: () => actions.openModal("exportDesignFiles") }),
       ],
     },
     {
