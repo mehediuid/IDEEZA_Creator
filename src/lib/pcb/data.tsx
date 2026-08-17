@@ -336,7 +336,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         // (frame + title block included); the board's PDF stays in the 2D menu.
         item("Sheet (PDF · PNG · SVG)…", { icon: "pdf", onClick: () => actions.openModal("exportSheet") }),
         dv,
-        item("3D Model (GLB)", { icon: "cube", onClick: () => actions.exportGlb() }),
+        item("Design files", { icon: "cube", onClick: () => actions.exportGlb() }),
       ],
     },
     {
@@ -781,7 +781,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Gerber", { icon: "gerber", onClick: () => actions.openModal("exportGerber2D") }),
         item("Pick and Place", { icon: "bom", onClick: () => actions.openModal("exportPickPlace") }),
         item("3D", { icon: "cube", onClick: () => actions.openModal("export3dFile") }),
-        item("3D Model (GLB)", { icon: "cube", onClick: () => actions.exportGlb() }),
+        item("Design files", { icon: "cube", onClick: () => actions.exportGlb() }),
       ],
     },
     {
