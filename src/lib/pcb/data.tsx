@@ -658,7 +658,6 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Remove all pours", { icon: "del", onClick: () => actions.clearPours() }),
         dv,
         // #101 — Import DXF/Image live in Project ▸ Import, their one home.
-        item("Import 3D Model…", { icon: "cube", onClick: () => actions.openModal("importGltf") }),
         item("Manage Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
         item("Footprint Manager", { icon: "foot", onClick: () => actions.openManager("footprint") }),
         // PDF Part 2: cascade of target layers.
