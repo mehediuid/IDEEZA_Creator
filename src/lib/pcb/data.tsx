@@ -292,7 +292,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       key: "L",
       items: [
         item("Group", { k: "Ctrl+G", icon: "group", onClick: () => actions.groupSelection() }),
-        item("Ungroup", { k: "Ctrl+Shift+G", icon: "group", onClick: () => actions.ungroupSelection() }),
+        item("Ungroup", { k: "Ctrl+Shift+G", icon: "ungroup", onClick: () => actions.ungroupSelection() }),
         dv,
         item("Align", {
           icon: "align",
@@ -548,8 +548,8 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // tools (rectangle / circle / polygon) are how an outline is drawn.
         item("Cutout", { icon: "del", sub: areaSub("cutout") }),
         dv,
-        item("Add Chamfer", { icon: "pPolyline", onClick: () => { actions.setCornerOp({ mode: "chamfer" }); actions.openModal("chamferFillet"); } }),
-        item("Add Fillet", { icon: "pArc", onClick: () => { actions.setCornerOp({ mode: "fillet" }); actions.openModal("chamferFillet"); } }),
+        item("Add Chamfer", { icon: "dChamfer", onClick: () => { actions.setCornerOp({ mode: "chamfer" }); actions.openModal("chamferFillet"); } }),
+        item("Add Fillet", { icon: "dFillet", onClick: () => { actions.setCornerOp({ mode: "fillet" }); actions.openModal("chamferFillet"); } }),
       ],
     },
     {
@@ -695,7 +695,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       items: [
         item("Single Routing", { k: "T", icon: "tTrack", onClick: () => actions.setTool("track") }),
         item("Differential Routing", { k: "D", icon: "tDiffPair", onClick: () => actions.setTool("diffPair") }),
-        item("Gloss Selected Track", { icon: "wire", onClick: () => actions.flashToast("Glossed selected tracks") }),
+        item("Gloss Selected Track", { icon: "tGloss", onClick: () => actions.flashToast("Glossed selected tracks") }),
         dv,
         item("Equal Length Tuning", { icon: "tLenTune", onClick: () => actions.openModal("equalLength") }),
         item("Differential Pair Equal Length Tuning", { icon: "tDiffLenTune", onClick: () => actions.openModal("equalLength") }),
@@ -713,14 +713,14 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         }),
         // #104 — Routing Corner is the angle of the bend.
         item("Routing Corner", {
-          icon: "pArc",
+          icon: "tRouteCorner",
           sub: [
             su("Any angle", "", { icon: state.routingCorner === "any" ? "check" : "blank", onClick: () => actions.setRoutingCorner("any") }),
             su("45°", "", { icon: state.routingCorner === "45" ? "check" : "blank", onClick: () => actions.setRoutingCorner("45") }),
             su("90°", "", { icon: state.routingCorner === "90" ? "check" : "blank", onClick: () => actions.setRoutingCorner("90") }),
           ],
         }),
-        item("Routing Width…", { icon: "wire", onClick: () => actions.openModal("routingWidth") }),
+        item("Routing Width…", { icon: "tRouteWidth", onClick: () => actions.openModal("routingWidth") }),
         dv,
         item("Unroute", { icon: "del", onClick: () => actions.flashToast("Unrouted") }),
         // "Remove Loop" left this menu (UIUX-19) — Unroute above it is the real
@@ -749,7 +749,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
                 onClick: () => actions.groupSelection(),
               }),
               su("Ungroup selected", "Ctrl+Shift+G", {
-                icon: "group",
+                icon: "ungroup",
                 disabled: !inGroup,
                 note: inGroup ? undefined : "Selection isn't in a group",
                 onClick: () => actions.ungroupSelection(),

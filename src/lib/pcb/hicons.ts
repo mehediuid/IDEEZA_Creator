@@ -8,7 +8,6 @@ import {
   AlignHorizontalDistributeCenterIcon,
   AlignLeftIcon,
   AlignRightIcon,
-  AlignSelectionIcon,
   AlignTopIcon,
   AlignVerticalCenterIcon,
   AlignVerticalDistributeCenterIcon,
@@ -51,7 +50,6 @@ import {
   FolderOpenIcon,
   FullScreenIcon,
   GridIcon,
-  GroupItemsIcon,
   Image01Icon,
   InformationCircleIcon,
   KeyboardIcon,
@@ -179,8 +177,10 @@ export const HICON: Record<string, typeof Activity01Icon> = {
   dReset: RefreshIcon,
   // Menu-bar additions — every menu item carries a glyph.
   move: Move01Icon,
-  group: GroupItemsIcon,
-  align: AlignSelectionIcon,
+  // `group` and `align` are deliberately absent so the hand-drawn glyphs win:
+  // GroupItemsIcon was the picture for Group *and* Ungroup, and
+  // AlignSelectionIcon is a plain frame that says nothing next to the six
+  // alignment children below (UIUX-38/40/59).
   alignLeft: AlignLeftIcon,
   alignRight: AlignRightIcon,
   alignTop: AlignTopIcon,

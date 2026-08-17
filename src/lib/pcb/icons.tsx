@@ -211,6 +211,29 @@ export const ic: Record<string, string> = {
   tInductor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 14h2"/><path d="M4 14a3 3 0 1 1 6 0M10 14a3 3 0 1 1 6 0M16 14a3 3 0 1 1 4 0"/><path d="M20 14h2"/></svg>',
   tHand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V13"/><path d="M17 9.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-2.5a1.5 1.5 0 0 1 3 0"/></svg>',
   tTrack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h6l4-8h8"/><circle cx="3" cy="14" r="1.6" fill="currentColor" stroke="none"/><circle cx="21" cy="6" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  // Arrange ▸ Align (parent) — objects flush against a guide, the one thing
+  // every sub-item does. It used to borrow AlignSelectionIcon, a plain frame
+  // that said nothing while its own six children read clearly (UIUX-38/59).
+  align: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.6 3v18"/><rect x="3.6" y="6" width="10.5" height="4.4" rx="1"/><rect x="3.6" y="13.6" width="16" height="4.4" rx="1"/></svg>',
+  // Group / Ungroup — one boundary drawn twice: whole around two shapes, then
+  // broken with the shapes adrift. They shared GroupItemsIcon, so the two
+  // opposite commands were the same picture (UIUX-40).
+  group: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="2.9" y="2.9" width="18.2" height="18.2" rx="2" stroke-dasharray="3 2.6"/><rect x="6.4" y="6.4" width="5.4" height="5.4" rx="1"/><rect x="12.2" y="12.2" width="5.4" height="5.4" rx="1"/></svg>',
+  ungroup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.4 3.2H4.6a1.4 1.4 0 0 0-1.4 1.4v3.8"/><path d="M15.6 20.8h3.8a1.4 1.4 0 0 0 1.4-1.4v-3.8"/><rect x="3.4" y="11.2" width="6" height="6" rx="1"/><rect x="14.6" y="6.8" width="6" height="6" rx="1"/></svg>',
+  // Route ▸ Routing Corner — the bend itself: a mitred turn with the rounded
+  // alternative ghosted over it, so the row previews what its submenu offers.
+  // It borrowed pArc, which Add Fillet also used (UIUX-56/61).
+  tRouteCorner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h8.5l6 6v5.5"/><path d="M12 6.5a6 6 0 0 1 6 6" stroke-width="1.5" stroke-dasharray="2 2.4" opacity="0.55"/></svg>',
+  // Route ▸ Routing Width — three weights of the same line. It shared the
+  // chain-link `wire` glyph with Gloss Selected Track (UIUX-60).
+  tRouteWidth: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3.5 6.5h17" stroke-width="1.2"/><path d="M3.5 12h17" stroke-width="2.6"/><path d="M3.5 17.8h17" stroke-width="4.2"/></svg>',
+  // Route ▸ Gloss Selected Track — a track whose corner has been smoothed.
+  tGloss: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 17.5h5.4a4.5 4.5 0 0 0 4.5-4.5V7.5"/><path d="M18 4.4l1 2.3 2.3 1-2.3 1-1 2.3-1-2.3-2.3-1 2.3-1z" stroke-width="1.4"/></svg>',
+  // Edit ▸ Add Chamfer / Add Fillet — the same square, one corner cut straight
+  // and one corner rounded, with the removed corner ghosted so the difference
+  // is the subject. Chamfer drew a zigzag; Fillet borrowed pArc (UIUX-61).
+  dChamfer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4.5 4.5h6.5L19.5 13v6.5h-15z"/><path d="M11 4.5L19.5 13" stroke-width="2.8" stroke-linecap="round"/></svg>',
+  dFillet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4.5 4.5h2.5a12.5 12.5 0 0 1 12.5 12.5v2.5h-15z"/><path d="M7 4.5a12.5 12.5 0 0 1 12.5 12.5" stroke-width="2.8" stroke-linecap="round"/></svg>',
   tPolygon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 10l8-6 8 6-3 9H7z"/></svg>',
   tFillRegion: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10l8-6 8 6-3 9H7z" fill-opacity="0.35"/></svg>',
   tSlot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="3"/><circle cx="8" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>',
