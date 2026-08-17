@@ -18,6 +18,9 @@ import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
 import { PANEL_LIMITS,
+  AREA_KINDS,
+  areaTool,
+  parseAreaTool,
   DEFAULT_SCHEM_OBJECTS,
   DEL_OBJ_NAMES,
   TOOLBAR_CATALOGS,
@@ -118,6 +121,8 @@ export interface PcbActions {
   closeBottom: () => void;
   toggleBottom: () => void;
   setTool: (t: string) => void;
+  /** UIUX-87 — draw a copper polygon and pour it the moment the ring closes. */
+  armPolygonPour: () => void;
   /** Arm a place tool whose object carries a specific name (VCC / -5V / …). */
   setToolAs: (t: string, text: string) => void;
   setSelectedTree: (label: string) => void;
@@ -921,7 +926,10 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       clearFind: () => merge({ findResults: [] }),
       closeBottom: () => merge({ bottomOpen: false }),
       toggleBottom: () => merge((s) => ({ bottomOpen: !s.bottomOpen })),
-      setTool: (t) => merge({ tool: t, placeText: null }),
+      // Arming any tool clears the Polygon-Pour intent — only armPolygonPour
+      // sets it, and it must not leak into the next polygon you draw.
+      setTool: (t) => merge({ tool: t, placeText: null, pourOnClose: false }),
+      armPolygonPour: () => merge({ tool: areaTool("polygon", "polygon"), placeText: null, pourOnClose: true }),
       setToolAs: (t, text) => merge({ tool: t, placeText: text }),
       setSelectedTree: (label) => merge({ selectedTree: label }),
       toggleExpanded: (label) =>
@@ -1796,6 +1804,33 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           // A cutout is an area, not a segment: store it corner-normalised so
           // width/height are always positive downstream (2D, 3D, exports).
           const isCutout = s.draftWire.kind === "cutout";
+          // Any area kind drawn as a dragged rectangle or circle (UIUX-86/92/97).
+          const area = parseAreaTool(s.draftWire.kind);
+          if (area) {
+            const dx = Math.abs(x - s.draftWire.startX), dy = Math.abs(y - s.draftWire.startY);
+            const isRect = area.shape === "rect";
+            if ((isRect && (dx < 8 || dy < 8)) || (!isRect && Math.hypot(dx, dy) < 8)) {
+              actions.flashToast("Too small — drag a larger area");
+              return { draftWire: null };
+            }
+            const label = AREA_KINDS.find((k) => k.kind === area.kind)?.label ?? area.kind;
+            const d = Math.hypot(dx, dy) * 2;
+            const obj: CanvasObject = isRect
+              ? {
+                  id, kind: area.kind, rotation: 0, scope: "pcb",
+                  layer: area.kind === "cutout" || area.kind === "slot" ? "outline" : s.activePcbLayer,
+                  x: Math.min(s.draftWire.startX, x), y: Math.min(s.draftWire.startY, y),
+                  width: dx, height: dy, props: { shape: "rect" },
+                }
+              : {
+                  id, kind: area.kind, rotation: 0, scope: "pcb",
+                  layer: area.kind === "cutout" || area.kind === "slot" ? "outline" : s.activePcbLayer,
+                  x: s.draftWire.startX, y: s.draftWire.startY,
+                  width: d, height: d, props: { shape: "circle" },
+                };
+            actions.flashToast(`${label} — ${isRect ? "rectangle" : "circle"}`);
+            return { objects: [...s.objects, obj], draftWire: null, selectedIds: [id] };
+          }
           // #122 — the board's own edge: a dragged rectangle or circle.
           if (s.draftWire.kind === "boardOutlineRect" || s.draftWire.kind === "boardOutlineCircle") {
             const isRect = s.draftWire.kind === "boardOutlineRect";
@@ -2084,26 +2119,34 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         const pts = s.draftPoly?.points ?? [];
         // Clicking back on the first vertex closes the ring.
         if (pts.length > 2 && Math.hypot(pts[0].x - x, pts[0].y - y) < 10) { actions.polyClose(); return; }
-        merge({ draftPoly: { tool, points: [...pts, { x, y }] } });
+        merge({ draftPoly: { tool, points: [...pts, { x, y }], pourOnClose: s.draftPoly?.pourOnClose ?? s.pourOnClose } });
       },
       polyClose: () => {
         const s = stateRef.current;
         const pts = s.draftPoly?.points ?? [];
-        if (pts.length < 3) { actions.flashToast("A polygon outline needs at least 3 points"); return; }
+        if (pts.length < 3) { actions.flashToast("A polygon needs at least 3 points"); return; }
         const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
         const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
         const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
         const id = `obj_${objIdCounter.current++}`;
+        // The same click-click-Enter flow closes the board's own edge and any
+        // area polygon (copper, fill, slot, keep-out, constraint, cutout).
+        const area = parseAreaTool(s.draftPoly?.tool ?? "");
+        const kind = area?.kind ?? "boardOutline";
+        const label = area ? AREA_KINDS.find((k) => k.kind === area.kind)?.label ?? area.kind : "Board outline";
+        const layer = !area || area.kind === "cutout" || area.kind === "slot" ? "outline" : s.activePcbLayer;
         mergeWithHistory((st) => ({
           objects: [...st.objects, {
-            id, kind: "boardOutline", x: cx, y: cy, rotation: 0, scope: "pcb", layer: "outline",
+            id, kind, x: cx, y: cy, rotation: 0, scope: "pcb", layer,
             points: [pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))],
             props: { shape: "polygon" },
           }],
           draftPoly: null,
           selectedIds: [id],
         }));
-        actions.flashToast(`Board outline — ${pts.length}-point polygon`);
+        actions.flashToast(`${label} — ${pts.length}-point polygon`);
+        // "Polygon Pour" is a copper area you want filled the moment it closes.
+        if (s.draftPoly?.pourOnClose) window.setTimeout(() => actions.pourRegions(true), 0);
       },
       polyCancel: () => merge({ draftPoly: null }),
       toggleFocusActiveLayer: () => {

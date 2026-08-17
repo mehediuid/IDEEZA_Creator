@@ -19,7 +19,7 @@ import { PcbThreeView } from "@/components/pcb/pcb-three-view";
 import { PlacedObjects } from "@/components/pcb/placed-objects";
 import { DrcMarkers } from "@/components/pcb/drc-markers";
 import { BOARD_COLOR_HEX, PAD_COLOR_HEX } from "@/lib/pcb/pcb-3d";
-import { PLACE_TOOLS, DRAFT_TOOLS, isSelectable, type GridType } from "@/lib/pcb/types";
+import { PLACE_TOOLS, DRAFT_TOOLS, isDraftTool, isPolyTool, areaTool, isSelectable, type AreaShape, type GridType } from "@/lib/pcb/types";
 import { pinsOf } from "@/lib/pcb/nets";
 import { glyphFor } from "@/components/pcb/placed-objects";
 import { buildToolLabels, toolLabel, toolHint } from "@/lib/pcb/tool-labels";
@@ -77,7 +77,16 @@ function GridPattern({ type }: { type: GridType }) {
 // arms a real tool, places a symbol or opens the device picker.
 // `railText` stamps the placed object's name when several options share one
 // symbol kind (VCC / +5V / -5V are all supply rails; DGND rides GND).
-type SchemOpt = { label: string; tool?: string; railText?: string; action?: "devicePicker"; svg: string };
+type SchemOpt = {
+  label: string;
+  tool?: string;
+  railText?: string;
+  action?: "devicePicker" | "polygonPour";
+  svg: string;
+  /** A row that expands into shapes (Rectangle · Circle · Polygon) instead of
+   *  arming a tool of its own — one shared picker, not six copies. */
+  options?: SchemOpt[];
+};
 type SchemTool = {
   key: string;
   label: string;
@@ -141,6 +150,20 @@ export const SCHEM_TOOLS: SchemTool[] = [
 // PCB 2D left tool palette — same split-button flyout structure as the
 // schematic one, but the board tool set: Select · Route · Pad · Via · Region ·
 // Line · Dimension · Text · Image · Eraser. Every option arms a real PCB tool.
+// One shape picker, reused by every area row instead of six copies of the same
+// three options (UIUX-86/97).
+const SHAPE_GLYPH: Record<AreaShape, string> = {
+  rect: '<rect x="3.5" y="6" width="17" height="12" rx="1"/>',
+  circle: '<circle cx="12" cy="12" r="8"/>',
+  polygon: '<path d="M12 3.5l8 5.5-3 9.5H7L4 9z"/>',
+};
+const areaShapeOptions = (kind: string) =>
+  (["rect", "circle", "polygon"] as AreaShape[]).map((shape) => ({
+    label: shape === "rect" ? "Rectangle" : shape === "circle" ? "Circle" : "Polygon",
+    tool: areaTool(kind, shape),
+    svg: SHAPE_GLYPH[shape],
+  }));
+
 export const PCB_TOOLS: SchemTool[] = [
   { key: "route", label: "Route", options: [
     { label: "Single Route", tool: "track", svg: '<path d="M4 18h6l4-8h6"/>' },
@@ -160,11 +183,16 @@ export const PCB_TOOLS: SchemTool[] = [
     { label: "Circle", tool: "boardOutlineCircle", svg: '<circle cx="12" cy="12" r="8"/>' },
     { label: "Polygon", tool: "boardOutlinePoly", svg: '<path d="M12 3.5l8 5.5-3 9.5H7L4 9z"/>' },
   ] },
+  // Areas are drawn, not stamped: every kind offers Rectangle · Circle ·
+  // Polygon (UIUX-86/97), and Polygon Pour leads the list as its own action —
+  // draw a copper ring and it fills itself (UIUX-87).
   { key: "region", label: "Region", options: [
-    { label: "Copper Region", tool: "polygon", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z"/>' },
-    { label: "Slot Region", tool: "slot", svg: '<rect x="4" y="9" width="16" height="6" rx="3"/>' },
-    { label: "Prohibited Region", tool: "prohibitedRegion", svg: '<circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/>' },
-    { label: "Constraint Region", tool: "constraintRegion", svg: '<rect x="4" y="6" width="16" height="12" rx="1" stroke-dasharray="3 2"/>' },
+    { label: "Polygon Pour", action: "polygonPour", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z" fill="currentColor" opacity=".25"/><path d="M5 8l6-3 8 4-1 9-7 3-6-4z"/>' },
+    { label: "Copper Area", svg: '<path d="M5 8l6-3 8 4-1 9-7 3-6-4z"/>', options: areaShapeOptions("polygon") },
+    { label: "Fill Area", svg: '<rect x="4" y="6" width="16" height="12" rx="1" fill="currentColor" opacity=".25"/><rect x="4" y="6" width="16" height="12" rx="1"/>', options: areaShapeOptions("fillRegion") },
+    { label: "Slot Region", svg: '<rect x="4" y="9" width="16" height="6" rx="3"/>', options: areaShapeOptions("slot") },
+    { label: "Prohibited Region", svg: '<circle cx="12" cy="12" r="8"/><path d="M6.5 6.5l11 11"/>', options: areaShapeOptions("prohibitedRegion") },
+    { label: "Constraint Region", svg: '<rect x="4" y="6" width="16" height="12" rx="1" stroke-dasharray="3 2"/>', options: areaShapeOptions("constraintRegion") },
   ] },
   { key: "line", label: "Shapes", options: [
     { label: "Line", tool: "line", svg: '<path d="M5 19L19 5"/>' },
@@ -188,7 +216,7 @@ const VARIANT_STRIP = 14;
  *  clamped into the viewport (flips left near the right edge, lifts near the
  *  bottom), per the editor's flyout rule. */
 function ToolFlyout({
-  outerRef, anchor, title, options, chosenIdx, onPick,
+  outerRef, anchor, title, options, chosenIdx, onPick, onPickSub,
 }: {
   outerRef: React.RefObject<HTMLDivElement | null>;
   anchor: DOMRect;
@@ -196,9 +224,12 @@ function ToolFlyout({
   options: SchemOpt[];
   chosenIdx: number;
   onPick: (index: number) => void;
+  onPickSub: (opt: SchemOpt) => void;
 }) {
   const GAP = 10;
   const EDGE = 8;
+  // Which row has its shapes open — one at a time, like a menu.
+  const [open, setOpenRow] = React.useState<string | null>(null);
   const [pos, setPos] = React.useState({ left: anchor.right + GAP, top: anchor.top - 2 });
 
   React.useLayoutEffect(() => {
@@ -232,22 +263,41 @@ function ToolFlyout({
       {options.map((o, oi) => {
         // Mark the variant currently shown on the palette button.
         const optChosen = oi === chosenIdx;
+        const expanded = open === o.label;
         return (
+          <React.Fragment key={o.label}>
           <div
-            key={o.label}
             className="ix-row"
             role="menuitem"
-            onClick={() => onPick(oi)}
+            aria-expanded={o.options ? expanded : undefined}
+            onClick={() => (o.options ? setOpenRow(expanded ? null : o.label) : onPick(oi))}
             style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3)", borderRadius: "var(--radius-md)", cursor: "pointer", background: optChosen ? "var(--color-bg-brand-subtle)" : "transparent" }}
           >
             <span style={{ width: 28, height: 28, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", background: optChosen ? "var(--color-violet-600)" : "var(--color-bg-subtle)", color: optChosen ? "#fff" : "var(--color-text-secondary)" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: o.svg }} />
             </span>
             <span style={{ flex: 1, fontSize: "var(--font-size-sm)", fontWeight: optChosen ? 700 : 500, color: optChosen ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap" }}>{o.label}</span>
-            {optChosen && (
+            {o.options ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: expanded ? "rotate(90deg)" : undefined, color: "var(--color-text-tertiary)" }}><path d="M9 5l7 7-7 7" /></svg>
+            ) : optChosen ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 6" /></svg>
-            )}
+            ) : null}
           </div>
+          {o.options && expanded && o.options.map((sub) => (
+            <div
+              key={sub.label}
+              className="ix-row"
+              role="menuitem"
+              onClick={() => onPickSub(sub)}
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-2) var(--spacing-3) var(--spacing-2) var(--spacing-10)", borderRadius: "var(--radius-md)", cursor: "pointer" }}
+            >
+              <span style={{ width: 24, height: 24, flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-md)", background: "var(--color-bg-subtle)", color: "var(--color-text-secondary)" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: sub.svg }} />
+              </span>
+              <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>{sub.label}</span>
+            </div>
+          ))}
+          </React.Fragment>
         );
       })}
     </div>,
@@ -434,8 +484,9 @@ function ToolPalette({ tools }: { tools: SchemTool[] }) {
     setOpen((o) => (o?.key === key ? null : { key, at: cell.getBoundingClientRect() }));
   };
 
-  const run = (o: { tool?: string; railText?: string; action?: "devicePicker" | "erase" }) => {
+  const run = (o: { tool?: string; railText?: string; action?: "devicePicker" | "erase" | "polygonPour"; options?: unknown }) => {
     if (o.action === "devicePicker") actions.openModal("devicePicker");
+    else if (o.action === "polygonPour") actions.armPolygonPour();
     else if (o.action === "erase") actions.deleteSelected();
     else if (o.tool && o.railText) actions.setToolAs(o.tool, o.railText);
     else if (o.tool) actions.setTool(o.tool);
@@ -548,6 +599,7 @@ function ToolPalette({ tools }: { tools: SchemTool[] }) {
           outerRef={flyRef}
           anchor={open.at}
           title={openTool.label}
+          onPickSub={(sub) => { run(sub); setOpen(null); }}
           options={openTool.options}
           chosenIdx={Math.min(chosen[openTool.key] ?? 0, openTool.options.length - 1)}
           onPick={(oi) => { setChosen((c) => ({ ...c, [openTool.key]: oi })); run(openTool.options![oi]); }}
@@ -585,7 +637,7 @@ export function CanvasArea() {
   // gets a hint chip + (for one-click placers) a ghost of what will land.
   const toolLabels = React.useMemo(() => buildToolLabels(SCHEM_TOOLS, PCB_TOOLS), []);
   const armedPlace = PLACE_TOOLS.includes(state.tool);
-  const armedDraft = DRAFT_TOOLS.includes(state.tool);
+  const armedDraft = isDraftTool(state.tool);
   const showHint = state.tool !== "select" && (state.mode === "schematic" || state.mode === "pcb");
   const top = v["Top Toolbar"] !== false ? 108 : 62;
   // 74 = the module rail; the panel's own width is draggable (state.panelSizes).
@@ -783,7 +835,7 @@ export function CanvasArea() {
     // support press-drag-release as a single gesture.
     const intentTool =
       isLeft && !handMode && interactiveMode &&
-      (DRAFT_TOOLS.includes(state.tool) || PLACE_TOOLS.includes(state.tool));
+      (isDraftTool(state.tool) || PLACE_TOOLS.includes(state.tool));
 
     let mode: "idle" | "pan" | "rubber" | "lasso" | "moveObj" | "tool" = "idle";
     let draftStartedInDrag = false;
@@ -835,7 +887,7 @@ export function CanvasArea() {
           // tools the press point starts the segment so press-drag-release
           // draws it in one gesture (DraftLine previews live).
           mode = "tool";
-          if (DRAFT_TOOLS.includes(state.tool) && !state.draftWire && canvasStart) {
+          if (isDraftTool(state.tool) && !state.draftWire && canvasStart) {
             const sp = snapWire(canvasStart.x, canvasStart.y);
             actions.startWire(state.tool, sp.x, sp.y);
             draftStartedInDrag = true;
@@ -886,7 +938,7 @@ export function CanvasArea() {
         suppressClickRef.current = true;
       } else if (
         mode === "tool" &&
-        DRAFT_TOOLS.includes(state.tool) &&
+        isDraftTool(state.tool) &&
         rect &&
         (draftStartedInDrag || state.draftWire)
       ) {
@@ -1065,7 +1117,7 @@ export function CanvasArea() {
             actions.placeObject(state.tool, cx, cy);
             return;
           }
-          if (interactiveMode && state.tool === "boardOutlinePoly") {
+          if (interactiveMode && isPolyTool(state.tool)) {
             const sp = snapPoint(cx, cy);
             // A double-click closes the ring; so does clicking the first vertex
             // again, or pressing Enter — three ways out, no pixel hunt.

@@ -320,6 +320,35 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
 ];
 
 // Tool keys that need two clicks (start + end) — wire-like.
+// ── Shaped areas (UIUX-86/87/92/97) ─────────────────────────────────────────
+// Every area on the board — copper, fill, slot, keep-out, constraint, cutout —
+// can be drawn as a rectangle, a circle or a polygon, the way the board outline
+// already could. One vocabulary instead of six copies: the tool id carries the
+// kind and the shape (`area:polygon:circle`), the drafting flow is the board
+// outline's (drag for rect/circle, click-click-Enter for polygon), and the
+// committed object stores `props.shape` + its geometry.
+export type AreaShape = "rect" | "circle" | "polygon";
+export const AREA_KINDS: ReadonlyArray<{ kind: string; label: string }> = [
+  { kind: "polygon", label: "Copper Area" },
+  { kind: "fillRegion", label: "Fill Area" },
+  { kind: "slot", label: "Slot Region" },
+  { kind: "prohibitedRegion", label: "Prohibited Region" },
+  { kind: "constraintRegion", label: "Constraint Region" },
+  { kind: "cutout", label: "Cutout" },
+];
+export const areaTool = (kind: string, shape: AreaShape) => `area:${kind}:${shape}`;
+export function parseAreaTool(tool: string): { kind: string; shape: AreaShape } | null {
+  const m = /^area:([A-Za-z]+):(rect|circle|polygon)$/.exec(tool);
+  return m ? { kind: m[1], shape: m[2] as AreaShape } : null;
+}
+/** Tools drawn by dragging two points (rect/circle areas + the listed kinds). */
+export const isDraftTool = (tool: string) => {
+  const a = parseAreaTool(tool);
+  return a ? a.shape !== "polygon" : DRAFT_TOOLS.includes(tool);
+};
+/** Tools drawn by clicking vertex after vertex (board outline + area polygons). */
+export const isPolyTool = (tool: string) => tool === "boardOutlinePoly" || parseAreaTool(tool)?.shape === "polygon";
+
 export const DRAFT_TOOLS: ReadonlyArray<string> = [
   // Board cutout — drag the two corners of the area to remove.
   "cutout",
@@ -573,7 +602,11 @@ export interface PcbState {
   /** #140 — dim everything that isn't on the active layer. */
   focusActiveLayer: boolean;
   /** #122 — click-click polygon draft: the vertices placed so far. */
-  draftPoly: { tool: string; points: { x: number; y: number }[] } | null;
+  // `pourOnClose` is the Polygon Pour flow: fill the copper area the moment
+  // its ring closes, instead of leaving an empty outline behind (UIUX-87).
+  draftPoly: { tool: string; points: { x: number; y: number }[]; pourOnClose?: boolean } | null;
+  /** Polygon Pour armed — the next closed copper ring pours itself. */
+  pourOnClose: boolean;
   /** #110 — Ratsnest (airwire) visibility, driven from the top toolbar. */
   showRatsnest: boolean;
   recentProjects: { id: string; slug: string; name: string; updatedAt: number }[];
@@ -1655,6 +1688,7 @@ export const initialState: PcbState = {
   panelSizes: { left: 292, right: 292, bottom: 248 },
   focusActiveLayer: false,
   draftPoly: null,
+  pourOnClose: false,
   showRatsnest: true,
   recentProjects: [],
   saveState: "saved",

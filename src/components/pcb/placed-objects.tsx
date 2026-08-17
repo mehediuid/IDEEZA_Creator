@@ -9,7 +9,7 @@
 import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { CanvasObject } from "@/lib/pcb/types";
-import { isSelectable, PLACE_TOOLS, DRAFT_TOOLS } from "@/lib/pcb/types";
+import { isSelectable, PLACE_TOOLS, isDraftTool, isPolyTool } from "@/lib/pcb/types";
 import { planTrackPath } from "@/lib/pcb/route-path";
 
 // Supply rail (VCC / +5V / -5V / any named rail). The arrow is drawn 20 units
@@ -44,6 +44,26 @@ const DRAW_COLOR: Record<string, string> = {
   maskRegion: "var(--color-draw-keepout)",
   componentMask: "var(--color-draw-keepout)",
   prohibitedRegion: "var(--color-draw-keepout)",
+};
+
+// Kinds that can be drawn as a real rectangle / circle / polygon rather than
+// stamped at a fixed size: the board's own edge plus every board area
+// (UIUX-86/87/92/97).
+const DRAWN_AREA_KINDS = new Set([
+  "boardOutline", "polygon", "fillRegion", "slot", "prohibitedRegion", "constraintRegion", "cutout",
+]);
+const AREA_LABEL: Record<string, string> = {
+  polygon: "Copper Area", fillRegion: "Fill Area", slot: "Slot Region",
+  prohibitedRegion: "Prohibited Region", constraintRegion: "Constraint Region", cutout: "Cutout",
+};
+const AREA_EDGE: Record<string, string> = {
+  boardOutline: "var(--color-pcb-outline)",
+  polygon: "var(--color-pcb-copper-region, var(--color-pcb-top-copper))",
+  fillRegion: "var(--color-pcb-copper-region, var(--color-pcb-top-copper))",
+  slot: "var(--color-pcb-outline)",
+  cutout: "var(--color-pcb-outline)",
+  prohibitedRegion: "var(--color-draw-keepout)",
+  constraintRegion: "var(--color-draw-keepout)",
 };
 
 /** The symbol a place tool will drop, drawn from the same geometry the placed
@@ -361,7 +381,10 @@ export function PlacedObjects() {
   // not swallow it — otherwise a net label can't be dropped on a wire or part.
   const state = usePcbState();
   const actions = usePcbActions();
-  const toolArmed = PLACE_TOOLS.includes(state.tool) || DRAFT_TOOLS.includes(state.tool);
+  // A drawing tool owns the click, so placed objects must not swallow it —
+  // area tools (area:<kind>:<shape>) count too, or a vertex dropped over an
+  // existing region would be eaten by that region.
+  const toolArmed = PLACE_TOOLS.includes(state.tool) || isDraftTool(state.tool) || isPolyTool(state.tool);
   // One state vocabulary, from tokens, for every kind (see tokens.css
   // "Canvas interaction states") — the colours used to be hardcoded rgba(), so
   // they could not differ per theme and drifted between object types.
@@ -616,7 +639,7 @@ export function PlacedObjects() {
       })()}
 
       {ordered.filter((o) => !WIRE_KINDS.has(o.kind) && isVisible(o) && inScope(o)).map((o) =>
-        o.kind === "boardOutline" && (o.props as Record<string, unknown> | undefined)?.shape ? (
+        (o.props as Record<string, unknown> | undefined)?.shape && DRAWN_AREA_KINDS.has(o.kind) ? (
           <BoardOutlineShape
             key={o.id}
             obj={o}
@@ -752,7 +775,12 @@ function BoardOutlineShape({
 }) {
   const p = (obj.props ?? {}) as Record<string, unknown>;
   const shape = String(p.shape ?? "rect");
-  const edge = selected ? "var(--color-canvas-select)" : hovered ? "var(--color-canvas-hover)" : "var(--color-pcb-outline)";
+  const own = AREA_EDGE[obj.kind] ?? "var(--color-pcb-outline)";
+  const edge = selected ? "var(--color-canvas-select)" : hovered ? "var(--color-canvas-hover)" : own;
+  // Copper areas read as copper (a translucent fill); the rest are outlines.
+  const fill = obj.kind === "polygon" || obj.kind === "fillRegion"
+    ? `color-mix(in srgb, ${own} 22%, transparent)`
+    : "none";
   const ring = obj.points?.[0] ?? [];
   const w = Math.max(2, obj.width ?? 0), h = Math.max(2, obj.height ?? 0);
   const box = shape === "polygon"
@@ -768,19 +796,19 @@ function BoardOutlineShape({
       data-object-id={obj.id}
       onClick={toolArmed ? undefined : (e) => e.stopPropagation()}
       {...hoverProps}
-      title={`Board outline · ${shape}`}
+      title={`${obj.kind === "boardOutline" ? "Board outline" : (AREA_LABEL[obj.kind] ?? obj.kind)} · ${shape}`}
       style={{ position: "absolute", left: box.left, top: box.top, width: Math.max(2, box.w), height: Math.max(2, box.h), zIndex: 2, opacity: dimmed ? "var(--pcb-dim-opacity, 0.3)" : undefined, cursor: toolArmed ? "inherit" : "pointer" }}
     >
       <svg width="100%" height="100%" viewBox={`0 0 ${Math.max(2, box.w)} ${Math.max(2, box.h)}`} style={{ display: "block", overflow: "visible" }}>
         {shape === "circle" ? (
-          <circle cx={box.w / 2} cy={box.h / 2} r={Math.max(1, box.w / 2 - 1)} fill="none" stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined} />
+          <circle cx={box.w / 2} cy={box.h / 2} r={Math.max(1, box.w / 2 - 1)} fill={fill} stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined} />
         ) : shape === "polygon" ? (
           <polygon
             points={ring.map((q) => `${q.x - Math.min(...ring.map((r) => r.x), 0)},${q.y - Math.min(...ring.map((r) => r.y), 0)}`).join(" ")}
-            fill="none" stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined}
+            fill={fill} stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined}
           />
         ) : (
-          <rect x={0.8} y={0.8} width={Math.max(1, box.w - 1.6)} height={Math.max(1, box.h - 1.6)} fill="none" stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined} />
+          <rect x={0.8} y={0.8} width={Math.max(1, box.w - 1.6)} height={Math.max(1, box.h - 1.6)} fill={fill} stroke={edge} strokeWidth={1.6} strokeDasharray={selected ? "5 3" : undefined} />
         )}
       </svg>
     </div>

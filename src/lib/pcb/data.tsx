@@ -401,6 +401,13 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
     onClick: o.onClick || close,
   });
   // top-level item; pass `sub` for a hover flyout
+  // UIUX-86/92/97 — every board area is drawn, not stamped: one shape picker
+  // (Rectangle · Circle · Polygon) reused by every row instead of six copies.
+  const areaSub = (kind) => [
+    su("Rectangle", "", { icon: "pRect", onClick: () => actions.setTool(`area:${kind}:rect`) }),
+    su("Circle", "", { icon: "pCircle", onClick: () => actions.setTool(`area:${kind}:circle`) }),
+    su("Polygon", "", { icon: "tPolygon", onClick: () => actions.setTool(`area:${kind}:polygon`) }),
+  ];
   const item = (label, o = {}) => ({
     label,
     k: o.k || "",
@@ -539,7 +546,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // tool id with no handler, so nothing could be edited. Vertex editing
         // needs an engine we don't have; until then the palette's Board Outline
         // tools (rectangle / circle / polygon) are how an outline is drawn.
-        item("Cutout", { icon: "del", onClick: () => actions.openModal("cutout") }),
+        item("Cutout", { icon: "del", sub: areaSub("cutout") }),
         dv,
         item("Add Chamfer", { icon: "pPolyline", onClick: () => { actions.setCornerOp({ mode: "chamfer" }); actions.openModal("chamferFillet"); } }),
         item("Add Fillet", { icon: "pArc", onClick: () => { actions.setCornerOp({ mode: "fillet" }); actions.openModal("chamferFillet"); } }),
@@ -609,9 +616,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // the left palette's (three shape variants a menu row can't carry, and
         // the one-click tool this row armed placed a degenerate 2×2 outline).
         item("Suture Vias…", { icon: "tSutureVias", onClick: () => actions.openModal("sutureVias") }),
-        item("Slot Region", { icon: "tSlot", onClick: () => actions.setTool("slot") }),
-        item("Prohibited Region", { icon: "pNoConnect", onClick: () => actions.setTool("prohibitedRegion") }),
-        item("Constraint Region", { icon: "rectIn", onClick: () => actions.setTool("constraintRegion") }),
+        item("Slot Region", { icon: "tSlot", sub: areaSub("slot") }),
+        item("Prohibited Region", { icon: "pNoConnect", sub: areaSub("prohibitedRegion") }),
+        item("Constraint Region", { icon: "rectIn", sub: areaSub("constraintRegion") }),
         dv,
         item("Line", { icon: "pPolyline", onClick: () => actions.setTool("line") }),
         item("Dimension", { icon: "measure", onClick: () => actions.setTool("dimension") }),
@@ -633,7 +640,11 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         dv,
         // #94/95 — the copper region lives here with the pour operations that
         // make it real copper. (Fill Region is the top toolbar's — #110.)
-        item("Copper Region", { icon: "tPolygon", onClick: () => actions.setTool("polygon") }),
+        item("Copper Area", { icon: "tPolygon", sub: areaSub("polygon") }),
+        item("Fill Area", { icon: "tFillRegion", sub: areaSub("fillRegion") }),
+        // Draw a copper ring and it fills itself — the pour is the point, so it
+        // is its own row rather than a shape hidden under Copper Area (UIUX-87).
+        item("Polygon Pour", { icon: "tPolygon", onClick: () => actions.armPolygonPour() }),
         item("Pour / Rebuild copper", { icon: "tPolygon", onClick: () => actions.pourRegions() }),
         item("Remove all pours", { icon: "del", onClick: () => actions.clearPours() }),
         dv,

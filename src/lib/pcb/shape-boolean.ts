@@ -35,6 +35,25 @@ export function shapeToPolygon(o: CanvasObject): Pt[] {
   if (o.points && o.points.length) {
     return o.points[0].map((p) => rotatePt(o.x + p.x, o.y + p.y, o.x, o.y, rot));
   }
+  // A drawn area carries its real size: `props.shape` says which, `width` /
+  // `height` say how big (rect anchors top-left, circle centres on x/y — the
+  // board-outline convention). Without this an area drawn 400 px wide poured,
+  // cleared and exported as the 28×20 stamp (UIUX-86/92/97).
+  const drawn = String((o.props as Record<string, unknown> | undefined)?.shape ?? "");
+  if (drawn === "rect" && o.width && o.height) {
+    const w = o.width, h = o.height;
+    return [
+      rotatePt(o.x, o.y, o.x, o.y, rot),
+      rotatePt(o.x + w, o.y, o.x, o.y, rot),
+      rotatePt(o.x + w, o.y + h, o.x, o.y, rot),
+      rotatePt(o.x, o.y + h, o.x, o.y, rot),
+    ];
+  }
+  if (drawn === "circle" && o.width) {
+    const r = o.width / 2, out: Pt[] = [];
+    for (let i = 0; i < 48; i++) out.push({ x: o.x + r * Math.cos((i / 48) * TAU), y: o.y + r * Math.sin((i / 48) * TAU) });
+    return out;
+  }
   if (o.kind === "circle") {
     const r = 12, out: Pt[] = [];
     for (let i = 0; i < 48; i++) out.push({ x: o.x + r * Math.cos((i / 48) * TAU), y: o.y + r * Math.sin((i / 48) * TAU) });
