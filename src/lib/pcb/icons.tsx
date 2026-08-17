@@ -60,6 +60,10 @@ export const ic: Record<string, string> = {
   power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v8M8 12h8M9 16h6M10 19h4"/></svg>',
   // Supply / ground family — each row of Insert ▸ Power & Ground gets the
   // schematic symbol it actually places, not one shared "power" glyph.
+  // Junction — the palette tool's exact geometry (crossing wires + a FILLED
+  // dot, the way a junction actually renders on the canvas). The Insert row
+  // used to borrow pTestPoint's hollow record circle (UIUX-71).
+  pJunction: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>',
   // The Insert ▸ Power & Ground parent row — a power bar over a ground fork,
   // so the family reads as "supplies" without borrowing any child's own glyph
   // (UIUX-70: it used to show the Text tool's T on the live build, and pwrVcc

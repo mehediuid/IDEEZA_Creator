@@ -157,7 +157,7 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tVcc5v", tool: "vcc5v", label: "+5V (VCC)", modes: SCH },
   { kind: "icon", key: "power", tool: "gnd", label: "GND", modes: SCH },
   { kind: "icon", key: "tNoConn", tool: "noConnect", label: "No Connect", modes: SCH },
-  { kind: "icon", key: "pTestPoint", tool: "junction", label: "Junction", modes: SCH },
+  { kind: "icon", key: "pJunction", tool: "junction", label: "Junction", modes: SCH },
   { kind: "icon", key: "tNetFlag", tool: "netFlag", label: "Net flag", modes: SCH },
   { kind: "icon", key: "tShortFlag", tool: "shortFlag", label: "Short Flag", modes: SCH },
   { kind: "icon", key: "tPort", tool: "port", label: "Port Out", modes: SCH },

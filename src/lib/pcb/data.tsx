@@ -220,7 +220,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         }),
         item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),
         item("No Connect", { icon: "pNoConnect", onClick: tool("noConnect") }),
-        item("Junction", { icon: "pTestPoint", onClick: tool("junction") }),
+        item("Junction", { icon: "pJunction", onClick: tool("junction") }),
         item("Differential Pair", { icon: "tDiffPair", onClick: tool("diffPair") }),
         item("Diff-pair tag", { icon: "pDiffFlag", onClick: tool("diffPairFlag") }),
         item("Keep-out area", { icon: "pKeepout", onClick: tool("maskRegion") }),
