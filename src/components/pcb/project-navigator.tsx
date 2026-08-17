@@ -83,7 +83,21 @@ export function ProjectNavigator({ query }: { query: string }) {
   };
 
   const rows: Row[] = [];
-  const objs = state.objects;
+  // The tree lists what the active editor holds: the board's copper on the
+  // board, this sheet's symbols on the sheet. It used to read every object in
+  // the document, so the schematic tab listed Track and Footprint groups from
+  // the board (UIUX-69).
+  const firstSheet = state.schematicSheets[0]?.id;
+  const inPcbView = state.mode === "pcb" || state.mode === "2d" || state.mode === "3d";
+  const objs = React.useMemo(
+    () =>
+      state.objects.filter((o) =>
+        inPcbView
+          ? o.scope === "pcb"
+          : o.scope !== "pcb" && (o.sheetId ?? firstSheet) === state.activeSheetId,
+      ),
+    [state.objects, inPcbView, firstSheet, state.activeSheetId],
+  );
 
   if (state.leftSub === "page") {
     // Project → Schematic (sheets) + PCB
@@ -122,46 +136,19 @@ export function ProjectNavigator({ query }: { query: string }) {
       objs.forEach((o) => { if (o.net) counts.set(o.net, (counts.get(o.net) ?? 0) + 1); });
       entries = [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count }));
     }
-    // Groups the netlist already implies — no new stored state: a bus's own
-    // PREFIX[lo:hi] label claims its members, supplies are known by name, an
-    // auto-generated net is N<number>, everything else was named by a label.
-    const busPrefixes = objs
-      .filter((o) => o.kind === "bus" && o.text)
-      .map((o) => (o.text as string).match(/^([A-Za-z_][\w]*)\s*\[/)?.[1])
-      .filter(Boolean) as string[];
+    // One row per net, named by the net itself (UIUX-29/1). Type categories
+    // (Power & ground · Named · Auto-named) put every net one click away behind
+    // a group it doesn't need — the name already says what it is. Sorted with
+    // supplies first, then names, then the auto-generated N<number> tail, each
+    // block numeric-aware so N2 precedes N10.
     const POWERISH = /^(vcc|vdd|vss|gnd|agnd|pgnd|dgnd|vbat|[+-]?\d+(\.\d+)?v)/i;
-    const groupOf = (name: string): string => {
-      if (POWERISH.test(name)) return "Power & ground";
-      const bus = busPrefixes.find((b) => name.startsWith(b));
-      if (bus) return `Bus ${bus}`;
-      return /^N\d+$/.test(name) ? "Auto-named" : "Named nets";
-    };
-    const netGroups = new Map<string, { name: string; count: number }[]>();
-    entries.filter((e) => match(e.name)).forEach((e) => {
-      const g = groupOf(e.name);
-      (netGroups.get(g) ?? netGroups.set(g, []).get(g)!).push(e);
-    });
-    const NET_ORDER = ["Power & ground", "Named nets", "Auto-named"];
-    const sortedGroups = [...netGroups.keys()].sort((a, b) => {
-      const ia = NET_ORDER.indexOf(a), ib = NET_ORDER.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);   // buses, alphabetical
-      if (ia === -1) return -1;                                 // buses above the fixed three
-      if (ib === -1) return 1;
-      return ia - ib;
-    });
-    sortedGroups.forEach((g) => {
-      const list = netGroups.get(g)!;
-      const gk = "netgrp:" + g;
-      const open = isOpen(gk, true);
-      rows.push({
-        id: gk, label: g, meta: String(list.length), icon: "wire", depth: 0,
-        hasCaret: true, open, onToggle: () => toggle(gk),
-        menu: [{ label: "Highlight every net in this group", icon: "wire", run: () => list.forEach((e) => actions.highlightNet(e.name)) }],
-      });
-      if (!open) return;
-      list.sort((a, b) => a.name.localeCompare(b.name)).forEach((e) =>
+    const rank = (n: string) => (POWERISH.test(n) ? 0 : /^N\d+$/.test(n) ? 2 : 1);
+    entries
+      .filter((e) => match(e.name))
+      .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name, undefined, { numeric: true }))
+      .forEach((e) =>
         rows.push({
-          id: "net:" + e.name, label: e.name, meta: `${e.count} obj`, icon: "wire", depth: 1,
+          id: "net:" + e.name, label: e.name, meta: `${e.count} obj`, icon: "wire", depth: 0,
           active: state.highlightedNet === e.name,
           onClick: () => actions.highlightNet(state.highlightedNet === e.name ? null : e.name),
           menu: [
@@ -171,12 +158,19 @@ export function ProjectNavigator({ query }: { query: string }) {
           ],
         }),
       );
-    });
   } else if (state.leftSub === "component") {
     // Designator prefix → package → part. The prefix is what an engineer reads
     // first (R, C, U…), the package is what the BOM buys.
     const parts = objs.filter(isPart).filter((o) => match(designator(o), o.footprint, o.comment));
-    const prefixOf = (o: CanvasObject) => (designator(o).match(/^([A-Za-z]+)/)?.[1] ?? "?").toUpperCase();
+    // The prefix is the designator's *letter code*, not every letter it starts
+    // with: "Rshunt" is a resistor, so it belongs with R1…R4 rather than in a
+    // singleton "RSHUNT parts" group (UIUX-72/37). Known two-letter codes (SW,
+    // TP) win over their first letter; anything else falls back to one letter.
+    const KNOWN_PREFIXES = Object.keys(PART_PREFIX_GROUPS).sort((a, b) => b.length - a.length);
+    const prefixOf = (o: CanvasObject) => {
+      const d = designator(o).toUpperCase();
+      return KNOWN_PREFIXES.find((p) => d.startsWith(p)) ?? (d.match(/^[A-Z]/)?.[0] ?? "?");
+    };
     const byPrefix = new Map<string, CanvasObject[]>();
     parts.forEach((o) => { const k = prefixOf(o); (byPrefix.get(k) ?? byPrefix.set(k, []).get(k)!).push(o); });
     [...byPrefix.keys()].sort().forEach((prefix) => {
@@ -268,7 +262,9 @@ export function ProjectNavigator({ query }: { query: string }) {
     : state.leftSub === "component" ? "No parts yet — place components or convert the schematic."
     : state.leftSub === "object" ? "No objects yet — place something on the canvas."
     : null;
-  const leafCount = rows.filter((r) => !r.hasCaret).length;
+  // "Nothing here yet" means the tree is empty — not that its groups happen to
+  // be collapsed, which is what counting leaf rows measured (UIUX-69).
+  const leafCount = rows.length;
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-2) var(--spacing-4) var(--spacing-6)" }} onScroll={() => menu && setMenu(null)}>

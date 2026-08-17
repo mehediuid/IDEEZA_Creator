@@ -405,10 +405,15 @@ export const OBJECT_FAMILIES: ReadonlyArray<{ label: string; kinds: readonly str
   { label: "Wire", kinds: ["wire"] },
   { label: "Bus", kinds: ["bus", "busEntry"] },
   { label: "Net label", kinds: ["netLabel", "globalLabel", "hierLabel", "netBusLabel", "net"] },
-  { label: "Net flag", kinds: ["netFlag", "vcc5v", "power", "gnd", "agnd", "pgnd", "shortFlag", "diffPairFlag"] },
+  // Supplies are their own families (UIUX-69): they used to hide inside "Net
+  // flag", so a sheet full of power and ground symbols showed none of them.
+  { label: "Power symbol", kinds: ["vcc5v", "power"] },
+  { label: "Ground symbol", kinds: ["gnd", "agnd", "pgnd"] },
+  { label: "Net flag", kinds: ["netFlag", "shortFlag", "diffPairFlag"] },
   { label: "Port", kinds: ["port", "offPageConnector"] },
   { label: "Pin", kinds: ["pin", "netTie"] },
-  { label: "Junction", kinds: ["junction", "noConnect"] },
+  { label: "Junction", kinds: ["junction"] },
+  { label: "No Connect", kinds: ["noConnect"] },
   { label: "Agile module", kinds: ["reuseBlock"] },
   { label: "Text & table", kinds: ["text", "note", "field", "table"] },
   { label: "Drawing", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "polygon", "image", "maskRegion", "componentMask", "dimension"] },
