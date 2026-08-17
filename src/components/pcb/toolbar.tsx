@@ -788,6 +788,13 @@ const PCB_ESSENTIAL: Item[] = [
   // line up on the one control you reach for by muscle memory (UIUX-13).
   { kind: "icon", key: "save", action: "save", label: "Save" },
   { kind: "div" },
+  // DRC sits where the schematic bar carries ERC, and reads the same way — icon
+  // + label in brand ink. It is the board's pre-fabrication check, not a utility
+  // glyph, so it no longer hides in the middle of the row wearing the generic
+  // tick (`dCheck`); `dDrc` draws the clearance gap that DRC actually measures
+  // (UIUX-52).
+  { kind: "icon", key: "dDrc", action: "runDrc", label: "Run DRC", tint: true, text: "DRC" },
+  { kind: "div" },
   { kind: "icon", key: "undo", action: "undo", label: "Undo" },
   { kind: "icon", key: "redo", action: "redo", label: "Redo" },
   { kind: "div" },
@@ -803,7 +810,6 @@ const PCB_ESSENTIAL: Item[] = [
   { kind: "icon", key: "tPad", tool: "pad", label: "Pad" },
   { kind: "icon", key: "tVia", tool: "via", label: "Via" },
   { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Fill Region" },
-  { kind: "icon", key: "dCheck", action: "runDrc", label: "Run DRC" },
   { kind: "icon", key: "tRatsnest", action: "toggleRatsnest", label: "Ratsnest" },
   { kind: "div" },
   { kind: "icon", key: "tAutoRoute", action: "openAutoRoute", label: "Auto Route" },

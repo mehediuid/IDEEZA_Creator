@@ -473,9 +473,11 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           k: "Ctrl+N",
           icon: "page",
           sub: [
+            // Part… and Agile Module… left the board (UIUX-75): the PCB is
+            // downstream of the sheet, so a part authored here would have no
+            // symbol to come from. Both keep their home in the schematic's
+            // Project ▸ New.
             su("PCB", "", { icon: "board", onClick: () => actions.createPcbDoc() }),
-            su("Part…", "", { icon: "pChip", onClick: () => actions.openModal("newPart") }),
-            su("Agile Module…", "", { icon: "tDevReuse", onClick: () => actions.openModal("newModule") }),
           ],
         }),
         // #78 — the projects the user already created, listed in the menu; the
