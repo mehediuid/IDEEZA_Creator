@@ -151,10 +151,10 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         }),
         dv,
         // The three "Move by <anchor>" rows all armed `setTool("move")`, which no
-        // handler implements — so they toasted an anchor and did nothing. The
-        // schematic now gets the board's real pair: grab-move and exact nudge.
+        // handler implements — so they toasted an anchor and did nothing. Grab-move
+        // is the schematic's one Move; the exact-offset "Move by step…" is the
+        // board menu's row only (UIUX-34) — grid + snap cover the sheet.
         item("Move", { k: "M", icon: "tMoveGrab", onClick: () => actions.startMoveSelected() }),
-        item("Move by step…", { icon: "tMoveStep", onClick: () => actions.openModal("moveStep") }),
         item("Find & replace", { k: "Ctrl+F", icon: "find", onClick: () => actions.openModal("findReplace") }),
         item("Duplicate in grid", { icon: "array", onClick: () => actions.openModal("array") }),
       ],
