@@ -208,12 +208,23 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Wire", { k: "Alt+W", icon: "pWire", onClick: tool("wire") }),
         // Each row places its own symbol under its own name — VCC, -5V and GND
         // used to arm a generic net flag ("F1"), which is not what they say.
-        item("Power & Ground", {
-          icon: "pwrMenu",
+        // Two menus, not one list (UIUX-98): a supply and a return are opposite
+        // ends of the same net, and you reach for one or the other, never scan
+        // both. Each supply rides the same symbol under its own name, so the
+        // netlist really carries VCC / +12V / -12V as separate nets.
+        item("Power", {
+          icon: "pwrRailMenu",
           sub: [
             su("VCC", "V", { icon: "pwrVcc", onClick: rail("vcc5v", "VCC") }),
             su("+5V", "", { icon: "pwr5v", onClick: rail("vcc5v", "+5V") }),
+            su("+12V", "", { icon: "pwr12v", onClick: rail("vcc5v", "+12V") }),
             su("-5V", "", { icon: "pwrN5v", onClick: rail("vcc5v", "-5V") }),
+            su("-12V", "", { icon: "pwrN12v", onClick: rail("vcc5v", "-12V") }),
+          ],
+        }),
+        item("Ground", {
+          icon: "pwrGndMenu",
+          sub: [
             su("GND", "", { icon: "pwrGnd", onClick: tool("gnd") }),
             // Digital ground — the GND symbol under its own name, so the
             // netlist really carries a separate DGND net.
@@ -651,6 +662,11 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // the left palette's (three shape variants a menu row can't carry, and
         // the one-click tool this row armed placed a degenerate 2×2 outline).
         item("Suture Vias…", { icon: "tSutureVias", onClick: () => actions.openModal("sutureVias") }),
+        // Copper Area and Fill Area moved here from Design (UIUX-96): they are
+        // things you place, so they belong with the other regions. The pour
+        // *operations* they feed stayed in Design, where board-level work lives.
+        item("Copper Area", { icon: "tCopperArea", sub: areaSub("polygon") }),
+        item("Fill Area", { icon: "tFillArea", sub: areaSub("fillRegion") }),
         item("Slot Region", { icon: "tSlot", sub: areaSub("slot") }),
         item("Prohibited Region", { icon: "pNoConnect", sub: areaSub("prohibitedRegion") }),
         item("Constraint Region", { icon: "rectIn", sub: areaSub("constraintRegion") }),
@@ -684,11 +700,11 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         dv,
         // #94/95 — the copper region lives here with the pour operations that
         // make it real copper. (Fill Region is the top toolbar's — #110.)
-        item("Copper Area", { icon: "tPolygon", sub: areaSub("polygon") }),
-        item("Fill Area", { icon: "tFillRegion", sub: areaSub("fillRegion") }),
+        // Copper Area and Fill Area are placements, so they live in Insert
+        // (UIUX-96). What stays here is the pour work they feed.
         // Draw a copper ring and it fills itself — the pour is the point, so it
         // is its own row rather than a shape hidden under Copper Area (UIUX-87).
-        item("Polygon Pour", { icon: "tPolygon", onClick: () => actions.armPolygonPour() }),
+        item("Polygon Pour", { icon: "tCopperArea", onClick: () => actions.armPolygonPour() }),
         item("Pour / Rebuild copper", { icon: "tPolygon", onClick: () => actions.pourRegions() }),
         item("Remove all pours", { icon: "del", onClick: () => actions.clearPours() }),
         dv,

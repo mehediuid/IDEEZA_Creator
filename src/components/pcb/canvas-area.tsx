@@ -116,7 +116,9 @@ export const SCHEM_TOOLS: SchemTool[] = [
   { key: "power", label: "Power", options: [
     { label: "VCC", tool: "vcc5v", railText: "VCC", svg: '<path d="M12 20V9M5 9h14M8.5 5.5L12 9l3.5-3.5"/>' },
     { label: "+5V", tool: "vcc5v", railText: "+5V", svg: '<path d="M12 20V9"/><path d="M12 3.5L6.5 9.5h11z" fill="currentColor"/>' },
+    { label: "+12V", tool: "vcc5v", railText: "+12V", svg: '<path d="M12 20v-9"/><path d="M12 6L7 11h10z" fill="currentColor"/><path d="M5.5 3.5h13"/>' },
     { label: "-5V", tool: "vcc5v", railText: "-5V", svg: '<path d="M12 4v11"/><path d="M12 20.5L6.5 14.5h11z" fill="currentColor"/>' },
+    { label: "-12V", tool: "vcc5v", railText: "-12V", svg: '<path d="M12 4v9"/><path d="M12 18L7 13h10z" fill="currentColor"/><path d="M5.5 20.5h13"/>' },
     { label: "GND", tool: "gnd", svg: '<path d="M12 4v9M4.5 13h15M7.5 16.5h9M10 20h4"/>' },
     { label: "DGND", tool: "gnd", railText: "DGND", svg: '<path d="M12 6v7M4.5 13h15M7.5 16.5h9M10 20h4"/><path d="M3.6 3.2v6.4h1.7a3.2 3.2 0 0 0 0-6.4z" stroke-width="1.5"/>' },
     { label: "Analog GND", tool: "agnd", svg: '<path d="M12 4v8M5 12h14"/><path d="M8 12l4 7 4-7z" fill="none"/>' },

@@ -72,6 +72,16 @@ export const ic: Record<string, string> = {
   pwrVcc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 20V8M5 8h14"/></svg>',
   pwr5v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V9"/><path d="M12 3.5L6.5 9.5h11z" fill="currentColor"/></svg>',
   pwrN5v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M12 20.5L6.5 14.5h11z" fill="currentColor"/></svg>',
+  // ±12V — the same positive/negative arrow as ±5V with a rail bar behind it,
+  // so the higher pair reads as its own rows rather than a second copy of the
+  // 5V glyphs (UIUX-98).
+  pwr12v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-9"/><path d="M12 6L7 11h10z" fill="currentColor"/><path d="M5.5 3.5h13"/></svg>',
+  pwrN12v: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9"/><path d="M12 18L7 13h10z" fill="currentColor"/><path d="M5.5 20.5h13"/></svg>',
+  // The two Insert parents. Neither may borrow a child's symbol (UIUX-70), so
+  // each draws the family rather than one member: a rail feeding several
+  // supplies, and several returns joining one ground.
+  pwrRailMenu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5h16"/><path d="M8 5v14M16 5v14"/></svg>',
+  pwrGndMenu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5v5M16 3.5v5M8 8.5h8M12 8.5v3.5"/><path d="M5.5 12h13M8.5 15.75h7M11 19.5h2"/></svg>',
   pwrGnd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v9M4.5 13h15M7.5 16.5h9M10 20h4"/></svg>',
   // Digital ground — the ground stack with a D mark, so it can't be mistaken
   // for plain GND in a list where both appear.
@@ -234,6 +244,11 @@ export const ic: Record<string, string> = {
   // is the subject. Chamfer drew a zigzag; Fillet borrowed pArc (UIUX-61).
   dChamfer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4.5 4.5h6.5L19.5 13v6.5h-15z"/><path d="M11 4.5L19.5 13" stroke-width="2.8" stroke-linecap="round"/></svg>',
   dFillet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4.5 4.5h2.5a12.5 12.5 0 0 1 12.5 12.5v2.5h-15z"/><path d="M7 4.5a12.5 12.5 0 0 1 12.5 12.5" stroke-width="2.8" stroke-linecap="round"/></svg>',
+  // Copper Area vs Fill Area — they shared one pentagon outline, so the two
+  // rows were the same picture. Copper is solid metal; a fill is hatched, the
+  // way a poured zone is drawn on a fabrication print (UIUX-96).
+  tCopperArea: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 9l8-5 8 5-3 10H7z" fill="currentColor" fill-opacity="0.85"/></svg>',
+  tFillArea: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 9l8-5 8 5-3 10H7z"/><path d="M7 13l4 4M9 10l7 7M13 7.5l5 5" stroke-width="1.1" stroke-linecap="round" opacity="0.8"/></svg>',
   tPolygon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 10l8-6 8 6-3 9H7z"/></svg>',
   tFillRegion: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 10l8-6 8 6-3 9H7z" fill-opacity="0.35"/></svg>',
   tSlot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="3"/><circle cx="8" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>',
