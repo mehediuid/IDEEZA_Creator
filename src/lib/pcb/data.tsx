@@ -221,10 +221,11 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),
         item("No Connect", { icon: "pNoConnect", onClick: tool("noConnect") }),
         item("Junction", { icon: "pJunction", onClick: tool("junction") }),
-        item("Differential Pair", { icon: "tDiffPair", onClick: tool("diffPair") }),
+        // UIUX-31: Differential Pair, Keep-out area and Part mask are board
+        // work, not schematic insertions — diff-pair routing lives in the 2D
+        // Route menu and the PCB palette. The diff-pair *tag* stays: it marks
+        // a pair on the sheet, which is where that marking belongs.
         item("Diff-pair tag", { icon: "pDiffFlag", onClick: tool("diffPairFlag") }),
-        item("Keep-out area", { icon: "pKeepout", onClick: tool("maskRegion") }),
-        item("Part mask", { icon: "pPartMask", onClick: tool("componentMask") }),
         item("Agile Module", { icon: "tDevReuse", onClick: tool("reuseBlock") }),
         dv,
         // Drawing primitives.
