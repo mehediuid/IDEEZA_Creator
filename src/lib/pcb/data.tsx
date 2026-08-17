@@ -332,10 +332,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Netlist", { icon: "wire", onClick: () => actions.exportNetlist() }),
         item("BOM (Bill of Materials)", { icon: "bom", onClick: () => actions.openModal("exportBom") }),
         item("DXF", { icon: "exp", onClick: () => actions.openModal("exportDxf2D") }),
-        item("PDF", { icon: "pdf", onClick: () => actions.openModal("exportPdf2D") }),
-        // Sheet images capture the live schematic; GLB is the board's 3D model.
-        item("PNG (this sheet)", { icon: "png", onClick: () => actions.exportSheetImage("PNG") }),
-        item("SVG (this sheet)", { icon: "exp", onClick: () => actions.exportSheetImage("SVG") }),
+        // UIUX-67: the sheet's own export dialog — captures the live schematic
+        // (frame + title block included); the board's PDF stays in the 2D menu.
+        item("Sheet (PDF · PNG · SVG)…", { icon: "pdf", onClick: () => actions.openModal("exportSheet") }),
         dv,
         item("3D Model (GLB)", { icon: "cube", onClick: () => actions.exportGlb() }),
       ],

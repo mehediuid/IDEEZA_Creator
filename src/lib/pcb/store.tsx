@@ -13,7 +13,7 @@ import { planTrackPath } from "./route-path";
 import { pourCopper, POURABLE } from "./pour";
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
 import { runDrc, runNetClasses, runEqualLength, runPadPairs, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
-import { captureSchematicSvg, downloadBlob, downloadDataUrl, rasterizeToPng } from "./exporters";
+import { downloadBlob, downloadDataUrl } from "./exporters";
 import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
@@ -89,7 +89,6 @@ export interface PcbActions {
   /** Board 3D model as binary glTF (.glb). */
   exportGlb: () => void;
   /** The visible schematic sheet as PNG or SVG. */
-  exportSheetImage: (fmt: "PNG" | "SVG") => void;
   /** Add objects as one undoable step (bulk import). */
   addObjects: (objs: CanvasObject[]) => void;
   toggleDrcMarkers: () => void;
@@ -842,18 +841,6 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
             actions.flashToast("Exported board.glb");
           })
           .catch(() => actions.flashToast("GLB export failed"));
-      },
-      exportSheetImage: (fmt) => {
-        const cap = captureSchematicSvg();
-        if (!cap) { actions.flashToast("Nothing on this sheet to export"); return; }
-        if (fmt === "SVG") {
-          downloadBlob("schematic.svg", cap.svg, "image/svg+xml");
-          actions.flashToast("Exported schematic.svg");
-          return;
-        }
-        rasterizeToPng(cap.svg, cap.width, cap.height, 2)
-          .then((png) => { downloadDataUrl("schematic.png", png); actions.flashToast("Exported schematic.png"); })
-          .catch(() => actions.flashToast("PNG export failed"));
       },
       addObjects: (objs) => {
         if (objs.length === 0) return;

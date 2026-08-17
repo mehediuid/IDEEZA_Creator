@@ -80,6 +80,8 @@ export type ModalId =
   // Phase 6 — 2D File / Edit / Export menus
   | "exportDxf2D"
   | "exportPdf2D"
+  // UIUX-67 — the schematic sheet's own export dialog (PDF · PNG · SVG)
+  | "exportSheet"
   | "exportGerber2D"
   | "exportPickPlace"
   | "exportBom"

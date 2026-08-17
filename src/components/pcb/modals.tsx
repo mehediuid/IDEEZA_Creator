@@ -60,6 +60,9 @@ import {
   buildObj,
   downloadBlob,
   downloadDataUrl,
+  captureSchematicSvg,
+  rasterizeToPng,
+  buildSheetPdf,
 } from "@/lib/pcb/exporters";
 import { ProjectInfoModal } from "@/components/dashboard/project-info-modal";
 import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
@@ -2613,6 +2616,109 @@ function DocumentModal() {
   );
 }
 
+// UIUX-67 — the schematic sheet's own export dialog. The board's DocumentModal
+// exports the PCB model; this one captures the live sheet (the same engine the
+// old one-click PNG/SVG rows used), so PDF · PNG · SVG all leave from one home,
+// with the frame + title block and a print-ink mode the capture now supports.
+function SheetExportModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const [fmt, setFmt] = React.useState<"PDF" | "PNG" | "SVG">("PDF");
+  const [frame, setFrame] = React.useState(true);
+  const [ink, setInk] = React.useState<"asDrawn" | "print">("asDrawn");
+  const [detail, setDetail] = React.useState<1 | 2 | 3>(2);
+
+  const firstSheetId = state.schematicSheets[0]?.id;
+  const sheet = state.schematicSheets.find((s) => s.id === state.activeSheetId) ?? state.schematicSheets[0];
+  const count = state.objects.filter(
+    (o) => o.scope !== "pcb" && (o.sheetId ?? firstSheetId) === (sheet?.id ?? firstSheetId),
+  ).length;
+  const [fileName, setFileName] = React.useState(
+    () => (sheet?.name ?? "sheet").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "sheet",
+  );
+
+  const rowSeg = <T extends string>(name: string, options: { label: string; value: T }[], value: T, onChange: (v: T) => void, muted?: boolean) => (
+    <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", opacity: muted ? 0.45 : 1, pointerEvents: muted ? "none" : "auto" }} aria-disabled={muted || undefined}>
+      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{name}</span>
+      <div style={{ display: "flex", gap: "var(--spacing-7)", flexWrap: "wrap" }}>
+        {options.map((o) => (
+          <div key={o.value} onClick={() => onChange(o.value)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+            <Radio on={value === o.value} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const buildPdfBlob = async () => {
+    const cap = captureSchematicSvg({ includeFrame: frame, ink });
+    return cap ? { blob: await buildSheetPdf(cap.svg, cap.width, cap.height, detail), cap } : null;
+  };
+
+  const doExport = async () => {
+    const base = (fileName || "sheet").replace(/\.(pdf|png|svg)$/i, "").slice(0, 60);
+    try {
+      if (fmt === "PDF") {
+        const r = await buildPdfBlob();
+        if (!r) { actions.flashToast("Nothing on this sheet to export"); return; }
+        downloadBlob(`${base}.pdf`, r.blob, "application/pdf");
+      } else {
+        const cap = captureSchematicSvg({ includeFrame: frame, ink });
+        if (!cap) { actions.flashToast("Nothing on this sheet to export"); return; }
+        if (fmt === "SVG") downloadBlob(`${base}.svg`, cap.svg, "image/svg+xml");
+        else downloadDataUrl(`${base}.png`, await rasterizeToPng(cap.svg, cap.width, cap.height, detail));
+      }
+      actions.flashToast(`Exported ${base}.${fmt.toLowerCase()}`);
+      actions.closeModal();
+    } catch {
+      actions.flashToast(`${fmt} export failed`);
+    }
+  };
+
+  const summary = count === 0
+    ? "Nothing on this sheet yet — place symbols or wires before exporting."
+    : `${sheet?.name ?? "Sheet"} · ${state.schemBorder.size} ${state.schemBorder.orientation} · ${count} object${count === 1 ? "" : "s"} · ${frame ? "frame & title block" : "content only"}${fmt !== "SVG" ? ` · ${detail}×` : ""}${ink === "print" ? " · black on white" : ""}`;
+
+  return (
+    <Overlay>
+      <Card width={580} maxHeight="90%" flexCol>
+        <Header title="Export Sheet" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          {rowSeg("Format", [{ label: "PDF", value: "PDF" as const }, { label: "PNG", value: "PNG" as const }, { label: "SVG", value: "SVG" as const }], fmt, setFmt)}
+          {rowSeg("Ink", [{ label: "As drawn (editor colours)", value: "asDrawn" as const }, { label: "Black on white (print)", value: "print" as const }], ink, setInk)}
+          {rowSeg("Detail", [{ label: "1×", value: "1" as const }, { label: "2×", value: "2" as const }, { label: "3×", value: "3" as const }], String(detail) as "1" | "2" | "3", (v) => setDetail(Number(v) as 1 | 2 | 3), fmt === "SVG")}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
+            <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Sheet frame</span>
+            <div onClick={() => setFrame((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+              <Check on={frame} size={18} />
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Include the frame & title block</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>File Name</span>
+            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+          </div>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{summary}</div>
+          {fmt === "SVG" && (
+            <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>SVG is vector — Detail doesn&apos;t apply.</div>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Pill style={{ marginLeft: "auto", ...(count === 0 ? { opacity: 0.45, pointerEvents: "none" } : null) }} onClick={async () => {
+            const r = await buildPdfBlob();
+            if (!r) { actions.flashToast("Nothing on this sheet to export"); return; }
+            const url = URL.createObjectURL(r.blob);
+            window.open(url, "_blank");
+            window.setTimeout(() => URL.revokeObjectURL(url), 8000);
+          }}>Print</Pill>
+          <Button hierarchy="primary" size="md" disabled={count === 0} onClick={doExport}>Export</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 // Import Image — Project ▸ Import ▸ Image… had no dialog at all (a toast on the
 // schematic side, a picture-frame glyph on the board). This reads a real file,
 // optionally reduces it to 1-bit silkscreen ink, and places a real image object.
@@ -3323,6 +3429,8 @@ export function Modals() {
       return <DxfModal />;
     case "exportPdf2D":
       return <DocumentModal />;
+    case "exportSheet":
+      return <SheetExportModal />;
     case "openProject":
       return <OpenProjectModal />;
     case "devicePicker":

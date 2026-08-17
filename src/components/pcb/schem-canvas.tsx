@@ -91,6 +91,7 @@ export function SchematicCanvas() {
 
   return (
     <div
+      data-sheet-frame
       style={{
         position: "absolute",
         top: 60,

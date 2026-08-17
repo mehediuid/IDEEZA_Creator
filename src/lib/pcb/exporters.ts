@@ -480,20 +480,58 @@ export function buildObj(m: ExportModel, include?: { board?: boolean; comps?: bo
 // into a standalone document, with computed colours baked in so `currentColor`
 // and CSS variables survive outside the app. What you see is what you export.
 type SchemCapture = { svg: string; width: number; height: number };
+export type SheetCaptureOptions = { includeFrame?: boolean; ink?: "asDrawn" | "print" };
 
-export function captureSchematicSvg(): SchemCapture | null {
+// Computed colours arrive as "rgb(…)" / "rgba(…)" or "color(srgb …)" → [r,g,b,a] in 0–1.
+function parseColor(c: string): [number, number, number, number] | null {
+  let m = c.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)/);
+  if (m) return [+m[1] / 255, +m[2] / 255, +m[3] / 255, m[4] === undefined ? 1 : +m[4]];
+  m = c.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/);
+  if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+  return null;
+}
+const relLum = (c: [number, number, number, number]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const escXml = (t: string) => t.replace(/[<&>]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
+
+export function captureSchematicSvg(opts: SheetCaptureOptions = {}): SchemCapture | null {
   if (typeof document === "undefined") return null;
   const root = document.querySelector(".pcb-app [data-canvas-wrapper]") as HTMLElement | null;
   if (!root) return null;
   const nodes = Array.from(root.querySelectorAll("[data-object-id]")) as (HTMLElement | SVGGraphicsElement)[];
   if (nodes.length === 0) return null;
 
+  // The sheet itself is transparent — the paint comes from an ancestor. Walk up
+  // for the first opaque colour, otherwise the baked (theme-coloured) strokes
+  // would land on white and vanish.
+  const liveBg = (() => {
+    let n: HTMLElement | null = root;
+    while (n) {
+      const c = window.getComputedStyle(n).backgroundColor;
+      if (c && !/^rgba\(0,\s*0,\s*0,\s*0\)$|^transparent$/.test(c)) return c;
+      n = n.parentElement;
+    }
+    return "#ffffff";
+  })();
+
+  // Print ink maps every colour by its distance from the page tone: surface
+  // fills (the tones that matched the sheet) go white, everything else goes
+  // near-black — so light and dark themes print the same black-on-white sheet.
+  const mapColor = (() => {
+    if (opts.ink !== "print") return (v: string) => v;
+    const bgLum = (() => { const c = parseColor(liveBg); return c ? relLum(c) : 1; })();
+    return (v: string): string => {
+      const c = parseColor(v);
+      if (!c || c[3] < 0.05) return v;
+      return Math.abs(relLum(c) - bgLum) < 0.22 ? "#ffffff" : "#141414";
+    };
+  })();
+
   // Bake computed paint onto a clone so the markup is self-contained.
   const bake = (live: Element, clone: Element) => {
     const cs = window.getComputedStyle(live);
     for (const prop of ["fill", "stroke"] as const) {
       const v = cs.getPropertyValue(prop);
-      if (v && v !== "none") clone.setAttribute(prop, v);
+      if (v && v !== "none") clone.setAttribute(prop, mapColor(v));
     }
     const lk = Array.from(live.children);
     const ck = Array.from(clone.children);
@@ -503,6 +541,84 @@ export function captureSchematicSvg(): SchemCapture | null {
   const rb = root.getBoundingClientRect();
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const items: string[] = [];
+
+  // The sheet frame (border, zone labels, title block) is HTML, not placed
+  // objects — serialized from the live DOM on the same principle as the object
+  // capture: what you see is what you export, no second copy of the geometry.
+  // Backgrounds/borders become rects/lines, leaf text becomes <text>, and the
+  // one inline <svg> (the logo) is cloned like an object glyph.
+  if (opts.includeFrame) {
+    const frameRoot = root.querySelector("[data-sheet-frame]") as HTMLElement | null;
+    if (frameRoot) {
+      const fr = frameRoot.getBoundingClientRect();
+      minX = Math.min(minX, fr.left - rb.left);
+      minY = Math.min(minY, fr.top - rb.top);
+      maxX = Math.max(maxX, fr.right - rb.left);
+      maxY = Math.max(maxY, fr.bottom - rb.top);
+      const walk = (el: Element) => {
+        if (el instanceof SVGSVGElement) {
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) return;
+          const clone = el.cloneNode(true) as SVGSVGElement;
+          bake(el, clone);
+          clone.setAttribute("x", (r.left - rb.left).toFixed(2));
+          clone.setAttribute("y", (r.top - rb.top).toFixed(2));
+          clone.setAttribute("width", r.width.toFixed(2));
+          clone.setAttribute("height", r.height.toFixed(2));
+          items.push(clone.outerHTML);
+          return;
+        }
+        if (!(el instanceof HTMLElement)) return;
+        const cs = window.getComputedStyle(el);
+        if (cs.display === "none" || cs.visibility === "hidden") return;
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 && r.height <= 0) return;
+        const x = r.left - rb.left;
+        const y = r.top - rb.top;
+        const opac = Math.max(0, Math.min(1, parseFloat(cs.opacity) || 1));
+        const o = opac < 1 ? ` opacity="${opac.toFixed(2)}"` : "";
+        const bgc = parseColor(cs.backgroundColor);
+        if (bgc && bgc[3] > 0.02) {
+          const rx = Math.min(parseFloat(cs.borderTopLeftRadius) || 0, r.height / 2);
+          items.push(
+            `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${r.width.toFixed(2)}" height="${r.height.toFixed(2)}"` +
+              ` fill="${mapColor(cs.backgroundColor)}"${rx > 0 ? ` rx="${rx.toFixed(2)}"` : ""}${o}/>`,
+          );
+        }
+        // Partial borders are load-bearing here (corner brackets, separators),
+        // so each side is its own line. Radius on a bracket arm is dropped.
+        const sides: [string, number, number, number, number][] = [
+          ["top", x, y, x + r.width, y],
+          ["right", x + r.width, y, x + r.width, y + r.height],
+          ["bottom", x, y + r.height, x + r.width, y + r.height],
+          ["left", x, y, x, y + r.height],
+        ];
+        for (const [side, x1, y1, x2, y2] of sides) {
+          const bw = parseFloat(cs.getPropertyValue(`border-${side}-width`)) || 0;
+          const bs = cs.getPropertyValue(`border-${side}-style`);
+          const bc = parseColor(cs.getPropertyValue(`border-${side}-color`));
+          if (bw > 0.4 && bs !== "none" && bc && bc[3] > 0.02) {
+            items.push(
+              `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"` +
+                ` stroke="${mapColor(cs.getPropertyValue(`border-${side}-color`))}" stroke-width="${bw.toFixed(2)}"${o}/>`,
+            );
+          }
+        }
+        let text = "";
+        for (const child of Array.from(el.childNodes)) if (child.nodeType === 3) text += child.textContent ?? "";
+        text = text.trim();
+        if (text && r.width > 0) {
+          items.push(
+            `<text x="${(x + r.width / 2).toFixed(2)}" y="${(y + r.height * 0.78).toFixed(2)}" text-anchor="middle"` +
+              ` font-family="${cs.fontFamily.replace(/"/g, "'")}" font-size="${cs.fontSize}" font-weight="${cs.fontWeight}"` +
+              ` fill="${mapColor(cs.color)}"${o}>${escXml(text)}</text>`,
+          );
+        }
+        for (const child of Array.from(el.children)) walk(child);
+      };
+      walk(frameRoot);
+    }
+  }
 
   for (const node of nodes) {
     const r = node.getBoundingClientRect();
@@ -517,12 +633,20 @@ export function captureSchematicSvg(): SchemCapture | null {
     // Wires / buses / tracks are <line> elements living inside one overlay
     // <svg>, so they carry no inner <svg> of their own. Their screen CTM maps
     // overlay user-space straight into the exported picture, zoom and pan
-    // included.
+    // included. The id sits on the transparent pick band, not on the ink — the
+    // visible line is its next sibling, so an invisible id-carrier defers to
+    // its twin (cloning the band alone exported wires as nothing at all).
     if (node instanceof SVGGraphicsElement && !(node instanceof SVGSVGElement)) {
-      const ctm = node.getScreenCTM();
+      const strokeC = parseColor(window.getComputedStyle(node).stroke);
+      const sib = node.nextElementSibling;
+      const src =
+        strokeC && strokeC[3] === 0 && sib instanceof SVGGraphicsElement && !(sib instanceof SVGSVGElement)
+          ? sib
+          : node;
+      const ctm = src.getScreenCTM();
       if (ctm) {
-        const clone = node.cloneNode(true) as SVGGraphicsElement;
-        bake(node, clone);
+        const clone = src.cloneNode(true) as SVGGraphicsElement;
+        bake(src, clone);
         items.push(
           `<g transform="matrix(${ctm.a},${ctm.b},${ctm.c},${ctm.d},${(ctm.e - rb.left).toFixed(2)},${(ctm.f - rb.top).toFixed(2)})">${clone.outerHTML}</g>`,
         );
@@ -550,7 +674,7 @@ export function captureSchematicSvg(): SchemCapture | null {
       items.push(
         `<text x="${(sr.left - rb.left + sr.width / 2).toFixed(2)}" y="${(sr.top - rb.top + sr.height * 0.78).toFixed(2)}"` +
           ` text-anchor="middle" font-family="${cs.fontFamily.replace(/"/g, "'")}" font-size="${cs.fontSize}"` +
-          ` font-weight="${cs.fontWeight}" fill="${cs.color}">${text.replace(/[<&>]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string))}</text>`,
+          ` font-weight="${cs.fontWeight}" fill="${mapColor(cs.color)}">${escXml(text)}</text>`,
       );
     }
   }
@@ -560,18 +684,7 @@ export function captureSchematicSvg(): SchemCapture | null {
   const width = Math.ceil(maxX - minX + pad * 2);
   const height = Math.ceil(maxY - minY + pad * 2);
   const shift = `translate(${(pad - minX).toFixed(2)}, ${(pad - minY).toFixed(2)})`;
-  // The sheet itself is transparent — the paint comes from an ancestor. Walk up
-  // for the first opaque colour, otherwise the baked (theme-coloured) strokes
-  // would land on white and vanish.
-  const bg = (() => {
-    let n: HTMLElement | null = root;
-    while (n) {
-      const c = window.getComputedStyle(n).backgroundColor;
-      if (c && !/^rgba\(0,\s*0,\s*0,\s*0\)$|^transparent$/.test(c)) return c;
-      n = n.parentElement;
-    }
-    return "#ffffff";
-  })();
+  const bg = opts.ink === "print" ? "#ffffff" : liveBg;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     `<rect width="${width}" height="${height}" fill="${bg}"/><g transform="${shift}">${items.join("")}</g></svg>`;
@@ -596,4 +709,69 @@ export function rasterizeToPng(svg: string, width: number, height: number, scale
     img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("svg raster failed")); };
     img.src = blobUrl;
   });
+}
+
+// ── Sheet PDF ─────────────────────────────────────────────────────────────────
+// The sheet capture is an SVG of the live DOM; translating arbitrary SVG into
+// PDF vector operators would be a whole renderer, so the sheet is rasterized
+// (like the PNG export, at the same `scale`) and embedded as one full-page
+// JPEG (DCTDecode) in a hand-rolled single-page PDF. Page size follows the
+// sheet's aspect at 96 px → 72 pt.
+export function buildSheetPdf(svg: string, width: number, height: number, scale = 2): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("no 2d context")); return; }
+      // JPEG carries no alpha — pre-fill so nothing lands on black.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(blobUrl);
+      const b64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1] ?? "";
+      const bin = atob(b64);
+      const jpeg = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) jpeg[i] = bin.charCodeAt(i);
+      resolve(wrapJpegInPdf(jpeg, canvas.width, canvas.height, width * 0.75, height * 0.75));
+    };
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("svg raster failed")); };
+    img.src = blobUrl;
+  });
+}
+
+// One JPEG on one page. All text parts are ASCII, so string length == byte
+// length and the xref offsets stay byte-accurate around the binary stream.
+function wrapJpegInPdf(jpeg: Uint8Array<ArrayBuffer>, pxW: number, pxH: number, wPt: number, hPt: number): Blob {
+  const content = `q ${wPt.toFixed(2)} 0 0 ${hPt.toFixed(2)} 0 0 cm /Im0 Do Q`;
+  const objs: (string | Uint8Array<ArrayBuffer>)[][] = [
+    ["<</Type/Catalog/Pages 2 0 R>>"],
+    ["<</Type/Pages/Kids[3 0 R]/Count 1>>"],
+    [`<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${wPt.toFixed(2)} ${hPt.toFixed(2)}]/Contents 4 0 R/Resources<</ProcSet[/PDF/ImageC]/XObject<</Im0 5 0 R>>>>>>`],
+    [`<</Length ${content.length}>>\nstream\n${content}\nendstream`],
+    [
+      `<</Type/XObject/Subtype/Image/Width ${pxW}/Height ${pxH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpeg.length}>>\nstream\n`,
+      jpeg,
+      "\nendstream",
+    ],
+  ];
+  const parts: (string | Uint8Array<ArrayBuffer>)[] = ["%PDF-1.4\n"];
+  let total = "%PDF-1.4\n".length;
+  const push = (p: string | Uint8Array<ArrayBuffer>) => { parts.push(p); total += p.length; };
+  const offsets: number[] = [];
+  objs.forEach((chunks, i) => {
+    offsets.push(total);
+    push(`${i + 1} 0 obj\n`);
+    for (const ch of chunks) push(ch);
+    push("\nendobj\n");
+  });
+  const xrefStart = total;
+  let tail = `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const o of offsets) tail += String(o).padStart(10, "0") + " 00000 n \n";
+  tail += `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xrefStart}\n%%EOF`;
+  push(tail);
+  return new Blob(parts, { type: "application/pdf" });
 }
