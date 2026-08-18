@@ -19,7 +19,9 @@
   --color-violet-100: #ede5ff;
   --color-violet-200: #d9cafe;
   --color-cyan-400: #22d3ee;
+  --color-teal-300: #5eead4;
   --color-teal-400: #2dd4bf;
+  --color-teal-600: #0d9488;
   --color-violet-300: #bb96fc;
   --color-violet-400: #ab60f7;
   --color-violet-500: #9126d9;
@@ -339,6 +341,16 @@
   --color-draw-dimension: var(--color-yellow-400);
   --color-draw-text: var(--color-gray-100);
   --color-draw-keepout: var(--color-orange-400);
+  /* UIUX-17 — the sheet's own standard per drawing primitive. The board's
+   * --color-draw-* above are picked to sit on dark green substrate, and a
+   * gray-300 line is nearly invisible on a white sheet, so the schematic
+   * carries its own set. Same meanings, one colour each: a plain rule, a
+   * closed shape, a curve, and a note. Ink-dark by default here; the dark
+   * theme lifts them below. A colour set on the object still wins. */
+  --color-schem-draw-line: var(--color-gray-600);
+  --color-schem-draw-shape: var(--color-blue-600);
+  --color-schem-draw-arc: var(--color-teal-600);
+  --color-schem-draw-text: var(--color-gray-800);
   /* #126 — board-only interaction states on top of the shared canvas ones:
    * copper being routed right now, and copper a DRC finding points at. */
   --color-pcb-routing: var(--color-violet-400);
@@ -446,6 +458,13 @@
   --color-canvas-select: var(--color-violet-300);
   --color-canvas-highlight: var(--color-yellow-500);
 
+  /* UIUX-17 — the sheet's drawing primitives, lifted for the dark sheet.
+   * Same hues as the light theme, raised for contrast rather than inverted. */
+  --color-schem-draw-line: var(--color-gray-300);
+  --color-schem-draw-shape: var(--color-blue-300);
+  --color-schem-draw-arc: var(--color-teal-300);
+  --color-schem-draw-text: var(--color-gray-100);
+
   /* The board keeps one substrate across themes (see the light block); only
    * the bed under it changes. */
   --color-pcb-bed: var(--color-bg-page);
@@ -549,6 +568,13 @@
    * highlight can go back to the brighter amber. */
   --color-canvas-select: var(--color-violet-300);
   --color-canvas-highlight: var(--color-yellow-500);
+
+  /* UIUX-17 — the sheet's drawing primitives, lifted for the dark sheet.
+   * Same hues as the light theme, raised for contrast rather than inverted. */
+  --color-schem-draw-line: var(--color-gray-300);
+  --color-schem-draw-shape: var(--color-blue-300);
+  --color-schem-draw-arc: var(--color-teal-300);
+  --color-schem-draw-text: var(--color-gray-100);
 
   /* The board keeps one substrate across themes (see the light block); only
    * the bed under it changes. */

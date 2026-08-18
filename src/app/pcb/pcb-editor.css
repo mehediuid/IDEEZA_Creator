@@ -63,7 +63,6 @@
 .pcb-app .ix-pill { transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
 .pcb-app .ix-pill:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); }
 .pcb-app .ix-mi:hover { background: var(--color-bg-brand-subtle) !important; }
-.pcb-app .ix-mi:hover > .ix-submenu { display: block !important; }
 .pcb-app .ix-arr-input:focus { border-color: var(--color-violet-600) !important; box-shadow: 0 0 0 3px rgba(124, 45, 185, 0.12); }
 .pcb-app .ix-arr-input::-webkit-outer-spin-button,
 .pcb-app .ix-arr-input::-webkit-inner-spin-button { opacity: 1; }
@@ -101,3 +100,11 @@
    outline in placed-objects.tsx rather than relying on this rule. */
 .pcb-app .ix-render-outline svg *:not(text) { fill: none; }
 .pcb-app .ix-render-outline svg *[fill="currentColor"]:not(text) { stroke: currentColor; stroke-width: 1; }
+
+/* UIUX-25 — hovering a placed object emphasises the object, not a box around
+   it. The glyph paints in `currentColor` (the wrapper swaps that to the hover
+   accent), and its strokes thicken to the same 2.6 a hovered wire already
+   uses, so the symbol's own linework, pin numbers and label read bolder.
+   Selection keeps its dashed marker, so the two states stay distinct. */
+.pcb-app .ix-hot svg *[stroke] { stroke-width: 2.6; }
+.pcb-app .ix-hot { font-weight: 700; }

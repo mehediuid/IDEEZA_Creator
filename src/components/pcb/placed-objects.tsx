@@ -29,6 +29,24 @@ function supplyGlyph(label: string) {
 
 // #130 — standard colours for the drawing / documentation kinds (tokens, so
 // both themes are covered and the Layer Manager can still override per layer).
+// UIUX-17 — one standard colour per drawing primitive on the *sheet*: a plain
+// rule, a closed shape, a curve, a note. Polyline reads as a line, bezier as a
+// curve, and rectangle/circle/ellipse/polygon as shapes, so six primitives take
+// four colours rather than six unrelated ones.
+const SCHEM_DRAW_COLOR: Record<string, string> = {
+  line: "var(--color-schem-draw-line)",
+  polyline: "var(--color-schem-draw-line)",
+  rectangle: "var(--color-schem-draw-shape)",
+  circle: "var(--color-schem-draw-shape)",
+  ellipse: "var(--color-schem-draw-shape)",
+  polygon: "var(--color-schem-draw-shape)",
+  arc: "var(--color-schem-draw-arc)",
+  bezier: "var(--color-schem-draw-arc)",
+  text: "var(--color-schem-draw-text)",
+  note: "var(--color-schem-draw-text)",
+  table: "var(--color-schem-draw-text)",
+};
+
 const DRAW_COLOR: Record<string, string> = {
   line: "var(--color-draw-line)",
   polyline: "var(--color-draw-line)",
@@ -490,6 +508,10 @@ export function PlacedObjects() {
     }
     // #130 — documentation strokes (line · polyline · dimension) take their
     // standard colour rather than plain ink, so they read as one family.
+    // UIUX-17 — the sheet has its own set: the board's are picked to sit on
+    // dark green substrate, and a gray-300 line all but vanished on a white
+    // sheet. Same meanings, values chosen for the sheet's own ink.
+    if (state.mode === "schematic" && obj.kind && SCHEM_DRAW_COLOR[obj.kind]) return SCHEM_DRAW_COLOR[obj.kind];
     if (obj.kind && DRAW_COLOR[obj.kind]) return DRAW_COLOR[obj.kind];
     return NORMAL;
   };
@@ -723,6 +745,9 @@ export function PlacedObjects() {
               ? (o.net ? netMap.get(o.net) : undefined) ?? (o.layer ? layerMap.get(o.layer)?.color : undefined)
               : undefined
           }
+          standardColor={
+            (state.mode === "schematic" ? SCHEM_DRAW_COLOR[o.kind] : undefined) ?? DRAW_COLOR[o.kind]
+          }
           designatorActive={selectedSet.has(o.id) && state.selSub === "designator"}
           toolArmed={toolArmed}
           hovered={isHovered(o.id) && !selectedSet.has(o.id)}
@@ -775,7 +800,14 @@ function ImageObject({
         width: w,
         height: h,
         boxSizing: "border-box",
-        border: `1.4px ${selected || hovered ? "dashed" : "solid"} ${edge}`,
+        // UIUX-25/26 — a bitmap has no strokes to embolden, so its own frame is
+        // what hover brightens (solid accent); selection keeps the dashed
+        // marker, so the two never read the same.
+        border: selected
+          ? `1.4px dashed var(--color-canvas-select)`
+          : hovered
+          ? `1.4px solid var(--color-canvas-hover)`
+          : `1.4px solid ${edge}`,
         transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
         zIndex: 3,
         cursor: toolArmed ? "inherit" : "pointer",
@@ -1047,6 +1079,7 @@ function PlacedGlyph({
   editing,
   dimmed,
   layerColor,
+  standardColor,
   designatorActive,
   toolArmed,
   hovered,
@@ -1063,6 +1096,10 @@ function PlacedGlyph({
   editing: boolean;
   dimmed?: boolean;
   layerColor?: string;
+  /** UIUX-17 — the standard colour for this kind in the *current* mode: the
+   *  sheet and the board have their own sets, and only the parent knows which
+   *  is in play. The glyph used to read the board's map in either view. */
+  standardColor?: string;
   designatorActive?: boolean;
   toolArmed?: boolean;
   hovered?: boolean;
@@ -1085,7 +1122,7 @@ function PlacedGlyph({
   // #130 — a documentation object without its own colour takes the standard
   // colour for its meaning (line · shape · arc · dimension · text · keep-out),
   // so the board's non-copper marks read as one family. User colour still wins.
-  const normalColor = obj.color || layerColor || DRAW_COLOR[obj.kind] || "var(--color-text-primary)";
+  const normalColor = obj.color || layerColor || standardColor || "var(--color-text-primary)";
   const glyphColor = highlighted ? "var(--color-canvas-highlight)" : normalColor;
   // Fillable shapes (rectangle/circle/ellipse) render their real outline colour
   // (obj.color via currentColor) + fill colour (props.fillColor), each with an
@@ -1103,6 +1140,7 @@ function PlacedGlyph({
       <div
         data-object-id={obj.id}
         onClick={toolArmed ? undefined : (e) => e.stopPropagation() /* selection handled by canvas mousedown */}
+        {...hoverProps}
         onDoubleClick={(e) => {
           e.stopPropagation();
           onEditStart();
@@ -1116,14 +1154,13 @@ function PlacedGlyph({
           padding: "2px 6px",
           fontSize: 12,
           fontFamily: "var(--font-family-body)",
-          color: glyphColor,
+          color: hovered && !selected && !highlighted ? "var(--color-canvas-hover)" : glyphColor,
           textShadow: highlighted && !selected ? "0 0 6px var(--color-canvas-highlight)" : undefined,
-          border: selected
-            ? "1px dashed var(--color-canvas-select)"
-            : hovered
-            ? "1px solid var(--color-canvas-hover)"
-            : "1px dashed transparent",
-          background: hovered && !selected ? "var(--color-canvas-hover-fill)" : "transparent",
+          // UIUX-25 — a note's own linework is its letterforms, so hover sets
+          // them bolder and takes the accent instead of boxing the text in.
+          fontWeight: hovered && !selected ? 700 : 400,
+          border: selected ? "1px dashed var(--color-canvas-select)" : "1px dashed transparent",
+          background: "transparent",
           cursor: editing ? "text" : "move",
           userSelect: editing ? "text" : "none",
           zIndex: 2,
@@ -1157,6 +1194,7 @@ function PlacedGlyph({
   return (
     <div
       data-object-id={obj.id}
+      className={hovered && !selected ? "ix-hot" : undefined}
       onClick={toolArmed ? undefined : (e) => e.stopPropagation() /* selection handled by canvas mousedown */}
       {...hoverProps}
       style={{
@@ -1167,7 +1205,9 @@ function PlacedGlyph({
         height: 48,
         transform: `rotate(${rotation}deg) scale(${fx}, ${fy})`,
         transformOrigin: "50% 50%",
-        color: glyphColor,
+        // Hovering takes the accent into the glyph's own colour — every part of
+        // it paints in `currentColor`, so the symbol itself brightens (UIUX-25).
+        color: hovered && !selected && !highlighted ? "var(--color-canvas-hover)" : glyphColor,
         filter: highlighted && !selected ? "drop-shadow(0 0 4px var(--color-canvas-highlight))" : undefined,
         // #140 — Focus-active-layer dims what isn't on the layer you're working
         // on, without hiding it: the stack stays readable, the work stands out.
@@ -1178,20 +1218,20 @@ function PlacedGlyph({
         justifyContent: "center",
         // Same three states, same tokens, every kind: hover reads as a lighter
         // echo of selection so the two can never be confused.
+        // UIUX-25 — hover emphasises the object itself, not a box around it:
+        // the glyph paints in `currentColor`, so taking the hover accent and
+        // thickening its strokes (the `.ix-hot` class) makes the part's own
+        // linework, pin numbers and label read bolder — the thing you are
+        // pointing at, rather than a rectangle near it. Selection keeps the
+        // dashed marker and tint, so the two can never be confused (UIUX-26).
         background: selected
           ? "var(--color-canvas-select-fill)"
           : highlighted
           ? "var(--color-canvas-highlight-fill)"
-          : hovered
-          ? "var(--color-canvas-hover-fill)"
           : "transparent",
-        outline: selected
-          ? "1px dashed var(--color-canvas-select)"
-          : hovered
-          ? "1px solid var(--color-canvas-hover)"
-          : "none",
+        outline: selected ? "1px dashed var(--color-canvas-select)" : "none",
         borderRadius: 4,
-        transition: "background .12s ease-out, outline-color .12s ease-out",
+        transition: "background .12s ease-out, outline-color .12s ease-out, color .12s ease-out",
         zIndex: 2,
       }}
       title={obj.text ? `${obj.text} · ${obj.kind}` : obj.kind}
