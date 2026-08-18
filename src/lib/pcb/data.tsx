@@ -7,6 +7,38 @@ import { C } from "./colors";
 import { exportKicadPcb, exportGerberViaKicad } from "./kicad-export";
 import { GRID_PRESETS } from "./types";
 import type { PcbState } from "./types";
+
+// ── Grid & snap, shared by View ▸ Grid Size and the board's right-click menu
+// so the two surfaces can't drift apart (UIUX-54/57). ────────────────────────
+/** Snap is stored in mil; the grid is in the document's unit. */
+const gridToMil = (v, unit) => {
+  const n = parseFloat(v);
+  if (!isFinite(n)) return null;
+  const u = String(unit || "Inch").toLowerCase();
+  return u === "mil" ? n : u === "mm" ? n / 0.0254 : n * 1000;
+};
+export const keepRatioOn = (state) => (state.boardSettings ?? {}).gridKeepRatio === true;
+/** Set the grid; with Keep Ratio on, snap follows it instead of drifting. */
+export const pickGridSize = (state, actions, g) => {
+  actions.setGridSize(g);
+  if (!keepRatioOn(state)) return;
+  const mil = gridToMil(g, state.unit);
+  if (mil != null) actions.setBoardSetting("snapSize", Math.round(mil * 1000) / 1000);
+};
+export const toggleKeepRatio = (state, actions) =>
+  actions.setBoardSetting("gridKeepRatio", !keepRatioOn(state));
+/**
+ * Grid and snap already live in the right panel's Document section, so the
+ * menu rows reveal that rather than opening a third copy of the same fields.
+ * It is the nothing-selected panel, hence the deselect.
+ */
+export const openGridSettingsPanel = (state, actions) => {
+  actions.selectMany([]);
+  actions.setRightTab("properties");
+  if (state.viewTog["Right-Side Panel"] === false) actions.toggleView("Right-Side Panel");
+};
+/** Snap presets offered by the right-click menu, in mil. */
+export const SNAP_PRESETS = [1, 2, 5, 10, 25];
 import type { PcbActions } from "./store";
 
 // (An earlier generic `buildMenus` lived here. It was superseded by the three
@@ -450,30 +482,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
   // keep-ratio row with no state behind it, and two settings rows that opened
   // nothing. Every row is real now, and the presets are the same list the
   // toolbar's grid-size dropdown offers, so the two can't drift apart.
-  const keepRatio = (state.boardSettings ?? {}).gridKeepRatio === true;
-  // The grid is in the document's unit; snap is stored in mil.
-  const gridToMil = (v) => {
-    const n = parseFloat(v);
-    if (!isFinite(n)) return null;
-    const u = String(state.unit || "Inch").toLowerCase();
-    return u === "mil" ? n : u === "mm" ? n / 0.0254 : n * 1000;
-  };
-  const pickGrid = (g) => {
-    actions.setGridSize(g);
-    // Keep Ratio means snap follows the grid rather than drifting from it.
-    if (keepRatio) {
-      const mil = gridToMil(g);
-      if (mil != null) actions.setBoardSetting("snapSize", Math.round(mil * 1000) / 1000);
-    }
-  };
-  // Grid and snap already live in the right panel's Document section — these
-  // rows open that, rather than a third copy of the same fields in a dialog.
-  // The Document panel is the nothing-selected panel, so the selection clears.
-  const openGridSettings = () => {
-    actions.selectMany([]);
-    actions.setRightTab("properties");
-    if (state.viewTog["Right-Side Panel"] === false) actions.toggleView("Right-Side Panel");
-  };
+  const keepRatio = keepRatioOn(state);
+  const pickGrid = (g) => pickGridSize(state, actions, g);
+  const openGridSettings = () => openGridSettingsPanel(state, actions);
   const gridFlyout = [
     ...GRID_PRESETS.map((g) =>
       su(`${g} ${state.unit || "Inch"}`, "", {
@@ -1153,6 +1164,9 @@ export function buildCtxItems(state: PcbState, actions: PcbActions) {
   const hasSel = (state.selectedIds || []).length > 0;
   const hasClip = (state.clipboardObjects || []).length > 0;
   const selObj = hasSel ? state.objects.find((o) => o.id === state.selectedIds[0]) : null;
+  const inGroup = state.objects.some(
+    (o) => (state.selectedIds || []).includes(o.id) && (o.props || {}).groupId,
+  );
   const selKind = selObj?.kind;
   const inPcb = state.mode === 'pcb' || state.mode === '2d';
   // ACTION/DIALOG helper — runs then closes; `disabled` greys it out; `title`
@@ -1221,8 +1235,15 @@ export function buildCtxItems(state: PcbState, actions: PcbActions) {
     ]) });
     items.push(A('Property…', 'prop', '', () => actions.setRightTab('properties')));
   } else {
-    // ─────────────── PCB 2D (spec: 7 items) ───────────────
+    // ─────────────── PCB 2D ───────────────
+    // UIUX-54 — the board's right-click had none of the everyday commands, so
+    // copying or deleting meant reaching for the keyboard or the menu bar.
+    // Each is the same action its shortcut and menu row already run.
+    items.push(A('Copy', 'copy', 'Ctrl+C', () => actions.copySelection(), !hasSel,
+      !hasSel ? 'Select something to copy' : undefined));
     items.push(A('Paste', 'paste', 'Ctrl+V', () => actions.pasteClipboard(), !hasClip));
+    items.push(A('Delete', 'del', 'Del', () => actions.deleteSelected(), !hasSel,
+      !hasSel ? 'Select something to delete' : undefined));
     items.push({
       label: 'Move', icon: 'move', disabled: !hasSel,
       submenu: [
@@ -1242,7 +1263,40 @@ export function buildCtxItems(state: PcbState, actions: PcbActions) {
     ]) });
     items.push(dv);
     items.push(A('Fit All in Window', 'fit', 'K', () => actions.zoomFit('all')));
+    items.push(A('Zoom In', 'zoomin', 'I', () => actions.zoomIn()));
+    items.push(A('Zoom Out', 'zoomout', 'O', () => actions.zoomOut()));
+    items.push(dv);
+    // Grid and snap, at the cursor rather than a trip to the sidebar. The rows
+    // drive the same state the toolbar and the Document panel do (UIUX-54).
+    items.push({
+      label: 'Grid Size', icon: 'grid',
+      submenu: GRID_PRESETS.map((g) => ({
+        label: `${g} ${state.unit || 'Inch'}`, icon: state.gridSize === g ? 'check' : 'blank',
+        onClick: () => pickGridSize(state, actions, g),
+      })),
+    });
+    items.push({
+      label: 'Snap Size', icon: 'snap',
+      submenu: SNAP_PRESETS.map((s) => ({
+        label: `${s} mil`, icon: Number((state.boardSettings ?? {}).snapSize) === s ? 'check' : 'blank',
+        onClick: () => actions.setBoardSetting('snapSize', s),
+      })),
+    });
+    items.push(T('Keep Ratio', 'tGridOptions', keepRatioOn(state), () => toggleKeepRatio(state, actions)));
     items.push(T('Snap', 'tGridOptions', state.snapEnabled, () => actions.toggleSnap()));
+    items.push(A('Snap Settings…', 'prop', '', () => openGridSettingsPanel(state, actions)));
+    items.push(dv);
+    items.push({
+      label: 'Group', icon: 'group',
+      submenu: [
+        A('Group selected', 'group', 'Ctrl+G', () => actions.groupSelection(), state.selectedIds.length < 2,
+          state.selectedIds.length < 2 ? 'Select 2 or more objects' : undefined),
+        A('Ungroup selected', 'ungroup', 'Ctrl+Shift+G', () => actions.ungroupSelection(), !inGroup,
+          !inGroup ? "Selection isn't in a group" : undefined),
+        A('Select group members', 'group', '', () => actions.selectGroupMembers(), !inGroup,
+          !inGroup ? 'Select an object that belongs to a group' : undefined),
+      ],
+    });
   }
 
   // ── Contextual extras (kept from before) — only for the matching object
