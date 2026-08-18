@@ -301,7 +301,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         dv,
         // Annotation objects — their own group, not drawing primitives.
         item("Text", { k: "Alt+T", icon: "pText", onClick: tool("text") }),
-        item("Image", { icon: "pImage", onClick: tool("image") }),
+        // UIUX-83 — the row armed a place tool that stamped an image object
+        // with no file behind it; it opens the real import dialog now.
+        item("Image…", { icon: "pImage", onClick: () => actions.openModal("importImage") }),
         item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
       ],
     },
@@ -701,7 +703,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         ] }),
         item("Dimension", { icon: "measure", onClick: () => actions.setTool("dimension") }),
         item("Text", { icon: "pText", onClick: () => actions.setTool("text") }),
-        item("Image", { icon: "pImage", onClick: () => actions.setTool("image") }),
+        item("Image…", { icon: "pImage", onClick: () => actions.openModal("importImage") }),
         item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
         item("Canvas Origin", { icon: "ruler", onClick: () => actions.setTool("canvasOrigin") }),
       ],

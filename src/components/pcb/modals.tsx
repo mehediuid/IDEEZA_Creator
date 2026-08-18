@@ -20,6 +20,7 @@ import { ERC_ENFORCED_ROWS, computeNets } from "@/lib/pcb/nets";
 import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
+import { PX_PER_MM } from "@/lib/pcb/drc";
 import { parseGltfFile } from "@/lib/pcb/gltf-import";
 import { dxfLayers, dxfToObjects, parseDxf, pxPerUnit, summariseDxf, type DxfDoc, type DxfLayerMap } from "@/lib/pcb/dxf-import";
 import {
@@ -3116,6 +3117,15 @@ function ImportImageModal() {
   const [mono, setMono] = React.useState(false);
   const [threshold, setThreshold] = React.useState(128);
   const [invert, setInvert] = React.useState(false);
+  // UIUX-99 — the 1-bit reduction is a lossy operation, so it can't be a blind
+  // toggle: the converted result is rendered live beside the original and the
+  // two knobs that shape it are on screen.
+  const [smooth, setSmooth] = React.useState(0);
+  const [monoSrc, setMonoSrc] = React.useState<string | null>(null);
+  // UIUX-83 — the schematic has no layers and no silkscreen; the sheet's own
+  // dialog asks for millimetres and offers the same reduction as "place the
+  // original bitmap or not".
+  const schematic = state.mode === "schematic";
 
   const layers = (state.pcbLayers ?? []).map((l) => ({ label: l.name, value: l.id }));
   const label: React.CSSProperties = { width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
@@ -3152,9 +3162,12 @@ function ImportImageModal() {
   const setWidth = (v: number) => { setW(v); if (lock) setH(Math.max(4, Math.round(v * ratio))); };
   const setHeight = (v: number) => { setH(v); if (lock) setW(Math.max(4, Math.round(v / (ratio || 0.75)))); };
 
-  // 1-bit reduction for silkscreen: luminance vs threshold, ink kept opaque and
-  // everything else transparent, so the board shows through.
-  const toMono = (url: string): Promise<string> =>
+  // 1-bit reduction for silkscreen: optional smoothing over the luminance (so
+  // speckle and JPEG noise don't come through as ink), then luminance vs
+  // threshold — ink kept opaque, everything else transparent so the board
+  // shows through. One function: the live preview and the placed image are
+  // the same pixels, so the preview can't promise something else.
+  const toMono = React.useCallback((url: string): Promise<string> =>
     new Promise((resolve) => {
       const img = new window.Image();
       img.onload = () => {
@@ -3166,9 +3179,33 @@ function ImportImageModal() {
         ctx.drawImage(img, 0, 0);
         const data = ctx.getImageData(0, 0, cv.width, cv.height);
         const px = data.data;
-        for (let i = 0; i < px.length; i += 4) {
-          const lum = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-          const ink = invert ? lum > threshold : lum <= threshold;
+        const W = cv.width, H = cv.height;
+        const lum = new Float32Array(W * H);
+        for (let i = 0, p = 0; i < px.length; i += 4, p++) {
+          lum[p] = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+        }
+        const r = Math.max(0, Math.min(3, Math.round(smooth)));
+        const soft = r > 0 ? new Float32Array(W * H) : lum;
+        if (r > 0) {
+          for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+              let sum = 0, n = 0;
+              for (let dy = -r; dy <= r; dy++) {
+                const yy = y + dy;
+                if (yy < 0 || yy >= H) continue;
+                for (let dx = -r; dx <= r; dx++) {
+                  const xx = x + dx;
+                  if (xx < 0 || xx >= W) continue;
+                  sum += lum[yy * W + xx];
+                  n++;
+                }
+              }
+              soft[y * W + x] = sum / Math.max(1, n);
+            }
+          }
+        }
+        for (let i = 0, p = 0; i < px.length; i += 4, p++) {
+          const ink = invert ? soft[p] > threshold : soft[p] <= threshold;
           px[i] = px[i + 1] = px[i + 2] = 255;
           px[i + 3] = ink ? 255 : 0;
         }
@@ -3177,11 +3214,41 @@ function ImportImageModal() {
       };
       img.onerror = () => resolve(url);
       img.src = url;
-    });
+    }), [threshold, invert, smooth]);
+
+  // Re-run the conversion whenever the source or either knob changes, so the
+  // "after" pane always shows what Place would write.
+  React.useEffect(() => {
+    let live = true;
+    if (!src || !mono) { setMonoSrc(null); return; }
+    void toMono(src).then((u) => { if (live) setMonoSrc(u); });
+    return () => { live = false; };
+  }, [src, mono, toMono]);
 
   const place = async () => {
     if (!src) return;
-    const finalSrc = mono ? await toMono(src) : src;
+    const finalSrc = mono ? monoSrc ?? (await toMono(src)) : src;
+    if (schematic) {
+      // The sheet asks for millimetres, so convert to the canvas units the
+      // renderer draws in rather than labelling px as mm.
+      actions.addObjects([
+        {
+          id: `img_${Date.now().toString(36)}`,
+          kind: "image",
+          x: 420,
+          y: 300,
+          rotation: 0,
+          scope: "schematic",
+          sheetId: state.activeSheetId,
+          width: Math.max(4, Math.round(w * PX_PER_MM)),
+          height: Math.max(4, Math.round(h * PX_PER_MM)),
+          props: { src: finalSrc, name, mono, threshold, invert, smooth, natW: nat?.w ?? 0, natH: nat?.h ?? 0 },
+        },
+      ]);
+      actions.flashToast(`Placed ${name || "image"} on the sheet`);
+      actions.closeModal();
+      return;
+    }
     const bw = state.pcbBoard?.width && state.pcbBoard.width > 0 ? state.pcbBoard.width : 720;
     const bh = state.pcbBoard?.height && state.pcbBoard.height > 0 ? state.pcbBoard.height : 480;
     actions.addObjects([
@@ -3195,7 +3262,7 @@ function ImportImageModal() {
         layer,
         width: w,
         height: h,
-        props: { src: finalSrc, name, mono, threshold, invert, natW: nat?.w ?? 0, natH: nat?.h ?? 0 },
+        props: { src: finalSrc, name, mono, threshold, invert, smooth, natW: nat?.w ?? 0, natH: nat?.h ?? 0 },
       },
     ]);
     actions.flashToast(`Placed ${name || "image"} on ${layers.find((l) => l.value === layer)?.label ?? layer}`);
@@ -3228,8 +3295,8 @@ function ImportImageModal() {
                 <img src={src} alt="preview" style={{ maxWidth: "100%", maxHeight: "100%", display: "block" }} />
               </div>
               <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
-                {row("Width (mil)", <NumberInput value={String(w)} onChange={(v) => setWidth(parseFloat(v) || 0)} min={4} />)}
-                {row("Height (mil)", <NumberInput value={String(h)} onChange={(v) => setHeight(parseFloat(v) || 0)} min={4} />)}
+                {row(schematic ? "Width (mm)" : "Width (mil)", <NumberInput value={String(w)} onChange={(v) => setWidth(parseFloat(v) || 0)} min={4} />)}
+                {row(schematic ? "Height (mm)" : "Height (mil)", <NumberInput value={String(h)} onChange={(v) => setHeight(parseFloat(v) || 0)} min={4} />)}
                 <div onClick={() => setLock((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
                   <Check on={lock} size={18} />
                   <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Keep the original aspect ratio</span>
@@ -3237,22 +3304,88 @@ function ImportImageModal() {
               </div>
             </div>
           )}
-          {row("Layer", <DsSelect value={layer} options={layers.length ? layers : [{ label: "Top Silkscreen", value: "topSilk" }]} onChange={setLayer} />)}
-          <div onClick={() => setMono((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
-            <Check on={mono} size={18} />
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Reduce to silkscreen ink (1-bit)</span>
+          {!schematic && row("Layer", <DsSelect value={layer} options={layers.length ? layers : [{ label: "Top Silkscreen", value: "topSilk" }]} onChange={setLayer} />)}
+          {/* UIUX-83 — on the sheet the same reduction reads the other way
+              round: place the original bitmap, or reduce it to ink. */}
+          <div
+            role="checkbox"
+            aria-checked={schematic ? !mono : mono}
+            tabIndex={0}
+            onClick={() => setMono((v) => !v)}
+            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setMono((v) => !v); } }}
+            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}
+          >
+            <Check on={schematic ? !mono : mono} size={18} />
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
+              {schematic ? "Place original (bitmap)" : "Reduce to silkscreen ink (1-bit)"}
+            </span>
           </div>
-          {mono && (
-            <>
-              {row("Threshold", <NumberInput value={String(threshold)} onChange={(v) => setThreshold(Math.max(0, Math.min(255, parseFloat(v) || 0)))} min={0} />)}
-              <div onClick={() => setInvert((v) => !v)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}>
+          {/* UIUX-99 — the conversion is lossy, so it is shown, not promised:
+              the original and the converted result side by side, with the two
+              knobs that shape them. */}
+          {mono && src && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-6)", padding: "var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}>
+              <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                {schematic ? "Ink conversion" : "Silkscreen conversion"}
+              </div>
+              <div style={{ display: "flex", gap: "var(--spacing-6)" }}>
+                {([["Original", src], [schematic ? "As ink" : "As silkscreen", monoSrc]] as const).map(([cap, url]) => (
+                  <div key={cap} style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+                    <div
+                      data-imgpane={cap === "Original" ? "before" : "after"}
+                      style={{ height: 96, border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-md)", background: cap === "Original" ? "var(--color-bg-surface)" : "var(--color-pcb-substrate)", display: "grid", placeItems: "center", overflow: "hidden" }}
+                    >
+                      {url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element -- local data: URI preview */
+                        <img src={url} alt={cap} style={{ maxWidth: "100%", maxHeight: "100%", display: "block" }} />
+                      ) : (
+                        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Converting…</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>{cap}</span>
+                  </div>
+                ))}
+              </div>
+              {row("Threshold", (
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)" }}>
+                  <input
+                    type="range" min={0} max={255} step={1} value={threshold} aria-label="Threshold"
+                    onChange={(e) => setThreshold(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: "var(--color-violet-600)" }}
+                  />
+                  <span style={{ width: 34, textAlign: "right", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{threshold}</span>
+                </div>
+              ))}
+              {row("Smoothing", (
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)" }}>
+                  <input
+                    type="range" min={0} max={3} step={1} value={smooth} aria-label="Smoothing"
+                    onChange={(e) => setSmooth(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: "var(--color-violet-600)" }}
+                  />
+                  <span style={{ width: 34, textAlign: "right", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{smooth === 0 ? "off" : smooth}</span>
+                </div>
+              ))}
+              <div
+                role="checkbox"
+                aria-checked={invert}
+                tabIndex={0}
+                onClick={() => setInvert((v) => !v)}
+                onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setInvert((v) => !v); } }}
+                style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer" }}
+              >
                 <Check on={invert} size={18} />
                 <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Invert — keep the light pixels as ink</span>
               </div>
-            </>
+              <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+                Smoothing averages the image before the cut, so speckle and compression noise don&apos;t come through as ink. What the right-hand pane shows is exactly what Place writes.
+              </div>
+            </div>
           )}
           <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
-            The image lands in the middle of the board and can be moved, resized and rotated like any object.
+            {schematic
+              ? "The image lands on the sheet and can be moved, resized and rotated like any object."
+              : "The image lands in the middle of the board and can be moved, resized and rotated like any object."}
             {mono ? " Ink pixels stay opaque and the rest becomes transparent, so the board shows through." : ""}
           </div>
         </div>
