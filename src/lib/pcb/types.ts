@@ -216,6 +216,8 @@ export interface ErcIssue {
   rule?: string; // rule id in the ERC catalog (nets.ts ERC_RULES)
   x?: number;
   y?: number;
+  /** UIUX-81 — the objects the finding is about, so the canvas can ring them. */
+  ids?: string[];
 }
 
 // PCB net — minimal model for Phase 2 (coloring + assignment).

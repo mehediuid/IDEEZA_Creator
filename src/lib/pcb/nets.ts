@@ -285,7 +285,9 @@ function isBusMember(label: string, bus: { prefix: string; lo: number; hi: numbe
  */
 export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSchRulesConfig()): ErcIssue[] {
   const issues: ErcIssue[] = [];
-  const emit = (rule: keyof typeof ERC_RULES, detail: string, p?: Pt, sevOverride?: ErcSeverity) => {
+  // UIUX-81 — a finding names the objects it is about, so the canvas can ring
+  // the offending symbol/wire instead of dropping a dot near it.
+  const emit = (rule: keyof typeof ERC_RULES, detail: string, p?: Pt, sevOverride?: ErcSeverity, ids?: (string | undefined)[]) => {
     let severity: ErcSeverity;
     if (sevOverride) severity = sevOverride; // matrix-driven (pinConflict)
     else {
@@ -296,7 +298,8 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
       if (!s) return;                             // Ignore → suppressed
       severity = s;
     }
-    issues.push({ rule, severity, title: ERC_RULES[rule].title, detail, x: p?.x, y: p?.y });
+    const on = (ids ?? []).filter((v): v is string => !!v);
+    issues.push({ rule, severity, title: ERC_RULES[rule].title, detail, x: p?.x, y: p?.y, ids: on.length ? [...new Set(on)] : undefined });
   };
 
   const { components, nets } = computeNets(objects);
@@ -312,18 +315,18 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
     // Net #9 / #17 / Component #9 — a symbol alone with nothing attached.
     if (comp.length === 1 && pins.length === 1) {
       const s = pins[0].sym!;
-      if (SCHEM_PINS[s.kind]) emit("floatingPin", `${s.text || s.kind} pin ${pins[0].pinIndex! + 1} has no connection`, pins[0].p);
+      if (SCHEM_PINS[s.kind]) emit("floatingPin", `${s.text || s.kind} pin ${pins[0].pinIndex! + 1} has no connection`, pins[0].p, undefined, [s.id]);
       else if (LABEL_NAMERS.has(s.kind) || PORTLIKE[s.kind] || s.kind === "shortFlag" || s.kind === "diffPairFlag")
-        emit("labelNotConnected", `${s.text || s.kind} is not connected to a wire or bus`, pins[0].p);
-      else emit("floatingPin", `${s.text || s.kind} is not connected`, pins[0].p);
+        emit("labelNotConnected", `${s.text || s.kind} is not connected to a wire or bus`, pins[0].p, undefined, [s.id]);
+      else emit("floatingPin", `${s.text || s.kind} is not connected`, pins[0].p, undefined, [s.id]);
     }
     // Net #9 — a wire net with no pins at all.
     if (pins.length === 0 && wireNodes.length > 0)
-      emit("danglingWire", "Wire is a free network with no pins attached", comp[0].p);
+      emit("danglingWire", "Wire is a free network with no pins attached", comp[0].p, undefined, wireNodes.map((n) => n.objId));
     // Net #10 — a wire net with exactly one pin.
     if (pins.length === 1 && wireNodes.length > 0) {
       const s = pins[0].sym!;
-      emit("singleNetWire", `Only ${s.text || s.kind} connects to this net`, pins[0].p);
+      emit("singleNetWire", `Only ${s.text || s.kind} connects to this net`, pins[0].p, undefined, [s.id, ...wireNodes.map((n) => n.objId)]);
     }
 
     // Names present on this net.
@@ -334,10 +337,10 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
     // (Bus branches are separate components now, so this no longer mis-fires
     // on a bus bundle.)
     if (labelNames.length >= 2)
-      emit("multipleNetNames", `This net carries ${labelNames.length} different names: ${labelNames.join(", ")}`, comp[0].p);
+      emit("multipleNetNames", `This net carries ${labelNames.length} different names: ${labelNames.join(", ")}`, comp[0].p, undefined, symsOf((k) => LABEL_NAMERS.has(k)).map((x) => x.id));
     // Net #7 — two different GLOBAL nets tied together (e.g. GND↔VCC short).
     if (globalNames.length >= 2)
-      emit("globalShort", `Global nets shorted together: ${globalNames.join(", ")}`, comp[0].p);
+      emit("globalShort", `Global nets shorted together: ${globalNames.join(", ")}`, comp[0].p, undefined, symsOf((k) => GLOBAL_NAMERS.has(k)).map((x) => x.id));
 
     // Net #11/#13/#15 — a port / flag / off-page connector on a WIRE must carry
     // the same name as the wire (its net label). Bus attachments → bus pass.
@@ -347,7 +350,7 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
       for (const s of symsOf((k) => !!PORTLIKE[k])) {
         const nm = (s.text || "").trim();
         if (nm && nm !== wireName)
-          emit(MISMATCH_ID[s.kind as keyof typeof MISMATCH_ID], `${PORTLIKE[s.kind].kind} "${nm}" does not match connected wire ${wireName}`, { x: s.x, y: s.y });
+          emit(MISMATCH_ID[s.kind as keyof typeof MISMATCH_ID], `${PORTLIKE[s.kind].kind} "${nm}" does not match connected wire ${wireName}`, { x: s.x, y: s.y }, undefined, [s.id]);
       }
     }
 
@@ -363,7 +366,7 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
           const sev = SEV_OF[pairSeverity(typed[a].type, typed[b].type, cfg.pinMatrix)];
           if (!sev) continue;
           const sa = typed[a].node.sym!, sb = typed[b].node.sym!;
-          emit("pinConflict", `${typed[a].type} pin (${sa.text || sa.kind}) connected to ${typed[b].type} pin (${sb.text || sb.kind}) — see Connection rule matrix`, typed[a].node.p, sev);
+          emit("pinConflict", `${typed[a].type} pin (${sa.text || sa.kind}) connected to ${typed[b].type} pin (${sb.text || sb.kind}) — see Connection rule matrix`, typed[a].node.p, sev, [sa.id, sb.id]);
         }
     }
   }
@@ -390,7 +393,7 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
       if (PORTLIKE[o.kind] && pinsOf(o).some((p) => onBusSeg(p, bo))) {
         const nm = (o.text || "").trim();
         if (nm && nm !== busName)
-          emit(BUS_ID[o.kind as keyof typeof BUS_ID], `${PORTLIKE[o.kind].kind} "${nm}" does not match connected bus ${busName}`, { x: o.x, y: o.y });
+          emit(BUS_ID[o.kind as keyof typeof BUS_ID], `${PORTLIKE[o.kind].kind} "${nm}" does not match connected bus ${busName}`, { x: o.x, y: o.y }, undefined, [o.id, bo.id]);
       }
       // Net #4 — a branch wire off the bus must be labelled as a valid member.
       if (bus && o.kind === "wire") {
@@ -400,7 +403,7 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
             ends.some((e) => { const q = pinsOf(L)[0]; const dx = q.x - e.x, dy = q.y - e.y; return dx * dx + dy * dy <= CLUSTER_TOL * CLUSTER_TOL; }));
           const nm = (label?.text || "").trim();
           if (nm && !isBusMember(nm, bus))
-            emit("busBranch", `Branch wire ${nm} is not named consistently with bus ${busName}`, { x: label!.x, y: label!.y });
+            emit("busBranch", `Branch wire ${nm} is not named consistently with bus ${busName}`, { x: label!.x, y: label!.y }, undefined, [label!.id, o.id]);
         }
       }
     }
@@ -409,8 +412,10 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
   // ── Named-net rules (Net #2 / #3) ───────────────────────────────────────
   for (const net of nets) {
     if (!net.named) continue;
-    if (net.name.length > 255) emit("netNameLength", `Net "${net.name.slice(0, 24)}…" is ${net.name.length} characters (max 255)`);
-    else if (!NET_NAME_RE.test(net.name)) emit("netNameChars", `Net name "${net.name}" contains an illegal character`);
+    const namePos = objects.find((o) => net.memberIds.includes(o.id) && (LABEL_NAMERS.has(o.kind) || !!PORTLIKE[o.kind]));
+    const at = namePos ? { x: namePos.x, y: namePos.y } : undefined;
+    if (net.name.length > 255) emit("netNameLength", `Net "${net.name.slice(0, 24)}…" is ${net.name.length} characters (max 255)`, at, undefined, [namePos?.id]);
+    else if (!NET_NAME_RE.test(net.name)) emit("netNameChars", `Net name "${net.name}" contains an illegal character`, at, undefined, [namePos?.id]);
   }
 
   // Net #20 — differential-pair members must come in matched _P/_N pairs.
@@ -428,30 +433,34 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
     if (SCHEM_PINS[o.kind]) {
       const t = (o.text || "").trim();
       // Component #11 — unannotated designator (blank or contains "?").
-      if (isUnannotated(t)) emit("notAnnotated", `${o.kind} designator is not annotated (${t || "blank"})`, { x: o.x, y: o.y });
+      if (isUnannotated(t)) emit("notAnnotated", `${o.kind} designator is not annotated (${t || "blank"})`, { x: o.x, y: o.y }, undefined, [o.id]);
       else {
         // Component #10 — annotated designator must be letter(s)+number(s).
-        if (!DESIGNATOR_RE.test(t)) emit("designatorFormat", `Designator "${t}" is not letter+number`, { x: o.x, y: o.y });
+        if (!DESIGNATOR_RE.test(t)) emit("designatorFormat", `Designator "${t}" is not letter+number`, { x: o.x, y: o.y }, undefined, [o.id]);
         partText.set(t, (partText.get(t) ?? 0) + 1);
       }
       // Component #2 — if a part carries a Value property it must not be empty.
       const v = o.props?.value;
-      if (v !== undefined && String(v).trim() === "") emit("valueEmpty", `${t || o.kind} has an empty Value property`, { x: o.x, y: o.y });
+      if (v !== undefined && String(v).trim() === "") emit("valueEmpty", `${t || o.kind} has an empty Value property`, { x: o.x, y: o.y }, undefined, [o.id]);
     }
     // Net #6 — netflag / netport needs a name.
     if ((o.kind === "netFlag" || o.kind === "port" || o.kind === "offPageConnector") && !(o.text || "").trim())
-      emit("flagNeedsName", `A ${o.kind === "port" ? "Netport" : o.kind === "netFlag" ? "Netflag" : "Off-page connector"} is missing its name`, { x: o.x, y: o.y });
+      emit("flagNeedsName", `A ${o.kind === "port" ? "Netport" : o.kind === "netFlag" ? "Netflag" : "Off-page connector"} is missing its name`, { x: o.x, y: o.y }, undefined, [o.id]);
     // Net #1 — bus name must conform to BUS[start:end] with start ≤ end.
     if (o.kind === "bus") {
       const nm = (o.text || "").trim();
       if (nm) {
         const m = BUS_NAME_RE.exec(nm);
-        if (!m || Number(m[1]) > Number(m[2])) emit("busName", `Bus name "${nm}" does not conform to BUS[start:end]`, { x: o.x, y: o.y });
+        if (!m || Number(m[1]) > Number(m[2])) emit("busName", `Bus name "${nm}" does not conform to BUS[start:end]`, { x: o.x, y: o.y }, undefined, [o.id]);
       }
     }
   }
   // Component #12 — duplicate (annotated) designators.
-  partText.forEach((n, t) => { if (n > 1) emit("dupDesignator", `${t} is used by ${n} components`); });
+  partText.forEach((n, t) => {
+    if (n <= 1) return;
+    const dupes = objects.filter((o) => SCHEM_PINS[o.kind] && (o.text || "").trim() === t);
+    emit("dupDesignator", `${t} is used by ${n} components`, dupes[0] ? { x: dupes[0].x, y: dupes[0].y } : undefined, undefined, dupes.map((o) => o.id));
+  });
 
   // Net #8 — two device-pin tips coincide with no wire/junction joining them.
   // Pins are meant to connect through wires; bare overlapping tips are the
@@ -476,7 +485,7 @@ export function runErc(objects: CanvasObject[], cfg: SchRulesConfig = defaultSch
       const key = [a.sym.id, b.sym.id].sort().join("|");
       if (reported.has(key)) continue;
       reported.add(key);
-      emit("pinOverlap", `Pin endpoints of ${a.sym.text || a.sym.kind}.${a.idx + 1} and ${b.sym.text || b.sym.kind}.${b.idx + 1} overlap without an electrical join`, a.p);
+      emit("pinOverlap", `Pin endpoints of ${a.sym.text || a.sym.kind}.${a.idx + 1} and ${b.sym.text || b.sym.kind}.${b.idx + 1} overlap without an electrical join`, a.p, undefined, [a.sym.id, b.sym.id]);
     }
 
   // Stable order: fatal → error → warning → note.

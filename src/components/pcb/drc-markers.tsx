@@ -8,6 +8,12 @@
 // positioned finding in the same coordinate space as the placed objects, and
 // pairs with the DRC tab: clicking a row focuses its marker, clicking a marker
 // focuses its row.
+//
+// UIUX-81 — a finding that names its objects (`issue.ids`) is drawn as a
+// **dashed ring around the offending element**, sized to that element's real
+// bounds and coloured by severity, so the ERC points at the wire/pin/part it
+// is talking about rather than dropping a dot nearby. A finding with only a
+// position keeps the small ring.
 
 import * as React from "react";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
@@ -22,19 +28,40 @@ export function DrcMarkers() {
   const [hover, setHover] = React.useState<number | null>(null);
 
   const issues = state.mode === "schematic" ? state.ercResults : state.pcbDrcResults;
+  // Bounds of the objects a finding names, padded so the ring sits clear of
+  // the glyph. Falls back to the finding's own point when it names nothing.
+  const boundsOf = React.useCallback(
+    (ids: string[] | undefined) => {
+      if (!ids?.length) return null;
+      const set = new Set(ids);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let n = 0;
+      for (const o of state.objects) {
+        if (!set.has(o.id)) continue;
+        n++;
+        const xs = [o.x, o.endX ?? o.x], ys = [o.y, o.endY ?? o.y];
+        minX = Math.min(minX, ...xs); maxX = Math.max(maxX, ...xs);
+        minY = Math.min(minY, ...ys); maxY = Math.max(maxY, ...ys);
+      }
+      if (!n) return null;
+      const M = 16;
+      return { x: minX - M, y: minY - M, w: maxX - minX + M * 2, h: maxY - minY + M * 2 };
+    },
+    [state.objects],
+  );
   const marks = React.useMemo(
     () =>
       issues
-        .map((it, i) => ({ it, i }))
-        .filter(({ it }) => typeof it.x === "number" && typeof it.y === "number"),
-    [issues],
+        .map((it, i) => ({ it, i, box: boundsOf(it.ids) }))
+        .filter(({ it, box }) => box !== null || (typeof it.x === "number" && typeof it.y === "number")),
+    [issues, boundsOf],
   );
   if (!state.drcMarkers || marks.length === 0) return null;
 
   return (
     <div style={{ position: "absolute", left: -OX, top: -OX, width: OX * 2, height: OX * 2, pointerEvents: "none", zIndex: 6 }}>
       <div style={{ position: "absolute", left: OX, top: OX }}>
-        {marks.map(({ it, i }) => {
+        {marks.map(({ it, i, box }) => {
           const key = sevKeyOf(it.severity);
           const color = SEV_META[key].color;
           const focused = state.focusedIssue === i;
@@ -42,8 +69,27 @@ export function DrcMarkers() {
           return (
             <div
               key={i}
-              style={{ position: "absolute", left: it.x, top: it.y, pointerEvents: "auto" }}
+              style={{ position: "absolute", left: box ? box.x + box.w / 2 : it.x, top: box ? box.y + box.h / 2 : it.y, pointerEvents: "auto" }}
             >
+              {/* the offending element, ringed — dashed and severity-coloured */}
+              {box && (
+                <div
+                  data-erc-ring={key}
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: -box.w / 2,
+                    top: -box.h / 2,
+                    width: box.w,
+                    height: box.h,
+                    borderRadius: "50%",
+                    border: `2px dashed ${color}`,
+                    background: open ? `color-mix(in srgb, ${color} 10%, transparent)` : "transparent",
+                    pointerEvents: "none",
+                    transition: "background .15s ease-out",
+                  }}
+                />
+              )}
               {/* marker — a severity ring, sized up while focused */}
               <button
                 type="button"
@@ -56,8 +102,8 @@ export function DrcMarkers() {
                 }}
                 style={{
                   position: "absolute",
-                  left: -9,
-                  top: -9,
+                  left: box ? box.w / 2 - 9 : -9,
+                  top: box ? -box.h / 2 - 9 : -9,
                   width: 18,
                   height: 18,
                   padding: 0,
@@ -74,8 +120,8 @@ export function DrcMarkers() {
                   role="tooltip"
                   style={{
                     position: "absolute",
-                    left: 14,
-                    top: -8,
+                    left: box ? box.w / 2 + 16 : 14,
+                    top: box ? -box.h / 2 - 8 : -8,
                     minWidth: 180,
                     maxWidth: 300,
                     padding: "var(--spacing-4) var(--spacing-5)",
