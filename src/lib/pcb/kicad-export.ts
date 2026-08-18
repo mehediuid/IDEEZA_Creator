@@ -71,6 +71,8 @@ export function buildKicadPcb(doc: KicadExportDoc, projectName = "ideeza-board")
   lines.push(`    (31 "B.Cu" signal)`);
   lines.push(`    (36 "B.SilkS" user "B.Silkscreen")`);
   lines.push(`    (37 "F.SilkS" user "F.Silkscreen")`);
+  lines.push(`    (35 "B.Paste" user)`);
+  lines.push(`    (34 "F.Paste" user)`);
   lines.push(`    (38 "B.Mask" user)`);
   lines.push(`    (39 "F.Mask" user)`);
   lines.push(`    (40 "Dwgs.User" user "User.Drawings")`);
@@ -213,23 +215,52 @@ export function exportKicadPcb(doc: KicadExportDoc, toast?: (m: string) => void)
 
 // Ask the server to run kicad-cli (Gerber). Downloads a zip when the server
 // has KiCad; explains what to install when it doesn't.
+// UIUX-100 — a Gerber export is one file per layer, so the dialog has to know
+// which layers exist and what each is called downstream. IDEEZA's own layer id
+// on the left, the KiCad plot layer the board file declares on the right.
+export const GERBER_LAYERS: ReadonlyArray<{ id: string; kicad: string; file: string; group: string }> = [
+  { id: "top",         kicad: "F.Cu",     file: "F_Cu.gbr",     group: "Copper" },
+  { id: "bottom",      kicad: "B.Cu",     file: "B_Cu.gbr",     group: "Copper" },
+  { id: "topSilk",     kicad: "F.SilkS",  file: "F_SilkS.gbr",  group: "Silkscreen" },
+  { id: "bottomSilk",  kicad: "B.SilkS",  file: "B_SilkS.gbr",  group: "Silkscreen" },
+  { id: "topMask",     kicad: "F.Mask",   file: "F_Mask.gbr",   group: "Solder mask" },
+  { id: "bottomMask",  kicad: "B.Mask",   file: "B_Mask.gbr",   group: "Solder mask" },
+  { id: "topPaste",    kicad: "F.Paste",  file: "F_Paste.gbr",  group: "Paste mask" },
+  { id: "bottomPaste", kicad: "B.Paste",  file: "B_Paste.gbr",  group: "Paste mask" },
+  { id: "outline",     kicad: "Edge.Cuts", file: "Edge_Cuts.gbr", group: "Mechanical" },
+];
+
+export type GerberOptions = {
+  /** KiCad plot layers to write — one Gerber each. */
+  layers: string[];
+  /** Also run the drill export (the .drl files). */
+  drill: boolean;
+  /** Base name for the board and the zip. */
+  name: string;
+};
+
 export async function exportGerberViaKicad(
   doc: KicadExportDoc,
+  opts: GerberOptions,
   toast?: (m: string) => void,
 ) {
+  if (!opts.layers.length && !opts.drill) {
+    toast?.("Nothing selected — tick at least one layer or the drill file");
+    return;
+  }
   toast?.("Generating Gerbers…");
   try {
     const res = await fetch("/api/kicad", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job: "gerber", board: buildKicadPcb(doc) }),
+      body: JSON.stringify({ job: "gerber", board: buildKicadPcb(doc), layers: opts.layers, drill: opts.drill, name: opts.name }),
     });
     if (res.ok) {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "ideeza-gerbers.zip";
+      a.download = `${opts.name || "board"}-gerbers.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();

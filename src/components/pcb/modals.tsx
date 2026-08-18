@@ -50,7 +50,7 @@ import {
 } from "@/lib/pcb/part-catalog";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useManualProjects } from "@/lib/manual/projects";
-import { exportGerberViaKicad } from "@/lib/pcb/kicad-export";
+import { exportGerberViaKicad, GERBER_LAYERS } from "@/lib/pcb/kicad-export";
 import {
   collectPcbModel,
   buildPickPlace,
@@ -3102,6 +3102,136 @@ function SheetExportModal() {
 // Import Image — Project ▸ Import ▸ Image… had no dialog at all (a toast on the
 // schematic side, a picture-frame glyph on the board). This reads a real file,
 // optionally reduces it to 1-bit silkscreen ink, and places a real image object.
+// UIUX-100 — a Gerber export is a per-layer job, not one ambiguous ".gbr". The
+// checklist is built from the board's own layers, grouped the way a fab reads
+// them, and the file list under it is generated from the same selection the
+// request sends — so what the dialog lists is what the zip holds. The format
+// choice is gone: only one format is in use, and offering RS-274D would be a
+// choice with nothing behind it.
+function GerberExportModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const [name, setName] = React.useState("board");
+  const [drill, setDrill] = React.useState(true);
+  const [on, setOn] = React.useState<Record<string, boolean>>(() =>
+    Object.fromEntries(GERBER_LAYERS.map((l) => [l.id, true])),
+  );
+
+  const layerName = (id: string) => (state.pcbLayers ?? []).find((l) => l.id === id)?.name ?? id;
+  // Inner copper exists in the editor but the exported board file is two-layer,
+  // so it is named with the reason rather than silently dropped.
+  const innerUsed = React.useMemo(
+    () => ["inner1", "inner2"].filter((id) => state.objects.some((o) => o.scope === "pcb" && o.layer === id)),
+    [state.objects],
+  );
+  const groups = React.useMemo(() => {
+    const out: { group: string; rows: typeof GERBER_LAYERS[number][] }[] = [];
+    for (const l of GERBER_LAYERS) {
+      const g = out.find((x) => x.group === l.group);
+      if (g) g.rows.push(l); else out.push({ group: l.group, rows: [l] });
+    }
+    return out;
+  }, []);
+  const picked = GERBER_LAYERS.filter((l) => on[l.id]);
+  const files = [
+    ...picked.map((l) => `${name || "board"}-${l.file}`),
+    ...(drill ? [`${name || "board"}-PTH.drl`, `${name || "board"}-NPTH.drl`] : []),
+  ];
+
+  const label: React.CSSProperties = { width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
+  const toggle = (id: string) => setOn((m) => ({ ...m, [id]: !m[id] }));
+
+  return (
+    <Overlay>
+      <Card width={620} maxHeight="90%" flexCol>
+        <Header title="Export Gerber" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            Stackup: <b style={{ color: "var(--color-text-primary)" }}>2 layers — {layerName("top")} → {layerName("bottom")}</b>
+            {innerUsed.length > 0 && (
+              <span style={{ color: "var(--color-text-tertiary)" }}>
+                {" "}· {innerUsed.map(layerName).join(" and ")} {innerUsed.length > 1 ? "carry" : "carries"} copper in the editor but the exported board is two-layer, so {innerUsed.length > 1 ? "they aren't" : "it isn't"} written yet
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+            <span style={label}>File name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value.replace(/[^A-Za-z0-9._-]/g, ""))}
+              style={{ flex: 1, boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--spacing-6)" }}>
+            {groups.map((g) => (
+              <div key={g.group} style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+                <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)" }}>{g.group}</div>
+                {g.rows.map((l) => (
+                  <div
+                    key={l.id}
+                    role="checkbox"
+                    aria-checked={!!on[l.id]}
+                    aria-label={layerName(l.id)}
+                    tabIndex={0}
+                    onClick={() => toggle(l.id)}
+                    onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(l.id); } }}
+                    style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer", minHeight: 24 }}
+                  >
+                    <Check on={!!on[l.id]} size={16} />
+                    <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{layerName(l.id)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
+              <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)" }}>Drill</div>
+              <div
+                role="checkbox"
+                aria-checked={drill}
+                aria-label="Drill files"
+                tabIndex={0}
+                onClick={() => setDrill((v) => !v)}
+                onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setDrill((v) => !v); } }}
+                style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer", minHeight: 24 }}
+              >
+                <Check on={drill} size={16} />
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Drill files (plated + non-plated)</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-3)", padding: "var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}>
+            <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              {files.length ? `${files.length} files, zipped as ${name || "board"}-gerbers.zip` : "Nothing selected"}
+            </div>
+            <div data-gerber-files style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 148, overflowY: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontFamily: "ui-monospace, monospace" }}>
+              {files.length
+                ? files.map((f) => <span key={f}>{f}</span>)
+                : <span>Tick a layer or the drill files to export something.</span>}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button
+            hierarchy="primary"
+            size="md"
+            disabled={!files.length}
+            onClick={() => {
+              void exportGerberViaKicad(state, { layers: picked.map((l) => l.kicad), drill, name: name || "board" }, actions.flashToast);
+              actions.closeModal();
+            }}
+          >
+            Export
+          </Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 function ImportImageModal() {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -3907,7 +4037,7 @@ export function Modals() {
       return <DevicePickerModal />;
     case "exportGerber2D":
       // Real pipeline: server-side kicad-cli (graceful 501 hint if not installed).
-      return <ExportFormatModal title="Export Gerber" defaultName="board.gbr" formats={["RS-274X (Extended)", "RS-274D"]} extraOpts={["Generate drill file", "Include silk", "Include solder mask", "Compress as ZIP"]} onExport={() => { exportGerberViaKicad(state, actions.flashToast); }} />;
+      return <GerberExportModal />;
     case "exportPickPlace":
       return <ExportFormatModal title="Export Pick and Place" defaultName="board-pnp" formats={["CSV", "TXT", "JSON"]} extraOpts={["Include top side", "Include bottom side", "Use metric units"]} onExport={(name, fmt) => {
         const m = collectPcbModel(state);

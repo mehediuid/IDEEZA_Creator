@@ -55,9 +55,9 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { job, board } =
+  const { job, board, layers, drill, name } =
     typeof body === "object" && body !== null
-      ? (body as { job?: unknown; board?: unknown })
+      ? (body as { job?: unknown; board?: unknown; layers?: unknown; drill?: unknown; name?: unknown })
       : {};
   if ((job !== "gerber" && job !== "drc") || typeof board !== "string") {
     return NextResponse.json(
@@ -81,8 +81,16 @@ export async function POST(req: Request) {
     );
   }
 
+  // UIUX-100 — the caller picks which layers get plotted; the board file's own
+  // name becomes the Gerber file prefix, so the dialog's name field is real.
+  const plot = Array.isArray(layers)
+    ? layers.filter((l): l is string => typeof l === "string" && /^[A-Za-z0-9.]{2,12}$/.test(l))
+    : [];
+  const wantDrill = drill !== false;
+  const base = typeof name === "string" && /^[A-Za-z0-9._-]{1,48}$/.test(name) ? name : "board";
+
   const work = await fs.mkdtemp(path.join(os.tmpdir(), "ideeza-kicad-"));
-  const boardPath = path.join(work, "board.kicad_pcb");
+  const boardPath = path.join(work, `${base}.kicad_pcb`);
   try {
     await fs.writeFile(boardPath, board, "utf8");
 
@@ -103,19 +111,25 @@ export async function POST(req: Request) {
     // job === "gerber": plot gerbers + drill files, zip the folder.
     const outDir = path.join(work, "gerbers");
     await fs.mkdir(outDir);
-    await execFileP(cli, ["pcb", "export", "gerbers", "--output", outDir + "/", boardPath], {
-      timeout: 120_000,
-    });
-    await execFileP(cli, ["pcb", "export", "drill", "--output", outDir + "/", boardPath], {
-      timeout: 120_000,
-    });
+    if (plot.length) {
+      await execFileP(
+        cli,
+        ["pcb", "export", "gerbers", "--layers", plot.join(","), "--output", outDir + "/", boardPath],
+        { timeout: 120_000 },
+      );
+    }
+    if (wantDrill) {
+      await execFileP(cli, ["pcb", "export", "drill", "--output", outDir + "/", boardPath], {
+        timeout: 120_000,
+      });
+    }
     const zipPath = path.join(work, "gerbers.zip");
     await execFileP("zip", ["-r", "-j", zipPath, outDir], { timeout: 60_000 });
     const zip = await fs.readFile(zipPath);
     return new NextResponse(new Uint8Array(zip), {
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": 'attachment; filename="ideeza-gerbers.zip"',
+        "Content-Disposition": `attachment; filename="${base}-gerbers.zip"`,
       },
     });
   } catch (e) {
