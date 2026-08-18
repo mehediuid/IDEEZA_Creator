@@ -10,7 +10,7 @@ import { planTeardrops, teardropIds } from "./teardrops";
 import { convertSchematicToPcb, routeRatsnest, unrouteGenerated } from "./schematic-to-pcb";
 import { booleanRings, shapeToPolygon, isCombinable, ringArea, chamferRing, filletRing } from "./shape-boolean";
 import { planSutureVias, type SutureConfig } from "./suture-vias";
-import { planTrackPath } from "./route-path";
+import { planTrackPath, CORNER_STYLES } from "./route-path";
 import { pourCopper, POURABLE } from "./pour";
 import { computeNets, runErc, buildNetlist, netlistText } from "./nets";
 import { runDrc, runNetClasses, runEqualLength, runPadPairs, defaultPcbDrcConfig, type PcbDrcConfig } from "./drc";
@@ -588,7 +588,12 @@ function sanitizePcbDoc(raw: unknown): Partial<PcbDoc> | null {
   const pp = named(r.pcbPadPairs); if (pp) out.pcbPadPairs = pp as PcbState["pcbPadPairs"];
   const dp = named(r.pcbDiffPairs); if (dp) out.pcbDiffPairs = dp as PcbState["pcbDiffPairs"];
   if (r.routingMode === "ignore" || r.routingMode === "walkaround" || r.routingMode === "push") out.routingMode = r.routingMode;
-  if (r.routingCorner === "any" || r.routingCorner === "45" || r.routingCorner === "90") out.routingCorner = r.routingCorner;
+  // UIUX-91 — the six corner styles, with the old three-value ids migrated.
+  const CORNER_OLD: Record<string, PcbState["routingCorner"]> = { any: "lineFree", "45": "line45", "90": "line90" };
+  if (typeof r.routingCorner === "string") {
+    const c = CORNER_OLD[r.routingCorner] ?? r.routingCorner;
+    if (CORNER_STYLES.some((x) => x.id === c)) out.routingCorner = c as PcbState["routingCorner"];
+  }
   if (typeof r.gridSize === "string") out.gridSize = r.gridSize;
   if (r.gridType === "lines" || r.gridType === "dots" || r.gridType === "none") out.gridType = r.gridType;
   if (typeof r.unit === "string") out.unit = r.unit;

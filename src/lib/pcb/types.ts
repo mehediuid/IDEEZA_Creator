@@ -872,7 +872,7 @@ export interface PcbState {
   /** Route ▸ Routing Mode — what a drafted track does about copper in the way. */
   routingMode: "ignore" | "walkaround" | "push";
   /** Route ▸ Routing Corner — the shape of a corner (any angle · 45° · 90°). */
-  routingCorner: "any" | "45" | "90";
+  routingCorner: import("./route-path").CornerStyle;
   routingWidth: number;
   // Task 4 — board-wide settings bag (2D Canvas Document / Common Setting / Selection Filter fields)
   boardSettings: Record<string, unknown>;
@@ -1917,7 +1917,7 @@ export const initialState: PcbState = {
   snapEnabled: true,
   cornerOp: { mode: "fillet", radius: 5 },
   routingMode: "walkaround",
-  routingCorner: "45",
+  routingCorner: "line45",
   routingWidth: 10,
   boardSettings: {},
 };

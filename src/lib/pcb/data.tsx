@@ -6,6 +6,7 @@ import { ic } from "./icons";
 import { C } from "./colors";
 import { exportKicadPcb, exportGerberViaKicad } from "./kicad-export";
 import { GRID_PRESETS } from "./types";
+import { CORNER_STYLES } from "./route-path";
 import type { PcbState } from "./types";
 
 // ── Grid & snap, shared by View ▸ Grid Size and the board's right-click menu
@@ -798,13 +799,20 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
             su("Push obstacles", "", { icon: state.routingMode === "push" ? "check" : "blank", onClick: () => actions.setRoutingMode("push") }),
           ],
         }),
-        // #104 — Routing Corner is the angle of the bend.
+        // #104 — Routing Corner is the shape of the bend and the angle its legs
+        // are held to. UIUX-91: the two are separate choices, so the six live
+        // in two groups (straight miters, then rounded arcs) rather than one
+        // flat list that read as if "45°" and "Arc" were alternatives.
         item("Routing Corner", {
           icon: "tRouteCorner",
           sub: [
-            su("Any angle", "", { icon: state.routingCorner === "any" ? "check" : "blank", onClick: () => actions.setRoutingCorner("any") }),
-            su("45°", "", { icon: state.routingCorner === "45" ? "check" : "blank", onClick: () => actions.setRoutingCorner("45") }),
-            su("90°", "", { icon: state.routingCorner === "90" ? "check" : "blank", onClick: () => actions.setRoutingCorner("90") }),
+            ...CORNER_STYLES.filter((c) => c.shape === "line").map((c) =>
+              su(c.label, "", { icon: state.routingCorner === c.id ? "check" : "blank", onClick: () => actions.setRoutingCorner(c.id) }),
+            ),
+            dv,
+            ...CORNER_STYLES.filter((c) => c.shape === "arc").map((c) =>
+              su(c.label, "", { icon: state.routingCorner === c.id ? "check" : "blank", onClick: () => actions.setRoutingCorner(c.id) }),
+            ),
           ],
         }),
         item("Routing Width…", { icon: "tRouteWidth", onClick: () => actions.openModal("routingWidth") }),
