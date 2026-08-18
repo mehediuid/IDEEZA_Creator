@@ -195,6 +195,12 @@ export function LibraryPanel() {
   const [big, setBig] = React.useState(true);
   const [variantOf, setVariantOf] = React.useState<Record<string, string>>({});
   const [picked, setPicked] = React.useState<{ key: string; card: LibCard; group: string } | null>(null);
+  // UIUX-73 — how tall the detail preview is, remembered with the document so
+  // it doesn't snap back to a thumbnail every time you open the panel.
+  const storedH = Number((state.boardSettings ?? {}).libPreviewH);
+  const previewH = Math.min(260, Math.max(66, Number.isFinite(storedH) && storedH ? storedH : 140));
+  const setPreviewH = (h: number) =>
+    actions.setBoardSetting("libPreviewH", Math.min(260, Math.max(66, Math.round(h))));
   const placeCount = React.useRef(0);
   const placeFromLib = (kind: string) => {
     const n = placeCount.current++;
@@ -315,9 +321,37 @@ export function LibraryPanel() {
           {/* #125 — what a click is about to add: a bigger preview of the real
               symbol, the numbers that matter, and the Place button. */}
           {picked && (
-            <div style={{ flex: "0 0 auto", borderTop: "var(--border-width-1) solid var(--color-border-default)", background: "var(--color-bg-surface)", padding: "var(--spacing-5) var(--spacing-7)", display: "flex", gap: "var(--spacing-6)", alignItems: "center" }}>
-              <div style={{ width: 92, height: 66, flex: "0 0 auto", borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-subtle)", background: "var(--color-bg-page)", display: "grid", placeItems: "center", color: "var(--color-violet-600)" }}>
-                <svg width="86" height="60" viewBox="-36 -24 72 48" style={{ overflow: "visible" }}>
+            <div style={{ flex: "0 0 auto", borderTop: "var(--border-width-1) solid var(--color-border-default)", background: "var(--color-bg-surface)", padding: "var(--spacing-5) var(--spacing-7)", display: "flex", gap: "var(--spacing-6)", alignItems: "center", position: "relative" }}>
+              {/* UIUX-73 — the preview was a fixed 92×66 box with no way to
+                  enlarge it, so a dense footprint couldn't be read. Drag this
+                  edge to resize; the size is remembered with the document. */}
+              <div
+                role="separator"
+                aria-label="Resize the preview"
+                aria-orientation="horizontal"
+                aria-valuenow={previewH}
+                aria-valuemin={66}
+                aria-valuemax={260}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  const step = e.key === "ArrowUp" ? 16 : e.key === "ArrowDown" ? -16 : 0;
+                  if (!step) return;
+                  e.preventDefault();
+                  setPreviewH(previewH + step);
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  const startY = e.clientY;
+                  const startH = previewH;
+                  const move = (ev: PointerEvent) => setPreviewH(startH + (startY - ev.clientY));
+                  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+                  window.addEventListener("pointermove", move);
+                  window.addEventListener("pointerup", up);
+                }}
+                style={{ position: "absolute", top: -3, left: 0, right: 0, height: 7, cursor: "ns-resize" }}
+              />
+              <div style={{ width: Math.round(previewH * 1.4), height: previewH, flex: "0 0 auto", borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-subtle)", background: "var(--color-bg-page)", display: "grid", placeItems: "center", color: "var(--color-violet-600)" }}>
+                <svg width={Math.round(previewH * 1.3)} height={Math.round(previewH * 0.9)} viewBox="-36 -24 72 48" style={{ overflow: "visible" }}>
                   <g stroke="currentColor" fill="none">{glyphFor(picked.card.kind)}</g>
                 </svg>
               </div>
