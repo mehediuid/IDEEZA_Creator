@@ -270,17 +270,16 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         // every kind stays placeable without a five-deep flyout on the canvas.
         // It sits right under the supplies — both name what a node *is*
         // (UIUX-32).
-        item("Net Label", {
+        // UIUX-33 — two rows, and the parent no longer shares a name with its
+        // own child. The other five label kinds moved to the canvas palette's
+        // Net Label flyout rather than being deleted: cutting them from here
+        // would have taken them out of ⌘K too, and left them unplaceable.
+        item("Net Markers", {
           k: "Alt+N",
           icon: "pNetLabel",
           sub: [
-            su("Local label", "Alt+N", { icon: "pNetLabel", onClick: tool("netLabel") }),
-            su("Global label", "", { icon: "pGlobalLabel", onClick: tool("globalLabel") }),
-            su("Hierarchical label", "", { icon: "pHierLabel", onClick: tool("hierLabel") }),
-            su("Attached net label", "", { icon: "pAttachedLabel", onClick: tool("netBusLabel") }),
-            dv,
-            su("Port", "", { icon: "pPort", onClick: tool("port") }),
-            su("Off-sheet link", "", { icon: "pOffPage", onClick: tool("offPageConnector") }),
+            su("Net Label", "Alt+N", { icon: "pNetLabel", onClick: tool("netLabel") }),
+            su("Net Flag", "", { icon: "pNetFlag", onClick: tool("netFlag") }),
           ],
         }),
         item("Bus", { k: "Alt+B", icon: "pBus", onClick: tool("bus") }),

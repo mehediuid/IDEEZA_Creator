@@ -169,9 +169,17 @@ export const SCHEM_TOOLS: SchemTool[] = [
   // stay placeable without turning this row back into a menu.
   // Net Label carries the flag beside it (UIUX-8): both name a node, and the
   // flag had no home on the canvas at all.
+  // The whole label family lives here (UIUX-33): Insert keeps the two you
+  // reach for constantly, and the rarer kinds stay placeable — and ⌘K-findable
+  // — instead of being deleted with the menu rows that used to carry them.
   { key: "netLabel", label: "Net Label", options: [
     { label: "Net Label", tool: "netLabel", svg: '<path d="M4 8h9l4 4-4 4H4z"/>' },
     { label: "Net Flag", tool: "netFlag", svg: '<path d="M6 20V5h10l-2.5 3.5L16 12H6"/>' },
+    { label: "Global label", tool: "globalLabel", svg: '<path d="M3 12h3"/><rect x="6" y="7.5" width="15" height="9" rx="4.5"/>' },
+    { label: "Hierarchical label", tool: "hierLabel", svg: '<path d="M3 12h3"/><path d="M9.5 7.5h11l-3 4.5 3 4.5h-11L6.5 12z"/>' },
+    { label: "Attached net label", tool: "netBusLabel", svg: '<path d="M3 17h18"/><path d="M8 5h9l3 3-3 3H8z"/><path d="M12 11v6"/>' },
+    { label: "Port", tool: "port", svg: '<path d="M3 12h4"/><path d="M7 7h11l3 5-3 5H7z"/>' },
+    { label: "Off-sheet link", tool: "offPageConnector", svg: '<path d="M4 5v14"/><path d="M8 12h9"/><path d="M13.5 8l4.5 4-4.5 4"/>' },
   ] },
   { key: "noConnect", label: "No Connect", tool: "noConnect", svg: '<path d="M6 6l12 12M18 6L6 18"/>' },
   { key: "junction", label: "Junction", tool: "junction", svg: '<path d="M12 4v16M4 12h16"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>' },
