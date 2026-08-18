@@ -45,6 +45,7 @@ import {
   type CatalogPart,
   type PartFilters,
   type PickerRail,
+  PART_CATALOG,
 } from "@/lib/pcb/part-catalog";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -2431,7 +2432,15 @@ function DevicePickerModal() {
 // and whether identical parts collapse into one line with a quantity. Before,
 // the table was static decoration and the exporter always wrote the same five
 // columns (Manufacturer permanently "-"), while picking XLSX still wrote CSV.
-type BomColKey = "no" | "qty" | "designator" | "comment" | "value" | "footprint" | "package" | "layer" | "mpn" | "description";
+type BomColKey = "no" | "qty" | "designator" | "comment" | "value" | "footprint" | "package" | "layer" | "manufacturer" | "mpn" | "price" | "extended" | "dnp" | "description";
+/** Catalogue price for a placed part, matched on its MPN. Blank when unknown —
+ *  a made-up number in a BOM is worse than an empty cell (UIUX-78). */
+function unitPrice(o: CanvasObject): string {
+  const mpn = String((o.props as Record<string, unknown> | undefined)?.mpn ?? "").trim();
+  if (!mpn) return "";
+  const hit = PART_CATALOG.find((p) => p.part === mpn);
+  return hit ? hit.price.replace(/^\$/, "") : "";
+}
 const BOM_COLUMNS: { key: BomColKey; label: string; of: (o: CanvasObject) => string }[] = [
   { key: "no", label: "No.", of: () => "" },
   { key: "qty", label: "Qty", of: () => "1" },
@@ -2441,8 +2450,17 @@ const BOM_COLUMNS: { key: BomColKey; label: string; of: (o: CanvasObject) => str
   { key: "footprint", label: "Footprint", of: (o) => (o.footprint || "").trim() },
   { key: "package", label: "Package", of: (o) => String((o.props as Record<string, unknown> | undefined)?.package ?? o.footprint ?? "").trim() },
   { key: "layer", label: "Side", of: (o) => ((o.side ?? o.layer) === "bottom" ? "Bottom" : "Top") },
-  { key: "mpn", label: "MPN / Supplier", of: (o) => String((o.props as Record<string, unknown> | undefined)?.mpn ?? "").trim() },
-  { key: "description", label: "Description", of: (o) => String((o.props as Record<string, unknown> | undefined)?.manufacturer ?? "").trim() },
+  // UIUX-78 — sourcing is its own set of columns. "MPN / Supplier" was one
+  // lumped field, and Description printed the *manufacturer*, so the column
+  // never held a description at all.
+  { key: "manufacturer", label: "Manufacturer", of: (o) => String((o.props as Record<string, unknown> | undefined)?.manufacturer ?? "").trim() },
+  { key: "mpn", label: "MPN", of: (o) => String((o.props as Record<string, unknown> | undefined)?.mpn ?? "").trim() },
+  // Unit price comes from the catalogue row the part was placed from, matched
+  // on MPN — the same figure the picker shows.
+  { key: "price", label: "Unit price (USD)", of: (o) => unitPrice(o) },
+  { key: "extended", label: "Extended (USD)", of: () => "" },
+  { key: "dnp", label: "DNP", of: (o) => ((o.props as Record<string, unknown> | undefined)?.dnp ? "DNP" : "") },
+  { key: "description", label: "Description", of: (o) => String((o.props as Record<string, unknown> | undefined)?.description ?? "").trim() },
 ];
 const BOM_COMPONENT_KINDS = new Set(["component", "resistor", "capacitor", "inductor", "diode", "ic", "connector", "resistorBox", "transistor", "opamp", "crystal", "fp0805", "fpSOD123", "fpSOT23", "fpSOIC8", "footprint"]);
 
@@ -2450,8 +2468,11 @@ function BomModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const [cols, setCols] = React.useState<Record<BomColKey, boolean>>({
-    no: true, qty: true, designator: true, comment: true, value: false,
-    footprint: true, package: false, layer: true, mpn: false, description: false,
+    // Value and sourcing are on by default: a BOM without them can be assembled
+    // from but not re-ordered from, which is half a BOM (UIUX-78).
+    no: true, qty: true, designator: true, comment: true, value: true,
+    footprint: true, package: false, layer: true,
+    manufacturer: true, mpn: true, price: true, extended: true, dnp: false, description: false,
   });
   const [sortBy, setSortBy] = React.useState<BomColKey>("designator");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
@@ -2500,6 +2521,10 @@ function BomModal() {
     for (const l of lines) {
       l.cells.qty = String(l.qty);
       if (groupSame && l.designators.length) l.cells.designator = l.designators.sort().join(", ");
+      // Extended = qty × unit price, so a grouped line carries what that line
+      // actually costs. Blank when we have no price rather than printing 0.
+      const unit = parseFloat(l.cells.price);
+      l.cells.extended = Number.isFinite(unit) ? (unit * l.qty).toFixed(4) : "";
     }
     const dir = sortDir === "asc" ? 1 : -1;
     lines.sort((a, b) => {
@@ -2576,7 +2601,7 @@ function BomModal() {
           {row("File Name", <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />)}
           {row("Format", <DsSelect value={fileType} options={[{ label: "CSV", value: "CSV" }, { label: "TSV", value: "TSV" }, { label: "JSON", value: "JSON" }]} onChange={(v) => setFileType(v as "CSV" | "TSV" | "JSON")} />)}
           <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
-            XLSX is deliberately absent — writing a real workbook needs a library we don&#39;t bundle, and labelling CSV as XLSX would be a lie. CSV opens in Excel and Sheets.
+            CSV opens in Excel and Google Sheets.
           </div>
           <div>
             <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--spacing-4)" }}>Preview — this is the file</div>
