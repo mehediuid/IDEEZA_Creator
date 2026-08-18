@@ -35,8 +35,14 @@ export function prettifyTool(id: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+const SUTURE_LABEL: Record<string, string> = {
+  "suture:rect": "Suture Vias · Rectangle",
+  "suture:polygon": "Suture Vias · Polygon",
+  "suture:line": "Suture Vias · Line",
+};
+
 export function toolLabel(id: string, labels: Record<string, string>, placeText?: string | null): string {
-  const base = labels[id] ?? prettifyTool(id);
+  const base = SUTURE_LABEL[id] ?? labels[id] ?? prettifyTool(id);
   // A rail tool carries the name it will stamp, so say which one is armed.
   return placeText && placeText !== base ? `${placeText} (${base})` : base;
 }
@@ -51,6 +57,10 @@ export function toolHint(id: string): string {
   if (id === "boardOutlineRect") return "Drag the board's rectangle · Esc cancels";
   if (id === "boardOutlineCircle") return "Drag from the centre to set the radius · Esc cancels";
   if (id === "boardOutlinePoly") return "Click each corner · Enter or double-click to close · Esc cancels";
+  // UIUX-95 — the suture shapes say what they'll stitch, not what they draw.
+  if (id === "suture:rect") return "Drag the rectangle to stitch · Esc cancels";
+  if (id === "suture:polygon") return "Click the area's corners · Enter or double-click closes it · Esc cancels";
+  if (id === "suture:line") return "Click along the fence path · Enter or double-click finishes · Esc cancels";
   if (DRAFT_TOOLS.includes(id)) return "Click to start, click again to finish · Esc cancels";
   if (PLACE_TOOLS.includes(id)) return "Click on the sheet to place · Esc cancels";
   return "Esc returns to Select";

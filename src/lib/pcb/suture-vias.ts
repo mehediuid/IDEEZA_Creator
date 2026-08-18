@@ -12,7 +12,7 @@ import type { CanvasObject, PcbState } from "./types";
 const REGION_KINDS = new Set(["polygon", "fillRegion", "combineShape", "constraintRegion"]);
 
 export type SutureConfig = {
-  target: "region" | "board";
+  target: "region" | "board" | "drawn";
   net: string;
   /** All four lengths are **mil** — the unit the dialog labels and the unit the
    *  placed via stores. The planner converts to canvas px for its geometry;
@@ -82,7 +82,40 @@ export function planSutureVias(state: PcbState, cfg: SutureConfig): SuturePlan {
 
   let ring: Pt[];
   let groupId: string;
-  if (cfg.target === "region") {
+  if (cfg.target === "drawn") {
+    // UIUX-95 — the shape drawn from Insert ▸ Suture Vias ▸ Rectangle/Polygon/Line.
+    const drawn = state.sutureShape;
+    if (!drawn || drawn.points.length < 2) {
+      return { points: [], groupId: "", reason: "Draw a rectangle, polygon or path first." };
+    }
+    if (drawn.shape === "line") {
+      // A via fence: vias walked along the path at the stitch pitch, not a
+      // lattice poured into an area.
+      const pts: Pt[] = [];
+      let carry = 0;
+      for (let i = 0; i + 1 < drawn.points.length; i++) {
+        const a = drawn.points[i], b = drawn.points[i + 1];
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len < 1e-6) continue;
+        const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+        for (let d = carry; d <= len; d += pitch) {
+          pts.push({ x: a.x + ux * d, y: a.y + uy * d });
+          if (pts.length > 4000) break;
+        }
+        const walked = Math.ceil((len - carry) / pitch) * pitch + carry;
+        carry = Math.max(0, walked - len);
+      }
+      const last = drawn.points[drawn.points.length - 1];
+      if (pts.length && Math.hypot(pts[pts.length - 1].x - last.x, pts[pts.length - 1].y - last.y) > pitch / 2) pts.push(last);
+      return {
+        points: pts,
+        groupId: "drawn",
+        reason: pts.length ? null : "That path is shorter than one stitch — draw further or reduce the spacing.",
+      };
+    }
+    ring = drawn.points;
+    groupId = "drawn";
+  } else if (cfg.target === "region") {
     const regions = sutureRegions(state);
     if (!regions.length) {
       return { points: [], groupId: "", reason: "Select a copper region, fill or combined shape to stitch." };
@@ -122,8 +155,10 @@ export function planSutureVias(state: PcbState, cfg: SutureConfig): SuturePlan {
   }
   const reason = points.length
     ? null
-    : cfg.target === "region"
-    ? "No room inside that region — try a smaller pitch, via size or edge clearance."
-    : "No room on the board — try a smaller pitch or edge clearance.";
+    : cfg.target === "board"
+    ? "No room on the board — try a smaller pitch or edge clearance."
+    : cfg.target === "drawn"
+    ? "No room inside that shape — try a smaller pitch, via size or edge clearance."
+    : "No room inside that region — try a smaller pitch, via size or edge clearance.";
   return { points, groupId, reason };
 }

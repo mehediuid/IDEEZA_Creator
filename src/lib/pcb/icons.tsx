@@ -216,6 +216,9 @@ export const ic: Record<string, string> = {
   tBoolSplit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="8" height="12" rx="1.5"/><rect x="13" y="6" width="8" height="12" rx="1.5"/><path d="M12 4v16" stroke-dasharray="2 2"/></svg>',
   tVia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/></svg>',
   tSutureVias: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="8" r="2.6"/><circle cx="17" cy="8" r="2.6"/><circle cx="7" cy="16" r="2.6"/><circle cx="17" cy="16" r="2.6"/><circle cx="12" cy="12" r="2.6"/></svg>',
+  // UIUX-95 — the Line row stitches a via *fence*: vias walked along a path,
+  // not a lattice poured into an area, so it can't borrow the lattice glyph.
+  tViaFence: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 17l6-8 6 5 6-8" stroke-dasharray="2.5 2.5"/><circle cx="3" cy="17" r="2.1"/><circle cx="9" cy="9" r="2.1"/><circle cx="15" cy="14" r="2.1"/><circle cx="21" cy="6" r="2.1"/></svg>',
   tPad: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="5" width="14" height="14" rx="1.5"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>',
   tDistH: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 5v14M21 5v14"/><rect x="6" y="8" width="5" height="8" rx="1"/><rect x="14" y="8" width="5" height="8" rx="1"/></svg>',
   tDistV: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 3h14M5 21h14"/><rect x="8" y="6" width="8" height="5" rx="1"/><rect x="8" y="14" width="8" height="5" rx="1"/></svg>',

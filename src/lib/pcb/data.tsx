@@ -671,7 +671,14 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // row on the top toolbar is their declared single home. Board Outline is
         // the left palette's (three shape variants a menu row can't carry, and
         // the one-click tool this row armed placed a degenerate 2×2 outline).
-        item("Suture Vias…", { icon: "tSutureVias", onClick: () => actions.openModal("sutureVias") }),
+        // UIUX-95 — pick the shape first: Rectangle and Polygon enclose the
+        // area to stitch, Line draws the path a via fence follows. Drawing it
+        // opens the stitching dialog on that shape.
+        item("Suture Vias", { icon: "tSutureVias", sub: [
+          su("Rectangle", "", { icon: "pRect", onClick: () => actions.armSutureShape("rect") }),
+          su("Polygon", "", { icon: "tPolygon", onClick: () => actions.armSutureShape("polygon") }),
+          su("Line", "", { icon: "tViaFence", onClick: () => actions.armSutureShape("line") }),
+        ] }),
         // Copper Area and Fill Area moved here from Design (UIUX-96): they are
         // things you place, so they belong with the other regions. The pour
         // *operations* they feed stayed in Design, where board-level work lives.

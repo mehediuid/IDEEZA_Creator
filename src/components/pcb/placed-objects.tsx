@@ -954,6 +954,21 @@ function DraftLine() {
       />
     );
   }
+  // UIUX-95 — the suture rectangle previews as the area it will stitch.
+  if (state.draftWire.kind === "suture:rect") {
+    const sx = state.draftWire.startX, sy = state.draftWire.startY;
+    return (
+      <rect
+        x={Math.min(sx, tx)} y={Math.min(sy, ty)}
+        width={Math.abs(tx - sx)} height={Math.abs(ty - sy)}
+        fill="var(--color-canvas-marquee-fill)"
+        stroke="var(--color-pcb-routing)"
+        strokeWidth={1.6}
+        strokeDasharray="5 3"
+        pointerEvents="none"
+      />
+    );
+  }
   // #122 — a dragged board outline previews as the shape it will become.
   if (state.draftWire.kind === "boardOutlineRect" || state.draftWire.kind === "boardOutlineCircle") {
     const sx = state.draftWire.startX, sy = state.draftWire.startY;

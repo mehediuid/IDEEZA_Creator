@@ -22,6 +22,9 @@ import { PANEL_LIMITS,
   AREA_KINDS,
   areaTool,
   parseAreaTool,
+  sutureTool,
+  parseSutureTool,
+  type SutureDrawShape,
   DEFAULT_SCHEM_OBJECTS,
   DEL_OBJ_NAMES,
   TOOLBAR_CATALOGS,
@@ -124,6 +127,7 @@ export interface PcbActions {
   setTool: (t: string) => void;
   /** UIUX-87 — draw a copper polygon and pour it the moment the ring closes. */
   armPolygonPour: () => void;
+  armSutureShape: (shape: SutureDrawShape) => void;
   /** Arm a place tool whose object carries a specific name (VCC / -5V / …). */
   setToolAs: (t: string, text: string) => void;
   setSelectedTree: (label: string) => void;
@@ -941,6 +945,18 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       // sets it, and it must not leak into the next polygon you draw.
       setTool: (t) => merge({ tool: t, placeText: null, pourOnClose: false }),
       armPolygonPour: () => merge({ tool: areaTool("polygon", "polygon"), placeText: null, pourOnClose: true }),
+      // UIUX-95 — draw the area (or the fence path) the vias follow, then the
+      // stitching dialog opens on that shape.
+      armSutureShape: (shape) => {
+        merge({ tool: sutureTool(shape), placeText: null, pourOnClose: false, sutureShape: null, draftPoly: null, openMenu: null, ctx: null });
+        actions.flashToast(
+          shape === "line"
+            ? "Click along the fence path — Enter or double-click finishes"
+            : shape === "polygon"
+            ? "Click the area's corners — Enter or double-click closes it"
+            : "Drag the rectangle to stitch",
+        );
+      },
       setToolAs: (t, text) => merge({ tool: t, placeText: text }),
       setSelectedTree: (label) => merge({ selectedTree: label }),
       toggleExpanded: (label) =>
@@ -1822,6 +1838,22 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           // A cutout is an area, not a segment: store it corner-normalised so
           // width/height are always positive downstream (2D, 3D, exports).
           const isCutout = s.draftWire.kind === "cutout";
+          // UIUX-95 — the dragged rectangle for Suture Vias: geometry, not an object.
+          const sut = parseSutureTool(s.draftWire.kind);
+          if (sut === "rect") {
+            const x0 = Math.min(s.draftWire.startX, x), x1 = Math.max(s.draftWire.startX, x);
+            const y0 = Math.min(s.draftWire.startY, y), y1 = Math.max(s.draftWire.startY, y);
+            if (x1 - x0 < 8 || y1 - y0 < 8) {
+              actions.flashToast("Too small — drag a larger area");
+              return { draftWire: null };
+            }
+            return {
+              draftWire: null,
+              tool: "",
+              sutureShape: { shape: "rect" as const, points: [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }] },
+              modal: "sutureVias",
+            };
+          }
           // Any area kind drawn as a dragged rectangle or circle (UIUX-86/92/97).
           const area = parseAreaTool(s.draftWire.kind);
           if (area) {
@@ -2166,6 +2198,18 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       polyClose: () => {
         const s = stateRef.current;
         const pts = s.draftPoly?.points ?? [];
+        // UIUX-95 — a suture shape isn't a placed object: it is where the vias
+        // go, so it hands off to the stitching dialog instead of committing.
+        const sut = parseSutureTool(s.draftPoly?.tool ?? "");
+        if (sut) {
+          const need = sut === "line" ? 2 : 3;
+          if (pts.length < need) {
+            actions.flashToast(sut === "line" ? "A fence path needs at least 2 points" : "An area needs at least 3 points");
+            return;
+          }
+          merge({ draftPoly: null, tool: "", sutureShape: { shape: sut, points: pts }, modal: "sutureVias" });
+          return;
+        }
         if (pts.length < 3) { actions.flashToast("A polygon needs at least 3 points"); return; }
         const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
         const cx = (Math.min(...xs) + Math.max(...xs)) / 2;

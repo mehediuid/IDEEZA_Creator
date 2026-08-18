@@ -350,13 +350,30 @@ export function parseAreaTool(tool: string): { kind: string; shape: AreaShape } 
   const m = /^area:([A-Za-z]+):(rect|circle|polygon)$/.exec(tool);
   return m ? { kind: m[1], shape: m[2] as AreaShape } : null;
 }
+// UIUX-95 — Suture Vias is a shape you draw, not a blind whole-board action:
+// Rectangle and Polygon enclose the area to stitch, Line draws the path a via
+// fence follows. The drawn geometry lands in `state.sutureShape` and the
+// stitching dialog opens on it.
+export type SutureDrawShape = "rect" | "polygon" | "line";
+export const sutureTool = (s: SutureDrawShape) => `suture:${s}`;
+export function parseSutureTool(tool: string): SutureDrawShape | null {
+  const m = /^suture:(rect|polygon|line)$/.exec(tool);
+  return m ? (m[1] as SutureDrawShape) : null;
+}
+
 /** Tools drawn by dragging two points (rect/circle areas + the listed kinds). */
 export const isDraftTool = (tool: string) => {
   const a = parseAreaTool(tool);
-  return a ? a.shape !== "polygon" : DRAFT_TOOLS.includes(tool);
+  if (a) return a.shape !== "polygon";
+  if (parseSutureTool(tool)) return parseSutureTool(tool) === "rect";
+  return DRAFT_TOOLS.includes(tool);
 };
 /** Tools drawn by clicking vertex after vertex (board outline + area polygons). */
-export const isPolyTool = (tool: string) => tool === "boardOutlinePoly" || parseAreaTool(tool)?.shape === "polygon";
+export const isPolyTool = (tool: string) =>
+  tool === "boardOutlinePoly" ||
+  parseAreaTool(tool)?.shape === "polygon" ||
+  parseSutureTool(tool) === "polygon" ||
+  parseSutureTool(tool) === "line";
 
 export const DRAFT_TOOLS: ReadonlyArray<string> = [
   // Board cutout — drag the two corners of the area to remove.
@@ -672,6 +689,9 @@ export interface PcbState {
   // `pourOnClose` is the Polygon Pour flow: fill the copper area the moment
   // its ring closes, instead of leaving an empty outline behind (UIUX-87).
   draftPoly: { tool: string; points: { x: number; y: number }[]; pourOnClose?: boolean } | null;
+  /** UIUX-95 — the rectangle, polygon or path just drawn for Suture Vias. The
+   *  stitching dialog plans against this, so "where" is what you drew. */
+  sutureShape: { shape: SutureDrawShape; points: { x: number; y: number }[] } | null;
   /** Polygon Pour armed — the next closed copper ring pours itself. */
   pourOnClose: boolean;
   /** #110 — Ratsnest (airwire) visibility, driven from the top toolbar. */
@@ -1762,6 +1782,7 @@ export const initialState: PcbState = {
   panelSizes: { left: 292, right: 292, bottom: 248 },
   focusActiveLayer: false,
   draftPoly: null,
+  sutureShape: null,
   pourOnClose: false,
   showRatsnest: true,
   recentProjects: [],

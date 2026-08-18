@@ -3372,9 +3372,10 @@ function SutureViasModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const regions = sutureRegions(state);
+  const drawn = state.sutureShape;
   const [cfg, setCfg] = React.useState<SutureConfig>(() => ({
     ...defaultSutureConfig(),
-    target: sutureRegions(state).length ? "region" : "board",
+    target: state.sutureShape ? "drawn" : sutureRegions(state).length ? "region" : "board",
   }));
   const set = (patch: Partial<SutureConfig>) => setCfg((c) => ({ ...c, ...patch }));
   const plan = React.useMemo(() => planSutureVias(state, cfg), [state, cfg]);
@@ -3404,7 +3405,7 @@ function SutureViasModal() {
               type="button"
               aria-pressed={on}
               disabled={o.disabled}
-              title={o.disabled ? "Select a copper region first" : undefined}
+              title={o.disabled ? (o.value === "drawn" ? "Draw a shape from Insert ▸ Suture Vias first" : "Select a copper region first") : undefined}
               onClick={() => onChange(o.value)}
               style={{ padding: "var(--spacing-3) var(--spacing-6)", borderRadius: "var(--radius-md)", border: "none", cursor: o.disabled ? "default" : "pointer", fontFamily: "inherit", fontSize: "var(--font-size-sm)", fontWeight: 600, opacity: o.disabled ? 0.45 : 1, background: on ? "var(--color-violet-600)" : "transparent", color: on ? "var(--color-text-on-brand)" : "var(--color-text-secondary)" }}
             >
@@ -3422,6 +3423,9 @@ function SutureViasModal() {
         <Header title="Stitch suture vias" onClose={actions.closeModal} padding="18px 22px" />
         <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
           {row("Where", seg([
+            // UIUX-95 — the shape drawn from the Insert submenu leads, since
+            // drawing one is what opened this dialog.
+            { label: drawn ? (drawn.shape === "line" ? "Drawn path" : drawn.shape === "rect" ? "Drawn rectangle" : "Drawn polygon") : "Drawn shape", value: "drawn" as const, disabled: !drawn },
             { label: regions.length ? `Selected region (${regions.length})` : "Selected region", value: "region" as const, disabled: !regions.length },
             { label: "Whole board", value: "board" as const },
           ], cfg.target, (v) => set({ target: v })))}
@@ -3436,7 +3440,7 @@ function SutureViasModal() {
           {row("Edge clearance", <NumberInput value={String(cfg.clearance)} onChange={(v) => set({ clearance: parseFloat(v) || 0 })} min={0} />)}
           <div style={{ fontSize: "var(--font-size-sm)", lineHeight: 1.5, color: plan.points.length ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>
             {plan.points.length
-              ? `Will stitch ${plan.points.length} via${plan.points.length > 1 ? "s" : ""} — real vias on ${cfg.net || "no net"}, so the DRC, the 3D view and the exports all see them.`
+              ? `Will ${cfg.target === "drawn" && drawn?.shape === "line" ? "fence" : "stitch"} ${plan.points.length} via${plan.points.length > 1 ? "s" : ""} — real vias on ${cfg.net || "no net"}, so the DRC, the 3D view and the exports all see them.`
               : plan.reason}
           </div>
         </div>
