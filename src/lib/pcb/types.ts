@@ -690,6 +690,9 @@ export interface PcbState {
   /** #122 — click-click polygon draft: the vertices placed so far. */
   // `pourOnClose` is the Polygon Pour flow: fill the copper area the moment
   // its ring closes, instead of leaving an empty outline behind (UIUX-87).
+  /** UIUX-89 — how the board is drawn: solid, or every filled thing reduced
+   *  to its outline. Independent of the 2D/3D view mode — it applies to both. */
+  renderStyle: "normal" | "outline";
   draftPoly: { tool: string; points: { x: number; y: number }[]; pourOnClose?: boolean } | null;
   /** UIUX-95 — the rectangle, polygon or path just drawn for Suture Vias. The
    *  stitching dialog plans against this, so "where" is what you drew. */
@@ -1783,6 +1786,7 @@ export const initialState: PcbState = {
   probe: null,
   panelSizes: { left: 292, right: 292, bottom: 248 },
   focusActiveLayer: false,
+  renderStyle: "normal",
   draftPoly: null,
   sutureShape: null,
   pourOnClose: false,

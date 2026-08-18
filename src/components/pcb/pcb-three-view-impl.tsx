@@ -165,7 +165,7 @@ export function PcbThreeViewImpl() {
         controls={controls}
       />
 
-      <PcbSceneMeshes scene={scene} explode={p3d.explode} />
+      <PcbSceneMeshes scene={scene} explode={p3d.explode} outline={state.renderStyle === "outline"} />
 
       {/* Imported glTF/GLB models — normalised to a fifth of the board's
           longest side so a model authored in metres isn't a wall, and parked on

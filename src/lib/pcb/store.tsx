@@ -402,6 +402,7 @@ export interface PcbActions {
   // Phase 7 — Route options
   setRoutingMode: (m: PcbState["routingMode"]) => void;
   setRoutingCorner: (c: PcbState["routingCorner"]) => void;
+  setRenderStyle: (v: PcbState["renderStyle"]) => void;
   setRoutingWidth: (w: number) => void;
 }
 
@@ -531,6 +532,7 @@ type PcbDoc = Pick<
   | "pcbDiffPairs"
   | "routingMode"
   | "routingCorner"
+  | "renderStyle"
 >;
 
 // Rebuild a safe document from persisted storage — stale or hand-edited data
@@ -596,6 +598,7 @@ function sanitizePcbDoc(raw: unknown): Partial<PcbDoc> | null {
   }
   if (typeof r.gridSize === "string") out.gridSize = r.gridSize;
   if (r.gridType === "lines" || r.gridType === "dots" || r.gridType === "none") out.gridType = r.gridType;
+  if (r.renderStyle === "normal" || r.renderStyle === "outline") out.renderStyle = r.renderStyle;
   if (typeof r.unit === "string") out.unit = r.unit;
   if (typeof r.snapEnabled === "boolean") out.snapEnabled = r.snapEnabled;
   // Design rules: accept a well-formed config, else fall back to defaults so a
@@ -706,6 +709,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           threeD: state.threeD,
           gridSize: state.gridSize,
           gridType: state.gridType,
+          renderStyle: state.renderStyle,
           unit: state.unit,
           snapEnabled: state.snapEnabled,
           designRules: state.designRules,
@@ -743,6 +747,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
     state.threeD,
     state.gridSize,
     state.gridType,
+    state.renderStyle,
     state.unit,
     state.snapEnabled,
     state.designRules,
@@ -758,7 +763,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
   // a write is pending, which is how the save chip knows to say "Saving…".
   const DOC_KEY_SET = React.useMemo(
     () => new Set<string>([
-      "objects", "pcbBoard", "twoD", "threeD", "gridSize", "gridType", "unit",
+      "objects", "pcbBoard", "twoD", "threeD", "gridSize", "gridType", "renderStyle", "unit",
       "snapEnabled", "designRules", "pcbDrcConfig", "pcbLayers", "pcbNets",
       "pcbDefaults", "boardSettings", "panelSizes",
     ]),
@@ -1093,7 +1098,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           const s = stateRef.current;
           const doc: PcbDoc = {
             objects: s.objects, pcbBoard: s.pcbBoard, twoD: s.twoD, threeD: s.threeD,
-            gridSize: s.gridSize, gridType: s.gridType, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
+            gridSize: s.gridSize, gridType: s.gridType, renderStyle: s.renderStyle, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
             pcbDrcConfig: s.pcbDrcConfig, pcbLayers: s.pcbLayers, pcbNets: s.pcbNets,
             pcbDefaults: s.pcbDefaults, boardSettings: s.boardSettings, panelSizes: s.panelSizes,
             pcbNetClasses: s.pcbNetClasses, pcbEqualLength: s.pcbEqualLength,
@@ -2708,6 +2713,12 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         mergeWithHistory((s) => ({ cornerOp: { ...s.cornerOp, ...patch } })),
       setRoutingMode: (m) => merge({ routingMode: m }),
       setRoutingCorner: (c) => merge({ routingCorner: c }),
+      // UIUX-89 — render style is a document view preference, like the grid
+      // style: it applies in 2D and in 3D, and it survives a reload.
+      setRenderStyle: (v) => {
+        merge({ renderStyle: v });
+        actions.flashToast(v === "outline" ? "Outline view — filled copper drawn as outlines" : "Normal view");
+      },
       setRoutingWidth: (w) => mergeWithHistory({ routingWidth: w }),
       alignSelectedToGrid: () =>
         mergeWithHistory((s) => {

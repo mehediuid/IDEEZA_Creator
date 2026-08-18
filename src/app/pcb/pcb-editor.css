@@ -92,3 +92,12 @@
 @media (prefers-reduced-motion: reduce) {
   .pcb-app .ix-probe { animation: none; opacity: 0.9; transform: scale(1.15); }
 }
+
+/* UIUX-89 — Outline view. The board's glyphs paint in `currentColor`, so
+   dropping the fill and stroking in the same colour turns every solid pad,
+   via, region and body into its own outline without inventing a palette.
+   Text keeps its fill: outlined letterforms are unreadable at board scale.
+   Tracks and buses carry a real width, so they draw their own capsule
+   outline in placed-objects.tsx rather than relying on this rule. */
+.pcb-app .ix-render-outline svg *:not(text) { fill: none; }
+.pcb-app .ix-render-outline svg *[fill="currentColor"]:not(text) { stroke: currentColor; stroke-width: 1; }

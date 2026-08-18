@@ -497,9 +497,15 @@ export function PlacedObjects() {
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const W = 5000;
   const OX = 2500;
+  // UIUX-89 — Outline view: every filled thing is drawn as its own outline
+  // instead of solid ink, so overlapping copper can be read apart. Filled
+  // glyph geometry is handled by one CSS rule (the glyphs paint in
+  // `currentColor`, so the outline keeps the object's real colour); tracks and
+  // buses carry a width, so they get their true capsule outline below.
+  const outline = state.renderStyle === "outline" && state.mode !== "schematic";
 
   return (
-    <>
+    <div className={outline ? "ix-render-outline" : undefined} style={{ display: "contents" }}>
       {/* Wires + buses + draft + rubber-band rect — single SVG overlay.
           zIndex lifts the wires above the sheet surface (which sits in its own
           positioned subtree); glyph divs below use a higher zIndex so component
@@ -555,6 +561,25 @@ export function PlacedObjects() {
             const w = (isTrack ? (sel ? 6 : 5) : isBus ? (sel ? 4 : 3) : drawW ? (sel ? drawW + 0.9 : drawW) : sel ? 2.6 : 1.7) + (hot ? 1.2 : 0);
             const x2 = o.endX ?? o.x;
             const y2 = o.endY ?? o.y;
+            // UIUX-89 — in Outline view a run that carries a width is drawn as
+            // the shape it really occupies: the two edges of the run plus its
+            // round caps, rather than a solid bar or a thinner solid bar.
+            if (outline && (isTrack || isBus)) {
+              const dx = x2 - o.x, dy = y2 - o.y;
+              const len = Math.hypot(dx, dy);
+              const r = w / 2;
+              const ux = len > 1e-6 ? dx / len : 1, uy = len > 1e-6 ? dy / len : 0;
+              const nx = -uy * r, ny = ux * r;
+              const d = len > 1e-6
+                ? `M${o.x + nx},${o.y + ny} L${x2 + nx},${y2 + ny} A${r},${r} 0 0 1 ${x2 - nx},${y2 - ny} L${o.x - nx},${o.y - ny} A${r},${r} 0 0 1 ${o.x + nx},${o.y + ny} Z`
+                : `M${o.x - r},${o.y} a${r},${r} 0 1 0 ${r * 2},0 a${r},${r} 0 1 0 ${-r * 2},0`;
+              return (
+                <React.Fragment key={o.id}>
+                  <line x1={o.x} y1={o.y} x2={x2} y2={y2} stroke="transparent" strokeWidth={Math.max(9, w)} strokeLinecap="round" pointerEvents="stroke" data-object-id={o.id} style={{ cursor: "pointer" }} />
+                  <path d={d} fill="none" stroke={stroke} strokeWidth={1} opacity={dim ? 0.3 : 1} pointerEvents="none" />
+                </React.Fragment>
+              );
+            }
             return (
               <React.Fragment key={o.id}>
                 {/* Hit line — a 1.7px stroke is a pixel-hunt to point at, so the
@@ -713,7 +738,7 @@ export function PlacedObjects() {
         />
         ),
       )}
-    </>
+    </div>
   );
 }
 

@@ -13,7 +13,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ArrowDown01Icon,
   Notification03Icon,
-  ShoppingCart01Icon,
   SidebarLeft01Icon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
@@ -179,10 +178,11 @@ export function TopBar() {
         {onFlowPage && <PremiumPartsChip />}
         {/* The Help "?" lives in the editor's own menu row (⚙ Settings · ? Help),
             where it opens a real menu. This cluster carried a second one that
-            answered to nothing — one Help, one home (UIUX-42). */}
-        <ToolBtn>
-          <HugeiconsIcon icon={ShoppingCart01Icon} size={21} color="currentColor" strokeWidth={1.8} />
-        </ToolBtn>
+            answered to nothing — one Help, one home (UIUX-42). The shopping
+            cart went the same way (UIUX-43): it answered to nothing, and there
+            is no store page for it to open yet — the sidebar's own "Explore
+            marketplace" link has no route behind it either. It comes back the
+            day that page exists, rather than sitting here as decoration. */}
         <ToolBtn>
           <HugeiconsIcon icon={Notification03Icon} size={21} color="currentColor" strokeWidth={1.8} />
           <span

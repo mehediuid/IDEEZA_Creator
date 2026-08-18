@@ -38,6 +38,12 @@ type MenuSub = {
 };
 type MenuItem = {
   divider?: boolean;
+  /** UIUX-89 — a two-state setting rendered as a segmented control, not a row
+   *  you click: mutually-exclusive options belong in one control that shows
+   *  which is active, the way the toolbar's 2D/3D toggle does. */
+  seg?: { label: string; value: string }[];
+  segValue?: string;
+  onSeg?: (v: string) => void;
   label?: string;
   k?: string;
   icon?: string;
@@ -89,6 +95,34 @@ function renderMenuItem(it: MenuItem, idx: number, saveState: SaveState) {
         key={idx}
         style={{ height: 1, background: "var(--color-border-subtle)", margin: "var(--spacing-2) var(--spacing-5)" }}
       />
+    );
+  }
+  if (it.seg) {
+    return (
+      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-3) var(--spacing-6)" }}>
+        <span style={{ width: 17, flex: "0 0 auto", color: "var(--color-text-secondary)", display: "inline-flex" }}>
+          <DsIcon name={it.icon} size={16} />
+        </span>
+        <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 500, whiteSpace: "nowrap" }}>{it.label}</span>
+        <div style={{ display: "inline-flex", background: "var(--color-bg-subtle)", borderRadius: "var(--radius-full)", padding: 2, gap: 2, flex: "0 0 auto" }}>
+          {it.seg.map((o) => {
+            const on = o.value === it.segValue;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-label={o.label}
+                onClick={(e) => { e.stopPropagation(); it.onSeg?.(o.value); }}
+                style={{ padding: "3px var(--spacing-5)", borderRadius: "var(--radius-full)", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "var(--font-size-xs)", fontWeight: 600, background: on ? "var(--color-violet-600)" : "transparent", color: on ? "var(--color-text-on-brand)" : "var(--color-text-secondary)" }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
   return (

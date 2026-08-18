@@ -641,11 +641,18 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ],
         }),
         dv,
-        item("2D View", { icon: "board", onClick: () => actions.setMode("pcb") }),
-        item("3D View", { icon: "cube", onClick: () => actions.setMode("3d") }),
-        item("Normal View", { icon: "preview", onClick: () => actions.flashToast("Normal view") }),
-        item("Outline View", { icon: "pRect", onClick: () => actions.flashToast("Outline view") }),
-        item("Flip Board", { k: "Alt+F", icon: "flipV" }),
+        // UIUX-89 — 2D View / 3D View left this menu: the toolbar's own 2D/3D
+        // toggle already owns that state, and two controls for one setting can
+        // disagree. Normal / Outline is a *render style*, a separate setting
+        // that applies in either view — so it is one segmented control showing
+        // which is active, not two rows that said nothing back.
+        { ...item("Render style", { icon: "preview" }),
+          seg: [{ label: "Normal", value: "normal" }, { label: "Outline", value: "outline" }],
+          segValue: state.renderStyle,
+          onSeg: (v) => actions.setRenderStyle(v) },
+        // A one-shot camera flip, so it stays a plain action — it just never
+        // had a handler behind it.
+        item("Flip Board", { k: "Alt+F", icon: "flipV", onClick: () => actions.toggleBoardFlip() }),
         dv,
         // Phase 8 — Appearance (IT-550). Dark / Light / System theme picker.
         item("Appearance", {

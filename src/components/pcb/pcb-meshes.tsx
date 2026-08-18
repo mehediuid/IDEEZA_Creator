@@ -335,12 +335,28 @@ export function PcbRegionMesh({ r, thickness, lift = 0 }: { r: Pcb3DRegion; thic
 // the layer stack apart vertically (top copper up, bottom copper down, bodies
 // highest). The group is offset by the board's PCB-Height-from-Bottom, and
 // `expose` (Layer Expose) raises the exposed copper proud of the mask.
-export function PcbSceneMeshes({ scene, explode = false }: { scene: Pcb3DScene; explode?: boolean }) {
+export function PcbSceneMeshes({ scene, explode = false, outline = false }: { scene: Pcb3DScene; explode?: boolean; outline?: boolean }) {
   const th = scene.board.thickness;
   const gap = explode ? 0.7 : 0; // vertical separation between stack levels
   const exp = scene.expose; // extra copper proudness above/below the mask
+  // UIUX-89 — Outline view is a render style, not a 2D-only setting: in 3D it
+  // draws the same geometry as edges so the stack can be seen through. Applied
+  // by walking the scene rather than threading a flag into every material.
+  const groupRef = React.useRef<THREE.Group>(null);
+  React.useEffect(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    g.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const mat = mesh.material;
+      if (!mat) return;
+      for (const m of Array.isArray(mat) ? mat : [mat]) {
+        if ("wireframe" in m) (m as THREE.MeshStandardMaterial).wireframe = outline;
+      }
+    });
+  });
   return (
-    <group name="pcb-scene" position={[0, scene.board.yOffset, 0]}>
+    <group ref={groupRef} name="pcb-scene" position={[0, scene.board.yOffset, 0]}>
       <PcbSlabMesh board={scene.board} />
       {scene.silk.map((s) => (
         <PcbSilkMesh key={s.id} s={s} thickness={th} color={scene.silkColor} glossy={scene.silkGlossy} lift={gap} />
