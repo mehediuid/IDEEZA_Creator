@@ -604,6 +604,29 @@ export function AllLibraryFlyout() {
   const actions = usePcbActions();
   const [query, setQuery] = React.useState("");
   const sel = ALL_ROWS.find((r) => r.id === state.libSelected) || null;
+  // UIUX-73 — the verified-parts preview column was a fixed 96px strip, so the
+  // symbol and footprint were squeezed into thumbnails you couldn't read. It is
+  // draggable now, and the previews grow with it. Remembered with the document.
+  const PREV_MIN = 96;
+  const PREV_MAX = 320;
+  const storedW = Number((state.boardSettings ?? {}).libAllPreviewW);
+  const previewW = Math.min(PREV_MAX, Math.max(PREV_MIN, Number.isFinite(storedW) && storedW ? storedW : PREV_MIN));
+  const setPreviewW = (w: number) =>
+    actions.setBoardSetting("libAllPreviewW", Math.min(PREV_MAX, Math.max(PREV_MIN, Math.round(w))));
+  const onPreviewDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = previewW;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => setPreviewW(startW - (ev.clientX - startX));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   return (
     <div
@@ -701,13 +724,36 @@ export function AllLibraryFlyout() {
           </div>
         </div>
 
-        {/* preview thumbnails (only when a row is selected) */}
+        {/* preview column (only when a row is selected) — drag its edge to read
+            the symbol and footprint at a real size, not as 56px thumbnails. */}
         {sel && (
-          <div style={{ width: 96, flex: "0 0 auto", borderLeft: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-5)", display: "flex", flexDirection: "column", gap: "var(--spacing-5)" }}>
-            <PreviewBox kind="sym" />
-            <PreviewBox kind="pcb" />
-            <PreviewBox kind="3d" />
-          </div>
+          <>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize preview"
+              aria-valuenow={previewW}
+              aria-valuemin={PREV_MIN}
+              aria-valuemax={PREV_MAX}
+              tabIndex={0}
+              onPointerDown={onPreviewDrag}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") { e.preventDefault(); setPreviewW(previewW + 16); }
+                else if (e.key === "ArrowRight") { e.preventDefault(); setPreviewW(previewW - 16); }
+                else if (e.key === "Home") { e.preventDefault(); setPreviewW(PREV_MAX); }
+                else if (e.key === "End") { e.preventDefault(); setPreviewW(PREV_MIN); }
+              }}
+              title="Drag to resize the preview"
+              style={{ width: 7, flex: "0 0 auto", cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}
+            >
+              <span style={{ width: 3, height: 26, borderRadius: "var(--radius-full)", background: "var(--color-border-strong)" }} />
+            </div>
+            <div style={{ width: previewW, flex: "0 0 auto", borderLeft: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-5)", display: "flex", flexDirection: "column", gap: "var(--spacing-5)", overflowY: "auto" }}>
+              <PreviewBox kind="sym" size={previewW - 24} />
+              <PreviewBox kind="pcb" size={previewW - 24} />
+              <PreviewBox kind="3d" size={previewW - 24} />
+            </div>
+          </>
         )}
       </div>
 
@@ -747,13 +793,14 @@ export function AllLibraryFlyout() {
   );
 }
 
-function PreviewBox({ kind }: { kind: "sym" | "pcb" | "3d" }) {
+function PreviewBox({ kind, size = 56 }: { kind: "sym" | "pcb" | "3d"; size?: number }) {
   const bg = kind === "pcb" ? "#1a1a1a" : "var(--color-bg-surface)";
+  const w = Math.round(size * 0.78);
   return (
-    <div style={{ width: 56, height: 56, borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-default)", background: bg, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-      {kind === "sym" && <svg width="40" height="20" viewBox="0 0 40 20"><path d="M2 10h6l2-6 4 12 4-12 4 12 2-6h12" fill="none" stroke="#1a1a1a" strokeWidth="1.3" /></svg>}
-      {kind === "pcb" && <svg width="40" height="40" viewBox="0 0 40 40"><rect x="12" y="14" width="16" height="9" fill="none" stroke="#e34c4c" strokeWidth="1.5" /><rect x="8" y="17" width="5" height="3" fill="#d8a838" /><rect x="27" y="17" width="5" height="3" fill="#d8a838" /></svg>}
-      {kind === "3d" && <svg width="40" height="30" viewBox="0 0 40 30"><rect x="8" y="11" width="24" height="9" rx="1" fill="#2f6db5" /><rect x="6" y="13" width="3" height="5" fill="#888" /><rect x="31" y="13" width="3" height="5" fill="#888" /></svg>}
+    <div data-preview={kind} style={{ width: size, height: size, borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-default)", background: bg, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      {kind === "sym" && <svg width={w} height={Math.round(w / 2)} viewBox="0 0 40 20"><path d="M2 10h6l2-6 4 12 4-12 4 12 2-6h12" fill="none" stroke="#1a1a1a" strokeWidth="1.3" /></svg>}
+      {kind === "pcb" && <svg width={w} height={w} viewBox="0 0 40 40"><rect x="12" y="14" width="16" height="9" fill="none" stroke="#e34c4c" strokeWidth="1.5" /><rect x="8" y="17" width="5" height="3" fill="#d8a838" /><rect x="27" y="17" width="5" height="3" fill="#d8a838" /></svg>}
+      {kind === "3d" && <svg width={w} height={Math.round(w * 0.75)} viewBox="0 0 40 30"><rect x="8" y="11" width="24" height="9" rx="1" fill="#2f6db5" /><rect x="6" y="13" width="3" height="5" fill="#888" /><rect x="31" y="13" width="3" height="5" fill="#888" /></svg>}
     </div>
   );
 }
