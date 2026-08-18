@@ -756,6 +756,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         dv,
         // #101 — Import DXF/Image live in Project ▸ Import, their one home.
         item("Manage Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
+        // UIUX-84 — Manage Layer names the layers; this says what they're made
+        // of, which is the part a fab needs and had no home at all.
+        item("Physical stackup…", { icon: "layer", onClick: () => actions.openModal("stackup") }),
         item("Footprint Manager", { icon: "foot", onClick: () => actions.openManager("footprint") }),
         // PDF Part 2: cascade of target layers.
         item("Move to Different Layer", {

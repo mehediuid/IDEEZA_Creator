@@ -15,7 +15,7 @@ import {
   NumberInput,
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
-import { ANNOT_PREFIX, AREA_KINDS, DEL_OBJ_NAMES, SEL_FILTER_KINDS, nextDesignator, type CanvasObject } from "@/lib/pcb/types";
+import { ANNOT_PREFIX, AREA_KINDS, COPPER_WEIGHTS, DEL_OBJ_NAMES, SEL_FILTER_KINDS, STACK_MATERIALS, nextDesignator, stackRoleOf, type CanvasObject, type StackRole } from "@/lib/pcb/types";
 import { ERC_ENFORCED_ROWS, computeNets } from "@/lib/pcb/nets";
 import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
@@ -3375,6 +3375,95 @@ function GerberExportModal() {
   );
 }
 
+// UIUX-84 — the physical stack. The Design menu could name the layers but not
+// say what the board is actually made of, which is the part a fab needs. This
+// is one column of rows read top-to-bottom the way the board is built, each
+// row carrying only the fields its own role has: a mask has a thickness, a
+// copper layer has a weight, a dielectric has a material and a Dk. The total
+// is computed from the rows, so the figure the 3D view uses and the figure
+// quoted here are the same number.
+function StackupModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const rows = state.threeD.layers;
+  const roleOf = (r: (typeof rows)[number]): StackRole => r.role ?? stackRoleOf(r.name);
+  const total = rows.reduce((a, r) => a + (parseFloat(r.thickness) || 0), 0);
+  const copperCount = rows.filter((r) => roleOf(r) === "copper").length;
+
+  const setRow = (i: number, patch: Partial<(typeof rows)[number]>) =>
+    actions.setThreeD({ layers: rows.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
+
+  const ROLE_TINT: Record<StackRole, string> = {
+    mask: "var(--color-pcb-mask)",
+    copper: "var(--color-pcb-top-copper)",
+    dielectric: "var(--color-text-tertiary)",
+  };
+  const ROLE_LABEL: Record<StackRole, string> = { mask: "Solder mask", copper: "Copper", dielectric: "Dielectric" };
+
+  return (
+    <Overlay>
+      <Card width={620} maxHeight="90%" flexCol>
+        <Header title="Physical stackup" onClose={actions.closeModal} padding="18px 22px" />
+        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            What the board is made of, top to bottom — <b style={{ color: "var(--color-text-primary)" }}>{copperCount} copper layers, {total.toFixed(3)} mm finished</b>. The 3D view reads these thicknesses, so what you set here is what the board becomes.
+          </div>
+          {rows.map((r, i) => {
+            const role = roleOf(r);
+            return (
+              <div
+                key={`${r.name}-${i}`}
+                data-stack-row={role}
+                style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-5) var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}
+              >
+                <span aria-hidden style={{ width: 4, alignSelf: "stretch", borderRadius: 2, background: ROLE_TINT[role], flex: "0 0 auto" }} />
+                <div style={{ width: 150, flex: "0 0 auto", minWidth: 0 }}>
+                  <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                  <div style={{ fontSize: "var(--font-size-2xs)", color: "var(--color-text-tertiary)" }}>{ROLE_LABEL[role]}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <DsSelect
+                    value={r.material ?? STACK_MATERIALS[role][0]}
+                    options={STACK_MATERIALS[role].map((m) => ({ label: m, value: m }))}
+                    onChange={(v) => setRow(i, { material: v })}
+                    minWidth={120}
+                  />
+                </div>
+                {role === "copper" && (
+                  <div style={{ width: 96, flex: "0 0 auto" }}>
+                    <DsSelect
+                      value={r.copper ?? "1 oz"}
+                      options={COPPER_WEIGHTS.map((w) => ({ label: w, value: w }))}
+                      onChange={(v) => setRow(i, { copper: v, thickness: String(0.035 * (parseFloat(v) || 1)) })}
+                      minWidth={96}
+                    />
+                  </div>
+                )}
+                {role === "dielectric" && (
+                  <div style={{ width: 78, flex: "0 0 auto" }}>
+                    <NumberInput value={String(r.dk ?? "4.3")} onChange={(v) => setRow(i, { dk: v })} min={1} />
+                  </div>
+                )}
+                <div style={{ width: 96, flex: "0 0 auto" }}>
+                  <NumberInput value={r.thickness} onChange={(v) => setRow(i, { thickness: v })} min={0} />
+                </div>
+                <span style={{ width: 22, flex: "0 0 auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>mm</span>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+            Copper weight sets its layer&apos;s thickness (1 oz = 0.035 mm), so the two can&apos;t disagree. Dk is the dielectric constant a fab needs for impedance control.
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <span style={{ marginRight: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>Saved as you edit</span>
+          <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Done</Button>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
 function ImportImageModal() {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -4201,6 +4290,8 @@ export function Modals() {
       return <CutoutModal />;
     case "sutureVias":
       return <SutureViasModal />;
+    case "stackup":
+      return <StackupModal />;
     case "importImage":
       return <ImportImageModal />;
     case "newPart":

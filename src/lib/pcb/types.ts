@@ -66,6 +66,7 @@ export type ModalId =
   | "convertConfirm"
   // Phase 3 — PCB Tools menu modals
   | "layerManager"
+  | "stackup"
   | "netClass"
   | "diffPair"
   | "equalLength"
@@ -245,6 +246,23 @@ export type PcbLayerType =
   | "soldermask"
   | "drill"
   | "mechanical";
+
+/** What a physical stack row is, which decides which fields it carries. */
+export type StackRole = "mask" | "copper" | "dielectric";
+export const STACK_MATERIALS: Record<StackRole, string[]> = {
+  mask: ["Liquid photoimageable", "Dry film"],
+  copper: ["Copper"],
+  dielectric: ["FR-4", "FR-4 high-Tg", "Rogers 4350B", "Polyimide", "Aluminium core"],
+};
+/** Copper weights, in ounces — the thickness a fab actually plates. */
+export const COPPER_WEIGHTS = ["0.5 oz", "1 oz", "2 oz", "3 oz"];
+/** The role a stack row plays, inferred from its name when it isn't stored. */
+export function stackRoleOf(name: string): StackRole {
+  const n = name.toLowerCase();
+  if (n.includes("mask")) return "mask";
+  if (n.includes("dielectric") || n.includes("core") || n.includes("prepreg")) return "dielectric";
+  return "copper";
+}
 
 export interface PcbLayer {
   id: string;
@@ -823,7 +841,12 @@ export interface PcbState {
     pcbHeightFromTop: string;
     boardThickness: string;
     layerExpose: string;
-    layers: Array<{ name: string; thickness: string }>;
+    /** UIUX-84 — the board's physical stack: what each layer is made of, how
+     *  thick it is, and (for the dielectrics) its Dk. One list — the 3D view
+     *  reads the thicknesses from it, the stackup editor edits the rest, so
+     *  the two can't disagree. `material`/`dk`/`copper` are optional so a
+     *  board saved before this still loads. */
+    layers: Array<{ name: string; thickness: string; role?: StackRole; material?: string; dk?: string; copper?: string }>;
   };
   // Right panel — Schematic Properties (default-no-selection view)
   schemBasic: { name: string; template: string };
@@ -1868,11 +1891,11 @@ export const initialState: PcbState = {
     boardThickness: "1.2mm",
     layerExpose: "0.5mm",
     layers: [
-      { name: "Top Solder Mask", thickness: "0.01" },
-      { name: "Top Layer", thickness: "0.035" },
-      { name: "Dielectric1", thickness: "1.13" },
-      { name: "Bottom Layer", thickness: "0.035" },
-      { name: "Bottom Solder Mask", thickness: "0.01" },
+      { name: "Top Solder Mask", thickness: "0.01", role: "mask", material: "Liquid photoimageable" },
+      { name: "Top Layer", thickness: "0.035", role: "copper", material: "Copper", copper: "1 oz" },
+      { name: "Dielectric1", thickness: "1.13", role: "dielectric", material: "FR-4", dk: "4.3" },
+      { name: "Bottom Layer", thickness: "0.035", role: "copper", material: "Copper", copper: "1 oz" },
+      { name: "Bottom Solder Mask", thickness: "0.01", role: "mask", material: "Liquid photoimageable" },
     ],
   },
   schemBasic: { name: "Main MCU", template: "A4 Landscape" },
