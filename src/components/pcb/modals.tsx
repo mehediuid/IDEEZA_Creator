@@ -15,7 +15,7 @@ import {
   NumberInput,
 } from "@/components/ideeza";
 import { Icon } from "@/lib/pcb/icons";
-import { ANNOT_PREFIX, DEL_OBJ_NAMES, SEL_FILTER_KINDS, nextDesignator, type CanvasObject } from "@/lib/pcb/types";
+import { ANNOT_PREFIX, AREA_KINDS, DEL_OBJ_NAMES, SEL_FILTER_KINDS, nextDesignator, type CanvasObject } from "@/lib/pcb/types";
 import { ERC_ENFORCED_ROWS, computeNets } from "@/lib/pcb/nets";
 import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
@@ -368,6 +368,12 @@ const FR_SCOPES = [
   { label: "All sheets", value: "all" },
   { label: "Current selection", value: "selection" },
 ];
+// UIUX-93 — the board is one document, so "This sheet / All sheets" was
+// schematic wording carried across. There is one board and a selection in it.
+const FR_SCOPES_BOARD = [
+  { label: "This board", value: "sheet" },
+  { label: "Current selection", value: "selection" },
+];
 
 // Which object kinds each "search in" chip covers. Reuses the app's own
 // category predicates (SEL_FILTER_KINDS) so a new symbol kind can't silently
@@ -379,6 +385,73 @@ const FR_KINDS: Record<string, (o: CanvasObject) => boolean> = {
   Text: (o) => ["text", "note", "field"].includes(o.kind),
 };
 const FR_OBJECTS = Object.keys(FR_KINDS);
+
+// UIUX-93 — the board's own object vocabulary. Parts/Nets/Pins/Text is the
+// sheet's; a board is pads, vias, tracks, copper and mechanical outlines, and
+// none of those were reachable from search at all.
+const FR_AREA_KINDS = new Set(AREA_KINDS.map((a) => a.kind));
+const FR_COMPONENT_KINDS = new Set(["component", "reuseBlock", "fp0805", "fpSOD123", "fpSOT23", "fpSOIC8"]);
+const FR_BOARD_TYPES: Record<string, (o: CanvasObject) => boolean> = {
+  Components: (o) => FR_COMPONENT_KINDS.has(o.kind),
+  Pads: (o) => o.kind === "pad",
+  Vias: (o) => o.kind === "via",
+  Tracks: (o) => o.kind === "track",
+  "Copper areas": (o) => FR_AREA_KINDS.has(o.kind),
+  "Board outline": (o) => o.kind === "boardOutline",
+  Text: (o) => o.kind === "text" || o.kind === "note",
+  Dimensions: (o) => o.kind === "dimension",
+  Images: (o) => o.kind === "image",
+  Groups: (o) => !!(o.props as Record<string, unknown> | undefined)?.groupId,
+};
+const FR_BOARD_OBJECTS = Object.keys(FR_BOARD_TYPES);
+
+// The property panel changes with the types in play: each condition field says
+// which board types actually carry it, so a Via never offers "Footprint".
+type FrCond = { id: string; field: string; op: string; value: string };
+type FrCondField = { value: string; label: string; numeric?: boolean; types: string[]; of: (o: CanvasObject) => string };
+const FR_COND_FIELDS: FrCondField[] = [
+  { value: "layer", label: "Layer", types: ["Components", "Pads", "Vias", "Tracks", "Copper areas", "Board outline", "Text", "Dimensions", "Images"], of: (o) => o.layer ?? "" },
+  { value: "net", label: "Net", types: ["Pads", "Vias", "Tracks", "Copper areas"], of: (o) => o.net ?? "" },
+  { value: "text", label: "Designator", types: ["Components", "Text", "Groups"], of: (o) => o.text ?? "" },
+  { value: "footprint", label: "Footprint", types: ["Components"], of: (o) => o.footprint ?? "" },
+  { value: "value", label: "Value", types: ["Components"], of: (o) => frProp(o, "value") },
+  { value: "package", label: "Package", types: ["Components"], of: (o) => frProp(o, "package") },
+  { value: "mpn", label: "MPN", types: ["Components"], of: (o) => frProp(o, "mpn") },
+  { value: "manufacturer", label: "Manufacturer", types: ["Components"], of: (o) => frProp(o, "manufacturer") },
+  { value: "comment", label: "Comment", types: ["Components", "Text"], of: (o) => o.comment ?? "" },
+  { value: "side", label: "Side", types: ["Components", "Pads"], of: (o) => o.side ?? "top" },
+  { value: "width", label: "Width", numeric: true, types: ["Pads", "Vias", "Tracks", "Images"], of: (o) => String(o.width ?? "") },
+  { value: "rotation", label: "Rotation", numeric: true, types: ["Components", "Pads", "Text", "Images"], of: (o) => String(o.rotation ?? 0) },
+  { value: "locked", label: "Locked", types: ["Components", "Pads", "Vias", "Tracks", "Copper areas", "Board outline", "Text", "Dimensions", "Images", "Groups"], of: (o) => (frProp(o, "locked") === "true" ? "yes" : "no") },
+];
+const FR_OPS = [
+  { label: "is", value: "is" },
+  { label: "is not", value: "not" },
+  { label: "contains", value: "has" },
+  { label: "is empty", value: "empty" },
+];
+const FR_OPS_NUM = [
+  ...FR_OPS,
+  { label: "greater than", value: "gt" },
+  { label: "less than", value: "lt" },
+];
+function frCondPasses(c: FrCond, o: CanvasObject): boolean {
+  const f = FR_COND_FIELDS.find((x) => x.value === c.field);
+  if (!f) return true;
+  const v = f.of(o);
+  const q = c.value.trim();
+  if (c.op === "empty") return v === "";
+  if (!q) return true;
+  if (f.numeric && (c.op === "gt" || c.op === "lt")) {
+    const a = parseFloat(v), b = parseFloat(q);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+    return c.op === "gt" ? a > b : a < b;
+  }
+  const lv = v.toLowerCase(), lq = q.toLowerCase();
+  if (c.op === "has") return lv.includes(lq);
+  if (c.op === "not") return lv !== lq;
+  return lv === lq;
+}
 
 // UIUX-76 — the field picker. Only fields the model really carries; each knows
 // how to read itself and (when writable) write itself back, so search, count
@@ -416,7 +489,23 @@ function FindReplaceModal() {
   const [replaceText, setReplaceText] = React.useState("");
   const [scope, setScope] = React.useState("sheet");
   const [field, setField] = React.useState("all");
+  const board = state.mode !== "schematic";
+  const typeNames = board ? FR_BOARD_OBJECTS : FR_OBJECTS;
+  const typeTest = board ? FR_BOARD_TYPES : FR_KINDS;
   const [objects, setObjects] = React.useState<Record<string, boolean>>({ Parts: true, Nets: true, Pins: true, Text: true });
+  const [boardTypes, setBoardTypes] = React.useState<Record<string, boolean>>(() =>
+    Object.fromEntries(FR_BOARD_OBJECTS.map((k) => [k, true])),
+  );
+  const picked = board ? boardTypes : objects;
+  const setPicked = board ? setBoardTypes : setObjects;
+  // UIUX-93 — property conditions, ANDed with the text query. The fields on
+  // offer follow the types in play, so a Via never offers "Footprint".
+  const [conds, setConds] = React.useState<FrCond[]>([]);
+  const condFields = React.useMemo(() => {
+    const on = FR_BOARD_OBJECTS.filter((k) => boardTypes[k]);
+    const live = on.length ? on : FR_BOARD_OBJECTS;
+    return FR_COND_FIELDS.filter((f) => f.types.some((t) => live.includes(t)));
+  }, [boardTypes]);
   const [matchCase, setMatchCase] = React.useState(false);
   const [useRegex, setUseRegex] = React.useState(false);
   const [wholeValue, setWholeValue] = React.useState(false);
@@ -450,9 +539,11 @@ function FindReplaceModal() {
         : scope === "sheet"
         ? state.objects.filter((o) => sheetOf(o) === state.activeSheetId)
         : state.objects;
-    const on = FR_OBJECTS.filter((k) => objects[k]);
-    return base.filter((o) => on.some((k) => FR_KINDS[k](o)));
-  }, [state.objects, state.selectedIds, state.activeSheetId, scope, objects]);
+    const inMode = board ? base.filter((o) => o.scope === "pcb") : base.filter((o) => o.scope !== "pcb");
+    const on = typeNames.filter((k) => picked[k]);
+    const byType = inMode.filter((o) => on.some((k) => typeTest[k](o)));
+    return conds.length ? byType.filter((o) => conds.every((c) => frCondPasses(c, o))) : byType;
+  }, [state.objects, state.selectedIds, state.activeSheetId, scope, picked, typeNames, typeTest, board, conds]);
 
   // Schematic objects don't store a net — the netlist derives it live. So the
   // Net-name field searches what the Nets tab shows (stored net first, derived
@@ -633,11 +724,63 @@ function FindReplaceModal() {
 
           {section("Search in")}
           <div style={{ maxWidth: 240 }}>
-            <DsSelect value={scope} options={FR_SCOPES} onChange={setScope} minWidth={240} />
+            <DsSelect value={scope} options={board ? FR_SCOPES_BOARD : FR_SCOPES} onChange={setScope} minWidth={240} />
           </div>
-          <div style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
-            {FR_OBJECTS.map((o) => chip(o, !!objects[o], () => setObjects((s) => ({ ...s, [o]: !s[o] }))))}
+          <div data-fr-types style={{ display: "flex", gap: "var(--spacing-3)", marginTop: "var(--spacing-4)", flexWrap: "wrap" }}>
+            {typeNames.map((o) => chip(o, !!picked[o], () => setPicked((s) => ({ ...s, [o]: !s[o] }))))}
           </div>
+
+          {/* UIUX-93 — property conditions. One card per condition: the field,
+              how to compare it, and what to compare against. The field list is
+              whatever the ticked types actually carry. */}
+          {board && (
+            <>
+              {section("Where")}
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+                {conds.map((c) => {
+                  const f = FR_COND_FIELDS.find((x) => x.value === c.field);
+                  const ops = f?.numeric ? FR_OPS_NUM : FR_OPS;
+                  return (
+                    <div key={c.id} data-fr-cond style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}>
+                      <DsSelect
+                        value={c.field}
+                        options={condFields.map((x) => ({ label: x.label, value: x.value }))}
+                        onChange={(v) => setConds((cs) => cs.map((x) => (x.id === c.id ? { ...x, field: v, op: "is" } : x)))}
+                        minWidth={132}
+                      />
+                      <DsSelect
+                        value={c.op}
+                        options={ops}
+                        onChange={(v) => setConds((cs) => cs.map((x) => (x.id === c.id ? { ...x, op: v } : x)))}
+                        minWidth={116}
+                      />
+                      <input
+                        value={c.value}
+                        disabled={c.op === "empty"}
+                        onChange={(e) => setConds((cs) => cs.map((x) => (x.id === c.id ? { ...x, value: e.target.value } : x)))}
+                        placeholder={c.op === "empty" ? "—" : f?.numeric ? "number" : "value"}
+                        style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit", opacity: c.op === "empty" ? 0.45 : 1 }}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Remove condition"
+                        onClick={() => setConds((cs) => cs.filter((x) => x.id !== c.id))}
+                        style={{ flex: "0 0 auto", width: 26, height: 26, borderRadius: "var(--radius-md)", border: "none", background: "transparent", color: "var(--color-text-tertiary)", cursor: "pointer", fontFamily: "inherit", fontSize: "var(--font-size-md)" }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+                <div>
+                  <Pill onClick={() => setConds((cs) => [...cs, { id: `c${Date.now().toString(36)}${cs.length}`, field: condFields[0]?.value ?? "layer", op: "is", value: "" }])}>
+                    + Add condition
+                  </Pill>
+                </div>
+              </div>
+            </>
+          )}
+
           <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: "var(--spacing-4)" }}>
             {pool.length} object{pool.length === 1 ? "" : "s"} in range · {field === "all"
               ? "searches designator, net, value, footprint, comment, part fields and pin type"
