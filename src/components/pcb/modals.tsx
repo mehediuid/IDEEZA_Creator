@@ -1918,16 +1918,28 @@ function Export3DModal({ shell }: { shell?: boolean }) {
             <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={inputCss} />
           </div>
 
-          {/* Export format — segmented pills */}
+          {/* Export format — segmented pills. STEP is listed but disabled with
+              its reason: it carries solid (BREP) geometry, which needs a CAD
+              kernel we don't have, and writing a mesh into a .step would be a
+              file that opens and is wrong (UIUX-101). */}
           <div>
             <div style={groupCss}>Export Format</div>
             <div style={{ display: "flex", gap: "var(--spacing-3)" }}>
-              {(["STL", "OBJ"] as const).map((t) => (
-                <button key={t} type="button" onClick={() => setType(t)}
-                  style={{ flex: 1, padding: "var(--spacing-4)", borderRadius: "var(--radius-md)", border: `var(--border-width-1) solid ${type === t ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: type === t ? "var(--color-violet-600)" : "transparent", color: type === t ? "#fff" : "var(--color-text-secondary)", fontWeight: 700, fontSize: "var(--font-size-sm)", cursor: "pointer", fontFamily: "inherit" }}>
-                  {t}
-                </button>
-              ))}
+              {(["STL", "OBJ", "STEP"] as const).map((t) => {
+                const off = t === "STEP";
+                return (
+                  <button key={t} type="button" disabled={off} onClick={() => !off && setType(t as "STL" | "OBJ")}
+                    title={off ? "Not available yet — STEP stores solid geometry, which needs a CAD kernel. STL and OBJ are meshes and export today." : undefined}
+                    style={{ flex: 1, padding: "var(--spacing-4)", borderRadius: "var(--radius-md)", border: `var(--border-width-1) solid ${type === t ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: type === t ? "var(--color-violet-600)" : "transparent", color: off ? "var(--color-text-disabled)" : type === t ? "#fff" : "var(--color-text-secondary)", fontWeight: 700, fontSize: "var(--font-size-sm)", cursor: off ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: off ? 0.5 : 1 }}>
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: "var(--spacing-3)", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
+              {/* STL and OBJ don't embed units reliably, so the file says which
+                  it used and the receiving CAD doesn't have to guess. */}
+              Written in <strong style={{ color: "var(--color-text-secondary)" }}>millimetres</strong>. STEP isn&rsquo;t available yet — it stores solid geometry, which needs a CAD kernel.
             </div>
           </div>
 

@@ -6,6 +6,7 @@
 // partial or updater-function), so the ported handlers read identically.
 
 import * as React from "react";
+import { planTeardrops, teardropIds } from "./teardrops";
 import { convertSchematicToPcb, routeRatsnest, unrouteGenerated } from "./schematic-to-pcb";
 import { booleanRings, shapeToPolygon, isCombinable, ringArea, chamferRing, filletRing } from "./shape-boolean";
 import { planSutureVias, type SutureConfig } from "./suture-vias";
@@ -253,6 +254,11 @@ export interface PcbActions {
   toggleRatsnest: () => void;
   /** #94/95 — pour every copper region (or the selection) for real. */
   pourRegions: (onlySelected?: boolean) => void;
+  /** UIUX-88 — re-pour every copper region on the board in one action. */
+  fillAllPlanes: () => void;
+  /** UIUX-88 — copper fillets where tracks meet pads/vias. */
+  addTeardrops: (onlySelected?: boolean) => void;
+  removeTeardrops: () => void;
   /** #94/95 — throw the poured copper away, keeping the outlines. */
   clearPours: () => void;
   /** Turn the ratsnest airwires into copper tracks (simple L-route). */
@@ -2194,6 +2200,41 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         const on = !stateRef.current.showRatsnest;
         merge({ showRatsnest: on });
         actions.flashToast(on ? "Ratsnest shown" : "Ratsnest hidden");
+      },
+      // Board-wide re-pour: every region at once, rather than picking each
+      // one. It runs the same engine, so the result is identical to pouring
+      // them individually (UIUX-88).
+      fillAllPlanes: () => {
+        const s = stateRef.current;
+        const planes = s.objects.filter(
+          (o) => o.scope === "pcb" && (o.kind === "polygon" || o.kind === "fillRegion"),
+        );
+        if (!planes.length) { actions.flashToast("No copper planes on this board yet"); return; }
+        actions.pourRegions(false);
+      },
+      addTeardrops: (onlySelected) => {
+        const s = stateRef.current;
+        const ids = onlySelected ? s.selectedIds : undefined;
+        const plan = planTeardrops(s.objects, ids);
+        if (!plan.drops.length) {
+          actions.flashToast(
+            plan.skipped
+              ? `Every joint already has a teardrop (${plan.skipped})`
+              : "No track-to-pad joints to fillet — route some tracks onto pads first",
+          );
+          return;
+        }
+        mergeWithHistory((st) => ({ objects: [...st.objects, ...plan.drops] }));
+        actions.flashToast(
+          `Added ${plan.drops.length} teardrop${plan.drops.length === 1 ? "" : "s"}` +
+            (plan.skipped ? ` · ${plan.skipped} already had one` : ""),
+        );
+      },
+      removeTeardrops: () => {
+        const ids = new Set(teardropIds(stateRef.current.objects));
+        if (!ids.size) { actions.flashToast("No teardrops to remove"); return; }
+        mergeWithHistory((st) => ({ objects: st.objects.filter((o) => !ids.has(o.id)) }));
+        actions.flashToast(`Removed ${ids.size} teardrop${ids.size === 1 ? "" : "s"}`);
       },
       pourRegions: (onlySelected) => {
         const s = stateRef.current;

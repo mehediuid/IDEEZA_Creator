@@ -716,7 +716,26 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         // is its own row rather than a shape hidden under Copper Area (UIUX-87).
         item("Polygon Pour", { icon: "tCopperArea", onClick: () => actions.armPolygonPour() }),
         item("Pour / Rebuild copper", { icon: "tPolygon", onClick: () => actions.pourRegions() }),
+        // Board-wide, not per-region (UIUX-88).
+        item("Fill All Planes", { icon: "tFillArea", onClick: () => actions.fillAllPlanes() }),
         item("Remove all pours", { icon: "del", onClick: () => actions.clearPours() }),
+        dv,
+        // Copper fillets where a track meets a pad or via — real geometry, so
+        // the DRC, the 3D view and the exporters see them like any copper.
+        item("Teardrop", {
+          icon: "tCopperArea",
+          sub: [
+            su("Add to all joints", "", { icon: "tCopperArea", onClick: () => actions.addTeardrops(false) }),
+            su("Add to selected tracks", "", {
+              icon: "tCopperArea",
+              disabled: !state.selectedIds.length,
+              note: state.selectedIds.length ? undefined : "Select one or more tracks",
+              onClick: () => actions.addTeardrops(true),
+            }),
+            dv,
+            su("Remove all teardrops", "", { icon: "del", onClick: () => actions.removeTeardrops() }),
+          ],
+        }),
         dv,
         // #101 — Import DXF/Image live in Project ▸ Import, their one home.
         item("Manage Layer", { icon: "layer", onClick: () => actions.openModal("layerManager") }),
