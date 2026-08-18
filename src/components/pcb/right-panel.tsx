@@ -18,7 +18,7 @@ import {
   resolveInspectorType,
   type InspectorField,
 } from "@/lib/pcb/inspector-schema";
-import { SCHEM_FILTER_ROWS, SCHEM_FILTER_KEY_FOR_KIND } from "@/lib/pcb/types";
+import { SCHEM_FILTER_ROWS, SCHEM_FILTER_KEY_FOR_KIND, SCHEM_FILTER_SUBKEY_FOR_KIND } from "@/lib/pcb/types";
 import { Splitter } from "@/components/pcb/splitter";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 
@@ -1167,6 +1167,8 @@ function SchematicFilterTab() {
   const actions = usePcbActions();
   const bag = (state.boardSettings ?? {}) as Record<string, unknown>;
   const on = (key: string) => bag[key] !== false;
+  // Which bundles are open. View state only — the switches themselves persist.
+  const [open, setOpen] = React.useState<Record<string, boolean>>({});
 
   // Objects the filter can act on: this sheet, schematic scope (same rule the
   // canvas uses to decide what it draws).
@@ -1180,15 +1182,35 @@ function SchematicFilterTab() {
       const key = SCHEM_FILTER_KEY_FOR_KIND[o.kind];
       if (!key) continue;
       out[key] = (out[key] ?? 0) + 1;
+      const sub = SCHEM_FILTER_SUBKEY_FOR_KIND[o.kind];
+      if (sub) out[sub] = (out[sub] ?? 0) + 1;
       total++;
     }
     return { out, total };
   }, [state.objects, state.activeSheetId, firstSheetId]);
 
-  const offRows = SCHEM_FILTER_ROWS.filter((r) => !on(r.key));
-  const allOn = offRows.length === 0;
-  const selectable = SCHEM_FILTER_ROWS.reduce((n, r) => n + (on(r.key) ? (counts.out[r.key] ?? 0) : 0), 0);
-  const setAll = (v: boolean) => SCHEM_FILTER_ROWS.forEach((r) => actions.setBoardSetting(r.key, v));
+  // A bundle is off when its row is off or every one of its entities is.
+  const rowOn = (r: (typeof SCHEM_FILTER_ROWS)[number]) =>
+    on(r.key) && (!r.sub || r.sub.some((s) => on(s.key)));
+  const offRows = SCHEM_FILTER_ROWS.filter((r) => !rowOn(r));
+  const allOn = offRows.length === 0 && SCHEM_FILTER_ROWS.every((r) => !r.sub || r.sub.every((s) => on(s.key)));
+  const selectable = SCHEM_FILTER_ROWS.reduce(
+    (n, r) =>
+      n +
+      (!on(r.key)
+        ? 0
+        : r.sub
+          ? r.sub.reduce((m, s) => m + (on(s.key) ? (counts.out[s.key] ?? 0) : 0), 0)
+          : (counts.out[r.key] ?? 0)),
+    0,
+  );
+  // The row switch drives its entities too, so a bundle can't read as on while
+  // everything inside it is off.
+  const setRow = (r: (typeof SCHEM_FILTER_ROWS)[number], v: boolean) => {
+    actions.setBoardSetting(r.key, v);
+    (r.sub ?? []).forEach((s) => actions.setBoardSetting(s.key, v));
+  };
+  const setAll = (v: boolean) => SCHEM_FILTER_ROWS.forEach((r) => setRow(r, v));
 
   return (
     <div style={{ padding: "var(--spacing-6) var(--spacing-8)" }}>
@@ -1229,19 +1251,65 @@ function SchematicFilterTab() {
 
       {SCHEM_FILTER_ROWS.map((r) => {
         const n = counts.out[r.key] ?? 0;
-        const isOn = on(r.key);
+        const isOn = rowOn(r);
+        const isOpen = !!open[r.key];
         return (
-          <div
-            key={r.key}
-            onClick={() => actions.setBoardSetting(r.key, !isOn)}
-            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-4) var(--spacing-0)", cursor: "pointer" }}
-          >
-            <Checkbox checked={isOn} />
-            <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: isOn ? "var(--color-text-primary)" : "var(--color-text-tertiary)" }}>{r.label}</span>
-            {/* an empty category says so plainly instead of showing a 0 that
-                reads like a filtered-out count */}
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{n || "—"}</span>
-          </div>
+          <React.Fragment key={r.key}>
+            <div
+              data-filter-row={r.key}
+              style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", padding: "var(--spacing-4) var(--spacing-0)" }}
+            >
+              {/* Disclosure is its own target: opening a bundle to reach one
+                  entity must not switch the whole bundle off (UIUX-28). */}
+              {r.sub ? (
+                <button
+                  type="button"
+                  aria-label={`${isOpen ? "Collapse" : "Expand"} ${r.label}`}
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen((o) => ({ ...o, [r.key]: !o[r.key] }))}
+                  className="ix-tool"
+                  style={{ width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--color-text-tertiary)", flex: "0 0 auto" }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 160ms ease-out" }}>
+                    <path d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ) : (
+                <span style={{ width: 18, flex: "0 0 auto" }} />
+              )}
+              <div
+                onClick={() => setRow(r, !isOn)}
+                style={{ flex: 1, display: "flex", alignItems: "center", gap: "var(--spacing-5)", cursor: "pointer", minWidth: 0 }}
+              >
+                <Checkbox checked={isOn} />
+                <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: isOn ? "var(--color-text-primary)" : "var(--color-text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+                {/* an empty category says so plainly instead of showing a 0 that
+                    reads like a filtered-out count */}
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{n || "—"}</span>
+              </div>
+            </div>
+            {isOpen &&
+              (r.sub ?? []).map((s) => {
+                const sn = counts.out[s.key] ?? 0;
+                const sOn = on(r.key) && on(s.key);
+                return (
+                  <div
+                    key={s.key}
+                    data-filter-sub={s.key}
+                    onClick={() => {
+                      actions.setBoardSetting(s.key, !sOn);
+                      // Switching an entity back on revives its bundle.
+                      if (!sOn && !on(r.key)) actions.setBoardSetting(r.key, true);
+                    }}
+                    style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-3) var(--spacing-0) var(--spacing-3) 30px", cursor: "pointer" }}
+                  >
+                    <Checkbox checked={sOn} />
+                    <span style={{ flex: 1, fontSize: "var(--font-size-xs)", color: sOn ? "var(--color-text-secondary)" : "var(--color-text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
+                    <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{sn || "—"}</span>
+                  </div>
+                );
+              })}
+          </React.Fragment>
         );
       })}
 

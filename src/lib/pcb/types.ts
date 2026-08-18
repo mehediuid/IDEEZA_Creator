@@ -419,19 +419,63 @@ export const PANEL_LIMITS = {
   bottom: { min: 120, max: 620 },
 } as const;
 
-export const SCHEM_FILTER_ROWS: ReadonlyArray<{ key: string; label: string; kinds: readonly string[] }> = [
+/**
+ * Schematic Selection Filter. A row that bundles several entity types carries
+ * `sub`, so the bundle can be opened and each type switched on its own
+ * (UIUX-28) — you could hide "Power & ground" but never just the grounds. The
+ * row's own checkbox still toggles the whole bundle.
+ */
+export const SCHEM_FILTER_ROWS: ReadonlyArray<{
+  key: string;
+  label: string;
+  kinds: readonly string[];
+  sub?: ReadonlyArray<{ key: string; label: string; kinds: readonly string[] }>;
+}> = [
   { key: "fsPart", label: "Components", kinds: ["resistor", "resistorBox", "capacitor", "inductor", "diode", "crystal", "opamp", "currentSource", "ic", "component", "transistor"] },
   { key: "fsWire", label: "Wires", kinds: ["wire"] },
   { key: "fsBus", label: "Buses", kinds: ["bus", "busEntry"] },
-  { key: "fsPower", label: "Power & ground", kinds: ["vcc5v", "power", "gnd", "agnd", "pgnd"] },
-  { key: "fsNetLabel", label: "Net labels", kinds: ["netLabel", "globalLabel", "hierLabel", "netBusLabel", "net"] },
-  { key: "fsPort", label: "Ports & flags", kinds: ["port", "offPageConnector", "netFlag", "shortFlag", "diffPairFlag"] },
+  { key: "fsPower", label: "Power & ground", kinds: ["vcc5v", "power", "gnd", "agnd", "pgnd"], sub: [
+    { key: "fsPowerSym", label: "Power symbol", kinds: ["vcc5v", "power"] },
+    { key: "fsGroundSym", label: "Ground symbol", kinds: ["gnd", "agnd", "pgnd"] },
+  ] },
+  { key: "fsNetLabel", label: "Net labels", kinds: ["netLabel", "globalLabel", "hierLabel", "netBusLabel", "net"], sub: [
+    { key: "fsLabelLocal", label: "Local label", kinds: ["netLabel", "net"] },
+    { key: "fsLabelGlobal", label: "Global label", kinds: ["globalLabel"] },
+    { key: "fsLabelHier", label: "Hierarchical label", kinds: ["hierLabel"] },
+    { key: "fsLabelBus", label: "Bus label", kinds: ["netBusLabel"] },
+  ] },
+  { key: "fsPort", label: "Ports & flags", kinds: ["port", "offPageConnector", "netFlag", "shortFlag", "diffPairFlag"], sub: [
+    { key: "fsPortSym", label: "Port", kinds: ["port"] },
+    { key: "fsOffPage", label: "Off-sheet link", kinds: ["offPageConnector"] },
+    { key: "fsNetFlag", label: "Net flag", kinds: ["netFlag", "shortFlag"] },
+    { key: "fsDiffFlag", label: "Diff-pair tag", kinds: ["diffPairFlag"] },
+  ] },
   { key: "fsPin", label: "Pins", kinds: ["pin", "netTie"] },
-  { key: "fsJunction", label: "Junctions & no-connect", kinds: ["junction", "noConnect"] },
+  // No Connect lives here and only here — it used to sit in this row *and* in
+  // Ports & flags, so one flag answered to two switches (UIUX-28).
+  { key: "fsJunction", label: "Junctions & no-connect", kinds: ["junction", "noConnect"], sub: [
+    { key: "fsJunctionDot", label: "Junction", kinds: ["junction"] },
+    { key: "fsNoConnect", label: "No Connect", kinds: ["noConnect"] },
+  ] },
   { key: "fsAgile", label: "Agile modules", kinds: ["reuseBlock"] },
-  { key: "fsText", label: "Text, tables & images", kinds: ["text", "note", "field", "table", "image"] },
-  { key: "fsDrawing", label: "Drawing objects", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "polygon", "maskRegion", "componentMask"] },
+  { key: "fsText", label: "Text, tables & images", kinds: ["text", "note", "field", "table", "image"], sub: [
+    { key: "fsTextObj", label: "Text & note", kinds: ["text", "note", "field"] },
+    { key: "fsTable", label: "Table", kinds: ["table"] },
+    { key: "fsImage", label: "Image", kinds: ["image"] },
+  ] },
+  { key: "fsDrawing", label: "Drawing objects", kinds: ["rectangle", "circle", "ellipse", "arc", "bezier", "line", "polyline", "polygon", "maskRegion", "componentMask"], sub: [
+    { key: "fsDrawLine", label: "Line & polyline", kinds: ["line", "polyline"] },
+    { key: "fsDrawRect", label: "Rectangle", kinds: ["rectangle"] },
+    { key: "fsDrawCircle", label: "Circle & ellipse", kinds: ["circle", "ellipse"] },
+    { key: "fsDrawArc", label: "Arc & bezier", kinds: ["arc", "bezier"] },
+    { key: "fsDrawPoly", label: "Polygon", kinds: ["polygon"] },
+    { key: "fsDrawMask", label: "Keep-out & part mask", kinds: ["maskRegion", "componentMask"] },
+  ] },
 ];
+
+/** Every filter row that can be opened, by row key. */
+export const SCHEM_FILTER_SUB: Record<string, ReadonlyArray<{ key: string; label: string; kinds: readonly string[] }>> =
+  Object.fromEntries(SCHEM_FILTER_ROWS.filter((r) => r.sub).map((r) => [r.key, r.sub!]));
 
 // Object families for the navigator tree — the vocabulary the Objects tab groups
 // by. Finer than SCHEM_FILTER_ROWS on purpose: a filter is a control surface
@@ -516,6 +560,10 @@ export function nextDesignator(objects: CanvasObject[], kind: string): string | 
 export const SCHEM_FILTER_KEY_FOR_KIND: Record<string, string> = Object.fromEntries(
   SCHEM_FILTER_ROWS.flatMap((r) => r.kinds.map((k) => [k, r.key])),
 );
+/** A kind's own switch, where its row was opened into per-entity rows. */
+export const SCHEM_FILTER_SUBKEY_FOR_KIND: Record<string, string> = Object.fromEntries(
+  SCHEM_FILTER_ROWS.flatMap((r) => (r.sub ?? []).flatMap((s) => s.kinds.map((k) => [k, s.key]))),
+);
 
 export const SEL_FILTER_KINDS: Record<string, (kind: string) => boolean> = {
   // schematic
@@ -541,9 +589,12 @@ export function isSelectable(kind: string, bag: Record<string, unknown>, mode?: 
   }
   if (mode === "schematic") {
     // Schematic has its own key filter (SCHEM_FILTER_ROWS); unmapped kinds stay
-    // selectable, and every category defaults ON.
+    // selectable, and every category defaults ON. A kind must pass both its row
+    // and — where the row was opened into per-entity switches — its own.
     const sk = SCHEM_FILTER_KEY_FOR_KIND[kind];
-    return !sk || bag[sk] !== false;
+    if (sk && bag[sk] === false) return false;
+    const sub = SCHEM_FILTER_SUBKEY_FOR_KIND[kind];
+    return !sub || bag[sub] !== false;
   }
   const key = FILTER_KEY_FOR_KIND[kind];
   if (!key) return true;                        // unmapped kinds always selectable
