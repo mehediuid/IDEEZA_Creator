@@ -42,6 +42,20 @@ const FP_3D: Record<string, FpSpec> = {
   fpSOIC8: { bodyW: 22, bodyD: 26, h: 0.42, padW: 7, padD: 9 },
 };
 
+/** The body shape a part gets: its land pattern decides the family, and the
+ *  designator distinguishes the two-terminal parts that share one pattern. */
+function bodyShape(kind: string, desig: string | undefined): Pcb3DShape {
+  const c = (desig ?? "").trim().charAt(0).toUpperCase();
+  if (kind === "fpSOD123" || c === "D") return "diode";
+  if (kind === "fpSOIC8" || kind === "fpSOT23" || c === "U" || c === "IC") return "ic";
+  if (c === "J" || c === "P" || c === "CN") return "connector";
+  // An electrolytic is the one two-terminal part that stands up as a can; the
+  // board can't tell it from an MLCC by land pattern alone, so the designator
+  // does — a bare "C" on a chip pattern stays a chip.
+  if (c === "L") return "can";
+  return "chip";
+}
+
 // Component body colour by designator prefix — reads like the real part.
 function bodyColor(desig: string | undefined): string {
   const c = (desig ?? "").trim().charAt(0).toUpperCase();
@@ -74,9 +88,14 @@ const MATERIAL_LOOK: Record<string, { roughness: number; metalness: number }> = 
 export type Pcb3DTrack = { id: string; x1: number; z1: number; x2: number; z2: number; width: number; top: boolean; color: string };
 export type Pcb3DVia = { id: string; x: number; z: number; outer: number; hole: number };
 export type Pcb3DPad = { id: string; x: number; z: number; w: number; d: number; rot: number };
-export type Pcb3DBody = { id: string; x: number; z: number; w: number; d: number; h: number; rot: number; color: string; label: string };
+/** UIUX-2 — what the part physically looks like, so a resistor, an
+ *  electrolytic, an IC and a diode aren't all the same black box. The shape
+ *  comes from the land pattern and the designator, which is what the board
+ *  actually knows about the part. */
+export type Pcb3DShape = "chip" | "can" | "ic" | "diode" | "connector" | "box";
+export type Pcb3DBody = { id: string; x: number; z: number; w: number; d: number; h: number; rot: number; color: string; label: string; shape: Pcb3DShape };
 export type Pcb3DRegion = { id: string; pts: Array<[number, number]>; top: boolean; color: string };
-export type Pcb3DSilk = { id: string; x: number; z: number; w: number; d: number; rot: number };
+export type Pcb3DSilk = { id: string; x: number; z: number; w: number; d: number; rot: number; label: string };
 
 export type Pcb3DScene = {
   board: {
@@ -259,6 +278,7 @@ export function derivePcbScene(state: PcbState): Pcb3DScene {
         rot,
         color: bodyColor(o.text),
         label: (o.text ?? "").trim(),
+        shape: bodyShape(o.kind, o.text),
       });
       // Silkscreen outline — a white plate slightly larger than the body, so a
       // thin printed border shows around each part (top-silk layer gated).
@@ -270,6 +290,7 @@ export function derivePcbScene(state: PcbState): Pcb3DScene {
           w: sz(spec.bodyW + 6),
           d: sz(spec.bodyD + 6),
           rot,
+          label: (o.text ?? "").trim(),
         });
       }
       if (topVis) {
