@@ -147,7 +147,7 @@ function roundCorners(pts: Pt[], radius: number): Pt[] {
     const bl = Math.hypot(bis.x, bis.y);
     if (bl < 1e-6) { out.push(p); continue; }
     const c = { x: p.x + (bis.x / bl) * (r / Math.sin(theta / 2)), y: p.y + (bis.y / bl) * (r / Math.sin(theta / 2)) };
-    let a1 = Math.atan2(t1.y - c.y, t1.x - c.x);
+    const a1 = Math.atan2(t1.y - c.y, t1.x - c.x);
     const a2 = Math.atan2(t2.y - c.y, t2.x - c.x);
     let sweep = a2 - a1;
     while (sweep > Math.PI) sweep -= 2 * Math.PI;
@@ -158,7 +158,6 @@ function roundCorners(pts: Pt[], radius: number): Pt[] {
       out.push({ x: c.x + r * Math.cos(ang), y: c.y + r * Math.sin(ang) });
     }
     out.push(t2);
-    void a1;
   }
   out.push(pts[pts.length - 1]);
   return out;

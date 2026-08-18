@@ -3394,7 +3394,7 @@ function ImportImageModal() {
   // toggle: the converted result is rendered live beside the original and the
   // two knobs that shape it are on screen.
   const [smooth, setSmooth] = React.useState(0);
-  const [monoSrc, setMonoSrc] = React.useState<string | null>(null);
+  const [monoSrc, setMonoSrc] = React.useState<{ key: string; url: string } | null>(null);
   // UIUX-83 — the schematic has no layers and no silkscreen; the sheet's own
   // dialog asks for millimetres and offers the same reduction as "place the
   // original bitmap or not".
@@ -3490,17 +3490,21 @@ function ImportImageModal() {
     }), [threshold, invert, smooth]);
 
   // Re-run the conversion whenever the source or either knob changes, so the
-  // "after" pane always shows what Place would write.
+  // "after" pane always shows what Place would write. The result is stamped
+  // with the settings that produced it, so a stale render reads as "not ready"
+  // instead of showing the previous cut.
+  const monoKey = `${src ?? ""}|${threshold}|${invert}|${smooth}`;
   React.useEffect(() => {
+    if (!src || !mono) return;
     let live = true;
-    if (!src || !mono) { setMonoSrc(null); return; }
-    void toMono(src).then((u) => { if (live) setMonoSrc(u); });
+    void toMono(src).then((u) => { if (live) setMonoSrc({ key: monoKey, url: u }); });
     return () => { live = false; };
-  }, [src, mono, toMono]);
+  }, [src, mono, toMono, monoKey]);
+  const monoUrl = monoSrc && monoSrc.key === monoKey ? monoSrc.url : null;
 
   const place = async () => {
     if (!src) return;
-    const finalSrc = mono ? monoSrc ?? (await toMono(src)) : src;
+    const finalSrc = mono ? monoUrl ?? (await toMono(src)) : src;
     if (schematic) {
       // The sheet asks for millimetres, so convert to the canvas units the
       // renderer draws in rather than labelling px as mm.
@@ -3602,7 +3606,7 @@ function ImportImageModal() {
                 {schematic ? "Ink conversion" : "Silkscreen conversion"}
               </div>
               <div style={{ display: "flex", gap: "var(--spacing-6)" }}>
-                {([["Original", src], [schematic ? "As ink" : "As silkscreen", monoSrc]] as const).map(([cap, url]) => (
+                {([["Original", src], [schematic ? "As ink" : "As silkscreen", monoUrl]] as const).map(([cap, url]) => (
                   <div key={cap} style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--spacing-3)" }}>
                     <div
                       data-imgpane={cap === "Original" ? "before" : "after"}
