@@ -13,6 +13,7 @@
 // dropdowns.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { DsIcon } from "@/lib/pcb/icons";
 import { toolCommandList } from "@/components/pcb/canvas-area";
 import { saveStatus } from "@/components/pcb/toolbar";
@@ -87,8 +88,34 @@ const saveFor = (label: string | undefined, st: SaveState): SaveState =>
 
 // One dropdown leaf / submenu row — shared by top-level items and their
 // hover flyouts. Pure: every handler is already baked into the item.
-function renderMenuItem(it: MenuItem, idx: number, saveState: SaveState) {
+function MenuRow({ it, idx, saveState }: { it: MenuItem; idx: number; saveState: SaveState }) {
   const save = saveFor(it.label, saveState);
+  // The flyout can't live inside the row: the dropdown panel scrolls (UIUX-41),
+  // and a child at `left: 100%` is clipped by that overflow — which is why no
+  // submenu was reachable at all. It portals to <body> at a fixed position
+  // measured off the row, and clamps into the viewport, per the editor's own
+  // rule that a menu must never clip.
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  const [open, setOpen] = React.useState(false);
+  const [at, setAt] = React.useState<{ left: number; top: number; flip: boolean } | null>(null);
+  const shutRef = React.useRef<number | null>(null);
+  const cancelShut = () => { if (shutRef.current) { window.clearTimeout(shutRef.current); shutRef.current = null; } };
+  React.useEffect(() => cancelShut, []);
+  const openSub = () => {
+    cancelShut();
+    const r = rowRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const W = 236, H = Math.min(420, 44 + (it.sub?.length ?? 0) * 34);
+    const flip = r.right + W + 12 > window.innerWidth;
+    setAt({
+      left: flip ? Math.max(8, r.left - W - 6) : r.right + 6,
+      top: Math.max(8, Math.min(r.top - 8, window.innerHeight - H - 8)),
+      flip,
+    });
+    setOpen(true);
+  };
+  // A short grace period so the pointer can cross the gap into the flyout.
+  const closeSub = () => { cancelShut(); shutRef.current = window.setTimeout(() => setOpen(false), 140); };
   if (it.divider) {
     return (
       <div
@@ -128,10 +155,15 @@ function renderMenuItem(it: MenuItem, idx: number, saveState: SaveState) {
   return (
     <div
       key={idx}
+      ref={rowRef}
       role="menuitem"
       aria-disabled={it.disabled || undefined}
+      aria-haspopup={it.hasSub || undefined}
+      aria-expanded={it.hasSub ? open : undefined}
       className={it.disabled ? undefined : "ix-mi"}
       onClick={it.disabled ? undefined : it.onClick}
+      onMouseEnter={it.hasSub ? openSub : undefined}
+      onMouseLeave={it.hasSub ? closeSub : undefined}
       title={it.disabled ? it.note : it.flagged ? it.note || FLAG_NOTE : undefined}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-4) var(--spacing-6)", borderRadius: "var(--radius-lg)", cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
     >
@@ -155,10 +187,14 @@ function renderMenuItem(it: MenuItem, idx: number, saveState: SaveState) {
         {it.k}
       </span>
 
-      {it.hasSub && (
+      {it.hasSub && open && at && createPortal(
         <div
           className="ix-submenu"
-          style={{ display: "none", position: "absolute", left: "100%", top: -8, marginLeft: "var(--spacing-2)", minWidth: 232, background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-xl)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-3)", zIndex: 62 }}
+          role="menu"
+          data-menu-flyout=""
+          onMouseEnter={cancelShut}
+          onMouseLeave={closeSub}
+          style={{ position: "fixed", left: at.left, top: at.top, minWidth: 232, maxHeight: "calc(100vh - 24px)", overflowY: "auto", overscrollBehavior: "contain", background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-xl)", boxShadow: "var(--elevation-6, 0 16px 40px -8px rgba(0,0,0,.22))", padding: "var(--spacing-3)", zIndex: 80 }}
         >
           {it.sub?.map((su, j) =>
             su.divider ? (
@@ -188,7 +224,8 @@ function renderMenuItem(it: MenuItem, idx: number, saveState: SaveState) {
               </div>
             ),
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -221,7 +258,7 @@ function MenuPanel({ m, alignRight, saveState }: { m: MenuGroup; alignRight?: bo
         animation: "ideeza-pop .16s cubic-bezier(.2,.9,.3,1.2)",
       }}
     >
-      {m.items.map((it, idx) => renderMenuItem(it, idx, saveState))}
+      {m.items.map((it, idx) => <MenuRow key={idx} it={it} idx={idx} saveState={saveState} />)}
     </div>
   );
 }
@@ -277,7 +314,12 @@ export function MenuBar() {
     if (!state.openMenu) return;
     const onDoc = (e: MouseEvent) => {
       const el = containerRef.current;
-      if (el && !el.contains(e.target as Node)) actions.closeAll();
+      const t = e.target as HTMLElement | null;
+      // A submenu is portalled to <body> so the scrolling panel can't clip it,
+      // which puts it outside this container — pressing in one is still inside
+      // the menu, not a click away from it.
+      if (t?.closest?.("[data-menu-flyout]")) return;
+      if (el && t && !el.contains(t)) actions.closeAll();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") actions.closeAll();
