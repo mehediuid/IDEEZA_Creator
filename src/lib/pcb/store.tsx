@@ -671,6 +671,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           .sort((a, b) => b.updatedAt - a.updatedAt);
         if (list.length) patch.recentProjects = list;
       }
+      patch.activeProjectId = window.localStorage.getItem(ACTIVE_PROJECT_KEY);
     } catch {}
     if (Object.keys(patch).length) setState((s) => ({ ...s, ...patch }));
     setDocHydrated(true);

@@ -626,6 +626,8 @@ export interface PcbState {
   /** #110 — Ratsnest (airwire) visibility, driven from the top toolbar. */
   showRatsnest: boolean;
   recentProjects: { id: string; slug: string; name: string; updatedAt: number }[];
+  /** Which of them is open — lets the title block name the project (UIUX-68). */
+  activeProjectId: string | null;
   saveState: "saved" | "saving" | "dirty" | "failed";
   lastSavedAt: number | null;
   /** Imported glTF/GLB models shown in the 3D view (session-only — the parsed
@@ -1712,6 +1714,7 @@ export const initialState: PcbState = {
   pourOnClose: false,
   showRatsnest: true,
   recentProjects: [],
+  activeProjectId: null,
   saveState: "saved",
   lastSavedAt: null,
   importedModels: [],

@@ -198,7 +198,12 @@ export function SchematicCanvas() {
           width={titleW}
           right={titleRight}
           bottom={titleBottom}
-          fields={tFields} sheetSize={`${b.size} ${b.orientation}`}/>
+          fields={tFields}
+          sheetSize={`${b.size} ${b.orientation}`}
+          // Project defaults to the project actually open, so the card names it
+          // instead of dropping the row when nobody typed one (UIUX-68).
+          projectName={(state.recentProjects.find((p) => p.id === state.activeProjectId) || {}).name}
+        />
       )}
     </div>
   );
@@ -229,12 +234,14 @@ function TitleBlock({
   bottom,
   fields,
   sheetSize,
+  projectName,
 }: {
   width: number;
   right: boolean;
   bottom: boolean;
   fields: Array<{ key: string; on: boolean; valueOn: boolean; value: string }>;
   sheetSize?: string;
+  projectName?: string;
 }) {
   const title = findValue(fields, "title", "") || "Untitled Board";
   const docNo = findValue(fields, "docNo", "");
@@ -247,12 +254,23 @@ function TitleBlock({
   // Sheet size is not stored on the field — it *is* the border's paper size.
   const sizeOn = fields.some((f) => f.key === "sheetSize" && f.on);
 
-  const meta: string[] = [];
-  if (rev && rev !== "—") meta.push(`Rev ${rev}`);
-  if (sheetNo && sheetNo !== "—") meta.push(sheetNo);
-  if (docNo && docNo !== "—") meta.push(docNo);
-  if (sizeOn && sheetSize) meta.push(sheetSize);
-  if (date && date !== "—") meta.push(date);
+  // UIUX-68 — every value carries its own label. The card used to print a dense
+  // unlabelled strip ("Ayaan K. · Rev C 1/2 SB-001 A4 Landscape 2026-07-16"), so
+  // a reader had to already know the schema to tell a doc number from a date,
+  // and Project never showed at all.
+  const has = (v: string) => !!v && v !== "—" && v !== "-";
+  const rows: Array<[string, string]> = [];
+  // Company is a labelled value, not the header: the header printed the company
+  // *or* "IDEEZA" as a fallback, so an unset company read as our branding.
+  if (has(company)) rows.push(["Company", company]);
+  const projectValue = has(project) ? project : projectName;
+  if (has(projectValue || "")) rows.push(["Project", projectValue!]);
+  if (has(author)) rows.push(["Author", author]);
+  if (has(docNo)) rows.push(["Doc No.", docNo]);
+  if (has(rev)) rows.push(["Revision", rev]);
+  if (has(sheetNo)) rows.push(["Sheet", sheetNo]);
+  if (has(date)) rows.push(["Date", date]);
+  if (sizeOn && sheetSize) rows.push(["Size", sheetSize]);
 
   return (
     <div
@@ -277,27 +295,42 @@ function TitleBlock({
           <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-text-on-brand)"><path d="M6 4l14 8-14 8z" /></svg>
         </span>
         <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-violet-600)", letterSpacing: 0.2 }}>
-          {company && company !== "—" ? company : "IDEEZA"}
+          IDEEZA
         </span>
       </div>
 
-      {/* board name + subtitle */}
+      {/* sheet title — the one value big enough to read as the heading */}
       <div>
-        <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={title}>
           {title}
         </div>
-        <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {[project && project !== "—" ? project : null, author && author !== "—" ? author : null, "schematic"]
-            .filter(Boolean)
-            .join(" · ")}
-        </div>
+        <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>Schematic sheet</div>
       </div>
 
-      {/* meta row */}
-      {meta.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", flexWrap: "wrap", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", paddingTop: "var(--spacing-3)" }}>
-          {meta.map((m, i) => (
-            <span key={i} style={{ fontSize: "var(--font-size-xs)", fontWeight: 500, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>{m}</span>
+      {/* the rest as label / value pairs, the way a real title block reads */}
+      {rows.length > 0 && (
+        <div
+          data-title-block-fields
+          style={{
+            display: "grid",
+            gridTemplateColumns: "auto 1fr",
+            columnGap: "var(--spacing-5)",
+            rowGap: 2,
+            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
+            paddingTop: "var(--spacing-3)",
+          }}
+        >
+          {rows.map(([label, value]) => (
+            <React.Fragment key={label}>
+              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>{label}</span>
+              <span
+                data-field={label}
+                title={value}
+                style={{ fontSize: "var(--font-size-xs)", fontWeight: 500, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {value}
+              </span>
+            </React.Fragment>
           ))}
         </div>
       )}
