@@ -216,11 +216,17 @@ export const GLYPHS: Record<string, React.ReactNode> = {
       <rect x={-7} y={-5} width={14} height={10} rx={1} />
     </g>
   ),
+  // UIUX-36 — the tag is fused to the wire it marks: the object's origin sits
+  // ON the conductor, a filled junction dot lands there, and a stem carries the
+  // tag body above it. It used to be a free-floating ")=(" that gave no clue
+  // which line it belonged to. The body is our own shape, not a copy: a tag
+  // with the two rails of a pair drawn inside it.
   diffPairFlag: (
-    <g stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" fill="none">
-      <path d="M-13 -7a11 11 0 0 1 0 14" />
-      <path d="M13 -7a11 11 0 0 0 0 14" />
-      <path d="M-7 -3h14M-7 3h14" strokeWidth={1.3} opacity={0.7} />
+    <g stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <circle cx={0} cy={0} r={2.6} fill="currentColor" stroke="none" />
+      <path d="M0 0v-9" />
+      <path d="M-13 -23h26a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H2l-2 2-2-2h-11a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z" />
+      <path d="M-8 -19.5h16M-8 -15.5h16" strokeWidth={1.4} opacity={0.75} />
     </g>
   ),
   reuseBlock: (

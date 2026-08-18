@@ -90,7 +90,10 @@ export const ic: Record<string, string> = {
   pwrPgnd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v9M4.5 13h15"/><path d="M7 13l-2.5 5M12 13l-2.5 5M17 13l-2.5 5"/></svg>',
   // Diff-pair *tag* — the pair plus the flag that names it (the pair tool keeps
   // the plain two-rail glyph).
-  pDiffFlag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h10M3 18h10"/><path d="M13 16V4h8l-3 3.5L21 11h-8"/></svg>',
+  // The tag, drawn the way it really lands: a pair of rails, a junction dot on
+  // the conductor and a stem carrying the tag body. The old glyph was a pennant
+  // on a pole, which is the shape EasyEDA uses (UIUX-36).
+  pDiffFlag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 17h20M2 21h20"/><circle cx="9" cy="17" r="1.7" fill="currentColor" stroke="none"/><path d="M9 17v-3"/><rect x="3.5" y="3" width="17" height="11" rx="2"/><path d="M7 7h10M7 10.5h10" stroke-width="1.3" opacity="0.75"/></svg>',
   // Keep-out — an area routing may not enter.
   pKeepout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5" stroke-dasharray="3 2.4"/><path d="M8 15l8-6" stroke-linecap="round"/></svg>',
   // Part mask — a masked-off component body.

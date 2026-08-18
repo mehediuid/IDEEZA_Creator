@@ -29,6 +29,33 @@ const DRAG_THRESHOLD = 4;
 
 // Net-naming symbols that should hug the conductor they label.
 const LABEL_TOOLS = new Set(["netLabel", "globalLabel", "hierLabel", "netBusLabel", "netFlag"]);
+// The diff-pair tag snaps to the same nodes but is NOT lifted off them: it is
+// drawn fused to the conductor, so its origin has to land on the wire (UIUX-36).
+const ATTACHED_TOOLS = new Set(["diffPairFlag"]);
+/** Nearest point on any wire within `tol`, or null — the anchor for a tag that
+ *  is drawn fused to the conductor (UIUX-36). */
+function nearestOnWire(
+  objects: readonly import("@/lib/pcb/types").CanvasObject[],
+  x: number,
+  y: number,
+  tol: number,
+): { x: number; y: number } | null {
+  let best: { x: number; y: number } | null = null;
+  let bestD = tol;
+  for (const o of objects) {
+    if (o.kind !== "wire" || o.endX == null || o.endY == null) continue;
+    const dx = o.endX - o.x;
+    const dy = o.endY - o.y;
+    const len2 = dx * dx + dy * dy;
+    if (!len2) continue;
+    const u = Math.max(0, Math.min(1, ((x - o.x) * dx + (y - o.y) * dy) / len2));
+    const px = o.x + u * dx;
+    const py = o.y + u * dy;
+    const d = Math.hypot(x - px, y - py);
+    if (d < bestD) { bestD = d; best = { x: px, y: py }; }
+  }
+  return best;
+}
 const LABEL_LIFT = 10; // px above the node — must stay < nets.ts CLUSTER_TOL (13)
 
 
@@ -1136,6 +1163,15 @@ export function CanvasArea() {
             if (LABEL_TOOLS.has(state.tool)) {
               const sp = snapPoint(cx, cy);
               actions.placeObject(state.tool, sp.x, sp.snapped ? sp.y - LABEL_LIFT : sp.y);
+              return;
+            }
+            if (ATTACHED_TOOLS.has(state.tool)) {
+              // You tag a pair mid-span, not at its ends, so this projects onto
+              // the nearest conductor rather than snapping to pins and grid —
+              // otherwise the tag lands a few px off and the "attachment" lies.
+              const onWire = nearestOnWire(state.objects, cx, cy, 18);
+              const sp = onWire ?? snapPoint(cx, cy);
+              actions.placeObject(state.tool, sp.x, sp.y);
               return;
             }
             actions.placeObject(state.tool, cx, cy);
