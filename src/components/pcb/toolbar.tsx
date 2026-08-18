@@ -810,7 +810,13 @@ const PCB_ESSENTIAL: Item[] = [
   // variants, which only the palette's flyout can carry.)
   { kind: "icon", key: "tPad", tool: "pad", label: "Pad" },
   { kind: "icon", key: "tVia", tool: "via", label: "Via" },
-  { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Fill Region" },
+  { kind: "icon", key: "tFillArea", tool: "fillRegion", label: "Fill Area" },
+  // UIUX-85 — Board Outline and Routing asked for on the main bar. These arm
+  // the variant you reach for most (rectangle outline, single track); the other
+  // shapes and the diff-pair/length-tuning rows stay on the palette's flyouts,
+  // which a toolbar button can't carry.
+  { kind: "icon", key: "tBoardOutline", tool: "boardOutlineRect", label: "Board Outline (rectangle) — more shapes on the left palette" },
+  { kind: "icon", key: "tTrack", tool: "track", label: "Routing (single track) — diff-pair and tuning on the left palette" },
   { kind: "icon", key: "tRatsnest", action: "toggleRatsnest", label: "Ratsnest" },
   { kind: "div" },
   { kind: "icon", key: "tAutoRoute", action: "openAutoRoute", label: "Auto Route" },
