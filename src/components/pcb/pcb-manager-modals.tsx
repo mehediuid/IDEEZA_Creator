@@ -17,7 +17,7 @@ import {
 import { Icon } from "@/lib/pcb/icons";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import type { ModalId } from "@/lib/pcb/types";
-import { ListPanel, EmptyResults, TransferArrows, ModalTabBar, FilterInput } from "@/components/pcb/modal-kit";
+import { EmptyResults, FilterInput, RailAction } from "@/components/pcb/modal-kit";
 import { PCB_RULE_TREE, CLEARANCE_COLS, defaultClearanceRows, type ClearanceRow } from "@/lib/pcb/design-rules-data";
 import { rulesToDrcConfig } from "@/lib/pcb/drc-rules-map";
 import { diffPairStats, defaultPcbDrcConfig } from "@/lib/pcb/drc";
@@ -358,77 +358,212 @@ function LayerManagerModal() {
 // PDF spec: left Classes/Groups list (filter, +Add/×Delete), middle "Not
 // Selected" nets, transfer arrows, right "Selected" nets, footer Apply/
 // Confirm/Cancel. Only the title differs between the two managers.
-function TransferManagerBody({
+// ── Group workbench — the shared shell behind Net Classes, Matched Length
+// Groups and Pin Pair Groups (UIUX-49/50/51) ─────────────────────────────────
+// The three used to share a dual-list transfer dialog: a group list with +/−,
+// then "Not Selected" and "Selected" columns with arrows between them. That
+// makes you hold the question "where is this net?" in your head while you
+// shuttle names across two columns, and it scales badly — a board with 200
+// nets is 200 rows you have to hunt through twice.
+//
+// The workbench inverts it: **one list of every member, each row carrying the
+// group it belongs to.** No second column, no arrows, no per-column filters.
+// Membership is a per-row control, so the answer to "where is this net?" is on
+// the row itself, and a group can never silently hold the same net twice —
+// assigning to another group moves it.
+type WbGroup = { id: string; name: string; meta: string };
+type WbMember = { id: string; label: string; sub?: string };
+
+function GroupWorkbench({
   title,
+  subtitle,
+  memberNoun,
   groups,
-  assignedOf,
+  members,
+  groupOf,
+  onAssign,
   onAdd,
   onDelete,
-  onAssign,
+  addLabel,
+  unassignedLabel = "Unassigned",
+  removeMeansDelete,
+  composer,
+  emptyHint,
 }: {
   title: string;
-  groups: { id: string; name: string }[];
-  assignedOf: (id: string) => string[];
+  subtitle: string;
+  memberNoun: string;
+  groups: WbGroup[];
+  members: WbMember[];
+  groupOf: (memberId: string) => string | null;
+  onAssign: (memberId: string, groupId: string | null) => void;
   onAdd: () => void;
   onDelete: (id: string) => void;
-  onAssign: (id: string, nets: string[]) => void;
+  addLabel: string;
+  unassignedLabel?: string;
+  removeMeansDelete?: boolean;
+  composer?: React.ReactNode;
+  emptyHint: string;
 }) {
-  const state = usePcbState();
   const actions = usePcbActions();
-  const allNets = React.useMemo(() => {
-    const names = new Set<string>(state.pcbNets.map((n) => n.name));
-    for (const o of state.objects) if (o.net) names.add(o.net);
-    return [...names];
-  }, [state.pcbNets, state.objects]);
+  const [query, setQuery] = React.useState("");
+  // The rail is a filter over one list, not a second place to stand: "All"
+  // shows every member, a group shows its own, "Unassigned" shows the rest.
+  const [scope, setScope] = React.useState<string | null>(null); // null = all
 
-  const [selGroup, setSelGroup] = React.useState<string | null>(groups[0]?.id ?? null);
-  const [pickLeft, setPickLeft] = React.useState<string | null>(null);
-  const [pickRight, setPickRight] = React.useState<string | null>(null);
-  const group = groups.find((g) => g.id === selGroup) ?? null;
-  const assigned = group ? assignedOf(group.id) : [];
-  const notSelected = allNets.filter((n) => !assigned.includes(n));
+  const counts = React.useMemo(() => {
+    const by: Record<string, number> = {};
+    let free = 0;
+    for (const m of members) {
+      const g = groupOf(m.id);
+      if (g) by[g] = (by[g] ?? 0) + 1;
+      else free++;
+    }
+    return { by, free };
+  }, [members, groupOf]);
 
-  const moveRight = () => {
-    if (!group || !pickLeft) return;
-    onAssign(group.id, [...assigned, pickLeft]);
-    setPickLeft(null);
-  };
-  const moveLeft = () => {
-    if (!group || !pickRight) return;
-    onAssign(group.id, assigned.filter((n) => n !== pickRight));
-    setPickRight(null);
+  const shown = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return members.filter((m) => {
+      const g = groupOf(m.id);
+      if (scope === "__free" ? g !== null : scope !== null && g !== scope) return false;
+      return !q || m.label.toLowerCase().includes(q) || (m.sub ?? "").toLowerCase().includes(q);
+    });
+  }, [members, groupOf, scope, query]);
+
+  const assignedTotal = members.length - counts.free;
+
+  const scopeRow = (key: string | null, label: string, meta: string, count: number) => {
+    const on = scope === key;
+    return (
+      <button
+        key={key ?? "__all"}
+        type="button"
+        onClick={() => setScope(key)}
+        aria-pressed={on}
+        className="ix-row"
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: "var(--spacing-4)",
+          padding: "var(--spacing-4) var(--spacing-5)", borderRadius: "var(--radius-md)",
+          border: "none", background: on ? "var(--color-bg-brand-subtle)" : "transparent",
+          cursor: "pointer", textAlign: "left", font: "inherit",
+        }}
+      >
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: "var(--font-size-sm)", fontWeight: on ? 700 : 600, color: on ? "var(--color-text-brand)" : "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {label}
+          </span>
+          <span style={{ display: "block", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {meta}
+          </span>
+        </span>
+        <span style={{ flex: "0 0 auto", fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+          {count}
+        </span>
+      </button>
+    );
   };
 
   return (
     <Overlay>
-      <Card width={860}>
-        <Header title={title} onClose={actions.closeModal} />
-        <div style={{ flex: 1, display: "flex", gap: 14, padding: "16px 24px", minHeight: 340 }}>
-          <div style={{ width: 220, flex: "0 0 auto", display: "flex" }}>
-            <ListPanel
-              title="Classes"
-              items={groups.map((g) => g.name)}
-              selected={group?.name ?? null}
-              onSelect={(name) => setSelGroup(groups.find((g) => g.name === name)?.id ?? null)}
-              height={256}
-              headerRight={
-                <span style={{ display: "inline-flex", gap: 4 }}>
-                  <RowBtn onClick={onAdd} icon={PLUS_SVG} title="Add" />
-                  <RowBtn onClick={() => { if (group) { onDelete(group.id); setSelGroup(null); } }} icon={MINUS_SVG} title="Delete selected" />
-                </span>
-              }
-            />
-          </div>
-          <ListPanel title="Not Selected" items={notSelected} selected={pickLeft} onSelect={setPickLeft} height={256} />
-          <TransferArrows onRight={moveRight} onLeft={moveLeft} />
-          <ListPanel title="Selected" items={assigned} selected={pickRight} onSelect={setPickRight} height={256} />
+      <Card width={880} maxHeight="88%">
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--spacing-6)", padding: "18px 24px 14px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)" }}>{title}</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>{subtitle}</span>
+          </span>
+          <IconButton hierarchy="ghost" size="sm" aria-label="Close" onClick={actions.closeModal} icon={<Icon html={CLOSE_SVG} />} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          {/* Assignment is live (each move writes the store), so there is no
+
+        <div style={{ flex: 1, display: "flex", minHeight: 320, overflow: "hidden" }}>
+          {/* Groups — cards that say what the group actually sets, and double as
+              the filter over the one member list. */}
+          <div style={{ width: 236, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", display: "flex", flexDirection: "column" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4)" }}>
+              {scopeRow(null, "All", `every ${memberNoun} on the board`, members.length)}
+              {groups.map((g) => (
+                <div key={g.id} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  {scopeRow(g.id, g.name, g.meta, counts.by[g.id] ?? 0)}
+                  <button
+                    type="button"
+                    aria-label={`Delete ${g.name}`}
+                    title={`Delete ${g.name}`}
+                    onClick={() => { onDelete(g.id); if (scope === g.id) setScope(null); }}
+                    style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: "var(--radius-sm)", background: "var(--color-bg-surface)", color: "var(--color-text-tertiary)", cursor: "pointer", padding: 0, opacity: 0, transition: "opacity .12s" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}
+                    onFocus={(e) => (e.currentTarget.style.opacity = "1")}
+                    onBlur={(e) => (e.currentTarget.style.opacity = "0")}
+                  >
+                    <Icon html={CLOSE_SVG} size={11} />
+                  </button>
+                </div>
+              ))}
+              {counts.free > 0 && scopeRow("__free", unassignedLabel, `not in any group yet`, counts.free)}
+            </div>
+            <div style={{ padding: "var(--spacing-4)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+              <Button hierarchy="secondary" size="sm" onClick={onAdd} style={{ width: "100%" }}>{addLabel}</Button>
+            </div>
+          </div>
+
+          {/* One list of members, each row carrying its own membership control. */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "var(--spacing-5) var(--spacing-7) var(--spacing-4)", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "var(--spacing-5)" }}>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${memberNoun}s`}
+                aria-label={`Search ${memberNoun}s`}
+                style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+              />
+              {composer}
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 var(--spacing-7) var(--spacing-6)" }}>
+              {shown.length === 0 ? (
+                <div style={{ padding: "var(--spacing-12)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", lineHeight: 1.6 }}>
+                  {query.trim() ? `No ${memberNoun} matches “${query.trim()}”.` : emptyHint}
+                </div>
+              ) : (
+                shown.map((m) => {
+                  const g = groupOf(m.id);
+                  return (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "7px 2px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</span>
+                        {m.sub && <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>{m.sub}</span>}
+                      </span>
+                      <select
+                        value={g ?? ""}
+                        aria-label={`Group for ${m.label}`}
+                        onChange={(e) => onAssign(m.id, e.target.value || null)}
+                        style={{
+                          flex: "0 0 auto", width: 168, padding: "5px 8px",
+                          border: "var(--border-width-1) solid var(--color-border-default)",
+                          borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)",
+                          fontFamily: "inherit", background: "var(--color-bg-surface)",
+                          color: g ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
+                          outline: "none",
+                        }}
+                      >
+                        <option value="">{removeMeansDelete ? "— remove —" : unassignedLabel}</option>
+                        {groups.map((gr) => (
+                          <option key={gr.id} value={gr.id}>{gr.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-6) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          {/* Assignment is live (each pick writes the store), so there is no
               "Apply" to fake — what the dialog offers instead is running the
-              check that now reads these lists. */}
+              check that now reads these groups. */}
           <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
-            {group ? `${group.name}: ${assigned.length} net${assigned.length === 1 ? "" : "s"} assigned · saved as you go` : "Pick a class to assign nets"}
+            {assignedTotal} of {members.length} {memberNoun}{members.length === 1 ? "" : "s"} grouped · saved as you go
           </span>
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-5)" }}>
             <Button hierarchy="secondary" size="md" onClick={() => { actions.closeModal(); actions.runDrcCheck(); }}>Check now</Button>
@@ -440,17 +575,46 @@ function TransferManagerBody({
   );
 }
 
+/** Every net on the board, whatever it came from. */
+function useBoardNets() {
+  const state = usePcbState();
+  return React.useMemo(() => {
+    const names = new Set<string>(state.pcbNets.map((n) => n.name));
+    for (const o of state.objects) if (o.net) names.add(o.net);
+    return [...names];
+  }, [state.pcbNets, state.objects]);
+}
+
 function NetClassManagerModal() {
   const state = usePcbState();
   const actions = usePcbActions();
+  const nets = useBoardNets();
+  const classes = state.pcbNetClasses;
+  const classOf = React.useCallback(
+    (net: string) => classes.find((c) => (c.nets ?? []).includes(net))?.id ?? null,
+    [classes],
+  );
   return (
-    <TransferManagerBody
-      title="Net Class Manager"
-      groups={state.pcbNetClasses}
-      assignedOf={(id) => state.pcbNetClasses.find((c) => c.id === id)?.nets ?? []}
+    <GroupWorkbench
+      title="Net classes"
+      subtitle="A class states the track width and via size its nets must be routed with."
+      memberNoun="net"
+      addLabel="New class"
+      groups={classes.map((c) => ({ id: c.id, name: c.name, meta: `${c.trackWidth} mil track · ${c.viaSize} mil via` }))}
+      members={nets.map((n) => ({ id: n, label: n }))}
+      groupOf={classOf}
+      onAssign={(net, classId) => {
+        // A net belongs to one class — picking another moves it rather than
+        // leaving the same name sitting in two lists.
+        for (const c of classes) {
+          const has = (c.nets ?? []).includes(net);
+          if (c.id === classId && !has) actions.setNetClassField(c.id, { nets: [...(c.nets ?? []), net] });
+          else if (c.id !== classId && has) actions.setNetClassField(c.id, { nets: (c.nets ?? []).filter((n) => n !== net) });
+        }
+      }}
       onAdd={actions.addNetClass}
       onDelete={actions.removeNetClass}
-      onAssign={(id, nets) => actions.setNetClassField(id, { nets })}
+      emptyHint="No nets on the board yet — convert the schematic or route some copper first."
     />
   );
 }
@@ -804,14 +968,31 @@ function AutoCreateDiffPairDialog({ onClose }: { onClose: () => void }) {
 function EqualLengthManagerModal() {
   const state = usePcbState();
   const actions = usePcbActions();
+  const nets = useBoardNets();
+  const groups = state.pcbEqualLength;
+  const groupOf = React.useCallback(
+    (net: string) => groups.find((g) => (g.nets ?? []).includes(net))?.id ?? null,
+    [groups],
+  );
   return (
-    <TransferManagerBody
-      title="Equal Length Group Manager"
-      groups={state.pcbEqualLength}
-      assignedOf={(id) => state.pcbEqualLength.find((g) => g.id === id)?.nets ?? []}
+    <GroupWorkbench
+      title="Matched length groups"
+      subtitle="Every net in a group has to land inside the same length window."
+      memberNoun="net"
+      addLabel="New group"
+      groups={groups.map((g) => ({ id: g.id, name: g.name, meta: `${g.target} ± ${g.tolerance} mil` }))}
+      members={nets.map((n) => ({ id: n, label: n }))}
+      groupOf={groupOf}
+      onAssign={(net, groupId) => {
+        for (const g of groups) {
+          const has = (g.nets ?? []).includes(net);
+          if (g.id === groupId && !has) actions.setEqualLengthField(g.id, { nets: [...(g.nets ?? []), net] });
+          else if (g.id !== groupId && has) actions.setEqualLengthField(g.id, { nets: (g.nets ?? []).filter((n) => n !== net) });
+        }
+      }}
       onAdd={actions.addEqualLengthGroup}
       onDelete={actions.removeEqualLengthGroup}
-      onAssign={(id, nets) => actions.setEqualLengthField(id, { nets })}
+      emptyHint="No nets on the board yet — convert the schematic or route some copper first."
     />
   );
 }
@@ -829,159 +1010,136 @@ function PadPairManagerModal() {
   const state = usePcbState();
   const actions = usePcbActions();
   const groups = state.pcbPadPairs;
-  const [selGroup, setSelGroup] = React.useState<string | null>(groups[0]?.id ?? null);
-  const [netFilter, setNetFilter] = React.useState("All nets");
   const [pad1, setPad1] = React.useState("");
   const [pad2, setPad2] = React.useState("");
-  const [selFilter, setSelFilter] = React.useState("");
-  const group = groups.find((g) => g.id === selGroup) ?? null;
-  const pairs = group ? parsePadPairs(group.pads) : [];
+  const [into, setInto] = React.useState<string>(groups[0]?.id ?? "");
 
   // Pads on the board: placed pad objects (P1…Pn) plus their nets.
+  // `name` is what the user reads, `key` is what gets stored — the DRC resolves
+  // the key, so reordering the board can't repoint a pair.
   const pads = React.useMemo(
     () =>
       state.objects
         .filter((o) => o.kind === "pad")
-        // `name` is what the user reads, `key` is what gets stored — the DRC
-        // resolves the key, so reordering the board can't repoint a pair.
         .map((o, i) => ({ name: o.text || `P${i + 1}`, key: o.id, net: o.net ?? "" })),
     [state.objects],
   );
-  const nets = ["All nets", ...new Set(pads.map((p) => p.net).filter(Boolean))];
-  const visiblePads = pads.filter((p) => netFilter === "All nets" || p.net === netFilter);
+  const padName = React.useCallback(
+    (key: string) => {
+      const p = pads.find((x) => x.key === key);
+      return p ? p.name : key;
+    },
+    [pads],
+  );
+  const padNet = React.useCallback(
+    (key: string) => pads.find((x) => x.key === key)?.net ?? "",
+    [pads],
+  );
 
-  const pickPad = (which: 1 | 2) => {
-    // Canvas pick placeholder: cycles through the available pads for now.
-    if (visiblePads.length === 0) {
-      actions.flashToast("No pads on the board yet — place pads first");
-      return;
+  // Unlike nets, a pin pair doesn't exist until you make one — so the member
+  // list is every pair already on the board and the composer above it is how a
+  // new one is born. Moving it between groups is then the same row control the
+  // other two managers use.
+  const members = React.useMemo(() => {
+    const out: WbMember[] = [];
+    const seen = new Set<string>();
+    for (const g of groups) {
+      for (const entry of parsePadPairs(g.pads)) {
+        if (seen.has(entry)) continue;
+        seen.add(entry);
+        const [a, b] = entry.split(" - ");
+        const nets = [padNet(a), padNet(b)].filter(Boolean);
+        out.push({
+          id: entry,
+          label: `${padName(a)} ↔ ${padName(b)}`,
+          sub: nets.length ? [...new Set(nets)].join(" · ") : undefined,
+        });
+      }
     }
-    const cur = which === 1 ? pad1 : pad2;
-    const idx = (visiblePads.findIndex((p) => p.key === cur) + 1) % visiblePads.length;
-    (which === 1 ? setPad1 : setPad2)(visiblePads[idx].key);
-  };
+    return out;
+  }, [groups, padName, padNet]);
+
+  const groupOf = React.useCallback(
+    (entry: string) => groups.find((g) => parsePadPairs(g.pads).includes(entry))?.id ?? null,
+    [groups],
+  );
 
   const addPair = () => {
-    if (!group) {
-      actions.flashToast("Select a group first");
-      return;
-    }
     if (!pad1 || !pad2 || pad1 === pad2) {
       actions.flashToast("Pick two different pads");
       return;
     }
-    const entry = `${pad1} - ${pad2}`;
-    if (pairs.includes(entry)) {
-      actions.flashToast("Pair already in the group");
+    const target = groups.find((g) => g.id === into) ?? groups[0];
+    if (!target) {
+      actions.flashToast("Make a group first");
       return;
     }
-    actions.setPadPairField(group.id, { pads: [...pairs, entry].join("; ") });
+    const entry = `${pad1} - ${pad2}`;
+    if (groups.some((g) => parsePadPairs(g.pads).includes(entry))) {
+      actions.flashToast("That pair is already in a group");
+      return;
+    }
+    actions.setPadPairField(target.id, { pads: [...parsePadPairs(target.pads), entry].join("; ") });
     setPad1("");
     setPad2("");
   };
-  const removePair = (entry: string) => {
-    if (!group) return;
-    actions.setPadPairField(group.id, { pads: pairs.filter((p) => p !== entry).join("; ") });
-  };
 
-  // PDF #16-17: each pad is set by picking from the dropdown OR by the
-  // "select pad(s)" canvas-pick button.
-  const padField = (label: string, value: string, setValue: (v: string) => void, pick: () => void) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)" }}>{label}:</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <select
-          value={value}
-          aria-label={label}
-          onChange={(e) => setValue(e.target.value)}
-          style={{ flex: 1, minWidth: 0, padding: "6px 10px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontFamily: "inherit", color: value ? "var(--color-text-primary)" : "var(--color-text-tertiary)", background: "var(--color-bg-surface)", outline: "none" }}
-        >
-          <option value="">— pick pad —</option>
-          {visiblePads.map((p) => (
-            <option key={p.key} value={p.key}>{p.name}{p.net ? ` (${p.net})` : ""}</option>
-          ))}
-        </select>
-        {value && <RowBtn onClick={() => setValue("")} icon={MINUS_SVG} title={`Clear ${label}`} />}
-      </div>
-      <Button hierarchy="secondary" size="sm" onClick={pick}>select pad(s)</Button>
+  const padSelect = (label: string, value: string, setValue: (v: string) => void) => (
+    <select
+      value={value}
+      aria-label={label}
+      onChange={(e) => setValue(e.target.value)}
+      style={{ flex: 1, minWidth: 0, padding: "5px 8px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontFamily: "inherit", color: value ? "var(--color-text-primary)" : "var(--color-text-tertiary)", background: "var(--color-bg-surface)", outline: "none" }}
+    >
+      <option value="">{label}</option>
+      {pads.map((p) => (
+        <option key={p.key} value={p.key}>{p.name}{p.net ? ` (${p.net})` : ""}</option>
+      ))}
+    </select>
+  );
+
+  const composer = (
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-4)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}>
+      {padSelect("Pad 1", pad1, setPad1)}
+      <span style={{ flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>↔</span>
+      {padSelect("Pad 2", pad2, setPad2)}
+      <select
+        value={into}
+        aria-label="Add to group"
+        onChange={(e) => setInto(e.target.value)}
+        style={{ flex: "0 0 auto", width: 128, padding: "5px 8px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", fontFamily: "inherit", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none" }}
+      >
+        {groups.map((g) => (
+          <option key={g.id} value={g.id}>{g.name}</option>
+        ))}
+      </select>
+      <Button hierarchy="secondary" size="sm" onClick={addPair} disabled={!pad1 || !pad2 || pad1 === pad2 || !groups.length}>Add pair</Button>
     </div>
   );
 
   return (
-    <Overlay>
-      <Card width={880}>
-        <Header title="Pad Pair Group Manager" onClose={actions.closeModal} />
-        <div style={{ flex: 1, display: "flex", gap: 14, padding: "16px 24px", minHeight: 340 }}>
-          {/* Groups + add/delete */}
-          <div style={{ width: 210, flex: "0 0 auto", display: "flex" }}>
-            <ListPanel
-              title="Groups"
-              items={groups.map((g) => g.name)}
-              selected={group?.name ?? null}
-              onSelect={(name) => setSelGroup(groups.find((g) => g.name === name)?.id ?? null)}
-              height={256}
-              headerRight={
-                <span style={{ display: "inline-flex", gap: 4 }}>
-                  <RowBtn onClick={actions.addPadPair} icon={PLUS_SVG} title="Add group" />
-                  <RowBtn onClick={() => { if (group) { actions.removePadPair(group.id); setSelGroup(null); } }} icon={MINUS_SVG} title="Delete selected group" />
-                </span>
-              }
-            />
-          </div>
-
-          {/* Pad picker */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", padding: 12 }}>
-            <DsSelect
-              size="sm"
-              value={netFilter}
-              onChange={setNetFilter}
-              options={nets.map((n) => ({ label: n, value: n }))}
-            />
-            {padField("Pad1", pad1, setPad1, () => pickPad(1))}
-            {padField("Pad2", pad2, setPad2, () => pickPad(2))}
-          </div>
-
-          {/* > add + Selected pairs */}
-          <div style={{ display: "flex", alignItems: "center", flex: "0 0 auto" }}>
-            <button type="button" aria-label="Add pair to group" title="Add pair to group" onClick={addPair} style={{ width: 34, height: 30, border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>
-              &gt;
-            </button>
-          </div>
-          <div style={{ width: 250, flex: "0 0 auto", display: "flex", flexDirection: "column", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-            <div style={{ padding: "8px 10px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", background: "var(--color-bg-subtle)", fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-              Selected
-            </div>
-            <div style={{ padding: "8px 10px 4px" }}>
-              <FilterInput value={selFilter} onChange={setSelFilter} ariaLabel="Filter selected pairs" />
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "4px 6px 8px" }}>
-              {pairs.filter((p) => p.toLowerCase().includes(selFilter.toLowerCase())).length === 0 ? (
-                <EmptyResults />
-              ) : (
-                pairs
-                  .filter((p) => p.toLowerCase().includes(selFilter.toLowerCase()))
-                  .map((p) => (
-                    <div key={p} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "5px 8px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                      <RowBtn onClick={() => removePair(p)} icon={MINUS_SVG} title={`Remove ${p}`} />
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
-          {/* Adding and removing a pair already writes the group, so there is
-              nothing for an Apply to apply and nothing for a Cancel to revert.
-              What the user still needs is to see the rule bite. */}
-          <span style={{ marginRight: "auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
-            Groups save as you edit them.
-          </span>
-          <Button hierarchy="secondary" size="md" onClick={() => { actions.runDrcCheck(); actions.closeModal(); }}>Check now</Button>
-          <Button hierarchy="primary" size="md" onClick={actions.closeModal}>Done</Button>
-        </div>
-      </Card>
-    </Overlay>
+    <GroupWorkbench
+      title="Pin pair groups"
+      subtitle="Each pair of pads in a group is routed to the same spacing."
+      memberNoun="pin pair"
+      addLabel="New group"
+      groups={groups.map((g) => ({ id: g.id, name: g.name, meta: `${g.spacing} mil target` }))}
+      members={members}
+      groupOf={groupOf}
+      removeMeansDelete
+      onAssign={(entry, groupId) => {
+        for (const g of groups) {
+          const list = parsePadPairs(g.pads);
+          const has = list.includes(entry);
+          if (g.id === groupId && !has) actions.setPadPairField(g.id, { pads: [...list, entry].join("; ") });
+          else if (g.id !== groupId && has) actions.setPadPairField(g.id, { pads: list.filter((p) => p !== entry).join("; ") });
+        }
+      }}
+      onAdd={actions.addPadPair}
+      onDelete={actions.removePadPair}
+      composer={composer}
+      emptyHint={pads.length ? "No pairs yet — pick two pads above and add them to a group." : "No pads on the board yet — place pads first."}
+    />
   );
 }
 
@@ -1522,8 +1680,6 @@ function applyCapabilityPreset(cfg: PcbRulesConfig, presetName: string): PcbRule
   };
 }
 
-const PCB_RULE_TABS = ["Rule Management", "Net Rule", "Net-Net Rule", "Region Rule"];
-
 // Rule types `runDrc` really enforces today (drc.ts phases 1–4). Everything
 // else is editable but carries a "not checked yet" badge, so a rule can never
 // pretend to matter.
@@ -1538,7 +1694,11 @@ const DRC_ENFORCED_LEAVES = new Set([
 function PcbDrcModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const [tab, setTab] = React.useState("Rule Management");
+  // Two destinations, not four tabs: the limits themselves, and where they
+  // apply. The three assignment tables are one destination with a scope switch,
+  // because "which net · which pair · which region" is one question.
+  const [dest, setDest] = React.useState<"limits" | "applies">("limits");
+  const [scope, setScope] = React.useState<"Nets" | "Net pairs" | "Regions">("Nets");
   const [onlyChecked, setOnlyChecked] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [cfg, setCfg] = React.useState<PcbRulesConfig>(() =>
@@ -1622,146 +1782,208 @@ function PcbDrcModal() {
   return (
     <Overlay>
       <Card width={1040} maxHeight="90%">
-        <Header title="Board design rules" onClose={actions.closeModal} />
-        {/* One honest line about the whole config, then the tabs. */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "10px 24px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 600 }}>
-            {cfg.rules.length} named rule{cfg.rules.length === 1 ? "" : "s"}
+        {/* Title, the two destinations and the dialog-wide display settings on
+            one bar — the unit and the layer scope govern every rule, so they
+            belong to the dialog rather than sitting inside one rule's form. */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--spacing-6)", padding: "18px 24px 12px", flex: "0 0 auto" }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)" }}>Board constraints</span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+              {cfg.rules.length} named limit{cfg.rules.length === 1 ? "" : "s"} · {DRC_ENFORCED_LEAVES.size} of {PCB_RULE_TREE.reduce((a, c) => a + c.leaves.length, 0)} kinds checked by the engine today
+            </span>
           </span>
-          <span style={{ fontSize: "var(--font-size-xs)", padding: "2px 8px", borderRadius: 999, background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)", fontWeight: 600 }}>
-            {DRC_ENFORCED_LEAVES.size} of {PCB_RULE_TREE.reduce((a, c) => a + c.leaves.length, 0)} rule types checked by the engine
-          </span>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", cursor: "pointer" }}>
-            <input type="checkbox" checked={onlyChecked} onChange={() => setOnlyChecked((v) => !v)} />
-            Only rules the engine checks
-          </label>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter rules"
-            aria-label="Filter rules"
-            style={{ marginLeft: "auto", width: 170, padding: "5px 9px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-xs)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
-          />
+          <IconButton hierarchy="ghost" size="sm" aria-label="Close" onClick={actions.closeModal} icon={<Icon html={CLOSE_SVG} />} />
         </div>
-        <ModalTabBar tabs={PCB_RULE_TABS} active={tab} onChange={setTab} />
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "0 24px 12px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
+          <div role="tablist" aria-label="Board constraints" style={{ display: "inline-flex", gap: "var(--spacing-6)" }}>
+            {([["limits", "Limits"], ["applies", "Where they apply"]] as const).map(([k, label]) => {
+              const on = dest === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setDest(k)}
+                  style={{ padding: "4px 0 6px", border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: "var(--font-size-md)", fontWeight: on ? 700 : 500, color: on ? "var(--color-text-brand)" : "var(--color-text-secondary)", borderBottom: `2px solid ${on ? "var(--color-violet-600)" : "transparent"}` }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <label style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+            Measured in
+            <select value={cfg.unit} onChange={(e) => setCfg((c) => ({ ...c, unit: e.target.value as "mm" | "mil" }))} style={{ ...selectStyle, padding: "3px 6px", fontSize: "var(--font-size-xs)" }} aria-label="Unit">
+              <option value="mm">mm</option>
+              <option value="mil">mil</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+            Applied
+            <select value={cfg.layered ? "Layered" : "All"} onChange={(e) => setCfg((c) => ({ ...c, layered: e.target.value === "Layered" }))} style={{ ...selectStyle, padding: "3px 6px", fontSize: "var(--font-size-xs)" }} aria-label="Layer scope">
+              <option value="All">across all layers</option>
+              <option value="Layered">per layer</option>
+            </select>
+          </label>
+        </div>
 
         <div style={{ flex: 1, overflow: "hidden", display: "flex", minHeight: 380 }}>
-          {tab === "Rule Management" && (
+          {dest === "limits" && (
             <>
-              {/* Category rail — each row says how many rules it holds and
-                  whether the engine checks that type at all. */}
-              <div style={{ width: 250, flex: "0 0 auto", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", padding: "12px 10px" }}>
-                {PCB_RULE_TREE.map((cat) => {
-                  const shownLeaves = cat.leaves.filter((leaf) =>
-                    (!onlyChecked || DRC_ENFORCED_LEAVES.has(leaf)) &&
-                    (!query.trim() || leaf.toLowerCase().includes(query.trim().toLowerCase()) ||
-                      cfg.rules.some((r) => r.leaf === leaf && r.name.toLowerCase().includes(query.trim().toLowerCase()))));
-                  if (!shownLeaves.length) return null;
-                  const checked = cat.leaves.filter((l) => DRC_ENFORCED_LEAVES.has(l)).length;
-                  return (
-                  <div key={cat.category} style={{ marginBottom: 10 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, padding: "4px 8px" }}>
-                      <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
-                        {cat.category}
-                      </span>
-                      <span style={{ fontSize: "var(--font-size-2xs, 10px)", color: "var(--color-text-tertiary)" }}>
-                        {checked}/{cat.leaves.length} checked
-                      </span>
-                    </div>
-                    {shownLeaves.map((leaf) => {
-                      const leafRules = cfg.rules.filter((r) => r.leaf === leaf);
-                      const leafActive = leafRules.some((r) => r.name === cfg.selected);
-                      return (
-                        <div key={leaf}>
-                          <div
-                            onClick={() => {
-                              // Selecting a leaf jumps to its first named rule.
-                              if (leafRules[0]) setCfg((c) => ({ ...c, selected: leafRules[0].name }));
-                            }}
-                            className="ix-mi"
-                            title={DRC_ENFORCED_LEAVES.has(leaf) ? `${leaf} — checked by Run design check` : `${leaf} — editable, but the DRC engine doesn't check this type yet`}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "4px 8px 4px 16px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", cursor: "pointer", color: "var(--color-text-primary)", fontWeight: leafActive ? 600 : 500 }}
-                          >
-                            <span style={{ display: "flex", alignItems: "center", gap: 6, overflow: "hidden" }}>
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{leaf}</span>
-                              {!DRC_ENFORCED_LEAVES.has(leaf) && (
-                                <span style={{ flex: "0 0 auto", fontSize: 9, lineHeight: 1.4, padding: "1px 5px", borderRadius: 999, background: "var(--color-bg-subtle)", color: "var(--color-text-tertiary)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-                                  not checked yet
-                                </span>
-                              )}
-                            </span>
-                            {/* PDF #3: + beside each rule-type heading — adds a named rule of this type */}
-                            <button
-                              type="button"
-                              aria-label={`Add ${leaf} rule`}
-                              title={`Add ${leaf} rule`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const base = defaultRuleName(leaf);
-                                let n = 2;
-                                while (cfg.rules.some((r) => r.name === `${base}${n}`)) n++;
-                                const fresh = makeRule(cat.category, leaf, `${base}${n}`, false);
-                                setCfg((c) => ({ ...c, rules: [...c.rules, fresh], selected: fresh.name }));
-                              }}
-                              style={{ width: 18, height: 18, flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-sm)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: "pointer", fontSize: 12, lineHeight: 1, padding: 0 }}
-                            >
-                              +
-                            </button>
-                          </div>
-                          {leafRules.map((r) => {
-                            const on = r.name === cfg.selected;
-                            return (
-                              <div
-                                key={r.name}
-                                onClick={() => setCfg((c) => ({ ...c, selected: r.name }))}
-                                className="ix-mi"
-                                style={{ padding: "4px 8px 4px 28px", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", cursor: "pointer", color: on ? "var(--color-violet-600)" : "var(--color-text-secondary)", fontWeight: on ? 600 : 500, background: on ? "var(--color-bg-brand-subtle)" : "transparent", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                                title={r.name}
-                              >
-                                {r.name}
-                              </div>
-                            );
-                          })}
+              {/* The rail lists the limits themselves, split by the only thing
+                  that changes whether a limit matters: does the engine check it
+                  today. The type is the row's sub-line, so a three-level
+                  category→type→rule tree collapses to one honest list. */}
+              <div style={{ width: 256, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+                <div style={{ flex: "0 0 auto", padding: "10px 10px 8px", display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search limits"
+                    aria-label="Search limits"
+                    style={{ width: "100%", boxSizing: "border-box", padding: "5px 9px", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-xs)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }}
+                  />
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", cursor: "pointer" }}>
+                    <input type="checkbox" checked={onlyChecked} onChange={() => setOnlyChecked((v) => !v)} />
+                    Only what the engine checks
+                  </label>
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 10px" }}>
+                  {([true, false] as const).map((enforced) => {
+                    const q = query.trim().toLowerCase();
+                    const group = cfg.rules.filter(
+                      (r) =>
+                        DRC_ENFORCED_LEAVES.has(r.leaf) === enforced &&
+                        (!onlyChecked || enforced) &&
+                        (!q || r.name.toLowerCase().includes(q) || r.leaf.toLowerCase().includes(q) || r.category.toLowerCase().includes(q)),
+                    );
+                    if (!group.length) return null;
+                    return (
+                      <div key={String(enforced)} style={{ marginBottom: 10 }}>
+                        <div style={{ padding: "4px 8px", fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                          {enforced ? "Checked by the engine" : "Not checked yet"}
                         </div>
-                      );
-                    })}
-                  </div>
-                  );
-                })}
+                        {group.map((r) => {
+                          const on = r.name === cfg.selected;
+                          return (
+                            <button
+                              key={r.name}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => setCfg((c) => ({ ...c, selected: r.name }))}
+                              className="ix-row"
+                              title={enforced ? `${r.leaf} — checked by Run design check` : `${r.leaf} — editable, but the DRC engine doesn't check this kind yet`}
+                              style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, padding: "5px 8px", border: "none", borderRadius: "var(--radius-md)", background: on ? "var(--color-bg-brand-subtle)" : "transparent", cursor: "pointer", font: "inherit", textAlign: "left", opacity: enforced ? 1 : 0.72 }}
+                            >
+                              <span style={{ width: "100%", fontSize: "var(--font-size-sm)", fontWeight: on ? 700 : 500, color: on ? "var(--color-text-brand)" : "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {r.name}{r.isDefault ? " · default" : ""}
+                              </span>
+                              <span style={{ width: "100%", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {r.leaf}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Adding a limit is one control that names every kind, rather
+                    than a + hidden on each of twenty-four tree rows. */}
+                <div style={{ flex: "0 0 auto", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-4)", display: "flex", flexDirection: "column", gap: 2 }}>
+                  <select
+                    value=""
+                    aria-label="Add a limit"
+                    onChange={(e) => {
+                      const leaf = e.target.value;
+                      e.target.value = "";
+                      if (!leaf) return;
+                      const cat = PCB_RULE_TREE.find((c) => c.leaves.includes(leaf));
+                      if (!cat) return;
+                      const stem = defaultRuleName(leaf);
+                      let n = 2;
+                      while (cfg.rules.some((r) => r.name === `${stem}${n}`)) n++;
+                      const fresh = makeRule(cat.category, leaf, `${stem}${n}`, false);
+                      setCfg((c) => ({ ...c, rules: [...c.rules, fresh], selected: fresh.name }));
+                    }}
+                    style={{ ...selectStyle, width: "100%", maxWidth: "none", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}
+                  >
+                    <option value="">+ Add a limit…</option>
+                    {PCB_RULE_TREE.map((cat) => (
+                      <optgroup key={cat.category} label={cat.category}>
+                        {cat.leaves.map((leaf) => (
+                          <option key={leaf} value={leaf}>
+                            {leaf}{DRC_ENFORCED_LEAVES.has(leaf) ? "" : " (not checked yet)"}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <span style={{ padding: "var(--spacing-4) var(--spacing-5) var(--spacing-2)", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                    Whole constraint set
+                  </span>
+                  <select
+                    value=""
+                    aria-label="Board capability preset"
+                    onChange={(e) => { if (e.target.value) applyPreset(e.target.value); e.target.value = ""; }}
+                    style={{ ...selectStyle, width: "100%", maxWidth: "none", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}
+                  >
+                    <option value="">Start from a fab preset…</option>
+                    {Object.keys(CAPABILITY_PRESETS).map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <RailAction onClick={() => fileRef.current?.click()}>Import a constraint set…</RailAction>
+                  <RailAction onClick={exportConfig}>Export this constraint set</RailAction>
+                  <RailAction onClick={() => {
+                    if (!rule) return;
+                    setCfg((c) => ({ ...c, rules: c.rules.map((r) => (r.name === rule.name ? makeRule(r.category, r.leaf, r.name, r.isDefault) : r)) }));
+                    actions.flashToast(`“${rule.name}” restored to factory defaults`);
+                  }}>Restore “{rule ? rule.name : "this limit"}”</RailAction>
+                </div>
               </div>
 
               {/* Rule pane */}
               <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "14px 18px" }}>
                 {rule ? (
                   <>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <label style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Name:</label>
-                      <CompactInput value={rule.name} width={220} onChange={(v) => setCfg((c) => ({ ...c, selected: v, rules: c.rules.map((r) => (r.name === rule.name ? { ...r, name: v } : r)) }))} />
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}>
-                        <input type="checkbox" checked={rule.isDefault} onChange={() => setCfg((c) => ({ ...c, rules: c.rules.map((r) => ({ ...r, isDefault: r.name === rule.name ? !r.isDefault : false })) }))} />
-                        Default
-                      </label>
-                      <Button hierarchy="secondary" size="sm" onClick={() => {
-                        if (cfg.rules.filter((r) => r.leaf === rule.leaf).length <= 1) { actions.flashToast(`${rule.leaf} needs at least one rule`); return; }
-                        setCfg((c) => { const rest = c.rules.filter((r) => r.name !== rule.name); return { ...c, rules: rest, selected: rest.find((r) => r.leaf === rule.leaf)?.name ?? rest[0].name }; });
-                      }}>Delete</Button>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 16, margin: "12px 0" }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
-                        Unit:
-                        <select value={cfg.unit} onChange={(e) => setCfg((c) => ({ ...c, unit: e.target.value as "mm" | "mil" }))} style={selectStyle} aria-label="Unit">
-                          <option value="mm">mm</option>
-                          <option value="mil">mil</option>
-                        </select>
-                      </label>
-                      <div role="radiogroup" aria-label="Layer scope" style={{ display: "flex", gap: 14 }}>
-                        {[["All", false] as const, ["Layered", true] as const].map(([label, v]) => (
-                          <label key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", cursor: "pointer" }}>
-                            <input type="radio" name="layerScope" checked={cfg.layered === v} onChange={() => setCfg((c) => ({ ...c, layered: v }))} />
-                            {label}
-                          </label>
-                        ))}
-                      </div>
+                    {/* The rule's name is the heading of its own editor, not a
+                        "Name:" field in a chrome row — and Default is a state
+                        of that heading, Delete an action on it. */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-5)", marginBottom: "var(--spacing-7)" }}>
+                      <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
+                        <input
+                          value={rule.name}
+                          aria-label="Limit name"
+                          onChange={(e) => { const v = e.target.value; setCfg((c) => ({ ...c, selected: v, rules: c.rules.map((r) => (r.name === rule.name ? { ...r, name: v } : r)) })); }}
+                          style={{ width: "100%", padding: "2px 0", border: "none", borderBottom: "var(--border-width-1) solid transparent", background: "transparent", fontFamily: "inherit", fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)", outline: "none" }}
+                          onFocus={(e) => (e.currentTarget.style.borderBottomColor = "var(--color-violet-600)")}
+                          onBlur={(e) => (e.currentTarget.style.borderBottomColor = "transparent")}
+                        />
+                        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                          {rule.category} · {rule.leaf}
+                          {DRC_ENFORCED_LEAVES.has(rule.leaf) ? "" : " · not checked yet"}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={rule.isDefault}
+                        onClick={() => setCfg((c) => ({ ...c, rules: c.rules.map((r) => ({ ...r, isDefault: r.name === rule.name ? !r.isDefault : false })) }))}
+                        title="The limit anything unassigned falls back to"
+                        style={{ flex: "0 0 auto", padding: "3px 10px", borderRadius: "var(--radius-full)", border: `var(--border-width-1) solid ${rule.isDefault ? "var(--color-violet-600)" : "var(--color-border-default)"}`, background: rule.isDefault ? "var(--color-bg-brand-subtle)" : "transparent", color: rule.isDefault ? "var(--color-text-brand)" : "var(--color-text-tertiary)", fontSize: "var(--font-size-xs)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        Board default
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (cfg.rules.filter((r) => r.leaf === rule.leaf).length <= 1) { actions.flashToast(`${rule.leaf} needs at least one limit`); return; }
+                          setCfg((c) => { const rest = c.rules.filter((r) => r.name !== rule.name); return { ...c, rules: rest, selected: rest.find((r) => r.leaf === rule.leaf)?.name ?? rest[0].name }; });
+                        }}
+                        style={{ flex: "0 0 auto", padding: "3px 4px", border: "none", background: "transparent", color: "var(--color-text-tertiary)", fontSize: "var(--font-size-xs)", cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        Delete
+                      </button>
                     </div>
                     {(() => {
                       const ed = RULE_EDITORS[rule.leaf];
@@ -1775,7 +1997,7 @@ function PcbDrcModal() {
                       if (!ed) return <EmptyResults label="No editor for this rule type." />;
                       if (ed.kind === "matrix") {
                         return (
-                          <ClearanceMatrix
+                          <SpacingEditor
                             rows={rule.clearance ?? defaultClearanceRows()}
                             unit={cfg.unit}
                             onCell={(ri, ci, v) =>
@@ -1819,73 +2041,84 @@ function PcbDrcModal() {
             </>
           )}
 
-          {tab === "Net Rule" && (
-            <RuleAssignTable
-              columns={["Type", "Name", "Rule", "Rule Type"]}
-              rows={nets.map((n) => ({ key: n, cells: ["Net", n] }))}
-              valueOf={(n) => cfg.netRules[n] ?? cfg.rules.find((r) => r.isDefault)?.name ?? ruleNames[0]}
-              ruleNames={ruleNames}
-              ruleLabel={ruleLabel}
-              ruleTypeOf={ruleTypeOf}
-              onAssign={(key, ruleName) => setCfg((c) => ({ ...c, netRules: { ...c.netRules, [key]: ruleName } }))}
-            />
-          )}
-
-          {tab === "Net-Net Rule" && (
-            <NetNetRuleTable
-              cfg={cfg}
-              nets={nets}
-              ruleNames={ruleNames}
-              ruleLabel={ruleLabel}
-              ruleTypeOf={ruleTypeOf}
-              onChange={(netNetRules) => setCfg((c) => ({ ...c, netNetRules }))}
-            />
-          )}
-
-          {tab === "Region Rule" && (
-            <RuleAssignTable
-              columns={["Region Name", "Rule", "Rule Type"]}
-              rows={regions.map((r) => ({ key: r, cells: [r] }))}
-              valueOf={(r) => cfg.regionRules[r] ?? cfg.rules.find((x) => x.isDefault)?.name ?? ruleNames[0]}
-              ruleNames={ruleNames}
-              ruleLabel={ruleLabel}
-              ruleTypeOf={ruleTypeOf}
-              onAssign={(key, ruleName) => setCfg((c) => ({ ...c, regionRules: { ...c.regionRules, [key]: ruleName } }))}
-            />
+          {dest === "applies" && (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              {/* One destination, one question — which nets, which pairs of
+                  nets, which regions. The three used to be three sibling tabs
+                  beside the rule editor, which made "define" and "assign" read
+                  as the same kind of choice. */}
+              <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "12px 18px 10px" }}>
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>Assign a limit to</span>
+                <div role="radiogroup" aria-label="Assignment scope" style={{ display: "inline-flex", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+                  {(["Nets", "Net pairs", "Regions"] as const).map((s, i) => {
+                    const on = scope === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => setScope(s)}
+                        style={{ padding: "4px 12px", border: "none", borderLeft: i ? "var(--border-width-1) solid var(--color-border-subtle)" : "none", background: on ? "var(--color-bg-brand-subtle)" : "transparent", color: on ? "var(--color-text-brand)" : "var(--color-text-secondary)", fontSize: "var(--font-size-sm)", fontWeight: on ? 700 : 500, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                {scope === "Nets" && (
+                  <RuleAssignTable
+                    columns={["Type", "Name", "Rule", "Rule Type"]}
+                    rows={nets.map((n) => ({ key: n, cells: ["Net", n] }))}
+                    valueOf={(n) => cfg.netRules[n] ?? cfg.rules.find((r) => r.isDefault)?.name ?? ruleNames[0]}
+                    ruleNames={ruleNames}
+                    ruleLabel={ruleLabel}
+                    ruleTypeOf={ruleTypeOf}
+                    onAssign={(key, ruleName) => setCfg((c) => ({ ...c, netRules: { ...c.netRules, [key]: ruleName } }))}
+                  />
+                )}
+                {scope === "Net pairs" && (
+                  <NetNetRuleTable
+                    cfg={cfg}
+                    nets={nets}
+                    ruleNames={ruleNames}
+                    ruleLabel={ruleLabel}
+                    ruleTypeOf={ruleTypeOf}
+                    onChange={(netNetRules) => setCfg((c) => ({ ...c, netNetRules }))}
+                  />
+                )}
+                {scope === "Regions" && (
+                  <RuleAssignTable
+                    columns={["Region Name", "Rule", "Rule Type"]}
+                    rows={regions.map((r) => ({ key: r, cells: [r] }))}
+                    valueOf={(r) => cfg.regionRules[r] ?? cfg.rules.find((x) => x.isDefault)?.name ?? ruleNames[0]}
+                    ruleNames={ruleNames}
+                    ruleLabel={ruleLabel}
+                    ruleTypeOf={ruleTypeOf}
+                    onAssign={(key, ruleName) => setCfg((c) => ({ ...c, regionRules: { ...c.regionRules, [key]: ruleName } }))}
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Footer — spec set: capability preset, Import/Export Config, Restore
-            Default (scoped to the selected rule), Apply, Confirm, Cancel */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
-          <select
-            value=""
-            aria-label="Board capability preset"
-            onChange={(e) => { if (e.target.value) applyPreset(e.target.value); e.target.value = ""; }}
-            style={{ ...ruleSelectStyle, maxWidth: 240, color: "var(--color-text-secondary)" }}
-          >
-            <option value="">Board capability preset…</option>
-            {Object.keys(CAPABILITY_PRESETS).map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <Button hierarchy="secondary" size="sm" onClick={() => fileRef.current?.click()}>Import Config</Button>
-          <Button hierarchy="secondary" size="sm" onClick={exportConfig}>Export Config</Button>
-          <Button hierarchy="secondary" size="sm" onClick={() => {
-            if (!rule) return;
-            setCfg((c) => ({ ...c, rules: c.rules.map((r) => (r.name === rule.name ? makeRule(r.category, r.leaf, r.name, r.isDefault) : r)) }));
-            actions.flashToast(`"${rule.name}" restored to factory defaults`);
-          }}>Restore Default</Button>
+        {/* The footer carries the dialog's own decision and nothing else — the
+            set-level actions (preset, import, export, restore) live at the foot
+            of the rail, beside the set they act on. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
           <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f); e.target.value = ""; }} />
-          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-4)" }}>
-            <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-            <Button hierarchy="secondary" size="md" onClick={() => { save(); actions.flashToast("Board design rules saved"); actions.closeModal(); }}>Save</Button>
-            <Button hierarchy="primary" size="md" onClick={() => {
-              // Save, then really run the check and open the results — the old
-              // primary just closed and left you to find the DRC yourself.
-              save();
-              actions.closeModal();
-              actions.runDrcCheck();
-            }}>Save &amp; check now</Button>
-          </div>
+          <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+          <Button hierarchy="secondary" size="md" onClick={() => { save(); actions.flashToast("Board constraints saved"); actions.closeModal(); }}>Save</Button>
+          <Button hierarchy="primary" size="md" onClick={() => {
+            // Save, then really run the check and open the results — the old
+            // primary just closed and left you to find the DRC yourself.
+            save();
+            actions.closeModal();
+            actions.runDrcCheck();
+          }}>Save &amp; check now</Button>
         </div>
       </Card>
     </Overlay>
@@ -2116,7 +2349,17 @@ function SpanTable({
 }
 
 // 13-type lower-triangular clearance matrix with editable cells.
-function ClearanceMatrix({
+// UIUX-90 — Minimum spacing. The matrix used to be a bare N×N grid of 91
+// identical boxes, which is both a cell-for-cell transcription and a poor way
+// to read the rule: almost every pair carries the same number, so the grid
+// spends its whole area repeating one value and hides the handful that matter.
+//
+// This says the same thing the way a fab reads it — **one base spacing, then
+// the object types that need more room**. Each of those types expands to the
+// individual pairs that differ, and the full grid is still one disclosure away
+// for anyone who wants to sweep it, now tinted by magnitude so the outliers
+// are visible rather than uniform.
+function SpacingEditor({
   rows,
   unit,
   onCell,
@@ -2125,44 +2368,174 @@ function ClearanceMatrix({
   unit: string;
   onCell: (row: number, col: number, value: number) => void;
 }) {
+  const [openType, setOpenType] = React.useState<number | null>(null);
+  const [showGrid, setShowGrid] = React.useState(false);
+
+  const cells = React.useMemo(() => {
+    const out: { ri: number; ci: number; v: number }[] = [];
+    rows.forEach((row, ri) => row.values.forEach((v, ci) => out.push({ ri, ci, v })));
+    return out;
+  }, [rows]);
+
+  // The base is simply the value most pairs already carry.
+  const base = React.useMemo(() => {
+    const tally = new Map<number, number>();
+    for (const c of cells) tally.set(c.v, (tally.get(c.v) ?? 0) + 1);
+    let best = cells[0]?.v ?? 0, bestN = -1;
+    for (const [v, n] of tally) if (n > bestN) { best = v; bestN = n; }
+    return best;
+  }, [cells]);
+  const atBase = cells.filter((c) => c.v === base).length;
+
+  // Types that need more room than the base, grouped by the object type whose
+  // row they sit on.
+  const outliers = React.useMemo(() => {
+    const by = new Map<number, { ci: number; v: number }[]>();
+    for (const c of cells) {
+      if (c.v === base) continue;
+      const list = by.get(c.ri) ?? [];
+      list.push({ ci: c.ci, v: c.v });
+      by.set(c.ri, list);
+    }
+    return [...by.entries()]
+      .map(([ri, list]) => ({ ri, list, distinct: [...new Set(list.map((x) => x.v))] }))
+      .sort((a, b) => b.list.length - a.list.length);
+  }, [cells, base]);
+
+  const setBase = (next: number) => {
+    for (const c of cells) if (c.v === base) onCell(c.ri, c.ci, next);
+  };
+
+  const lo = Math.min(...cells.map((c) => c.v));
+  const hi = Math.max(...cells.map((c) => c.v));
+  const tint = (v: number) => {
+    const t = hi > lo ? (v - lo) / (hi - lo) : 0;
+    return `color-mix(in oklab, var(--color-violet-600) ${Math.round(4 + t * 20)}%, transparent)`;
+  };
+
+  const num = (v: number, onCommit: (mm: number) => void, ariaLabel: string, width = 66) => (
+    <input
+      value={String(mmToUnit(v, unit))}
+      aria-label={ariaLabel}
+      onChange={(e) => {
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n) && n >= 0) onCommit(unitToMm(n, unit));
+      }}
+      style={{ width, height: 26, textAlign: "center", fontSize: "var(--font-size-sm)", fontVariantNumeric: "tabular-nums", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit" }}
+    />
+  );
+
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ borderCollapse: "collapse", fontVariantNumeric: "tabular-nums" }}>
-        <thead>
-          <tr>
-            <th style={{ position: "sticky", left: 0, background: "var(--color-bg-surface)" }} />
-            {CLEARANCE_COLS.map((c) => (
-              <th key={c} style={{ padding: "3px 4px", fontSize: 9.5, fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap", maxWidth: 58, overflow: "hidden", textOverflow: "ellipsis" }} title={c}>
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={row.name}>
-              <th style={{ padding: "3px 8px", fontSize: 10.5, fontWeight: 700, color: "var(--color-text-secondary)", textAlign: "right", whiteSpace: "nowrap", position: "sticky", left: 0, background: "var(--color-bg-surface)" }}>
-                {row.name}
-              </th>
-              {row.values.map((v, ci) => (
-                <td key={ci} style={{ padding: 1.5 }}>
-                  <input
-                    value={String(mmToUnit(v, unit))}
-                    aria-label={`${row.name} to ${CLEARANCE_COLS[ci] ?? row.name} clearance (${unit})`}
-                    onChange={(e) => {
-                      const n = parseFloat(e.target.value);
-                      if (!isNaN(n) && n >= 0) onCell(ri, ci, unitToMm(n, unit));
-                    }}
-                    style={{ width: 52, height: 24, textAlign: "center", fontSize: 10.5, border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-sm)", background: "var(--color-bg-subtle)", color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit" }}
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div style={{ marginTop: 6, fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
-        Minimum spacing between each pair of object types ({unit}).
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-5) var(--spacing-6)", border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-subtle)" }}>
+        <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+          <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Base spacing</span>
+          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+            Used by {atBase} of {cells.length} pairs — changing it moves all of them.
+          </span>
+        </span>
+        {num(base, setBase, `Base spacing (${unit})`, 78)}
+        <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", width: 22 }}>{unit}</span>
+      </div>
+
+      {outliers.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2 }}>
+            Types that keep their own spacing
+          </span>
+          {outliers.map(({ ri, list, distinct }) => {
+            const open = openType === ri;
+            return (
+              <div key={ri} style={{ borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenType(open ? null : ri)}
+                  className="ix-row"
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "7px var(--spacing-4)", border: "none", background: "transparent", borderRadius: "var(--radius-md)", cursor: "pointer", font: "inherit", textAlign: "left" }}
+                >
+                  <span style={{ flex: "0 0 auto", fontSize: 10, color: "var(--color-text-tertiary)", transform: open ? "rotate(90deg)" : "none", transition: "transform .14s" }}>▶</span>
+                  <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", fontWeight: 500 }}>{rows[ri].name}</span>
+                  <span style={{ flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+                    {distinct.length === 1 ? `${mmToUnit(distinct[0], unit)} ${unit}` : "mixed"}
+                  </span>
+                  <span style={{ flex: "0 0 auto", width: 62, textAlign: "right", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                    {list.length} pair{list.length === 1 ? "" : "s"}
+                  </span>
+                </button>
+                {open && (
+                  <div style={{ padding: "2px 0 var(--spacing-5) 26px", display: "flex", flexDirection: "column", gap: 4 }}>
+                    {list.map(({ ci, v }) => (
+                      <div key={ci} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
+                        <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                          {rows[ri].name} ↔ {CLEARANCE_COLS[ci] ?? rows[ri].name}
+                        </span>
+                        {num(v, (mm) => onCell(ri, ci, mm), `${rows[ri].name} to ${CLEARANCE_COLS[ci] ?? rows[ri].name} spacing (${unit})`)}
+                        <button
+                          type="button"
+                          onClick={() => onCell(ri, ci, base)}
+                          title="Back to the base spacing"
+                          style={{ flex: "0 0 auto", padding: "2px 8px", border: "none", background: "transparent", color: "var(--color-text-tertiary)", fontSize: "var(--font-size-xs)", cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          use base
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div>
+        <button
+          type="button"
+          aria-expanded={showGrid}
+          onClick={() => setShowGrid((v) => !v)}
+          style={{ padding: 0, border: "none", background: "transparent", color: "var(--color-text-brand)", fontSize: "var(--font-size-sm)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          {showGrid ? "Hide" : "Show"} every pair ({cells.length})
+        </button>
+        {showGrid && (
+          <div style={{ overflowX: "auto", marginTop: "var(--spacing-5)" }}>
+            <table style={{ borderCollapse: "collapse", fontVariantNumeric: "tabular-nums" }}>
+              <thead>
+                <tr>
+                  <th style={{ position: "sticky", left: 0, background: "var(--color-bg-surface)" }} />
+                  {CLEARANCE_COLS.map((c) => (
+                    <th key={c} style={{ padding: "3px 4px", fontSize: 9.5, fontWeight: 700, color: "var(--color-text-secondary)", whiteSpace: "nowrap", maxWidth: 58, overflow: "hidden", textOverflow: "ellipsis" }} title={c}>
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={row.name}>
+                    <th style={{ padding: "3px 8px", fontSize: 10.5, fontWeight: 700, color: "var(--color-text-secondary)", textAlign: "right", whiteSpace: "nowrap", position: "sticky", left: 0, background: "var(--color-bg-surface)" }}>
+                      {row.name}
+                    </th>
+                    {row.values.map((v, ci) => (
+                      <td key={ci} style={{ padding: 1.5 }}>
+                        <input
+                          value={String(mmToUnit(v, unit))}
+                          aria-label={`${row.name} to ${CLEARANCE_COLS[ci] ?? row.name} spacing (${unit})`}
+                          onChange={(e) => {
+                            const n = parseFloat(e.target.value);
+                            if (!isNaN(n) && n >= 0) onCell(ri, ci, unitToMm(n, unit));
+                          }}
+                          style={{ width: 52, height: 24, textAlign: "center", fontSize: 10.5, border: "var(--border-width-1) solid var(--color-border-subtle)", borderRadius: "var(--radius-sm)", background: tint(v), color: "var(--color-text-primary)", outline: "none", fontFamily: "inherit" }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

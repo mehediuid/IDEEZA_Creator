@@ -781,10 +781,11 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           ),
         }),
         dv,
-        // PDF Part 2 (Popup 6): grouping / length-matching managers.
-        item("Net Class Manager", { icon: "wire", onClick: () => actions.openModal("netClass") }),
-        item("Equal Length Group Manager", { icon: "tLengthTune", onClick: () => actions.openModal("equalLength") }),
-        item("Pad Pair Group Manager", { icon: "tPad", onClick: () => actions.openModal("padPair") }),
+        // Grouping / length-matching. The rows carry the same names the
+        // dialogs do, and the names the rest of the industry uses.
+        item("Net classes", { icon: "wire", onClick: () => actions.openModal("netClass") }),
+        item("Matched length groups", { icon: "tLengthTune", onClick: () => actions.openModal("equalLength") }),
+        item("Pin pair groups", { icon: "tPad", onClick: () => actions.openModal("padPair") }),
       ],
     },
     // Phase 7 — Route menu (IT-658).

@@ -72,10 +72,10 @@ import { PcbManagerModals } from "@/components/pcb/pcb-manager-modals";
 import { SettingDialog, HotkeyDialog, TopToolbarDialog } from "@/components/pcb/settings-dialogs";
 import {
   ModalTabBar,
-  SeverityChip,
   nextSeverity,
   DirectionTiles,
   ORDER_OPTIONS,
+  RailAction,
 } from "@/components/pcb/modal-kit";
 import {
   SCH_NET_RULES,
@@ -91,11 +91,8 @@ import {
   type SchRuleState,
 } from "@/lib/pcb/design-rules-data";
 
-const PRIMARY = "var(--color-violet-600)";
 const CLOSE_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-const RESTORE_SVG =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="var(--color-violet-600)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
 // (The old annotate-preview illustration was replaced by the PDF-spec
 // direction tiles in modal-kit's DirectionTiles.)
 
@@ -869,6 +866,77 @@ const SEV_TONE: Record<string, { fg: string; bg: string }> = {
   Ignore: { fg: "var(--color-text-tertiary)", bg: "var(--color-bg-subtle)" },
 };
 
+// UIUX-39 — a rule used to carry two controls that could contradict each other:
+// a checkbox saying whether it runs, and a badge saying how loudly it reports.
+// One decision, one control: Off is the first stop on the same scale, so the
+// row shows the current level and every alternative at once instead of hiding
+// them behind a dropdown, and the numbered checkbox column is gone.
+const REPORT_STOPS = [
+  { key: "Off", label: "Off" },
+  { key: "Note", label: "Note" },
+  { key: "Warning", label: "Warn" },
+  { key: "Error", label: "Error" },
+  { key: "Fatal Error", label: "Fatal" },
+] as const;
+
+function ReportLevel({
+  enabled,
+  severity,
+  onChange,
+}: {
+  enabled: boolean;
+  severity: Severity;
+  onChange: (patch: { enabled: boolean; severity?: Severity }) => void;
+}) {
+  // A stored "Ignore" severity means the same thing as off, so it reads as Off
+  // rather than leaving the control with nothing selected.
+  const current = !enabled || severity === "Ignore" ? "Off" : severity;
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Report level"
+      style={{
+        flex: "0 0 auto", display: "inline-flex", alignItems: "stretch",
+        border: "var(--border-width-1) solid var(--color-border-default)",
+        borderRadius: "var(--radius-md)", overflow: "hidden",
+        background: "var(--color-bg-surface)",
+      }}
+    >
+      {REPORT_STOPS.map((s, i) => {
+        const on = current === s.key;
+        const tone = s.key === "Off" ? null : SEVERITY_COLOR[s.key as Severity];
+        return (
+          <button
+            key={s.key}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            title={s.key === "Off" ? "Don't report this" : `Report as ${s.key}`}
+            onClick={() =>
+              onChange(s.key === "Off" ? { enabled: false } : { enabled: true, severity: s.key as Severity })
+            }
+            style={{
+              padding: "3px 9px",
+              minWidth: 44,
+              border: "none",
+              borderLeft: i ? "var(--border-width-1) solid var(--color-border-subtle)" : "none",
+              background: on ? (tone ? tone.bg : "var(--color-bg-subtle)") : "transparent",
+              color: on ? (tone ? tone.fg : "var(--color-text-secondary)") : "var(--color-text-tertiary)",
+              fontSize: "var(--font-size-xs)",
+              fontWeight: on ? 700 : 500,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              transition: "background .14s, color .14s",
+            }}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DesignRulesModal() {
   const state = usePcbState();
   const actions = usePcbActions();
@@ -974,7 +1042,7 @@ function DesignRulesModal() {
   return (
     <Overlay>
       <Card width={1000} maxHeight="88%" flexCol>
-        <Header title="Design Rules" onClose={actions.closeModal} padding="18px 24px" />
+        <Header title="Electrical rules" onClose={actions.closeModal} padding="18px 24px" />
 
         {/* State of the whole config, before any detail */}
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "0 var(--spacing-12) var(--spacing-5)", flex: "0 0 auto", flexWrap: "wrap" }}>
@@ -994,12 +1062,26 @@ function DesignRulesModal() {
         </div>
 
         <div style={{ flex: 1, display: "flex", minHeight: 0, borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
-          {/* Categories */}
-          <div style={{ width: 224, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-4)", overflowY: "auto" }}>
-            {(["Net", "Component", "Reuse Block"] as RuleCat[]).map((c) =>
-              catRow(c, CAT_LABEL[c], `${enabledCount(c)} / ${cfg[c].length} on · ${ERC_ENFORCED_ROWS[c].size} checked`),
-            )}
-            {catRow("Connection", "Pin conflicts", cfg.pinCheckEnabled ? "Matrix on" : "Matrix off")}
+          {/* Categories, and under them the actions that act on the whole
+              config rather than on this dialog's decision — keeping the footer
+              for Cancel/Save alone. */}
+          <div style={{ width: 224, flex: "0 0 auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-4)" }}>
+              {(["Net", "Component", "Reuse Block"] as RuleCat[]).map((c) =>
+                catRow(c, CAT_LABEL[c], `${enabledCount(c)} / ${cfg[c].length} on · ${ERC_ENFORCED_ROWS[c].size} checked`),
+              )}
+              {catRow("Connection", "Pin conflicts", cfg.pinCheckEnabled ? "Matrix on" : "Matrix off")}
+            </div>
+            <div style={{ flex: "0 0 auto", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-4)", display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ padding: "0 var(--spacing-5) var(--spacing-2)", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                Whole rule set
+              </span>
+              <RailAction onClick={openImportPicker}>Import a rule set…</RailAction>
+              <RailAction onClick={exportConfig}>Export this rule set</RailAction>
+              <RailAction onClick={() => { setCfg(defaultSchRulesConfig()); actions.flashToast("Electrical rules restored to defaults"); }}>
+                Restore IDEEZA defaults
+              </RailAction>
+            </div>
           </div>
 
           {/* Rules */}
@@ -1026,30 +1108,24 @@ function DesignRulesModal() {
                     const r = rows[idx];
                     const enforced = ERC_ENFORCED_ROWS[catKey].has(idx);
                     return (
-                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "9px 2px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)", opacity: r.enabled ? 1 : 0.55 }}>
-                        <button
-                          type="button"
-                          role="checkbox"
-                          aria-checked={r.enabled}
-                          aria-label={`${def.text} — ${r.enabled ? "on" : "off"}`}
-                          onClick={() => setRow(idx, { enabled: !r.enabled })}
-                          onKeyDown={(e) => { if (e.key === " ") { e.preventDefault(); setRow(idx, { enabled: !r.enabled }); } }}
-                          style={{ display: "inline-flex", cursor: "pointer", flex: "0 0 auto", padding: 0, border: "none", background: "none" }}
-                        >
-                          <Check on={r.enabled} size={17} decorative />
-                        </button>
-                        <span style={{ width: 22, flex: "0 0 auto", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
-                          {String(idx + 1).padStart(2, "0")}
+                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "10px 2px", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+                        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                          <span style={{ fontSize: "var(--font-size-sm)", color: r.enabled ? "var(--color-text-primary)" : "var(--color-text-tertiary)", lineHeight: 1.35 }}>
+                            {def.text}
+                          </span>
+                          <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
+                            {enforced
+                              ? r.enabled
+                                ? `Reported as ${r.severity === "Fatal Error" ? "a fatal error" : `a ${r.severity.toLowerCase()}`}`
+                                : "Not reported"
+                              : "Not checked yet — the checker doesn’t implement this rule"}
+                          </span>
                         </span>
-                        <span style={{ flex: 1, fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", lineHeight: 1.35 }}>
-                          {def.text}
-                          {!enforced && (
-                            <span title="Listed for completeness — the checker doesn't implement this rule yet, so the toggle won't change results." style={{ marginLeft: 8, padding: "1px 6px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 700, color: "var(--color-text-tertiary)", background: "var(--color-bg-subtle)", whiteSpace: "nowrap" }}>
-                              not checked yet
-                            </span>
-                          )}
-                        </span>
-                        <SeverityChip value={r.severity} onChange={(sv) => setRow(idx, { severity: sv })} disabled={!r.enabled} />
+                        <ReportLevel
+                          enabled={r.enabled}
+                          severity={r.severity}
+                          onChange={(patch) => setRow(idx, patch)}
+                        />
                       </div>
                     );
                   })}
@@ -1091,22 +1167,14 @@ function DesignRulesModal() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
-          <Pill onClick={openImportPicker}>Import…</Pill>
-          <Pill onClick={exportConfig}>Export</Pill>
-          <div onClick={() => { setCfg(defaultSchRulesConfig()); actions.flashToast("Design rules restored to defaults"); }} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", color: PRIMARY, fontSize: "var(--font-size-sm)", fontWeight: 600, cursor: "pointer" }}>
-            <span>Restore defaults</span>
-            <Icon html={RESTORE_SVG} size={15} />
-          </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-4)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto", flexWrap: "wrap" }}>
           <input ref={fileRef} type="file" accept="application/json" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importConfig(f); e.target.value = ""; }} />
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--spacing-4)" }}>
-            <Pill onClick={actions.closeModal}>Cancel</Pill>
-            {/* Saves, then actually runs the check and shows the results tab. */}
-            <Pill onClick={() => { save(); actions.runErcCheck(); actions.closeModal(); }}>Save &amp; check now</Pill>
-            <PrimaryBtn onClick={() => { save(); actions.flashToast("Design rules saved"); actions.closeModal(); }} style={{ padding: "var(--spacing-4) var(--spacing-12)" }}>
-              Save
-            </PrimaryBtn>
-          </div>
+          <Pill onClick={actions.closeModal}>Cancel</Pill>
+          {/* Saves, then actually runs the check and shows the results tab. */}
+          <Pill onClick={() => { save(); actions.runErcCheck(); actions.closeModal(); }}>Save &amp; check now</Pill>
+          <PrimaryBtn onClick={() => { save(); actions.flashToast("Electrical rules saved"); actions.closeModal(); }} style={{ padding: "var(--spacing-4) var(--spacing-12)" }}>
+            Save
+          </PrimaryBtn>
         </div>
       </Card>
     </Overlay>
@@ -2858,38 +2926,59 @@ function DxfModal() {
 }
 
 // ── Export Document / PDF·PNG·SVG (Popup 13) ─────────────────────────────────
+// UIUX-79 — the board's artwork export. It used to be a stack of five labelled
+// radio rows in EasyEDA's own vocabulary (File Type · Theme · Line Width ·
+// Range · Output) with nothing to look at, so you picked a theme and a stroke
+// policy blind and found out what you'd chosen by opening the file. It is now
+// the same two-pane shape the sheet export uses — calibration left, a live
+// preview right that renders the very SVG the export writes — in the board's
+// own language: Format · Ink · Copper strokes · Range · Sides.
 function DocumentModal() {
   const actions = usePcbActions();
   const state = usePcbState();
   const sel = state.selectedIds.length;
-  const [fileType, setFileType] = React.useState<"PDF" | "PNG" | "SVG">("PDF");
-  const [theme, setTheme] = React.useState<"default" | "whiteOnBlack" | "blackOnWhite">("default");
+  const [fmt, setFmt] = React.useState<"PDF" | "PNG" | "SVG">("PDF");
+  const [ink, setInk] = React.useState<"default" | "whiteOnBlack" | "blackOnWhite">("default");
   const [hairline, setHairline] = React.useState(false);
   const [range, setRange] = React.useState<"board" | "selection">("board");
-  const [output, setOutput] = React.useState<"merged" | "perSide">("merged");
+  const [sides, setSides] = React.useState<"merged" | "perSide">("merged");
   const [fileName, setFileName] = React.useState("board");
   const model = React.useMemo(
     () => collectPcbModel(state, { onlySelected: range === "selection" }),
     [state, range],
   );
-  const themeLabel = { default: "Board colours", whiteOnBlack: "White on black", blackOnWhite: "Black on white" } as const;
+  const inkLabel = { default: "as drawn", whiteOnBlack: "white on black", blackOnWhite: "black on white" } as const;
+  const empty = range === "selection" && sel === 0;
 
   const write = async (side: "both" | "top" | "bottom", suffix: string) => {
-    const opts = { theme, hairline, include: { side } } as const;
+    const opts = { theme: ink, hairline, include: { side } } as const;
     const base = (fileName || "board").replace(/\.(pdf|png|svg)$/i, "") + suffix;
-    if (fileType === "SVG") downloadBlob(`${base}.svg`, buildSvg(model, opts), "image/svg+xml");
-    else if (fileType === "PNG") {
+    if (fmt === "SVG") downloadBlob(`${base}.svg`, buildSvg(model, opts), "image/svg+xml");
+    else if (fmt === "PNG") {
       const png = await rasterizeSvgToPng(buildSvg(model, opts), model.boardWmm + 8, model.boardHmm + 8);
       downloadDataUrl(`${base}.png`, png);
     } else downloadBlob(`${base}.pdf`, buildPdf(model, opts), "application/pdf");
   };
 
-  const rowSeg = <T extends string>(name: string, options: { label: string; value: T }[], value: T, onChange: (v: T) => void) => (
-    <div key={name} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)" }}>
-      <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{name}</span>
-      <div style={{ display: "flex", gap: "var(--spacing-7)", flexWrap: "wrap" }}>
+  // The preview is the export: same builder, same options, only the side is
+  // pinned to the top when two files are being written.
+  const previewUrl = React.useMemo(() => {
+    if (empty) return null;
+    const svg = buildSvg(model, { theme: ink, hairline, include: { side: sides === "perSide" ? "top" : "both" } });
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }, [model, ink, hairline, sides, empty]);
+
+  const rowSeg = <T extends string>(name: string, options: { label: string; value: T; off?: boolean }[], value: T, onChange: (v: T) => void) => (
+    <div key={name} style={{ display: "flex", alignItems: "flex-start", gap: "var(--spacing-7)" }}>
+      <span style={{ width: 104, flex: "0 0 auto", paddingTop: 2, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{name}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
         {options.map((o) => (
-          <div key={o.value} onClick={() => onChange(o.value)} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: "pointer" }}>
+          <div
+            key={o.value}
+            onClick={() => !o.off && onChange(o.value)}
+            aria-disabled={o.off || undefined}
+            style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", cursor: o.off ? "default" : "pointer", opacity: o.off ? 0.45 : 1 }}
+          >
             <Radio on={value === o.value} /><span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{o.label}</span>
           </div>
         ))}
@@ -2899,33 +2988,69 @@ function DocumentModal() {
 
   return (
     <Overlay>
-      <Card width={580} maxHeight="90%" flexCol>
-        <Header title="Export Document" onClose={actions.closeModal} padding="16px 22px" />
-        <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-9) var(--spacing-10)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
-          {rowSeg("File Type", [{ label: "PDF", value: "PDF" as const }, { label: "PNG", value: "PNG" as const }, { label: "SVG", value: "SVG" as const }], fileType, setFileType)}
-          {rowSeg("Theme", [{ label: "Board colours", value: "default" as const }, { label: "White on black", value: "whiteOnBlack" as const }, { label: "Black on white", value: "blackOnWhite" as const }], theme, setTheme)}
-          {rowSeg("Line Width", [{ label: "True widths", value: false as unknown as string }, { label: "Hairline", value: true as unknown as string }] as { label: string; value: string }[], (hairline ? true : false) as unknown as string, (v) => setHairline(Boolean(v)))}
-          {rowSeg("Range", [{ label: "Whole board", value: "board" as const }, { label: sel ? `Selection (${sel})` : "Selection — nothing selected", value: "selection" as const }], range, setRange)}
-          {rowSeg("Output", [{ label: "One sheet", value: "merged" as const }, { label: "One file per side", value: "perSide" as const }], output, setOutput)}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={{ width: 120, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>File Name</span>
-            <input value={fileName} onChange={(e) => setFileName(e.target.value)} style={{ flex: 1, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+      <Card width={940} maxHeight="90%" flexCol>
+        <Header title="Export board artwork" onClose={actions.closeModal} padding="16px 22px" />
+        <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 340 }}>
+          <div style={{ width: 400, flex: "0 0 auto", padding: "var(--spacing-8) var(--spacing-9)", overflowY: "auto", borderRight: "var(--border-width-1) solid var(--color-border-subtle)", display: "flex", flexDirection: "column", gap: "var(--spacing-7)" }}>
+            {rowSeg("Format", [{ label: "PDF", value: "PDF" as const }, { label: "PNG", value: "PNG" as const }, { label: "SVG", value: "SVG" as const }], fmt, setFmt)}
+            {rowSeg("Range", [
+              { label: "Whole board", value: "board" as const },
+              { label: sel ? `Selection (${sel})` : "Selection — nothing selected", value: "selection" as const, off: sel === 0 },
+            ], range, setRange)}
+            {rowSeg("Ink", [
+              { label: "As drawn (board colours)", value: "default" as const },
+              { label: "White on black", value: "whiteOnBlack" as const },
+              { label: "Black on white (print)", value: "blackOnWhite" as const },
+            ], ink, setInk)}
+            {rowSeg("Copper strokes", [
+              { label: "True widths", value: "true" as const },
+              { label: "Hairline", value: "hair" as const },
+            ], hairline ? "hair" : "true", (v) => setHairline(v === "hair"))}
+            {rowSeg("Sides", [
+              { label: "Both on one sheet", value: "merged" as const },
+              { label: "Top and bottom separately", value: "perSide" as const },
+            ], sides, setSides)}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
+              <span style={{ width: 104, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>File name</span>
+              <input value={fileName} onChange={(e) => setFileName(e.target.value)} aria-label="File name" style={{ flex: 1, minWidth: 0, padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
+            </div>
+            <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
+              {empty
+                ? "Nothing is selected — pick objects on the board, or export the whole board."
+                : `${sides === "perSide" ? `Two ${fmt} files` : `One ${fmt} file`} · ${inkLabel[ink]} · ${hairline ? "hairline strokes" : "true copper widths"} · ${model.tracks.length} track${model.tracks.length === 1 ? "" : "s"}, ${model.comps.length} component${model.comps.length === 1 ? "" : "s"}.`}
+            </div>
           </div>
-          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-            {`${output === "perSide" ? "Two files" : "One file"} · ${themeLabel[theme]} · ${hairline ? "hairline strokes" : "true copper widths"} · ${model.tracks.length} track${model.tracks.length === 1 ? "" : "s"}, ${model.comps.length} component${model.comps.length === 1 ? "" : "s"}.`}
+
+          {/* live preview — the same SVG the export writes */}
+          <div style={{ flex: 1, padding: "var(--spacing-8)", display: "flex", flexDirection: "column", gap: "var(--spacing-4)", background: "var(--color-bg-subtle)", minWidth: 0 }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)", padding: "var(--spacing-5)", overflow: "hidden" }}>
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local data: URI preview
+                <img src={previewUrl} alt="Export preview" style={{ maxWidth: "100%", maxHeight: "100%", display: "block" }} />
+              ) : (
+                <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", textAlign: "center", maxWidth: 260 }}>
+                  Select something on the board to preview the crop.
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", textAlign: "center" }}>
+              {previewUrl
+                ? `${model.boardWmm.toFixed(1)} × ${model.boardHmm.toFixed(1)} mm${sides === "perSide" ? " · previewing the top side" : ""}`
+                : ""}
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Pill style={{ marginLeft: "auto" }} onClick={() => {
-            const url = URL.createObjectURL(buildPdf(model, { theme, hairline }));
+          <Pill style={{ marginLeft: "auto", ...(empty ? { opacity: 0.45, pointerEvents: "none" } : null) }} onClick={() => {
+            const url = URL.createObjectURL(buildPdf(model, { theme: ink, hairline }));
             window.open(url, "_blank");
             window.setTimeout(() => URL.revokeObjectURL(url), 8000);
           }}>Print</Pill>
-          <Button hierarchy="primary" size="md" onClick={async () => {
-            if (output === "perSide") { await write("top", "-top"); await write("bottom", "-bottom"); }
+          <Button hierarchy="primary" size="md" disabled={empty} onClick={async () => {
+            if (sides === "perSide") { await write("top", "-top"); await write("bottom", "-bottom"); }
             else await write("both", "");
-            actions.flashToast(`Exported ${fileType}${output === "perSide" ? " — top + bottom" : ""}`);
+            actions.flashToast(`Exported ${fmt}${sides === "perSide" ? " — top + bottom" : ""}`);
             actions.closeModal();
           }}>Export</Button>
         </div>

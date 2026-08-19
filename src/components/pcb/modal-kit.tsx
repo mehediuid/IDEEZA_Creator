@@ -432,6 +432,31 @@ export function DirectionTiles({
   );
 }
 
+// ── Rail action ─────────────────────────────────────────────────────────
+// A quiet text row for the actions that act on a whole config rather than on
+// the dialog's own decision (import / export / restore defaults). Living at the
+// foot of the rail keeps the dialog footer for Cancel and Save alone, instead
+// of a single row of five buttons where the destructive one sits beside them.
+export function RailAction({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ix-row"
+      style={{
+        display: "block", width: "100%", textAlign: "left",
+        padding: "var(--spacing-3) var(--spacing-5)",
+        border: "none", background: "transparent",
+        borderRadius: "var(--radius-md)", cursor: "pointer",
+        font: "inherit", fontSize: "var(--font-size-sm)",
+        color: "var(--color-text-secondary)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ── Section label ───────────────────────────────────────────────────────
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
