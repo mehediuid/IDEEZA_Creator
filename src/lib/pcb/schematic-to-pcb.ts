@@ -450,3 +450,45 @@ export function unrouteGenerated(objects: CanvasObject[], nets?: Set<string>): {
   }
   return { objects: [...objects.filter((o) => !isGen(o)), ...rats], freed: rats.length };
 }
+
+/** What Import Changes From Schematic is about to do — built by the same pass
+ *  that does it (store's action consumes this very plan), so the confirm
+ *  dialog's counts can't drift from the result (UIUX-104). */
+export interface ImportChangesPlan {
+  /** Fresh footprints, with the placement/rotation/side of parts already on
+   *  the board kept (matched by `sourceId`). */
+  merged: CanvasObject[];
+  /** The rest of the fresh convert output (the rebuilt ratsnest). */
+  rest: CanvasObject[];
+  /** Parts on the sheet that have no footprint on the board yet. */
+  added: ConvertPlanRow[];
+  /** Designators of board parts whose schematic symbol is gone. */
+  removedDesignators: string[];
+  kept: number;
+}
+
+export function planImportChanges(src: CanvasObject[]): ImportChangesPlan {
+  const { objects: generated, plan } = convertSchematicToPcb(src);
+  const genFoot = generated.filter((o) => o.props?.gen === "convert" && o.sourceId);
+  const rest = generated.filter((o) => !(o.props?.gen === "convert" && o.sourceId));
+  const existing = src.filter((o) => o.props?.gen === "convert" && o.sourceId);
+  const bySource = new Map(existing.map((o) => [o.sourceId as string, o]));
+  const added: ConvertPlanRow[] = [];
+  let kept = 0;
+  // plan.rows and genFoot come out of the same per-part loop, so index i is
+  // the same part in both.
+  const merged = genFoot.map((g, i) => {
+    const old = bySource.get(g.sourceId as string);
+    if (!old) {
+      added.push(plan.rows[i] ?? { designator: g.text ?? "?", symbol: g.kind, footprint: g.footprint ?? "" });
+      return g;
+    }
+    kept++;
+    return { ...g, x: old.x, y: old.y, rotation: old.rotation, side: old.side, layer: old.layer };
+  });
+  const liveSources = new Set(genFoot.map((g) => g.sourceId));
+  const removedDesignators = existing
+    .filter((o) => !liveSources.has(o.sourceId))
+    .map((o) => o.text || o.comment || "?");
+  return { merged, rest, added, removedDesignators, kept };
+}

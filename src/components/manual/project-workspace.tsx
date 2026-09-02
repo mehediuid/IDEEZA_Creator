@@ -49,6 +49,10 @@ const PreviewApp = dynamic(
   () => import("@/components/preview/preview-app").then((m) => m.PreviewApp),
   { ssr: false, loading },
 );
+const AssemblyApp = dynamic(
+  () => import("@/components/assembly/assembly-app").then((m) => m.AssemblyApp),
+  { ssr: false, loading },
+);
 const WiringApp = dynamic(
   () => import("@/components/wiring/wiring-app").then((m) => m.WiringApp),
   { ssr: false, loading },
@@ -62,8 +66,9 @@ const APP_BY_STEP: Record<keyof ManualFlowState, React.ComponentType> = {
   pcb: PcbApp,
   code: CodeApp,
   three: ThreeApp,
-  preview: PreviewApp,
+  assembly: AssemblyApp,
   wiring: WiringApp,
+  preview: PreviewApp,
   brief: BriefApp,
 };
 

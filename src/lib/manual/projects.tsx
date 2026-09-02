@@ -26,8 +26,9 @@ export type ManualFlowState = {
   pcb: boolean;
   code: boolean;
   three: boolean;
-  preview: boolean;
+  assembly: boolean;
   wiring: boolean;
+  preview: boolean;
   brief: boolean;
 };
 
@@ -35,8 +36,9 @@ export const EMPTY_FLOW_STATE: ManualFlowState = {
   pcb: false,
   code: false,
   three: false,
-  preview: false,
+  assembly: false,
   wiring: false,
+  preview: false,
   brief: false,
 };
 
@@ -130,8 +132,11 @@ function normalizeProjects(list: ManualProject[]): ManualProject[] {
     while (taken.has(slug)) slug = `${base}-${n++}`;
     taken.add(slug);
     const productName = p.productName ?? "";
-    if (p.slug === slug && p.productName !== undefined) return p;
-    return { ...p, slug, productName };
+    // Backfill steps added after a project was saved (e.g. `assembly`,
+    // UIUX-80) so flowState always carries every step key.
+    const flowOk = p.flowState && FLOW_STEPS.every((s) => s in p.flowState);
+    if (p.slug === slug && p.productName !== undefined && flowOk) return p;
+    return { ...p, slug, productName, flowState: { ...EMPTY_FLOW_STATE, ...(p.flowState ?? {}) } };
   });
 }
 
@@ -300,12 +305,15 @@ export function useManualProjects(): Ctx {
 
 // Derived helper — returns the first step not yet completed on a
 // project, so "Resume" navigates the user where they actually left off.
+// UIUX-80 — module order per client direction: PCB Design → Code → 3D Module →
+// Assembly → Peripheral Wiring → Product Preview → Add Brief.
 export const FLOW_STEPS: Array<keyof ManualFlowState> = [
   "pcb",
   "code",
   "three",
-  "preview",
+  "assembly",
   "wiring",
+  "preview",
   "brief",
 ];
 
@@ -315,8 +323,9 @@ export const STEP_URL_SEGMENT: Record<keyof ManualFlowState, string> = {
   pcb: "pcb",
   code: "code",
   three: "3d",
-  preview: "preview",
+  assembly: "assembly",
   wiring: "wiring",
+  preview: "preview",
   brief: "brief",
 };
 
@@ -325,8 +334,9 @@ export const SEGMENT_TO_STEP: Record<string, keyof ManualFlowState> = {
   pcb: "pcb",
   code: "code",
   "3d": "three",
-  preview: "preview",
+  assembly: "assembly",
   wiring: "wiring",
+  preview: "preview",
   brief: "brief",
 };
 
@@ -344,8 +354,9 @@ export const STEP_LABELS: Record<keyof ManualFlowState, string> = {
   pcb: "PCB Design",
   code: "Code",
   three: "3D Module",
+  assembly: "Assembly",
+  wiring: "Peripheral Wiring",
   preview: "Product Preview",
-  wiring: "Wiring",
   brief: "Brief",
 };
 

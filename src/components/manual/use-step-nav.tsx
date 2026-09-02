@@ -19,8 +19,9 @@ export const RAIL_KEY_TO_STEP: Partial<
   pcb: "pcb",
   code: "code",
   "3d": "three",
-  preview: "preview",
+  assembly: "assembly",
   wiring: "wiring",
+  preview: "preview",
   brief: "brief",
 };
 

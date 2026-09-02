@@ -31,8 +31,9 @@ export const FLOW_LABELS: Record<FlowStep, string> = {
   pcb: STEP_LABELS.pcb.replace(" Design", ""), // back-compat short labels
   code: STEP_LABELS.code,
   three: "3D",
+  assembly: "Assembly",
+  wiring: "Peripheral Wiring",
   preview: "Preview",
-  wiring: "Wiring",
   brief: "Brief",
 };
 // Inverse lookup: given a pathname, return the matching FlowStep or null.

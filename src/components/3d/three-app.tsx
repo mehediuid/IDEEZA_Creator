@@ -740,8 +740,8 @@ export function ThreeApp() {
                 Back to Code
               </Pill>
             )}
-            <Pill trailing={<Caret dir="right" />} onClick={() => goStep("preview")}>
-              Continue to Preview
+            <Pill trailing={<Caret dir="right" />} onClick={() => goStep("assembly")}>
+              Continue to Assembly
             </Pill>
           </div>
         </>

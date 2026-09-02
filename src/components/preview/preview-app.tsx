@@ -99,19 +99,20 @@ function PreviewBody({ variant }: { variant: PreviewVariant }) {
         leftOffset={viewportLeft + 16}
       />
 
-      {/* Back — bottom-LEFT inside the viewport area. */}
+      {/* Back — bottom-LEFT inside the viewport area. UIUX-80 — Product
+          Preview now follows Peripheral Wiring in the module order. */}
       <FlowPill
         kind="back"
-        label={isWiring ? "Back to Preview" : "Back to 3D"}
-        onClick={() => goStep(isWiring ? "preview" : "three")}
+        label={isWiring ? "Back to Assembly" : "Back to Peripheral Wiring"}
+        onClick={() => goStep(isWiring ? "assembly" : "wiring")}
         style={{ left: viewportLeft + 20, bottom: 20 }}
       />
 
       {/* Continue — bottom-RIGHT inside the viewport area. */}
       <FlowPill
         kind="forward"
-        label={isWiring ? "Continue to Brief" : "Continue to Wiring"}
-        onClick={() => goStep(isWiring ? "brief" : "wiring")}
+        label={isWiring ? "Continue to Preview" : "Continue to Brief"}
+        onClick={() => goStep(isWiring ? "preview" : "brief")}
         style={{ right: RIGHT_PANEL_W + 20, bottom: 20 }}
       />
 

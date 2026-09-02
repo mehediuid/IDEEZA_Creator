@@ -41,12 +41,13 @@ function WiringBody() {
       <WiringRightPanel topOffset={TOP} />
 
       {/* flow pills */}
-      <FlowPill kind="back" label="Back to Preview" onClick={() => go("preview")} style={{ left: LEFT_RAIL + LEFT_PANEL + 20, bottom: 20 }} />
-      <FlowPill kind="forward" label="Continue to Brief" onClick={() => go("brief")} style={{ right: RIGHT_PANEL + 20, bottom: 20 }} />
+      {/* UIUX-80 — Peripheral Wiring sits between Assembly and Product Preview. */}
+      <FlowPill kind="back" label="Back to Assembly" onClick={() => go("assembly")} style={{ left: LEFT_RAIL + LEFT_PANEL + 20, bottom: 20 }} />
+      <FlowPill kind="forward" label="Continue to Preview" onClick={() => go("preview")} style={{ right: RIGHT_PANEL + 20, bottom: 20 }} />
 
       {/* bottom bar */}
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 36, background: "var(--color-bg-surface)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", zIndex: 12, display: "flex", alignItems: "center", padding: "0 var(--spacing-8)", fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)" }}>
-        Wiring · connect peripheral parts pin-to-pin
+        Peripheral Wiring · connect peripheral parts pin-to-pin
       </div>
 
       {toast && (

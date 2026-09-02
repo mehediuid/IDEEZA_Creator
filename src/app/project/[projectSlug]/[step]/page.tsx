@@ -9,8 +9,9 @@ const SEGMENT_TO_STEP: Record<string, keyof ManualFlowState> = {
   pcb: "pcb",
   code: "code",
   "3d": "three",
-  preview: "preview",
+  assembly: "assembly",
   wiring: "wiring",
+  preview: "preview",
   brief: "brief",
 };
 
@@ -18,8 +19,9 @@ const TITLES: Record<string, string> = {
   pcb: "PCB Software",
   code: "Code",
   "3d": "3D Module",
+  assembly: "Assembly",
+  wiring: "Peripheral Wiring",
   preview: "Product Preview",
-  wiring: "Wiring",
   brief: "Add Brief",
 };
 
