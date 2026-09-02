@@ -272,65 +272,60 @@ function TitleBlock({
   if (has(date)) rows.push(["Date", date]);
   if (sizeOn && sheetSize) rows.push(["Size", sheetSize]);
 
+  // A drawing's title block is part of the sheet, not floating UI: a compact
+  // corner strip (two lines, no elevation) instead of the tall card that
+  // covered a quarter of an A4 page — and display-only, so it no longer
+  // swallows canvas clicks over the area it sits on. Every field keeps its
+  // label (UIUX-68), just inline: `Doc No. SB-001 · Revision C · …`.
   return (
     <div
       style={{
         position: "absolute",
         ...(right ? { right: 34 } : { left: 34 }),
         ...(bottom ? { bottom: 34 } : { top: 34 }),
-        width: Math.min(width, 320),
+        width: "max-content",
+        maxWidth: Math.min(width, 290),
         border: "var(--border-width-1) solid var(--color-canvas-card-border)",
-        borderRadius: "var(--radius-lg)",
+        borderRadius: "var(--radius-md)",
         background: "var(--color-canvas-card)",
-        boxShadow: "var(--elevation-3)",
-        padding: "var(--spacing-6) var(--spacing-7)",
+        padding: "var(--spacing-3) var(--spacing-5)",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--spacing-3)",
+        gap: 3,
+        pointerEvents: "none",
       }}
     >
-      {/* logo + company */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)" }}>
-        <span style={{ width: 20, height: 20, borderRadius: "var(--radius-full)", background: "var(--color-violet-600)", display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-text-on-brand)"><path d="M6 4l14 8-14 8z" /></svg>
+      {/* one line: mark · title · sheet kind */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-3)", minWidth: 0 }}>
+        <span style={{ width: 14, height: 14, borderRadius: "var(--radius-full)", background: "var(--color-violet-600)", display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>
+          <svg width="7" height="7" viewBox="0 0 24 24" fill="var(--color-text-on-brand)"><path d="M6 4l14 8-14 8z" /></svg>
         </span>
-        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-violet-600)", letterSpacing: 0.2 }}>
+        <span style={{ fontSize: "var(--font-size-2xs, 10px)", fontWeight: 700, color: "var(--color-violet-600)", letterSpacing: 0.3, flex: "0 0 auto" }}>
           IDEEZA
         </span>
-      </div>
-
-      {/* sheet title — the one value big enough to read as the heading */}
-      <div>
-        <div style={{ fontSize: "var(--font-size-lg)", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={title}>
+        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={title}>
           {title}
-        </div>
-        <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", marginTop: 2 }}>Schematic sheet</div>
+        </span>
+        <span style={{ fontSize: "var(--font-size-2xs, 10px)", color: "var(--color-text-tertiary)", flex: "0 0 auto" }}>· Schematic sheet</span>
       </div>
 
-      {/* the rest as label / value pairs, the way a real title block reads */}
+      {/* the fields as inline label·value pairs — labelled, but one dense row */}
       {rows.length > 0 && (
         <div
           data-title-block-fields
-          style={{
-            display: "grid",
-            gridTemplateColumns: "auto 1fr",
-            columnGap: "var(--spacing-5)",
-            rowGap: 2,
-            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-            paddingTop: "var(--spacing-3)",
-          }}
+          style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: "var(--spacing-5)", rowGap: 1 }}
         >
           {rows.map(([label, value]) => (
-            <React.Fragment key={label}>
-              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>{label}</span>
+            <span key={label} style={{ display: "inline-flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
+              <span style={{ fontSize: "var(--font-size-2xs, 10px)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>{label}</span>
               <span
                 data-field={label}
                 title={value}
-                style={{ fontSize: "var(--font-size-xs)", fontWeight: 500, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                style={{ fontSize: "var(--font-size-xs)", fontWeight: 500, color: "var(--color-text-secondary)", fontVariantNumeric: "tabular-nums", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}
               >
                 {value}
               </span>
-            </React.Fragment>
+            </span>
           ))}
         </div>
       )}
