@@ -107,7 +107,10 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
   const tool = (t) => () => actions.setTool(t);
   // Same symbol kind, different rail name stamped on the placed object.
   const rail = (t, text) => () => actions.setToolAs(t, text);
-  const toastSu = (label, msg) => su(label, "", { onClick: () => actions.flashToast(msg ?? `${label.replace(/…$/, "")} — coming soon`) });
+  // An importer with no parser behind it is greyed with the reason — a toast
+  // (or a Notice dialog whose Confirm did nothing) pretended the import worked.
+  const noImporter = (label) =>
+    su(label, "", { disabled: true, note: `${label.replace(/…$/, "")} importer isn't built yet.` });
 
   const data = [
     {
@@ -147,17 +150,19 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
           icon: "imp",
           sub: [
             su("DXF…", "", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
-            toastSu("Image…"),
-            toastSu("EasyEDA (Standard)…"),
-            toastSu("EasyEDA (Professional)…"),
-            su("Altium Designer…", "", { icon: "imp", onClick: () => actions.openModal("importAltium") }),
-            toastSu("Allegro/OrCad…"),
-            toastSu("EAGLE…"),
-            su("KiCad…", "", { icon: "imp", onClick: () => actions.openModal("importKicad") }),
-            toastSu("PADS/PADS Pro…"),
-            toastSu("Protel…"),
-            toastSu("LTspice…"),
-            toastSu("T/DISA 4001…"),
+            // UIUX-83 — the real image-import dialog (it used to toast here
+            // while Insert ▸ Image opened it).
+            su("Image…", "", { icon: "pImage", onClick: () => actions.openModal("importImage") }),
+            noImporter("EasyEDA (Standard)…"),
+            noImporter("EasyEDA (Professional)…"),
+            noImporter("Altium Designer…"),
+            noImporter("Allegro/OrCad…"),
+            noImporter("EAGLE…"),
+            noImporter("KiCad…"),
+            noImporter("PADS/PADS Pro…"),
+            noImporter("Protel…"),
+            noImporter("LTspice…"),
+            noImporter("T/DISA 4001…"),
           ],
         }),
       ],
@@ -305,6 +310,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         // with no file behind it; it opens the real import dialog now.
         item("Image…", { icon: "pImage", onClick: () => actions.openModal("importImage") }),
         item("Table", { icon: "pTable", onClick: () => actions.openModal("tableProps") }),
+        // Final List 3 — Insert BOM Table: a real table object carrying the
+        // live BOM of this sheet (identical parts grouped with a quantity).
+        item("BOM Table", { icon: "pBomTable", onClick: () => actions.insertBomTable() }),
       ],
     },
     {
@@ -312,7 +320,9 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       label: "Design",
       key: "D",
       items: [
-        item("Generate PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.convertSchematicToPcb() }),
+        // UIUX-104 — opens the convert-plan dialog (the same one the PCB tab
+        // opens) instead of converting behind your back; Confirm runs it.
+        item("Generate PCB", { k: "Alt+I", icon: "dConvert", onClick: () => actions.openModal("convertConfirm") }),
         dv,
         // The sheet's rules are electrical — "Design rules" pointed at the
         // board's DRC, and the row now carries the toolbar's own ERC glyph so
@@ -322,6 +332,10 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
         item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
         item("Import 3D Model…", { icon: "cube", onClick: () => actions.openModal("importGltf") }),
+        dv,
+        // Final List 3 — opens the left panel's AI assistant (the product's
+        // chatbot), which can really generate onto the sheet.
+        item("Generate Data From Chatbot", { icon: "dChat", onClick: () => { window.dispatchEvent(new CustomEvent("ideeza:ai:open")); actions.closeAll(); } }),
         // Annotate Designator is gone from here and from the toolbar (UIUX-3):
         // parts number themselves as they land. Re-numbering a whole sheet
         // stays available on a component's right-click menu.
@@ -499,8 +513,10 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       icon: keepRatio ? "check" : "blank",
       onClick: () => actions.setBoardSetting("gridKeepRatio", !keepRatio),
     }),
+    // UIUX-20 — one settings row, in our own words. EasyEDA's pair ("Common
+    // Grid/Snap setting" · "Grid Range setting") both opened the same fields
+    // here, so the second row was a duplicate wearing a borrowed name.
     su("Grid & snap settings…", "", { icon: "grid", onClick: openGridSettings }),
-    su("Grid range settings…", "", { icon: "fitarea", onClick: openGridSettings }),
   ];
 
   // Snap toggle reflects current `snapEnabled` flag (Phase 6, IT-604).
@@ -561,12 +577,15 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
           sub: [
             su("DXF…", "", { icon: "imp", onClick: () => actions.openModal("importDfx") }),
             su("Image…", "", { icon: "pImage", onClick: () => actions.openModal("importImage") }),
-            su("Altium…", "", { icon: "imp", onClick: () => actions.openModal("importAltium") }),
-            su("Allegro/OrCad…", "", { onClick: () => actions.flashToast("Allegro/OrCad — coming soon") }),
-            su("EAGLE…", "", { onClick: () => actions.flashToast("EAGLE — coming soon") }),
-            su("KiCad…", "", { icon: "imp", onClick: () => actions.openModal("importKicad") }),
-            su("PADS…", "", { onClick: () => actions.flashToast("PADS — coming soon") }),
-            su("Protel…", "", { onClick: () => actions.flashToast("Protel — coming soon") }),
+            // Formats with no parser behind them are greyed with the reason —
+            // the toasts (and the Altium/KiCad Notice dialogs whose Confirm
+            // did nothing) pretended the import worked.
+            su("Altium…", "", { disabled: true, note: "Altium importer isn't built yet." }),
+            su("Allegro/OrCad…", "", { disabled: true, note: "Allegro/OrCad importer isn't built yet." }),
+            su("EAGLE…", "", { disabled: true, note: "EAGLE importer isn't built yet." }),
+            su("KiCad…", "", { disabled: true, note: "KiCad importer isn't built yet." }),
+            su("PADS…", "", { disabled: true, note: "PADS importer isn't built yet." }),
+            su("Protel…", "", { disabled: true, note: "Protel importer isn't built yet." }),
           ],
         }),
       ],
@@ -658,9 +677,14 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Appearance", {
           icon: "appearance",
           sub: [
-            su("Light Mode", "", { icon: "sun", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
-            su("Dark Mode", "", { icon: "moon", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
-            su("System Default", "", { icon: "sys", onClick: () => actions.flashToast("Switch theme via Setting → System") }),
+            // Real theme switches — the ThemeProvider listens on this event
+            // (these rows are pure data, so they can't reach its context).
+            ...[["Light Mode", "light", "sun"], ["Dark Mode", "dark", "moon"], ["System Default", "system", "sys"]].map(([label, mode, ic]) =>
+              su(label, "", {
+                icon: (typeof localStorage !== "undefined" && (localStorage.getItem("ideeza-theme") ?? "system") === mode) ? "check" : ic,
+                onClick: () => { window.dispatchEvent(new CustomEvent("ideeza:set-theme", { detail: mode })); actions.closeAll(); },
+              }),
+            ),
             dv,
             su("Open Theme Settings…", "", { icon: "appearance", onClick: () => actions.openSettings("system") }),
           ],
@@ -695,7 +719,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         item("Copper Area", { icon: "tCopperArea", sub: areaSub("polygon") }),
         item("Fill Area", { icon: "tFillArea", sub: areaSub("fillRegion") }),
         item("Slot Region", { icon: "tSlot", sub: areaSub("slot") }),
-        item("Prohibited Region", { icon: "pNoConnect", sub: areaSub("prohibitedRegion") }),
+        item("Prohibited Region", { icon: "pKeepout", sub: areaSub("prohibitedRegion") }),
         item("Constraint Region", { icon: "rectIn", sub: areaSub("constraintRegion") }),
         dv,
         // The palette's Shapes flyout and this row arm the same tools, so the
@@ -721,7 +745,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       label: "Design",
       key: "D",
       items: [
-        item("Import Changes From Schematic", { k: "Alt+I", icon: "dConvert", onClick: () => actions.importChangesFromSchematic() }),
+        // UIUX-104 — opens the import-plan dialog (kept / new / removed parts)
+        // rather than rewriting the board on the spot; Confirm applies it.
+        item("Import Changes From Schematic", { k: "Alt+I", icon: "dConvert", onClick: () => actions.openModal("importChanges") }),
         item("Design rules", { icon: "dDrc", onClick: () => actions.openModal("pcbDrc") }),
         item("Diff-pair manager", { icon: "dCross", onClick: () => actions.openModal("diffPair") }),
         dv,
@@ -796,10 +822,14 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       items: [
         item("Single Routing", { k: "T", icon: "tTrack", onClick: () => actions.setTool("track") }),
         item("Differential Routing", { k: "D", icon: "tDiffPair", onClick: () => actions.setTool("diffPair") }),
-        item("Gloss Selected Track", { icon: "tGloss", onClick: () => actions.flashToast("Glossed selected tracks") }),
+        item("Gloss Selected Track", { icon: "tGloss", onClick: () => actions.glossSelectedTracks() }),
         dv,
-        item("Equal Length Tuning", { icon: "tLenTune", onClick: () => actions.openModal("equalLength") }),
-        item("Differential Pair Equal Length Tuning", { icon: "tDiffLenTune", onClick: () => actions.openModal("equalLength") }),
+        // UIUX-18 — these are tools, not dialogs: clicking arms the on-canvas
+        // tuning draft (the same tool the palette's Route flyout carries).
+        // They used to open the Matched-length-groups manager, which is a
+        // different job and keeps its own home in the Design menu.
+        item("Equal Length Tuning", { icon: "tLenTune", onClick: () => actions.setTool("lengthTune") }),
+        item("Differential Pair Equal Length Tuning", { icon: "tDiffLenTune", onClick: () => actions.setTool("lengthTune") }),
         dv,
         item("Auto Routing", { icon: "tAutoRoute", onClick: () => actions.autoRoute() }),
         // #103 — Routing Mode is about obstacles (the 45/90 shapes moved to
@@ -830,7 +860,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
         }),
         item("Routing Width…", { icon: "tRouteWidth", onClick: () => actions.openModal("routingWidth") }),
         dv,
-        item("Unroute", { icon: "del", onClick: () => actions.flashToast("Unrouted") }),
+        item("Unroute", { icon: "del", onClick: () => actions.unrouteTracks() }),
         // "Remove Loop" left this menu (UIUX-19) — Unroute above it is the real
         // command, and the row only toasted.
       ],
@@ -880,6 +910,9 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
             su("Align Bottom", "", { icon: "alignBottom", onClick: () => actions.alignSelected("bottom") }),
             su("Align Horizontal centers", "", { icon: "alignHCenter", onClick: () => actions.alignSelected("hcenter") }),
             su("Align Vertical Center", "", { icon: "alignVCenter", onClick: () => actions.alignSelected("vcenter") }),
+            dv,
+            // Final List 3 "Align Grid" — the Position panel's Tidy up (⌃⌥T).
+            su("Align to Grid", "", { icon: "tAlignGrid", onClick: () => actions.alignSelectedToGrid() }),
           ],
         }),
         item("Distribute", {
@@ -1031,9 +1064,11 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
           sub: [
             su("General", "", { icon: "sys", onClick: () => actions.openSettings("footprint") }),
             su("Theme", "", { icon: "appearance", onClick: () => actions.openSettings("footprint") }),
-            su("Common Grid/Snap Size setting", "", { icon: "grid", onClick: () => actions.openSettings("footprint") }),
-            su("Common Track Width Setting", "", { icon: "wire", onClick: () => actions.openSettings("footprint") }),
-            su("Common Via Size Setting", "", { icon: "tVia", onClick: () => actions.openSettings("footprint") }),
+            // UIUX-20 — our own wording; the old rows were EasyEDA's
+            // "Common … setting" labels verbatim.
+            su("Grid & snap defaults", "", { icon: "grid", onClick: () => actions.openSettings("footprint") }),
+            su("Track width defaults", "", { icon: "wire", onClick: () => actions.openSettings("footprint") }),
+            su("Via size defaults", "", { icon: "tVia", onClick: () => actions.openSettings("footprint") }),
             su("Snap", "", { icon: "snap", onClick: () => actions.toggleSnap() }),
           ],
         }),
@@ -1380,12 +1415,15 @@ export function buildCtxItems(state: PcbState, actions: PcbActions) {
 // `iconEl(x)` reduced to the raw SVG string `x` (rendered via <Icon html=.../>).
 
 export function buildRail(_state: PcbState | null = null, activeKey: string = 'pcb') {
+  // UIUX-80 — module order per client direction: Assembly is new (after 3D),
+  // Wiring reads "Peripheral Wiring", and Product Preview follows it.
   const railDefs = [
     { key: 'pcb', label: 'PCB Design', icon: 'pcb' },
     { key: 'code', label: 'Code', icon: 'code' },
     { key: '3d', label: '3D Module', icon: 'cube' },
+    { key: 'assembly', label: 'Assembly', icon: 'assembly' },
+    { key: 'wiring', label: 'Peripheral Wiring', icon: 'wire' },
     { key: 'preview', label: 'Product Preview', icon: 'preview' },
-    { key: 'wiring', label: 'Wiring', icon: 'wire' },
     { key: 'brief', label: 'Add Brief', icon: 'brief' },
   ];
   return railDefs.map((r) => {

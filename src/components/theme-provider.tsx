@@ -52,6 +52,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(next);
   }, []);
 
+  // Surfaces built from pure data (the PCB editor's View ▸ Appearance rows)
+  // can't reach this context — they ask over a window event instead.
+  React.useEffect(() => {
+    const onSet = (e: Event) => {
+      const v = (e as CustomEvent).detail;
+      if (v === "light" || v === "dark" || v === "system") setTheme(v);
+    };
+    window.addEventListener("ideeza:set-theme", onSet);
+    return () => window.removeEventListener("ideeza:set-theme", onSet);
+  }, [setTheme]);
+
   const value = React.useMemo<ThemeContextValue>(
     () => ({ theme, resolvedTheme, setTheme }),
     [theme, resolvedTheme, setTheme],

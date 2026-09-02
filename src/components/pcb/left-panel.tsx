@@ -119,6 +119,14 @@ export function LeftPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Menu rows (Design ▸ Generate Data From Chatbot) open the assistant over a
+  // window event — the menu builders are pure data and can't reach this state.
+  React.useEffect(() => {
+    const onOpen = () => setAiOpen(true);
+    window.addEventListener("ideeza:ai:open", onOpen);
+    return () => window.removeEventListener("ideeza:ai:open", onOpen);
+  }, []);
+
   // AI action executor — lets the assistant actually edit the open module:
   // place parts / route tracks on the board, add primitive shapes in 3D.
   const aiOffset = React.useRef(0);

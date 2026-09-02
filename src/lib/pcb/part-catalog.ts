@@ -20,6 +20,11 @@ export type CatalogPart = {
   features: string[];
   /** Placed object kind — a real schematic symbol, never a generic box. */
   kind: string;
+  /** Who produced the symbol/footprint (PRD 2026-08-30 §9.2) — independent of
+   *  verification. Omitted = human-submitted. */
+  origin?: "human" | "ai";
+  /** Reviewed/approved. Omitted = verified (the curated system catalogue). */
+  verified?: boolean;
 };
 
 /** Agile Module — a reusable multi-part block placed as one object. */
@@ -48,6 +53,13 @@ export const PART_CATALOG: CatalogPart[] = [
   { id: "p13", part: "BSS138", pkg: "SOT-23", mfr: "onsemi", price: "$0.0410", stock: "220,910", features: ["MOSFET", "Level shift"], kind: "transistor" },
   { id: "p14", part: "USB4110-GF-A", pkg: "USB-C-16P", mfr: "GCT", price: "$0.4800", stock: "24,110", features: ["Connector", "USB-C"], kind: "connector" },
   { id: "p15", part: "PJ-320A", pkg: "TH-5P", mfr: "Xkb", price: "$0.0930", stock: "77,050", features: ["Connector", "Audio"], kind: "connector" },
+  // AI-generated library entries — symbol/footprint produced by IDEEZA part
+  // generation for a real MPN. Origin is independent of verification (PRD §4):
+  // two have been human-reviewed, two are still waiting.
+  { id: "ai1", part: "TPS62840DLCR", pkg: "SOT-583", mfr: "TI", price: "$0.9200", stock: "18,750", features: ["Regulator", "Buck", "Low IQ"], kind: "ic", origin: "ai", verified: true },
+  { id: "ai2", part: "W25Q128JVSIQ", pkg: "SOIC-8", mfr: "Winbond", price: "$1.1400", stock: "64,020", features: ["Flash", "QSPI"], kind: "ic", origin: "ai", verified: true },
+  { id: "ai3", part: "NCP1117ST33T3G", pkg: "SOT-223", mfr: "onsemi", price: "$0.1480", stock: "133,600", features: ["Regulator", "LDO"], kind: "ic", origin: "ai", verified: false },
+  { id: "ai4", part: "SMBJ5.0A", pkg: "SMB", mfr: "Littelfuse", price: "$0.0620", stock: "88,410", features: ["Diode", "TVS"], kind: "diode", origin: "ai", verified: false },
 ];
 
 export const MODULE_CATALOG: AgileModule[] = [

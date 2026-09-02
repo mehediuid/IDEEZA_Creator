@@ -32,7 +32,6 @@ type ToolbarAction =
   | "openJlcpcb"
   | "openGenBlock"
   | "openBoolOp"
-  | "openDistribute"
   | "rotateRight"
   | "rotateLeft"
   | "flipV"
@@ -52,10 +51,7 @@ type ToolbarAction =
   | "openReannotate"
   // Phase 7 — 2D Main Toolbar (IT-718) extras
   | "openArray"
-  | "view2D"
-  | "view3D"
   | "flipBoard"
-  | "openDrc"
   | "openGerber"
   | "openPickPlace"
   // Main Toolbar Comparison — sub-grouped parity additions.
@@ -138,9 +134,8 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit all in window" },
   { kind: "icon", key: "tFitSection", action: "fitSection", label: "Fit section" },
   { kind: "icon", key: "tFitArea", action: "fitArea", label: "Fit Area Selection view" },
-  /* View Modes (PCB sheet) */
-  { kind: "icon", key: "board", action: "view2D", label: "2D View", modes: PCB },
-  { kind: "icon", key: "cube", action: "view3D", label: "3D View", modes: PCB },
+  /* View Modes (PCB sheet) — the bar's own view tabs are the one home for the
+     2D/3D switch, so those two rows are gone. */
   { kind: "icon", key: "convert", action: "flipBoard", label: "Flip Board", modes: PCB },
   { kind: "div" },
   /* Grid / Units */
@@ -167,7 +162,7 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tCapacitor", tool: "capacitor", label: "Capacitor", modes: SCH },
   { kind: "icon", key: "tPgnd", tool: "pgnd", label: "PGND", modes: SCH },
   { kind: "icon", key: "tAgnd", tool: "agnd", label: "AGND", modes: SCH },
-  { kind: "icon", key: "pNetLabel", tool: "pin", label: "Pin", modes: SCH },
+  { kind: "icon", key: "pPin", tool: "pin", label: "Pin", modes: SCH },
   { kind: "icon", key: "tNetLabel", tool: "netLabel", label: "Net Label", modes: SCH },
   { kind: "div" },
   /* Placement — Drawing & Shapes (Schematic) */
@@ -205,10 +200,9 @@ const ITEMS: Item[] = [
   { kind: "icon", key: "tJlcpcb", action: "openJlcpcb", label: "JLCPCB Layout Service", modes: SCH },
   { kind: "icon", key: "tGenBlock", action: "openGenBlock", label: "Generate / Update Block Symbol", modes: SCH },
   { kind: "div" },
-  /* Routing (PCB) */
-  { kind: "icon", key: "dCheck", action: "openDrc", label: "Design Rule Check", modes: PCB },
+  /* Routing (PCB) — the second DRC button (PCB_ESSENTIAL's named DRC is the
+     one home) and Stretch Track (no engine behind the tool) left this list. */
   { kind: "icon", key: "tTrack", tool: "track", label: "Single Route — PCB route", modes: PCB },
-  { kind: "icon", key: "pWire", tool: "stretchTrack", label: "Stretch Track", modes: PCB },
   { kind: "icon", key: "tDiffPair", tool: "diffPair", label: "Differential Pair Route", modes: PCB },
   { kind: "icon", key: "pArc", tool: "routingCorner", label: "Routing Corner", modes: PCB },
   { kind: "icon", key: "tLengthTune", tool: "lengthTune", label: "Length Tuning", modes: PCB },
@@ -270,8 +264,8 @@ const ITEMS_2D: Item[] = [
   { kind: "icon", key: "zoomout", action: "zoomOut", label: "Zoom Out" },
   { kind: "icon", key: "tFitAll", action: "fitAll", label: "Fit All in Window" },
   { kind: "icon", key: "tGridOptions", action: "toggleGrid", label: "Toggle Grid" },
-  { kind: "icon", key: "board", action: "view2D", label: "2D View" },
-  { kind: "icon", key: "cube", action: "view3D", label: "3D View" },
+  // 2D/3D View rows left this list — the bar's own view tabs are the one home
+  // for that switch, and two controls for one setting can disagree.
   { kind: "icon", key: "convert", action: "flipBoard", label: "Flip Board" },
   { kind: "div" },
   /* unit (existing dropdown) */
@@ -283,17 +277,16 @@ const ITEMS_2D: Item[] = [
   { kind: "icon", key: "tFillRegion", tool: "fillRegion", label: "Fill Region (already built)" },
   { kind: "icon", key: "tSlot", tool: "slot", label: "Slot Region (already built)" },
   { kind: "icon", key: "tBoardOutline", tool: "boardOutline", label: "Board Outline (already built)" },
-  { kind: "icon", key: "del", tool: "prohibitedRegion", label: "Prohibited Region" },
+  { kind: "icon", key: "pKeepout", tool: "prohibitedRegion", label: "Prohibited Region" },
   { kind: "icon", key: "pText", tool: "text", label: "Text" },
   { kind: "icon", key: "tDimension", tool: "dimension", label: "Dimension (already built)" },
   { kind: "div" },
   /* route */
+  // Stretch Track (no engine behind the tool), "Routing Corner (set)" (it
+  // opened the Distribute dialog — the Route menu owns corners) and the
+  // second DRC button (PCB_ESSENTIAL's named DRC control is the one home)
+  // all left this list.
   { kind: "icon", key: "tTrack", tool: "track", label: "Single Route (already built)" },
-  { kind: "icon", key: "pWire", tool: "stretchTrack", label: "Stretch Track" },
-  { kind: "icon", key: "wire", action: "openDistribute", label: "Routing Corner (set)" },
-  { kind: "div" },
-  /* design / DRC */
-  { kind: "icon", key: "dCheck", action: "openDrc", label: "Design Rule Check" },
   { kind: "div" },
   /* transform */
   { kind: "icon", key: "tRotLeft", action: "rotateLeft", label: "Rotate Left" },
@@ -876,7 +869,6 @@ export function Toolbar() {
     openJlcpcb: () => actions.openModal("jlcpcb"),
     openGenBlock: () => actions.openModal("genBlock"),
     openBoolOp: () => actions.openModal("boolOp"),
-    openDistribute: () => actions.openModal("distribute"),
     // Rotate/Flip target placed canvas objects first; fall back to the legacy
     // U12 component when nothing on the canvas is selected.
     rotateRight: () =>
@@ -900,10 +892,7 @@ export function Toolbar() {
     openReannotate: () => actions.openModal("reannotate"),
     // Phase 7 — IT-718 toolbar additions
     openArray: () => actions.openModal("array"),
-    view2D: () => actions.setMode("pcb"),
-    view3D: () => actions.setMode("3d"),
     flipBoard: () => actions.toggleBoardFlip(),
-    openDrc: () => actions.openModal("pcbDrc"),
     openGerber: () => actions.openModal("exportGerber2D"),
     openPickPlace: () => actions.openModal("exportPickPlace"),
     // Main Toolbar Comparison — sub-grouped parity additions.

@@ -64,6 +64,7 @@ export type ModalId =
   | "boolOp"
   | "distribute"
   | "convertConfirm"
+  | "importChanges"
   // Phase 3 — PCB Tools menu modals
   | "layerManager"
   | "stackup"
@@ -115,7 +116,10 @@ export type ManagerId = "device" | "footprint" | null;
 // Left-panel library: which library + common-library sub-tab + all-library filter.
 export type LibView = "common" | "all";
 export type LibCommonTab = "schematic" | "pcb" | "panel";
-export type LibFilter = "all" | "verified" | "public" | "private";
+export type LibFilter = "all" | "public" | "private" | "ai";
+// Verification is its own dimension (PRD 2026-08-30): a part's origin and its
+// review state are independent, so "Verified" left the tab row for this control.
+export type LibVerif = "all" | "verified" | "unverified";
 export type LibPrice = "all" | "free" | "premium";
 
 /**
@@ -312,6 +316,7 @@ export const PLACE_TOOLS: ReadonlyArray<string> = [
   "text",
   "note",
   "field",
+  "table",
   "pad",
   "via",
   "sutureVias",
@@ -745,7 +750,10 @@ export interface PcbState {
   libView: LibView;
   libCommonTab: LibCommonTab;
   libFilter: LibFilter;
+  libVerif: LibVerif;
   libPrice: LibPrice;
+  /** All-Library category picked in the sidebar tree (family, optional package). */
+  libCat: { family: string; pkg: string | null } | null;
   libSelected: string | null;
   libCtx: { x: string; y: string } | null;
   // Right-panel Filter tab interactions
@@ -1344,7 +1352,6 @@ export const TOOLBAR_CATALOGS: Record<ToolbarScope, ToolbarCatalogItem[]> = {
     { id: "selectVisible",  label: "Select Visible Parts" },
     // Main Toolbar Comparison parity — placement / routing tools.
     { id: "prohibitedRegion", label: "Prohibited Region" },
-    { id: "stretchTrack",   label: "Stretch Track" },
     { id: "routingCorner",  label: "Routing Corner" },
     { id: "mountingHole",   label: "Mounting Hole" },
     { id: "polyline",       label: "Polyline" },
@@ -1794,8 +1801,10 @@ export const initialState: PcbState = {
   manager: null,
   libView: "common",
   libCommonTab: "schematic",
-  libFilter: "verified",
+  libFilter: "all",
+  libVerif: "all",
   libPrice: "all",
+  libCat: null,
   libSelected: null,
   libCtx: null,
   filterExpanded: false,

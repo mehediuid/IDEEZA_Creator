@@ -284,6 +284,36 @@ export const GLYPHS: Record<string, React.ReactNode> = {
       <text x={0} y={2} textAnchor="middle" fontSize={8} stroke="none" fill="currentColor">U?</text>
     </g>
   ),
+  // The part catalogue's own kinds — they used to fall back to the generic
+  // dot, so an IC placed from the library was a dot on the sheet.
+  ic: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none">
+      <rect x={-14} y={-10} width={28} height={20} rx={1.5} />
+      <path d="M-14 -5h-4M-14 0h-4M-14 5h-4M14 -5h4M14 0h4M14 5h4" strokeLinecap="round" />
+      <circle cx={-10} cy={-6} r={1.3} fill="currentColor" stroke="none" />
+    </g>
+  ),
+  // NPN BJT — envelope, base bar, collector and the emitter arrow.
+  transistor: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx={2} cy={0} r={11} />
+      <path d="M-14 0h10M-4 -7v14" />
+      <path d="M-4 -3l10 -7M6 -10v-4M-4 3l10 7M6 10v4" />
+      <path d="M6 10l-4.6 -1.2M6 10l-1.4 -4.4" strokeWidth={1.3} />
+    </g>
+  ),
+  // Header connector — housing with a column of pins.
+  connector: (
+    <g stroke="currentColor" strokeWidth={1.6} fill="none" strokeLinecap="round">
+      <rect x={-6} y={-14} width={12} height={28} rx={1.5} />
+      {[-9, -3, 3, 9].map((y) => (
+        <g key={y}>
+          <circle cx={0} cy={y} r={1.4} fill="currentColor" stroke="none" />
+          <path d={`M6 ${y}h6`} />
+        </g>
+      ))}
+    </g>
+  ),
   // ── Real land patterns (Schematic → PCB convert output) ────────────────
   // Filled copper pads in the layer color + faint silkscreen body outline.
   // 0805 chip (R / C / L): two pads flanking a body.
@@ -702,6 +732,16 @@ export function PlacedObjects() {
             hovered={isHovered(o.id) && !selectedSet.has(o.id)}
             hoverProps={hoverProps(o.id)}
           />
+        ) : o.kind === "table" ? (
+          <TableObject
+            key={o.id}
+            obj={o}
+            selected={selectedSet.has(o.id)}
+            toolArmed={toolArmed}
+            hovered={isHovered(o.id) && !selectedSet.has(o.id)}
+            hoverProps={hoverProps(o.id)}
+            color={(state.mode === "schematic" ? SCHEM_DRAW_COLOR.table : DRAW_COLOR.table) as string}
+          />
         ) : o.kind === "image" && (o.props as Record<string, unknown> | undefined)?.src ? (
           <ImageObject
             key={o.id}
@@ -764,6 +804,81 @@ export function PlacedObjects() {
         ),
       )}
     </div>
+  );
+}
+
+// A placed table — a real grid, not a picture of one. Dimensions come from the
+// Table dialog (props.rows/cols); a table with content (props.cells, e.g. the
+// BOM table) draws its text in the draw-text colour. Cell metrics scale from
+// the object's own width/height so Properties can resize it like any object.
+function TableObject({
+  obj, selected, toolArmed, hovered, hoverProps, color,
+}: {
+  obj: CanvasObject;
+  selected: boolean;
+  toolArmed?: boolean;
+  hovered?: boolean;
+  hoverProps?: { onMouseEnter?: () => void; onMouseLeave?: () => void };
+  color: string;
+}) {
+  const p = (obj.props ?? {}) as Record<string, unknown>;
+  const cells = Array.isArray(p.cells) ? (p.cells as string[][]) : null;
+  const rows = Math.max(1, Math.min(60, cells ? cells.length : Number(p.rows) || 4));
+  const cols = Math.max(1, Math.min(24, cells ? Math.max(...cells.map((r) => r.length), 1) : Number(p.cols) || 3));
+  const w = Math.max(24, obj.width ?? cols * 64);
+  const h = Math.max(16, obj.height ?? rows * 18);
+  const cw = w / cols;
+  const rh = h / rows;
+  const stroke = selected
+    ? "var(--color-canvas-select)"
+    : hovered
+    ? "var(--color-canvas-hover)"
+    : color;
+  const fontSize = Math.max(6, Math.min(11, rh - 7));
+  return (
+    <svg
+      data-object-id={obj.id}
+      onClick={toolArmed ? undefined : (e) => e.stopPropagation()}
+      {...hoverProps}
+      width={w + 2}
+      height={h + 2}
+      style={{
+        position: "absolute",
+        left: obj.x - w / 2,
+        top: obj.y - h / 2,
+        overflow: "visible",
+        transform: obj.rotation ? `rotate(${obj.rotation}deg)` : undefined,
+        zIndex: 3,
+        cursor: toolArmed ? "inherit" : "pointer",
+      }}
+    >
+      <title>{`${String(p.name || "Table")} · ${rows} × ${cols}`}</title>
+      <g stroke={stroke} strokeWidth={hovered || selected ? 1.8 : 1.2} fill="none" strokeDasharray={selected ? "4 3" : undefined}>
+        <rect x={1} y={1} width={w} height={h} />
+        {Array.from({ length: rows - 1 }, (_, i) => (
+          <line key={`r${i}`} x1={1} y1={1 + (i + 1) * rh} x2={1 + w} y2={1 + (i + 1) * rh} />
+        ))}
+        {Array.from({ length: cols - 1 }, (_, i) => (
+          <line key={`c${i}`} x1={1 + (i + 1) * cw} y1={1} x2={1 + (i + 1) * cw} y2={1 + h} />
+        ))}
+      </g>
+      {cells && cells.slice(0, rows).map((row, ri) =>
+        row.slice(0, cols).map((cell, ci) => (
+          <text
+            key={`${ri}.${ci}`}
+            x={1 + ci * cw + 4}
+            y={1 + ri * rh + rh / 2}
+            dominantBaseline="central"
+            fontSize={fontSize}
+            fontWeight={ri === 0 ? 700 : 500}
+            fill={color}
+            style={{ userSelect: "none" }}
+          >
+            {String(cell).slice(0, Math.max(2, Math.floor(cw / (fontSize * 0.6))))}
+          </text>
+        )),
+      )}
+    </svg>
   );
 }
 

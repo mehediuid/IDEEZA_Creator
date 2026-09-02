@@ -10,6 +10,9 @@ export const ic: Record<string, string> = {
   pcb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.4" fill="currentColor" stroke="none"/><path d="M9 9h4v6" stroke-linecap="round"/></svg>',
   code: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>',
   cube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg>',
+  // UIUX-80 — Assembly module: a part descending onto its board (exploded
+  // stack), which is what assembling is. Not a borrowed cube or eye.
+  assembly: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2.5" width="8" height="6" rx="1.2"/><path d="M12 8.5v5" stroke-dasharray="2 2"/><path d="M9.8 11.3L12 13.5l2.2-2.2"/><path d="M3 16.5h18v3.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 20z"/><circle cx="6.5" cy="19" r=".9" fill="currentColor" stroke="none"/><circle cx="17.5" cy="19" r=".9" fill="currentColor" stroke="none"/></svg>',
   // 3D-view control cluster icons (top toolbar in 3D mode).
   v3dTop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M12 14v7M12 21l3-3M12 21l-3-3"/></svg>',
   v3dBottom: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 21l9-5-9-5-9 5 9 5z"/><path d="M12 10V3M12 3l3 3M12 3l-3 3"/></svg>',
@@ -124,6 +127,9 @@ export const ic: Record<string, string> = {
   // as a plain wire.
   pBus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 18h18" stroke-width="2.8"/><path d="M8 18l4-6M13 18l4-6" stroke-width="1.6"/><path d="M12 12h8" stroke-width="1.6"/></svg>',
   pNetLabel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h6"/><path d="M9 7h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9l-3.2-5z"/></svg>',
+  // A pin is a lead with a connection tip and its number tick — not a label
+  // tag, which is what it used to borrow (`pNetLabel`).
+  pPin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5.5" cy="12" r="2.3"/><path d="M7.8 12H19"/><path d="M13 8.5v-2"/></svg>',
   // Label family — each kind draws the outline it actually places, matching the
   // left palette's glyphs: local = tag, global = stadium, hierarchical =
   // hexagon, off-sheet = arrow into the sheet edge.
@@ -150,6 +156,11 @@ export const ic: Record<string, string> = {
   pText: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg>',
   pImage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5L5 19"/></svg>',
   pTable: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg>',
+  // BOM table — a table whose header row is filled: it carries data, not just
+  // a grid (so it can't be read as the plain Table row beside it).
+  pBomTable: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18" fill="none"/><rect x="3.8" y="4.8" width="16.4" height="4" fill="currentColor" stroke="none" opacity="0.85"/><path d="M3 14.8h18M10 9.5v10.5"/></svg>',
+  // The assistant — a speech bubble with a spark: the row opens the chatbot.
+  dChat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v11H9l-5 4z"/><path d="M12 8l.9 2.1L15 11l-2.1.9L12 14l-.9-2.1L9 11l2.1-.9L12 8z" fill="currentColor" stroke="none"/></svg>',
   dConvert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/></svg>',
   dLayout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>',
   dImport: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5 12 16l2.5-2.5"/></svg>',

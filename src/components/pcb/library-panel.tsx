@@ -11,7 +11,8 @@ import { Icon } from "@/lib/pcb/icons";
 import { Button, SearchInput } from "@/components/ideeza";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 import { glyphFor } from "@/components/pcb/placed-objects";
-import type { LibCommonTab, LibFilter, LibPrice } from "@/lib/pcb/types";
+import { allParts, pushRecent, readFavorites, toggleFavorite, type CatalogPart } from "@/lib/pcb/part-catalog";
+import { nextDesignator, type CanvasObject, type LibCommonTab, type LibFilter, type LibPrice, type LibVerif } from "@/lib/pcb/types";
 
 // ── module-scope pure data + helpers ──
 
@@ -94,50 +95,32 @@ const COMMON_GROUPS: Record<LibCommonTab, CommonGroup[]> = {
   ],
 };
 
-// All Library — sidebar category tree (Figma 445:204996).
-type Branch = { label: string; leaves?: string[]; children?: { label: string; leaves: string[] }[] };
-const CATEGORY_TREE: Branch[] = [
-  {
-    label: "AD8497ARMZ",
-    children: [
-      { label: "Adaptor", leaves: ["D8497ARMZ", "8497ARMZ", "497ARMZ", "D8497ARMZ", "UD8497ARMZ", "ER8497ARMZ"] },
-      { label: "AD8497ARMZ", leaves: [] },
-      { label: "AD8497ARMZ", leaves: [] },
-      { label: "AD8497ARMZ", leaves: [] },
-    ],
-  },
-  { label: "Adafruit" },
-  { label: "Anti-static, ESD, clean room product" },
-  { label: "Audio products" },
-  { label: "Audio & video" },
-  { label: "Battery products" },
-  { label: "Boxes, Enclosures, Racks" },
-  { label: "Bushings, grommets" },
-  { label: "Bushings, grommets" },
-  { label: "Bushings, grommets" },
-  { label: "Bushings, grommets" },
-  { label: "Bushings, grommets" },
-  { label: "Bushings, grommets" },
-  { label: "Cable assemblies" },
-  { label: "Capacitors" },
-  { label: "Crystals, oscillators, Resonators" },
-];
+// All Library — the sidebar tree is DERIVED from the real catalogue (family →
+// packages, live counts), so it can never list a category with nothing in it.
+const KIND_FAMILY: Record<string, string> = {
+  resistor: "Resistors",
+  capacitor: "Capacitors",
+  inductor: "Inductors",
+  diode: "Diodes",
+  transistor: "Transistors",
+  ic: "ICs",
+  connector: "Connectors",
+};
+const libFamilyOf = (p: CatalogPart) => KIND_FAMILY[p.kind] ?? "Other parts";
 
-// The 6 view icons above the category tree (icon #2 = schematic is active).
-const TREE_TOOLBAR: { key: string; svg: string }[] = [
-  { key: "grid", svg: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>' },
-  { key: "schematic", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 12h3l2-6 4 12 2-6h7"/></svg>' },
-  { key: "footprint", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="7" y="7" width="10" height="10" rx="1"/><path d="M3 9v6M21 9v6M9 3h6M9 21h6"/></svg>' },
-  { key: "cube", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 3v9l8 4.5M12 12L4 16.5"/></svg>' },
-  { key: "doc", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h6M10 16h6"/></svg>' },
-  { key: "graph", svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="9" r="2"/><circle cx="9" cy="18" r="2"/><path d="M8 7l8 1M8 8l1 8"/></svg>' },
-];
-
+// PRD 2026-08-30 — the tab row carries origin/access; "Verified" moved out to
+// the Verification control below (§9.1: one filter must not live in two rows).
 const FILTER_ITEMS: { label: string; value: LibFilter }[] = [
   { label: "All", value: "all" },
-  { label: "Verified", value: "verified" },
   { label: "Public", value: "public" },
   { label: "Private", value: "private" },
+  { label: "AI-Generated", value: "ai" },
+];
+
+const VERIF_ITEMS: { label: string; value: LibVerif }[] = [
+  { label: "All", value: "all" },
+  { label: "Verified", value: "verified" },
+  { label: "Not Verified", value: "unverified" },
 ];
 
 const PRICE_ITEMS: { label: string; value: LibPrice }[] = [
@@ -146,27 +129,54 @@ const PRICE_ITEMS: { label: string; value: LibPrice }[] = [
   { label: "Premium", value: "premium" },
 ];
 
-// All Library — results table rows (Figma 445:206940). Same part, many authors.
-type Row = { id: string; title: string; author: string; desc: string; paid: boolean };
-const ALL_ROWS: Row[] = [
-  { id: "r1", title: "D8497ARMZ", author: "Esther Howard", desc: "IC MCU 8BIT 32KB FLAS…", paid: false },
-  { id: "r2", title: "D8497ARMZ", author: "Ralph Edwards", desc: "IC MCU 8BIT 32KB FLAS…", paid: false },
-  { id: "r3", title: "D8497ARMZ", author: "Jacob Jones", desc: "IC MCU 8BIT 32KB FLAS…", paid: false },
-  { id: "r4", title: "D8497ARMZ", author: "Leslie Alexander", desc: "IC MCU 8BIT 32KB FLAS…", paid: false },
-  { id: "r5", title: "D8497ARMZ", author: "Kristin Watson", desc: "IC MCU 8BIT 32KB FLAS…", paid: false },
-  { id: "r6", title: "D8497ARMZ", author: "Floyd Miles", desc: "IC MCU 8BIT 32KB FLAS…", paid: true },
-  { id: "r7", title: "D8497ARMZ", author: "Cameron Williamson", desc: "IC MCU 8BIT 32KB FLAS…", paid: false },
-  { id: "r8", title: "D8497ARMZ", author: "Cameron Williamson", desc: "IC MCU 8BIT 32KB FLASH…", paid: true },
-];
+// All Library — one row per real catalogue part (system catalogue + the parts
+// the user authored via Project ▸ New ▸ Part). origin + verified are the PRD's
+// two independent dimensions: today's system rows are human-submitted and
+// verified, a personal part is unverified + private until reviewed, and
+// AI-generated rows appear when IDEEZA part generation starts writing them.
+type LibRow = {
+  id: string; p: CatalogPart; family: string;
+  origin: "human" | "ai"; verified: boolean; access: "public" | "private"; paid: boolean;
+};
+const isPersonal = (p: CatalogPart) => p.id.startsWith("own_");
+const buildLibRows = (): LibRow[] =>
+  allParts().map((p) => ({
+    id: p.id,
+    p,
+    family: libFamilyOf(p),
+    // Origin and verification come from the part record itself (PRD §9.2) —
+    // the curated catalogue defaults to human + verified, a personal part is
+    // unverified until reviewed.
+    origin: p.origin ?? "human",
+    verified: isPersonal(p) ? false : p.verified ?? true,
+    access: isPersonal(p) ? "private" : "public",
+    // Library entries are free today; a premium marketplace price is a listing
+    // property, not the part's unit price.
+    paid: false,
+  }));
 
-const CTX_ITEMS = ["Refresh", "Add to Common Library", "Remove form Library"];
+// Package → the land-pattern glyph that really exists for it (footprint
+// preview); a package with no pattern yet says so instead of faking one.
+const FP_GLYPH: [RegExp, string][] = [
+  [/^(0402|0603|0805|1206|1210|1806)$/i, "fp0805"],
+  [/SOD/i, "fpSOD123"],
+  [/^SOT-23/i, "fpSOT23"],
+  [/SOIC|TSSOP/i, "fpSOIC8"],
+];
+const fpGlyphFor = (pkg: string): string | null => FP_GLYPH.find(([re]) => re.test(pkg))?.[1] ?? null;
 
 const CARET =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>';
 const CHECK_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"/></svg>';
-const CHIP_SVG =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="7" y="7" width="10" height="10" rx="1"/><path d="M3 9v6M21 9v6M9 3h6M9 21h6"/></svg>';
+// Not Verified — a hollow clock, deliberately low-weight: "waiting for review",
+// never an error (PRD §8). AI-Generated — a sparkle chip in the brand accent, a
+// different shape class from the verification icons so the two can't be misread
+// as one dimension and can co-exist on a row (PRD FR-5).
+const UNVERIFIED_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+const AI_SVG =
+  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M18.5 15l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z"/></svg>';
 
 // ── Sidebar (left panel content) ──────────────────────────────────────────────
 
@@ -176,7 +186,6 @@ export function LibraryPanel() {
   const [commonQuery, setCommonQuery] = React.useState("");
   const [allQuery, setAllQuery] = React.useState("");
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({ "0": true, "0.0": true });
-  const [treeSel, setTreeSel] = React.useState("0.0.0");
 
   // #112 — board mode gets the board library (the pcb set existed but the panel
   // always showed the schematic one). The segmented control below still lets you
@@ -388,51 +397,81 @@ export function LibraryPanel() {
 
       {state.libView === "all" && (
         <>
-          {/* search */}
+          {/* search — filters the category tree below (the flyout's own search
+              filters the result rows) */}
           <div style={{ padding: "var(--spacing-5) var(--spacing-7) var(--spacing-4)" }}>
-            <SearchInput value={allQuery} onValueChange={setAllQuery} placeholder="Search parts & compo.." />
+            <SearchInput value={allQuery} onValueChange={setAllQuery} placeholder="Search categories & parts" />
           </div>
 
-          {/* 6-icon view toolbar */}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)", padding: "var(--spacing-0) var(--spacing-8) var(--spacing-4)" }}>
-            {TREE_TOOLBAR.map((ic) => {
-              const active = ic.key === "schematic";
-              return (
-                <div key={ic.key} className="ix-btn" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}>
-                  <span style={{ width: 17, height: 17, color: active ? "var(--color-violet-600)" : "var(--color-text-tertiary)" }}>
-                    <Icon html={ic.svg} size={17} />
-                  </span>
-                  <span style={{ width: 14, height: 2, borderRadius: 2, background: active ? "var(--color-violet-600)" : "transparent" }} />
-                </div>
-              );
-            })}
-          </div>
-
-          {/* category tree */}
+          {/* category tree — derived from the real catalogue: family → package,
+              each with its live part count; picking one filters the results. */}
           <div style={{ flex: 1, overflowY: "auto", padding: "var(--spacing-0) var(--spacing-4) var(--spacing-6)" }}>
-            {CATEGORY_TREE.map((b, i) => {
-              const bk = String(i);
-              const hasChildren = !!b.children?.length;
-              const bOpen = !!expanded[bk];
+            {(() => {
+              const aq = allQuery.trim().toLowerCase();
+              const parts = allParts().filter(
+                (p) =>
+                  aq === "" ||
+                  libFamilyOf(p).toLowerCase().includes(aq) ||
+                  p.part.toLowerCase().includes(aq) ||
+                  p.pkg.toLowerCase().includes(aq) ||
+                  p.mfr.toLowerCase().includes(aq),
+              );
+              const fams = new Map<string, Map<string, number>>();
+              for (const p of parts) {
+                const fam = libFamilyOf(p);
+                const pkgs = fams.get(fam) ?? new Map<string, number>();
+                pkgs.set(p.pkg, (pkgs.get(p.pkg) ?? 0) + 1);
+                fams.set(fam, pkgs);
+              }
+              const famList = [...fams.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+              if (!famList.length)
+                return (
+                  <div style={{ padding: "var(--spacing-8) var(--spacing-4)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+                    No categories match “{allQuery}”.
+                  </div>
+                );
               return (
-                <div key={bk}>
-                  <TreeRow label={b.label} depth={0} caret={hasChildren ? (bOpen ? "open" : "closed") : "none"} onClick={() => hasChildren && toggle(bk)} />
-                  {hasChildren && bOpen && b.children!.map((c, j) => {
-                    const ck = `${bk}.${j}`;
-                    const cOpen = !!expanded[ck];
+                <>
+                  <TreeRow
+                    label={`All parts (${parts.length})`}
+                    depth={0}
+                    caret="none"
+                    selected={state.libCat === null}
+                    onClick={() => actions.setLibCat(null)}
+                  />
+                  {famList.map(([fam, pkgs]) => {
+                    const open = !!expanded[fam];
+                    const count = [...pkgs.values()].reduce((a, b) => a + b, 0);
+                    const famSel = state.libCat?.family === fam && !state.libCat?.pkg;
                     return (
-                      <div key={ck}>
-                        <TreeRow label={c.label} depth={1} caret={c.leaves.length ? (cOpen ? "open" : "closed") : "none"} onClick={() => c.leaves.length && toggle(ck)} />
-                        {cOpen && c.leaves.map((leaf, k) => {
-                          const lk = `${ck}.${k}`;
-                          return <TreeRow key={lk} label={leaf} depth={2} caret="none" selected={treeSel === lk} onClick={() => setTreeSel(lk)} />;
-                        })}
+                      <div key={fam}>
+                        <TreeRow
+                          label={`${fam} (${count})`}
+                          depth={0}
+                          caret={open ? "open" : "closed"}
+                          selected={famSel}
+                          onClick={() => {
+                            toggle(fam);
+                            actions.setLibCat({ family: fam, pkg: null });
+                          }}
+                        />
+                        {open &&
+                          [...pkgs.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([pkg, n]) => (
+                            <TreeRow
+                              key={pkg}
+                              label={`${pkg} (${n})`}
+                              depth={1}
+                              caret="none"
+                              selected={state.libCat?.family === fam && state.libCat?.pkg === pkg}
+                              onClick={() => actions.setLibCat({ family: fam, pkg })}
+                            />
+                          ))}
                       </div>
                     );
                   })}
-                </div>
+                </>
               );
-            })}
+            })()}
           </div>
         </>
       )}
@@ -603,7 +642,60 @@ export function AllLibraryFlyout() {
   const state = usePcbState();
   const actions = usePcbActions();
   const [query, setQuery] = React.useState("");
-  const sel = ALL_ROWS.find((r) => r.id === state.libSelected) || null;
+  const [favs, setFavs] = React.useState<string[]>(() => readFavorites());
+  // The rows are the REAL catalogue (system parts + the user's own from
+  // Project ▸ New ▸ Part) — not demo data.
+  const rows = React.useMemo(buildLibRows, []);
+  // PRD FR-3/FR-9 — tabs, verification, price, the sidebar's category pick and
+  // search AND-combine over the rows.
+  const q = query.trim().toLowerCase();
+  const cat = state.libCat;
+  const visibleRows = rows.filter((r) =>
+    (state.libFilter === "all" || (state.libFilter === "ai" ? r.origin === "ai" : r.access === state.libFilter)) &&
+    (state.libVerif === "all" || (state.libVerif === "verified") === r.verified) &&
+    (state.libPrice === "all" || (state.libPrice === "premium") === r.paid) &&
+    (!cat || (r.family === cat.family && (!cat.pkg || r.p.pkg === cat.pkg))) &&
+    (q === "" ||
+      r.p.part.toLowerCase().includes(q) ||
+      r.p.mfr.toLowerCase().includes(q) ||
+      r.p.pkg.toLowerCase().includes(q) ||
+      r.p.features.some((f) => f.toLowerCase().includes(q))),
+  );
+  // A row filtered out of view can't stay "selected" behind the user's back.
+  const sel = visibleRows.find((r) => r.id === state.libSelected) || null;
+
+  // "Use" — the same real placement the part picker does: next free
+  // designator, MPN/package/manufacturer on the object, Recent updated.
+  const placePart = (p: CatalogPart) => {
+    pushRecent(p.id);
+    const inPcb = state.mode === "pcb" || state.mode === "2d";
+    const des = nextDesignator(state.objects, p.kind);
+    let n = state.objects.length + 1;
+    while (state.objects.some((o) => o.id === `obj_lib${n}`)) n++;
+    const id = `obj_lib${n}`;
+    const offset = (state.objects.length % 5) * 30;
+    actions.merge({
+      objects: [
+        ...state.objects,
+        {
+          id,
+          kind: p.kind,
+          x: 420 + offset,
+          y: 300 + offset,
+          rotation: 0,
+          text: des ?? p.part,
+          footprint: p.pkg,
+          comment: p.mfr,
+          scope: inPcb ? "pcb" : undefined,
+          layer: inPcb ? state.activePcbLayer : undefined,
+          sheetId: inPcb ? undefined : state.activeSheetId,
+          props: { mpn: p.part, package: p.pkg, manufacturer: p.mfr },
+        } as CanvasObject,
+      ],
+      selectedIds: [id],
+    });
+    actions.flashToast(des ? `Placed ${des} — ${p.part} (${p.pkg})` : `Placed ${p.part} (${p.pkg})`);
+  };
   // UIUX-73 — the verified-parts preview column was a fixed 96px strip, so the
   // symbol and footprint were squeezed into thumbnails you couldn't read. It is
   // draggable now, and the previews grow with it. Remembered with the document.
@@ -674,8 +766,36 @@ export function AllLibraryFlyout() {
         </div>
       </div>
 
-      {/* price radios */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-7)", padding: "var(--spacing-0) var(--spacing-8) var(--spacing-5)" }}>
+      {/* verification segmented control + price radios — one row (PRD §7.2:
+          verification sits next to Price; origin lives in the tabs above) */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "var(--spacing-4) var(--spacing-7)", padding: "var(--spacing-0) var(--spacing-8) var(--spacing-5)" }}>
+        <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Verification</span>
+        <div style={{ display: "flex", gap: "var(--spacing-2)" }}>
+          {VERIF_ITEMS.map((v) => {
+            const active = state.libVerif === v.value;
+            return (
+              <button
+                key={v.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => actions.setLibVerif(v.value)}
+                style={{
+                  padding: "var(--spacing-1) var(--spacing-4)",
+                  borderRadius: "var(--radius-full)",
+                  fontFamily: "inherit",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  border: `var(--border-width-1) solid ${active ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
+                  background: active ? "var(--color-bg-brand-subtle)" : "transparent",
+                  color: active ? "var(--color-text-brand)" : "var(--color-text-tertiary)",
+                }}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
         <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: "var(--color-text-primary)" }}>Price</span>
         {PRICE_ITEMS.map((p) => {
           const active = state.libPrice === p.value;
@@ -695,29 +815,64 @@ export function AllLibraryFlyout() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* header */}
           <div style={{ display: "flex", padding: "var(--spacing-4) var(--spacing-8)", background: "var(--color-bg-brand-subtle)", fontSize: "var(--font-size-xs)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
-            <span style={{ flex: 2 }}>Title</span>
-            <span style={{ flex: 1.4 }}>Create by</span>
+            <span style={{ flex: 2 }}>Part</span>
+            <span style={{ flex: 1.2 }}>Manufacturer</span>
             <span style={{ flex: 2 }}>Description</span>
           </div>
           {/* rows */}
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {ALL_ROWS.map((r) => {
+            {visibleRows.length === 0 && (
+              <div style={{ padding: "var(--spacing-8)", textAlign: "center", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
+                No parts match these filters — clear a filter or the search to widen.
+              </div>
+            )}
+            {visibleRows.map((r) => {
               const selected = state.libSelected === r.id;
               return (
                 <div
                   key={r.id}
                   className="ix-row"
                   onClick={() => actions.setLibSelected(r.id)}
-                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); actions.openLibCtx(e); }}
+                  onDoubleClick={() => placePart(r.p)}
+                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); actions.setLibSelected(r.id); actions.openLibCtx(e); }}
+                  title={`${r.p.part} · ${r.p.pkg} — click for details, double-click to place`}
                   style={{ display: "flex", alignItems: "center", padding: "var(--spacing-4) var(--spacing-8)", cursor: "pointer", background: selected ? "var(--color-bg-brand-subtle)" : "transparent", borderBottom: "var(--border-width-1) solid var(--color-border-subtle)" }}
                 >
                   <div style={{ flex: 2, display: "flex", alignItems: "center", gap: "var(--spacing-3)", minWidth: 0 }}>
-                    <span style={{ width: 16, height: 16, flex: "0 0 auto", color: "var(--color-violet-600)" }}><Icon html={CHIP_SVG} size={16} /></span>
-                    <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: selected ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</span>
-                    <span style={{ width: 14, height: 14, flex: "0 0 auto", borderRadius: "var(--radius-full)", background: "var(--color-text-success)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon html={CHECK_SVG} size={10} /></span>
+                    {/* the real symbol the row places, as its icon */}
+                    <svg width={24} height={16} viewBox="-34 -22 68 44" style={{ flex: "0 0 auto", color: "var(--color-violet-600)", overflow: "visible" }}>
+                      <g stroke="currentColor" fill="none">{glyphFor(r.p.kind)}</g>
+                    </svg>
+                    <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, color: selected ? "var(--color-text-brand)" : "var(--color-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.p.part}</span>
+                    {favs.includes(r.id) && (
+                      <span title="Favourite" style={{ flex: "0 0 auto", color: "var(--color-text-warning)", fontSize: 11, lineHeight: 1 }}>★</span>
+                    )}
+                    {r.verified ? (
+                      <span
+                        title="Verified — symbol, footprint and metadata reviewed"
+                        style={{ width: 14, height: 14, flex: "0 0 auto", borderRadius: "var(--radius-full)", background: "var(--color-text-success)", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        <Icon html={CHECK_SVG} size={10} />
+                      </span>
+                    ) : (
+                      <span
+                        title={r.origin === "ai" ? "AI-Generated — not yet human-verified" : "Not verified yet — no quality guarantee"}
+                        style={{ width: 14, height: 14, flex: "0 0 auto", color: "var(--color-text-warning)", display: "flex" }}
+                      >
+                        <Icon html={UNVERIFIED_SVG} size={14} />
+                      </span>
+                    )}
+                    {r.origin === "ai" && (
+                      <span
+                        title="AI-Generated — produced by IDEEZA part generation"
+                        style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", borderRadius: "var(--radius-full)", background: "var(--color-bg-brand-subtle)", color: "var(--color-text-brand)", fontSize: "var(--font-size-2xs, 10px)", fontWeight: 700 }}
+                      >
+                        <Icon html={AI_SVG} size={10} /> AI
+                      </span>
+                    )}
                   </div>
-                  <span style={{ flex: 1.4, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.author}</span>
-                  <span style={{ flex: 2, fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.desc}</span>
+                  <span style={{ flex: 1.2, fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.p.mfr}</span>
+                  <span style={{ flex: 2, fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.p.features.join(", ")} · {r.p.pkg}</span>
                 </div>
               );
             })}
@@ -749,41 +904,51 @@ export function AllLibraryFlyout() {
               <span style={{ width: 3, height: 26, borderRadius: "var(--radius-full)", background: "var(--color-border-strong)" }} />
             </div>
             <div style={{ width: previewW, flex: "0 0 auto", borderLeft: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-5)", display: "flex", flexDirection: "column", gap: "var(--spacing-5)", overflowY: "auto" }}>
-              <PreviewBox kind="sym" size={previewW - 24} />
-              <PreviewBox kind="pcb" size={previewW - 24} />
-              <PreviewBox kind="3d" size={previewW - 24} />
+              {/* the REAL geometry: the symbol the row places, and the land
+                  pattern its package maps to (honest when none exists yet) */}
+              <PreviewGlyph label="Symbol" kind={sel.p.kind} size={previewW - 24} />
+              <PreviewGlyph label="Footprint" kind={fpGlyphFor(sel.p.pkg)} size={previewW - 24} board emptyText={`No land pattern for ${sel.p.pkg} yet`} />
             </div>
           </>
         )}
       </div>
 
-      {/* selected detail strip */}
+      {/* selected detail strip — the row's REAL data (catalogue stock/price),
+          and Use really places the part like the picker does */}
       {sel && (
         <div style={{ borderTop: "var(--border-width-1) solid var(--color-border-subtle)", padding: "var(--spacing-5) var(--spacing-8)" }}>
           <div style={{ fontSize: "var(--font-size-xs)", fontStyle: "italic", color: "var(--color-text-tertiary)", marginBottom: "var(--spacing-3)" }}>
-            Parts & Agile module &gt; AD8497ARMZ &gt; <span style={{ color: "var(--color-text-brand)" }}>Adaptor</span> &gt; 497ARMZ D8497ARMZ
+            All Library &gt; <span style={{ color: "var(--color-text-brand)" }}>{sel.family}</span> &gt; {sel.p.part}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", marginBottom: "var(--spacing-4)" }}>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>DIgiKey Stock: <span style={{ color: "var(--color-text-error)", fontWeight: 600 }}>20490</span></span>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>LCSC Stock <span style={{ color: "var(--color-text-error)", fontWeight: 600 }}>1123</span></span>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-8)", marginBottom: "var(--spacing-4)", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Package: <b>{sel.p.pkg}</b></span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Stock: <span style={{ color: "var(--color-text-error)", fontWeight: 600 }}>{sel.p.stock}</span></span>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Unit price: <span style={{ color: "var(--color-text-error)", fontWeight: 700 }}>{sel.p.price}</span></span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>Price: <span style={{ color: "var(--color-text-error)", fontWeight: 700 }}>{sel.paid ? "Paid" : "$0.5"}</span></span>
-            <span style={{ marginLeft: "auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)", cursor: "pointer" }}>Report</span>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-brand)", fontWeight: 600, cursor: "pointer" }}>See Details</span>
-            <Button hierarchy="primary" size="sm">Use</Button>
+            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sel.p.features.join(" · ")}</span>
+            <span style={{ marginLeft: "auto" }} />
+            <Button hierarchy="primary" size="sm" onClick={() => placePart(sel.p)}>Use</Button>
           </div>
         </div>
       )}
 
-      {/* right-click context menu + backdrop */}
-      {state.libCtx && (
+      {/* right-click context menu — real commands on the right-clicked row */}
+      {state.libCtx && sel && (
         <>
           <div onClick={actions.closeLibCtx} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
           <div style={{ position: "fixed", left: state.libCtx.x, top: state.libCtx.y, zIndex: 999, minWidth: 184, padding: "var(--spacing-2)", background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", boxShadow: "var(--elevation-2)" }}>
-            {CTX_ITEMS.map((item) => (
-              <div key={item} className="ix-row" onClick={actions.closeLibCtx} style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
-                {item}
+            {[
+              { label: `Place ${sel.p.part}`, run: () => placePart(sel.p) },
+              { label: favs.includes(sel.id) ? "Remove from Favourites" : "Add to Favourites", run: () => setFavs(toggleFavorite(sel.id)) },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="ix-row"
+                onClick={() => { item.run(); actions.closeLibCtx(); }}
+                style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", padding: "var(--spacing-3) var(--spacing-4)", borderRadius: "var(--radius-sm)", cursor: "pointer" }}
+              >
+                {item.label}
               </div>
             ))}
           </div>
@@ -793,14 +958,47 @@ export function AllLibraryFlyout() {
   );
 }
 
-function PreviewBox({ kind, size = 56 }: { kind: "sym" | "pcb" | "3d"; size?: number }) {
-  const bg = kind === "pcb" ? "#1a1a1a" : "var(--color-bg-surface)";
-  const w = Math.round(size * 0.78);
+// A real preview: the same glyph geometry the canvas draws (`glyphFor`), on the
+// sheet ground for symbols and the board ground for land patterns. A package
+// with no pattern yet says so instead of showing a stand-in doodle.
+function PreviewGlyph({ label, kind, size = 96, board = false, emptyText }: {
+  label: string;
+  kind: string | null;
+  size?: number;
+  board?: boolean;
+  emptyText?: string;
+}) {
+  const h = Math.round(size * 0.72);
   return (
-    <div data-preview={kind} style={{ width: size, height: size, borderRadius: "var(--radius-md)", border: "var(--border-width-1) solid var(--color-border-default)", background: bg, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-      {kind === "sym" && <svg width={w} height={Math.round(w / 2)} viewBox="0 0 40 20"><path d="M2 10h6l2-6 4 12 4-12 4 12 2-6h12" fill="none" stroke="#1a1a1a" strokeWidth="1.3" /></svg>}
-      {kind === "pcb" && <svg width={w} height={w} viewBox="0 0 40 40"><rect x="12" y="14" width="16" height="9" fill="none" stroke="#e34c4c" strokeWidth="1.5" /><rect x="8" y="17" width="5" height="3" fill="#d8a838" /><rect x="27" y="17" width="5" height="3" fill="#d8a838" /></svg>}
-      {kind === "3d" && <svg width={w} height={Math.round(w * 0.75)} viewBox="0 0 40 30"><rect x="8" y="11" width="24" height="9" rx="1" fill="#2f6db5" /><rect x="6" y="13" width="3" height="5" fill="#888" /><rect x="31" y="13" width="3" height="5" fill="#888" /></svg>}
+    <div>
+      <div style={{ fontSize: "var(--font-size-2xs, 10px)", fontWeight: 700, letterSpacing: 0.3, color: "var(--color-text-tertiary)", marginBottom: "var(--spacing-2)", textTransform: "uppercase" }}>
+        {label}
+      </div>
+      <div
+        data-preview={label.toLowerCase()}
+        style={{
+          width: size,
+          height: h,
+          borderRadius: "var(--radius-md)",
+          border: "var(--border-width-1) solid var(--color-border-default)",
+          background: board ? "var(--color-pcb-substrate, #14532d)" : "var(--color-bg-page)",
+          color: board ? "var(--color-pcb-pad, #d8a838)" : "var(--color-violet-600)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
+      >
+        {kind ? (
+          <svg width={Math.round(size * 0.82)} height={Math.round(h * 0.8)} viewBox="-36 -24 72 48" style={{ overflow: "visible" }}>
+            <g stroke="currentColor" fill="none">{glyphFor(kind)}</g>
+          </svg>
+        ) : (
+          <span style={{ fontSize: "var(--font-size-xs)", color: board ? "rgba(255,255,255,.75)" : "var(--color-text-tertiary)", padding: "var(--spacing-4)", textAlign: "center" }}>
+            {emptyText ?? "No preview yet"}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

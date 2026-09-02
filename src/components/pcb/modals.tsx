@@ -17,7 +17,7 @@ import {
 import { Icon } from "@/lib/pcb/icons";
 import { ANNOT_PREFIX, AREA_KINDS, COPPER_WEIGHTS, DEL_OBJ_NAMES, SEL_FILTER_KINDS, STACK_MATERIALS, nextDesignator, stackRoleOf, type CanvasObject, type StackRole } from "@/lib/pcb/types";
 import { ERC_ENFORCED_ROWS, computeNets } from "@/lib/pcb/nets";
-import { convertSchematicToPcb } from "@/lib/pcb/schematic-to-pcb";
+import { convertSchematicToPcb, planImportChanges } from "@/lib/pcb/schematic-to-pcb";
 import { isCombinable } from "@/lib/pcb/shape-boolean";
 import { defaultSutureConfig, planSutureVias, sutureRegions, type SutureConfig } from "@/lib/pcb/suture-vias";
 import { PX_PER_MM } from "@/lib/pcb/drc";
@@ -832,7 +832,15 @@ function TableModal() {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-10)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Pill onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-12)" }}>Cancel</Pill>
-          <PrimaryBtn onClick={actions.closeModal} style={{ padding: "var(--spacing-5) var(--spacing-16)" }}>Confirm</PrimaryBtn>
+          {/* Confirm arms the table place tool with these dimensions — the
+              dialog's Row/Column used to go nowhere (Confirm only closed it).
+              The hint chip then says where to click. */}
+          <PrimaryBtn
+            onClick={() => { actions.setTool("table"); actions.closeModal(); }}
+            style={{ padding: "var(--spacing-5) var(--spacing-16)" }}
+          >
+            Confirm
+          </PrimaryBtn>
         </div>
       </Card>
     </Overlay>
@@ -1939,6 +1947,106 @@ function ConvertConfirmModal() {
               onClick={() => { actions.closeModal(); actions.convertSchematicToPcb(); }}
             >
               Convert
+            </Button>
+          </span>
+        </div>
+      </Card>
+    </Overlay>
+  );
+}
+
+// UIUX-104 — the board-side counterpart of the convert-plan dialog: Design ▸
+// Import Changes From Schematic previews what the sync will do (parts kept in
+// place, new parts arriving, parts whose symbol is gone) before touching the
+// board. The dry run is `planImportChanges`, the very plan the store action
+// applies, so the preview can't disagree with the result.
+function ImportChangesModal() {
+  const state = usePcbState();
+  const actions = usePcbActions();
+  const plan = React.useMemo(() => planImportChanges(state.objects), [state.objects]);
+  const removed = plan.removedDesignators.length;
+  const nothing = plan.merged.length === 0 && removed === 0;
+  const cell: React.CSSProperties = {
+    padding: "var(--spacing-3) var(--spacing-5)",
+    fontSize: "var(--font-size-sm)",
+    color: "var(--color-text-primary)",
+    borderBottom: "var(--border-width-1) solid var(--color-border-subtle)",
+    textAlign: "left",
+  };
+  const head: React.CSSProperties = {
+    ...cell,
+    fontWeight: 700,
+    color: "var(--color-text-secondary)",
+    position: "sticky",
+    top: 0,
+    background: "var(--color-bg-surface)",
+  };
+  const note = (text: React.ReactNode) => (
+    <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>{text}</div>
+  );
+  return (
+    <Overlay>
+      <Card width={560} maxHeight="86%" flexCol>
+        <Header title="Import changes from schematic" onClose={actions.closeModal} padding="18px 22px" />
+
+        <div style={{ padding: "var(--spacing-6) var(--spacing-12) var(--spacing-4)", flex: "0 0 auto", display: "flex", flexDirection: "column", gap: "var(--spacing-4)" }}>
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+            {plan.added.length === 0 && removed === 0 ? (
+              <>The board already matches the schematic — <b style={{ color: "var(--color-text-primary)" }}>{plan.kept} part{plan.kept === 1 ? "" : "s"}</b> stay{plan.kept === 1 ? "s" : ""} where you put {plan.kept === 1 ? "it" : "them"}. The ratsnest is still rebuilt from the sheet&apos;s wiring.</>
+            ) : (
+              <>
+                <b style={{ color: "var(--color-text-primary)" }}>{plan.kept} part{plan.kept === 1 ? "" : "s"}</b> keep{plan.kept === 1 ? "s" : ""} the placement you gave {plan.kept === 1 ? "it" : "them"},{" "}
+                <b style={{ color: "var(--color-text-primary)" }}>{plan.added.length} new</b> arrive{plan.added.length === 1 ? "s" : ""} from the sheet
+                {removed > 0 && (
+                  <>, and <b style={{ color: "var(--color-text-primary)" }}>{removed}</b> whose symbol is gone {removed === 1 ? "leaves" : "leave"} the board</>
+                )}
+                .
+              </>
+            )}
+          </div>
+          {removed > 0 && note(<>Removed: {plan.removedDesignators.join(" · ")}</>)}
+          {note("Hand-drawn tracks, vias and regions are left alone; the ratsnest is rebuilt.")}
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 var(--spacing-12)" }}>
+          {plan.added.length > 0 && (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={head}>New part</th>
+                  <th style={head}>Symbol</th>
+                  <th style={head}>Footprint</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plan.added.map((r, i) => (
+                  <tr key={`${r.designator}-${i}`}>
+                    <td style={{ ...cell, fontWeight: 600 }}>{r.designator}</td>
+                    <td style={{ ...cell, color: "var(--color-text-secondary)" }}>{r.symbol}</td>
+                    <td style={{ ...cell, fontVariantNumeric: "tabular-nums" }}>{r.footprint}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {nothing && (
+            <div style={{ ...cell, textAlign: "center", color: "var(--color-text-tertiary)", padding: "var(--spacing-10)", borderBottom: "none" }}>
+              Nothing to import — draw parts on the sheet first.
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--spacing-5)", padding: "var(--spacing-6) var(--spacing-12)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)", flex: "0 0 auto" }}>
+          {note("New parts land auto-placed — move them like any other footprint.")}
+          <span style={{ marginLeft: "auto", display: "flex", gap: "var(--spacing-5)" }}>
+            <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
+            <Button
+              hierarchy="primary"
+              size="md"
+              disabled={nothing}
+              onClick={() => { actions.closeModal(); actions.importChangesFromSchematic(); }}
+            >
+              Import changes
             </Button>
           </span>
         </div>
@@ -4382,6 +4490,8 @@ export function Modals() {
       return <TopToolbarDialog />;
     case "convertConfirm":
       return <ConvertConfirmModal />;
+    case "importChanges":
+      return <ImportChangesModal />;
     case "reannotate":
       return <ReannotateModal />;
     case "exportDxf2D":

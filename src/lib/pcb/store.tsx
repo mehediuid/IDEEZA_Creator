@@ -7,7 +7,7 @@
 
 import * as React from "react";
 import { planTeardrops, teardropIds } from "./teardrops";
-import { convertSchematicToPcb, routeRatsnest, unrouteGenerated } from "./schematic-to-pcb";
+import { convertSchematicToPcb, planImportChanges, routeRatsnest, unrouteGenerated } from "./schematic-to-pcb";
 import { booleanRings, shapeToPolygon, isCombinable, ringArea, chamferRing, filletRing } from "./shape-boolean";
 import { planSutureVias, type SutureConfig } from "./suture-vias";
 import { planTrackPath, CORNER_STYLES } from "./route-path";
@@ -45,6 +45,7 @@ import { PANEL_LIMITS,
   type LibCommonTab,
   type LibFilter,
   type LibPrice,
+  type LibVerif,
   type GridType,
   type LibView,
   type ManagerId,
@@ -151,7 +152,9 @@ export interface PcbActions {
   setLibView: (v: LibView) => void;
   setLibCommonTab: (v: LibCommonTab) => void;
   setLibFilter: (v: LibFilter) => void;
+  setLibVerif: (v: LibVerif) => void;
   setLibPrice: (v: LibPrice) => void;
+  setLibCat: (v: { family: string; pkg: string | null } | null) => void;
   setLibSelected: (id: string | null) => void;
   openLibCtx: (e: React.MouseEvent) => void;
   closeLibCtx: () => void;
@@ -268,6 +271,12 @@ export interface PcbActions {
   /** Turn the ratsnest airwires into copper tracks (simple L-route). */
   /** Auto Routing — the dialog's options, or defaults when called from a menu. */
   autoRoute: (opts?: AutoRouteOpts) => void;
+  /** Re-pull the selected track runs along the planner's path (Route ▸ Gloss). */
+  glossSelectedTracks: () => void;
+  /** Selected tracks → airwires/deleted; nothing selected → all generated copper. */
+  unrouteTracks: () => void;
+  /** Place a real table object carrying the live BOM (Insert ▸ BOM Table). */
+  insertBomTable: () => void;
   /** Assign the current selection to a new group (selects together after). */
   groupSelection: () => void;
   ungroupSelection: () => void;
@@ -1001,7 +1010,9 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       setLibView: (v) => merge({ libView: v, libSelected: null, libCtx: null }),
       setLibCommonTab: (v) => merge({ libCommonTab: v }),
       setLibFilter: (v) => merge({ libFilter: v }),
+      setLibVerif: (v) => merge({ libVerif: v }),
       setLibPrice: (v) => merge({ libPrice: v }),
+      setLibCat: (v) => merge({ libCat: v, libSelected: null }),
       setLibSelected: (id) => merge({ libSelected: id }),
       openLibCtx: (e) => {
         e.preventDefault();
@@ -1789,6 +1800,15 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
               // Outline/Fill toggles reflect real state from the start.
               : kind === "rectangle" || kind === "circle" || kind === "ellipse"
               ? { props: { lineOn: true, fillOn: false, fillColor: "#FFFFFF" } }
+              // A table places at the size the Table dialog asked for — the
+              // dialog's Row/Column really reach the object (they used to go
+              // nowhere: Confirm only closed the dialog).
+              : kind === "table"
+              ? (() => {
+                  const rows = Math.max(1, Math.min(60, Number(s.tbl.row) || 2));
+                  const cols = Math.max(1, Math.min(24, Number(s.tbl.col) || 2));
+                  return { width: cols * 64, height: rows * 18, props: { rows, cols } };
+                })()
               : {};
           // Parts number themselves as they land (R1, R2, C1 …) — the sheet
           // shouldn't fill up with "R?" waiting for a manual pass. An explicit
@@ -2141,29 +2161,19 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
       // where the user already put each part (matched by `sourceId`), add the
       // new ones, drop the ones whose symbol is gone, and rebuild the ratsnest.
       importChangesFromSchematic: () => {
+        // UIUX-104 — the same plan the confirm dialog previews is the one
+        // applied here (planImportChanges), so the popup can't promise
+        // something else.
         const src = stateRef.current.objects;
-        const { objects: generated } = convertSchematicToPcb(src);
-        const genFoot = generated.filter((o) => o.props?.gen === "convert" && o.sourceId);
-        const genOther = generated.filter((o) => !(o.props?.gen === "convert" && o.sourceId));
-        const existing = src.filter((o) => o.props?.gen === "convert" && o.sourceId);
-        const bySource = new Map(existing.map((o) => [o.sourceId as string, o]));
-        let added = 0, kept = 0;
-        const merged = genFoot.map((g) => {
-          const old = bySource.get(g.sourceId as string);
-          if (!old) { added++; return g; }
-          kept++;
-          // keep placement + rotation + side, take the fresh designator/footprint
-          return { ...g, x: old.x, y: old.y, rotation: old.rotation, side: old.side, layer: old.layer };
-        });
-        const liveSources = new Set(genFoot.map((g) => g.sourceId));
-        const removed = existing.filter((o) => !liveSources.has(o.sourceId)).length;
+        const { merged, rest, added, removedDesignators, kept } = planImportChanges(src);
+        const removed = removedDesignators.length;
         mergeWithHistory((st) => ({
           objects: [
             // hand-placed board work (tracks, vias, regions…) survives; only the
             // previous convert output is replaced.
             ...st.objects.filter((o) => o.props?.gen !== "convert" && o.props?.gen !== "route"),
             ...merged,
-            ...genOther,
+            ...rest,
           ],
           mode: "pcb",
           openMenu: null,
@@ -2171,8 +2181,8 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           draftWire: null,
         }));
         actions.flashToast(
-          added || removed
-            ? `Imported changes — ${added} new part${added === 1 ? "" : "s"} · ${removed} removed · ${kept} kept in place`
+          added.length || removed
+            ? `Imported changes — ${added.length} new part${added.length === 1 ? "" : "s"} · ${removed} removed · ${kept} kept in place`
             : `Board already matches the schematic — ${kept} part${kept === 1 ? "" : "s"} unchanged`,
         );
       },
@@ -2379,6 +2389,187 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         actions.flashToast(
           `Auto-routed ${routed} connection${routed > 1 ? "s" : ""} → copper tracks${opts?.mitre ? " (45° corners)" : ""}`,
         );
+      },
+      // Route ▸ Gloss Selected Track — re-pull each selected run through the
+      // path planner (current corner style + obstacle policy), so a jogged or
+      // stair-stepped run comes back as the clean path the planner would draw
+      // today. Chains are maximal same-layer/net runs; a branch ends a chain.
+      glossSelectedTracks: () => {
+        const s = stateRef.current;
+        const sel = new Set(s.selectedIds);
+        const tracks = s.objects.filter((o) => o.kind === "track" && sel.has(o.id));
+        if (!tracks.length) {
+          actions.flashToast("Select the tracks to gloss first");
+          return;
+        }
+        const key = (x: number, y: number) => `${Math.round(x)}:${Math.round(y)}`;
+        const byEnd = new Map<string, CanvasObject[]>();
+        for (const t of tracks) {
+          for (const k of [key(t.x, t.y), key(t.endX ?? t.x, t.endY ?? t.y)]) {
+            const a = byEnd.get(k) ?? [];
+            a.push(t);
+            byEnd.set(k, a);
+          }
+        }
+        const used = new Set<string>();
+        const chains: { segs: CanvasObject[]; from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
+        for (const t of tracks) {
+          if (used.has(t.id)) continue;
+          used.add(t.id);
+          const segs = [t];
+          const walk = (sx: number, sy: number) => {
+            let cx = sx, cy = sy;
+            for (;;) {
+              const cands = (byEnd.get(key(cx, cy)) ?? []).filter(
+                (o) => !used.has(o.id) && o.layer === t.layer && o.net === t.net,
+              );
+              if (cands.length !== 1) break; // a branch or the run's end
+              const nx = cands[0];
+              used.add(nx.id);
+              segs.push(nx);
+              const [ax, ay, bx, by] = [nx.x, nx.y, nx.endX ?? nx.x, nx.endY ?? nx.y];
+              if (key(ax, ay) === key(cx, cy)) { cx = bx; cy = by; } else { cx = ax; cy = ay; }
+            }
+            return { x: cx, y: cy };
+          };
+          const to = walk(t.endX ?? t.x, t.endY ?? t.y);
+          const from = walk(t.x, t.y);
+          chains.push({ segs, from, to });
+        }
+        let before = 0, after = 0;
+        const replaced = new Set<string>();
+        const fresh: CanvasObject[] = [];
+        for (const c of chains) {
+          const plan = planTrackPath(s, c.from, c.to);
+          if (plan.points.length < 2) continue;
+          const t0 = c.segs[0];
+          // Keep the generated-id grouping when the whole run came from the
+          // router, so Unroute can still hand it back as one airwire.
+          const genKey = t0.id.match(/^(pcb-trk-.+)-\d+$/)?.[1];
+          const sameGen = genKey && c.segs.every((o) => o.id.startsWith(genKey + "-"));
+          before += c.segs.length;
+          for (const o of c.segs) replaced.add(o.id);
+          for (let i = 0; i + 1 < plan.points.length; i++) {
+            const a = plan.points[i], b = plan.points[i + 1];
+            fresh.push({
+              ...t0,
+              id: sameGen ? `${genKey}-${i}` : `obj_${objIdCounter.current++}`,
+              x: a.x, y: a.y, endX: b.x, endY: b.y,
+            });
+            after++;
+          }
+        }
+        if (!replaced.size) {
+          actions.flashToast("Nothing to gloss on that selection");
+          return;
+        }
+        mergeWithHistory((st) => ({
+          objects: [...st.objects.filter((o) => !replaced.has(o.id)), ...fresh],
+          selectedIds: fresh.map((o) => o.id),
+        }));
+        actions.flashToast(
+          `Glossed ${chains.length} track run${chains.length > 1 ? "s" : ""} — ${before} segment${before > 1 ? "s" : ""} → ${after}`,
+        );
+      },
+      // Route ▸ Unroute — selected tracks: router-generated copper goes back to
+      // airwires (whole net runs, so the ratsnest stays honest), hand-drawn
+      // copper is removed. With nothing selected, every generated run unroutes.
+      unrouteTracks: () => {
+        const s = stateRef.current;
+        const sel = new Set(s.selectedIds);
+        const selTracks = s.objects.filter((o) => o.kind === "track" && sel.has(o.id));
+        if (selTracks.length) {
+          const genNets = new Set(
+            selTracks
+              .filter((o) => (o.props as Record<string, unknown> | undefined)?.gen === "route" && o.net)
+              .map((o) => o.net as string),
+          );
+          const handIds = new Set(
+            selTracks
+              .filter((o) => (o.props as Record<string, unknown> | undefined)?.gen !== "route")
+              .map((o) => o.id),
+          );
+          let freed = 0;
+          mergeWithHistory((st) => {
+            const un = genNets.size ? unrouteGenerated(st.objects, genNets) : { objects: st.objects, freed: 0 };
+            freed = un.freed;
+            return { objects: un.objects.filter((o) => !handIds.has(o.id)), selectedIds: [], selSub: "none" };
+          });
+          const bits = [
+            freed ? `${freed} routed net${freed > 1 ? "s" : ""} back to airwires` : "",
+            handIds.size ? `${handIds.size} hand-drawn segment${handIds.size > 1 ? "s" : ""} removed` : "",
+          ].filter(Boolean);
+          actions.flashToast(bits.length ? `Unrouted — ${bits.join(" · ")}` : "Nothing to unroute in that selection");
+        } else {
+          const un = unrouteGenerated(s.objects);
+          if (!un.freed) {
+            actions.flashToast("No routed copper to unroute — select tracks, or run Auto Route first");
+            return;
+          }
+          mergeWithHistory(() => ({ objects: un.objects, selectedIds: [], selSub: "none" }));
+          actions.flashToast(`Unrouted ${un.freed} connection${un.freed > 1 ? "s" : ""} back to airwires`);
+        }
+      },
+      // Insert ▸ BOM Table — a real table object carrying the live BOM of the
+      // active sheet (identical parts grouped with a quantity), drawn by the
+      // table renderer like any placed object and kept by undo/history.
+      insertBomTable: () => {
+        const s = stateRef.current;
+        const BOM_KINDS = new Set([
+          "component", "resistor", "resistorBox", "capacitor", "inductor",
+          "diode", "ic", "connector", "transistor", "opamp", "crystal",
+        ]);
+        const first = s.schematicSheets[0]?.id;
+        const comps = s.objects.filter(
+          (o) =>
+            (!o.scope || o.scope === "schematic") &&
+            (o.sheetId ?? first) === s.activeSheetId &&
+            BOM_KINDS.has(o.kind),
+        );
+        if (!comps.length) {
+          actions.flashToast("No parts on this sheet yet — place components first");
+          return;
+        }
+        const groups = new Map<string, { refs: string[]; value: string; footprint: string }>();
+        for (const c of comps) {
+          const p = (c.props ?? {}) as Record<string, unknown>;
+          const value = String(p.value ?? p.mpn ?? "");
+          const fp = String(c.footprint ?? p.package ?? "");
+          const k = `${c.kind}|${value}|${fp}`;
+          const g = groups.get(k) ?? { refs: [], value, footprint: fp };
+          g.refs.push(c.text || c.kind);
+          groups.set(k, g);
+        }
+        const cells: string[][] = [
+          ["Designator", "Qty", "Value", "Footprint"],
+          ...[...groups.values()].map((g) => [
+            g.refs.join(", "),
+            String(g.refs.length),
+            g.value || "—",
+            g.footprint || "—",
+          ]),
+        ];
+        const rows = cells.length;
+        const id = `obj_${objIdCounter.current++}`;
+        mergeWithHistory((st) => ({
+          objects: [
+            ...st.objects,
+            {
+              id,
+              kind: "table",
+              x: 340,
+              y: 160 + rows * 9,
+              rotation: 0,
+              width: 4 * 96,
+              height: rows * 18,
+              sheetId: st.activeSheetId,
+              props: { name: "BOM", rows, cols: 4, cells },
+            },
+          ],
+          selectedIds: [id],
+          selSub: "none",
+        }));
+        actions.flashToast(`BOM table placed — ${groups.size} line${groups.size > 1 ? "s" : ""}, ${comps.length} part${comps.length > 1 ? "s" : ""}`);
       },
       moveObject: (id, x, y) =>
         mergeWithHistory((s) => ({
