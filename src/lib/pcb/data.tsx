@@ -99,7 +99,10 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       k: "Alt+S",
       submenu: false,
       hasSub: false,
-      icon: on ? "check" : "blank",
+      // UIUX-234 — off used to render `blank`, so Snap was the one Edit row
+      // with an empty icon gap. The snap glyph is the row's identity when off;
+      // the check still says "on", like the grid presets beside it.
+      icon: on ? "check" : "snap",
       sub: [],
       onClick: () => actions.toggleSnap(),
     };
@@ -527,7 +530,10 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       k: "Alt+S",
       submenu: false,
       hasSub: false,
-      icon: on ? "check" : "blank",
+      // UIUX-234 — off used to render `blank`, so Snap was the one Edit row
+      // with an empty icon gap. The snap glyph is the row's identity when off;
+      // the check still says "on", like the grid presets beside it.
+      icon: on ? "check" : "snap",
       sub: [],
       onClick: () => actions.toggleSnap(),
     };
