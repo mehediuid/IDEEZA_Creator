@@ -144,6 +144,27 @@ export const ic: Record<string, string> = {
   pPort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h7v8H4z"/><path d="M11 12h6M15 9l3 3-3 3"/></svg>',
   pNoConnect: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   pTestPoint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
+  // A symbol pin as the part editor draws it — the body edge, the pin's own
+  // lead, and the hollow terminal a wire lands on. Deliberately not
+  // pTestPoint's record circle: that marks a probe point on a board.
+  pPin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 4v16"/><path d="M19 12H8"/><circle cx="5" cy="12" r="2.6"/></svg>',
+  // ── New Package flow, step rail (one glyph per step, legible at 20px) ──
+  // The whole part: a package box with its seam and pin-1 mark.
+  pkgPackage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.2l8-4 8 4v7.6l-8 4-8-4z"/><path d="M4 8.2l8 4 8-4M12 12.2v7.6"/><circle cx="7.6" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>',
+  // The symbol: a body with pins and their hollow terminals — the same language
+  // pPin uses, so the rail and the tool agree.
+  pkgSymbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="6.5" width="7" height="11" rx="1"/><path d="M8.5 9.5H5M8.5 14.5H5M15.5 9.5H19M15.5 14.5H19"/><circle cx="3.6" cy="9.5" r="1.3"/><circle cx="3.6" cy="14.5" r="1.3"/></svg>',
+  // The footprint: a land pattern — two rows of filled pads round a body
+  // outline, not a generic 2x2 grid.
+  pkgFootprint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="7.5" y="8.5" width="9" height="7" rx="0.6" stroke-dasharray="2 1.6"/><g fill="currentColor" stroke="none"><rect x="4" y="8" width="3" height="2.2" rx="0.4"/><rect x="4" y="13.8" width="3" height="2.2" rx="0.4"/><rect x="17" y="8" width="3" height="2.2" rx="0.4"/><rect x="17" y="13.8" width="3" height="2.2" rx="0.4"/></g></svg>',
+  // 3D placement: a body sitting above the board it is being aligned to.
+  pkgPlace3d: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17.5l9 3.5 9-3.5"/><path d="M8 9.5l4-1.6 4 1.6v3.6l-4 1.6-4-1.6z"/><path d="M8 9.5l4 1.6 4-1.6M12 11.1v3.6"/><path d="M12 4.2v2.2"/></svg>',
+  // Finalize: the part filed — a document with a tick.
+  pkgFinalize: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5"/><path d="M8.8 14.4l2 2 4-4.2"/></svg>',
+  // A plain two-point rule with its endpoints shown. `lineT` can't be used for
+  // a Line *tool* button: hicons.ts maps that key to a Hugeicon, so the
+  // straight rule this needs is overridden by a different glyph.
+  pLine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.7 17.3L17.3 6.7"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg>',
   pChip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1.6"/><path d="M9 6V3M15 6V3M9 21v-3M15 21v-3M6 9H3M6 15H3M21 9h-3M21 15h-3" stroke-linecap="round"/></svg>',
   // Polyline — segments plus the vertices you click; the bare zig-zag alone
   // was indistinguishable from a plotted path.

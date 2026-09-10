@@ -13,7 +13,7 @@
 // camera framing is board-size-independent.
 
 import type { CanvasObject, PcbState } from "./types";
-import { BOARD_COLOR_HEX, PAD_COLOR_HEX } from "./pcb-3d";
+import { BOARD_COLOR_HEX, PAD_COLOR_HEX, componentBodyColor as bodyColor } from "./pcb-3d";
 import { PAD_OFFSETS } from "./schematic-to-pcb";
 
 // Board canvas origin — matches pcb-canvas.tsx (top:60, left:60).
@@ -54,16 +54,6 @@ function bodyShape(kind: string, desig: string | undefined): Pcb3DShape {
   // does — a bare "C" on a chip pattern stays a chip.
   if (c === "L") return "can";
   return "chip";
-}
-
-// Component body colour by designator prefix — reads like the real part.
-function bodyColor(desig: string | undefined): string {
-  const c = (desig ?? "").trim().charAt(0).toUpperCase();
-  if (c === "R") return "#23262d"; // black chip resistor
-  if (c === "C") return "#c9a15a"; // tan MLCC
-  if (c === "L") return "#33373f"; // inductor
-  if (c === "D") return "#101216"; // glass/black diode
-  return "#181b21"; // IC / default black body
 }
 
 // Parse a "1.6mm" style string → millimetres (number), 0 on failure.

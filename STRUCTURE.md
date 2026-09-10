@@ -22,8 +22,10 @@ ideeza-creator-panel/
    ├─ app/                   Next App Router — routes & layouts
    │  ├─ layout.tsx          Root layout (ThemeProvider, fonts, global CSS)
    │  ├─ api/                Server API routes
-   │  ├─ (dashboard)/        Home + Innovations
+   │  ├─ (dashboard)/        Home + Parts + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
+   │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
+   │  │   │   └─ new/                 "/parts/new" — New Package authoring flow
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/[id]/           "/projects" — My projects + details
@@ -38,6 +40,10 @@ ideeza-creator-panel/
    │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
    │  ├─ create/             build-shell/status, concept-chat, chat-thread,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card
+   │  ├─ package/            ★ New Package flow — shell + step rail, the two canvas
+   │  │                      editors (symbol/footprint), 3D placement, finalize,
+   │  │                      confirmation, and the chrome both editors share
+   │  ├─ parts/              Parts & Agile Module library page
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
    │  ├─ projects/           my-projects, project-details
    │  ├─ manual/             manual project creation + step navigation
@@ -49,13 +55,17 @@ ideeza-creator-panel/
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
    │  ├─ preview/            Product Preview: three.js assembly, mates, instances
    │  ├─ wiring/             Wiring module: canvas, library, right panel, menu
-   │  ├─ ideeza/             In-house design-system primitives (button, select, toggle…)
+   │  ├─ ideeza/             In-house design-system primitives (button, select, toggle,
+   │  │                      text-input, slider, banner…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
    │  └─ theme-provider.tsx · theme-toggle.tsx
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
+   │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
+   │  │                      units), store, wizard (24 families), kicad parsers,
+   │  │                      library (save/publish, version lock)
    │  ├─ create/             history.tsx, plan.tsx (build-plan data)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store)
