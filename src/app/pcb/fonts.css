@@ -1,5 +1,6 @@
 /* IDEEZA PCB Software — editor typeface.
- * The design system's --font-family-body token resolves to "Manrope", so the
- * editor loads Manrope (weights 200–800) and references the token everywhere
- * via var(--font-family-body). */
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap");
+ * Manrope and Roboto Mono now load app-wide from src/app/globals.css, so the
+ * editor inherits them like every other route and this file no longer imports
+ * them itself (a second @import of the same families was a duplicate request).
+ * Kept as the editor's own stylesheet hook: the project workspace layout
+ * imports it, so anything typeface-related that is editor-only belongs here. */

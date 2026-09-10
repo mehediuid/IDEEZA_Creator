@@ -1,3 +1,8 @@
+/* The typefaces the tokens name — --font-family-display/body resolve to
+   Manrope and --font-family-mono to Roboto Mono, so they load app-wide here.
+   They used to be imported only by src/app/pcb/fonts.css, which the project
+   workspace layout loads, so every other route rendered in system-ui. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap");
 @import "../styles/tokens.css";
 @import "../styles/reset.css";
 
@@ -18,3 +23,79 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+
+/* Design-system Slider (components/ideeza/slider.tsx) — the track and thumb are
+   vendor pseudo-elements, so they can't be utility classes. `--ds-slider-fill`
+   is written by the component from the current value. */
+.ds-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  cursor: pointer;
+}
+.ds-slider:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+.ds-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    to right,
+    var(--color-bg-brand) 0%,
+    var(--color-bg-brand) var(--ds-slider-fill, 0%),
+    var(--color-bg-subtle) var(--ds-slider-fill, 0%),
+    var(--color-bg-subtle) 100%
+  );
+}
+.ds-slider::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+}
+.ds-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-brand);
+}
+.ds-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px;
+  height: 16px;
+  width: 16px;
+  border-radius: var(--radius-full);
+  border: var(--border-width-2) solid var(--color-bg-surface);
+  background: var(--color-bg-brand);
+  box-shadow: var(--elevation-1);
+  transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+.ds-slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: var(--radius-full);
+  border: var(--border-width-2) solid var(--color-bg-surface);
+  background: var(--color-bg-brand);
+  box-shadow: var(--elevation-1);
+}
+.ds-slider:hover:not(:disabled)::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+.ds-slider:focus-visible {
+  outline: none;
+}
+.ds-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
+}
+.ds-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-slider::-webkit-slider-thumb {
+    transition: none;
+  }
+}
+
