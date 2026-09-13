@@ -31,13 +31,9 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
-
-// "PCB" · "PCB and Firmware code" — same join rule build-status.tsx uses
-// for its own failed-item rollups.
-function joinLabels(labels: string[]): string {
-  if (labels.length <= 1) return labels[0] ?? "";
-  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
-}
+// "PCB" · "PCB and Firmware code" — the build page's own join rule, so
+// the two surfaces can't word one list two ways.
+import { joinLabels } from "./build-status";
 
 function failedLabels(items: BuildItem[]): string[] {
   return items.filter((i) => i.status === "failed").map((i) => ITEM_LABELS[i.kind]);
@@ -79,8 +75,9 @@ export function BuildAttentionBanner() {
 
   // A system failure (the whole job died on our side, not the maker's)
   // gets its own tone and copy — it is not "a piece failed", it's
-  // everything, and `failBuildSystem` marks every item failed, so
-  // rendering it as a partial-failure rollup produced broken grammar
+  // everything, and `failBuildSystem` marks every unfinished item
+  // failed, so rendering it as a partial-failure rollup produced broken
+  // grammar
   // ("…the 3D model, PCB, Firmware code, Wiring and Parts step failed").
   const systemFailure = job.failure === "system";
   const tone: "brand" | "warning" | "error" = systemFailure
@@ -98,7 +95,9 @@ export function BuildAttentionBanner() {
         : "BUILD READY TO REVIEW";
 
   const message = systemFailure
-    ? `${job.title} · the build stopped on our side — your credits were refunded`
+    ? `${job.title} · the build stopped on our side${
+        job.creditsRefunded ? " — your credits were refunded" : ""
+      }`
     : reason === "retry"
       ? (() => {
           const labels = failedLabels(job.items);

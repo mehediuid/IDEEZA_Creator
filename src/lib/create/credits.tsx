@@ -92,9 +92,13 @@ export function applyEntry(
 // build can be charged again once every prior charge on it has been
 // refunded — this is what lets charge -> refund -> charge deduct twice
 // while charge -> charge and refund -> refund each stay a no-op.
-function openCharges(state: CreditsState, buildId: string): number {
+//
+// Exported because it is also the evidence the build orchestrator writes
+// its credit flags from: the ledger says whether money moved, not a flag
+// that was set beside it.
+export function openCharges(ledger: CreditEntry[], buildId: string): number {
   let open = 0;
-  for (const e of state.ledger) {
+  for (const e of ledger) {
     if (e.buildId !== buildId) continue;
     if (e.reason === "build") open += 1;
     else if (e.reason === "refund") open -= 1;
@@ -113,7 +117,7 @@ export function chargeState(
   buildId: string,
   cost: number = BUILD_COST,
 ): { state: CreditsState; ok: boolean } {
-  if (openCharges(state, buildId) > 0) return { state, ok: true };
+  if (openCharges(state.ledger, buildId) > 0) return { state, ok: true };
   if (state.balance < cost) return { state, ok: false };
   const entry: CreditEntry = {
     id: makeId(),
@@ -133,7 +137,7 @@ export function refundState(
   state: CreditsState,
   buildId: string,
 ): { state: CreditsState; ok: boolean } {
-  if (openCharges(state, buildId) <= 0) return { state, ok: false };
+  if (openCharges(state.ledger, buildId) <= 0) return { state, ok: false };
   const charge = state.ledger.findLast(
     (e) => e.reason === "build" && e.buildId === buildId,
   );

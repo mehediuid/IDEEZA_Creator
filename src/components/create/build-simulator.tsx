@@ -30,6 +30,7 @@ import {
 } from "@/lib/create/history";
 import {
   BUILD_COST,
+  openCharges,
   useCredits,
   type CreditEntry,
 } from "@/lib/create/credits";
@@ -67,18 +68,11 @@ function oldestQueued(builds: BuildJob[]): BuildJob | null {
   return next;
 }
 
-// Whether the ledger currently holds an un-refunded charge for this
-// build. This is the evidence the credit flags are written from: a
-// build is marked charged only once the money has really left, and
-// marked refunded only once it has really come back.
-function hasOpenCharge(ledger: CreditEntry[], buildId: string): boolean {
-  let open = 0;
-  for (const e of ledger) {
-    if (e.buildId !== buildId) continue;
-    if (e.reason === "build") open += 1;
-    else if (e.reason === "refund") open -= 1;
-  }
-  return open > 0;
+// Whether the ledger has ever put this build's credits back. Read with
+// openCharges() it separates the two ways a build can have no open
+// charge: the money came back, or it never left.
+function refundedOnLedger(ledger: CreditEntry[], buildId: string): boolean {
+  return ledger.some((e) => e.reason === "refund" && e.buildId === buildId);
 }
 
 export function BuildSimulator() {
@@ -125,7 +119,7 @@ export function BuildSimulator() {
       // The ledger is the evidence, not charge()'s return value: that
       // is computed inside a setState updater React may not run
       // eagerly, so it can answer false for a charge that did apply.
-      if (hasOpenCharge(ledger, b.id)) {
+      if (openCharges(ledger, b.id) > 0) {
         markCharged(b.id);
         continue;
       }
@@ -150,14 +144,22 @@ export function BuildSimulator() {
   ]);
 
   // A system failure puts the credits back — once, and only when the
-  // ledger actually shows the money returned.
+  // ledger actually shows the money returned. The ledger is the evidence
+  // here too, not `creditsCharged`: that flag is written a render after
+  // the charge lands, so a build that died inside that window would
+  // otherwise keep money it never got to spend.
   React.useEffect(() => {
     if (!ready) return;
     for (const b of builds) {
-      if (b.failure !== "system") continue;
-      if (!b.creditsCharged || b.creditsRefunded) continue;
-      if (hasOpenCharge(ledger, b.id)) refund(b.id);
-      else markRefunded(b.id);
+      if (b.failure !== "system" || b.creditsRefunded) continue;
+      if (openCharges(ledger, b.id) > 0) {
+        refund(b.id);
+        continue;
+      }
+      // No open charge: either the refund is already on the ledger — so
+      // the flag can be set and the page can say so — or nothing was
+      // ever charged, and there is nothing to claim.
+      if (refundedOnLedger(ledger, b.id)) markRefunded(b.id);
     }
   }, [ready, builds, ledger, refund, markRefunded]);
 
@@ -194,7 +196,10 @@ export function BuildSimulator() {
       // un-promoting it every tick.
       const next = oldestQueued(buildsRef.current);
       if (!next) return;
-      if (affordable) promoteQueued();
+      // A build that has already paid (a partial build queued for a
+      // single retry) owes nothing more, so an empty balance must not
+      // park it — retrying a piece costs no extra credits.
+      if (affordable || next.creditsCharged) promoteQueued();
       // Already parked for the same reason — don't re-issue the action
       // every tick, which is what kept re-rendering the provider and
       // rewriting localStorage while a credits-blocked build just sat

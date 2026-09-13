@@ -102,8 +102,6 @@ export type BuildItem = {
   progress: number; // 0–100
 };
 
-export type BuildOutcome = "private" | "community" | "sell";
-
 export type BuildJob = {
   id: string;
   chatId: string;
@@ -139,8 +137,6 @@ export type BuildJob = {
   items: BuildItem[];
   createdAt: number;
   updatedAt: number;
-  // Once the user picks an outcome the build is closed for that path.
-  outcome?: BuildOutcome;
   // The user pressed "Dismiss" on the attention banner for this build.
   // Re-armed automatically the next time the build's status changes.
   attentionDismissedAt?: number;
@@ -151,8 +147,7 @@ export type BuildJob = {
 };
 
 // What "needs attention" means for a build (spec §7b):
-//   • ready (no outcome yet) — user must review and pick Private /
-//     Community / Sell
+//   • ready, not yet saved as a project — user must review it
 //   • partial / failed       — at least one item failed and is waiting
 //     for a retry
 //   • credits                — the queue reached it but the balance
@@ -190,12 +185,6 @@ export const ITEM_SUBTITLES: Record<BuildItemKind, string> = {
 
 // How long a full build is expected to take, in minutes.
 export const BUILD_ESTIMATE_MIN = 10;
-
-export const OUTCOME_LABELS: Record<BuildOutcome, string> = {
-  private: "Save as Private",
-  community: "Give to community",
-  sell: "Sell on marketplace",
-};
 
 // ─────────────────────────── storage ───────────────────────────────
 
@@ -249,6 +238,19 @@ function deriveStatus(items: BuildItem[]): BuildStatus {
 export function statusOf(job: BuildJob): BuildStatus {
   if (job.status === "queued" || job.status === "failed") return job.status;
   return deriveStatus(job.items);
+}
+
+// How many builds are really waiting in front of this one: queued jobs
+// booked before it. The build currently running isn't "ahead in the
+// queue" — it's the one the queue is waiting on, which every caller
+// says separately.
+export function queuedAhead(job: BuildJob, builds: BuildJob[]): number {
+  return builds.filter(
+    (b) =>
+      b.id !== job.id &&
+      statusOf(b) === "queued" &&
+      b.createdAt < job.createdAt,
+  ).length;
 }
 
 // Average progress across the artifacts that are actually being built.
@@ -357,8 +359,8 @@ const ITEM_STATUS_VALUES: BuildItemStatus[] = [
 // one — hydrate must restore the invariant rather than let the queue
 // worker referee it, since `promoteQueued`/the simulator assume it
 // already holds. The oldest running job keeps running; the rest go back
-// to the queue with their items reset to pending, exactly like any other
-// demotion into "queued".
+// to the queue with the work that was in flight reset to pending,
+// exactly like any other demotion into "queued".
 function enforceSingleRunning(jobs: BuildJob[]): BuildJob[] {
   const running = jobs.filter((j) => j.status === "running");
   if (running.length <= 1) return jobs;
@@ -373,9 +375,9 @@ function enforceSingleRunning(jobs: BuildJob[]): BuildJob[] {
           status: "queued" as const,
           startedAt: undefined,
           items: j.items.map((it) =>
-            it.status === "skipped"
-              ? it
-              : { ...it, status: "pending" as const, progress: 0 },
+            it.status === "building"
+              ? { ...it, status: "pending" as const, progress: 0 }
+              : it,
           ),
         }
       : j,
@@ -453,7 +455,6 @@ type Ctx = {
   // Starts the oldest queued build when nothing is running. Called by
   // the simulator on each tick.
   promoteQueued: () => void;
-  setBuildOutcome: (buildId: string, outcome: BuildOutcome) => void;
   // Records the ManualProject this build became, so Save Project /
   // Advance Edit create one project per build and reuse it after that.
   setBuildProject: (buildId: string, projectId: string) => void;
@@ -771,9 +772,42 @@ export function CreateHistoryProvider({
     [],
   );
 
+  // Retrying one artifact restarts that artifact — but only if this
+  // build may run at all. `updateBuildItem` recomputes the job's status
+  // from its items, so on a partial build the retried row would flip the
+  // whole job back to "running" while another build already holds the
+  // worker. When something else is running, the retry goes back in the
+  // queue with that row pending and waits for promotion, exactly like
+  // retryBuild.
   const retryBuildItem = React.useCallback(
     (buildId: string, kind: BuildItemKind) => {
-      updateBuildItem(buildId, kind, { status: "building", progress: 0 });
+      const busy = buildsRef.current.some(
+        (b) => b.status === "running" && b.id !== buildId,
+      );
+      if (!busy) {
+        updateBuildItem(buildId, kind, { status: "building", progress: 0 });
+        return;
+      }
+      const now = Date.now();
+      setBuilds((arr) =>
+        arr.map((b) =>
+          b.id === buildId
+            ? {
+                ...b,
+                status: "queued" as const,
+                startedAt: undefined,
+                endedAt: undefined,
+                items: b.items.map((it) =>
+                  it.kind === kind
+                    ? { ...it, status: "pending" as const, progress: 0 }
+                    : it,
+                ),
+                updatedAt: now,
+                attentionDismissedAt: undefined,
+              }
+            : b,
+        ),
+      );
     },
     [updateBuildItem],
   );
@@ -821,8 +855,13 @@ export function CreateHistoryProvider({
           failure: "system" as const,
           blocked: undefined,
           endedAt: now,
+          // An artifact that had already reached "ready" was really
+          // produced — the failure stopped the rest, it didn't undo
+          // that one.
           items: b.items.map((it) =>
-            it.status === "skipped" ? it : { ...it, status: "failed" as const },
+            it.status === "skipped" || it.status === "ready"
+              ? it
+              : { ...it, status: "failed" as const },
           ),
           updatedAt: now,
           attentionDismissedAt: undefined,
@@ -866,10 +905,12 @@ export function CreateHistoryProvider({
               blocked: "credits" as const,
               startedAt: undefined,
               endedAt: undefined,
+              // Whatever was in flight goes back to waiting; a finished
+              // artifact stays finished.
               items: x.items.map((it) =>
-                it.status === "skipped"
-                  ? it
-                  : { ...it, status: "pending" as const, progress: 0 },
+                it.status === "building"
+                  ? { ...it, status: "pending" as const, progress: 0 }
+                  : it,
               ),
               updatedAt: Date.now(),
             }
@@ -897,10 +938,13 @@ export function CreateHistoryProvider({
               status: "running" as const,
               blocked: undefined,
               startedAt: now,
+              // Only what is waiting starts. A build that queued for a
+              // single retry keeps the artifacts it already delivered —
+              // restarting them would throw away real work.
               items: b.items.map((it) =>
-                it.status === "skipped"
-                  ? it
-                  : { ...it, status: "building" as const, progress: 0 },
+                it.status === "pending"
+                  ? { ...it, status: "building" as const, progress: 0 }
+                  : it,
               ),
               updatedAt: now,
             }
@@ -908,21 +952,6 @@ export function CreateHistoryProvider({
       );
     });
   }, []);
-
-  const setBuildOutcome = React.useCallback(
-    (buildId: string, outcome: BuildOutcome) => {
-      setBuilds((arr) =>
-        arr.map((b) =>
-          b.id === buildId
-            ? // Picking an outcome closes the review path → no more
-              // attention for this build.
-              { ...b, outcome, attentionDismissedAt: undefined }
-            : b,
-        ),
-      );
-    },
-    [],
-  );
 
   const setBuildProject = React.useCallback(
     (buildId: string, projectId: string) => {
@@ -1006,7 +1035,6 @@ export function CreateHistoryProvider({
     markRefunded,
     blockForCredits,
     promoteQueued,
-    setBuildOutcome,
     setBuildProject,
     setBuildModel,
     getBuild,
@@ -1067,11 +1095,10 @@ function computeRollup(items: BuildItem[]): BuildRollup {
 //   • ready, not yet reviewed — must be opened and taken somewhere
 //   • partial / failed        — at least one item failed; retry needed
 //
-// "Reviewed" is either outcome the review shell offers: an explicit
-// `outcome`, or the `projectId` that Save Project / Advance Edit set
-// when the build becomes a real project. Without the second one a saved
-// build keeps asking to be reviewed forever — the work is done and the
-// bell is still lit.
+// "Reviewed" is the `projectId` that Save Project / Advance Edit set
+// when the build becomes a real project. Without it a saved build keeps
+// asking to be reviewed forever — the work is done and the bell is
+// still lit.
 export function buildAttention(job: BuildJob): BuildAttention | null {
   // One naming rule for every message: the build's own title, and only
   // when it has none, a title derived from the prompt that started it.
@@ -1091,7 +1118,7 @@ export function buildAttention(job: BuildJob): BuildAttention | null {
     };
   }
   const rollup = rollupBuild(job);
-  if (rollup.status === "ready" && !job.outcome && !job.projectId) {
+  if (rollup.status === "ready" && !job.projectId) {
     return {
       job,
       reason: "review",

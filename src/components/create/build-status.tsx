@@ -39,6 +39,7 @@ import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
   elapsedMinutes,
+  queuedAhead,
   rollupBuild,
   statusOf,
   useCreateHistory,
@@ -79,8 +80,9 @@ export type StateRow = {
 
 const HOME_LINK = { label: "Back to home", href: "/" } as const;
 
-// "PCB" · "PCB and Wiring" · "PCB, Wiring and Parts".
-function joinLabels(labels: string[]): string {
+// "PCB" · "PCB and Wiring" · "PCB, Wiring and Parts". Exported because
+// the attention banner rolls the same failed-item list into a sentence.
+export function joinLabels(labels: string[]): string {
   if (labels.length <= 1) return labels[0] ?? "";
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
@@ -97,7 +99,13 @@ function labelsOf(job: BuildJob, status: BuildItem["status"]): string[] {
 
 // What this build is, said once. Everything the page renders — badge,
 // banner, clock line, footer, whole-build action — reads from here.
-export function stateRowFor(job: BuildJob, now: number): StateRow {
+// `ahead` is how many builds are really queued in front of this one, so
+// the queue copy states the position instead of assuming it.
+export function stateRowFor(
+  job: BuildJob,
+  now: number,
+  ahead: number,
+): StateRow {
   const status = statusOf(job);
   const elapsed = elapsedMinutes(job, now);
 
@@ -119,31 +127,53 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
   }
 
   if (status === "queued") {
+    const next = ahead === 0;
     return {
       badge: { text: "Queued", tone: "neutral" },
       sectionLabel: "Build queue",
       banner: {
         tone: "info",
         title: "Your build starts shortly",
-        body: "One build ahead of you. Credits are only charged once your build starts.",
+        body: `${
+          next
+            ? "Yours is next — it starts when the current build finishes."
+            : `${ahead} build${ahead === 1 ? "" : "s"} ahead of you.`
+        } Credits are only charged once your build starts.`,
       },
       meta: "Free plan runs one build at a time",
-      footer:
-        "You're next in the queue. We'll start automatically and notify you — no need to wait here.",
+      footer: next
+        ? "You're next in the queue. We'll start automatically and notify you — no need to wait here."
+        : "We'll start it automatically and notify you — no need to wait here.",
       footerLink: HOME_LINK,
     };
   }
 
   if (status === "failed") {
+    // What the ledger really did with the money, in three honest
+    // states — the refund is a separate step from the failure, so the
+    // banner can't announce one that hasn't happened.
+    const credits = job.creditsRefunded
+      ? `All ${BUILD_COST} credits have been refunded automatically — your balance is unchanged.`
+      : job.creditsCharged
+        ? `The ${BUILD_COST} credits this build was charged are being put back now.`
+        : "Nothing was charged for this build.";
+    // A piece that finished before the failure is still a piece that
+    // finished — the rows say so, so the clock line can't say nothing
+    // was delivered.
+    const delivered = labelsOf(job, "ready");
     return {
       badge: { text: "Build failed", tone: "error" },
       sectionLabel: "Build failed",
       banner: {
         tone: "error",
         title: "A system error stopped this build",
-        body: `This was our fault, not yours. All ${BUILD_COST} credits have been refunded automatically — your balance is unchanged.`,
+        body: `This was our fault, not yours. ${credits}`,
       },
-      meta: `Stopped after ${minutes(elapsed)} · nothing was delivered`,
+      meta: delivered.length
+        ? `Stopped after ${minutes(elapsed)} · only your ${joinLabels(delivered)} ${
+            delivered.length === 1 ? "was" : "were"
+          } finished`
+        : `Stopped after ${minutes(elapsed)} · nothing was delivered`,
       footer:
         "Nothing about your concept was lost — it stays in the chat exactly as you left it.",
       footerLink: HOME_LINK,
@@ -226,8 +256,9 @@ const BANNER_TONE = {
 
 // The clock line is in whole minutes, so the page re-reads the clock on
 // a slow tick instead of at render — a render must never depend on
-// Date.now(), and a minute cannot turn over faster than this.
-function useMinuteClock(): number {
+// Date.now(), and a minute cannot turn over faster than this. Exported
+// so every surface that prints a build's minutes reads the same clock.
+export function useMinuteClock(): number {
   const [now, setNow] = React.useState(() =>
     typeof window === "undefined" ? 0 : Date.now(),
   );
@@ -246,9 +277,9 @@ function useMinuteClock(): number {
 }
 
 export function BuildStatus({ job }: { job: BuildJob }) {
-  const { retryBuildItem, retryBuild } = useCreateHistory();
+  const { builds, retryBuildItem, retryBuild } = useCreateHistory();
   const now = useMinuteClock();
-  const row = stateRowFor(job, now);
+  const row = stateRowFor(job, now, queuedAhead(job, builds));
   // The whole build died, so no single row failed to generate — none of
   // them ran. The retry that makes sense is the whole build's.
   const systemFailure = statusOf(job) === "failed";
@@ -314,8 +345,9 @@ export function BuildStatus({ job }: { job: BuildJob }) {
 // shows the same strip above its outputs, so the page reads the same
 // whichever half of the build is on screen.
 export function BuildConceptCard({ job }: { job: BuildJob }) {
+  const { builds } = useCreateHistory();
   const now = useMinuteClock();
-  const row = stateRowFor(job, now);
+  const row = stateRowFor(job, now, queuedAhead(job, builds));
   return (
     <section aria-label="Build header" className={CARD}>
       <ConceptHeader job={job} row={row} />

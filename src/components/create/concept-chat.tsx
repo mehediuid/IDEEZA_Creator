@@ -19,7 +19,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Cancel01Icon, Clock01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { deriveTitle, useCreateHistory } from "@/lib/create/history";
+import {
+  deriveTitle,
+  queuedAhead,
+  useCreateHistory,
+  type BuildJob,
+} from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
 import { useCreatePlan } from "@/lib/create/plan";
 import { ChatThread, conceptLabels } from "./chat-thread";
@@ -31,6 +36,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const router = useRouter();
   const {
     hydrated,
+    builds,
     getChat,
     getBuild,
     appendUserTurn,
@@ -87,6 +93,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     return out;
   }, [chat, regenSource]);
 
+  // …and the entry goes as soon as that child leaves "pending". The map
+  // is session state keyed by turn id: unpruned it grows by one entry
+  // per Regenerate for as long as the chat stays open.
+  const releaseRegenSource = React.useCallback((turnId: string) => {
+    setRegenSource((prev) => {
+      if (!(turnId in prev)) return prev;
+      const next = { ...prev };
+      delete next[turnId];
+      return next;
+    });
+  }, []);
+
   // Auto-run any pending assistant turns. This handles:
   //   • the home→chat redirect (initial fresh turn comes in pending),
   //   • turns the user kicked off then refreshed away from before they
@@ -128,10 +146,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     Map<string, ReturnType<typeof setInterval>>
   >(new Map());
   React.useEffect(() => {
-    if (!chat) return;
     const timers = progressTimers.current;
+    // The sweep comes first: a chat that has gone (cleared storage, a
+    // route change) leaves no pending turns, and returning before this
+    // would leave its intervals ticking against a turn nothing renders.
     const pending = new Set(
-      chat.turns
+      (chat?.turns ?? [])
         .filter((t) => t.role === "assistant" && t.status === "pending")
         .map((t) => t.id),
     );
@@ -140,6 +160,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       clearInterval(handle);
       timers.delete(id);
     }
+    if (!chat) return;
     for (const turn of chat.turns) {
       if (turn.role !== "assistant" || turn.status !== "pending") continue;
       if (timers.has(turn.id)) continue;
@@ -190,9 +211,19 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         resolveAssistantTurn(cid, turnId, data.imageUrl);
       } catch {
         failAssistantTurn(cid, turnId);
+      } finally {
+        // Ready or failed, the turn has left "pending": the Regenerate
+        // that spawned it is free again and its entry has nothing left
+        // to say.
+        releaseRegenSource(turnId);
       }
     },
-    [incrementPrompt, resolveAssistantTurn, failAssistantTurn],
+    [
+      incrementPrompt,
+      resolveAssistantTurn,
+      failAssistantTurn,
+      releaseRegenSource,
+    ],
   );
 
   // One lineage label per concept — the same map the thread renders from,
@@ -438,7 +469,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               className="mb-[12px] flex items-center gap-[10px] rounded-xl border border-solid border-border bg-bg-subtle px-[14px] py-[10px] text-sm text-text-secondary"
             >
               <Icon icon={Clock01Icon} size={16} />
-              Queued — one build ahead of you
+              {queuedNoticeText(queuedNoticeJob, builds)}
               <Link
                 href={`/build/${queuedNotice}`}
                 className="ml-auto font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -488,6 +519,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       />
     </div>
   );
+}
+
+// What the notice under the prompt bar says about a build that didn't
+// start. A build parked on credits isn't waiting its turn — it is
+// waiting on the user — so it reads the way the concept card's own
+// status line reads; everything else names the real queue depth
+// instead of assuming one build is ahead.
+function queuedNoticeText(job: BuildJob, builds: BuildJob[]): string {
+  if (job.blocked === "credits") return "Paused — top up credits to start";
+  const ahead = queuedAhead(job, builds);
+  if (ahead === 0) return "Queued — starts when the current build finishes";
+  return `Queued — ${ahead} build${ahead === 1 ? "" : "s"} ahead of you`;
 }
 
 function LoadingShell() {

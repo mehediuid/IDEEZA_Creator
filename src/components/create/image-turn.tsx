@@ -47,6 +47,7 @@ import {
   type BuildJob,
   type ChatTurn,
 } from "@/lib/create/history";
+import { useMinuteClock } from "./build-status";
 
 const COST_HINT = `Generating the full product uses ${BUILD_COST} credits. Refining stays free.`;
 
@@ -253,6 +254,10 @@ function SentChip() {
 // tick, which is what moves the "minutes left" figure here.
 function SentToBuildRow({ buildId }: { buildId: string }) {
   const { getBuild } = useCreateHistory();
+  // The same minute clock the build page reads — the countdown is in
+  // whole minutes, so it is re-read on a slow tick rather than at
+  // render, where Date.now() has no business.
+  const now = useMinuteClock();
   const job = getBuild(buildId);
 
   // A chat kept from an earlier session can name a build this browser no
@@ -266,7 +271,7 @@ function SentToBuildRow({ buildId }: { buildId: string }) {
         data-testid="build-status-line"
         className="min-w-0 text-sm text-text-tertiary"
       >
-        {buildStatusLine(job)}
+        {buildStatusLine(job, now)}
       </span>
       <Link
         href={`/build/${job.id}`}
@@ -285,14 +290,14 @@ function SentToBuildRow({ buildId }: { buildId: string }) {
 // The stored `status` only speaks for the two states the items can't
 // express (queued, and a system failure) — everything else is derived
 // from the artifacts themselves, so the line reads statusOf(job).
-function buildStatusLine(job: BuildJob): string {
+function buildStatusLine(job: BuildJob, now: number): string {
   switch (statusOf(job)) {
     case "queued":
       return job.blocked === "credits"
         ? "Paused · top up credits to start"
         : "Queued · starts when the current build finishes";
     case "running":
-      return `Building now · about ${minutesLeft(job)} minutes left`;
+      return `Building now · about ${minutesLeft(job, now)} minutes left`;
     case "ready":
       return "Build ready · review your deliverables";
     case "partial":
