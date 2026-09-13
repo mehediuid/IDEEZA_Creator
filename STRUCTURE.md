@@ -22,7 +22,7 @@ ideeza-creator-panel/
    ├─ app/                   Next App Router — routes & layouts
    │  ├─ layout.tsx          Root layout (ThemeProvider, fonts, global CSS)
    │  ├─ api/                Server API routes (concept/generate · concept/summarize
-   │  │                      · refine · build/start · three/generate)
+   │  │                      · refine · build/start · three/generate · and others)
    │  ├─ (dashboard)/        Home + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
    │  │   └─ innovations/[slug]/      community feed + detail

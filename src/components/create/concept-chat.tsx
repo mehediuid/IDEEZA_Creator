@@ -9,7 +9,10 @@
 //                                  specific image+prompt
 //   • ConfirmBuildDialog confirm → /api/build/start + record job in
 //                                  the Project create history + route
-//                                  to /build/[jobId]
+//                                  to /build/[jobId] — unless the job
+//                                  queues behind another build, in which
+//                                  case we stay in the chat and show a
+//                                  queued notice instead
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -29,6 +32,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const {
     hydrated,
     getChat,
+    getBuild,
     appendUserTurn,
     appendAssistantTurn,
     resolveAssistantTurn,
@@ -55,6 +59,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // refine then continues in the thread (pending → ready), where the user can
   // watch it land and reopen Refine to iterate.
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
+
+  // The notice names one specific build — once it leaves the queue
+  // (started, finished, or failed), there's nothing left for it to
+  // point at. Derived from live build state each render (via `builds`,
+  // read fresh by `getBuild`) rather than mirrored into its own effect,
+  // so it can't go stale on screen or trigger a cascading re-render.
+  const queuedNoticeJob = queuedNotice ? getBuild(queuedNotice) : null;
+  const showQueuedNotice = queuedNoticeJob?.status === "queued";
 
   // Which concept each Regenerate came from: child turn id → source turn
   // id. The source card's Regenerate reads pressed while its child is
@@ -367,11 +379,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         });
         // A queued build isn't building yet, so we stay in the chat and
         // say so beside the concept that started it — the build page
-        // would only show a waiting room.
+        // would only show a waiting room. Any earlier notice is for a
+        // build this new confirm has nothing to do with, so it's
+        // replaced (or cleared, if this one didn't queue) rather than
+        // left pointing at a stale job.
         if (job.status === "queued") {
           setQueuedNotice(job.id);
           return;
         }
+        setQueuedNotice(null);
         router.push(`/build/${job.id}`);
       } finally {
         setSubmittingBuild(false);
@@ -415,7 +431,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
       <div className="bg-bg-page">
         <div className="mx-auto w-full max-w-[640px] px-[24px] py-[16px]">
-          {queuedNotice && (
+          {showQueuedNotice && (
             <div
               role="status"
               data-testid="queued-notice"

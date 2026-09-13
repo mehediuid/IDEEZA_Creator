@@ -16,6 +16,7 @@
 // explained rather than listed.
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ActivityIcon,
   Cancel01Icon,
@@ -62,9 +63,9 @@ const KIND_TITLE: Record<BuildItemKind, string> = {
 };
 
 const KIND_DETAIL: Record<BuildItemKind, string> = {
-  "3d": "Printable enclosure with mount points",
-  pcb: "Schematic, layout and BOM",
-  code: "Starter firmware for the parts used",
+  "3d": "Printable model with mount points and tolerances",
+  pcb: "Schematic, layout and BOM ready for fabrication",
+  code: "Starter firmware with the libraries the parts need",
   wiring: "Peripheral harness with pin-to-pin labels and wire colours",
   parts: "Every component with quantity, footprint and where to buy it",
 };
@@ -86,6 +87,38 @@ const TIME_CHIP = `About ${BUILD_ESTIMATE_MIN - ESTIMATE_WINDOW}–${
 // One summarize call per concept: reopening the dialog on the same turn
 // shows what it read the first time instead of asking again.
 const summaryCache = new Map<string, ConceptSummary>();
+
+// In-flight requests, keyed the same way — a quick close/reopen (or a
+// second mount) while the round-trip is still out reuses this promise
+// instead of firing a second /api/concept/summarize call.
+const pendingSummaries = new Map<string, Promise<ConceptSummary>>();
+
+function summarizeConcept(turnId: string, prompt: string): Promise<ConceptSummary> {
+  const pending = pendingSummaries.get(turnId);
+  if (pending) return pending;
+  const request = (async (): Promise<ConceptSummary> => {
+    try {
+      const res = await fetch("/api/concept/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error("summarize failed");
+      const data = (await res.json()) as Partial<ConceptSummary>;
+      if (!data.title || !Array.isArray(data.parts) || !data.parts.length) {
+        throw new Error("empty concept");
+      }
+      return { title: data.title, summary: data.summary ?? "", parts: data.parts };
+    } catch {
+      // The same deterministic concept the route falls back to, so a
+      // build started offline still carries a real parts list.
+      return fallbackConcept(prompt);
+    }
+  })();
+  pendingSummaries.set(turnId, request);
+  request.finally(() => pendingSummaries.delete(turnId));
+  return request;
+}
 
 export function ConfirmBuildDialog({
   open,
@@ -110,51 +143,38 @@ export function ConfirmBuildDialog({
   submitting: boolean;
 }) {
   const { hydrated: creditsHydrated, balance } = useCredits();
-  const [fetched, setFetched] = React.useState<{
+  const [resolved, setResolved] = React.useState<{
     turnId: string;
     concept: ConceptSummary;
   } | null>(null);
 
   // What this dialog shows: the cached read if this concept has been
-  // summarized before, else whatever this open's fetch brought back.
+  // summarized before, else whatever this open's fetch resolved to, else
+  // the same deterministic fallback the route itself falls back to — so
+  // there's a real, buildable concept on screen (and Generate can stay
+  // enabled) from the instant the modal opens, not just once the network
+  // answers.
   const concept =
     summaryCache.get(turnId) ??
-    (fetched && fetched.turnId === turnId ? fetched.concept : null);
-  const loading = !concept;
+    (resolved && resolved.turnId === turnId ? resolved.concept : null) ??
+    fallbackConcept(conceptPrompt);
+  // Only the summary row's skeleton reads this — the seeded fallback
+  // above already stands in for `concept` everywhere else.
+  const loading =
+    !summaryCache.has(turnId) && !(resolved && resolved.turnId === turnId);
 
   // Read the concept back the moment the dialog opens — the summary row
   // is what the build will be filed under, so it is shown before the
-  // user pays for it.
+  // user pays for it. `summarizeConcept` dedupes an in-flight request,
+  // so a quick close/reopen on the same turn reuses it.
   React.useEffect(() => {
     if (!open || !turnId || summaryCache.has(turnId)) return;
     let live = true;
-    (async () => {
-      let result: ConceptSummary;
-      try {
-        const res = await fetch("/api/concept/summarize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: conceptPrompt }),
-        });
-        if (!res.ok) throw new Error("summarize failed");
-        const data = (await res.json()) as Partial<ConceptSummary>;
-        if (!data.title || !Array.isArray(data.parts) || !data.parts.length) {
-          throw new Error("empty concept");
-        }
-        result = {
-          title: data.title,
-          summary: data.summary ?? "",
-          parts: data.parts,
-        };
-      } catch {
-        // The same deterministic concept the route falls back to, so a
-        // build started offline still carries a real parts list.
-        result = fallbackConcept(conceptPrompt);
-      }
+    summarizeConcept(turnId, conceptPrompt).then((result) => {
       summaryCache.set(turnId, result);
       if (!live) return;
-      setFetched({ turnId, concept: result });
-    })();
+      setResolved({ turnId, concept: result });
+    });
     return () => {
       live = false;
     };
@@ -176,12 +196,11 @@ export function ConfirmBuildDialog({
   // refreshes that ref in its own effect, which runs after ours, so it
   // reads a render behind here (chat-thread.tsx reads it the same way).
   const shortOnCredits = creditsHydrated && balance < BUILD_COST;
-  const blocked = shortOnCredits || loading || submitting;
-  const blockedWhy = shortOnCredits
-    ? "Not enough credits"
-    : loading
-      ? "Reading the concept…"
-      : undefined;
+  // The concept summary loading in the background is never a reason to
+  // block Generate — `concept` already carries a real, buildable
+  // fallback while the fetch is in flight (see above).
+  const blocked = shortOnCredits || submitting;
+  const blockedWhy = shortOnCredits ? "Not enough credits" : undefined;
 
   return (
     <div
@@ -201,28 +220,30 @@ export function ConfirmBuildDialog({
         onClick={(e) => e.stopPropagation()}
         className="relative flex max-h-[calc(100dvh-48px)] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface shadow-3"
       >
-        {/* Body — scrolls if it overflows. */}
-        <div className="flex-1 overflow-y-auto px-[24px] pb-[20px] pt-[22px]">
-          <div className="flex items-start gap-[12px]">
-            <span
-              aria-hidden
-              className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-bg-info-subtle text-[var(--color-icon-info)]"
-            >
-              <Icon icon={InformationCircleIcon} size={20} />
-            </span>
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={onCancel}
-              className="ml-auto inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <Icon icon={Cancel01Icon} />
-            </button>
-          </div>
+        {/* Sticky header — stays put above the scrolling body so Close
+            is always reachable, not just at the top of a long dialog. */}
+        <div className="flex shrink-0 items-start gap-[12px] px-[24px] pt-[22px] pb-[8px]">
+          <span
+            aria-hidden
+            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-bg-info-subtle text-[var(--color-icon-info)]"
+          >
+            <Icon icon={InformationCircleIcon} size={20} />
+          </span>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={onCancel}
+            className="ml-auto inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={Cancel01Icon} />
+          </button>
+        </div>
 
+        {/* Body — scrolls if it overflows. */}
+        <div className="flex-1 overflow-y-auto px-[24px] pb-[20px]">
           <h2
             id="confirm-build-title"
-            className="mt-[16px] text-xl font-bold tracking-tight text-text-primary"
+            className="text-xl font-bold tracking-tight text-text-primary"
           >
             Generate the full product
           </h2>
@@ -241,7 +262,7 @@ export function ConfirmBuildDialog({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={conceptImageUrl}
-                alt={`Concept ${conceptLabel}`}
+                alt=""
                 className="h-[72px] w-[80px] shrink-0 rounded-lg object-cover"
               />
             )}
@@ -249,7 +270,7 @@ export function ConfirmBuildDialog({
               <span className="inline-flex rounded-full bg-bg-brand-subtle px-[8px] py-[3px] text-2xs font-bold uppercase tracking-wider text-text-brand">
                 Concept {conceptLabel}
               </span>
-              {loading || !concept ? (
+              {loading ? (
                 <ConceptSkeleton />
               ) : (
                 <>
@@ -326,7 +347,7 @@ export function ConfirmBuildDialog({
             title={blockedWhy}
             className={
               blocked
-                ? "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[18px] text-md font-bold text-text-disabled"
+                ? "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-[var(--color-button-disabled-bg)] px-[18px] text-md font-bold text-[color:var(--color-button-disabled-text)]"
                 : "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-violet-600 px-[18px] text-md font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
             }
           >
@@ -334,6 +355,25 @@ export function ConfirmBuildDialog({
             {submitting ? "Starting build…" : "Generate full product"}
           </button>
         </footer>
+
+        {/* The disabled button's title is a tooltip, which a touch/keyboard
+            user may never see — when credits are the only reason Generate
+            won't run, say so in the open too. */}
+        {shortOnCredits && (
+          <p
+            data-testid="credits-blocked-reason"
+            className="border-t border-solid border-border bg-bg-page/40 px-[24px] py-[10px] text-center text-sm text-text-secondary"
+          >
+            Not enough credits —{" "}
+            <Link
+              href="/history#credits"
+              className="font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              top up
+            </Link>{" "}
+            to generate.
+          </p>
+        )}
       </div>
     </div>
   );
