@@ -50,7 +50,7 @@ import {
 const COST_HINT = `Generating the full product uses ${BUILD_COST} credits. Refining stays free.`;
 
 const OUTLINE_BUTTON =
-  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
+  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
 
 export function ImageTurn({
   turn,
@@ -78,6 +78,7 @@ export function ImageTurn({
   // waits for `hydrated` rather than greying every card on load.
   const { hydrated: creditsHydrated, balance } = useCredits();
   const shortOnCredits = creditsHydrated && balance < BUILD_COST;
+  const costHintId = React.useId();
 
   if (turn.status === "pending") {
     return (
@@ -113,11 +114,11 @@ export function ImageTurn({
             src={turn.imageUrl}
             alt={`Concept ${conceptLabel} ${turn.kind === "refine" ? "refining Concept " + parentConceptLabel : "from"}: ${turn.prompt}`}
             onError={() => setImgOk(false)}
-            className="aspect-[4/3] w-full object-cover"
+            className="aspect-[16/10] w-full object-cover"
           />
         </button>
       ) : turn.imageUrl ? (
-        <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-[8px] rounded-xl bg-bg-surface-raised px-[16px] text-center">
+        <div className="flex aspect-[16/10] w-full flex-col items-center justify-center gap-[8px] rounded-xl bg-bg-surface-raised px-[16px] text-center">
           <p className="text-sm text-text-tertiary">
             Couldn&apos;t load this image.
           </p>
@@ -165,8 +166,8 @@ export function ImageTurn({
             </button>
             <button
               type="button"
-              onClick={onRegenerate}
-              disabled={regenerating}
+              onClick={regenerating ? () => {} : onRegenerate}
+              aria-disabled={regenerating}
               aria-pressed={regenerating}
               aria-label={`Regenerate a fresh take of Concept ${conceptLabel}`}
               title={
@@ -176,7 +177,7 @@ export function ImageTurn({
               }
               className={
                 regenerating
-                  ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-border-brand bg-bg-brand-subtle px-[12px] text-sm font-medium text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                  ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border-strong bg-bg-subtle px-[12px] text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                   : OUTLINE_BUTTON
               }
             >
@@ -200,10 +201,14 @@ export function ImageTurn({
                 type="button"
                 aria-label={COST_HINT}
                 title={COST_HINT}
+                aria-describedby={costHintId}
                 className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-full outline-none transition-colors duration-fast hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 <Icon icon={InformationCircleIcon} size={14} />
               </button>
+              <span id={costHintId} className="sr-only">
+                {COST_HINT}
+              </span>
             </span>
             <button
               type="button"
@@ -354,6 +359,7 @@ function ConceptHeader({
 // answer — a silent icon leaves the user guessing whether it fired.
 function CopyPromptButton({ prompt }: { prompt: string }) {
   const [copied, setCopied] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(
@@ -364,10 +370,24 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
   );
 
   const copy = React.useCallback(() => {
-    void navigator.clipboard?.writeText(prompt)?.catch(() => null);
-    setCopied(true);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), 1200);
+    if (!navigator.clipboard) {
+      setFailed(true);
+      timer.current = setTimeout(() => setFailed(false), 1200);
+      return;
+    }
+    navigator.clipboard
+      .writeText(prompt)
+      .then(() => {
+        setFailed(false);
+        setCopied(true);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => setCopied(false), 1200);
+      })
+      .catch(() => {
+        setFailed(true);
+        timer.current = setTimeout(() => setFailed(false), 1200);
+      });
   }, [prompt]);
 
   return (
@@ -376,7 +396,13 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
       onClick={copy}
       data-testid="copy-prompt"
       aria-label={copied ? "Copied" : "Copy prompt"}
-      title={copied ? "Copied" : "Copy prompt"}
+      title={
+        failed
+          ? "Copy failed — select the text instead"
+          : copied
+            ? "Copied"
+            : "Copy prompt"
+      }
       className="inline-flex h-[28px] shrink-0 items-center gap-[4px] rounded-lg px-[6px] text-2xs font-medium text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
     >
       <Icon icon={copied ? Tick02Icon : Copy01Icon} size={15} />
@@ -408,7 +434,7 @@ function PendingImageTurn({
           ? `Refining Concept ${parentConceptLabel} into Concept ${conceptLabel}`
           : `Drafting Concept ${conceptLabel}`
       }
-      className="relative flex aspect-[64/53] w-full max-w-[640px] items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-glass-fill-brand)] bg-bg-surface"
+      className="relative flex aspect-[64/53] w-full max-w-[640px] items-center justify-center overflow-hidden rounded-2xl border border-solid border-[var(--color-glass-fill-brand)] bg-bg-brand-subtle"
     >
       <span
         aria-hidden
@@ -421,7 +447,7 @@ function PendingImageTurn({
       />
       <span
         data-testid="turn-progress"
-        className="relative inline-flex items-center rounded-full bg-[var(--color-glass-fill-md)] px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary backdrop-blur-sm"
+        className="relative inline-flex items-center rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
       >
         Rendering concept {conceptLabel} · {pct}%
       </span>
@@ -449,7 +475,7 @@ function FailedImageTurn({ onRetry }: { onRetry: () => void }) {
         <button
           type="button"
           onClick={onRetry}
-          className="mt-[4px] inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="mt-[4px] inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           <Icon icon={Refresh01Icon} />
           Try again
