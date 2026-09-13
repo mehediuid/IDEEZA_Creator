@@ -11,6 +11,7 @@
 // `blockedReason`, so they can never disagree about whether the flow can move.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft01Icon, ArrowRight01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { DsIcon } from "@/lib/pcb/icons";
@@ -52,6 +53,106 @@ function useInertBehind(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
+/** The way out of a full-screen flow.
+ *
+ *  The mark used to be decoration (`decorative`, no handler), so the only exit
+ *  was the X in the opposite corner — and it went to one place without saying
+ *  where. A logo is where people reach for home, so this makes it the door and
+ *  names every destination. Leaving is safe and the menu says so: the draft is
+ *  debounce-persisted, so the flow reopens where it was left.
+ *
+ *  A real menu, not a painted one: the trigger is a button announcing
+ *  `aria-haspopup`, the panel is a `menu` of `menuitem`s, arrows move between
+ *  them, Escape closes and hands focus back to the trigger. */
+const EXITS = [
+  { href: "/", label: "Home", hint: "Dashboard" },
+  { href: "/parts", label: "Parts & Agile Module", hint: "Where this flow started" },
+  { href: "/projects", label: "My projects", hint: "Boards you are building" },
+];
+
+function LogoMenu() {
+  const [open, setOpen] = React.useState(false);
+  const [active, setActive] = React.useState(0);
+  const wrap = React.useRef<HTMLDivElement>(null);
+  const trigger = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const last = EXITS.length - 1;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) { setActive(0); setOpen(true); } else setActive((i) => (i >= last ? 0 : i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) { setActive(last); setOpen(true); } else setActive((i) => (i <= 0 ? last : i - 1));
+    } else if (e.key === "Escape" && open) {
+      e.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    } else if (e.key === "Tab" && open) {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={wrap} className="relative shrink-0">
+      <button
+        ref={trigger}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="IDEEZA — leave the flow"
+        title="Leave the flow — your draft is kept"
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={onKeyDown}
+        className="flex h-[36px] cursor-pointer items-center gap-[var(--spacing-2)] rounded-[var(--radius-lg)] px-[var(--spacing-3)] outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <IdeezaLogo height={24} decorative className="shrink-0" />
+        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden className="text-text-tertiary">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Leave the flow"
+          className="absolute left-0 top-[calc(100%+6px)] z-toast w-[280px] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-2)] shadow-[var(--elevation-5)]"
+        >
+          {EXITS.map((x, i) => (
+            <Link
+              key={x.href}
+              href={x.href}
+              role="menuitem"
+              onMouseEnter={() => setActive(i)}
+              onClick={() => setOpen(false)}
+              className={[
+                "flex flex-col gap-[var(--spacing-1)] rounded-[var(--radius-lg)] px-[var(--spacing-5)] py-[var(--spacing-4)] outline-none",
+                "focus-visible:ring-2 focus-visible:ring-border-focus",
+                i === active ? "bg-bg-surface-raised" : "",
+              ].join(" ")}
+            >
+              <span className="font-display text-sm font-medium text-text-primary">{x.label}</span>
+              <span className="font-display text-2xs font-regular text-text-tertiary">{x.hint}</span>
+            </Link>
+          ))}
+          <p className="border-t border-border-subtle px-[var(--spacing-5)] py-[var(--spacing-4)] font-display text-2xs font-regular leading-relaxed text-text-tertiary">
+            Your draft is saved as you go — leaving here and coming back picks up where you left off.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function FlowShell({ children }: { children: React.ReactNode }) {
   const { step, draft, toast, done } = usePackageState();
   const actions = usePackageActions();
@@ -74,7 +175,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
     <div ref={shellRef} className="fixed inset-0 z-sheet flex flex-col overflow-hidden bg-bg-page font-sans text-text-primary">
       {/* Top bar */}
       <header className="flex h-[56px] shrink-0 items-center gap-[var(--spacing-6)] border-b border-border bg-bg-surface px-[var(--spacing-8)]">
-        <IdeezaLogo height={24} decorative className="shrink-0" />
+        <LogoMenu />
         <span aria-hidden className="h-[20px] w-px bg-border-default" />
         <h1 className="font-display text-sm font-semibold text-text-primary">New Package</h1>
         <div className="flex-1" />
