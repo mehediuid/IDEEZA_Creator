@@ -62,6 +62,10 @@ export type StateTone = "neutral" | "brand" | "warning" | "error" | "success";
 export type StateRow = {
   badge: { text: string; tone: StateTone };
   banner?: { tone: "info" | "warning" | "error"; title: string; body: string };
+  // The section's aria-label — names what's on screen in this state,
+  // so assistive tech never hears "Build progress" while looking at a
+  // queue or a failure.
+  sectionLabel: string;
   // The clock line under the rows.
   meta: string;
   footer: string;
@@ -102,6 +106,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
   if (status === "queued" && job.blocked === "credits") {
     return {
       badge: { text: "Paused — needs credits", tone: "warning" },
+      sectionLabel: "Build paused",
       banner: {
         tone: "warning",
         title: "Not enough credits to start this build",
@@ -116,6 +121,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
   if (status === "queued") {
     return {
       badge: { text: "Queued", tone: "neutral" },
+      sectionLabel: "Build queue",
       banner: {
         tone: "info",
         title: "Your build starts shortly",
@@ -131,6 +137,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
   if (status === "failed") {
     return {
       badge: { text: "Build failed", tone: "error" },
+      sectionLabel: "Build failed",
       banner: {
         tone: "error",
         title: "A system error stopped this build",
@@ -153,6 +160,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
       : "";
     return {
       badge: { text: "Partial — retry needed", tone: "warning" },
+      sectionLabel: "Build results",
       banner: {
         tone: "warning",
         title: `The ${failedList} step${failed.length === 1 ? "" : "s"} failed`,
@@ -169,6 +177,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
   if (status === "ready") {
     return {
       badge: { text: "Ready", tone: "success" },
+      sectionLabel: "Build results",
       meta: `Finished in ${minutes(elapsed)}`,
       footer: "All five pieces are ready. Choose what happens to this build next.",
       footerLink: HOME_LINK,
@@ -177,6 +186,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
 
   return {
     badge: { text: `Building · ${rollupBuild(job).progress}%`, tone: "brand" },
+    sectionLabel: "Build progress",
     meta: `About 8–12 minutes · ${minutes(elapsed)} elapsed`,
     footer:
       "You can leave — the build keeps running and we'll notify you when each piece is ready.",
@@ -189,7 +199,7 @@ export function stateRowFor(job: BuildJob, now: number): StateRow {
 const CARD = "rounded-2xl border border-border bg-bg-surface p-[16px]";
 
 const BADGE_TONE: Record<StateTone, string> = {
-  neutral: "bg-bg-surface-raised text-text-secondary",
+  neutral: "border border-solid border-border bg-bg-surface text-text-secondary",
   brand: "bg-bg-brand-subtle text-text-brand",
   warning: "bg-bg-warning-subtle text-text-warning",
   error: "bg-bg-error-subtle text-text-error",
@@ -221,8 +231,15 @@ function useMinuteClock(): number {
   const [now, setNow] = React.useState(() =>
     typeof window === "undefined" ? 0 : Date.now(),
   );
+  const bucketRef = React.useRef(Math.floor(now / 60_000));
   React.useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 15_000);
+    const id = window.setInterval(() => {
+      const next = Date.now();
+      const bucket = Math.floor(next / 60_000);
+      if (bucket === bucketRef.current) return;
+      bucketRef.current = bucket;
+      setNow(next);
+    }, 15_000);
     return () => window.clearInterval(id);
   }, []);
   return now;
@@ -238,7 +255,7 @@ export function BuildStatus({ job }: { job: BuildJob }) {
 
   return (
     <section
-      aria-label="Build progress"
+      aria-label={row.sectionLabel}
       className={[CARD, "flex flex-col gap-[12px]"].join(" ")}
     >
       <ConceptHeader job={job} row={row} />
@@ -367,9 +384,14 @@ function BuildItemRow({
   onRetry: () => void;
 }) {
   const label = ITEM_LABELS[item.kind];
-  // A bar is a thing in motion or a thing finished. A row that couldn't
-  // generate, or never ran, has no progress to show.
-  const bar = item.status === "building" || item.status === "ready";
+  // A bar is a thing in motion, a thing finished, or a thing waiting
+  // its turn — a pending row still has a place in line, drawn as the
+  // rail with no fill. A row that couldn't generate, or never ran, has
+  // no progress to show at all.
+  const bar =
+    item.status === "building" ||
+    item.status === "ready" ||
+    item.status === "pending";
   const canRetry = item.status === "failed" && !systemFailure;
 
   return (
@@ -434,9 +456,11 @@ function statusLabel(
   progress: number,
   systemFailure: boolean,
 ): string {
-  // The whole build died before it delivered anything — every row is a
-  // thing that never ran, not five separate generation failures.
-  if (systemFailure) return "Didn't run";
+  // The whole build died before it delivered anything — every row that
+  // hadn't already finished is a thing that never ran, not a
+  // generation failure. A row that had already reached "ready" is
+  // still ready — the system failure didn't undo it.
+  if (systemFailure && status !== "ready") return "Didn't run";
   if (status === "ready") return "Ready";
   if (status === "failed") return "Couldn't generate";
   if (status === "skipped") return "Didn't run";
