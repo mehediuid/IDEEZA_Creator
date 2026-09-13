@@ -7,12 +7,14 @@
 // AFTER mint (Step 3) and lives in the global VideoJobsProvider so it doesn't
 // block this flow at all.
 //
-// Sell + Give intents lock AR and Skip (AI storyboard is required so the
-// listing has SOMETHING to show). Save can pick freely.
+// Every intent can record from a phone (AR) or generate from a prompt (AI).
+// Only "Add later" (Skip) is locked for Sell / Give — a listing needs a
+// preview clip.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
-import type { BriefState, Scene, MediaType } from "./brief-app";
+import { BriefCard } from "./brief-app";
+import type { BriefState, MediaType, Scene } from "./brief-app";
 import {
   useVideoJobs,
   progressOf,
@@ -20,6 +22,13 @@ import {
   STAGE_ORDER,
   type VideoJob,
 } from "@/components/video-jobs/video-jobs-provider";
+
+/** What "Auto Generate Video" writes into the prompt field. */
+function autoVideoPrompt(productName: string, productDescription: string): string {
+  return `Cinematic product reveal of ${productName}: ${productDescription}. Slow orbit, soft studio light, 10 seconds.`;
+}
+
+const LOCK_REASON = "A listing needs a preview clip";
 
 export function Step2Video({
   state,
@@ -31,6 +40,7 @@ export function Step2Video({
   onContinue,
   onSkip,
   onBack,
+  onPromptHelp,
 }: {
   state: BriefState;
   generatingStoryboard: boolean;
@@ -41,13 +51,17 @@ export function Step2Video({
   onContinue: () => void;
   onSkip: () => void;
   onBack: () => void;
+  /** Opens the prompt-help modal. Omitted = the help link isn't offered. */
+  onPromptHelp?: () => void;
 }) {
   const { jobs, setEmailReminder, setBrowserNotify } = useVideoJobs();
   const [editingId, setEditingId] = React.useState<string | null>(null);
 
-  const videoRequired = state.intent === "sell" || state.intent === "give";
-  const canGenerateStoryboard =
-    state.videoPrompt.trim().length > 0 && !generatingStoryboard;
+  // Sell / Give must ship something to look at, so "Add later" is locked for
+  // them. Recording from a phone counts — AR is available to every intent.
+  const skipLocked = state.intent === "sell" || state.intent === "give";
+  const hasPrompt = state.videoPrompt.trim().length > 0;
+  const canGenerateStoryboard = hasPrompt && !generatingStoryboard;
 
   // The render job is created when the user clicks "Continue" on Step 2 for an
   // AI flow. Once it exists, we replace the Continue button with an inline
@@ -58,510 +72,533 @@ export function Step2Video({
     : null;
   const renderStarted = !!job;
 
-  const canStartRender = videoRequired
-    ? state.mediaType === "ai" && state.storyboardGenerated
-    : state.mediaType === "ai" && state.storyboardGenerated;
+  const canStartRender = state.mediaType === "ai" && state.storyboardGenerated;
   const canContinueWithoutRender =
     state.mediaType === "ar" || state.mediaType === "skip";
 
+  const filledPrompt = autoVideoPrompt(
+    state.productName || "your product",
+    state.productDescription || "what it does",
+  );
+
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 560,
-        display: "flex",
-        flexDirection: "column",
-        gap: 28,
-      }}
-    >
-      <div>
-        <div
-          onClick={onBack}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            color: C.body,
-            fontSize: 13,
-            cursor: "pointer",
-            marginBottom: 12,
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <BriefCard onBack={onBack}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <h1
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: C.text,
+              margin: 0,
+              letterSpacing: -0.2,
+            }}
           >
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-          Back
+            Pick your preview
+          </h1>
+          <p style={{ fontSize: 13, color: C.body, marginTop: 6 }}>
+            {skipLocked
+              ? state.intent === "sell"
+                ? "Generate a storyboard for your listing — your 10s video starts rendering when you continue."
+                : "Generate a storyboard for the drop — your 10s video starts rendering when you continue."
+              : "Pick how you want to record — or skip it for now."}
+          </p>
         </div>
-        <h1
+
+        <div
           style={{
-            fontSize: 32,
-            fontWeight: 700,
-            color: C.text,
-            margin: 0,
-            letterSpacing: -0.5,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 10,
           }}
         >
-          Pick your preview
-        </h1>
-        <p style={{ fontSize: 14, color: C.body, marginTop: 6 }}>
-          {videoRequired
-            ? state.intent === "sell"
-              ? "Generate a storyboard for your listing — your 10s video starts rendering when you continue."
-              : "Generate a storyboard for the drop — your 10s video starts rendering when you continue."
-            : "Pick how you want to record — or skip it for now."}
-        </p>
-      </div>
+          <TypeCard
+            id="ar"
+            label="AR"
+            sub="Record from your phone"
+            status="available"
+            selected={state.mediaType === "ar"}
+            onClick={() => onChange({ mediaType: "ar" })}
+            icon={
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="6" y="3" width="12" height="18" rx="2" />
+                <circle cx="12" cy="17" r="1" />
+                <path d="M9 7h6" />
+              </svg>
+            }
+          />
+          <TypeCard
+            id="ai"
+            label="AI"
+            sub="Generate from a prompt"
+            status="recommended"
+            selected={state.mediaType === "ai"}
+            onClick={() => onChange({ mediaType: "ai" })}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10.5 3l1.7 4.8L17 9.5l-4.8 1.7L10.5 16l-1.7-4.8L4 9.5l4.8-1.7z" />
+                <path d="M17.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+              </svg>
+            }
+          />
+          <TypeCard
+            id="skip"
+            label="Skip"
+            sub="Add later"
+            status={skipLocked ? "locked" : "available"}
+            locked={skipLocked}
+            lockReason={LOCK_REASON}
+            selected={state.mediaType === "skip"}
+            onClick={() => {
+              if (!skipLocked) onChange({ mediaType: "skip" });
+            }}
+            icon={
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7.5V12l3 1.8" />
+              </svg>
+            }
+          />
+        </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 10,
-        }}
-      >
-        <TypeCard
-          id="ar"
-          label="AR"
-          sub={videoRequired ? "Not available" : "Record from your phone"}
-          recommended={!videoRequired}
-          disabled={videoRequired}
-          selected={state.mediaType === "ar"}
-          onClick={() => {
-            if (!videoRequired) onChange({ mediaType: "ar" });
-          }}
-          icon={
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        {state.mediaType === "ai" && (
+          <>
+            <FieldGroup
+              label="What should the video show?"
+              htmlFor="s2-video-prompt"
+              right={
+                onPromptHelp ? (
+                  <button
+                    type="button"
+                    onClick={onPromptHelp}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "var(--color-text-brand)",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Need to prompt help?
+                  </button>
+                ) : null
+              }
             >
-              <rect x="6" y="3" width="12" height="18" rx="2" />
-              <circle cx="12" cy="17" r="1" />
-              <path d="M9 7h6" />
-            </svg>
-          }
-        />
-        <TypeCard
-          id="ai"
-          label="AI"
-          sub="Generate from a prompt"
-          required={videoRequired}
-          selected={state.mediaType === "ai"}
-          onClick={() => onChange({ mediaType: "ai" })}
-          icon={
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path d="M9 12a3 3 0 0 1 6 0z M12 7v2 M12 15v2 M7 12h2 M15 12h2" />
-            </svg>
-          }
-        />
-        <TypeCard
-          id="skip"
-          label="Skip"
-          sub={videoRequired ? "Not available" : "Add later"}
-          disabled={videoRequired}
-          selected={state.mediaType === "skip"}
-          onClick={() => {
-            if (!videoRequired) onChange({ mediaType: "skip" });
-          }}
-          icon={
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 8l7 5-7 5 M13 8l7 5-7 5" />
-            </svg>
-          }
-        />
-      </div>
+              <textarea
+                id="s2-video-prompt"
+                className="ix-brief-field"
+                value={state.videoPrompt}
+                onChange={(e) =>
+                  onChange({
+                    videoPrompt: e.target.value,
+                    // Once you write it yourself it is no longer auto-written.
+                    autoGenerateVideo: false,
+                  })
+                }
+                placeholder="Write here your description for your new product video"
+                rows={3}
+                style={textareaStyle}
+              />
+              <ToggleRow
+                label="Auto Generate Video"
+                on={state.autoGenerateVideo}
+                onChange={(v) =>
+                  onChange(
+                    v
+                      ? { autoGenerateVideo: true, videoPrompt: filledPrompt }
+                      : { autoGenerateVideo: false },
+                  )
+                }
+              />
+            </FieldGroup>
 
-      {state.mediaType === "ai" && (
-        <>
-          <FieldGroup label="What should the video show?">
-            <textarea
-              value={state.videoPrompt}
-              onChange={(e) => onChange({ videoPrompt: e.target.value })}
-              placeholder="Aerial cinematic of a Discord bot ping notification floating over a cityscape at dusk."
-              rows={3}
-              style={textareaStyle}
-            />
-          </FieldGroup>
-
-          <FieldGroup
-            label="Audio prompt"
-            right={
-              <Toggle
-                small
-                label="Auto-generate"
+            <FieldGroup label="Audio prompt" htmlFor="s2-audio-prompt">
+              <textarea
+                id="s2-audio-prompt"
+                className="ix-brief-field"
+                value={state.audioPrompt}
+                onChange={(e) => onChange({ audioPrompt: e.target.value })}
+                placeholder={
+                  state.audioAutoGenerate
+                    ? "Auto: ambient + soft synth (override if you want)"
+                    : "Describe soundscape - ambient noise, music mood, speech tone..."
+                }
+                rows={2}
+                style={textareaStyle}
+              />
+              <ToggleRow
+                label="Auto Generate Audio"
                 on={state.audioAutoGenerate}
                 onChange={(v) => onChange({ audioAutoGenerate: v })}
               />
-            }
-          >
-            <textarea
-              value={state.audioPrompt}
-              onChange={(e) => onChange({ audioPrompt: e.target.value })}
-              placeholder={
-                state.audioAutoGenerate
-                  ? "Auto: ambient + soft synth (override if you want)"
-                  : "Describe the soundscape, mood, instruments"
+            </FieldGroup>
+
+            <FieldGroup
+              label="Quality"
+              labelId="s2-quality-label"
+              right={
+                <span style={{ fontSize: 12, color: C.body }}>
+                  Full video is 10s
+                </span>
               }
-              rows={2}
-              style={{
-                ...textareaStyle,
-                opacity: state.audioAutoGenerate ? 0.7 : 1,
-              }}
-            />
-          </FieldGroup>
-
-          <FieldGroup
-            label="Quality"
-            right={
-              <span style={{ fontSize: 11, color: C.body }}>
-                Full video is 10s
-              </span>
-            }
-          >
-            <div style={{ display: "flex", gap: 8 }}>
-              <Pill
-                selected={state.quality === "low"}
-                onClick={() => onChange({ quality: "low" })}
-              >
-                Low · 480p
-              </Pill>
-              <Pill
-                selected={state.quality === "high"}
-                onClick={() => onChange({ quality: "high" })}
-              >
-                High · 720p
-              </Pill>
-            </div>
-          </FieldGroup>
-
-          <button
-            onClick={onGenerateStoryboard}
-            disabled={!canGenerateStoryboard}
-            style={primaryButtonStyle(
-              canGenerateStoryboard && !generatingStoryboard,
-            )}
-          >
-            {generatingStoryboard ? (
-              <>
-                <Spinner />
-                Drafting storyboard…
-              </>
-            ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5z" />
-                </svg>
-                {state.storyboardGenerated
-                  ? "Regenerate storyboard"
-                  : "Generate storyboard"}
-              </>
-            )}
-          </button>
-
-          {state.storyboardGenerated && !generatingStoryboard && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                paddingTop: 4,
-              }}
             >
               <div
+                role="group"
+                aria-labelledby="s2-quality-label"
                 style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  justifyContent: "space-between",
+                  display: "inline-flex",
+                  alignSelf: "flex-start",
+                  gap: 2,
+                  padding: 3,
+                  background: "var(--color-bg-subtle)",
+                  borderRadius: "var(--radius-lg)",
                 }}
               >
-                <div
-                  style={{ fontSize: 13, fontWeight: 700, color: C.text }}
+                <QualityTab
+                  selected={state.quality === "low"}
+                  onClick={() => onChange({ quality: "low" })}
                 >
-                  Storyboard
-                </div>
-                <div style={{ fontSize: 11, color: C.body }}>
-                  3 scenes · used as the listing preview
-                </div>
+                  Low · 480p · 10 sec
+                </QualityTab>
+                <QualityTab
+                  selected={state.quality === "high"}
+                  onClick={() => onChange({ quality: "high" })}
+                >
+                  High · 720p · 10 sec
+                </QualityTab>
               </div>
-              {state.scenes.map((s) => (
-                <SceneRow
-                  key={s.id}
-                  scene={s}
-                  editing={editingId === s.id}
-                  onToggleEdit={() =>
-                    setEditingId(editingId === s.id ? null : s.id)
-                  }
-                  onChange={(patch) => onSceneChange(s.id, patch)}
-                />
-              ))}
-              {!renderStarted && (
+            </FieldGroup>
+
+            <span
+              title={hasPrompt ? undefined : "Type a prompt first"}
+              style={{ display: "block" }}
+            >
+              <button
+                onClick={onGenerateStoryboard}
+                disabled={!canGenerateStoryboard}
+                title={hasPrompt ? undefined : "Type a prompt first"}
+                style={outlineButtonStyle(canGenerateStoryboard)}
+              >
+                {generatingStoryboard ? (
+                  <>
+                    <Spinner />
+                    Drafting storyboard…
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden
+                    >
+                      <path d="M12 3.2l1.9 5.4 5.4 1.9-5.4 1.9-1.9 5.4-1.9-5.4L4.7 10.5l5.4-1.9z" />
+                    </svg>
+                    Regenerate storyboard
+                  </>
+                )}
+              </button>
+            </span>
+
+            {state.storyboardGenerated && !generatingStoryboard && (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
                 <div
                   style={{
-                    marginTop: 4,
-                    padding: "10px 12px",
-                    background: "var(--color-bg-brand-subtle)",
-                    border:
-                      "var(--border-width-1) solid var(--color-border-brand)",
-                    borderRadius: "var(--radius-md)",
-                    fontSize: 12,
-                    color: "var(--color-violet-700, var(--color-violet-600))",
                     display: "flex",
-                    alignItems: "center",
-                    gap: 8,
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    gap: 12,
                   }}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ flex: "0 0 14px" }}
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8v4 M12 16h.01" />
-                  </svg>
-                  <span>
-                    Click <strong>Continue</strong> to start rendering your
-                    10s video. You&rsquo;ll see progress right here.
-                  </span>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                    Storyboard
+                  </div>
+                  <div style={{ fontSize: 12, color: C.body }}>
+                    3 scenes · used as the listing preview
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
-
-          {renderStarted && job && (
-            <RenderCard
-              job={job}
-              onSetEmail={(e) => setEmailReminder(job.id, e)}
-              onSetBrowserNotify={(v) => setBrowserNotify(job.id, v)}
-            />
-          )}
-        </>
-      )}
-
-      {state.mediaType === "ar" && (
-        <div
-          style={{
-            padding: 24,
-            background: "var(--color-bg-surface)",
-            border:
-              "var(--border-width-1) solid var(--color-border-subtle)",
-            borderRadius: "var(--radius-lg)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-            textAlign: "center",
-          }}
-        >
-          <svg
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-violet-600)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="6" y="2" width="12" height="20" rx="2.5" />
-            <circle cx="12" cy="17.5" r="1" />
-            <path d="M9 6h6" />
-          </svg>
-          <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-            Record from your phone
-          </div>
-          <div style={{ fontSize: 13, color: C.body, maxWidth: 340 }}>
-            Open the IDEEZA app on your phone and scan the QR code at the next
-            step to start recording.
-          </div>
-        </div>
-      )}
-
-      {state.mediaType === "skip" && (
-        <div style={{ fontSize: 13, color: C.body }}>
-          You can add media later from the project dashboard. Continue to set
-          up the mint.
-        </div>
-      )}
-
-      {renderStarted && state.mediaType === "ai" && (
-        <div
-          style={{
-            fontSize: 13,
-            color: C.body,
-            lineHeight: 1.5,
-            textAlign: "center",
-            padding: "0 8px",
-          }}
-        >
-          You can <strong>stay here</strong> and wait, or continue to the
-          mint setup in parallel — the render keeps running either way.
-        </div>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginTop: 4,
-        }}
-      >
-        {videoRequired ? (
-          <span style={{ fontSize: 12, color: C.body }}>
-            {!state.storyboardGenerated &&
-              "Type a prompt and generate the storyboard."}
-            {state.storyboardGenerated &&
-              !renderStarted &&
-              "Storyboard ready · Continue to start render."}
-            {renderStarted &&
-              "Render in flight · you can leave any time."}
-          </span>
-        ) : state.mediaType === "skip" ? (
-          <span />
-        ) : (
-          <button
-            onClick={onSkip}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: C.body,
-              fontSize: 13,
-              cursor: "pointer",
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-            }}
-          >
-            Skip media
-          </button>
-        )}
-        {!renderStarted ? (
-          <button
-            onClick={() => {
-              // AI flow w/ storyboard → kick off render and stay here.
-              // AR / Skip flows → just navigate forward.
-              if (state.mediaType === "ai" && canStartRender) {
-                onStartRender();
-              } else if (canContinueWithoutRender) {
-                onContinue();
-              }
-            }}
-            disabled={!canStartRender && !canContinueWithoutRender}
-            style={primaryFooterButton(
-              canStartRender || canContinueWithoutRender,
+                {state.scenes.map((s) => (
+                  <SceneRow
+                    key={s.id}
+                    scene={s}
+                    editing={editingId === s.id}
+                    onToggleEdit={() =>
+                      setEditingId(editingId === s.id ? null : s.id)
+                    }
+                    onChange={(patch) => onSceneChange(s.id, patch)}
+                  />
+                ))}
+                {!renderStarted && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      padding: "12px 14px",
+                      background: "var(--color-bg-info-subtle)",
+                      border:
+                        "var(--border-width-1) solid var(--color-border-blue)",
+                      borderRadius: "var(--radius-lg)",
+                    }}
+                  >
+                    <svg
+                      width="17"
+                      height="17"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--color-text-blue)"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ flexShrink: 0, marginTop: 1 }}
+                      aria-hidden
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 11v5 M12 7.6v.4" />
+                    </svg>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                        }}
+                      >
+                        Click Continue to start rendering your 10s video
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--color-text-secondary)",
+                          marginTop: 2,
+                        }}
+                      >
+                        You will see progress right here. The render keeps
+                        running if you leave.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-          >
-            Continue
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
-        ) : (
-          <button onClick={onContinue} style={primaryFooterButton(true)}>
-            Continue to mint setup
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
+
+            {renderStarted && job && (
+              <RenderCard
+                job={job}
+                onSetEmail={(e) => setEmailReminder(job.id, e)}
+                onSetBrowserNotify={(v) => setBrowserNotify(job.id, v)}
+              />
+            )}
+
+            {/* True from the moment there is a storyboard: the next click starts
+                a render that never needs this tab to stay open. */}
+            {state.storyboardGenerated && !generatingStoryboard && (
+              <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
+                You can stay here and wait, or continue to the mint setup in
+                parallel — the render keeps running either way.
+              </div>
+            )}
+          </>
         )}
+
+        {state.mediaType === "ar" && (
+          <div
+            style={{
+              padding: 24,
+              background: "var(--color-bg-subtle)",
+              borderRadius: "var(--radius-xl)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 12,
+              textAlign: "center",
+            }}
+          >
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-violet-600)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="6" y="2" width="12" height="20" rx="2.5" />
+              <circle cx="12" cy="17.5" r="1" />
+              <path d="M9 6h6" />
+            </svg>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+              Record from your phone
+            </div>
+            <div style={{ fontSize: 13, color: C.body, maxWidth: 340 }}>
+              Open the IDEEZA app on your phone and scan the QR code at the next
+              step to start recording.
+            </div>
+          </div>
+        )}
+
+        {state.mediaType === "skip" && (
+          <div style={{ fontSize: 13, color: C.body }}>
+            You can add media later from the project dashboard. Continue to set
+            up the mint.
+          </div>
+        )}
+
+        <div
+          style={{
+            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
+            paddingTop: 18,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+          }}
+        >
+          {state.mediaType === "ai" ? (
+            <span style={{ fontSize: 12, color: C.body }}>
+              {!state.storyboardGenerated &&
+                "Type a prompt and generate the storyboard."}
+              {state.storyboardGenerated &&
+                !renderStarted &&
+                "Storyboard ready · Continue to start render."}
+              {renderStarted && "Render in flight · you can leave any time."}
+            </span>
+          ) : !skipLocked && state.mediaType !== "skip" ? (
+            <button
+              onClick={onSkip}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                color: C.body,
+                fontSize: 13,
+                cursor: "pointer",
+                textDecoration: "underline",
+                textUnderlineOffset: 3,
+                fontFamily: "inherit",
+              }}
+            >
+              Skip media
+            </button>
+          ) : (
+            <span />
+          )}
+          {!renderStarted ? (
+            <button
+              onClick={() => {
+                // AI flow w/ storyboard → kick off render and stay here.
+                // AR / Skip flows → just navigate forward.
+                if (state.mediaType === "ai" && canStartRender) {
+                  onStartRender();
+                } else if (canContinueWithoutRender) {
+                  onContinue();
+                }
+              }}
+              disabled={!canStartRender && !canContinueWithoutRender}
+              style={primaryFooterButton(
+                canStartRender || canContinueWithoutRender,
+              )}
+            >
+              Continue
+              <ChevronRight />
+            </button>
+          ) : (
+            <button onClick={onContinue} style={primaryFooterButton(true)}>
+              Continue to mint setup
+              <ChevronRight />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </BriefCard>
   );
 }
 
-function primaryButtonStyle(enabled: boolean): React.CSSProperties {
+function ChevronRight() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+// The storyboard button is secondary work on this step — the page's one filled
+// button is Continue — so it reads as a full-width outline.
+function outlineButtonStyle(enabled: boolean): React.CSSProperties {
   return {
-    padding: "14px 24px",
-    background: enabled
-      ? "var(--color-violet-600)"
-      : "var(--color-bg-surface-raised)",
+    width: "100%",
+    padding: "12px 20px",
+    background: enabled ? "var(--color-bg-surface)" : "var(--color-bg-subtle)",
     color: enabled
-      ? "var(--color-text-on-brand)"
-      : "var(--color-text-tertiary)",
-    border: "none",
-    borderRadius: "var(--radius-3xl)",
+      ? "var(--color-text-primary)"
+      : "var(--color-text-disabled)",
+    border: `var(--border-width-1) solid ${
+      enabled ? "var(--color-border-default)" : "var(--color-border-subtle)"
+    }`,
+    borderRadius: "var(--radius-lg)",
     fontSize: 14,
-    fontWeight: 700,
-    cursor: enabled ? "pointer" : "default",
+    fontWeight: 600,
+    cursor: enabled ? "pointer" : "not-allowed",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    transition: "background .14s",
+    fontFamily: "inherit",
+    transition: "background .14s, border-color .14s",
   };
 }
 
 function primaryFooterButton(enabled: boolean): React.CSSProperties {
   return {
-    padding: "14px 32px",
-    background: enabled ? C.primary : "var(--color-bg-surface-raised)",
+    padding: "11px 22px",
+    background: enabled ? C.primary : "var(--color-bg-subtle)",
     color: enabled
       ? "var(--color-text-on-brand)"
-      : "var(--color-text-tertiary)",
+      : "var(--color-text-disabled)",
     border: "none",
-    borderRadius: "var(--radius-3xl)",
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: enabled ? "pointer" : "default",
+    borderRadius: "var(--radius-lg)",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: enabled ? "pointer" : "not-allowed",
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
+    fontFamily: "inherit",
+    transition: "background .14s",
   };
 }
 
@@ -687,6 +724,13 @@ function RenderCard({
               transition: "width .5s linear",
             }}
           />
+        </div>
+      )}
+
+      {!isDone && (
+        <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
+          You can leave — the render keeps running and the project goes live
+          once it is done.
         </div>
       )}
 
@@ -837,144 +881,155 @@ function Opt({
   );
 }
 
+type CardStatus = "available" | "recommended" | "locked";
+
+// The status is the card's own header band — what this way of getting a
+// preview costs you is the first thing to read, before the name.
+const STATUS_BAND: Record<
+  CardStatus,
+  { label: string; background: string; color: string }
+> = {
+  available: {
+    label: "Available",
+    background: "var(--color-bg-success-subtle)",
+    color: "var(--color-text-success)",
+  },
+  recommended: {
+    label: "Recommended",
+    background: "var(--gradient-brand)",
+    color: "var(--color-text-on-brand)",
+  },
+  locked: {
+    label: "Locked",
+    background: "var(--color-bg-subtle)",
+    color: "var(--color-text-secondary)",
+  },
+};
+
 function TypeCard({
   label,
   sub,
   icon,
+  status,
   selected,
-  recommended,
-  required,
-  disabled,
+  locked,
+  lockReason,
   onClick,
 }: {
   id: MediaType;
   label: string;
   sub: string;
   icon: React.ReactNode;
+  status: CardStatus;
   selected: boolean;
-  recommended?: boolean;
-  required?: boolean;
-  disabled?: boolean;
+  locked?: boolean;
+  lockReason?: string;
   onClick: () => void;
 }) {
+  const band = STATUS_BAND[status];
   return (
     <button
-      onClick={onClick}
-      disabled={disabled}
+      onClick={() => {
+        if (!locked) onClick();
+      }}
+      aria-disabled={locked || undefined}
+      aria-pressed={selected}
+      title={locked ? lockReason : undefined}
       style={{
-        position: "relative",
-        padding: "16px 12px",
-        background: selected
-          ? "var(--color-bg-brand-subtle)"
-          : "var(--color-bg-surface)",
-        border: `var(--border-width-1-5) solid ${
-          selected ? "var(--color-border-brand)" : "var(--color-border-subtle)"
+        padding: 0,
+        overflow: "hidden",
+        textAlign: "left",
+        background: "var(--color-bg-surface)",
+        border: `var(--border-width-1) solid ${
+          selected ? "var(--color-border-brand)" : "var(--color-border-default)"
         }`,
-        borderRadius: "var(--radius-lg)",
-        cursor: disabled ? "not-allowed" : "pointer",
+        boxShadow: selected ? "0 0 0 3px var(--color-bg-brand-subtle)" : "none",
+        borderRadius: "var(--radius-xl)",
+        cursor: locked ? "not-allowed" : "pointer",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        gap: 6,
-        color: selected ? C.primary : C.text,
-        transition: "background .14s, border-color .14s",
-        opacity: disabled ? 0.45 : 1,
+        opacity: locked ? 0.6 : 1,
+        transition: "border-color .14s, box-shadow .14s",
       }}
     >
-      {recommended && (
-        <span
-          style={badgeStyle(
-            "var(--color-green-100)",
-            "var(--color-green-700)",
-          )}
-        >
-          Recommended
-        </span>
-      )}
-      {required && (
-        <span
-          style={badgeStyle(
-            "var(--color-bg-brand-subtle)",
-            "var(--color-violet-600)",
-          )}
-        >
-          Required
-        </span>
-      )}
-      {disabled && !recommended && !required && (
-        <span
-          style={badgeStyle(
-            "var(--color-bg-surface-raised)",
-            "var(--color-text-tertiary)",
-          )}
-        >
-          Locked
-        </span>
-      )}
-      {icon}
-      <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
-      <div
+      <span
         style={{
+          display: "block",
+          padding: "5px 10px",
+          background: band.background,
+          color: band.color,
           fontSize: 11,
-          color: selected ? C.primary : C.body,
-          opacity: selected ? 0.85 : 1,
-          fontWeight: 500,
-          textAlign: "center",
+          fontWeight: 600,
         }}
       >
-        {sub}
-      </div>
-    </button>
-  );
-}
-
-function badgeStyle(bg: string, fg: string): React.CSSProperties {
-  return {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    fontSize: 9,
-    fontWeight: 700,
-    padding: "2px 6px",
-    background: bg,
-    color: fg,
-    borderRadius: 999,
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  };
-}
-
-function FieldGroup({
-  label,
-  right,
-  children,
-}: {
-  label: string;
-  right?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {band.label}
+      </span>
       <span
         style={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexDirection: "column",
+          gap: 4,
+          padding: "10px 12px 12px",
         }}
       >
         <span
           style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--color-text-secondary)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            color: selected ? "var(--color-text-brand)" : C.text,
           }}
         >
-          {label}
+          {icon}
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
         </span>
-        {right}
+        <span style={{ fontSize: 12, color: C.body }}>{sub}</span>
       </span>
+    </button>
+  );
+}
+
+function FieldGroup({
+  label,
+  labelId,
+  htmlFor,
+  right,
+  children,
+}: {
+  label: string;
+  labelId?: string;
+  htmlFor?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const labelStyle: React.CSSProperties = {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--color-text-primary)",
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        {htmlFor ? (
+          <label htmlFor={htmlFor} style={labelStyle}>
+            {label}
+          </label>
+        ) : (
+          <span id={labelId} style={labelStyle}>
+            {label}
+          </span>
+        )}
+        {right}
+      </div>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -992,11 +1047,9 @@ function SceneRow({
   return (
     <div
       style={{
-        background: "var(--color-bg-surface)",
+        background: "var(--color-bg-subtle)",
         border: `var(--border-width-1) solid ${
-          editing
-            ? "var(--color-border-brand)"
-            : "var(--color-border-subtle)"
+          editing ? "var(--color-border-brand)" : "transparent"
         }`,
         borderRadius: "var(--radius-lg)",
         overflow: "hidden",
@@ -1020,15 +1073,13 @@ function SceneRow({
             gap: 12,
           }}
         >
-          <span
-            style={{ fontSize: 13, fontWeight: 700, color: C.text }}
-          >
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
             {scene.label}
           </span>
           <span
             style={{
               fontSize: 12,
-              color: C.primary,
+              color: "var(--color-text-brand)",
               fontWeight: 600,
             }}
           >
@@ -1100,6 +1151,7 @@ function SceneRow({
             label="Speech / Dialogue"
             value={scene.speech}
             onChange={(v) => onChange({ speech: v })}
+            placeholder="No Speech in this scene..."
             rows={1}
           />
         </div>
@@ -1112,11 +1164,13 @@ function SceneField({
   label,
   value,
   onChange,
+  placeholder,
   rows,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  placeholder?: string;
   rows: number;
 }) {
   return (
@@ -1127,10 +1181,11 @@ function SceneField({
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
         rows={rows}
         style={{
           padding: "8px 10px",
-          background: "var(--color-bg-page)",
+          background: "var(--color-bg-surface)",
           border: "var(--border-width-1) solid var(--color-border-subtle)",
           borderRadius: "var(--radius-md)",
           fontSize: 13,
@@ -1144,7 +1199,7 @@ function SceneField({
   );
 }
 
-function Pill({
+function QualityTab({
   selected,
   onClick,
   children,
@@ -1156,20 +1211,22 @@ function Pill({
   return (
     <button
       onClick={onClick}
+      aria-pressed={selected}
       style={{
         padding: "8px 16px",
-        background: selected
-          ? "var(--color-bg-brand-subtle)"
-          : "var(--color-bg-surface)",
+        background: selected ? "var(--color-bg-surface)" : "transparent",
         border: `var(--border-width-1) solid ${
-          selected ? "var(--color-border-brand)" : "var(--color-border-subtle)"
+          selected ? "var(--color-border-subtle)" : "transparent"
         }`,
-        borderRadius: 999,
-        color: selected ? C.primary : C.body,
+        boxShadow: selected ? "var(--elevation-1)" : "none",
+        borderRadius: "var(--radius-md)",
+        color: selected ? "var(--color-text-primary)" : C.body,
         fontSize: 13,
-        fontWeight: 600,
+        fontWeight: selected ? 600 : 500,
+        fontFamily: "inherit",
         cursor: "pointer",
-        transition: "background .14s, border-color .14s",
+        whiteSpace: "nowrap",
+        transition: "background .14s, color .14s",
       }}
     >
       {children}
@@ -1177,65 +1234,73 @@ function Pill({
   );
 }
 
-function Toggle({
+// The two auto-generate rows sit UNDER their field, at its right edge — the
+// switch first, then what it does.
+function ToggleRow({
+  label,
   on,
   onChange,
-  label,
-  small,
 }: {
+  label: string;
   on: boolean;
   onChange: (v: boolean) => void;
-  label?: string;
-  small?: boolean;
 }) {
-  const w = small ? 28 : 34;
-  const h = small ? 16 : 20;
-  const knob = small ? 12 : 16;
   return (
-    <span
+    <div
       style={{
-        display: "inline-flex",
+        display: "flex",
+        justifyContent: "flex-end",
         alignItems: "center",
         gap: 8,
-        fontSize: 12,
-        color: "var(--color-text-secondary)",
-        fontWeight: 500,
       }}
     >
-      {label}
-      <span
-        onClick={(e) => {
-          e.preventDefault();
-          onChange(!on);
-        }}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        onClick={() => onChange(!on)}
         style={{
-          width: w,
-          height: h,
-          borderRadius: h / 2,
+          width: 34,
+          height: 20,
+          padding: 0,
+          borderRadius: 10,
+          border: "none",
           background: on
             ? "var(--color-violet-600)"
             : "var(--color-bg-surface-raised)",
           position: "relative",
           cursor: "pointer",
           transition: "background .14s",
-          flex: `0 0 ${w}px`,
+          flex: "0 0 34px",
         }}
       >
         <span
           style={{
             position: "absolute",
             top: 2,
-            left: on ? w - knob - 2 : 2,
-            width: knob,
-            height: knob,
+            left: on ? 16 : 2,
+            width: 16,
+            height: 16,
             background: "var(--color-bg-surface)",
             borderRadius: "50%",
-            boxShadow: "0 1px 2px rgba(0,0,0,.2)",
+            boxShadow: "var(--elevation-1)",
             transition: "left .14s",
           }}
         />
+      </button>
+      <span
+        onClick={() => onChange(!on)}
+        style={{
+          fontSize: 13,
+          color: "var(--color-text-secondary)",
+          fontWeight: 500,
+          cursor: "pointer",
+        }}
+      >
+        {label}
       </span>
-    </span>
+    </div>
   );
 }
 
@@ -1246,7 +1311,7 @@ function Spinner() {
         width: 14,
         height: 14,
         borderRadius: "50%",
-        border: "2px solid rgba(255,255,255,0.45)",
+        border: "2px solid var(--color-border-default)",
         borderTopColor: "currentColor",
         animation: "ix-brief-spin .8s linear infinite",
         display: "inline-block",
@@ -1259,11 +1324,12 @@ function Spinner() {
 
 const textareaStyle: React.CSSProperties = {
   padding: "12px 14px",
-  background: "var(--color-bg-surface)",
-  border: "var(--border-width-1) solid var(--color-border-subtle)",
+  background: "var(--color-input-bg)",
+  border: "var(--border-width-1) solid var(--color-border-default)",
   borderRadius: "var(--radius-lg)",
   fontSize: 14,
   color: "var(--color-text-primary)",
+  lineHeight: 1.5,
   resize: "vertical",
   outline: "none",
   fontFamily: "inherit",

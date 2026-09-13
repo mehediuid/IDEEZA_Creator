@@ -282,14 +282,10 @@ export function BriefApp() {
     1 + builds.filter((b) => b.projectId === projectId).length;
 
   const goToStep2 = () => {
+    // Media is chosen on Step 2 itself, for every intent: recording from a
+    // phone (AR) is a preview too, so Sell / Give are no longer snapped to AI
+    // on the way in. Only "Add later" stays locked for them.
     let next: BriefState = { ...state };
-    // Sell / Give require AI media — snap mediaType to AI when arriving here.
-    if (
-      (state.intent === "sell" || state.intent === "give") &&
-      state.mediaType !== "ai"
-    ) {
-      next.mediaType = "ai";
-    }
 
     // "Choose Project" is answered here, once: a new project is created (and
     // the choice rewritten to its id, so Back → Continue attaches to the same
