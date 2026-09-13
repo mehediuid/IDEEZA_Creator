@@ -63,6 +63,12 @@ export type Scene = {
   speech: string;
 };
 
+/** A clip recorded on the phone and handed back to this brief. */
+export type ArClip = {
+  url: string;
+  receivedAt: number;
+};
+
 export type BriefState = {
   // Step 1
   projectId: string;
@@ -82,6 +88,10 @@ export type BriefState = {
   quality: Quality;
   scenes: Scene[];
   storyboardGenerated: boolean;
+  // The clip the phone app uploads for an AR preview. Written by the app, never
+  // by this page — so `null` is the honest state until one really arrives, and
+  // Step 2 keeps Continue shut on it.
+  arClip: ArClip | null;
   // Step 3 — common
   network: Network;
   collection: string;
@@ -131,6 +141,7 @@ export const DEFAULT_STATE: BriefState = {
   quality: "low",
   scenes: [],
   storyboardGenerated: false,
+  arClip: null,
   network: "baseSepolia",
   collection: "",
   story: "",
@@ -215,6 +226,19 @@ function normalizeScenes(v: unknown): Scene[] {
   });
 }
 
+// The clip arrives from outside this app, so a stored draft's `arClip` is only
+// trusted when it is really a URL plus a time — a half-written one reads as no
+// clip rather than as a clip that can't be played.
+function normalizeArClip(v: unknown): ArClip | null {
+  const c = asDict(v);
+  const url = typeof c.url === "string" ? c.url : "";
+  const receivedAt =
+    typeof c.receivedAt === "number" && Number.isFinite(c.receivedAt)
+      ? c.receivedAt
+      : 0;
+  return url && receivedAt ? { url, receivedAt } : null;
+}
+
 /**
  * Bring any stored draft — current, older, or corrupt — up to the live model.
  * Pure: no storage, no DOM. Unknown values fall back to the default rather
@@ -265,6 +289,7 @@ export function normalizeBrief(parsed: unknown): BriefState {
       s.storyboardGenerated,
       DEFAULT_STATE.storyboardGenerated,
     ),
+    arClip: normalizeArClip(s.arClip),
     network,
     collection: str(s.collection, DEFAULT_STATE.collection),
     story: str(s.story, DEFAULT_STATE.story),

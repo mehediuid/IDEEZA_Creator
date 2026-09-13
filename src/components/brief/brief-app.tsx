@@ -46,6 +46,7 @@ export {
   normalizeBrief,
 } from "@/lib/brief/types";
 export type {
+  ArClip,
   BriefState,
   Intent,
   License,

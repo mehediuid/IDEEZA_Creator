@@ -15,6 +15,7 @@ import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { BriefCard } from "./brief-app";
 import type { BriefState, MediaType, Scene } from "./brief-app";
+import { ArRecordPanel } from "./ar-record-panel";
 import {
   useVideoJobs,
   progressOf,
@@ -87,13 +88,16 @@ export function Step2Video({
 
   const canStartRender =
     effectiveMediaType === "ai" && state.storyboardGenerated;
-  // TODO(Task 6): AR continues unconditionally here, but BriefState carries no
-  // recorded-clip field yet — Task 6 adds the AR panel and its clip state
-  // (e.g. a `state.arClipUrl` / `state.arClipRecorded`). Once that lands, gate
-  // this on that field so a sell/give listing can't reach mint with an AR
-  // selection but no clip actually captured.
-  const canContinueWithoutRender =
-    effectiveMediaType === "ar" || effectiveMediaType === "skip";
+  // AR hands the recording to the phone app, so this step can only wait: until
+  // a clip really comes back there is nothing to carry to mint, and Continue
+  // stays shut. Nothing in the browser writes `arClip` — that is the point of
+  // the waiting state, not an oversight.
+  const arClipReady = effectiveMediaType === "ar" && !!state.arClip;
+  const canContinueWithoutRender = arClipReady || effectiveMediaType === "skip";
+  const continueBlockedReason =
+    effectiveMediaType === "ar" && !state.arClip
+      ? "The clip hasn't arrived yet"
+      : undefined;
 
   const filledPrompt = autoVideoPrompt(
     state.productName || "your product",
@@ -445,40 +449,10 @@ export function Step2Video({
         )}
 
         {effectiveMediaType === "ar" && (
-          <div
-            style={{
-              padding: 24,
-              background: "var(--color-bg-subtle)",
-              borderRadius: "var(--radius-xl)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 12,
-              textAlign: "center",
-            }}
-          >
-            <svg
-              width="40"
-              height="40"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-violet-600)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="6" y="2" width="12" height="20" rx="2.5" />
-              <circle cx="12" cy="17.5" r="1" />
-              <path d="M9 6h6" />
-            </svg>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-              Record from your phone
-            </div>
-            <div style={{ fontSize: 13, color: C.body, maxWidth: 340 }}>
-              Open the IDEEZA app on your phone and scan the QR code at the next
-              step to start recording.
-            </div>
-          </div>
+          <ArRecordPanel
+            projectId={state.projectId}
+            onSwitchToAi={() => onChange({ mediaType: "ai" })}
+          />
         )}
 
         {effectiveMediaType === "skip" && (
@@ -512,45 +486,51 @@ export function Step2Video({
               Skip isn't available for this listing — choose AR or generate an
               AI storyboard to continue.
             </span>
-          ) : !skipLocked && effectiveMediaType !== "skip" ? (
-            <button
-              onClick={onSkip}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: 0,
-                color: C.body,
-                fontSize: 13,
-                cursor: "pointer",
-                textDecoration: "underline",
-                textUnderlineOffset: 3,
-                fontFamily: "inherit",
-              }}
+          ) : effectiveMediaType === "ar" ? (
+            /* The wait is the state of this step, so it is said here too — and
+               Save, which may go on without any media, keeps its way out. */
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 12 }}
             >
-              Skip media
-            </button>
+              <span style={{ fontSize: 12, color: C.body }}>
+                {state.arClip
+                  ? "Clip received from your phone."
+                  : "Waiting for the clip from your phone."}
+              </span>
+              {!skipLocked && <SkipMediaLink onClick={onSkip} />}
+            </div>
+          ) : !skipLocked && effectiveMediaType !== "skip" ? (
+            <SkipMediaLink onClick={onSkip} />
           ) : (
             <span />
           )}
           {!renderStarted ? (
-            <button
-              onClick={() => {
-                // AI flow w/ storyboard → kick off render and stay here.
-                // AR / Skip flows → just navigate forward.
-                if (effectiveMediaType === "ai" && canStartRender) {
-                  onStartRender();
-                } else if (canContinueWithoutRender) {
-                  onContinue();
-                }
-              }}
-              disabled={!canStartRender && !canContinueWithoutRender}
-              style={primaryFooterButton(
-                canStartRender || canContinueWithoutRender,
-              )}
+            /* A disabled button takes no pointer events, so the reason has to
+               live on a wrapper the cursor can still reach. */
+            <span
+              title={continueBlockedReason}
+              style={{ display: "inline-flex" }}
             >
-              Continue
-              <ChevronRight />
-            </button>
+              <button
+                onClick={() => {
+                  // AI flow w/ storyboard → kick off render and stay here.
+                  // AR (clip in hand) / Skip flows → just navigate forward.
+                  if (effectiveMediaType === "ai" && canStartRender) {
+                    onStartRender();
+                  } else if (canContinueWithoutRender) {
+                    onContinue();
+                  }
+                }}
+                disabled={!canStartRender && !canContinueWithoutRender}
+                title={continueBlockedReason}
+                style={primaryFooterButton(
+                  canStartRender || canContinueWithoutRender,
+                )}
+              >
+                Continue
+                <ChevronRight />
+              </button>
+            </span>
           ) : (
             <button onClick={onContinue} style={primaryFooterButton(true)}>
               Continue to mint setup
@@ -560,6 +540,29 @@ export function Step2Video({
         </div>
       </div>
     </BriefCard>
+  );
+}
+
+// The way past media for a Save brief — the one intent that may go on without
+// any preview at all.
+function SkipMediaLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        color: C.body,
+        fontSize: 13,
+        cursor: "pointer",
+        textDecoration: "underline",
+        textUnderlineOffset: 3,
+        fontFamily: "inherit",
+      }}
+    >
+      Skip media
+    </button>
   );
 }
 
