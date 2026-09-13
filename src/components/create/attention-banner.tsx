@@ -36,10 +36,8 @@ function joinLabels(labels: string[]): string {
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
-function failedLabels(items: BuildItem[]): string {
-  return joinLabels(
-    items.filter((i) => i.status === "failed").map((i) => ITEM_LABELS[i.kind]),
-  );
+function failedLabels(items: BuildItem[]): string[] {
+  return items.filter((i) => i.status === "failed").map((i) => ITEM_LABELS[i.kind]);
 }
 
 export function BuildAttentionBanner() {
@@ -63,22 +61,39 @@ export function BuildAttentionBanner() {
 
   const { job, reason } = topAttention;
 
-  // Auto-hide on the target build page — the build status / review
-  // surface itself IS the action they'd take.
-  if (pathname.startsWith(`/build/${job.id}`)) return null;
+  // Auto-hide on any build page — every build page carries its own
+  // "← Back" control the toast would otherwise sit on top of, and the
+  // status/review surface itself IS the action they'd take.
+  if (pathname.startsWith("/build/")) return null;
 
-  const warning = reason !== "review";
+  // A system failure (the whole job died on our side, not the maker's)
+  // gets its own tone and copy — it is not "a piece failed", it's
+  // everything, and `failBuildSystem` marks every item failed, so
+  // rendering it as a partial-failure rollup produced broken grammar
+  // ("…the 3D model, PCB, Firmware code, Wiring and Parts step failed").
+  const systemFailure = job.failure === "system";
+  const tone: "brand" | "warning" | "error" = systemFailure
+    ? "error"
+    : reason === "review"
+      ? "brand"
+      : "warning";
 
-  const eyebrow =
-    reason === "retry"
+  const eyebrow = systemFailure
+    ? "BUILD FAILED"
+    : reason === "retry"
       ? "BUILD NEEDS A RETRY"
       : reason === "credits"
         ? "BUILD PAUSED"
         : "BUILD READY TO REVIEW";
 
-  const message =
-    reason === "retry"
-      ? `${job.title} · the ${failedLabels(job.items)} step failed`
+  const message = systemFailure
+    ? `${job.title} · the build stopped on our side — your credits were refunded`
+    : reason === "retry"
+      ? (() => {
+          const labels = failedLabels(job.items);
+          const step = labels.length <= 1 ? "step" : "steps";
+          return `${job.title} · the ${joinLabels(labels)} ${step} failed`;
+        })()
       : reason === "credits"
         ? `${job.title} is paused — top up credits to start it`
         : `${job.title} is ready`;
@@ -93,7 +108,11 @@ export function BuildAttentionBanner() {
       className={[
         "fixed top-[16px] left-1/2 z-toast w-[540px] max-w-[calc(100vw-32px)] -translate-x-1/2",
         "flex items-center gap-[12px] rounded-2xl border bg-bg-surface px-[16px] py-[12px] shadow-3",
-        warning ? "border-[var(--color-border-warning)]" : "border-border-brand",
+        tone === "error"
+          ? "border-[var(--color-border-error)]"
+          : tone === "warning"
+            ? "border-[var(--color-border-warning)]"
+            : "border-border-brand",
         "transition-all duration-normal ease-out motion-reduce:transition-none",
         entered ? "translate-y-0 opacity-100" : "-translate-y-[8px] opacity-0",
       ].join(" ")}
@@ -102,9 +121,11 @@ export function BuildAttentionBanner() {
         aria-hidden
         className={[
           "inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg",
-          warning
-            ? "bg-bg-warning-subtle text-text-warning"
-            : "bg-bg-brand-subtle text-text-brand",
+          tone === "error"
+            ? "bg-bg-error-subtle text-text-error"
+            : tone === "warning"
+              ? "bg-bg-warning-subtle text-text-warning"
+              : "bg-bg-brand-subtle text-text-brand",
         ].join(" ")}
       >
         <Icon icon={Notification03Icon} />
@@ -113,7 +134,7 @@ export function BuildAttentionBanner() {
         <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
           {eyebrow}
         </p>
-        <p className="mt-[2px] truncate text-md font-semibold text-text-primary">
+        <p className="mt-[2px] line-clamp-2 text-md font-semibold text-text-primary">
           {message}
         </p>
       </div>
