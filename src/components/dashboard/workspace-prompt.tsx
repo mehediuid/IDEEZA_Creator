@@ -8,92 +8,66 @@
 // so component dimensions use explicit arbitrary px values for clarity.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity01Icon,
+  AiMagicIcon,
   ArrowRight01Icon,
-  ArrowUpRight01Icon,
   Attachment01Icon,
   Cancel01Icon,
   CheckListIcon,
-  CheckmarkBadge01Icon,
-  CpuIcon,
   DeliveryBox01Icon,
-  DropletIcon,
-  IdeaIcon,
+  FavouriteIcon,
   MagicWand01Icon,
   Mic01Icon,
+  PlusSignIcon,
   Refresh01Icon,
   SparklesIcon,
-  SquareUnlock01Icon,
-  TemperatureIcon,
-  Wrench01Icon,
+  ViewIcon,
 } from "@hugeicons/core-free-icons";
 import { useCreateHistory } from "@/lib/create/history";
 import { useVoiceInput } from "@/lib/voice/use-voice-input";
+import { PROJECTS, type Project } from "@/lib/feed";
+import { MintedBadge } from "@/components/newsfeed/minted-badge";
 import { BuildManuallyInfo } from "./build-manually-info";
 import { ProjectInfoModal } from "./project-info-modal";
 import { Icon, type IconValue } from "./icon";
 
 type Mode = "ai" | "manual";
 
-const CHIPS = [
-  "Smart plant watering system",
-  "Bluetooth temperature logger",
+// Nine ideas, three on screen. Shuffle rotates the window through the
+// pool, so the button really changes what is offered instead of
+// re-rendering the same three.
+const CHIP_POOL = [
+  "Voice-controlled lamp",
+  "NFC crypto tap card",
+  "Solar-powered charger",
+  "Smart plant waterer",
+  "Bluetooth door sensor",
+  "E-ink weather display",
+  "USB-C power bank",
   "Gesture-controlled LED strip",
+  "Pocket air-quality monitor",
 ];
+const CHIPS_SHOWN = 3;
 
-type ExampleCard = {
-  id: string;
-  title: string;
-  tagline: string;
-  category: string;
-  parts: number;
-  icon: IconValue;
-  image?: string;
-};
+// "Get inspired" shows real community projects — the same feed dataset the
+// Innovations grid reads — so every card links to a page that exists and
+// every count on it is the project's own.
+const INSPIRATION: Project[] = PROJECTS.slice(0, 4);
 
-const EXAMPLES: ExampleCard[] = [
-  {
-    id: "smart-plant",
-    title: "Smart plant monitor",
-    tagline: "Water when dry.",
-    category: "IoT · Soil sensor",
-    parts: 12,
-    icon: DropletIcon,
-    image: "/images/browse-project/smart-plant.png",
-  },
-  {
-    id: "ble-logger",
-    title: "BLE temperature logger",
-    tagline: "Track every degree.",
-    category: "Wearable · Bluetooth",
-    parts: 9,
-    icon: TemperatureIcon,
-    image: "/images/browse-project/ble-logger.png",
-  },
-  {
-    id: "gesture-led",
-    title: "Gesture LED strip",
-    tagline: "Wave to light.",
-    category: "Home · Vision",
-    parts: 15,
-    icon: IdeaIcon,
-    image: "/images/browse-project/gesture-led.png",
-  },
-  {
-    id: "heart-band",
-    title: "Heart-rate band",
-    tagline: "Pulse on your wrist.",
-    category: "Wearable · Health",
-    parts: 8,
-    icon: CpuIcon,
-    image: "/images/browse-project/heart-band.png",
-  },
-];
+const AI_PLACEHOLDER = "Describe your electronics project...";
 
-const AI_PLACEHOLDER =
-  "A smart plant watering system that alerts me when the soil is dry";
+// 3.9k / 142 — the feed's own formatting, so a count reads the same here
+// as it does on the Innovations grid.
+function formatCount(n: number): string {
+  if (n >= 1000) {
+    const v = n / 1000;
+    return `${v.toFixed(v >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
+  }
+  return String(n);
+}
 
 export function WorkspacePrompt() {
   const router = useRouter();
@@ -106,6 +80,7 @@ export function WorkspacePrompt() {
   // Project" inside BuildManuallyInfo can open it, and the dropdown
   // inside it reads from ManualProjectsProvider.
   const [projectModalOpen, setProjectModalOpen] = React.useState(false);
+  const [chipOffset, setChipOffset] = React.useState(0);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
 
   // AI mode is the only mode that uses the prompt textarea today. The
@@ -159,16 +134,27 @@ export function WorkspacePrompt() {
   // used for AI mode now.
   const placeholder = AI_PLACEHOLDER;
 
+  const chips = React.useMemo(
+    () =>
+      Array.from(
+        { length: CHIPS_SHOWN },
+        (_, i) => CHIP_POOL[(chipOffset + i) % CHIP_POOL.length],
+      ),
+    [chipOffset],
+  );
+
   return (
-    <div className="flex min-h-full w-full flex-col pb-[64px]">
+    <div className="relative flex min-h-full w-full flex-col pb-[64px]">
+      <HeroGlow />
+
       {/* Hero — centered narrow column. */}
-      <div className="mx-auto w-full max-w-[760px] px-[32px] pt-[64px]">
+      <div className="relative mx-auto w-full max-w-[760px] px-[32px] pt-[64px]">
         <h1 className="text-center text-5xl font-bold tracking-tight text-text-primary">
           What will you build today?
         </h1>
         <p className="mx-auto mt-[16px] max-w-[560px] text-center text-md leading-relaxed text-text-secondary">
-          Describe your electronics idea. AI drafts the schematic, parts list,
-          and build steps — ready to mint on-chain when you are.
+          Turn your electronics idea into a buildable design — with AI or on
+          your own. No wallet or KYC to start.
         </p>
 
         <div className="mt-[40px] flex justify-center">
@@ -196,19 +182,23 @@ export function WorkspacePrompt() {
         {/* Chips suggest prompts — only meaningful in AI mode. */}
         {mode === "ai" && (
           <div className="mt-[16px]">
-            <Chips items={CHIPS} onPick={pickChip} />
+            <Chips
+              items={chips}
+              onPick={pickChip}
+              onShuffle={() =>
+                setChipOffset((o) => (o + CHIPS_SHOWN) % CHIP_POOL.length)
+              }
+            />
           </div>
         )}
 
-        {/* Unified footer hints — "what you'll get" + reassurance. */}
-        <div className="mt-[48px] flex flex-col items-center gap-[16px]">
+        <div className="mt-[48px] flex flex-col items-center">
           <WhatYouGet />
-          <Reassurance />
         </div>
       </div>
 
       {/* Examples — full main width, capped at 1400px. */}
-      <Examples items={EXAMPLES} />
+      <Examples items={INSPIRATION} />
 
       {/* Manual mode → Create Project → opens this modal. Closing
           dismisses; submitting persists the project and routes into
@@ -222,6 +212,23 @@ export function WorkspacePrompt() {
 }
 
 // ────────────────────────────────── parts ───────────────────────────────
+
+// The soft violet wash behind the hero. One blurred ellipse painted with
+// the brand's own AI gradient at low opacity, so it follows the theme
+// instead of carrying its own colour; decorative, never in the way.
+function HeroGlow() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 flex justify-center overflow-hidden"
+    >
+      <div
+        className="h-[420px] w-[1100px] max-w-[140%] -translate-y-[38%] rounded-full opacity-25 blur-[120px]"
+        style={{ backgroundImage: "var(--gradient-ai)" }}
+      />
+    </div>
+  );
+}
 
 function ModeToggle({
   mode,
@@ -239,13 +246,11 @@ function ModeToggle({
       <ModeButton
         active={mode === "ai"}
         onClick={() => onChange("ai")}
-        icon={SparklesIcon}
         label="Generate with AI"
       />
       <ModeButton
         active={mode === "manual"}
         onClick={() => onChange("manual")}
-        icon={Wrench01Icon}
         label="Build manually"
       />
     </div>
@@ -255,12 +260,10 @@ function ModeToggle({
 function ModeButton({
   active,
   onClick,
-  icon,
   label,
 }: {
   active: boolean;
   onClick: () => void;
-  icon: IconValue;
   label: string;
 }) {
   return (
@@ -270,14 +273,13 @@ function ModeButton({
       aria-checked={active}
       onClick={onClick}
       className={[
-        "inline-flex h-[40px] items-center gap-[8px] rounded-full px-[20px] text-md font-semibold outline-none transition-colors duration-fast",
+        "inline-flex h-[40px] items-center rounded-full px-[20px] text-md font-semibold outline-none transition-colors duration-fast",
         "focus-visible:ring-2 focus-visible:ring-border-focus",
         active
           ? "bg-bg-surface-raised text-text-primary"
           : "text-text-secondary hover:text-text-primary",
       ].join(" ")}
     >
-      <Icon icon={icon} />
       {label}
     </button>
   );
@@ -394,7 +396,7 @@ const PromptCard = React.forwardRef<
           <ToolbarIconButton
             ariaLabel="Attach a reference image"
             onClick={() => fileRef.current?.click()}
-            icon={Attachment01Icon}
+            icon={PlusSignIcon}
           />
           <ToolbarIconButton
             ariaLabel={
@@ -419,7 +421,12 @@ const PromptCard = React.forwardRef<
               disabled={!canRefine}
             />
           )}
-          <SendButton onClick={onSubmit} disabled={submitting} mode={mode} />
+          <SendButton
+            onClick={onSubmit}
+            submitting={submitting}
+            hasText={value.trim().length > 0}
+            mode={mode}
+          />
         </div>
       </div>
     </div>
@@ -488,31 +495,53 @@ function RefineButton({
         icon={refining ? Refresh01Icon : MagicWand01Icon}
         className={refining ? "animate-spin motion-reduce:animate-none" : undefined}
       />
-      {refining ? "Enhancing…" : "Enhance prompt"}
+      {refining ? "Enhancing…" : "Enhance"}
     </button>
   );
 }
 
+// Two states, one control. Nothing typed → a quiet square that says the
+// box is the next step (disabled, so the click can't go nowhere). Text
+// typed → the page's one primary button, labelled with what it will do.
 function SendButton({
   onClick,
-  disabled,
+  submitting,
+  hasText,
   mode,
 }: {
   onClick: () => void;
-  disabled: boolean;
+  submitting: boolean;
+  hasText: boolean;
   mode: Mode;
 }) {
   const label = mode === "ai" ? "Generate project" : "Open manual builder";
+
+  if (!hasText) {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-disabled
+        aria-label={`${label} — describe your project first`}
+        title="Describe your project first"
+        className="inline-flex h-[40px] w-[40px] cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
+      >
+        <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={submitting}
       aria-label={label}
       title={label}
-      className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-full bg-violet-600 text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-wait disabled:opacity-60"
+      className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-button-primary-bg px-[16px] text-md font-semibold text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-wait disabled:opacity-60"
     >
-      <Icon icon={ArrowRight01Icon} size={20} strokeWidth={2} />
+      {mode === "ai" ? "Generate" : "Open builder"}
+      <Icon icon={SparklesIcon} size={16} strokeWidth={1.8} />
     </button>
   );
 }
@@ -520,29 +549,30 @@ function SendButton({
 function Chips({
   items,
   onPick,
+  onShuffle,
 }: {
   items: readonly string[];
   onPick: (text: string) => void;
+  onShuffle: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-[6px]">
+    <div className="flex flex-wrap items-center justify-center gap-[8px]">
       {items.map((t) => (
         <button
           key={t}
           type="button"
           onClick={() => onPick(t)}
-          className="inline-flex h-[32px] items-center gap-[6px] rounded-md border border-border bg-bg-surface px-[12px] text-sm font-regular text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="inline-flex h-[32px] items-center rounded-full bg-bg-subtle px-[14px] text-sm font-regular text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
         >
-          <span aria-hidden className="text-text-tertiary">
-            <Icon icon={SparklesIcon} size={14} />
-          </span>
           {t}
         </button>
       ))}
       <button
         type="button"
-        aria-label="Shuffle example ideas"
-        className="inline-flex h-[32px] w-[32px] items-center justify-center rounded-md border border-border bg-bg-surface text-text-tertiary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+        onClick={onShuffle}
+        aria-label="Show three other ideas"
+        title="Show three other ideas"
+        className="inline-flex h-[32px] w-[32px] items-center justify-center rounded-full bg-bg-subtle text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={Refresh01Icon} size={14} />
       </button>
@@ -583,18 +613,7 @@ function WhatYouGet() {
   );
 }
 
-function Reassurance() {
-  return (
-    <p className="inline-flex items-center gap-[8px] text-sm font-regular text-text-tertiary">
-      <span aria-hidden>
-        <Icon icon={SquareUnlock01Icon} size={14} />
-      </span>
-      No wallet or KYC needed to start — only when you sell.
-    </p>
-  );
-}
-
-function Examples({ items }: { items: ExampleCard[] }) {
+function Examples({ items }: { items: Project[] }) {
   return (
     <section
       aria-labelledby="examples-heading"
@@ -604,17 +623,17 @@ function Examples({ items }: { items: ExampleCard[] }) {
         <header className="mb-[20px] flex items-end justify-between gap-[16px]">
           <h2
             id="examples-heading"
-            className="inline-flex h-[36px] items-center rounded-lg bg-bg-surface px-[16px] text-md font-semibold text-text-primary"
+            className="text-lg font-bold text-text-primary"
           >
-            Browse Project
+            Get inspired
           </h2>
-          <a
-            href="/marketplace"
-            className="inline-flex h-[36px] items-center gap-[8px] rounded-lg px-[12px] text-md font-semibold text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          <Link
+            href="/innovations"
+            className="inline-flex h-[36px] items-center gap-[6px] rounded-lg px-[12px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:text-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             Browse all
-            <Icon icon={ArrowUpRight01Icon} />
-          </a>
+            <Icon icon={ArrowRight01Icon} />
+          </Link>
         </header>
 
         <ul
@@ -632,47 +651,65 @@ function Examples({ items }: { items: ExampleCard[] }) {
   );
 }
 
-function ExampleTile({ item }: { item: ExampleCard }) {
+function ExampleTile({ item }: { item: Project }) {
+  const [imgOk, setImgOk] = React.useState(true);
   return (
-    <a
-      href={`/marketplace/${item.id}`}
-      aria-label={`${item.title} — ${item.category}`}
+    <Link
+      href={`/innovations/${item.slug}`}
+      aria-label={`Open project ${item.title} by ${item.creator.name}`}
       className="group block overflow-hidden rounded-xl border border-border bg-bg-surface outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      {/* Image header — clean, no text or badge overlays. */}
+      {/* Image header — carries the Minted badge, top-left. */}
       <div className="relative aspect-[16/10] overflow-hidden bg-bg-surface-raised">
-        {item.image ? (
+        {item.image && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={item.image}
-            alt={`${item.title} — ${item.tagline}`}
+            alt={item.title}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgOk(false)}
             className="h-full w-full object-cover transition-transform duration-normal ease-standard group-hover:scale-[1.02]"
           />
         ) : (
           <div
             aria-hidden
-            className="flex h-full w-full items-center justify-center text-text-tertiary"
-          >
-            <Icon icon={item.icon} size={24} />
-          </div>
+            className="h-full w-full"
+            style={{ background: item.gradient }}
+          />
+        )}
+        {item.minted && (
+          <span className="pointer-events-none absolute left-[10px] top-[10px]">
+            <MintedBadge />
+          </span>
         )}
       </div>
 
-      {/* Card body — product name + Minted + metadata. */}
-      <div className="px-[20px] py-[16px]">
-        <div className="flex items-center justify-between gap-[12px]">
-          <p className="truncate text-md font-semibold text-text-primary">
-            {item.title}
-          </p>
-          <span className="inline-flex shrink-0 items-center gap-[4px] text-2xs font-bold uppercase tracking-wider text-text-brand">
-            <Icon icon={CheckmarkBadge01Icon} size={12} />
-            Minted
+      {/* Card body — project name, then the counts the project carries. */}
+      <div className="px-[16px] py-[14px]">
+        <p className="truncate text-md font-semibold text-text-primary">
+          {item.title}
+        </p>
+        <div className="mt-[6px] flex items-center gap-[10px] text-2xs font-medium tabular-nums text-text-tertiary">
+          <span className="min-w-0 flex-1 truncate font-regular">
+            {item.creator.name}
+          </span>
+          <span
+            className="inline-flex shrink-0 items-center gap-[4px]"
+            title={`${item.views} views`}
+          >
+            <Icon icon={ViewIcon} size={13} strokeWidth={1.6} />
+            {formatCount(item.views)}
+          </span>
+          <span
+            className="inline-flex shrink-0 items-center gap-[4px]"
+            title={`${item.appreciations} appreciations`}
+          >
+            <Icon icon={FavouriteIcon} size={13} strokeWidth={1.6} />
+            {formatCount(item.appreciations)}
           </span>
         </div>
-        <p className="mt-[4px] truncate text-sm text-text-tertiary">
-          {item.category} · {item.parts} parts
-        </p>
       </div>
-    </a>
+    </Link>
   );
 }

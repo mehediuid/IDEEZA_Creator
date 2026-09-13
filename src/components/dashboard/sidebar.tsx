@@ -18,13 +18,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowDown01Icon,
-  ArrowUpRight01Icon,
   BookOpen01Icon,
   Bug01Icon,
   Compass01Icon,
   ComputerIcon,
   CpuIcon,
   CrownIcon,
+  FlashIcon,
   Folder01Icon,
   HistoryIcon,
   Home01Icon,
@@ -67,7 +67,6 @@ const NAV: Array<{
 const USER = {
   name: "You",
   initials: "Y",
-  notificationCount: 0,
 };
 
 const COLLAPSED_KEY = "ideeza:sidebar:collapsed";
@@ -305,20 +304,21 @@ function Footer({ collapsed }: { collapsed: boolean }) {
   return (
     <div className="border-t border-border p-[12px]">
       <UpgradeButton collapsed={collapsed} />
-      <ForYouGroup collapsed={collapsed} />
+      <SupportBlock collapsed={collapsed} />
       <ProfileRow collapsed={collapsed} />
     </div>
   );
 }
 
 function UpgradeButton({ collapsed }: { collapsed: boolean }) {
+  const label = "Upgrade to Builder — unlock more features";
   if (collapsed) {
     return (
       <button
         type="button"
-        aria-label="Upgrade to Pro"
-        title="Upgrade to Pro"
-        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-md bg-violet-600 text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+        aria-label={label}
+        title={label}
+        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg border border-transparent bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:border-border-brand focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={CrownIcon} />
       </button>
@@ -327,60 +327,110 @@ function UpgradeButton({ collapsed }: { collapsed: boolean }) {
   return (
     <button
       type="button"
-      aria-label="Upgrade to Pro for unlimited generations, on-chain proofs, and marketplace listings"
-      className="mb-[12px] flex h-[40px] w-full items-center gap-[10px] rounded-md bg-violet-600 px-[12px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+      aria-label={label}
+      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg border border-transparent bg-bg-brand-subtle px-[12px] py-[12px] text-left outline-none transition-colors duration-fast hover:border-border-brand focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      <Icon icon={CrownIcon} />
-      <span className="flex-1 text-left">Upgrade to Pro</span>
-      <Icon icon={ArrowUpRight01Icon} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-md font-semibold text-text-brand">
+          Upgrade to Builder
+        </span>
+        <span className="block truncate text-xs font-regular text-text-secondary">
+          Unlock more features
+        </span>
+      </span>
+      <span
+        aria-hidden
+        className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-lg bg-bg-surface text-text-brand"
+      >
+        <Icon icon={FlashIcon} />
+      </span>
     </button>
   );
 }
 
-function ForYouGroup({ collapsed }: { collapsed: boolean }) {
+// Support — the four help destinations, written as sentence links rather
+// than four nav-sized rows: they are read once, not navigated daily.
+const SUPPORT_LINKS: Array<{ label: string; icon: IconValue }> = [
+  { label: "Help Center", icon: HelpCircleIcon },
+  { label: "Tutorial", icon: MortarboardIcon },
+  { label: "Tour Guide", icon: Compass01Icon },
+];
+
+function SupportBlock({ collapsed }: { collapsed: boolean }) {
+  if (collapsed) {
+    return (
+      <ul role="list" className="mb-[12px] flex flex-col gap-[2px]">
+        {[...SUPPORT_LINKS, { label: "Report a Problem", icon: Bug01Icon }].map(
+          (row) => (
+            <li key={row.label}>
+              <SupportAction label={row.label} icon={row.icon} collapsed />
+            </li>
+          ),
+        )}
+      </ul>
+    );
+  }
   return (
     <div className="mb-[16px]">
-      {!collapsed && (
-        <p className="mb-[6px] px-[10px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          For you
-        </p>
-      )}
-      <ul role="list" className="flex flex-col gap-[2px]">
-        <ForYouRow icon={MortarboardIcon} label="Tutorial" collapsed={collapsed} />
-        <ForYouRow icon={Compass01Icon} label="Tour guide" collapsed={collapsed} />
-        <ForYouRow icon={HelpCircleIcon} label="Help & support" collapsed={collapsed} />
-        <ForYouRow icon={Bug01Icon} label="Report a problem" collapsed={collapsed} />
-      </ul>
+      <p className="mb-[6px] text-md font-semibold text-text-primary">
+        Support
+      </p>
+      <p className="flex flex-wrap items-center gap-x-[6px] gap-y-[2px]">
+        {SUPPORT_LINKS.map((row, i) => (
+          <React.Fragment key={row.label}>
+            {i > 0 && (
+              <span aria-hidden className="text-text-tertiary">
+                •
+              </span>
+            )}
+            <SupportAction label={row.label} icon={row.icon} />
+          </React.Fragment>
+        ))}
+      </p>
+      <p className="mt-[2px]">
+        <SupportAction label="Report a Problem" icon={Bug01Icon} />
+      </p>
     </div>
   );
 }
 
-function ForYouRow({
-  icon,
+// One handler for all four: they open the same help surfaces the command
+// palette lists, which have no page of their own yet — so the control
+// says so instead of pretending to navigate.
+function SupportAction({
   label,
+  icon,
   collapsed,
 }: {
-  icon: IconValue;
   label: string;
-  collapsed: boolean;
+  icon: IconValue;
+  collapsed?: boolean;
 }) {
-  return (
-    <li>
+  if (collapsed) {
+    return (
       <button
         type="button"
-        aria-label={collapsed ? label : undefined}
-        title={collapsed ? label : undefined}
-        className={[
-          "flex h-[32px] w-full items-center rounded-md text-md font-regular text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
-          collapsed ? "justify-center px-0" : "gap-[12px] px-[10px]",
-        ].join(" ")}
+        disabled
+        aria-disabled
+        aria-label={`${label} — not available yet`}
+        title={`${label} isn't available yet`}
+        className="flex h-[32px] w-full cursor-not-allowed items-center justify-center rounded-md text-text-disabled"
       >
-        <span aria-hidden className="shrink-0">
-          <Icon icon={icon} />
-        </span>
-        {!collapsed && <span className="truncate">{label}</span>}
+        <Icon icon={icon} />
       </button>
-    </li>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled
+      aria-disabled
+      aria-label={`${label} — not available yet`}
+      title={`${label} isn't available yet`}
+      className="cursor-not-allowed text-sm font-regular text-text-secondary underline-offset-2 disabled:text-text-disabled"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -407,26 +457,28 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
 
   return (
     <div ref={ref} className="relative border-t border-border pt-[12px]">
-      <button
-        type="button"
-        onClick={() => setMenuOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        aria-label={`${USER.name} — open account menu`}
-        title={collapsed ? `${USER.name} — account` : undefined}
-        className={[
-          "flex w-full items-center rounded-lg outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
-          collapsed ? "h-[44px] justify-center px-0" : "h-[52px] gap-[12px] px-[8px]",
-        ].join(" ")}
-      >
-        <span
-          aria-hidden
-          className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-violet-600 text-md font-bold text-text-on-brand"
+      <div className="flex items-center gap-[6px]">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label={`${USER.name} — open account menu`}
+          title={collapsed ? `${USER.name} — account` : undefined}
+          className={[
+            "flex min-w-0 flex-1 items-center rounded-lg outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
+            collapsed
+              ? "h-[44px] justify-center px-0"
+              : "h-[52px] gap-[12px] px-[8px]",
+          ].join(" ")}
         >
-          {USER.initials}
-        </span>
-        {!collapsed && (
-          <>
+          <span
+            aria-hidden
+            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-violet-600 text-md font-bold text-text-on-brand"
+          >
+            {USER.initials}
+          </span>
+          {!collapsed && (
             <span className="min-w-0 flex-1 text-left">
               <span className="block truncate text-md font-medium text-text-primary">
                 {USER.name}
@@ -435,19 +487,25 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
                 Free plan
               </span>
             </span>
-            <NotificationBell count={USER.notificationCount} />
-            <span
-              aria-hidden
-              className={[
-                "shrink-0 text-text-tertiary transition-transform duration-fast",
-                menuOpen ? "rotate-180" : "",
-              ].join(" ")}
+          )}
+        </button>
+
+        {/* Credits and notifications sit beside the account button, not
+            inside it — each is its own destination. */}
+        {!collapsed && (
+          <>
+            <Link
+              href="/history#credits"
+              aria-label="Credits ledger"
+              title="Credits ledger"
+              className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
             >
-              <Icon icon={ArrowDown01Icon} />
-            </span>
+              <Icon icon={Wallet01Icon} />
+            </Link>
+            <NotificationBell />
           </>
         )}
-      </button>
+      </div>
 
       {menuOpen && (
         <AccountMenu collapsed={collapsed} onClose={() => setMenuOpen(false)} />
@@ -456,26 +514,95 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function NotificationBell({ count }: { count: number }) {
+// The bell answers with what the app actually knows: the builds waiting
+// for the user (the same list the attention banner surfaces), or, when
+// there are none, a panel that says so — never a click that does nothing.
+function NotificationBell() {
+  const { attentionBuilds } = useCreateHistory();
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const count = attentionBuilds.length;
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const label =
+    count > 0
+      ? `Notifications, ${count} need${count === 1 ? "s" : ""} attention`
+      : "No notifications yet";
+
   return (
-    <span
-      aria-label={
-        count > 0
-          ? `Notifications, ${count} unread`
-          : "Notifications, none unread"
-      }
-      className="relative inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg text-text-tertiary"
-    >
-      <Icon icon={Notification03Icon} />
-      {count > 0 && (
-        <span
-          aria-hidden
-          className="absolute right-[4px] top-[4px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-bg-error px-[4px] text-2xs font-bold leading-none text-text-inverse"
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        className="relative inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg border border-border text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <Icon icon={Notification03Icon} />
+        {count > 0 && (
+          <span
+            aria-hidden
+            className="absolute right-[2px] top-[2px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-bg-error px-[4px] text-2xs font-bold leading-none text-text-inverse"
+          >
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Notifications"
+          className="absolute bottom-[calc(100%+8px)] right-0 z-dropdown w-[260px] overflow-hidden rounded-xl border border-border bg-bg-surface shadow-3"
         >
-          {count > 99 ? "99+" : count}
-        </span>
+          <p className="border-b border-border px-[16px] py-[10px] text-2xs font-bold uppercase tracking-wider text-text-tertiary">
+            Notifications
+          </p>
+          {count === 0 ? (
+            <p className="px-[16px] py-[16px] text-sm font-regular text-text-tertiary">
+              No notifications yet — builds that need you show up here.
+            </p>
+          ) : (
+            <ul role="none" className="py-[4px]">
+              {attentionBuilds.map((att) => (
+                <li key={att.job.id} role="none">
+                  <Link
+                    href={`/build/${att.job.id}`}
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                    className="block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
+                  >
+                    <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">
+                      {att.reason === "retry"
+                        ? "Needs attention"
+                        : "Ready to review"}
+                    </span>
+                    <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
+                      {att.message}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 
