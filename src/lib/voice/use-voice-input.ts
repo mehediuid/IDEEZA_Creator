@@ -90,6 +90,12 @@ export function useVoiceInput(opts: { onFinal: (text: string) => void }): {
   const streamRef = React.useRef<MediaStream | null>(null);
   const audioCtxRef = React.useRef<AudioContext | null>(null);
   const rafRef = React.useRef<number | null>(null);
+  // Bumped by start() and by every teardown path (stop/cancel/onend/
+  // onerror/unmount). A getUserMedia() call captures the generation it
+  // was issued under; if that no longer matches by the time the promise
+  // settles, the session it belonged to is already gone and the newly
+  // acquired stream/context must be discarded instead of adopted.
+  const genRef = React.useRef(0);
 
   // Support is a client fact — resolve it after mount so SSR and the
   // first client render agree.
@@ -121,13 +127,35 @@ export function useVoiceInput(opts: { onFinal: (text: string) => void }): {
   // the last LEVEL_SAMPLES readings (newest last).
   const startMeter = React.useCallback(async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
+    const gen = genRef.current;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
+      // The session this call belonged to already ended (stop/cancel/
+      // unmount) — its own teardown already ran, so there's nothing
+      // left here to report or clean up.
+      if (gen !== genRef.current) return;
       const name = (err as { name?: string } | null)?.name;
-      if (name === "NotAllowedError" || name === "SecurityError") {
+      // Metering is a bonus, not the feature — if SpeechRecognition is
+      // still running, a mic failure here shouldn't flip the whole
+      // session to "denied"; just carry on without levels.
+      if (
+        (name === "NotAllowedError" || name === "SecurityError") &&
+        recogRef.current === null
+      ) {
         setStatus("denied");
+      }
+      return;
+    }
+    if (gen !== genRef.current) {
+      // Same story on the success path: the session ended while
+      // permission was pending. Release the stream we just opened and
+      // touch nothing else.
+      for (const track of stream.getTracks()) {
+        try {
+          track.stop();
+        } catch {}
       }
       return;
     }
@@ -168,6 +196,7 @@ export function useVoiceInput(opts: { onFinal: (text: string) => void }): {
   // transcript (plus whatever was still interim) is delivered once.
   const end = React.useCallback(
     (discard: boolean) => {
+      genRef.current += 1;
       const r = recogRef.current;
       recogRef.current = null;
       if (r) {
@@ -199,6 +228,7 @@ export function useVoiceInput(opts: { onFinal: (text: string) => void }): {
 
   const start = React.useCallback(() => {
     if (recogRef.current) return;
+    genRef.current += 1;
     const Ctor = recognitionCtor();
     if (!Ctor) {
       setStatus("unsupported");
@@ -263,6 +293,7 @@ export function useVoiceInput(opts: { onFinal: (text: string) => void }): {
   // Never leave the microphone open behind a closed surface.
   React.useEffect(() => {
     return () => {
+      genRef.current += 1;
       const r = recogRef.current;
       recogRef.current = null;
       if (r) {
