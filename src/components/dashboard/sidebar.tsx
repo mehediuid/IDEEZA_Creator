@@ -45,7 +45,7 @@ import {
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import { useTheme } from "@/components/theme-provider";
-import { useCreateHistory } from "@/lib/create/history";
+import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { Icon, type IconValue } from "./icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 
@@ -427,7 +427,7 @@ function SupportAction({
       aria-disabled
       aria-label={`${label} — not available yet`}
       title={`${label} isn't available yet`}
-      className="cursor-not-allowed text-sm font-regular text-text-secondary underline-offset-2 disabled:text-text-disabled"
+      className="cursor-not-allowed text-sm font-regular text-[color:var(--color-button-disabled-text)] underline-offset-2"
     >
       {label}
     </button>
@@ -435,34 +435,41 @@ function SupportAction({
 }
 
 function ProfileRow({ collapsed }: { collapsed: boolean }) {
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  // One panel open at a time — the account menu and the notification bell
+  // both anchor to this row, and opening one must close the other rather
+  // than let them stack on top of each other.
+  const [openPanel, setOpenPanel] = React.useState<"menu" | "bell" | null>(
+    null,
+  );
   const ref = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (!menuOpen) return;
+    if (!openPanel) return;
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setMenuOpen(false);
+        setOpenPanel(null);
       }
     };
     const onKey = (e: KeyboardEvent) =>
-      e.key === "Escape" && setMenuOpen(false);
+      e.key === "Escape" && setOpenPanel(null);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [menuOpen]);
+  }, [openPanel]);
 
   return (
     <div ref={ref} className="relative border-t border-border pt-[12px]">
       <div className="flex items-center gap-[6px]">
         <button
           type="button"
-          onClick={() => setMenuOpen((v) => !v)}
+          onClick={() =>
+            setOpenPanel((v) => (v === "menu" ? null : "menu"))
+          }
           aria-haspopup="menu"
-          aria-expanded={menuOpen}
+          aria-expanded={openPanel === "menu"}
           aria-label={`${USER.name} — open account menu`}
           title={collapsed ? `${USER.name} — account` : undefined}
           className={[
@@ -502,40 +509,49 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
             >
               <Icon icon={Wallet01Icon} />
             </Link>
-            <NotificationBell />
+            <NotificationBell
+              open={openPanel === "bell"}
+              onToggle={() =>
+                setOpenPanel((v) => (v === "bell" ? null : "bell"))
+              }
+              onClose={() => setOpenPanel(null)}
+            />
           </>
         )}
       </div>
 
-      {menuOpen && (
-        <AccountMenu collapsed={collapsed} onClose={() => setMenuOpen(false)} />
+      {openPanel === "menu" && (
+        <AccountMenu collapsed={collapsed} onClose={() => setOpenPanel(null)} />
       )}
     </div>
   );
 }
 
+// Exhaustive over BuildAttention.reason — a build blocked on credits reads
+// and links differently than one merely waiting on a retry or a review, and
+// TS enforces every reason has a kicker so a new reason can't fall through.
+const ATTENTION_KICKER: Record<BuildAttention["reason"], string> = {
+  review: "Ready to review",
+  retry: "Needs attention",
+  credits: "Paused — needs credits",
+};
+
 // The bell answers with what the app actually knows: the builds waiting
 // for the user (the same list the attention banner surfaces), or, when
 // there are none, a panel that says so — never a click that does nothing.
-function NotificationBell() {
+// Open state is controlled by ProfileRow so the bell and the account menu
+// can never both be open at once.
+function NotificationBell({
+  open,
+  onToggle,
+  onClose,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
   const { attentionBuilds } = useCreateHistory();
-  const [open, setOpen] = React.useState(false);
-  const ref = React.useRef<HTMLDivElement>(null);
   const count = attentionBuilds.length;
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   const label =
     count > 0
@@ -543,10 +559,10 @@ function NotificationBell() {
       : "No notifications yet";
 
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div className="relative shrink-0">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
@@ -582,15 +598,17 @@ function NotificationBell() {
               {attentionBuilds.map((att) => (
                 <li key={att.job.id} role="none">
                   <Link
-                    href={`/build/${att.job.id}`}
+                    href={
+                      att.reason === "credits"
+                        ? "/history#credits"
+                        : `/build/${att.job.id}`
+                    }
                     role="menuitem"
-                    onClick={() => setOpen(false)}
+                    onClick={onClose}
                     className="block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
                   >
                     <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-                      {att.reason === "retry"
-                        ? "Needs attention"
-                        : "Ready to review"}
+                      {ATTENTION_KICKER[att.reason]}
                     </span>
                     <span className="mt-[2px] block truncate text-sm font-regular text-text-primary">
                       {att.message}

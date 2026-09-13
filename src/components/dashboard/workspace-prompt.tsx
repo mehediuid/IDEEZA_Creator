@@ -425,7 +425,6 @@ const PromptCard = React.forwardRef<
             onClick={onSubmit}
             submitting={submitting}
             hasText={value.trim().length > 0}
-            mode={mode}
           />
         </div>
       </div>
@@ -503,18 +502,18 @@ function RefineButton({
 // Two states, one control. Nothing typed → a quiet square that says the
 // box is the next step (disabled, so the click can't go nowhere). Text
 // typed → the page's one primary button, labelled with what it will do.
+// PromptCard only renders in AI mode (WorkspacePrompt swaps to
+// BuildManuallyInfo for manual mode), so this always generates a project.
 function SendButton({
   onClick,
   submitting,
   hasText,
-  mode,
 }: {
   onClick: () => void;
   submitting: boolean;
   hasText: boolean;
-  mode: Mode;
 }) {
-  const label = mode === "ai" ? "Generate project" : "Open manual builder";
+  const label = "Generate project";
 
   if (!hasText) {
     return (
@@ -540,7 +539,7 @@ function SendButton({
       title={label}
       className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-button-primary-bg px-[16px] text-md font-semibold text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-wait disabled:opacity-60"
     >
-      {mode === "ai" ? "Generate" : "Open builder"}
+      Generate
       <Icon icon={SparklesIcon} size={16} strokeWidth={1.8} />
     </button>
   );
@@ -659,7 +658,7 @@ function ExampleTile({ item }: { item: Project }) {
       aria-label={`Open project ${item.title} by ${item.creator.name}`}
       className="group block overflow-hidden rounded-xl border border-border bg-bg-surface outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      {/* Image header — carries the Minted badge, top-left. */}
+      {/* Image header — carries the Minted badge, top-right. */}
       <div className="relative aspect-[16/10] overflow-hidden bg-bg-surface-raised">
         {item.image && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -679,7 +678,7 @@ function ExampleTile({ item }: { item: Project }) {
           />
         )}
         {item.minted && (
-          <span className="pointer-events-none absolute left-[10px] top-[10px]">
+          <span className="pointer-events-none absolute right-[10px] top-[10px]">
             <MintedBadge />
           </span>
         )}
