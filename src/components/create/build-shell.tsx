@@ -5,23 +5,21 @@
 //   • While items are still building or failed → shows <BuildStatus />
 //   • Once every item is ready                 → shows <ReviewOutputs />
 //
-// The page header carries the back-to-home link and a small breadcrumb
-// to the source chat (one chat → many builds, so getting back to the
-// originating concept is important).
+// The page is one centred card under a plain "← Back" link (Ai-Flow
+// frames 11–14): back means where you came from, which for a build
+// opened straight from its concept is the source chat.
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  ArrowLeft01Icon,
-  Clock01Icon,
-} from "@hugeicons/core-free-icons";
+import { useRouter } from "next/navigation";
+import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import {
   rollupBuild,
   useCreateHistory,
   type BuildJob,
 } from "@/lib/create/history";
-import { BuildStatus } from "./build-status";
+import { BuildConceptCard, BuildStatus } from "./build-status";
 import { ReviewOutputs } from "./review-outputs";
 
 // Tracks jobs whose 3D generation is in flight this session, so navigating
@@ -100,44 +98,53 @@ export function BuildShell({ jobId }: { jobId: string }) {
   const ready = rollup.status === "ready";
 
   return (
-    <div className="flex h-full flex-col">
-      <Header job={job} />
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[920px] px-[24px] py-[32px]">
-          {ready ? <ReviewOutputs job={job} /> : <BuildStatus job={job} />}
+    <div className="h-full overflow-y-auto">
+      {/* The review surface is a wider reading layout than the five
+          progress rows; the build states themselves are one 580px card. */}
+      <div
+        className={[
+          "mx-auto w-full px-[24px] py-[24px]",
+          ready ? "max-w-[920px]" : "max-w-[580px]",
+        ].join(" ")}
+      >
+        <BackLink job={job} />
+        <div className="mt-[12px] flex flex-col gap-[16px]">
+          {ready ? (
+            <>
+              <BuildConceptCard job={job} />
+              <ReviewOutputs job={job} />
+            </>
+          ) : (
+            <BuildStatus job={job} />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function Header({ job }: { job: BuildJob }) {
+// Back is where the user came from. A build opened from its concept has
+// that chat one step back; a build opened cold (a link, a reload) has
+// nothing to go back to, so it falls back to the chat the build belongs
+// to rather than dropping the user on an unrelated page.
+function BackLink({ job }: { job: BuildJob }) {
+  const router = useRouter();
+  const chatHref = `/chat/${job.chatId}`;
   return (
-    <header className="flex items-center gap-[16px] border-b border-border bg-bg-page px-[24px] py-[12px]">
-      <Link
-        href="/"
-        aria-label="Back to Home"
-        className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        <Icon icon={ArrowLeft01Icon} />
-      </Link>
-      <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          Project build
-        </p>
-        <h1 className="truncate text-md font-semibold text-text-primary">
-          {prettyTitle(job.conceptPrompt)}
-        </h1>
-      </div>
-      <Link
-        href={`/chat/${job.chatId}`}
-        className="inline-flex h-[32px] items-center gap-[8px] rounded-full border border-border bg-bg-surface px-[12px] text-2xs font-bold uppercase tracking-wider text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        <Icon icon={Clock01Icon} size={14} />
-        Source chat
-      </Link>
-    </header>
+    <button
+      type="button"
+      onClick={() => {
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          router.back();
+          return;
+        }
+        router.push(chatHref);
+      }}
+      className="inline-flex h-[32px] items-center gap-[8px] rounded-lg px-[8px] text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+    >
+      <Icon icon={ArrowLeft02Icon} size={18} />
+      Back
+    </button>
   );
 }
 
@@ -170,9 +177,4 @@ function NotFoundShell() {
       </Link>
     </div>
   );
-}
-
-function prettyTitle(prompt: string): string {
-  const t = prompt.trim().replace(/\s+/g, " ");
-  return t.length > 80 ? `${t.slice(0, 80)}…` : t;
 }
