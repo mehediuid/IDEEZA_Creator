@@ -13,6 +13,11 @@
 // `useCreateHistory()`.
 
 import * as React from "react";
+import {
+  deriveTitle,
+  type ConceptPart,
+  type ConceptPartCategory,
+} from "./concept";
 
 // ─────────────────────────── types ────────────────────────────────
 
@@ -65,9 +70,26 @@ export type ChatSession = {
   updatedAt: number;
 };
 
-export type BuildItemKind = "3d" | "pcb" | "code";
+export type BuildItemKind = "3d" | "pcb" | "code" | "wiring" | "parts";
 
-export type BuildItemStatus = "pending" | "building" | "ready" | "failed";
+export type BuildItemStatus =
+  | "pending"
+  | "building"
+  | "ready"
+  | "failed"
+  // An artifact an older build never produced. Kept in the list so the
+  // five rows always read honestly instead of silently shrinking.
+  | "skipped";
+
+// The build as a whole. `queued` is a build waiting for the one ahead
+// of it (one build runs at a time); `failed` is the system failure —
+// the whole job died and the credits went back.
+export type BuildStatus =
+  | "queued"
+  | "running"
+  | "ready"
+  | "partial"
+  | "failed";
 
 export type BuildItem = {
   kind: BuildItemKind;
@@ -83,6 +105,28 @@ export type BuildJob = {
   // The locked concept that started this build — pinned for reference.
   conceptImageUrl: string;
   conceptPrompt: string;
+  // The concept as the summarizer read it: a short name, the parts line
+  // under it, and the parts themselves — which every deliverable is
+  // derived from (see build-artifacts.ts).
+  title: string;
+  summary: string;
+  parts: ConceptPart[];
+  // Which concept in the chat this build came from — "2", or "1.1" for
+  // a refinement of the first.
+  conceptNumber: string;
+  status: BuildStatus;
+  startedAt?: number;
+  endedAt?: number;
+  // Minutes the whole build is expected to take, for the countdown.
+  estimateMin: number;
+  creditsCharged: boolean;
+  creditsRefunded: boolean;
+  // Set when the build died for a reason that isn't the user's — the
+  // credits are refunded and the whole build can be retried.
+  failure?: "system";
+  // Set by Save Project / Advance Edit once the build becomes a real
+  // ManualProject.
+  projectId?: string;
   items: BuildItem[];
   createdAt: number;
   updatedAt: number;
@@ -108,11 +152,33 @@ export type BuildAttention = {
   message: string;
 };
 
+// The five artifacts every build produces, in the order they're shown.
+export const ITEM_KINDS: BuildItemKind[] = [
+  "3d",
+  "pcb",
+  "code",
+  "wiring",
+  "parts",
+];
+
 export const ITEM_LABELS: Record<BuildItemKind, string> = {
   "3d": "3D model",
   pcb: "PCB",
   code: "Firmware code",
+  wiring: "Wiring",
+  parts: "Parts",
 };
+
+export const ITEM_SUBTITLES: Record<BuildItemKind, string> = {
+  "3d": "Printable enclosure with mount points",
+  pcb: "Schematic, layout and BOM",
+  code: "Starter firmware for the parts used",
+  wiring: "Harness and pin-to-pin connections",
+  parts: "Bill of materials with suppliers",
+};
+
+// How long a full build is expected to take, in minutes.
+export const BUILD_ESTIMATE_MIN = 10;
 
 export const OUTCOME_LABELS: Record<BuildOutcome, string> = {
   private: "Save as Private",
@@ -149,11 +215,97 @@ function makeId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
 }
 
-function deriveTitle(prompt: string): string {
-  const trimmed = prompt.trim().replace(/\s+/g, " ");
-  if (trimmed.length <= 56) return trimmed || "Untitled concept";
-  return `${trimmed.slice(0, 56)}…`;
+// Items an old build never had are "skipped" — they say nothing about
+// whether the build finished, so every rollup ignores them.
+function liveItems(items: BuildItem[]): BuildItem[] {
+  return items.filter((i) => i.status !== "skipped");
 }
+
+// The build's state as its items describe it. `statusOf` prefers the
+// stored status for the two states items can't express (queued, and a
+// whole-build system failure).
+function deriveStatus(items: BuildItem[]): BuildStatus {
+  const live = liveItems(items);
+  if (!live.length) return "ready";
+  if (live.every((i) => i.status === "ready")) return "ready";
+  const building = live.some(
+    (i) => i.status === "building" || i.status === "pending",
+  );
+  if (!building && live.some((i) => i.status === "failed")) return "partial";
+  return "running";
+}
+
+export function statusOf(job: BuildJob): BuildStatus {
+  if (job.status === "queued" || job.status === "failed") return job.status;
+  return deriveStatus(job.items);
+}
+
+// Average progress across the artifacts that are actually being built.
+function progressOf(items: BuildItem[]): number {
+  const live = liveItems(items);
+  if (!live.length) return 100;
+  return Math.round(live.reduce((s, i) => s + i.progress, 0) / live.length);
+}
+
+// Whole minutes since the build started — frozen at endedAt once it's
+// over, so a finished build doesn't keep counting.
+export function elapsedMinutes(job: BuildJob, now: number = Date.now()): number {
+  if (!job.startedAt) return 0;
+  const end = job.endedAt ?? now;
+  return Math.max(0, Math.floor((end - job.startedAt) / 60_000));
+}
+
+// The estimate scaled by what's left to do. Never says "0 minutes left"
+// while work remains — the smallest honest answer is 1.
+export function minutesLeft(job: BuildJob, now: number = Date.now()): number {
+  void now;
+  const remaining = (100 - progressOf(job.items)) / 100;
+  if (remaining <= 0) return 0;
+  return Math.max(1, Math.round(job.estimateMin * remaining));
+}
+
+// ─────────────────────────── migration ─────────────────────────────
+
+// Stored builds predate the five-artifact model, the queue and the
+// concept summary. Bring each one forward on hydrate — never at render,
+// so what the UI reads is what's in storage.
+function normalizeJob(raw: BuildJob): BuildJob {
+  const stored = raw as Partial<BuildJob> & { items?: BuildItem[] };
+  const byKind = new Map<BuildItemKind, BuildItem>();
+  for (const item of stored.items ?? []) {
+    if (!ITEM_KINDS.includes(item.kind)) continue;
+    byKind.set(item.kind, item);
+  }
+  const items: BuildItem[] = ITEM_KINDS.map(
+    (kind) =>
+      byKind.get(kind) ?? { kind, status: "skipped" as const, progress: 0 },
+  );
+  const prompt = stored.conceptPrompt ?? "";
+  const status: BuildStatus =
+    stored.status && STATUS_VALUES.includes(stored.status)
+      ? stored.status
+      : deriveStatus(items);
+  return {
+    ...(stored as BuildJob),
+    items,
+    title: stored.title || deriveTitle(prompt),
+    summary: stored.summary ?? "",
+    parts: Array.isArray(stored.parts) ? stored.parts : [],
+    conceptNumber: stored.conceptNumber || "1",
+    status,
+    estimateMin: stored.estimateMin ?? BUILD_ESTIMATE_MIN,
+    creditsCharged: stored.creditsCharged ?? false,
+    creditsRefunded: stored.creditsRefunded ?? false,
+  };
+}
+
+const STATUS_VALUES: BuildStatus[] = [
+  "queued",
+  "running",
+  "ready",
+  "partial",
+  "failed",
+];
 
 // Deterministic placeholder image so refreshes don't reshuffle.
 // Picsum gives a real-looking photo per seed.
@@ -194,6 +346,10 @@ type Ctx = {
     turnId: string;
     imageUrl: string;
     prompt: string;
+    conceptNumber: string;
+    title: string;
+    summary: string;
+    parts: ConceptPart[];
   }) => BuildJob;
   updateBuildItem: (
     buildId: string,
@@ -201,6 +357,18 @@ type Ctx = {
     patch: Partial<BuildItem>,
   ) => void;
   retryBuildItem: (buildId: string, kind: BuildItemKind) => void;
+  // Whole-build retry, after a system failure took the job down.
+  retryBuild: (buildId: string) => void;
+  // The build died for a reason that isn't the user's: every artifact
+  // fails, the job is marked failed and the credits go back.
+  failBuildSystem: (buildId: string) => void;
+  // Records that the credits ledger has charged for this build. The
+  // component that owns the simulator charges and then calls this, so
+  // a build is only ever charged once per run.
+  markCharged: (buildId: string) => void;
+  // Starts the oldest queued build when nothing is running. Called by
+  // the simulator on each tick.
+  promoteQueued: () => void;
   setBuildOutcome: (buildId: string, outcome: BuildOutcome) => void;
   setBuildModel: (buildId: string, glbUrl: string) => void;
   getBuild: (buildId: string) => BuildJob | null;
@@ -225,10 +393,19 @@ export function CreateHistoryProvider({
   const [builds, setBuilds] = React.useState<BuildJob[]>([]);
   const [hydrated, setHydrated] = React.useState(false);
 
-  // Hydrate from storage once on mount.
+  // Latest builds, readable inside event callbacks (the queue has to
+  // know whether something is already running).
+  const buildsRef = React.useRef(builds);
+  React.useEffect(() => {
+    buildsRef.current = builds;
+  }, [builds]);
+
+  // Hydrate from storage once on mount. Stored builds are migrated here
+  // — once, on the way in — so nothing downstream has to cope with an
+  // older shape.
   React.useEffect(() => {
     setChats(loadJSON<ChatSession[]>(CHATS_KEY, []));
-    setBuilds(loadJSON<BuildJob[]>(BUILDS_KEY, []));
+    setBuilds(loadJSON<BuildJob[]>(BUILDS_KEY, []).map(normalizeJob));
     setHydrated(true);
   }, []);
 
@@ -381,19 +558,35 @@ export function CreateHistoryProvider({
       turnId: string;
       imageUrl: string;
       prompt: string;
+      conceptNumber: string;
+      title: string;
+      summary: string;
+      parts: ConceptPart[];
     }) => {
       const now = Date.now();
       const id = makeId("build");
+      // One build runs at a time — a second one waits its turn rather
+      // than competing for the same worker.
+      const busy = buildsRef.current.some((b) => b.status === "running");
       const job: BuildJob = {
         id,
         chatId: input.chatId,
         conceptImageUrl: input.imageUrl,
         conceptPrompt: input.prompt,
-        items: [
-          { kind: "3d", status: "building", progress: 0 },
-          { kind: "pcb", status: "building", progress: 0 },
-          { kind: "code", status: "building", progress: 0 },
-        ],
+        title: input.title,
+        summary: input.summary,
+        parts: input.parts,
+        conceptNumber: input.conceptNumber,
+        status: busy ? "queued" : "running",
+        startedAt: busy ? undefined : now,
+        estimateMin: BUILD_ESTIMATE_MIN,
+        creditsCharged: false,
+        creditsRefunded: false,
+        items: ITEM_KINDS.map((kind) => ({
+          kind,
+          status: busy ? ("pending" as const) : ("building" as const),
+          progress: 0,
+        })),
         createdAt: now,
         updatedAt: now,
       };
@@ -433,10 +626,27 @@ export function CreateHistoryProvider({
           const wasRolled = computeRollup(b.items);
           const nextRolled = computeRollup(nextItems);
           const statusChanged = wasRolled.status !== nextRolled.status;
+          // Keep the job's own status in step with its items, except
+          // for the two the items can't express: a queued build stays
+          // queued until it's promoted, and a system failure stays
+          // failed until the whole build is retried.
+          const now = Date.now();
+          const derived = deriveStatus(nextItems);
+          const status =
+            b.status === "queued" || b.status === "failed" ? b.status : derived;
           return {
             ...b,
-            updatedAt: Date.now(),
+            updatedAt: now,
             items: nextItems,
+            status,
+            startedAt:
+              status === "running" && !b.startedAt ? now : b.startedAt,
+            endedAt:
+              status === "running"
+                ? undefined
+                : status === "ready" || status === "partial"
+                  ? (b.endedAt ?? now)
+                  : b.endedAt,
             attentionDismissedAt: statusChanged
               ? undefined
               : b.attentionDismissedAt,
@@ -453,6 +663,94 @@ export function CreateHistoryProvider({
     },
     [updateBuildItem],
   );
+
+  const retryBuild = React.useCallback((buildId: string) => {
+    const now = Date.now();
+    const busy = buildsRef.current.some(
+      (b) => b.status === "running" && b.id !== buildId,
+    );
+    setBuilds((arr) =>
+      arr.map((b) => {
+        if (b.id !== buildId) return b;
+        return {
+          ...b,
+          status: busy ? "queued" : "running",
+          failure: undefined,
+          startedAt: busy ? undefined : now,
+          endedAt: undefined,
+          // The failed run was refunded, so the retry is charged again.
+          creditsCharged: false,
+          creditsRefunded: false,
+          items: b.items.map((it) => ({
+            ...it,
+            status: busy ? ("pending" as const) : ("building" as const),
+            progress: 0,
+          })),
+          updatedAt: now,
+          attentionDismissedAt: undefined,
+        };
+      }),
+    );
+  }, []);
+
+  const failBuildSystem = React.useCallback((buildId: string) => {
+    const now = Date.now();
+    setBuilds((arr) =>
+      arr.map((b) => {
+        if (b.id !== buildId) return b;
+        return {
+          ...b,
+          status: "failed" as const,
+          failure: "system" as const,
+          endedAt: now,
+          creditsRefunded: b.creditsCharged,
+          items: b.items.map((it) =>
+            it.status === "skipped" ? it : { ...it, status: "failed" as const },
+          ),
+          updatedAt: now,
+          attentionDismissedAt: undefined,
+        };
+      }),
+    );
+  }, []);
+
+  const markCharged = React.useCallback((buildId: string) => {
+    setBuilds((arr) =>
+      arr.map((b) =>
+        b.id === buildId ? { ...b, creditsCharged: true } : b,
+      ),
+    );
+  }, []);
+
+  const promoteQueued = React.useCallback(() => {
+    setBuilds((arr) => {
+      if (arr.some((b) => b.status === "running")) return arr;
+      // Oldest first — the queue is a queue.
+      let next: BuildJob | null = null;
+      for (const b of arr) {
+        if (b.status !== "queued") continue;
+        if (!next || b.createdAt < next.createdAt) next = b;
+      }
+      if (!next) return arr;
+      const promoted = next;
+      const now = Date.now();
+      return arr.map((b) =>
+        b.id === promoted.id
+          ? {
+              ...b,
+              status: "running" as const,
+              startedAt: now,
+              items: b.items.map((it) =>
+                it.status === "skipped"
+                  ? it
+                  : { ...it, status: "building" as const, progress: 0 },
+              ),
+              updatedAt: now,
+            }
+          : b,
+      );
+    });
+  }, []);
 
   const setBuildOutcome = React.useCallback(
     (buildId: string, outcome: BuildOutcome) => {
@@ -531,6 +829,10 @@ export function CreateHistoryProvider({
     startBuild,
     updateBuildItem,
     retryBuildItem,
+    retryBuild,
+    failBuildSystem,
+    markCharged,
+    promoteQueued,
     setBuildOutcome,
     setBuildModel,
     getBuild,
@@ -560,26 +862,29 @@ export function useCreateHistory(): Ctx {
 // ─────────────────────────── public helpers ────────────────────────
 
 export { placeholderImage, deriveTitle, makeId };
+export type { ConceptPart, ConceptPartCategory };
 
 export type BuildRollup = {
   status: "building" | "ready" | "partial" | "failed";
   progress: number;
 };
 
-// Derived status across all items on a build.
+// Derived status across all items on a build. A system failure takes
+// the whole job down, so it outranks whatever the items say.
 export function rollupBuild(job: BuildJob): BuildRollup {
+  if (job.status === "failed") return { status: "failed", progress: 0 };
   return computeRollup(job.items);
 }
 
 function computeRollup(items: BuildItem[]): BuildRollup {
-  const allReady = items.every((i) => i.status === "ready");
+  const live = liveItems(items);
+  if (!live.length) return { status: "ready", progress: 100 };
+  const allReady = live.every((i) => i.status === "ready");
   if (allReady) return { status: "ready", progress: 100 };
-  const allFailed = items.every((i) => i.status === "failed");
+  const allFailed = live.every((i) => i.status === "failed");
   if (allFailed) return { status: "failed", progress: 0 };
-  const anyFailed = items.some((i) => i.status === "failed");
-  const progress = Math.round(
-    items.reduce((sum, i) => sum + i.progress, 0) / items.length,
-  );
+  const anyFailed = live.some((i) => i.status === "failed");
+  const progress = progressOf(items);
   if (anyFailed) return { status: "partial", progress };
   return { status: "building", progress };
 }
@@ -588,7 +893,14 @@ function computeRollup(items: BuildItem[]): BuildRollup {
 //   • ready (no outcome yet) — must review and pick an outcome
 //   • partial / failed       — at least one item failed; retry needed
 export function buildAttention(job: BuildJob): BuildAttention | null {
-  const rollup = computeRollup(job.items);
+  if (job.failure === "system") {
+    return {
+      job,
+      reason: "retry",
+      message: `“${shortTitle(job.title || job.conceptPrompt)}” stopped on our side${job.creditsRefunded ? " — your credits were refunded" : ""}.`,
+    };
+  }
+  const rollup = rollupBuild(job);
   if (rollup.status === "ready" && !job.outcome) {
     return {
       job,

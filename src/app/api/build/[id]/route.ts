@@ -23,6 +23,8 @@ export async function GET(
       { kind: "3d", status: "building", progress: 0 },
       { kind: "pcb", status: "building", progress: 0 },
       { kind: "code", status: "building", progress: 0 },
+      { kind: "wiring", status: "building", progress: 0 },
+      { kind: "parts", status: "building", progress: 0 },
     ],
   });
 }

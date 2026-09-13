@@ -19,7 +19,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { Icon } from "@/components/dashboard/icon";
-import { useCreateHistory, type ChatSession } from "@/lib/create/history";
+import {
+  deriveTitle,
+  useCreateHistory,
+  type ChatSession,
+} from "@/lib/create/history";
 import { useCreatePlan } from "@/lib/create/plan";
 import { ChatThread } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
@@ -286,6 +290,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         turnId: confirmFor.turnId,
         imageUrl: confirmFor.imageUrl,
         prompt: confirmFor.prompt,
+        // The concept summary lands here once the confirm dialog reads
+        // /api/concept/summarize; until then the build carries the
+        // title we can derive and an empty parts list rather than an
+        // invented one.
+        conceptNumber: "1",
+        title: deriveTitle(confirmFor.prompt),
+        summary: "",
+        parts: [],
       });
       router.push(`/build/${job.id}`);
     } finally {

@@ -5,8 +5,9 @@
 // client store; this route is a placeholder so a real backend can
 // hook in later without changing call sites.
 //
-// Request:  { chatId, turnId, imageUrl, prompt }
-// Response: { jobId }
+// Request:  { chatId, turnId, imageUrl, prompt, conceptNumber?, title?,
+//             summary?, parts? }
+// Response: { jobId, ...the concept it was started from }
 
 import { NextResponse } from "next/server";
 
@@ -24,11 +25,19 @@ export async function POST(req: Request) {
     turnId?: unknown;
     imageUrl?: unknown;
     prompt?: unknown;
+    conceptNumber?: unknown;
+    title?: unknown;
+    summary?: unknown;
+    parts?: unknown;
   };
   const chatId = String(obj.chatId ?? "");
   const turnId = String(obj.turnId ?? "");
   const imageUrl = String(obj.imageUrl ?? "");
   const prompt = String(obj.prompt ?? "");
+  const conceptNumber = String(obj.conceptNumber ?? "1");
+  const title = String(obj.title ?? "");
+  const summary = String(obj.summary ?? "");
+  const parts = Array.isArray(obj.parts) ? obj.parts : [];
   if (!chatId || !turnId || !imageUrl) {
     return NextResponse.json(
       { error: "chatId, turnId, imageUrl are required" },
@@ -36,5 +45,15 @@ export async function POST(req: Request) {
     );
   }
   const jobId = `build_${chatId.slice(-6)}_${Date.now().toString(36)}`;
-  return NextResponse.json({ jobId, chatId, turnId, imageUrl, prompt });
+  return NextResponse.json({
+    jobId,
+    chatId,
+    turnId,
+    imageUrl,
+    prompt,
+    conceptNumber,
+    title,
+    summary,
+    parts,
+  });
 }

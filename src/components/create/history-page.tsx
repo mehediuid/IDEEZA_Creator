@@ -28,6 +28,7 @@ import { Icon } from "@/components/dashboard/icon";
 import {
   rollupBuild,
   useCreateHistory,
+  type BuildItemKind,
   type BuildJob,
   type ChatSession,
 } from "@/lib/create/history";
@@ -367,7 +368,7 @@ function shorten(s: string): string {
 // real retry binding happens in attachRetry below.)
 function RetryWiring(_props: {
   builds: BuildJob[];
-  retryBuildItem: (buildId: string, kind: "3d" | "pcb" | "code") => void;
+  retryBuildItem: (buildId: string, kind: BuildItemKind) => void;
 }) {
   return null;
 }

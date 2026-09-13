@@ -19,7 +19,9 @@ import {
   CodeIcon,
   CpuIcon,
   CubeIcon,
+  ElectricWireIcon,
   LockIcon,
+  PackageIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
@@ -32,11 +34,14 @@ import {
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
+import { useCredits } from "@/lib/create/credits";
 
 const KIND_ICON: Record<BuildItemKind, IconValue> = {
   "3d": CubeIcon,
   pcb: CpuIcon,
   code: CodeIcon,
+  wiring: ElectricWireIcon,
+  parts: PackageIcon,
 };
 
 // Per-tick increment per item (synthetic; real backend will push real
@@ -50,56 +55,93 @@ const PER_ITEM_JITTER: Record<BuildItemKind, number> = {
   "3d": 0,
   pcb: 1,
   code: 2,
+  wiring: 3,
+  parts: 4,
 };
-// Inject a deterministic failure on PCB at 60% the FIRST time a user
-// sees a build — gives them a chance to see the partial-retry flow.
-const FAIL_AT = 60;
-const FAIL_KIND: BuildItemKind = "pcb";
+
+// Dev-only hooks so the failure states are reachable on demand. There
+// is no random failure injection: a build that fails in front of a user
+// has to be a real failure, not a demo.
+type DevWindow = Window & {
+  __ideezaFailBuild?: (buildId: string) => void;
+  __ideezaFailItem?: (buildId: string, kind: BuildItemKind) => void;
+};
 
 export function BuildStatus({ job }: { job: BuildJob }) {
-  const { updateBuildItem } = useCreateHistory();
+  const {
+    builds,
+    updateBuildItem,
+    promoteQueued,
+    markCharged,
+    failBuildSystem,
+  } = useCreateHistory();
+  const { charge, refund, canAfford } = useCredits();
   const rollup = rollupBuild(job);
   const reducedMotion = useReducedMotion();
-  // Track whether we've already injected the demo failure on this
-  // build so reloading doesn't re-fail a recovered item.
-  const sawFailure = React.useRef(false);
+
+  // The tick reads the latest builds without restarting the interval.
+  const buildsRef = React.useRef(builds);
+  React.useEffect(() => {
+    buildsRef.current = builds;
+  }, [builds]);
+
+  // A build costs credits the moment it actually starts — a queued one
+  // is charged when its turn comes, not when it's booked.
+  React.useEffect(() => {
+    for (const b of builds) {
+      if (b.status !== "running" || b.creditsCharged) continue;
+      if (!canAfford()) continue;
+      charge(b.id);
+      markCharged(b.id);
+    }
+  }, [builds, charge, canAfford, markCharged]);
 
   React.useEffect(() => {
-    if (rollup.status === "ready") return;
     if (reducedMotion) return;
     const t = window.setInterval(() => {
-      // Tick each item that's still building.
-      for (const item of job.items) {
-        if (item.status !== "building") continue;
-        const next = Math.min(
-          100,
-          item.progress + TICK_PROGRESS - PER_ITEM_JITTER[item.kind],
-        );
-        if (
-          !sawFailure.current &&
-          item.kind === FAIL_KIND &&
-          item.progress < FAIL_AT &&
-          next >= FAIL_AT
-        ) {
-          sawFailure.current = true;
-          updateBuildItem(job.id, item.kind, {
-            status: "failed",
-            progress: FAIL_AT,
-          });
-          continue;
-        }
-        if (next >= 100) {
-          updateBuildItem(job.id, item.kind, {
-            status: "ready",
-            progress: 100,
-          });
-        } else {
-          updateBuildItem(job.id, item.kind, { progress: next });
+      let running = false;
+      // Advance every running build, not just the one on screen —
+      // leaving this page shouldn't stall a build in the background.
+      for (const b of buildsRef.current) {
+        if (b.status !== "running") continue;
+        running = true;
+        for (const item of b.items) {
+          if (item.status !== "building") continue;
+          const next = Math.min(
+            100,
+            item.progress + TICK_PROGRESS - PER_ITEM_JITTER[item.kind],
+          );
+          if (next >= 100) {
+            updateBuildItem(b.id, item.kind, {
+              status: "ready",
+              progress: 100,
+            });
+          } else {
+            updateBuildItem(b.id, item.kind, { progress: next });
+          }
         }
       }
+      // The worker is free — start whoever has been waiting longest.
+      if (!running) promoteQueued();
     }, TICK_MS);
     return () => window.clearInterval(t);
-  }, [job, rollup.status, reducedMotion, updateBuildItem]);
+  }, [reducedMotion, updateBuildItem, promoteQueued]);
+
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const w = window as DevWindow;
+    w.__ideezaFailBuild = (buildId: string) => {
+      refund(buildId);
+      failBuildSystem(buildId);
+    };
+    w.__ideezaFailItem = (buildId: string, kind: BuildItemKind) => {
+      updateBuildItem(buildId, kind, { status: "failed" });
+    };
+    return () => {
+      delete w.__ideezaFailBuild;
+      delete w.__ideezaFailItem;
+    };
+  }, [refund, failBuildSystem, updateBuildItem]);
 
   return (
     <div className="flex flex-col gap-[24px]">

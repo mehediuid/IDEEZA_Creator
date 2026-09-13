@@ -18,7 +18,9 @@ import {
   CodeIcon,
   CpuIcon,
   CubeIcon,
+  ElectricWireIcon,
   HelpCircleIcon,
+  PackageIcon,
   ShoppingBag01Icon,
   User02Icon,
   Wallet01Icon,
@@ -39,6 +41,8 @@ const KIND_ICON: Record<BuildItemKind, IconValue> = {
   "3d": CubeIcon,
   pcb: CpuIcon,
   code: CodeIcon,
+  wiring: ElectricWireIcon,
+  parts: PackageIcon,
 };
 
 const KIND_BLURB: Record<BuildItemKind, string> = {
@@ -48,6 +52,10 @@ const KIND_BLURB: Record<BuildItemKind, string> = {
     "The circuit board: the schematic, layout, and the parts to buy. Send it to a fab as Gerbers.",
   code:
     "The firmware: starter code wired to the parts in the PCB, ready to flash and modify.",
+  wiring:
+    "The harness: which pin goes to which pin, so the parts outside the board connect the right way round.",
+  parts:
+    "The bill of materials: every part, its reference on the board, and how many you need to order.",
 };
 
 export function ReviewOutputs({ job }: { job: BuildJob }) {
@@ -309,6 +317,20 @@ function DeliverablePreview({
               <PreviewLine>Arduino-style sketch, fully commented</PreviewLine>
               <PreviewLine>Library list pinned to versions</PreviewLine>
               <PreviewLine>Wiring map to the PCB pins</PreviewLine>
+            </>
+          )}
+          {kind === "wiring" && (
+            <>
+              <PreviewLine>Pin-to-pin connection list</PreviewLine>
+              <PreviewLine>Power, ground and signal nets separated</PreviewLine>
+              <PreviewLine>Harness diagram for off-board parts</PreviewLine>
+            </>
+          )}
+          {kind === "parts" && (
+            <>
+              <PreviewLine>Every part with its board reference</PreviewLine>
+              <PreviewLine>Quantities, actives and passives counted</PreviewLine>
+              <PreviewLine>Exportable as CSV for your supplier</PreviewLine>
             </>
           )}
         </ul>
