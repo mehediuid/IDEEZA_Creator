@@ -12,6 +12,7 @@ import * as React from "react";
 import { Attachment01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Banner, Button } from "@/components/ideeza";
 import { Icon } from "@/components/dashboard/icon";
+import { FootprintThumb, SymbolThumb } from "./package-thumbs";
 import { usePackageActions, usePackageDraft } from "@/lib/package/store";
 import { electricalPads, fpPads, symPins, type PackageDraft } from "@/lib/package/types";
 import { componentBodyColor } from "@/lib/pcb/pcb-3d";
@@ -274,67 +275,3 @@ function PreviewCard({
 
 /** Auto-fitted thumbnails of what actually landed in the draft — the same
  *  objects the next two steps will edit, not a picture of the file. */
-function SymbolThumb({ draft }: { draft: PackageDraft }) {
-  const pins = symPins(draft);
-  const rects = draft.symbol.filter((o): o is Extract<typeof o, { kind: "rect" }> => o.kind === "rect");
-  const xs = [...pins.map((p) => p.x), ...rects.flatMap((r) => [r.x, r.x + r.w])];
-  const ys = [...pins.map((p) => p.y), ...rects.flatMap((r) => [r.y, r.y + r.h])];
-  if (!xs.length) return <div className="h-[170px] rounded-[var(--radius-lg)] bg-bg-subtle" />;
-  const W = 320;
-  const H = 170;
-  const spanX = Math.max(20, Math.max(...xs) - Math.min(...xs));
-  const spanY = Math.max(20, Math.max(...ys) - Math.min(...ys));
-  const k = Math.min((W - 30) / spanX, (H - 30) / spanY);
-  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-  const sx = (v: number) => W / 2 + (v - cx) * k;
-  const sy = (v: number) => H / 2 + (v - cy) * k;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full rounded-[var(--radius-lg)] bg-bg-subtle" role="img" aria-label={`${pins.length}-pin symbol preview`}>
-      {rects.map((r) => (
-        <rect key={r.id} x={sx(r.x)} y={sy(r.y)} width={r.w * k} height={r.h * k} fill="var(--color-bg-brand-subtle)" stroke="var(--color-text-primary)" strokeWidth={1.2} />
-      ))}
-      {pins.map((p) => {
-        const d = p.angle === 0 ? [1, 0] : p.angle === 90 ? [0, 1] : p.angle === 180 ? [-1, 0] : [0, -1];
-        return (
-          <g key={p.id}>
-            <line x1={sx(p.x)} y1={sy(p.y)} x2={sx(p.x + d[0] * p.length)} y2={sy(p.y + d[1] * p.length)} stroke="var(--color-text-primary)" strokeWidth={1.2} />
-            <circle cx={sx(p.x)} cy={sy(p.y)} r={2} fill="none" stroke="var(--color-text-primary)" strokeWidth={1.1} />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function FootprintThumb({ draft }: { draft: PackageDraft }) {
-  const pads = fpPads(draft);
-  if (!pads.length) return <div className="h-[170px] rounded-[var(--radius-lg)] bg-bg-subtle" />;
-  const W = 320;
-  const H = 170;
-  const minX = Math.min(...pads.map((p) => p.x - p.w / 2));
-  const maxX = Math.max(...pads.map((p) => p.x + p.w / 2));
-  const minY = Math.min(...pads.map((p) => p.y - p.h / 2));
-  const maxY = Math.max(...pads.map((p) => p.y + p.h / 2));
-  const k = Math.min((W - 30) / Math.max(0.5, maxX - minX), (H - 30) / Math.max(0.5, maxY - minY));
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  const sx = (mm: number) => W / 2 + (mm - cx) * k;
-  const sy = (mm: number) => H / 2 + (mm - cy) * k;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full rounded-[var(--radius-lg)] bg-bg-subtle" role="img" aria-label={`${pads.length}-pad footprint preview`}>
-      {pads.map((p) => {
-        const w = Math.max(1.5, p.w * k);
-        const h = Math.max(1.5, p.h * k);
-        const round = p.shape === "THT round" || p.shape === "SMD round";
-        return round ? (
-          <circle key={p.id} cx={sx(p.x)} cy={sy(p.y)} r={w / 2} fill={p.padKind === "Mounting" ? "var(--color-pad-mechanical)" : "var(--color-pad-copper)"} />
-        ) : (
-          <rect key={p.id} x={sx(p.x) - w / 2} y={sy(p.y) - h / 2} width={w} height={h} fill="var(--color-pad-copper)" />
-        );
-      })}
-    </svg>
-  );
-}

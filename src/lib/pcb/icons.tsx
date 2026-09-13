@@ -144,10 +144,6 @@ export const ic: Record<string, string> = {
   pPort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h7v8H4z"/><path d="M11 12h6M15 9l3 3-3 3"/></svg>',
   pNoConnect: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   pTestPoint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
-  // A symbol pin as the part editor draws it — the body edge, the pin's own
-  // lead, and the hollow terminal a wire lands on. Deliberately not
-  // pTestPoint's record circle: that marks a probe point on a board.
-  pPin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 4v16"/><path d="M19 12H8"/><circle cx="5" cy="12" r="2.6"/></svg>',
   // ── New Package flow, step rail (one glyph per step, legible at 20px) ──
   // The whole part: a package box with its seam and pin-1 mark.
   pkgPackage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.2l8-4 8 4v7.6l-8 4-8-4z"/><path d="M4 8.2l8 4 8-4M12 12.2v7.6"/><circle cx="7.6" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>',

@@ -23,7 +23,10 @@ import { SCHEM_FILTER_ROWS, type CanvasObject } from "./types";
 // Physical part kind → footprint reference + land-pattern glyph.
 // `name` is what a person reads (the convert dialog lists it); `kind` keys are
 // the code's own symbol ids and never reach the UI.
-const FOOTPRINT: Record<string, { fp: string; glyph: string; name: string }> = {
+/** Symbol kind → the land pattern the converter gives it. Exported so a part's
+ *  detail page can say which footprint it would place. Keyed by *kind*, so it
+ *  is the same pattern for every IC regardless of the catalogue's package. */
+export const FOOTPRINT: Record<string, { fp: string; glyph: string; name: string }> = {
   resistorBox: { fp: "R_0805", glyph: "fp0805", name: "Resistor" },
   resistor: { fp: "R_0805", glyph: "fp0805", name: "Resistor" },
   capacitor: { fp: "C_0805", glyph: "fp0805", name: "Capacitor" },
