@@ -95,8 +95,8 @@ function PathChooser() {
                 selected
                   ? "border-border-brand bg-bg-brand-subtle shadow-1"
                   : off
-                    ? "border-border-default"
-                    : "border-border-default hover:border-border-strong hover:shadow-1",
+                    ? "border-border"
+                    : "border-border hover:border-border-strong hover:shadow-1",
               ].join(" ")}
               style={{ borderWidth: "var(--border-width-1)" }}
             >
@@ -149,7 +149,7 @@ function FamilyPicker() {
             type="button"
             role="listitem"
             onClick={() => actions.patch({ wizard: { family: f.id, params: { ...f.params } } })}
-            className="flex cursor-pointer flex-col items-start gap-[var(--spacing-2)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-6)] text-left outline-none transition-[border-color,box-shadow] duration-fast hover:border-border-strong hover:shadow-1 focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="flex cursor-pointer flex-col items-start gap-[var(--spacing-2)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-6)] text-left outline-none transition-[border-color,box-shadow] duration-fast hover:border-border-strong hover:shadow-1 focus-visible:ring-2 focus-visible:ring-border-focus"
             style={{ borderWidth: "var(--border-width-1)" }}
           >
             <span className="font-display text-sm font-semibold leading-sm text-text-primary">{f.label}</span>
@@ -206,7 +206,7 @@ function WizardParams() {
           ))}
         </div>
 
-        <div className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-7)]">
+        <div className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
           <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Live preview</h3>
           <WizardPreview pads={pads} silk={silk} />
           <div className="flex flex-wrap gap-x-[var(--spacing-6)] gap-y-[var(--spacing-2)] font-mono text-2xs text-text-tertiary">

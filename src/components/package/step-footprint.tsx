@@ -441,9 +441,9 @@ function PadTable() {
   return (
     <div className="flex flex-col gap-[var(--spacing-4)]">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[880px] border-collapse">
+        <table className="w-full min-w-[760px] border-collapse">
           <thead>
-            <tr className="border-b border-border-default">
+            <tr className="border-b border-border">
               {cols.map((h, i) => (
                 <th
                   key={i}
@@ -469,7 +469,7 @@ function PadTable() {
                     type="button"
                     onClick={() => actions.select(p.id)}
                     title="Select this pad on the canvas"
-                    className="cursor-pointer rounded-[var(--radius-sm)] px-[var(--spacing-2)] font-mono text-sm text-text-primary outline-none hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex h-[24px] min-w-[24px] cursor-pointer items-center justify-center rounded-[var(--radius-sm)] px-[var(--spacing-2)] font-mono text-sm text-text-primary outline-none hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
                     {padLabel(draft, p.id)}
                   </button>
@@ -477,7 +477,7 @@ function PadTable() {
                 <td className="w-[48px] px-[var(--spacing-3)] py-[var(--spacing-3)] font-mono text-sm text-text-tertiary">
                   {p.pin === null ? "—" : p.pin}
                 </td>
-                <td className="w-[140px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                <td className="w-[124px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <Select
                     size="sm"
                     value={p.padKind}
@@ -485,7 +485,7 @@ function PadTable() {
                     onChange={(v) => actions.updateFp(p.id, padKindChange(p, v as PadKind, nextFreePin(draft)))}
                   />
                 </td>
-                <td className="w-[142px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                <td className="w-[128px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <Select
                     size="sm"
                     value={p.shape}
@@ -496,14 +496,14 @@ function PadTable() {
                     }}
                   />
                 </td>
-                <td className="w-[104px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                <td className="w-[92px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <MmField size="sm" ariaLabel={`Pad ${padLabel(draft, p.id)} width`} value={p.w} unit={u} min={0.05} onCommit={(mm) => actions.updateFp(p.id, { w: mm })} />
                 </td>
-                <td className="w-[104px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                <td className="w-[92px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <MmField size="sm" ariaLabel={`Pad ${padLabel(draft, p.id)} height`} value={p.h} unit={u} min={0.05} onCommit={(mm) => actions.updateFp(p.id, { h: mm })} />
                 </td>
                 {showDrill ? (
-                  <td className="w-[104px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                  <td className="w-[92px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                     {p.shape.startsWith("THT") ? (
                       <MmField
                         size="sm"
@@ -518,10 +518,10 @@ function PadTable() {
                     )}
                   </td>
                 ) : null}
-                <td className="w-[104px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                <td className="w-[92px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <MmField size="sm" ariaLabel={`Pad ${padLabel(draft, p.id)} X`} value={p.x} unit={u} min={-999} onCommit={(mm) => actions.updateFp(p.id, { x: mm })} />
                 </td>
-                <td className="w-[104px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
+                <td className="w-[92px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <MmField size="sm" ariaLabel={`Pad ${padLabel(draft, p.id)} Y`} value={p.y} unit={u} min={-999} onCommit={(mm) => actions.updateFp(p.id, { y: mm })} />
                 </td>
                 <td className="w-[44px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
@@ -530,7 +530,7 @@ function PadTable() {
                     onClick={() => actions.removeFp(p.id)}
                     aria-label={`Delete pad ${padLabel(draft, p.id)}`}
                     title="Delete pad"
-                    className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-border-default bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-error hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-border bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-error hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
                     <Icon icon={Delete02Icon} size={15} />
                   </button>

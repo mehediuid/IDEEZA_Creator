@@ -69,7 +69,7 @@ export function Step3D() {
 
       <div className="grid grid-cols-1 gap-[var(--spacing-8)] lg:grid-cols-[minmax(0,1fr)_300px]">
         <div
-          className="overflow-hidden rounded-[var(--radius-xl)] border border-border-default bg-bg-subtle"
+          className="overflow-hidden rounded-[var(--radius-xl)] border border-border bg-bg-subtle"
           style={{ aspectRatio: "16 / 10" }}
         >
           <Place3DViewImpl draft={draft} />
@@ -122,7 +122,7 @@ export function Step3D() {
                 type="color"
                 value={b.color}
                 onChange={(e) => actions.setBody({ color: e.target.value })}
-                className="h-[34px] w-[54px] cursor-pointer rounded-[var(--radius-lg)] border border-border-default bg-bg-surface p-[3px] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="h-[34px] w-[54px] cursor-pointer rounded-[var(--radius-lg)] border border-border bg-bg-surface p-[3px] outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
               />
               <span className="font-mono text-xs uppercase text-text-tertiary">{b.color}</span>
             </div>

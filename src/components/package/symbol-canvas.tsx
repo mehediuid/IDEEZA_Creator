@@ -496,7 +496,7 @@ export function SymbolCanvas({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[var(--radius-xl)] border border-border-default bg-bg-surface"
+      className="relative overflow-hidden rounded-[var(--radius-xl)] border border-border bg-bg-surface"
       style={{ aspectRatio: `${CANVAS_W} / ${CANVAS_H}` }}
     >
       <svg

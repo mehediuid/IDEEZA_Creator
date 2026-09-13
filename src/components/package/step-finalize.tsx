@@ -97,7 +97,7 @@ export function StepFinalize() {
                     className={[
                       "flex cursor-pointer items-start gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border p-[var(--spacing-6)] text-left outline-none",
                       "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                      on ? "border-border-brand bg-bg-brand-subtle" : "border-border-default bg-bg-surface hover:border-border-strong",
+                      on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface hover:border-border-strong",
                     ].join(" ")}
                     style={{ borderWidth: "var(--border-width-1)" }}
                   >
@@ -116,7 +116,7 @@ export function StepFinalize() {
         </div>
 
         {/* What is about to be filed — read from the model, not retyped */}
-        <aside className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-6)]">
+        <aside className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-6)]">
           <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">This package</h3>
           {[
             ["Pins", String(pins)],

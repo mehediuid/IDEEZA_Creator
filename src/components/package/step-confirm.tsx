@@ -34,7 +34,7 @@ export function StepConfirm({ saved }: { saved: SavedPackage }) {
         </p>
       </div>
 
-      <dl className="grid max-w-[560px] grid-cols-2 gap-[var(--spacing-6)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-8)] sm:grid-cols-4">
+      <dl className="grid max-w-[560px] grid-cols-2 gap-[var(--spacing-6)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-8)] sm:grid-cols-4">
         {[
           ["Pins", String(saved.pins)],
           ["Mount", saved.mounting],
@@ -54,7 +54,7 @@ export function StepConfirm({ saved }: { saved: SavedPackage }) {
         </Button>
         <Link
           href="/parts"
-          className="inline-flex h-[40px] items-center rounded-[var(--radius-xl)] border border-border-default bg-bg-surface px-[var(--spacing-8)] font-display text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="inline-flex h-[40px] items-center rounded-[var(--radius-xl)] border border-border bg-bg-surface px-[var(--spacing-8)] font-display text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           Go to Parts &amp; Agile Module
         </Link>

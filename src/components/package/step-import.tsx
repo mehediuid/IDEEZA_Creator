@@ -116,7 +116,7 @@ export function ImportFields() {
           return (
             <div
               key={s.id}
-              className="flex flex-wrap items-center gap-[var(--spacing-6)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-7)]"
+              className="flex flex-wrap items-center gap-[var(--spacing-6)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]"
               style={{ borderWidth: "var(--border-width-1)" }}
             >
               <div className="flex min-w-[220px] flex-1 flex-col gap-[var(--spacing-1)]">
@@ -212,7 +212,7 @@ export function ImportResult() {
         </PreviewCard>
       </div>
 
-      <dl className="grid grid-cols-2 gap-[var(--spacing-6)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-7)] sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-[var(--spacing-6)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)] sm:grid-cols-4">
         {[
           ["Pins", String(pins)],
           ["Electrical pads", String(pads)],
@@ -262,7 +262,7 @@ function PreviewCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-[var(--spacing-4)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-7)]">
+    <div className="flex flex-col gap-[var(--spacing-4)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
       <div className="flex items-baseline justify-between gap-[var(--spacing-4)]">
         <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">{title}</h3>
         <span className="min-w-0 truncate font-mono text-2xs text-text-tertiary">{file ?? empty}</span>

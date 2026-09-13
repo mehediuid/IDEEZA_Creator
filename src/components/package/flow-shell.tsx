@@ -30,10 +30,34 @@ const STEP_ICON: Record<StepId, string> = {
   finalize: "pkgFinalize",
 };
 
+/** The flow covers the dashboard chrome, so that chrome has to leave the tab
+ *  order with it — otherwise Tab walks a sidebar the user cannot see (measured:
+ *  16 stops on hidden controls before reaching the flow). Everything that is not
+ *  an ancestor of the shell is marked `inert` while it is open, and restored on
+ *  the way out. */
+function useInertBehind(ref: React.RefObject<HTMLElement | null>) {
+  React.useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const marked: Element[] = [];
+    for (let node: HTMLElement | null = root; node && node !== document.body; node = node.parentElement) {
+      for (const sib of Array.from(node.parentElement?.children ?? [])) {
+        if (sib !== node && !sib.hasAttribute("inert")) {
+          sib.setAttribute("inert", "");
+          marked.push(sib);
+        }
+      }
+    }
+    return () => marked.forEach((el) => el.removeAttribute("inert"));
+  }, [ref]);
+}
+
 export function FlowShell({ children }: { children: React.ReactNode }) {
   const { step, draft, toast, done } = usePackageState();
   const actions = usePackageActions();
   const router = useRouter();
+  const shellRef = React.useRef<HTMLDivElement>(null);
+  useInertBehind(shellRef);
   const blocked = blockedReason(step, draft);
   const i = stepIndex(step);
   const isLast = i === STEPS.length - 1;
@@ -47,9 +71,9 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="fixed inset-0 z-sheet flex flex-col overflow-hidden bg-bg-page font-sans text-text-primary">
+    <div ref={shellRef} className="fixed inset-0 z-sheet flex flex-col overflow-hidden bg-bg-page font-sans text-text-primary">
       {/* Top bar */}
-      <header className="flex h-[56px] shrink-0 items-center gap-[var(--spacing-6)] border-b border-border-default bg-bg-surface px-[var(--spacing-8)]">
+      <header className="flex h-[56px] shrink-0 items-center gap-[var(--spacing-6)] border-b border-border bg-bg-surface px-[var(--spacing-8)]">
         <IdeezaLogo height={24} decorative className="shrink-0" />
         <span aria-hidden className="h-[20px] w-px bg-border-default" />
         <h1 className="font-display text-sm font-semibold text-text-primary">New Package</h1>
@@ -70,7 +94,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
         {/* Step rail — the flow's spine, visible at every step */}
         <nav
           aria-label="Package steps"
-          className="flex w-[104px] shrink-0 flex-col gap-[var(--spacing-2)] border-r border-border-default bg-bg-surface p-[var(--spacing-4)]"
+          className="flex w-[104px] shrink-0 flex-col gap-[var(--spacing-2)] border-r border-border bg-bg-surface p-[var(--spacing-4)]"
         >
           {STEPS.map((s) => {
             const active = s === step;
@@ -106,13 +130,23 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
 
         {/* Step body */}
         <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1000px] px-[var(--spacing-12)] py-[var(--spacing-16)]">{children}</div>
+          <div
+            className={[
+              "mx-auto w-full px-[var(--spacing-12)] py-[var(--spacing-16)]",
+              // The two editor steps are canvas + panel + a wide pad/pin table, so
+              // they take the width they are given; the rest are prose and forms,
+              // which read badly past ~1000px.
+              step === "symbol" || step === "footprint" ? "max-w-[1400px]" : "max-w-[1000px]",
+            ].join(" ")}
+          >
+            {children}
+          </div>
         </main>
       </div>
 
       {/* Footer — the confirmation carries its own actions, so it has none */}
       {done ? null : (
-      <footer className="flex h-[72px] shrink-0 items-center justify-between gap-[var(--spacing-6)] border-t border-border-default bg-bg-surface px-[var(--spacing-8)]">
+      <footer className="flex h-[72px] shrink-0 items-center justify-between gap-[var(--spacing-6)] border-t border-border bg-bg-surface px-[var(--spacing-8)]">
         <Button
           hierarchy="secondary"
           size="lg"

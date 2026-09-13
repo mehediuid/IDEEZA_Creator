@@ -311,8 +311,15 @@
   /* Text */
   --color-text-primary: var(--color-gray-900);
   --color-text-secondary: var(--color-gray-600);
-  --color-text-tertiary: var(--color-gray-400);
-  --color-text-disabled: var(--color-gray-300);
+  /* Tertiary is the workhorse of every panel: table headers, field hints, unit
+   * chips, counts, placeholders. It was gray-400, which measures 2.34-2.56:1 on
+   * the surfaces it actually sits on — a WCAG 1.4.3 failure across the whole
+   * app, and a drift from the design system, whose own colour/text/tertiary is
+   * #475569. Restored to the DS value (7.56:1). Disabled follows it down one
+   * step so it still reads as inactive while staying legible — 1.48:1 meant you
+   * could not read what a greyed control said. */
+  --color-text-tertiary: var(--color-gray-600);
+  --color-text-disabled: var(--color-gray-400);
   --color-text-inverse: var(--color-white);
   --color-text-on-brand: var(--color-white);
   --color-text-brand: var(--color-violet-600);
@@ -420,7 +427,7 @@
 
   /* Icons */
   --color-icon-default: var(--color-gray-600);
-  --color-icon-secondary: var(--color-gray-400);
+  --color-icon-secondary: var(--color-gray-500);
   --color-icon-disabled: var(--color-gray-300);
   --color-icon-on-brand: var(--color-white);
   --color-icon-brand: var(--color-violet-600);
@@ -536,8 +543,8 @@
   /* Text */
   --color-text-primary: var(--color-gray-50);
   --color-text-secondary: var(--color-gray-300);
-  --color-text-tertiary: var(--color-gray-500);
-  --color-text-disabled: var(--color-gray-600);
+  --color-text-tertiary: var(--color-gray-400);
+  --color-text-disabled: var(--color-gray-500);
   --color-text-inverse: var(--color-gray-900);
   --color-text-brand: var(--color-violet-300);
   --color-text-blue: var(--color-blue-300);
@@ -636,8 +643,8 @@
 
     --color-text-primary: var(--color-gray-50);
     --color-text-secondary: var(--color-gray-300);
-    --color-text-tertiary: var(--color-gray-500);
-    --color-text-disabled: var(--color-gray-600);
+    --color-text-tertiary: var(--color-gray-400);
+    --color-text-disabled: var(--color-gray-500);
 
     --color-border-default: var(--color-gray-800);
     --color-border-strong: var(--color-gray-600);

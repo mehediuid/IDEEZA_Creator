@@ -346,7 +346,7 @@ function PinTable() {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[620px] border-collapse">
           <thead>
-            <tr className="border-b border-border-default">
+            <tr className="border-b border-border">
               {["#", "Name", "Electrical type", "Length", "", ""].map((h, i) => (
                 <th
                   key={i}
@@ -403,7 +403,7 @@ function PinTable() {
                     onClick={() => rotate(p.id, p.angle)}
                     aria-label={`Rotate pin ${p.num} — now ${p.angle}°`}
                     title={`Rotate 90° — now ${p.angle}°`}
-                    className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-border-default bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-border bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
                     <DsIcon name="tRotRight" size={15} />
                   </button>
@@ -414,7 +414,7 @@ function PinTable() {
                     onClick={() => actions.removeSym(p.id)}
                     aria-label={`Delete pin ${p.num}`}
                     title="Delete pin"
-                    className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-border-default bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-error hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border border-border bg-bg-surface text-text-secondary outline-none transition-colors duration-fast hover:border-border-error hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
                     <Icon icon={Delete02Icon} size={15} />
                   </button>

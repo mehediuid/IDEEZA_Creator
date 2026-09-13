@@ -32,7 +32,9 @@
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 16px;
+  /* 24px so the pointer target clears WCAG 2.5.8 — the track stays 6px and the
+     thumb 16px, both centred in it, so only the hit area grows. */
+  height: 24px;
   background: transparent;
   cursor: pointer;
 }

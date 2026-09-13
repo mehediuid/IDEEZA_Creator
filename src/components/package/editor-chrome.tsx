@@ -36,7 +36,7 @@ export function EditorToolbar<T extends string>({
     <div
       role="toolbar"
       aria-label="Editor tools"
-      className="flex flex-wrap items-center gap-[var(--spacing-2)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-4)]"
+      className="flex flex-wrap items-center gap-[var(--spacing-2)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-4)]"
     >
       {tools.map((t) => {
         const on = t.id === active;
@@ -176,7 +176,7 @@ export function EditorBody({ canvas, panel }: { canvas: React.ReactNode; panel: 
 
 export function SidePanel({ hint, children }: { hint: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <aside className="flex flex-col gap-[var(--spacing-8)] rounded-[var(--radius-xl)] border border-border-default bg-bg-surface p-[var(--spacing-6)]">
+    <aside className="flex flex-col gap-[var(--spacing-8)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-6)]">
       <section className="flex flex-col gap-[var(--spacing-3)]">
         <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Tool</h3>
         <p className="font-display text-sm font-regular leading-relaxed text-text-secondary">{hint}</p>
