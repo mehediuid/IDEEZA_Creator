@@ -17,19 +17,19 @@ import { useRouter } from "next/navigation";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { BriefRail } from "./brief-rail";
-import { Step1Idea } from "./step-1-idea";
+import { Step1Idea, type Step1Patch } from "./step-1-idea";
 import { Step2Video } from "./step-2-video";
 import { Step3Mint } from "./step-3-mint";
 import { Step4Success } from "./step-4-success";
 import { C } from "@/lib/pcb/colors";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProductFlow } from "@/components/product-flow/product-flow-provider";
-import { useManualProjects } from "@/lib/manual/projects";
+import { stepHref, useManualProjects } from "@/lib/manual/projects";
+import { useCreateHistory } from "@/lib/create/history";
 import {
   DEFAULT_STATE,
   normalizeBrief,
   type BriefState,
-  type Intent,
   type Scene,
 } from "@/lib/brief/types";
 
@@ -87,6 +87,49 @@ function readFromStorage(projectId: string): { state: BriefState; step: number }
   return { state: DEFAULT_STATE, step: 1 };
 }
 
+// Seed another project's brief draft with what Step 1 just answered. The draft
+// is stored PER PROJECT and the active project is about to become that one, so
+// without this the per-project hydration would read an empty draft and throw
+// Step 1 away the moment Continue switches projects. Anything already stored
+// for that project (a Step 2/3 in progress) is kept — only Step 1's answers
+// are overlaid.
+function seedDraft(projectId: string, s: BriefState, step: number) {
+  try {
+    const raw = window.localStorage.getItem(draftKey(projectId));
+    const prev = raw
+      ? normalizeBrief((JSON.parse(raw) as { state?: unknown }).state)
+      : null;
+    const merged: BriefState = prev
+      ? {
+          ...prev,
+          projectId: s.projectId,
+          projectChoice: s.projectChoice,
+          newProjectName: s.newProjectName,
+          newProjectDescription: s.newProjectDescription,
+          productName: s.productName,
+          productDescription: s.productDescription,
+          intent: s.intent,
+          mediaType: s.mediaType,
+        }
+      : s;
+    window.localStorage.setItem(
+      draftKey(projectId),
+      JSON.stringify({ state: merged, step }),
+    );
+  } catch {}
+}
+
+// The default answer to Step 1's "Choose Project" is the project the Brief was
+// opened inside. A stored draft only overrides that once the user has really
+// started a new project in it — an untouched "new" is still the default rather
+// than a choice, so a draft saved before the chooser existed doesn't offer to
+// make a second copy of the project you are already in.
+function withDefaultProjectChoice(s: BriefState, activeProjectId: string): BriefState {
+  return s.projectChoice === "new" && !s.newProjectName.trim()
+    ? { ...s, projectChoice: activeProjectId }
+    : s;
+}
+
 type RegenRequest = {
   title?: string;
   prompt?: string;
@@ -128,8 +171,15 @@ export function BriefApp() {
   const router = useRouter();
   const { createJob, markMinted } = useVideoJobs();
   const { markCompleted: markFlowStep } = useProductFlow();
-  const { activeProject, activeProjectId, setStatus, updateProject } =
-    useManualProjects();
+  const {
+    activeProject,
+    activeProjectId,
+    projects,
+    createProject,
+    setStatus,
+    updateProject,
+  } = useManualProjects();
+  const { builds } = useCreateHistory();
   const [state, setState] = React.useState<BriefState>(DEFAULT_STATE);
   const [step, setStep] = React.useState(1);
   const [hydrated, setHydrated] = React.useState(false);
@@ -148,7 +198,7 @@ export function BriefApp() {
       window.localStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch {}
     const { state: loaded, step: loadedStep } = readFromStorage(activeProjectId);
-    let normalized: BriefState = loaded;
+    let normalized: BriefState = withDefaultProjectChoice(loaded, activeProjectId);
     let nextStep = loadedStep;
     const regen = readRegenRequest();
     if (regen) {
@@ -211,26 +261,67 @@ export function BriefApp() {
   // Step 1 edits the product name into local state (smooth, controlled input)
   // AND writes it straight through to the project so the editor chrome shows
   // the same name on every step. Written on change — no reactive round-trip,
-  // so the input never fights itself.
-  const handleStep1Change = (next: {
-    productName?: string;
-    productDescription?: string;
-    intent?: Intent;
-  }) => {
+  // so the input never fights itself. Only when the chosen project IS the
+  // active one, though: a product being attached elsewhere must not rename the
+  // product of the project you happen to be standing in. Continue writes it
+  // onto whichever project the build lands in.
+  const handleStep1Change = (next: Step1Patch) => {
     patch(next);
-    if (next.productName !== undefined && activeProjectId) {
+    if (
+      next.productName !== undefined &&
+      activeProjectId &&
+      state.projectChoice === activeProjectId
+    ) {
       updateProject(activeProjectId, { productName: next.productName });
     }
   };
 
+  // Products already inside a project: its own, plus every AI build saved into
+  // it. A project always holds at least the one it was made for.
+  const productCount = (projectId: string) =>
+    1 + builds.filter((b) => b.projectId === projectId).length;
+
   const goToStep2 = () => {
+    let next: BriefState = { ...state };
     // Sell / Give require AI media — snap mediaType to AI when arriving here.
     if (
       (state.intent === "sell" || state.intent === "give") &&
       state.mediaType !== "ai"
     ) {
-      patch({ mediaType: "ai" });
+      next.mediaType = "ai";
     }
+
+    // "Choose Project" is answered here, once: a new project is created (and
+    // the choice rewritten to its id, so Back → Continue attaches to the same
+    // project instead of making a second one); an existing one is opened.
+    let targetId = state.projectChoice;
+    let targetSlug = activeProject?.slug ?? "";
+    if (state.projectChoice === "new") {
+      const created = createProject({
+        name: state.newProjectName.trim(),
+        description: state.newProjectDescription.trim(),
+      });
+      targetId = created.id;
+      targetSlug = created.slug;
+      next = { ...next, projectChoice: created.id, projectId: created.id };
+    } else {
+      next = { ...next, projectId: targetId };
+      targetSlug = projects.find((p) => p.id === targetId)?.slug ?? targetSlug;
+    }
+    // The product being built belongs to the project it was just attached to.
+    updateProject(targetId, { productName: state.productName });
+
+    // The URL is what says which project the editor is in — the workspace
+    // gate reads the slug and remounts the Brief per project. So attaching the
+    // build elsewhere is a navigation, with the draft seeded first so the
+    // remount opens on Step 2 carrying what was just typed.
+    if (targetId !== activeProjectId) {
+      seedDraft(targetId, next, 2);
+      router.push(stepHref(targetSlug, "brief"));
+      return;
+    }
+
+    setState(next);
     setStep(2);
   };
 
@@ -386,11 +477,16 @@ export function BriefApp() {
           <Crossfade keyName={`step-${step}`}>
             {step === 1 && (
               <Step1Idea
-                activeProjectName={activeProject?.name ?? ""}
+                projects={projects}
+                projectChoice={state.projectChoice}
+                newProjectName={state.newProjectName}
+                newProjectDescription={state.newProjectDescription}
+                productCount={productCount}
                 productName={state.productName}
                 productDescription={state.productDescription}
                 intent={state.intent}
                 onChange={handleStep1Change}
+                onBack={() => router.push("/projects")}
                 onContinue={goToStep2}
               />
             )}
@@ -461,8 +557,76 @@ export function BriefApp() {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        .ix-brief-field:focus {
+          border-color: var(--color-border-brand);
+          box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
+        }
+        .ix-brief-back:hover { color: var(--color-text-primary); }
       `}</style>
     </EditorShell>
+  );
+}
+
+/**
+ * The frame every Brief step renders in: a "← Back" text link over a white
+ * card. One wrapper, so the steps can't drift apart on width, padding or the
+ * place Back sits. `onBack` omitted = a step with nowhere to go back to.
+ */
+export function BriefCard({
+  onBack,
+  children,
+}: {
+  onBack?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 600,
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--spacing-8)",
+      }}
+    >
+      {onBack ? (
+        <button
+          type="button"
+          className="ix-brief-back"
+          onClick={onBack}
+          style={{
+            alignSelf: "flex-start",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--spacing-4)",
+            padding: 0,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 14,
+            fontWeight: 500,
+            color: "var(--color-text-secondary)",
+            transition: "color .14s",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M19 12H5 M11 6l-6 6 6 6" />
+          </svg>
+          Back
+        </button>
+      ) : null}
+      <div
+        style={{
+          background: "var(--color-bg-surface)",
+          border: "var(--border-width-1) solid var(--color-border-subtle)",
+          borderRadius: "var(--radius-2xl)",
+          boxShadow: "var(--elevation-1)",
+          padding: "var(--spacing-12)",
+        }}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 

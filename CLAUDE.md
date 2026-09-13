@@ -344,7 +344,7 @@ Net highlight (amber glow), managers (Device / Footprint), DRC + export modals (
 - **3D Module** (`components/3d`): `model-viewer`, **AI generate modal**, sketch mode, three.js canvas, floating tools + left panel + menu bar.
 - **Product Preview** (`components/preview`): three.js product assembly — instances, **mate panel**, viewport, toolbar, its own right-click menu.
 - **Wiring** (`components/wiring`): wiring canvas + component library + right panel + menu.
-- **Add Brief** (`components/brief`): 4-step flow — **idea → video → mint → success** — with review + regenerate confirms.
+- **Add Brief** (`components/brief`): 4-step flow — **idea → video → mint → success** — with review + regenerate confirms. Every step renders in the shared **`BriefCard`** frame (surface card, `--radius-2xl`, `--elevation-1`, a "← Back" link above it). **Step 1 chooses the project it attaches to** (`SelectMenu`: `+ Create new project`, then an `EXISTING PROJECTS` section of every `ManualProject`, Draft-suffixed): picking **new** opens an inset *New project details* panel (name + description) and Continue really creates that project, names its product and **navigates into it** (`/project/<slug>/brief` — the URL is what says which project the editor is in, so the draft is seeded there first and Back → Continue attaches to the same project instead of making a second one); picking an **existing** one says so in the hint and a callout that counts what it already holds (`1 + its builds`). The three intent cards carry their real requirement — **Wallet + identity check** · **Wallet needed · no KYC** · **No wallet · no KYC** — and Continue is disabled until the project, product name, one-liner and intent are filled, naming the first missing one in its tooltip.
 
 ---
 
