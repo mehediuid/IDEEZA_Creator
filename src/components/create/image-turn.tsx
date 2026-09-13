@@ -30,15 +30,15 @@ import type { ChatTurn } from "@/lib/create/history";
 
 export function ImageTurn({
   turn,
-  conceptNumber,
-  parentConceptNumber,
+  conceptLabel,
+  parentConceptLabel,
   onRegenerate,
   onUseThis,
   onRefine,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
-  conceptNumber: number;
-  parentConceptNumber?: number;
+  conceptLabel: string;
+  parentConceptLabel?: string;
   onRegenerate: () => void;
   onUseThis: () => void;
   onRefine: () => void;
@@ -48,9 +48,10 @@ export function ImageTurn({
   if (turn.status === "pending") {
     return (
       <PendingImageTurn
-        conceptNumber={conceptNumber}
-        parentConceptNumber={parentConceptNumber}
+        conceptLabel={conceptLabel}
+        parentConceptLabel={parentConceptLabel}
         kind={turn.kind}
+        progress={turn.progress}
       />
     );
   }
@@ -61,12 +62,12 @@ export function ImageTurn({
   // status === "ready"
   return (
     <article
-      aria-label={`Concept ${conceptNumber}`}
+      aria-label={`Concept ${conceptLabel}`}
       className="flex max-w-[640px] flex-col gap-[12px] rounded-2xl border border-border bg-bg-surface p-[16px]"
     >
       <ConceptHeader
-        conceptNumber={conceptNumber}
-        parentConceptNumber={parentConceptNumber}
+        conceptLabel={conceptLabel}
+        parentConceptLabel={parentConceptLabel}
         kind={turn.kind}
         ts={turn.ts}
       />
@@ -75,13 +76,13 @@ export function ImageTurn({
         <button
           type="button"
           onClick={onRefine}
-          aria-label={`Refine Concept ${conceptNumber} — open the image editor`}
+          aria-label={`Refine Concept ${conceptLabel} — open the image editor`}
           className="group/img relative block w-full overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={turn.imageUrl}
-            alt={`Concept ${conceptNumber} ${turn.kind === "refine" ? "refining Concept " + parentConceptNumber : "from"}: ${turn.prompt}`}
+            alt={`Concept ${conceptLabel} ${turn.kind === "refine" ? "refining Concept " + parentConceptLabel : "from"}: ${turn.prompt}`}
             onError={() => setImgOk(false)}
             className="aspect-[4/3] w-full object-cover transition-transform duration-normal ease-standard group-hover/img:scale-[1.01]"
           />
@@ -129,7 +130,7 @@ export function ImageTurn({
             <button
               type="button"
               onClick={onRefine}
-              aria-label={`Refine Concept ${conceptNumber} in the editor`}
+              aria-label={`Refine Concept ${conceptLabel} in the editor`}
               title="Open the editor — describe edits to this image"
               className="inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
             >
@@ -139,7 +140,7 @@ export function ImageTurn({
             <button
               type="button"
               onClick={onRegenerate}
-              aria-label={`Regenerate a fresh take of Concept ${conceptNumber}`}
+              aria-label={`Regenerate a fresh take of Concept ${conceptLabel}`}
               title="Fresh take — ignores the current image"
               className="inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
             >
@@ -149,7 +150,7 @@ export function ImageTurn({
             <button
               type="button"
               onClick={onUseThis}
-              aria-label={`Use Concept ${conceptNumber} and start the full build`}
+              aria-label={`Use Concept ${conceptLabel} and start the full build`}
               className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
             >
               Use this
@@ -165,13 +166,13 @@ export function ImageTurn({
 // ───────────────────── parts ─────────────────────
 
 function ConceptHeader({
-  conceptNumber,
-  parentConceptNumber,
+  conceptLabel,
+  parentConceptLabel,
   kind,
   ts,
 }: {
-  conceptNumber: number;
-  parentConceptNumber?: number;
+  conceptLabel: string;
+  parentConceptLabel?: string;
   kind: "fresh" | "refine";
   ts?: number;
 }) {
@@ -180,12 +181,12 @@ function ConceptHeader({
     <header className="flex items-center justify-between gap-[12px]">
       <div className="flex min-w-0 items-center gap-[8px]">
         <span className="inline-flex h-[22px] items-center rounded-full bg-bg-brand-subtle px-[8px] text-2xs font-bold uppercase tracking-wider text-text-brand">
-          Concept {conceptNumber}
+          Concept {conceptLabel}
         </span>
-        {kind === "refine" && parentConceptNumber && (
+        {kind === "refine" && parentConceptLabel && (
           <span className="inline-flex items-center gap-[6px] truncate text-2xs font-medium text-text-tertiary">
             <Icon icon={Link01Icon} size={12} />
-            Refines Concept {parentConceptNumber}
+            Refines Concept {parentConceptLabel}
           </span>
         )}
       </div>
@@ -199,28 +200,31 @@ function ConceptHeader({
 }
 
 function PendingImageTurn({
-  conceptNumber,
-  parentConceptNumber,
+  conceptLabel,
+  parentConceptLabel,
   kind,
+  progress,
 }: {
-  conceptNumber: number;
-  parentConceptNumber?: number;
+  conceptLabel: string;
+  parentConceptLabel?: string;
   kind: "fresh" | "refine";
+  progress?: number;
 }) {
+  const pct = typeof progress === "number" ? Math.round(progress) : null;
   return (
     <div
       role="status"
       aria-live="polite"
       aria-label={
         kind === "refine"
-          ? `Refining Concept ${parentConceptNumber} into Concept ${conceptNumber}`
-          : `Drafting Concept ${conceptNumber}`
+          ? `Refining Concept ${parentConceptLabel} into Concept ${conceptLabel}`
+          : `Drafting Concept ${conceptLabel}`
       }
       className="flex max-w-[640px] flex-col gap-[12px] rounded-2xl border border-border bg-bg-surface p-[16px]"
     >
       <ConceptHeader
-        conceptNumber={conceptNumber}
-        parentConceptNumber={parentConceptNumber}
+        conceptLabel={conceptLabel}
+        parentConceptLabel={parentConceptLabel}
         kind={kind}
       />
       <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-bg-surface-raised">
@@ -234,8 +238,16 @@ function PendingImageTurn({
           }}
         />
       </div>
-      <p className="text-sm text-text-tertiary">
+      <p className="flex items-center gap-[8px] text-sm text-text-tertiary">
         {kind === "refine" ? "Refining…" : "Drafting concept…"}
+        {pct !== null && (
+          <span
+            data-testid="turn-progress"
+            className="text-2xs font-semibold tabular-nums text-text-secondary"
+          >
+            {pct}%
+          </span>
+        )}
       </p>
       <style>{`
         @keyframes ix-shimmer-kf {

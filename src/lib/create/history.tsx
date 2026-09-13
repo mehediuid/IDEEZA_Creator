@@ -54,6 +54,11 @@ export type ChatTurn =
       // refinement chain is visible while scrolling.
       parentTurnId?: string;
       status: AssistantImageStatus;
+      // How far the render has visibly got, 0–100. Ticked by the chat
+      // orchestrator while the turn is pending and set to 100 the moment
+      // the image lands, so the card shows real motion instead of an
+      // endless shimmer. Absent on turns that predate it.
+      progress?: number;
       imageUrl?: string;
       // Whether this image has been promoted to a build (informational —
       // does NOT lock the chat, since spec §1 says one chat can produce
@@ -338,6 +343,7 @@ type Ctx = {
     imageUrl: string,
   ) => void;
   failAssistantTurn: (chatId: string, turnId: string) => void;
+  setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -516,7 +522,7 @@ export function CreateHistoryProvider({
             updatedAt: Date.now(),
             turns: c.turns.map((t) =>
               t.id === turnId && t.role === "assistant"
-                ? { ...t, status: "ready" as const, imageUrl }
+                ? { ...t, status: "ready" as const, progress: 100, imageUrl }
                 : t,
             ),
           };
@@ -537,6 +543,29 @@ export function CreateHistoryProvider({
             turns: c.turns.map((t) =>
               t.id === turnId && t.role === "assistant"
                 ? { ...t, status: "failed" as const }
+                : t,
+            ),
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  // Render progress while a turn is pending. Plain state — the number
+  // moves several times a second and carries no decision, so it doesn't
+  // belong in any history of its own.
+  const setTurnProgress = React.useCallback(
+    (chatId: string, turnId: string, progress: number) => {
+      const next = Math.max(0, Math.min(100, progress));
+      setChats((arr) =>
+        arr.map((c) => {
+          if (c.id !== chatId) return c;
+          return {
+            ...c,
+            turns: c.turns.map((t) =>
+              t.id === turnId && t.role === "assistant" && t.progress !== next
+                ? { ...t, progress: next }
                 : t,
             ),
           };
@@ -825,6 +854,7 @@ export function CreateHistoryProvider({
     appendAssistantTurn,
     resolveAssistantTurn,
     failAssistantTurn,
+    setTurnProgress,
     getChat,
     startBuild,
     updateBuildItem,

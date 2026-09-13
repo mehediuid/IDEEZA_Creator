@@ -25,7 +25,7 @@ import {
   type ChatSession,
 } from "@/lib/create/history";
 import { useCreatePlan } from "@/lib/create/plan";
-import { ChatThread } from "./chat-thread";
+import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog } from "./confirm-build-dialog";
 import { ImageEditorModal } from "./image-editor-modal";
@@ -39,6 +39,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     appendAssistantTurn,
     resolveAssistantTurn,
     failAssistantTurn,
+    setTurnProgress,
     startBuild,
     buildsForChat,
   } = useCreateHistory();
@@ -91,6 +92,49 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, chat?.id, chat?.turns]);
 
+  // Render progress. The generator gives no milestones, so the card
+  // shows the honest shape of a wait: fast at first, slowing as it goes,
+  // and parked at 90 until the image really lands (resolve writes 100).
+  // A timer per pending turn, so several renders in flight each move.
+  const progressTimers = React.useRef<
+    Map<string, ReturnType<typeof setInterval>>
+  >(new Map());
+  React.useEffect(() => {
+    if (!chat) return;
+    const timers = progressTimers.current;
+    const pending = new Set(
+      chat.turns
+        .filter((t) => t.role === "assistant" && t.status === "pending")
+        .map((t) => t.id),
+    );
+    for (const [id, handle] of timers) {
+      if (pending.has(id)) continue;
+      clearInterval(handle);
+      timers.delete(id);
+    }
+    for (const turn of chat.turns) {
+      if (turn.role !== "assistant" || turn.status !== "pending") continue;
+      if (timers.has(turn.id)) continue;
+      const cid = chat.id;
+      const tid = turn.id;
+      let p = turn.progress ?? 0;
+      timers.set(
+        tid,
+        setInterval(() => {
+          p = Math.min(90, p + Math.max(1, (90 - p) * 0.12));
+          setTurnProgress(cid, tid, p);
+        }, 700),
+      );
+    }
+  }, [chat, setTurnProgress]);
+  React.useEffect(() => {
+    const timers = progressTimers.current;
+    return () => {
+      for (const handle of timers.values()) clearInterval(handle);
+      timers.clear();
+    };
+  }, []);
+
   const runGeneration = React.useCallback(
     async (
       cid: string,
@@ -123,44 +167,52 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [incrementPrompt, resolveAssistantTurn, failAssistantTurn],
   );
 
-  // Find the most-recent READY assistant turn — what a prompt-bar
-  // submission should evolve from. If nothing is ready yet (e.g. the
-  // very first generation is still pending), refinement degrades to a
-  // fresh take so the user is never blocked.
-  //
-  // Also compute its position number in the assistant-turn sequence so
-  // the prompt-bar hint can say "refines Concept N" naturally.
-  const { latestReadyTurn, latestReadyConceptNumber } = React.useMemo(() => {
-    if (!chat) return { latestReadyTurn: null, latestReadyConceptNumber: 0 };
-    let conceptIdx = 0;
+  // One lineage label per concept — the same map the thread renders from,
+  // so every surface names a concept identically.
+  const labels = React.useMemo(
+    () => conceptLabels(chat?.turns ?? []),
+    [chat?.turns],
+  );
+
+  // The most-recent READY assistant turn — what a prompt-bar submission
+  // evolves from, with its label so the hint can say "refines Concept N".
+  // If nothing is ready yet (the first generation is still pending),
+  // refinement degrades to a fresh take so the user is never blocked.
+  const { latestReadyTurn, latestReadyConceptLabel } = React.useMemo(() => {
+    if (!chat) return { latestReadyTurn: null, latestReadyConceptLabel: "" };
     let last: Extract<
       (typeof chat.turns)[number],
       { role: "assistant" }
     > | null = null;
-    let lastIdx = 0;
     for (const t of chat.turns) {
-      if (t.role === "assistant") {
-        conceptIdx += 1;
-        if (t.status === "ready" && t.imageUrl) {
-          last = t;
-          lastIdx = conceptIdx;
-        }
+      if (t.role === "assistant" && t.status === "ready" && t.imageUrl) {
+        last = t;
       }
     }
-    return { latestReadyTurn: last, latestReadyConceptNumber: lastIdx };
-  }, [chat]);
+    return {
+      latestReadyTurn: last,
+      latestReadyConceptLabel: last ? (labels.get(last.id) ?? "1") : "",
+    };
+  }, [chat, labels]);
 
-  // Concept number of the turn currently open in the editor (for its label).
-  const editorConceptNumber = React.useMemo(() => {
+  // The concept open in the editor, and which refine of it the next edit
+  // will be — the editor names the number the result will carry.
+  const editorConceptLabel = editorTurnId
+    ? (labels.get(editorTurnId) ?? "1")
+    : "1";
+  const editorNextRefineIndex = React.useMemo(() => {
     if (!chat || !editorTurnId) return 1;
     let n = 0;
     for (const t of chat.turns) {
-      if (t.role === "assistant") {
+      if (
+        t.role === "assistant" &&
+        t.kind === "refine" &&
+        t.parentTurnId === editorTurnId
+      ) {
         n += 1;
-        if (t.id === editorTurnId) return n;
       }
     }
-    return n || 1;
+    return n + 1;
   }, [chat, editorTurnId]);
 
   const handleUserSubmit = React.useCallback(
@@ -294,7 +346,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // /api/concept/summarize; until then the build carries the
         // title we can derive and an empty parts list rather than an
         // invented one.
-        conceptNumber: "1",
+        conceptNumber: labels.get(confirmFor.turnId) ?? "1",
         title: deriveTitle(confirmFor.prompt),
         summary: "",
         parts: [],
@@ -304,7 +356,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       setSubmittingBuild(false);
       setConfirmFor(null);
     }
-  }, [chat, confirmFor, startBuild, router]);
+  }, [chat, confirmFor, labels, startBuild, router]);
 
   if (!hydrated) {
     return <LoadingShell />;
@@ -352,7 +404,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           />
           <p className="mt-[8px] text-center text-2xs font-medium text-text-tertiary">
             {latestReadyTurn
-              ? `Typing a change refines Concept ${latestReadyConceptNumber}. Use Regenerate for a fresh take. One chat can produce many builds.`
+              ? `Typing a change refines Concept ${latestReadyConceptLabel}. Use Regenerate for a fresh take. One chat can produce many builds.`
               : "Start by describing the concept. Refine and regenerate as many times as you like."}
           </p>
         </div>
@@ -371,7 +423,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         open={editorTurnId !== null && editorImage !== null}
         image={editorImage}
         title={chat.title}
-        conceptNumber={editorConceptNumber}
+        conceptLabel={editorConceptLabel}
+        nextRefineIndex={editorNextRefineIndex}
         onClose={() => setEditorTurnId(null)}
         onSubmitEdit={handleSubmitEdit}
       />

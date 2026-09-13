@@ -30,6 +30,7 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { useCreateHistory } from "@/lib/create/history";
+import { useVoiceInput } from "@/lib/voice/use-voice-input";
 import { BuildManuallyInfo } from "./build-manually-info";
 import { ProjectInfoModal } from "./project-info-modal";
 import { Icon, type IconValue } from "./icon";
@@ -282,20 +283,6 @@ function ModeButton({
   );
 }
 
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult:
-    | ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void)
-    | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
-
 const PromptCard = React.forwardRef<
   HTMLTextAreaElement,
   {
@@ -321,15 +308,14 @@ const PromptCard = React.forwardRef<
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [attachment, setAttachment] = React.useState<string | null>(null);
 
-  // Latest value / onChange for the (mount-once) speech callback.
-  const valueRef = React.useRef(value);
-  valueRef.current = value;
-  const onChangeRef = React.useRef(onChange);
-  onChangeRef.current = onChange;
-
-  const [voiceSupported, setVoiceSupported] = React.useState(false);
-  const [listening, setListening] = React.useState(false);
-  const recogRef = React.useRef<SpeechRecognitionLike | null>(null);
+  // Dictation appends what was said to whatever is already typed.
+  const voice = useVoiceInput({
+    onFinal: (said) => {
+      const cur = value.trim();
+      onChange(cur ? `${cur} ${said}` : said);
+    },
+  });
+  const listening = voice.status === "listening";
 
   React.useEffect(() => {
     const el = localRef.current;
@@ -338,55 +324,13 @@ const PromptCard = React.forwardRef<
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [value]);
 
-  // Web Speech API — transcribe speech and append it to the prompt.
-  React.useEffect(() => {
-    const w = window as unknown as Record<string, unknown>;
-    const SRCtor = (w.SpeechRecognition || w.webkitSpeechRecognition) as
-      | (new () => SpeechRecognitionLike)
-      | undefined;
-    if (!SRCtor) return;
-    setVoiceSupported(true);
-    const r = new SRCtor();
-    r.continuous = false;
-    r.interimResults = false;
-    r.lang = "en-US";
-    r.onresult = (e) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) {
-        transcript += `${e.results[i]?.[0]?.transcript ?? ""} `;
-      }
-      transcript = transcript.trim();
-      if (!transcript) return;
-      const cur = valueRef.current.trim();
-      onChangeRef.current(cur ? `${cur} ${transcript}` : transcript);
-    };
-    r.onend = () => setListening(false);
-    r.onerror = () => setListening(false);
-    recogRef.current = r;
-    return () => {
-      try {
-        r.abort();
-      } catch {}
-    };
-  }, []);
-
   const toggleVoice = () => {
-    const r = recogRef.current;
-    if (!r) return;
     if (listening) {
-      try {
-        r.stop();
-      } catch {}
-      setListening(false);
+      voice.stop();
       return;
     }
-    try {
-      r.start();
-      setListening(true);
-      localRef.current?.focus();
-    } catch {
-      setListening(false);
-    }
+    voice.start();
+    localRef.current?.focus();
   };
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -454,16 +398,16 @@ const PromptCard = React.forwardRef<
           />
           <ToolbarIconButton
             ariaLabel={
-              !voiceSupported
+              !voice.supported
                 ? "Voice input isn't supported in this browser"
                 : listening
                   ? "Stop voice input"
                   : "Use voice input"
             }
-            onClick={voiceSupported ? toggleVoice : undefined}
+            onClick={voice.supported ? toggleVoice : undefined}
             icon={Mic01Icon}
             active={listening}
-            disabled={!voiceSupported}
+            disabled={!voice.supported}
           />
         </div>
 

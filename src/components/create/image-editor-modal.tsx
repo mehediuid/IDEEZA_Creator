@@ -18,44 +18,38 @@ import {
   Mic01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult:
-    | ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void)
-    | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
+import { useVoiceInput } from "@/lib/voice/use-voice-input";
 
 export function ImageEditorModal({
   open,
   image,
   title,
-  conceptNumber,
+  conceptLabel,
+  nextRefineIndex,
   onClose,
   onSubmitEdit,
 }: {
   open: boolean;
   image: string | null;
   title: string;
-  conceptNumber: number;
+  // The concept being refined — "2", or "1.1" for a refine of a refine.
+  conceptLabel: string;
+  // Which refine of this concept the result will be, so the editor can
+  // name the number the new card will carry.
+  nextRefineIndex: number;
   onClose: () => void;
   onSubmitEdit: (text: string) => void;
 }) {
   const [text, setText] = React.useState("");
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
-  const textRef = React.useRef(text);
-  textRef.current = text;
-  const [voiceSupported, setVoiceSupported] = React.useState(false);
-  const [listening, setListening] = React.useState(false);
-  const recogRef = React.useRef<SpeechRecognitionLike | null>(null);
+  // Dictation appends what was said to whatever is already typed.
+  const voice = useVoiceInput({
+    onFinal: (said) => {
+      setText((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said));
+    },
+  });
+  const listening = voice.status === "listening";
 
   // Focus the edit box on open.
   React.useEffect(() => {
@@ -80,55 +74,13 @@ export function ImageEditorModal({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
 
-  // Web Speech API — append transcript to the edit box.
-  React.useEffect(() => {
-    const w = window as unknown as Record<string, unknown>;
-    const SRCtor = (w.SpeechRecognition || w.webkitSpeechRecognition) as
-      | (new () => SpeechRecognitionLike)
-      | undefined;
-    if (!SRCtor) return;
-    setVoiceSupported(true);
-    const r = new SRCtor();
-    r.continuous = false;
-    r.interimResults = false;
-    r.lang = "en-US";
-    r.onresult = (e) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) {
-        transcript += `${e.results[i]?.[0]?.transcript ?? ""} `;
-      }
-      transcript = transcript.trim();
-      if (!transcript) return;
-      const cur = textRef.current.trim();
-      setText(cur ? `${cur} ${transcript}` : transcript);
-    };
-    r.onend = () => setListening(false);
-    r.onerror = () => setListening(false);
-    recogRef.current = r;
-    return () => {
-      try {
-        r.abort();
-      } catch {}
-    };
-  }, []);
-
   const toggleVoice = () => {
-    const r = recogRef.current;
-    if (!r) return;
     if (listening) {
-      try {
-        r.stop();
-      } catch {}
-      setListening(false);
+      voice.stop();
       return;
     }
-    try {
-      r.start();
-      setListening(true);
-      inputRef.current?.focus();
-    } catch {
-      setListening(false);
-    }
+    voice.start();
+    inputRef.current?.focus();
   };
 
   if (!open) return null;
@@ -144,7 +96,7 @@ export function ImageEditorModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Refine Concept ${conceptNumber}`}
+      aria-label={`Refining Concept ${conceptLabel}`}
       className="fixed inset-0 z-modal flex flex-col bg-bg-page/95 backdrop-blur-sm"
     >
       {/* Top bar */}
@@ -161,7 +113,7 @@ export function ImageEditorModal({
           {title}
         </p>
         <span className="shrink-0 rounded-full bg-bg-brand-subtle px-[10px] py-[4px] text-2xs font-bold uppercase tracking-wider text-text-brand">
-          Concept {conceptNumber}
+          Refining Concept {conceptLabel}
         </span>
       </header>
 
@@ -177,7 +129,7 @@ export function ImageEditorModal({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image}
-              alt={`Concept ${conceptNumber}: ${title}`}
+              alt={`Concept ${conceptLabel}: ${title}`}
               className="max-h-[calc(100dvh-220px)] w-auto rounded-xl object-contain"
             />
           </div>
@@ -207,10 +159,10 @@ export function ImageEditorModal({
           />
           <button
             type="button"
-            onClick={voiceSupported ? toggleVoice : undefined}
-            disabled={!voiceSupported}
+            onClick={voice.supported ? toggleVoice : undefined}
+            disabled={!voice.supported}
             aria-label={
-              !voiceSupported
+              !voice.supported
                 ? "Voice input isn't supported in this browser"
                 : listening
                   ? "Stop voice input"
@@ -240,8 +192,7 @@ export function ImageEditorModal({
           </button>
         </div>
         <p className="mt-[8px] text-center text-2xs font-medium text-text-tertiary">
-          Describe a change — it evolves this image, keeping the same concept.
-          The result lands in your chat below.
+          {`The result lands in your chat as Concept ${conceptLabel}.${nextRefineIndex} — the original stays untouched.`}
         </p>
       </div>
     </div>

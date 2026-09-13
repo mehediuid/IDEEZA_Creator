@@ -9,12 +9,38 @@
 // back to compare or reuse any prior result.
 //
 // Spec §4c: each image turn is labelled "Concept N" so users can locate
-// a specific version. Refinements get a "Refines Concept M" breadcrumb
-// so the evolution chain is visible while scrolling.
+// a specific version. Refinements are numbered off their parent
+// ("Concept 1.1") and get a "Refines Concept M" breadcrumb, so the
+// evolution chain is visible while scrolling.
 
 import * as React from "react";
-import type { ChatSession } from "@/lib/create/history";
+import type { ChatSession, ChatTurn } from "@/lib/create/history";
 import { ImageTurn } from "./image-turn";
+
+// Label every concept by its lineage, not by its position: a fresh take
+// counts up ("1", "2", …) and a refine hangs off the concept it evolves
+// ("1.1", "1.2"), which is how the user talks about them — "the second
+// try at the first idea". A refine whose parent is gone (older stored
+// chats) reads as a fresh one rather than pointing at nothing.
+export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
+  const out = new Map<string, string>();
+  const children = new Map<string, number>();
+  let fresh = 0;
+  for (const t of turns) {
+    if (t.role !== "assistant") continue;
+    const parentId = t.kind === "refine" ? t.parentTurnId : undefined;
+    const parentLabel = parentId ? out.get(parentId) : undefined;
+    if (parentId && parentLabel) {
+      const k = (children.get(parentId) ?? 0) + 1;
+      children.set(parentId, k);
+      out.set(t.id, `${parentLabel}.${k}`);
+      continue;
+    }
+    fresh += 1;
+    out.set(t.id, String(fresh));
+  }
+  return out;
+}
 
 export function ChatThread({
   chat,
@@ -27,21 +53,9 @@ export function ChatThread({
   onUseTurn: (turnId: string) => void;
   onRefineTurn: (turnId: string) => void;
 }) {
-  // Number each assistant turn in render order so the labels match what
-  // the user sees in the thread. A map from turnId → concept number lets
-  // refine-children point back to their parent's number for breadcrumb
-  // copy ("Refines Concept 2").
-  const conceptNumber = React.useMemo(() => {
-    const out = new Map<string, number>();
-    let n = 0;
-    for (const t of chat.turns) {
-      if (t.role === "assistant") {
-        n += 1;
-        out.set(t.id, n);
-      }
-    }
-    return out;
-  }, [chat.turns]);
+  // One label per concept, so a card, its breadcrumb and the editor all
+  // name the same thing.
+  const labels = React.useMemo(() => conceptLabels(chat.turns), [chat.turns]);
 
   // Auto-scroll to the newest turn so the latest result is in view.
   const endRef = React.useRef<HTMLDivElement>(null);
@@ -60,21 +74,21 @@ export function ChatThread({
         if (turn.role === "user") {
           return <UserBubble key={turn.id} text={turn.text} />;
         }
-        const number = conceptNumber.get(turn.id) ?? 1;
-        const parentNumber =
+        const label = labels.get(turn.id) ?? "1";
+        const parentLabel =
           turn.kind === "refine" && turn.parentTurnId
-            ? conceptNumber.get(turn.parentTurnId)
+            ? labels.get(turn.parentTurnId)
             : undefined;
         return (
           <div
             key={turn.id}
             className="flex"
-            aria-label={`Concept ${number}`}
+            aria-label={`Concept ${label}`}
           >
             <ImageTurn
               turn={turn}
-              conceptNumber={number}
-              parentConceptNumber={parentNumber}
+              conceptLabel={label}
+              parentConceptLabel={parentLabel}
               onRegenerate={() => onRegenerateAt(turn.prompt)}
               onUseThis={() => onUseTurn(turn.id)}
               onRefine={() => onRefineTurn(turn.id)}
