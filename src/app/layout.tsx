@@ -9,6 +9,7 @@ import { CreateHistoryProvider } from "@/lib/create/history";
 import { CreatePlanProvider } from "@/lib/create/plan";
 import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
+import { BuildSimulator } from "@/components/create/build-simulator";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -46,6 +47,11 @@ export default function RootLayout({
                     <CreditsProvider>
                       <CreateHistoryProvider>
                         {children}
+                        {/* A build is a background job: it has to keep
+                            running whatever page the user is on, so the
+                            worker lives here rather than on the build
+                            page. Renders nothing. */}
+                        <BuildSimulator />
                         <GlobalRenderIndicator />
                       </CreateHistoryProvider>
                     </CreditsProvider>

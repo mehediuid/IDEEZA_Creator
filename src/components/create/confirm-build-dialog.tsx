@@ -2,13 +2,18 @@
 
 // ConfirmBuildDialog — the lock gate between Phase 1 and Phase 2.
 //
-// Shows a manifest of every deliverable the full build will generate
-// (3D model · PCB · firmware) plus a time and credit estimate, plus
-// the locked concept image for reference. Confirming calls
-// `/api/build/start` and triggers the parent's `onConfirm` which:
+// Shows a manifest of every deliverable the full build will generate,
+// plus a time and credit estimate and the locked concept image for
+// reference. Confirming calls `/api/build/start` and triggers the
+// parent's `onConfirm` which:
 //   1. Locks the concept on the source turn,
 //   2. Creates a build job in the Project create history,
 //   3. Routes to /build/[jobId].
+//
+// The manifest, the estimate and the cost are all read from the model
+// that actually runs the build — ITEM_KINDS / ITEM_LABELS /
+// ITEM_SUBTITLES, BUILD_ESTIMATE_MIN and BUILD_COST — so the dialog
+// can't promise a different build from the one that starts.
 
 import * as React from "react";
 import {
@@ -19,42 +24,46 @@ import {
   CodeIcon,
   CpuIcon,
   CubeIcon,
+  ElectricWireIcon,
   LockIcon,
+  PackageIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
+import {
+  BUILD_ESTIMATE_MIN,
+  ITEM_KINDS,
+  ITEM_LABELS,
+  ITEM_SUBTITLES,
+  type BuildItemKind,
+} from "@/lib/create/history";
+import { BUILD_COST } from "@/lib/create/credits";
+
+const KIND_ICON: Record<BuildItemKind, IconValue> = {
+  "3d": CubeIcon,
+  pcb: CpuIcon,
+  code: CodeIcon,
+  wiring: ElectricWireIcon,
+  parts: PackageIcon,
+};
 
 export type ManifestItem = {
-  kind: "3d" | "pcb" | "code";
+  kind: BuildItemKind;
   title: string;
   detail: string;
   icon: IconValue;
 };
 
-const MANIFEST: ManifestItem[] = [
-  {
-    kind: "3d",
-    title: "3D enclosure",
-    detail: "Printable model with mount points and tolerances.",
-    icon: CubeIcon,
-  },
-  {
-    kind: "pcb",
-    title: "PCB design",
-    detail: "Schematic, layout, and BOM ready for fabrication.",
-    icon: CpuIcon,
-  },
-  {
-    kind: "code",
-    title: "Firmware code",
-    detail: "Starter firmware with the libraries the parts need.",
-    icon: CodeIcon,
-  },
-];
+const MANIFEST: ManifestItem[] = ITEM_KINDS.map((kind) => ({
+  kind,
+  title: ITEM_LABELS[kind],
+  detail: ITEM_SUBTITLES[kind],
+  icon: KIND_ICON[kind],
+}));
 
 const ESTIMATE = {
-  time: "About 8–12 minutes",
-  credits: 4,
+  time: `About ${BUILD_ESTIMATE_MIN} minutes`,
+  credits: BUILD_COST,
 };
 
 export function ConfirmBuildDialog({

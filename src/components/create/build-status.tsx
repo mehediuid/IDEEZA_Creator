@@ -1,19 +1,18 @@
 "use client";
 
 // BuildStatus — Phase 2 progress view. Shows the locked concept, the
-// per-item progress for 3D / PCB / firmware, and a partial-retry on
-// any failed item. The simulated worker is co-located here so the UI
-// has motion to render against today; when a real backend lands,
-// replace it with a subscription to `/api/build/:id`.
+// per-item progress for each of the five artifacts, and a partial-retry
+// on any failed item. Pure rendering: the worker that advances builds,
+// promotes the queue and charges credits is <BuildSimulator />, mounted
+// once beside the providers so a build keeps going after this page has
+// swapped itself for the review screen.
 //
 // Spec rules respected:
-//   • Background-friendly: leaving and coming back resumes from where
-//     localStorage left off (the simulator only runs while mounted, but
-//     items it advances are persisted by the provider).
+//   • Background-friendly: the build advances whatever page is open, so
+//     leaving and coming back just shows where it got to.
 //   • Per-item retry — failed item only.
 //   • Concept image is reference-only here; no edit affordance.
 
-import * as React from "react";
 import Link from "next/link";
 import {
   CodeIcon,
@@ -34,7 +33,6 @@ import {
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
-import { useCredits } from "@/lib/create/credits";
 
 const KIND_ICON: Record<BuildItemKind, IconValue> = {
   "3d": CubeIcon,
@@ -44,104 +42,9 @@ const KIND_ICON: Record<BuildItemKind, IconValue> = {
   parts: PackageIcon,
 };
 
-// Per-tick increment per item (synthetic; real backend will push real
-// progress). 6% / tick * 800ms ≈ 13s per fresh item — close enough to
-// the manifest's 8–12m estimate to feel cohesive without making the
-// demo painful.
-const TICK_MS = 800;
-const TICK_PROGRESS = 6;
-// A small randomness so items finish at different times.
-const PER_ITEM_JITTER: Record<BuildItemKind, number> = {
-  "3d": 0,
-  pcb: 1,
-  code: 2,
-  wiring: 3,
-  parts: 4,
-};
-
-// Dev-only hooks so the failure states are reachable on demand. There
-// is no random failure injection: a build that fails in front of a user
-// has to be a real failure, not a demo.
-type DevWindow = Window & {
-  __ideezaFailBuild?: (buildId: string) => void;
-  __ideezaFailItem?: (buildId: string, kind: BuildItemKind) => void;
-};
-
 export function BuildStatus({ job }: { job: BuildJob }) {
-  const {
-    builds,
-    updateBuildItem,
-    promoteQueued,
-    markCharged,
-    failBuildSystem,
-  } = useCreateHistory();
-  const { charge, refund, canAfford } = useCredits();
+  const { updateBuildItem } = useCreateHistory();
   const rollup = rollupBuild(job);
-  const reducedMotion = useReducedMotion();
-
-  // The tick reads the latest builds without restarting the interval.
-  const buildsRef = React.useRef(builds);
-  React.useEffect(() => {
-    buildsRef.current = builds;
-  }, [builds]);
-
-  // A build costs credits the moment it actually starts — a queued one
-  // is charged when its turn comes, not when it's booked.
-  React.useEffect(() => {
-    for (const b of builds) {
-      if (b.status !== "running" || b.creditsCharged) continue;
-      if (!canAfford()) continue;
-      charge(b.id);
-      markCharged(b.id);
-    }
-  }, [builds, charge, canAfford, markCharged]);
-
-  React.useEffect(() => {
-    if (reducedMotion) return;
-    const t = window.setInterval(() => {
-      let running = false;
-      // Advance every running build, not just the one on screen —
-      // leaving this page shouldn't stall a build in the background.
-      for (const b of buildsRef.current) {
-        if (b.status !== "running") continue;
-        running = true;
-        for (const item of b.items) {
-          if (item.status !== "building") continue;
-          const next = Math.min(
-            100,
-            item.progress + TICK_PROGRESS - PER_ITEM_JITTER[item.kind],
-          );
-          if (next >= 100) {
-            updateBuildItem(b.id, item.kind, {
-              status: "ready",
-              progress: 100,
-            });
-          } else {
-            updateBuildItem(b.id, item.kind, { progress: next });
-          }
-        }
-      }
-      // The worker is free — start whoever has been waiting longest.
-      if (!running) promoteQueued();
-    }, TICK_MS);
-    return () => window.clearInterval(t);
-  }, [reducedMotion, updateBuildItem, promoteQueued]);
-
-  React.useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
-    const w = window as DevWindow;
-    w.__ideezaFailBuild = (buildId: string) => {
-      refund(buildId);
-      failBuildSystem(buildId);
-    };
-    w.__ideezaFailItem = (buildId: string, kind: BuildItemKind) => {
-      updateBuildItem(buildId, kind, { status: "failed" });
-    };
-    return () => {
-      delete w.__ideezaFailBuild;
-      delete w.__ideezaFailItem;
-    };
-  }, [refund, failBuildSystem, updateBuildItem]);
 
   return (
     <div className="flex flex-col gap-[24px]">
@@ -215,8 +118,17 @@ function BuildItemRow({
   onRetry: () => void;
 }) {
   const tone = toneFor(item.status);
+  // An artifact this build never produced. It is listed so the five
+  // rows stay honest, but it is not a deliverable in progress — no
+  // progress bar, and the whole row steps back.
+  const skipped = item.status === "skipped";
   return (
-    <li className="flex items-center gap-[16px] rounded-xl border border-border bg-bg-surface p-[16px]">
+    <li
+      className={[
+        "flex items-center gap-[16px] rounded-xl border border-border bg-bg-surface p-[16px]",
+        skipped ? "opacity-60" : "",
+      ].join(" ")}
+    >
       <span
         aria-hidden
         className={[
@@ -229,26 +141,37 @@ function BuildItemRow({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-[12px]">
-          <p className="text-md font-semibold text-text-primary">
+          <p
+            className={[
+              "text-md font-semibold",
+              skipped ? "text-text-tertiary" : "text-text-primary",
+            ].join(" ")}
+          >
             {ITEM_LABELS[item.kind]}
           </p>
           <span className={["text-2xs font-bold uppercase tracking-wider", tone.text].join(" ")}>
             {statusLabel(item.status, item.progress)}
           </span>
         </div>
-        <div
-          role="progressbar"
-          aria-label={`${ITEM_LABELS[item.kind]} progress`}
-          aria-valuenow={item.progress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          className="mt-[8px] h-[6px] w-full overflow-hidden rounded-full bg-bg-surface-raised"
-        >
+        {skipped ? (
+          <p className="mt-[6px] text-sm text-text-tertiary">
+            Not generated for this build.
+          </p>
+        ) : (
           <div
-            className={["h-full transition-[width] duration-normal ease-decelerate", tone.bar].join(" ")}
-            style={{ width: `${item.progress}%` }}
-          />
-        </div>
+            role="progressbar"
+            aria-label={`${ITEM_LABELS[item.kind]} progress`}
+            aria-valuenow={item.progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="mt-[8px] h-[6px] w-full overflow-hidden rounded-full bg-bg-surface-raised"
+          >
+            <div
+              className={["h-full transition-[width] duration-normal ease-decelerate", tone.bar].join(" ")}
+              style={{ width: `${item.progress}%` }}
+            />
+          </div>
+        )}
       </div>
       {item.status === "failed" && (
         <button
@@ -293,11 +216,21 @@ function StatusBadge({
 function statusLabel(status: BuildItem["status"], progress: number): string {
   if (status === "ready") return "Ready";
   if (status === "failed") return "Failed";
+  // Not queued, not failed — an artifact this build never made.
+  if (status === "skipped") return "Didn't run";
   if (status === "pending") return "Queued";
   return `${progress}%`;
 }
 
 function toneFor(status: BuildItem["status"]) {
+  if (status === "skipped") {
+    return {
+      iconBg: "bg-bg-surface-raised",
+      iconFg: "text-text-tertiary",
+      text: "text-text-tertiary",
+      bar: "bg-bg-surface-raised",
+    };
+  }
   if (status === "ready") {
     return {
       iconBg: "bg-bg-brand-subtle",
@@ -325,16 +258,4 @@ function toneFor(status: BuildItem["status"]) {
 function prettyTitle(prompt: string): string {
   const t = prompt.trim().replace(/\s+/g, " ");
   return t.length > 80 ? `${t.slice(0, 80)}…` : t;
-}
-
-function useReducedMotion() {
-  const [reduced, setReduced] = React.useState(false);
-  React.useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return reduced;
 }

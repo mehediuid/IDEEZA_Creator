@@ -157,8 +157,11 @@ function slug(text: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
+// A C identifier for the part. A name that starts with a digit ("74HC595",
+// "2N2222") would slug to an illegal macro name, so it gets a prefix.
 function symbolFor(name: string): string {
-  return slug(name).toUpperCase() || "PART";
+  const symbol = slug(name).toUpperCase() || "PART";
+  return /^[0-9]/.test(symbol) ? `P_${symbol}` : symbol;
 }
 
 // The library each part family needs, so the sketch compiles against
@@ -171,8 +174,11 @@ const INCLUDE_FOR: Partial<Record<ConceptPartCategory, string>> = {
 };
 
 // Parts the firmware addresses: regulators, passives and connectors
-// carry no pin, so they get no define.
+// carry no pin, so they get no define. Neither does the microcontroller
+// — it is the thing running this sketch, not something wired to a pin
+// on it.
 const UNADDRESSED: ConceptPartCategory[] = [
+  "Microcontroller",
   "Power Management",
   "Passive",
   "Connector & mech",
@@ -196,11 +202,15 @@ export function firmwareFor(job: ArtifactSource): Firmware {
   );
 
   const setup = ["void setup() {", "  Serial.begin(115200);"];
+  // One bus, one Wire.begin() — however many sensors sit on it.
+  if (addressed.some((p) => p.category === "Sensor")) {
+    setup.push("  Wire.begin();");
+  }
   for (const part of addressed) {
     const pin = `${symbolFor(part.name)}_PIN`;
     setup.push(
       part.category === "Sensor"
-        ? `  Wire.begin();  // ${part.name} on ${pin}`
+        ? `  pinMode(${pin}, INPUT);  // ${part.name} interrupt line`
         : `  pinMode(${pin}, OUTPUT);  // ${part.name}`,
     );
   }

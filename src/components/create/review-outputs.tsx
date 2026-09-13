@@ -59,9 +59,26 @@ const KIND_BLURB: Record<BuildItemKind, string> = {
 };
 
 export function ReviewOutputs({ job }: { job: BuildJob }) {
-  const [active, setActive] = React.useState<BuildItemKind>(job.items[0].kind);
+  // An artifact an older build never produced has nothing to review, so
+  // it gets no tab — a deliverable panel for something that was never
+  // made would be a lie.
+  const deliverables = React.useMemo(
+    () => job.items.filter((i) => i.status !== "skipped"),
+    [job.items],
+  );
+  const [active, setActive] = React.useState<BuildItemKind>(
+    () => (deliverables[0] ?? job.items[0]).kind,
+  );
   const [picking, setPicking] = React.useState<BuildOutcome | null>(null);
   const { setBuildOutcome } = useCreateHistory();
+
+  // If the active tab isn't one of the real deliverables (a migrated
+  // job, or one whose items changed underneath), fall back to the first
+  // that is.
+  const shown =
+    deliverables.some((i) => i.kind === active) || !deliverables.length
+      ? active
+      : deliverables[0].kind;
 
   return (
     <div className="flex flex-col gap-[24px]">
@@ -90,8 +107,8 @@ export function ReviewOutputs({ job }: { job: BuildJob }) {
           aria-label="Deliverables"
           className="flex items-center gap-[4px] border-b border-border px-[12px] pt-[12px]"
         >
-          {job.items.map((item) => {
-            const isActive = active === item.kind;
+          {deliverables.map((item) => {
+            const isActive = shown === item.kind;
             return (
               <button
                 key={item.kind}
@@ -117,13 +134,13 @@ export function ReviewOutputs({ job }: { job: BuildJob }) {
         </div>
 
         {/* Active panel */}
-        {job.items.map((item) => (
+        {deliverables.map((item) => (
           <div
             key={item.kind}
             id={`output-panel-${item.kind}`}
             role="tabpanel"
             aria-labelledby={`output-tab-${item.kind}`}
-            hidden={active !== item.kind}
+            hidden={shown !== item.kind}
             className="bg-bg-page p-[20px]"
           >
             <DeliverablePreview kind={item.kind} modelGlbUrl={job.modelGlbUrl} />

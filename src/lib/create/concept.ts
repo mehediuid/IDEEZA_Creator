@@ -103,6 +103,57 @@ export function fallbackConcept(prompt: string): ConceptSummary {
   };
 }
 
+// Words a model reaches for instead of our category names. Everything
+// here is a synonym we are confident about — the point is to recognise
+// what the model meant, never to guess. An unrecognised word means the
+// payload isn't understood, and the caller falls back rather than
+// filing an MCU under "Passive".
+const CATEGORY_SYNONYMS: Record<string, ConceptPartCategory> = {
+  mcu: "Microcontroller",
+  microcontroller: "Microcontroller",
+  soc: "Microcontroller",
+  sensor: "Sensor",
+  led: "Actuator",
+  motor: "Actuator",
+  relay: "Actuator",
+  actuator: "Actuator",
+  strip: "Actuator",
+  power: "Power Management",
+  regulator: "Power Management",
+  ldo: "Power Management",
+  battery: "Power Management",
+  charger: "Power Management",
+  display: "Display & I/O",
+  screen: "Display & I/O",
+  button: "Display & I/O",
+  switch: "Display & I/O",
+  io: "Display & I/O",
+  wifi: "Connectivity",
+  ble: "Connectivity",
+  radio: "Connectivity",
+  connectivity: "Connectivity",
+  resistor: "Passive",
+  capacitor: "Passive",
+  passive: "Passive",
+  connector: "Connector & mech",
+  enclosure: "Connector & mech",
+  mech: "Connector & mech",
+  mounting: "Connector & mech",
+};
+
+// Maps whatever the model wrote in `category` onto one of ours, or null
+// when we don't recognise it.
+export function normalizeCategory(raw: unknown): ConceptPartCategory | null {
+  if (typeof raw !== "string") return null;
+  const text = raw.trim();
+  if (!text) return null;
+  const exact = CONCEPT_CATEGORIES.find(
+    (c) => c.toLowerCase() === text.toLowerCase(),
+  );
+  if (exact) return exact;
+  return CATEGORY_SYNONYMS[text.toLowerCase()] ?? null;
+}
+
 // Shape-checks whatever the model returned. Returns null when the
 // payload isn't a usable concept, so the caller can fall back.
 export function parseConcept(
@@ -118,11 +169,12 @@ export function parseConcept(
     const p = entry as { name?: unknown; role?: unknown; category?: unknown };
     const name = String(p.name ?? "").trim();
     if (!name) continue;
-    const category = CONCEPT_CATEGORIES.includes(
-      p.category as ConceptPartCategory,
-    )
-      ? (p.category as ConceptPartCategory)
-      : "Passive";
+    const category = normalizeCategory(p.category);
+    // A category we can't place means we don't actually know what this
+    // part is — and every deliverable downstream (ref designator, rail,
+    // include, pin) is derived from it. Treat the whole payload as
+    // unparseable so the caller uses the deterministic fallback.
+    if (!category) return null;
     parts.push({
       name: name.slice(0, 48),
       role: String(p.role ?? "").trim().slice(0, 120),

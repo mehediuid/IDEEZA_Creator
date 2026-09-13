@@ -129,6 +129,10 @@ export type BuildJob = {
   // Set when the build died for a reason that isn't the user's — the
   // credits are refunded and the whole build can be retried.
   failure?: "system";
+  // Why a queued build isn't starting. "credits" means its turn came up
+  // but the balance couldn't cover it, so it went back in the queue
+  // rather than running unpaid.
+  blocked?: "credits";
   // Set by Save Project / Advance Edit once the build becomes a real
   // ManualProject.
   projectId?: string;
@@ -261,9 +265,18 @@ export function elapsedMinutes(job: BuildJob, now: number = Date.now()): number 
 }
 
 // The estimate scaled by what's left to do. Never says "0 minutes left"
-// while work remains — the smallest honest answer is 1.
+// while work remains — the smallest honest answer is 1 — and never
+// counts down for work that has stopped: a system failure, or a partial
+// build sitting on a failed artifact with nothing still in flight.
 export function minutesLeft(job: BuildJob, now: number = Date.now()): number {
-  void now;
+  if (statusOf(job) === "failed") return 0;
+  const working = liveItems(job.items).some(
+    (i) => i.status === "building" || i.status === "pending",
+  );
+  if (!working) return 0;
+  // The job has already been closed out (ready / partial) — anything
+  // still marked building is stale, so there's nothing to wait for.
+  if (job.endedAt !== undefined && job.endedAt <= now) return 0;
   const remaining = (100 - progressOf(job.items)) / 100;
   if (remaining <= 0) return 0;
   return Math.max(1, Math.round(job.estimateMin * remaining));
@@ -278,8 +291,20 @@ function normalizeJob(raw: BuildJob): BuildJob {
   const stored = raw as Partial<BuildJob> & { items?: BuildItem[] };
   const byKind = new Map<BuildItemKind, BuildItem>();
   for (const item of stored.items ?? []) {
-    if (!ITEM_KINDS.includes(item.kind)) continue;
-    byKind.set(item.kind, item);
+    if (!item || !ITEM_KINDS.includes(item.kind)) continue;
+    // An item's own fields are storage too — a hand-edited or
+    // half-written build must not reach the UI with a NaN bar width or
+    // a status nothing renders.
+    const progress = Number(item.progress);
+    byKind.set(item.kind, {
+      kind: item.kind,
+      status: ITEM_STATUS_VALUES.includes(item.status)
+        ? item.status
+        : "pending",
+      progress: Number.isFinite(progress)
+        ? Math.max(0, Math.min(100, progress))
+        : 0,
+    });
   }
   const items: BuildItem[] = ITEM_KINDS.map(
     (kind) =>
@@ -301,6 +326,11 @@ function normalizeJob(raw: BuildJob): BuildJob {
     estimateMin: stored.estimateMin ?? BUILD_ESTIMATE_MIN,
     creditsCharged: stored.creditsCharged ?? false,
     creditsRefunded: stored.creditsRefunded ?? false,
+    // Only a queued build can be waiting on credits.
+    blocked:
+      status === "queued" && stored.blocked === "credits"
+        ? "credits"
+        : undefined,
   };
 }
 
@@ -310,6 +340,14 @@ const STATUS_VALUES: BuildStatus[] = [
   "ready",
   "partial",
   "failed",
+];
+
+const ITEM_STATUS_VALUES: BuildItemStatus[] = [
+  "pending",
+  "building",
+  "ready",
+  "failed",
+  "skipped",
 ];
 
 // Deterministic placeholder image so refreshes don't reshuffle.
@@ -366,12 +404,20 @@ type Ctx = {
   // Whole-build retry, after a system failure took the job down.
   retryBuild: (buildId: string) => void;
   // The build died for a reason that isn't the user's: every artifact
-  // fails, the job is marked failed and the credits go back.
+  // fails and the job is marked failed. The refund is a separate step —
+  // see markRefunded — so the flag can never claim money moved that
+  // didn't.
   failBuildSystem: (buildId: string) => void;
-  // Records that the credits ledger has charged for this build. The
-  // component that owns the simulator charges and then calls this, so
-  // a build is only ever charged once per run.
+  // Records that the credits ledger holds an open charge for this
+  // build. The simulator calls it only once the ledger really shows the
+  // charge, so the flag can't claim money moved that didn't.
   markCharged: (buildId: string) => void;
+  // Records that the ledger has actually put this build's credits back.
+  // Same rule: called only once the refund is really on the ledger.
+  markRefunded: (buildId: string) => void;
+  // Its turn came up but the balance couldn't cover it: back to the
+  // queue, flagged, rather than running unpaid.
+  blockForCredits: (buildId: string) => void;
   // Starts the oldest queued build when nothing is running. Called by
   // the simulator on each tick.
   promoteQueued: () => void;
@@ -705,6 +751,7 @@ export function CreateHistoryProvider({
           ...b,
           status: busy ? "queued" : "running",
           failure: undefined,
+          blocked: undefined,
           startedAt: busy ? undefined : now,
           endedAt: undefined,
           // The failed run was refunded, so the retry is charged again.
@@ -722,6 +769,8 @@ export function CreateHistoryProvider({
     );
   }, []);
 
+  // The failure alone. Whether the money went back is the ledger's
+  // answer, recorded by markRefunded once refund() has actually run.
   const failBuildSystem = React.useCallback((buildId: string) => {
     const now = Date.now();
     setBuilds((arr) =>
@@ -731,8 +780,8 @@ export function CreateHistoryProvider({
           ...b,
           status: "failed" as const,
           failure: "system" as const,
+          blocked: undefined,
           endedAt: now,
-          creditsRefunded: b.creditsCharged,
           items: b.items.map((it) =>
             it.status === "skipped" ? it : { ...it, status: "failed" as const },
           ),
@@ -746,8 +795,43 @@ export function CreateHistoryProvider({
   const markCharged = React.useCallback((buildId: string) => {
     setBuilds((arr) =>
       arr.map((b) =>
-        b.id === buildId ? { ...b, creditsCharged: true } : b,
+        b.id === buildId
+          ? { ...b, creditsCharged: true, blocked: undefined }
+          : b,
       ),
+    );
+  }, []);
+
+  const markRefunded = React.useCallback((buildId: string) => {
+    setBuilds((arr) =>
+      arr.map((b) =>
+        b.id === buildId && !b.creditsRefunded
+          ? { ...b, creditsRefunded: true, updatedAt: Date.now() }
+          : b,
+      ),
+    );
+  }, []);
+
+  const blockForCredits = React.useCallback((buildId: string) => {
+    setBuilds((arr) =>
+      arr.map((b) => {
+        if (b.id !== buildId) return b;
+        // Already parked — don't rewrite state every tick.
+        if (b.status === "queued" && b.blocked === "credits") return b;
+        return {
+          ...b,
+          status: "queued" as const,
+          blocked: "credits" as const,
+          startedAt: undefined,
+          endedAt: undefined,
+          items: b.items.map((it) =>
+            it.status === "skipped"
+              ? it
+              : { ...it, status: "pending" as const, progress: 0 },
+          ),
+          updatedAt: Date.now(),
+        };
+      }),
     );
   }, []);
 
@@ -768,6 +852,7 @@ export function CreateHistoryProvider({
           ? {
               ...b,
               status: "running" as const,
+              blocked: undefined,
               startedAt: now,
               items: b.items.map((it) =>
                 it.status === "skipped"
@@ -862,6 +947,8 @@ export function CreateHistoryProvider({
     retryBuild,
     failBuildSystem,
     markCharged,
+    markRefunded,
+    blockForCredits,
     promoteQueued,
     setBuildOutcome,
     setBuildModel,
@@ -923,11 +1010,14 @@ function computeRollup(items: BuildItem[]): BuildRollup {
 //   • ready (no outcome yet) — must review and pick an outcome
 //   • partial / failed       — at least one item failed; retry needed
 export function buildAttention(job: BuildJob): BuildAttention | null {
+  // One naming rule for every message: the build's own title, and only
+  // when it has none, a title derived from the prompt that started it.
+  const name = shortTitle(job.title || deriveTitle(job.conceptPrompt));
   if (job.failure === "system") {
     return {
       job,
       reason: "retry",
-      message: `“${shortTitle(job.title || job.conceptPrompt)}” stopped on our side${job.creditsRefunded ? " — your credits were refunded" : ""}.`,
+      message: `“${name}” stopped on our side${job.creditsRefunded ? " — your credits were refunded" : ""}.`,
     };
   }
   const rollup = rollupBuild(job);
@@ -935,14 +1025,14 @@ export function buildAttention(job: BuildJob): BuildAttention | null {
     return {
       job,
       reason: "review",
-      message: `Your build “${shortTitle(job.conceptPrompt)}” is ready to review.`,
+      message: `Your build “${name}” is ready to review.`,
     };
   }
   if (rollup.status === "partial" || rollup.status === "failed") {
     return {
       job,
       reason: "retry",
-      message: `A piece of “${shortTitle(job.conceptPrompt)}” failed and needs a retry.`,
+      message: `A piece of “${name}” failed and needs a retry.`,
     };
   }
   return null;
