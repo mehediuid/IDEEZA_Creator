@@ -71,8 +71,8 @@ function PathChooser() {
   return (
     <div className="flex flex-col gap-[var(--spacing-12)]">
       <StepHeading title="How do you want to start this package?">
-        Every path below ends up in the same place — a Symbol, a Footprint and a 3D Placement you can inspect and adjust
-        — just filled in differently depending on where you start.
+        Every path below ends up in the same place: a Symbol, a Footprint and a 3D Placement you can inspect and adjust,
+        just filled in differently depending on where you start.
       </StepHeading>
 
       <div role="radiogroup" aria-label="Starting path" className="grid grid-cols-1 gap-[var(--spacing-6)] md:grid-cols-3">
@@ -112,7 +112,7 @@ function PathChooser() {
               </span>
               <span
                 className={[
-                  "mt-auto rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-2)] font-mono text-2xs",
+                  "mt-auto rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-2)] font-mono text-sm",
                   off ? "text-text-disabled" : "text-text-tertiary",
                 ].join(" ")}
               >
@@ -166,7 +166,7 @@ function FamilyPicker() {
               <span className="truncate font-display text-sm font-semibold leading-sm text-text-primary group-hover:text-text-brand">
                 {f.label}
               </span>
-              <span className="truncate font-mono text-2xs text-text-tertiary">
+              <span className="truncate font-mono text-sm text-text-tertiary">
                 {f.prefix} · {f.mount} · {f.arrangement}
               </span>
             </span>
@@ -211,7 +211,7 @@ function WizardParams() {
       <div className="grid grid-cols-1 gap-[var(--spacing-10)] lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex h-fit flex-col gap-[var(--spacing-7)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
           <div className="flex flex-wrap items-center justify-between gap-[var(--spacing-5)]">
-            <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Parameters</h3>
+            <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">Parameters</h3>
             <Segmented
               label="Display unit"
               size="sm"
@@ -234,9 +234,9 @@ function WizardParams() {
         </div>
 
         <div className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
-          <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Live preview</h3>
+          <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">Live preview</h3>
           <WizardPreview pads={pads} silk={silk} />
-          <div className="flex flex-wrap gap-x-[var(--spacing-6)] gap-y-[var(--spacing-2)] font-mono text-2xs text-text-tertiary">
+          <div className="flex flex-wrap gap-x-[var(--spacing-6)] gap-y-[var(--spacing-2)] font-mono text-sm text-text-tertiary">
             <span>
               {pads.length} pin{pads.length === 1 ? "" : "s"}
             </span>
@@ -245,8 +245,8 @@ function WizardParams() {
             {params.rowSpacing ? <span>Row spacing {fmt(params.rowSpacing, draft.units)} {draft.units}</span> : null}
             <span>{family.arrangement}</span>
           </div>
-          <p className="font-display text-2xs font-regular leading-2xs text-text-tertiary">
-            Nominal reference geometry, not an IPC-7351 toe/heel/side calculation — you can adjust every pad on the next
+          <p className="font-display text-sm font-regular leading-sm text-text-tertiary">
+            Nominal reference geometry, not an IPC-7351 toe/heel/side calculation. You can adjust every pad on the next
             two steps.
           </p>
         </div>

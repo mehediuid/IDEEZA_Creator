@@ -52,7 +52,7 @@ function find(id: string): Found | null {
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-[var(--spacing-5)]">
-      <h2 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">{title}</h2>
+      <h2 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">{title}</h2>
       {children}
     </section>
   );
@@ -64,7 +64,7 @@ function Frame({ label, children }: { label: string; children: React.ReactNode }
       <div className="aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-xl)] border border-border bg-bg-subtle p-[var(--spacing-7)]">
         {children}
       </div>
-      <figcaption className="font-display text-2xs font-regular text-text-tertiary">{label}</figcaption>
+      <figcaption className="font-display text-sm font-regular text-text-tertiary">{label}</figcaption>
     </figure>
   );
 }
@@ -87,7 +87,7 @@ function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-[var(--radius-full)] bg-bg-subtle px-[var(--spacing-5)] py-[var(--spacing-2)] font-display text-2xs text-text-secondary">
+    <span className="rounded-[var(--radius-full)] bg-bg-subtle px-[var(--spacing-5)] py-[var(--spacing-2)] font-display text-xs text-text-secondary">
       {children}
     </span>
   );
@@ -95,7 +95,7 @@ function Chip({ children }: { children: React.ReactNode }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-[var(--radius-lg)] border border-dashed border-border bg-bg-page p-[var(--spacing-5)] font-display text-2xs font-regular leading-relaxed text-text-tertiary">
+    <p className="max-w-[68ch] rounded-[var(--radius-lg)] border border-dashed border-border bg-bg-page p-[var(--spacing-5)] font-display text-sm font-regular leading-relaxed text-text-tertiary">
       {children}
     </p>
   );
@@ -193,7 +193,7 @@ export function PartDetail({ id }: { id: string }) {
                     <PartGlyph kind={part?.kind ?? "component"} />
                   </span>
                   <span className="min-w-0 flex-1 truncate font-display text-sm font-medium text-text-primary">{mpn}</span>
-                  <span className="shrink-0 font-mono text-2xs text-text-tertiary">{part ? `${part.pkg} · ${part.mfr}` : "not in the catalogue"}</span>
+                  <span className="shrink-0 font-mono text-sm text-text-tertiary">{part ? `${part.pkg} · ${part.mfr}` : "not in the catalogue"}</span>
                 </>
               );
               return (
@@ -338,13 +338,13 @@ function Shell({
             <h1 className="min-w-0 break-words font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">
               {name}
             </h1>
-            <span className="rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-2xs font-medium text-text-secondary">
+            <span className="rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium text-text-secondary">
               {badge}
             </span>
             {visibility ? (
               <span
                 className={[
-                  "rounded-[var(--radius-full)] px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-2xs font-medium",
+                  "rounded-[var(--radius-full)] px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium",
                   visibility === "public" ? "bg-bg-success-subtle text-text-success" : "bg-bg-subtle text-text-secondary",
                 ].join(" ")}
               >
@@ -353,7 +353,7 @@ function Shell({
             ) : null}
           </div>
           {description ? (
-            <p className="max-w-[620px] font-display text-md font-regular leading-relaxed text-text-secondary">{description}</p>
+            <p className="max-w-[62ch] font-display text-md font-regular leading-relaxed text-text-secondary">{description}</p>
           ) : null}
         </div>
 

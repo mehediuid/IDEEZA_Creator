@@ -145,7 +145,7 @@ function LogoMenu() {
             </Link>
           ))}
           <p className="border-t border-border-subtle px-[var(--spacing-5)] py-[var(--spacing-4)] font-display text-2xs font-regular leading-relaxed text-text-tertiary">
-            Your draft is saved as you go — leaving here and coming back picks up where you left off.
+            Your draft is saved as you go. Leaving here and coming back picks up where you left off.
           </p>
         </div>
       ) : null}
@@ -223,7 +223,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
                 ].join(" ")}
               >
                 <DsIcon name={STEP_ICON[s]} size={20} strokeWidth={1.6} />
-                <span className="font-display text-2xs font-medium leading-none">{STEP_LABEL[s]}</span>
+                <span className="font-display text-xs font-medium leading-none">{STEP_LABEL[s]}</span>
               </button>
             );
           })}

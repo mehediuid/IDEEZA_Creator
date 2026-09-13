@@ -41,7 +41,7 @@ export function StepFinalize() {
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
       <StepHeading title="Finalize">
-        Name it, file it, and decide who can see it. Everything below is about the library entry — the part itself is
+        Name it, file it, and decide who can see it. Everything below is about the library entry; the part itself is
         already built.
       </StepHeading>
 
@@ -117,7 +117,7 @@ export function StepFinalize() {
 
         {/* What is about to be filed — read from the model, not retyped */}
         <aside className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-6)]">
-          <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">This package</h3>
+          <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">This package</h3>
           {[
             ["Pins", String(pins)],
             ["Pads", String(pads)],
@@ -133,7 +133,7 @@ export function StepFinalize() {
             </div>
           ))}
           {version > 1 ? (
-            <p className="font-display text-2xs font-regular leading-2xs text-text-tertiary">
+            <p className="font-display text-sm font-regular leading-sm text-text-tertiary">
               A package with this name already exists — saving files this as a new version rather than replacing it.
             </p>
           ) : null}

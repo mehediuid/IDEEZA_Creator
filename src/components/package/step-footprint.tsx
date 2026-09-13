@@ -68,7 +68,7 @@ const TOOLS: readonly ToolDef<FpTool>[] = [
 
 const HINTS: Record<FpTool, string> = {
   select: "Click a pad or shape to select it, then drag to move. Properties for the selection appear below.",
-  pad: "Click to drop a pad. It answers to the lowest symbol pin that hasn't got one yet; Mounting pads are mechanical and take no pin.",
+  pad: "Click to drop a pad. It takes the lowest symbol pin that has not got one yet. Mounting pads are mechanical and take no pin.",
   line: "Click to start, click again to finish. It lands on the Draw layer above.",
   polyline: "Click each vertex. Enter, a double-click, or clicking the first vertex closes the run.",
   rect: "Press and drag corner to corner.",
@@ -158,7 +158,7 @@ export function StepFootprint() {
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
       <StepHeading title="Footprint Creator">
-        Define what this part occupies physically on the board — drag pads into place, add new ones, and draw graphics on
+        Define what this part occupies physically on the board. Drag pads into place, add new ones, and draw graphics on
         any layer. Numeric X/Y is always available in the table for exact placement.
       </StepHeading>
 

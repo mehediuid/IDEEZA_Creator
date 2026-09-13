@@ -47,7 +47,7 @@ const TOOLS: readonly ToolDef<SymTool>[] = [
 ];
 
 const HINTS: Record<SymTool, string> = {
-  select: "Click a pin or shape to select it. Drag its body to move, or drag a handle to resize / adjust length. Properties for the selection appear below.",
+  select: "Click a pin or shape to select it. Drag its body to move, or drag a handle to resize or adjust length. Properties for the selection appear below.",
   pin: "Click on the canvas to place a pin. It takes the next free number; rename and re-type it in the table below.",
   line: "Click to start, click again to finish.",
   polyline: "Click each vertex. Enter, a double-click, or clicking the first vertex closes the run. Esc cancels.",
@@ -74,7 +74,7 @@ export function StepSymbol() {
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
       <StepHeading title="Symbol Creator">
-        Draw the symbol directly — place and drag pins, adjust their length, and add body graphics. Footprint pads are
+        Draw the symbol directly: place and drag pins, adjust their length, and add body graphics. Footprint pads are
         matched to these pin numbers in the next step.
       </StepHeading>
 

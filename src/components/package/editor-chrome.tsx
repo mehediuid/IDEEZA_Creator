@@ -54,7 +54,7 @@ export function EditorToolbar<T extends string>({
             ].join(" ")}
           >
             <DsIcon name={t.icon} size={17} strokeWidth={1.7} />
-            <span className="font-display text-2xs font-medium leading-none">{t.label}</span>
+            <span className="font-display text-xs font-medium leading-none">{t.label}</span>
           </button>
         );
       })}
@@ -100,7 +100,7 @@ export function ToolbarToggle({
       ].join(" ")}
     >
       <DsIcon name={icon} size={17} strokeWidth={1.7} />
-      <span className="font-display text-2xs font-medium leading-none">{label}</span>
+      <span className="font-display text-xs font-medium leading-none">{label}</span>
     </button>
   );
 }
@@ -134,7 +134,7 @@ export function ToolbarAction({
       ].join(" ")}
     >
       <DsIcon name={icon} size={17} strokeWidth={1.7} />
-      <span className="font-display text-2xs font-medium leading-none">{label}</span>
+      <span className="font-display text-xs font-medium leading-none">{label}</span>
     </button>
   );
 }
@@ -178,14 +178,14 @@ export function SidePanel({ hint, children }: { hint: React.ReactNode; children?
   return (
     <aside className="flex flex-col gap-[var(--spacing-8)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-6)]">
       <section className="flex flex-col gap-[var(--spacing-3)]">
-        <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Tool</h3>
+        <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">Tool</h3>
         <p className="font-display text-sm font-regular leading-relaxed text-text-secondary">{hint}</p>
       </section>
       <section className="flex flex-col gap-[var(--spacing-4)]">
-        <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Properties</h3>
+        <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">Properties</h3>
         {children ?? (
           <p className="font-display text-sm font-regular leading-relaxed text-text-tertiary">
-            Nothing selected — click a shape on the canvas to edit it.
+            Nothing selected. Click a shape on the canvas to edit it.
           </p>
         )}
       </section>
@@ -228,7 +228,7 @@ export function Field({
         {children}
       </div>
       {hint ? (
-        <span className="max-w-[440px] font-display text-2xs font-regular leading-2xs text-text-tertiary">{hint}</span>
+        <span className="max-w-[440px] font-display text-sm font-regular leading-sm text-text-tertiary">{hint}</span>
       ) : null}
     </div>
   );
@@ -288,7 +288,7 @@ export function StepHeading({ title, children }: { title: string; children?: Rea
     <div className="flex flex-col gap-[var(--spacing-4)]">
       <h2 className="font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">{title}</h2>
       {children ? (
-        <p className="max-w-[660px] font-display text-md font-regular leading-relaxed text-text-secondary">{children}</p>
+        <p className="max-w-[62ch] font-display text-md font-regular leading-relaxed text-text-secondary">{children}</p>
       ) : null}
     </div>
   );

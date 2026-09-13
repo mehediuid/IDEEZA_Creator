@@ -63,7 +63,7 @@ export function Step3D() {
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
       <StepHeading title="3D Placement">
-        Align a 3D body against the footprint you just defined — the pads below are your reference, so misalignment is
+        Align a 3D body against the footprint you just defined. The pads below are your reference, so misalignment is
         obvious before you save.
       </StepHeading>
 

@@ -42,7 +42,7 @@ export function StepConfirm({ saved }: { saved: SavedPackage }) {
           ["Visibility", published ? "Community" : "Private"],
         ].map(([k, v]) => (
           <div key={k} className="flex flex-col gap-[var(--spacing-2)]">
-            <dt className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">{k}</dt>
+            <dt className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">{k}</dt>
             <dd className="font-display text-md font-semibold text-text-primary">{v}</dd>
           </div>
         ))}

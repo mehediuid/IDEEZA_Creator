@@ -127,7 +127,7 @@ export function ImportFields() {
               <div className="flex min-w-[220px] flex-1 flex-col gap-[var(--spacing-1)]">
                 <span className="font-display text-md font-semibold text-text-primary">{s.label}</span>
                 <span className="font-display text-sm font-regular text-text-secondary">{s.feeds}</span>
-                <span className="font-mono text-2xs text-text-tertiary">
+                <span className="font-mono text-sm text-text-tertiary">
                   {s.ext} · {s.required}
                 </span>
               </div>
@@ -148,7 +148,7 @@ export function ImportFields() {
               {f ? (
                 <span className="inline-flex max-w-full items-center gap-[var(--spacing-4)] rounded-[var(--radius-full)] bg-bg-subtle px-[var(--spacing-5)] py-[var(--spacing-3)]">
                   <Icon icon={Attachment01Icon} size={14} />
-                  <span className="max-w-[220px] truncate font-mono text-2xs text-text-secondary">{f.name}</span>
+                  <span className="max-w-[220px] truncate font-mono text-sm text-text-secondary">{f.name}</span>
                   <button
                     type="button"
                     onClick={() => setFiles((cur) => ({ ...cur, [s.id]: undefined }))}
@@ -232,7 +232,7 @@ export function ImportResult() {
           ["3D body", imp.step ?? "—"],
         ].map(([k, v]) => (
           <div key={k} className="flex min-w-0 flex-col gap-[var(--spacing-2)]">
-            <dt className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">{k}</dt>
+            <dt className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">{k}</dt>
             <dd className="truncate font-display text-md font-semibold text-text-primary">{v}</dd>
           </div>
         ))}
@@ -240,7 +240,7 @@ export function ImportResult() {
 
       {imp.notes.length ? (
         <div className="flex flex-col gap-[var(--spacing-3)]">
-          <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">
+          <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
             What the files carried that this flow does not
           </h3>
           <ul role="list" className="flex flex-col gap-[var(--spacing-2)]">
@@ -276,8 +276,8 @@ function PreviewCard({
   return (
     <div className="flex flex-col gap-[var(--spacing-4)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
       <div className="flex items-baseline justify-between gap-[var(--spacing-4)]">
-        <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">{title}</h3>
-        <span className="min-w-0 truncate font-mono text-2xs text-text-tertiary">{file ?? empty}</span>
+        <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">{title}</h3>
+        <span className="min-w-0 truncate font-mono text-sm text-text-tertiary">{file ?? empty}</span>
       </div>
       {file ? children : <div className="h-[170px] rounded-[var(--radius-lg)] bg-bg-subtle" />}
     </div>
