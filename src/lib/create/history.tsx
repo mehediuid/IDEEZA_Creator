@@ -196,7 +196,12 @@ function loadJSON<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    const parsed = JSON.parse(raw) as T;
+    // Both stores hold arrays and the callers map over them, so a stored
+    // value of the wrong shape would throw during hydration and take the
+    // whole app with it. Fall back instead.
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }

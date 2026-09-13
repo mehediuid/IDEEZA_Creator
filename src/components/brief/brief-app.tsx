@@ -771,6 +771,7 @@ export function BriefApp() {
                 onBack={goBack}
                 onMint={commit}
                 onNext={goNext}
+                onPreview={() => setStep("preview")}
                 isLastStep={isLastStep}
                 minting={minting}
                 projectName={activeProject?.name ?? ""}
