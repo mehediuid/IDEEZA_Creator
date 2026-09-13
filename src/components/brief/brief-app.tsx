@@ -19,6 +19,7 @@ import { TopBar } from "@/components/pcb/top-bar";
 import { BriefRail } from "./brief-rail";
 import { Step1Idea, type Step1Patch } from "./step-1-idea";
 import { Step2Video } from "./step-2-video";
+import { PromptHelpModal } from "./prompt-help-modal";
 import { Step3Mint } from "./step-3-mint";
 import { Step4Success } from "./step-4-success";
 import { C } from "@/lib/pcb/colors";
@@ -267,6 +268,9 @@ export function BriefApp() {
   const [hydrated, setHydrated] = React.useState(false);
   const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
+  // Step 2's "Need to prompt help?" — a view, not an answer, so it stays out
+  // of the saved draft.
+  const [promptHelpOpen, setPromptHelpOpen] = React.useState(false);
   // Step 1's hand-off is in flight: Continue has created/attached and the page
   // is navigating. The ref is what actually stops a second press (React state
   // doesn't land inside the same tick — the same guard projectFromBuild uses
@@ -633,6 +637,7 @@ export function BriefApp() {
                 onContinue={goToStep3}
                 onSkip={skipMedia}
                 onBack={() => setStep(1)}
+                onPromptHelp={() => setPromptHelpOpen(true)}
               />
             )}
             {step === 3 && (
@@ -656,6 +661,17 @@ export function BriefApp() {
             )}
           </Crossfade>
         </div>
+
+        <PromptHelpModal
+          open={promptHelpOpen && step === 2}
+          productName={state.productName}
+          productDescription={state.productDescription}
+          onUse={(prompt) =>
+            // Hand-authored now — the auto toggle must not overwrite it.
+            patch({ videoPrompt: prompt, autoGenerateVideo: false })
+          }
+          onClose={() => setPromptHelpOpen(false)}
+        />
 
         {hydrated && step < 4 && (
           <div
