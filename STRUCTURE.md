@@ -39,7 +39,8 @@ ideeza-creator-panel/
    │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
-   │  │                      history-*, image-editor/turn, prompt-bar, quota-card
+   │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
+   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived)
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
    │  ├─ projects/           my-projects, project-details
    │  ├─ manual/             manual project creation + step navigation
