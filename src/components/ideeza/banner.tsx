@@ -14,13 +14,19 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+// Weight matches urgency. `attention` blocks Next, so it takes a filled, bordered
+// box; `good` is the absence of a problem, and a full-width saturated slab
+// announcing that nothing is wrong competed with the step heading for the eye.
+// It keeps the tick and the success colour, and gives up the fill and the edge.
 const TONES = {
   good: {
-    box: "border-[var(--color-border-success)] bg-[var(--color-bg-success-subtle)] text-[color:var(--color-text-success)]",
+    box: "text-[color:var(--color-text-success)]",
+    boxed: false,
     glyph: "M20 6L9 17l-5-5",
   },
   attention: {
     box: "border-[var(--color-border-warning)] bg-[var(--color-bg-warning-subtle)] text-[color:var(--color-text-warning)]",
+    boxed: true,
     glyph: "M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z",
   },
 } as const;
@@ -40,12 +46,13 @@ export function Banner({ tone, children, className }: BannerProps) {
       role="status"
       aria-live="polite"
       className={cn(
-        "flex items-start gap-[var(--spacing-4)] rounded-[var(--radius-lg)] border px-[var(--spacing-6)] py-[var(--spacing-5)]",
+        "flex items-start gap-[var(--spacing-4)] rounded-[var(--radius-lg)]",
         "text-[length:var(--font-size-md)] leading-md font-[family-name:var(--font-family-body)]",
+        t.boxed ? "border px-[var(--spacing-6)] py-[var(--spacing-5)]" : "py-[var(--spacing-1)]",
         t.box,
         className,
       )}
-      style={{ borderWidth: "var(--border-width-1)" }}
+      style={t.boxed ? { borderWidth: "var(--border-width-1)" } : undefined}
     >
       <svg
         aria-hidden

@@ -57,7 +57,7 @@ export function StepFinalize() {
             />
           </Field>
 
-          <Field label="Category" htmlFor="pkg-category" hint="One functional taxonomy — this is what search and filters use later.">
+          <Field width="short" label="Category" htmlFor="pkg-category" hint="One functional taxonomy — this is what search and filters use later.">
             <Select
               value={draft.category}
               placeholder="Choose a category…"
@@ -97,7 +97,7 @@ export function StepFinalize() {
                     className={[
                       "flex cursor-pointer items-start gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border p-[var(--spacing-6)] text-left outline-none",
                       "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                      on ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface hover:border-border-strong",
+                      on ? "border-border-brand bg-bg-surface shadow-1" : "border-border bg-bg-surface hover:border-border-strong",
                     ].join(" ")}
                     style={{ borderWidth: "var(--border-width-1)" }}
                   >

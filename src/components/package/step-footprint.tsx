@@ -171,15 +171,13 @@ export function StepFootprint() {
       </Banner>
 
       <div className="flex flex-wrap items-end gap-[var(--spacing-8)]">
-        <div className="w-[240px]">
-          <Field label="Mounting">
-            <Select
-              value={draft.mounting}
-              options={MOUNTINGS.map((m) => ({ label: m, value: m }))}
-              onChange={(v) => actions.patch({ mounting: v as Mounting })}
-            />
-          </Field>
-        </div>
+        <Field width="short" label="Mounting">
+          <Select
+            value={draft.mounting}
+            options={MOUNTINGS.map((m) => ({ label: m, value: m }))}
+            onChange={(v) => actions.patch({ mounting: v as Mounting })}
+          />
+        </Field>
         <Field label="Units">
           <Segmented
             label="Display unit"
@@ -188,15 +186,13 @@ export function StepFootprint() {
             onChange={(v) => actions.patch({ units: v as Unit })}
           />
         </Field>
-        <div className="w-[240px]">
-          <Field label="Draw layer">
-            <Select
-              value={draft.drawLayer}
-              options={FP_LAYERS.map((l) => ({ label: l, value: l }))}
-              onChange={(v) => actions.patch({ drawLayer: v as FpLayer })}
-            />
-          </Field>
-        </div>
+        <Field width="short" label="Draw layer">
+          <Select
+            value={draft.drawLayer}
+            options={FP_LAYERS.map((l) => ({ label: l, value: l }))}
+            onChange={(v) => actions.patch({ drawLayer: v as FpLayer })}
+          />
+        </Field>
       </div>
 
       <EditorToolbar

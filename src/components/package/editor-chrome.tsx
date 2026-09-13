@@ -193,16 +193,30 @@ export function SidePanel({ hint, children }: { hint: React.ReactNode; children?
   );
 }
 
+/** How wide a field should be — decided by what goes in it, not by the grid
+ *  it happens to sit in. A single-letter reference prefix in a 660px box and
+ *  `1.2` in a 715px one is what made these forms read as unfinished. */
+const FIELD_WIDTH = {
+  /** A number with a unit — `1.27`, `0.65`. */
+  num: 150,
+  /** A code, a short name, a select — `SMD`, `Top Silkscreen`, `D`. */
+  short: 260,
+  /** Prose, or a name that can be long. Takes the measure it is given. */
+  full: undefined,
+} as const;
+
 /** Label-over-control, the form rhythm the flow's screenshots use. */
 export function Field({
   label,
   htmlFor,
   hint,
+  width = "full",
   children,
 }: {
   label: string;
   htmlFor?: string;
   hint?: string;
+  width?: keyof typeof FIELD_WIDTH;
   children: React.ReactNode;
 }) {
   return (
@@ -210,8 +224,12 @@ export function Field({
       <label htmlFor={htmlFor} className="font-display text-sm font-medium leading-sm text-text-secondary">
         {label}
       </label>
-      {children}
-      {hint ? <span className="font-display text-2xs font-regular leading-2xs text-text-tertiary">{hint}</span> : null}
+      <div className="min-w-0" style={{ maxWidth: FIELD_WIDTH[width] }}>
+        {children}
+      </div>
+      {hint ? (
+        <span className="max-w-[440px] font-display text-2xs font-regular leading-2xs text-text-tertiary">{hint}</span>
+      ) : null}
     </div>
   );
 }

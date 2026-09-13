@@ -11,7 +11,9 @@
 //
 // `suffix` carries a unit adornment inside the field (mm · mil · °), which is
 // what a dimension field needs — the unit belongs to the value, not to a
-// separate label somewhere else in the form.
+// separate label somewhere else in the form. It is drawn as quiet text inside
+// the field, with no divider or fill: it labels the value, and anything with an
+// edge and a background reads as a button you can press.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -75,7 +77,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
       {suffix ? (
         <span
           aria-hidden
-          className="inline-flex shrink-0 items-center border-l border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-[var(--spacing-5)] font-[family-name:var(--font-family-mono)] text-[length:var(--font-size-sm)] text-[color:var(--color-text-secondary)]"
+          className="inline-flex shrink-0 items-center pr-[var(--spacing-5)] font-[family-name:var(--font-family-mono)] text-[length:var(--font-size-sm)] text-[color:var(--color-text-tertiary)]"
         >
           {suffix}
         </span>

@@ -79,7 +79,7 @@ export function StepSymbol() {
       </StepHeading>
 
       <FieldGrid>
-        <Field label="Reference prefix" htmlFor="pkg-prefix" hint="Feeds the Designator text kind — shown as U? until the part is placed on a board.">
+        <Field label="Reference prefix" width="short" htmlFor="pkg-prefix" hint="Feeds the Designator text kind — shown as U? until the part is placed on a board.">
           <TextInput
             id="pkg-prefix"
             value={draft.prefix}
@@ -88,7 +88,7 @@ export function StepSymbol() {
             maxLength={4}
           />
         </Field>
-        <Field label="Default value" htmlFor="pkg-value" hint="Feeds the Value text kind, shared with the Footprint Creator.">
+        <Field label="Default value" width="short" htmlFor="pkg-value" hint="Feeds the Value text kind, shared with the Footprint Creator.">
           <TextInput id="pkg-value" value={draft.value} onValueChange={(v) => actions.patch({ value: v })} placeholder="10k" />
         </Field>
       </FieldGrid>
@@ -171,7 +171,7 @@ function SymProps({ obj }: { obj: SymObj }) {
 
       {obj.kind === "pin" ? (
         <>
-          <Field label="Pin No." hint="Read-only here — renumber in the pin table, which carries the pads with it.">
+          <Field width="short" label="Pin No." hint="Read-only here — renumber in the pin table, which carries the pads with it.">
             <TextInput value={String(obj.num)} readOnly disabled />
           </Field>
           <Field label="Name">
@@ -184,7 +184,7 @@ function SymProps({ obj }: { obj: SymObj }) {
               onChange={(v) => set({ etype: v as PinType })}
             />
           </Field>
-          <Field label="Length">
+          <Field width="num" label="Length">
             <TextInput value={numField(obj.length)} onValueChange={(v) => set({ length: Math.max(6, readNum(v, obj.length)) })} />
           </Field>
           <Field label="Angle">

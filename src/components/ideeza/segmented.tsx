@@ -53,7 +53,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       className={cn(
-        "inline-flex overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)]",
+        "inline-flex w-fit self-start overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)]",
         disabled && "opacity-[var(--opacity-disabled)]",
         className,
       )}

@@ -17,6 +17,7 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { usePackageActions, usePackageDraft } from "@/lib/package/store";
 import { UNITS, entrySub, fmt, fromDisplay, type PathId, type Unit } from "@/lib/package/types";
 import { FAMILIES, FIELDS, familyById, padsFor, silkFor } from "@/lib/package/wizard";
+import { FootprintThumb } from "./package-thumbs";
 import { Breadcrumb, Field,  StepHeading } from "./editor-chrome";
 import { ImportFields, ImportResult } from "./step-import";
 
@@ -155,12 +156,19 @@ function FamilyPicker() {
             type="button"
             role="listitem"
             onClick={() => actions.patch({ wizard: { family: f.id, params: { ...f.params } } })}
-            className="flex cursor-pointer flex-col items-start gap-[var(--spacing-2)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-6)] text-left outline-none transition-[border-color,box-shadow] duration-fast hover:border-border-strong hover:shadow-1 focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="group flex cursor-pointer flex-col gap-[var(--spacing-4)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-5)] text-left outline-none transition-[border-color,box-shadow] duration-fast hover:border-border-strong hover:shadow-1 focus-visible:ring-2 focus-visible:ring-border-focus"
             style={{ borderWidth: "var(--border-width-1)" }}
           >
-            <span className="font-display text-sm font-semibold leading-sm text-text-primary">{f.label}</span>
-            <span className="font-mono text-2xs text-text-tertiary">
-              {f.prefix} · {f.mount} · {f.arrangement}
+            <span className="block h-[72px] w-full overflow-hidden rounded-[var(--radius-lg)] bg-bg-subtle">
+              <FootprintThumb draft={{ symbol: [], footprint: padsFor(f, f.params) }} w={220} h={72} />
+            </span>
+            <span className="flex min-w-0 flex-col gap-[var(--spacing-1)]">
+              <span className="truncate font-display text-sm font-semibold leading-sm text-text-primary group-hover:text-text-brand">
+                {f.label}
+              </span>
+              <span className="truncate font-mono text-2xs text-text-tertiary">
+                {f.prefix} · {f.mount} · {f.arrangement}
+              </span>
             </span>
           </button>
         ))}
@@ -201,22 +209,28 @@ function WizardParams() {
       </StepHeading>
 
       <div className="grid grid-cols-1 gap-[var(--spacing-10)] lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="flex flex-col gap-[var(--spacing-7)]">
-          <Segmented
-            label="Display unit"
-            value={draft.units}
-            options={UNITS.map((u) => ({ label: u, value: u }))}
-            onChange={(v) => actions.patch({ units: v as Unit })}
-          />
-          {fields.map((f) => (
-            <ParamInput
-              key={f.key}
-              field={f}
-              unit={draft.units}
-              value={params[f.key] ?? 0}
-              onCommit={(v) => setParam(f.key, v)}
+        <div className="flex h-fit flex-col gap-[var(--spacing-7)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
+          <div className="flex flex-wrap items-center justify-between gap-[var(--spacing-5)]">
+            <h3 className="font-display text-2xs font-semibold uppercase tracking-caps text-text-tertiary">Parameters</h3>
+            <Segmented
+              label="Display unit"
+              size="sm"
+              value={draft.units}
+              options={UNITS.map((u) => ({ label: u, value: u }))}
+              onChange={(v) => actions.patch({ units: v as Unit })}
             />
-          ))}
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,max-content))] gap-x-[var(--spacing-8)] gap-y-[var(--spacing-6)]">
+            {fields.map((f) => (
+              <ParamInput
+                key={f.key}
+                field={f}
+                unit={draft.units}
+                value={params[f.key] ?? 0}
+                onCommit={(v) => setParam(f.key, v)}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="flex h-fit flex-col gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-7)]">
@@ -278,7 +292,7 @@ function ParamInput({
   };
 
   return (
-    <Field label={field.label}>
+    <Field label={field.label} width="num">
       <TextInput
         value={text}
         suffix={field.mm ? unit : undefined}
