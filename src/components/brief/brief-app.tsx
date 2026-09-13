@@ -69,6 +69,15 @@ function draftKey(projectId: string): string {
 // into BriefState, clears the storyboard + videoJobId, and snaps to Step 2.
 const REGEN_REQUEST_KEY = "ideeza:brief:regenerate";
 const REGEN_EVENT = "ideeza:brief-regenerate";
+// Hand-off slot written when Step 1 attaches the build to a project that turns
+// out to already hold a brief of its own: that draft is kept and the target's
+// Brief says so on arrival, rather than the user finding their answers gone
+// with no explanation. One-shot, and stale after a minute so a hand-off the
+// user abandoned can't surface days later.
+const HANDOFF_KEPT_KEY = "ideeza:brief:handoff-kept";
+const HANDOFF_KEPT_MAX_AGE = 60_000;
+const HANDOFF_KEPT_NOTICE =
+  "That project already has a brief in progress — opening it instead, so nothing there is overwritten.";
 
 // Every read migrates: a draft stored before the testnet move (Ethereum /
 // Polygon / Solana, Bundle / Offers listings) comes back on the live model
@@ -87,36 +96,109 @@ function readFromStorage(projectId: string): { state: BriefState; step: number }
   return { state: DEFAULT_STATE, step: 1 };
 }
 
+// Does a stored draft hold work of its own? Anything the user answered on Step
+// 1 or produced downstream counts — a draft like this belongs to its project
+// and must never be written over by a hand-off from another one.
+function draftHasWork(s: BriefState): boolean {
+  return Boolean(
+    s.productName.trim() ||
+      s.productDescription.trim() ||
+      s.intent ||
+      s.scenes.length ||
+      s.storyboardGenerated ||
+      s.videoJobId ||
+      s.mintedAt,
+  );
+}
+
 // Seed another project's brief draft with what Step 1 just answered. The draft
 // is stored PER PROJECT and the active project is about to become that one, so
 // without this the per-project hydration would read an empty draft and throw
-// Step 1 away the moment Continue switches projects. Anything already stored
-// for that project (a Step 2/3 in progress) is kept — only Step 1's answers
-// are overlaid.
-function seedDraft(projectId: string, s: BriefState, step: number) {
+// Step 1 away the moment Continue switches projects.
+//
+// Only the Step 1 answers travel, over a FRESH default — a brief is one
+// product's, so its storyboard, render link, price, licence, confirmations and
+// mint stamp are not another project's to inherit. And a target that already
+// holds a brief of its own keeps it: this returns false and the caller says so
+// instead of replacing that project's work.
+function seedDraft(projectId: string, s: BriefState, step: number): boolean {
   try {
     const raw = window.localStorage.getItem(draftKey(projectId));
     const prev = raw
       ? normalizeBrief((JSON.parse(raw) as { state?: unknown }).state)
       : null;
-    const merged: BriefState = prev
-      ? {
-          ...prev,
-          projectId: s.projectId,
-          projectChoice: s.projectChoice,
-          newProjectName: s.newProjectName,
-          newProjectDescription: s.newProjectDescription,
-          productName: s.productName,
-          productDescription: s.productDescription,
-          intent: s.intent,
-          mediaType: s.mediaType,
-        }
-      : s;
+    if (prev && draftHasWork(prev)) return false;
+    const seeded: BriefState = {
+      ...DEFAULT_STATE,
+      projectId,
+      projectChoice: projectId,
+      productName: s.productName,
+      productDescription: s.productDescription,
+      intent: s.intent,
+      mediaType: s.mediaType,
+    };
     window.localStorage.setItem(
       draftKey(projectId),
-      JSON.stringify({ state: merged, step }),
+      JSON.stringify({ state: seeded, step }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The build just went to another project, so this one's draft must stop
+// pointing at a project it no longer owns: left as "new" with the typed name
+// still in it, reopening this Brief and pressing Continue would create a
+// second, identically-named project.
+function releaseProjectChoice(projectId: string) {
+  try {
+    const raw = window.localStorage.getItem(draftKey(projectId));
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { state?: unknown; step?: number };
+    const prev = normalizeBrief(parsed.state);
+    window.localStorage.setItem(
+      draftKey(projectId),
+      JSON.stringify({
+        state: {
+          ...prev,
+          projectChoice: projectId,
+          newProjectName: "",
+          newProjectDescription: "",
+        },
+        step: parsed.step ?? 1,
+      }),
     );
   } catch {}
+}
+
+function noteHandoffKept(projectId: string) {
+  try {
+    window.localStorage.setItem(
+      HANDOFF_KEPT_KEY,
+      JSON.stringify({ projectId, at: Date.now() }),
+    );
+  } catch {}
+}
+
+// Read once, on the project the hand-off landed in.
+function readHandoffKept(projectId: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(HANDOFF_KEPT_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { projectId?: string; at?: number };
+    const stale =
+      typeof parsed?.at !== "number" ||
+      Date.now() - parsed.at > HANDOFF_KEPT_MAX_AGE;
+    if (parsed?.projectId !== projectId || stale) {
+      if (stale) window.localStorage.removeItem(HANDOFF_KEPT_KEY);
+      return false;
+    }
+    window.localStorage.removeItem(HANDOFF_KEPT_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // The default answer to Step 1's "Choose Project" is the project the Brief was
@@ -185,6 +267,19 @@ export function BriefApp() {
   const [hydrated, setHydrated] = React.useState(false);
   const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
+  // Step 1's hand-off is in flight: Continue has created/attached and the page
+  // is navigating. The ref is what actually stops a second press (React state
+  // doesn't land inside the same tick — the same guard projectFromBuild uses
+  // to keep one build to one project); the flag is what greys the button.
+  const continuingRef = React.useRef(false);
+  const [continuing, setContinuing] = React.useState(false);
+  // Set when this project's own brief was kept instead of being overwritten by
+  // a hand-off from elsewhere — the page says so on arrival. The slot is
+  // one-shot, so the ref keeps the read to once per project: StrictMode runs
+  // the hydration effect twice in dev and the second pass would otherwise find
+  // the notice already consumed and clear it again.
+  const [handoffKept, setHandoffKept] = React.useState(false);
+  const handoffReadFor = React.useRef<string | null>(null);
 
   // Hydration is PER PROJECT: load THIS project's brief draft (or a fresh Step
   // 1 if it has none). The cross-page regenerate handoff still applies on top.
@@ -207,6 +302,10 @@ export function BriefApp() {
     }
     setState(normalized);
     setStep(nextStep);
+    if (handoffReadFor.current !== activeProjectId) {
+      handoffReadFor.current = activeProjectId;
+      setHandoffKept(readHandoffKept(activeProjectId));
+    }
     setHydrated(true);
   }, [activeProjectId]);
 
@@ -277,11 +376,22 @@ export function BriefApp() {
   };
 
   // Products already inside a project: its own, plus every AI build saved into
-  // it. A project always holds at least the one it was made for.
-  const productCount = (projectId: string) =>
-    1 + builds.filter((b) => b.projectId === projectId).length;
+  // it. A project always holds at least the one it was made for — and when the
+  // project WAS made from a build, that build is the project's own product, so
+  // counting it again would report two products where there is one.
+  const productCount = (projectId: string) => {
+    const originBuildId = projects.find((p) => p.id === projectId)?.buildId;
+    return (
+      1 +
+      builds.filter((b) => b.projectId === projectId && b.id !== originBuildId)
+        .length
+    );
+  };
 
   const goToStep2 = () => {
+    // One press, one project.
+    if (continuingRef.current) return;
+
     // Media is chosen on Step 2 itself, for every intent: recording from a
     // phone (AR) is a preview too, so Sell / Give are no longer snapped to AI
     // on the way in. Only "Add later" stays locked for them.
@@ -291,8 +401,11 @@ export function BriefApp() {
     // the choice rewritten to its id, so Back → Continue attaches to the same
     // project instead of making a second one); an existing one is opened.
     let targetId = state.projectChoice;
-    let targetSlug = activeProject?.slug ?? "";
+    let targetSlug: string;
     if (state.projectChoice === "new") {
+      if (!state.newProjectName.trim()) return;
+      continuingRef.current = true;
+      setContinuing(true);
       const created = createProject({
         name: state.newProjectName.trim(),
         description: state.newProjectDescription.trim(),
@@ -301,22 +414,37 @@ export function BriefApp() {
       targetSlug = created.slug;
       next = { ...next, projectChoice: created.id, projectId: created.id };
     } else {
+      // Step 1 blocks Continue on a choice that matches no project and says
+      // why; this is the last line of defence, not a silent no-op.
+      const target = projects.find((p) => p.id === targetId);
+      if (!target) return;
+      continuingRef.current = true;
+      setContinuing(true);
+      targetSlug = target.slug;
       next = { ...next, projectId: targetId };
-      targetSlug = projects.find((p) => p.id === targetId)?.slug ?? targetSlug;
     }
-    // The product being built belongs to the project it was just attached to.
-    updateProject(targetId, { productName: state.productName });
 
     // The URL is what says which project the editor is in — the workspace
     // gate reads the slug and remounts the Brief per project. So attaching the
     // build elsewhere is a navigation, with the draft seeded first so the
     // remount opens on Step 2 carrying what was just typed.
     if (targetId !== activeProjectId) {
-      seedDraft(targetId, next, 2);
+      // Unless that project already has a brief of its own — then its draft
+      // wins, we only open it, and Step 1 there explains what happened.
+      if (seedDraft(targetId, next, 2)) {
+        // The product being built belongs to the project it lands in.
+        updateProject(targetId, { productName: next.productName });
+      } else {
+        noteHandoffKept(targetId);
+      }
+      if (activeProjectId) releaseProjectChoice(activeProjectId);
       router.push(stepHref(targetSlug, "brief"));
       return;
     }
 
+    updateProject(targetId, { productName: next.productName });
+    continuingRef.current = false;
+    setContinuing(false);
     setState(next);
     setStep(2);
   };
@@ -466,10 +594,17 @@ export function BriefApp() {
           style={{
             minHeight: "100%",
             display: "flex",
-            justifyContent: "center",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--spacing-6)",
             padding: "64px 32px",
           }}
         >
+          {/* Above the card rather than inside Step 1: the kept brief opens on
+              whichever step it had reached, so a Step-1-only notice would go
+              unread exactly when the user most needs it. */}
+          {handoffKept ? <HandoffNotice /> : null}
+
           <Crossfade keyName={`step-${step}`}>
             {step === 1 && (
               <Step1Idea
@@ -481,6 +616,7 @@ export function BriefApp() {
                 productName={state.productName}
                 productDescription={state.productDescription}
                 intent={state.intent}
+                busy={continuing}
                 onChange={handleStep1Change}
                 onBack={() => router.push("/projects")}
                 onContinue={goToStep2}
@@ -622,6 +758,45 @@ export function BriefCard({
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+/** Why this Brief isn't carrying the answers Step 1 was just given elsewhere. */
+function HandoffNotice() {
+  return (
+    <div
+      role="status"
+      data-handoff-notice
+      style={{
+        width: "100%",
+        maxWidth: 600,
+        display: "flex",
+        gap: 10,
+        padding: "12px 14px",
+        background: "var(--color-bg-info-subtle)",
+        border: "var(--border-width-1) solid var(--color-border-blue)",
+        borderRadius: "var(--radius-lg)",
+        fontSize: 13,
+        color: "var(--color-text-primary)",
+      }}
+    >
+      <svg
+        width="17"
+        height="17"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--color-text-blue)"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ flexShrink: 0, marginTop: 1 }}
+        aria-hidden
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5 M12 7.6v.4" />
+      </svg>
+      <span>{HANDOFF_KEPT_NOTICE}</span>
     </div>
   );
 }

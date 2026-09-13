@@ -76,6 +76,7 @@ export function Step1Idea({
   productName,
   productDescription,
   intent,
+  busy,
   onChange,
   onBack,
   onContinue,
@@ -89,12 +90,16 @@ export function Step1Idea({
   productName: string;
   productDescription: string;
   intent: Intent | null;
+  /** Continue has been answered and the hand-off is in flight. */
+  busy?: boolean;
   onChange: (patch: Step1Patch) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
   const isNew = projectChoice === "new";
   const chosen = isNew ? null : projects.find((p) => p.id === projectChoice) ?? null;
+  const reasonId = React.useId();
+  const intentLabelId = React.useId();
 
   const options: SelectOption[] = React.useMemo(
     () => [
@@ -113,14 +118,19 @@ export function Step1Idea({
   const missing =
     isNew && !newProjectName.trim()
       ? "Name the new project to continue."
-      : !productName.trim()
-        ? "Add a product name to continue."
-        : !productDescription.trim()
-          ? "Add the one-line description to continue."
-          : !intent
-            ? "Pick how you want to share it."
-            : null;
-  const canContinue = !missing;
+      : // A stored choice can outlive the project it names (deleted, or a
+        // browser that no longer holds it) — say so rather than letting
+        // Continue do nothing.
+        !isNew && !chosen
+        ? "That project isn't available any more — choose another."
+        : !productName.trim()
+          ? "Add a product name to continue."
+          : !productDescription.trim()
+            ? "Add the one-line description to continue."
+            : !intent
+              ? "Pick how you want to share it."
+              : null;
+  const canContinue = !missing && !busy;
 
   return (
     <BriefCard onBack={onBack}>
@@ -207,10 +217,17 @@ export function Step1Idea({
             paddingTop: 18,
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}>
+          <div
+            id={intentLabelId}
+            style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}
+          >
             How do you want to share it?
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div
+            role="group"
+            aria-labelledby={intentLabelId}
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
+          >
             {INTENTS.map((i) => {
               const sel = intent === i.id;
               return (
@@ -267,12 +284,27 @@ export function Step1Idea({
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          {/* The reason Continue is off is text on the page, not a tooltip —
+              so a screen reader reaches it through aria-describedby. */}
+          {missing ? (
+            <span id={reasonId} style={{ fontSize: 12, color: C.body, textAlign: "right" }}>
+              {missing}
+            </span>
+          ) : null}
           <span title={missing ?? undefined} style={{ display: "inline-flex" }}>
             <button
               onClick={onContinue}
               disabled={!canContinue}
               title={missing ?? undefined}
+              aria-describedby={missing ? reasonId : undefined}
               style={{
                 padding: "11px 22px",
                 background: canContinue ? C.primary : "var(--color-bg-subtle)",
