@@ -30,6 +30,21 @@ function labelFor(id: BriefStepId, intent: Intent | null): string {
   }
 }
 
+/** The row closest to `rank` in the canonical order; ties go to the earlier. */
+function nearestIndex(steps: BriefStepId[], rank: number): number {
+  if (rank < 0 || !steps.length) return -1;
+  let best = -1;
+  let bestGap = Infinity;
+  steps.forEach((s, i) => {
+    const gap = Math.abs(STEP_ORDER.indexOf(s) - rank);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = i;
+    }
+  });
+  return best;
+}
+
 export function BriefRail({
   steps,
   current,
@@ -53,6 +68,12 @@ export function BriefRail({
   // step order instead; without this the rail blanked (nothing done, nothing
   // active) exactly when the user was dropped into the middle of it.
   const currentRank = STEP_ORDER.indexOf(current);
+  // Which row reads as "you are here". Off-sequence there is no exact row, so
+  // it is the nearest one by canonical rank — ties going to the earlier, the
+  // way `stepBefore` in the wizard places an off-sequence step. Without this
+  // the rail showed ticks and nothing active, which reads as a finished flow.
+  const activeIndex =
+    currentIndex >= 0 ? currentIndex : nearestIndex(steps, currentRank);
   const isDone = (id: BriefStepId, i: number) =>
     currentIndex >= 0
       ? i < currentIndex
@@ -88,9 +109,11 @@ export function BriefRail({
         }}
       >
         {steps.map((id, i) => {
-          const active = i === currentIndex;
+          const active = i === activeIndex;
           // Before the current step = answered; after it = not reached yet.
-          const done = isDone(id, i);
+          // The row standing in for an off-sequence step is where you are, not
+          // something you have answered.
+          const done = !active && isDone(id, i);
           const canGo = Boolean(onGo) && done;
           return (
             <button

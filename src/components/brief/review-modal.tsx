@@ -8,7 +8,9 @@
 //    approve here: the card is a way to watch what is about to be minted.
 //  approve — opened from the global render indicator when a render lands:
 //    the same clip with the decision on it ("Looks good · continue to mint"),
-//    which is what sets videoReviewed and lets the Pay button light up.
+//    which marks that job `acknowledged` so the ready toast stops asking to be
+//    reviewed. It gates nothing on the mint form — Pay reads the brief's own
+//    fields, never this.
 //
 // Regenerate is the caller's to carry out in both (it owns the prompt); the
 // preview variant puts the existing RegenerateConfirm in front of it, since

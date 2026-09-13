@@ -55,7 +55,6 @@ export function Step2Video({
   onGenerateStoryboard,
   onStartRender,
   onContinue,
-  onSkip,
   onBack,
   isLastStep,
   minting,
@@ -68,7 +67,6 @@ export function Step2Video({
   onGenerateStoryboard: () => void;
   onStartRender: () => void;
   onContinue: () => void;
-  onSkip: () => void;
   onBack: () => void;
   /** Is this preview the last thing to answer — so Continue commits? */
   isLastStep: boolean;
@@ -135,11 +133,13 @@ export function Step2Video({
   // commit whatever the sequence says.
   const commits = isLastStep && !startsRender;
   const forwardLabel = isLastStep ? FINAL_CTA[intent] : "Continue to mint setup";
-  // The way past media belongs to a step you can still come back from. On a
-  // last-step preview "Skip media" would mint the whole brief behind a word
-  // that promises the opposite — the Skip card above still sets the same
-  // choice, and the CTA then says what it does.
-  const offerSkip = !skipLocked && !isLastStep;
+  // There is no separate "Skip media" link. It could only ever be honest where
+  // skipping is allowed AND a step still follows — and `stepsFor` gives those
+  // no overlap: Sell/Give lock skipping, and a Save brief only reaches this
+  // step with Share to Innovations on, which puts the preview last. The Skip
+  // CARD above makes the same choice, and the CTA then names what it commits
+  // to, so the way past media is still one click — just not behind a word
+  // that would have minted the brief.
 
   return (
     <BriefCard onBack={onBack}>
@@ -530,20 +530,12 @@ export function Step2Video({
               AI storyboard to continue.
             </span>
           ) : effectiveMediaType === "ar" ? (
-            /* The wait is the state of this step, so it is said here too — and
-               Save, which may go on without any media, keeps its way out. */
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 12 }}
-            >
-              <span style={{ fontSize: 12, color: C.body }}>
-                {state.arClip
-                  ? "Clip received from your phone."
-                  : "Waiting for the clip from your phone."}
-              </span>
-              {offerSkip && <SkipMediaLink onClick={onSkip} />}
-            </div>
-          ) : offerSkip && effectiveMediaType !== "skip" ? (
-            <SkipMediaLink onClick={onSkip} />
+            /* The wait is the state of this step, so it is said here too. */
+            <span style={{ fontSize: 12, color: C.body }}>
+              {state.arClip
+                ? "Clip received from your phone."
+                : "Waiting for the clip from your phone."}
+            </span>
           ) : (
             <span />
           )}
@@ -627,29 +619,6 @@ function ForwardLabel({
       {label}
       {commits ? null : <ChevronRight />}
     </>
-  );
-}
-
-// The way past media for a Save brief — the one intent that may go on without
-// any preview at all.
-function SkipMediaLink({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: "transparent",
-        border: "none",
-        padding: 0,
-        color: C.body,
-        fontSize: 13,
-        cursor: "pointer",
-        textDecoration: "underline",
-        textUnderlineOffset: 3,
-        fontFamily: "inherit",
-      }}
-    >
-      Skip media
-    </button>
   );
 }
 

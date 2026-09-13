@@ -61,6 +61,22 @@ function pendingSubline(intent: Intent, share: boolean): string {
     : base;
 }
 
+/**
+ * The line under the storyboard, while the render is still running. It has to
+ * agree with `pendingSubline` above it — a save that is already stored isn't
+ * waiting to "go live" — and it must not name a numbered step: the steps have
+ * names now, and the reminder email is set on the render card itself, not on
+ * the form.
+ */
+function pendingCardLine(intent: Intent, share: boolean, quality: string): string {
+  const clip = `your ${quality} 10s video`;
+  if (intent === "sell") return `Your listing goes live as soon as ${clip} finishes.`;
+  if (intent === "give") return `The drop opens as soon as ${clip} finishes.`;
+  return share
+    ? `Your Innovations post goes up as soon as ${clip} finishes.`
+    : `It is replaced by ${clip} as soon as that finishes.`;
+}
+
 export function Step4Success({
   state,
   onBrowse,
@@ -306,10 +322,14 @@ export function Step4Success({
                 <path d="M12 8v4 M12 16h.01" />
               </svg>
               <span>
-                Storyboard is your private preview for now. Project goes live
-                as soon as your {state.quality === "low" ? "480p" : "720p"} 10s
-                video finishes — we&rsquo;ll notify you on this browser and at
-                the email you set on Step 3.
+                Storyboard is your private preview for now.{" "}
+                {pendingCardLine(
+                  intent,
+                  state.shareToNewsfeed,
+                  state.quality === "low" ? "480p" : "720p",
+                )}{" "}
+                We&rsquo;ll tell you here when it lands — and email you, if you
+                asked for that when the render started.
               </span>
             </div>
           )}

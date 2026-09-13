@@ -117,9 +117,15 @@ function readFromStorage(projectId: string): { state: BriefState; step: BriefSte
 // Does a stored draft hold work of its own? Anything the user answered on Step
 // 1 or produced downstream counts — a draft like this belongs to its project
 // and must never be written over by a hand-off from another one.
-function draftHasWork(s: BriefState): boolean {
+//
+// `productName` alone does NOT count while it still reads the project's own
+// name: the Brief adopts that on mount and the persist effect flushes it, so
+// merely OPENING a project's brief once wrote a draft that looked like work
+// and made every later hand-off into that project refuse.
+function draftHasWork(s: BriefState, ownProductName: string): boolean {
+  const named = s.productName.trim();
   return Boolean(
-    s.productName.trim() ||
+    (named && named !== ownProductName.trim()) ||
       s.productDescription.trim() ||
       s.intent ||
       s.scenes.length ||
@@ -139,13 +145,18 @@ function draftHasWork(s: BriefState): boolean {
 // mint stamp are not another project's to inherit. And a target that already
 // holds a brief of its own keeps it: this returns false and the caller says so
 // instead of replacing that project's work.
-function seedDraft(projectId: string, s: BriefState, step: BriefStepId): boolean {
+function seedDraft(
+  projectId: string,
+  s: BriefState,
+  step: BriefStepId,
+  targetProductName: string,
+): boolean {
   try {
     const raw = window.localStorage.getItem(draftKey(projectId));
     const prev = raw
       ? normalizeBrief((JSON.parse(raw) as { state?: unknown }).state)
       : null;
-    if (prev && draftHasWork(prev)) return false;
+    if (prev && draftHasWork(prev, targetProductName)) return false;
     const seeded: BriefState = {
       ...DEFAULT_STATE,
       projectId,
@@ -190,32 +201,38 @@ function releaseProjectChoice(projectId: string) {
   } catch {}
 }
 
-function noteHandoffKept(projectId: string) {
+// `from` is the project the answers were typed in — they stay in ITS draft, so
+// the notice on the other side can say where to go back for them.
+function noteHandoffKept(projectId: string, from: string) {
   try {
     window.localStorage.setItem(
       HANDOFF_KEPT_KEY,
-      JSON.stringify({ projectId, at: Date.now() }),
+      JSON.stringify({ projectId, from, at: Date.now() }),
     );
   } catch {}
 }
 
 // Read once, on the project the hand-off landed in.
-function readHandoffKept(projectId: string): boolean {
+function readHandoffKept(projectId: string): { from: string } | null {
   try {
     const raw = window.localStorage.getItem(HANDOFF_KEPT_KEY);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw) as { projectId?: string; at?: number };
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      projectId?: string;
+      from?: string;
+      at?: number;
+    };
     const stale =
       typeof parsed?.at !== "number" ||
       Date.now() - parsed.at > HANDOFF_KEPT_MAX_AGE;
     if (parsed?.projectId !== projectId || stale) {
       if (stale) window.localStorage.removeItem(HANDOFF_KEPT_KEY);
-      return false;
+      return null;
     }
     window.localStorage.removeItem(HANDOFF_KEPT_KEY);
-    return true;
+    return { from: typeof parsed.from === "string" ? parsed.from : "" };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -325,7 +342,9 @@ export function BriefApp() {
   // one-shot, so the ref keeps the read to once per project: StrictMode runs
   // the hydration effect twice in dev and the second pass would otherwise find
   // the notice already consumed and clear it again.
-  const [handoffKept, setHandoffKept] = React.useState(false);
+  const [handoffKept, setHandoffKept] = React.useState<{ from: string } | null>(
+    null,
+  );
   const handoffReadFor = React.useRef<string | null>(null);
 
   // Hydration is PER PROJECT: load THIS project's brief draft (or a fresh Step
@@ -483,6 +502,9 @@ export function BriefApp() {
     // project instead of making a second one); an existing one is opened.
     let targetId = state.projectChoice;
     let targetSlug: string;
+    // The name the target project already carries — what its own draft would
+    // hold without anyone having typed a thing (see `draftHasWork`).
+    let targetProductName = "";
     if (state.projectChoice === "new") {
       if (!state.newProjectName.trim()) return;
       continuingRef.current = true;
@@ -502,6 +524,7 @@ export function BriefApp() {
       continuingRef.current = true;
       setContinuing(true);
       targetSlug = target.slug;
+      targetProductName = target.productName;
       next = { ...next, projectId: targetId };
     }
 
@@ -517,11 +540,13 @@ export function BriefApp() {
     if (targetId !== activeProjectId) {
       // Unless that project already has a brief of its own — then its draft
       // wins, we only open it, and Step 1 there explains what happened.
-      if (seedDraft(targetId, next, afterIdea)) {
+      if (seedDraft(targetId, next, afterIdea, targetProductName)) {
         // The product being built belongs to the project it lands in.
         updateProject(targetId, { productName: next.productName });
       } else {
-        noteHandoffKept(targetId);
+        // Nothing is lost: this project's own draft still holds what was just
+        // typed, and the notice on the other side names it.
+        noteHandoffKept(targetId, activeProject?.name ?? "");
       }
       if (activeProjectId) releaseProjectChoice(activeProjectId);
       router.push(stepHref(targetSlug, "brief"));
@@ -625,17 +650,23 @@ export function BriefApp() {
   const commit = () => {
     setMinting(true);
     window.setTimeout(() => {
-      if (state.videoJobId) markMinted(state.videoJobId);
-      // Brief is the last step in the product flow — closing it out marks the
-      // whole product as complete so the home page can offer "Start fresh"
-      // instead of "Continue".
-      markFlowStep("brief");
-      // Terminal step done → flip the project Draft → Completed so it reads as
-      // Completed in My Projects.
-      if (activeProjectId) setStatus(activeProjectId, "completed");
-      setState((s) => ({ ...s, mintedAt: Date.now() }));
-      setMinting(false);
-      setStep("success");
+      // Whatever happens in here, the button has to come back: without the
+      // finally a throw mid-write left `minting` true and the CTA disabled
+      // for good, with no way on and no way back.
+      try {
+        if (state.videoJobId) markMinted(state.videoJobId);
+        // Brief is the last step in the product flow — closing it out marks
+        // the whole product as complete so the home page can offer "Start
+        // fresh" instead of "Continue".
+        markFlowStep("brief");
+        // Terminal step done → flip the project Draft → Completed so it reads
+        // as Completed in My Projects.
+        if (activeProjectId) setStatus(activeProjectId, "completed");
+        setState((s) => ({ ...s, mintedAt: Date.now() }));
+        setStep("success");
+      } finally {
+        setMinting(false);
+      }
     }, 1400);
   };
 
@@ -654,18 +685,7 @@ export function BriefApp() {
     if (target) setStep(target);
   };
 
-  const skipMedia = () => {
-    // Only Save intent can skip media; Sell/Give require AI for the storyboard.
-    if (state.intent === "sell" || state.intent === "give") return;
-    patch({
-      mediaType: "skip",
-      scenes: [],
-      storyboardGenerated: false,
-    });
-    goNext();
-  };
-
-  const updateScene = (id: string, p: Partial<Scene>) =>
+  const updateScene =(id: string, p: Partial<Scene>) =>
     setState((s) => ({
       ...s,
       scenes: s.scenes.map((sc) => (sc.id === id ? { ...sc, ...p } : sc)),
@@ -679,8 +699,10 @@ export function BriefApp() {
         current={step}
         intent={state.intent}
         // Backwards only, and only while there is still something to change:
-        // once it is minted the brief is a record, not a form.
-        onGo={step === "success" ? undefined : setStep}
+        // once it is minted the brief is a record, not a form. The write
+        // itself locks it too — a rail click mid-commit navigated away and
+        // the commit then yanked the user to success behind their back.
+        onGo={step === "success" || minting ? undefined : setStep}
         topOffset={62}
       />
 
@@ -708,7 +730,7 @@ export function BriefApp() {
           {/* Above the card rather than inside Step 1: the kept brief opens on
               whichever step it had reached, so a Step-1-only notice would go
               unread exactly when the user most needs it. */}
-          {handoffKept ? <HandoffNotice /> : null}
+          {handoffKept ? <HandoffNotice from={handoffKept.from} /> : null}
 
           <Crossfade keyName={`step-${step}`}>
             {step === "idea" && (
@@ -736,7 +758,6 @@ export function BriefApp() {
                 onGenerateStoryboard={generateStoryboard}
                 onStartRender={startRender}
                 onContinue={goNext}
-                onSkip={skipMedia}
                 onBack={goBack}
                 isLastStep={isLastStep}
                 minting={minting}
@@ -881,8 +902,12 @@ export function BriefCard({
   );
 }
 
-/** Why this Brief isn't carrying the answers Step 1 was just given elsewhere. */
-function HandoffNotice() {
+/**
+ * Why this Brief isn't carrying the answers Step 1 was just given elsewhere —
+ * and where those answers are, since nothing was thrown away: they are still
+ * in the brief they were typed in, one project away.
+ */
+function HandoffNotice({ from }: { from: string }) {
   return (
     <div
       role="status"
@@ -915,7 +940,12 @@ function HandoffNotice() {
         <circle cx="12" cy="12" r="9" />
         <path d="M12 11v5 M12 7.6v.4" />
       </svg>
-      <span>{HANDOFF_KEPT_NOTICE}</span>
+      <span>
+        {HANDOFF_KEPT_NOTICE}{" "}
+        {from
+          ? `What you just typed is still in ${from}'s brief — open that project to carry on there.`
+          : "What you just typed is still in the brief you came from — open that project to carry on there."}
+      </span>
     </div>
   );
 }
