@@ -49,6 +49,25 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // watch it land and reopen Refine to iterate.
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
 
+  // Which concept each Regenerate came from: child turn id → source turn
+  // id. The source card's Regenerate reads pressed while its child is
+  // still rendering, so the click has a visible answer up where it was
+  // made. Derived from the live turns, so a finished child releases the
+  // button without any cleanup pass.
+  const [regenSource, setRegenSource] = React.useState<
+    Record<string, string>
+  >({});
+  const regeneratingFrom = React.useMemo(() => {
+    const out = new Set<string>();
+    if (!chat) return out;
+    for (const t of chat.turns) {
+      if (t.role !== "assistant" || t.status !== "pending") continue;
+      const source = regenSource[t.id];
+      if (source) out.add(source);
+    }
+    return out;
+  }, [chat, regenSource]);
+
   // Auto-run any pending assistant turns. This handles:
   //   • the home→chat redirect (initial fresh turn comes in pending),
   //   • turns the user kicked off then refreshed away from before they
@@ -238,7 +257,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 
   const handleRegenerate = React.useCallback(
-    (sourcePrompt: string) => {
+    (sourcePrompt: string, sourceTurnId: string) => {
       if (!chat) return;
       // Regenerate (spec §4c) is a FRESH take on the same prompt — it
       // ignores the existing image. No new user turn because the user
@@ -247,6 +266,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         prompt: sourcePrompt,
         kind: "fresh",
       });
+      setRegenSource((prev) => ({ ...prev, [turnId]: sourceTurnId }));
       runGeneration(chat.id, turnId, {
         prompt: sourcePrompt,
         kind: "fresh",
@@ -369,6 +389,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         <div className="mx-auto w-full max-w-[640px] px-[24px] py-[32px]">
           <ChatThread
             chat={chat}
+            regeneratingFrom={regeneratingFrom}
             onRegenerateAt={handleRegenerate}
             onUseTurn={handleUseTurn}
             onRefineTurn={handleOpenEditor}

@@ -10,8 +10,8 @@
 //
 // Spec §4c: each image turn is labelled "Concept N" so users can locate
 // a specific version. Refinements are numbered off their parent
-// ("Concept 1.1") and get a "Refines Concept M" breadcrumb, so the
-// evolution chain is visible while scrolling.
+// ("Concept 1.1"), so the dotted label alone carries the evolution
+// chain while scrolling.
 
 import * as React from "react";
 import type { ChatSession, ChatTurn } from "@/lib/create/history";
@@ -44,12 +44,16 @@ export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
 
 export function ChatThread({
   chat,
+  regeneratingFrom,
   onRegenerateAt,
   onUseTurn,
   onRefineTurn,
 }: {
   chat: ChatSession;
-  onRegenerateAt: (sourcePrompt: string) => void;
+  // Turns whose Regenerate is still rendering its fresh take — the
+  // orchestrator owns the child→source link, the card only reads it.
+  regeneratingFrom?: ReadonlySet<string>;
+  onRegenerateAt: (sourcePrompt: string, sourceTurnId: string) => void;
   onUseTurn: (turnId: string) => void;
   onRefineTurn: (turnId: string) => void;
 }) {
@@ -89,7 +93,8 @@ export function ChatThread({
               turn={turn}
               conceptLabel={label}
               parentConceptLabel={parentLabel}
-              onRegenerate={() => onRegenerateAt(turn.prompt)}
+              regenerating={regeneratingFrom?.has(turn.id) ?? false}
+              onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
               onUseThis={() => onUseTurn(turn.id)}
               onRefine={() => onRefineTurn(turn.id)}
             />

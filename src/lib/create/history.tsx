@@ -50,7 +50,7 @@ export type ChatTurn =
       prompt: string;
       kind: AssistantTurnKind;
       // When kind === "refine": the turn this concept evolves from. The
-      // UI uses this to render a "Refines Concept N" breadcrumb so the
+      // UI numbers a refine off its parent ("Concept 1.1"), so the
       // refinement chain is visible while scrolling.
       parentTurnId?: string;
       status: AssistantImageStatus;
