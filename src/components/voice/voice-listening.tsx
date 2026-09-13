@@ -10,6 +10,7 @@
 // hook, 0..1, newest last), not a decorative animation.
 
 import * as React from "react";
+import { cn } from "@/lib/utils";
 
 // One screenful of waveform — the same count `useVoiceInput` keeps, so a
 // full buffer fills the row exactly and a shorter one leaves the tail at
@@ -39,12 +40,10 @@ export function VoiceListening({
 
   return (
     <div
-      className={[
+      className={cn(
         "flex flex-col gap-[14px] rounded-2xl border-[1.5px] border-solid border-border-brand bg-bg-surface p-[16px]",
-        className ?? "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        className,
+      )}
     >
       <div
         role="status"
@@ -77,13 +76,11 @@ export function VoiceListening({
               key={i}
               data-bar={heard ? "heard" : "waiting"}
               style={{ height: `${height}px` }}
-              className={[
+              className={cn(
                 "w-[3px] shrink-0 rounded-[2px] bg-bg-brand",
                 "transition-[height] duration-normal ease-decelerate motion-reduce:transition-none",
-                heard ? "" : "opacity-20",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+                !heard && "opacity-20",
+              )}
             />
           );
         })}

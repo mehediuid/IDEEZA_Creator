@@ -26,6 +26,7 @@ import {
   SparklesIcon,
   ViewIcon,
 } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
@@ -303,11 +304,13 @@ const PromptCard = React.forwardRef<
   ref,
 ) {
   const localRef = React.useRef<HTMLTextAreaElement | null>(null);
-  React.useImperativeHandle(
-    ref,
-    () => localRef.current as HTMLTextAreaElement,
-    [],
-  );
+  // No dep array on purpose. The listening view below replaces this
+  // whole card, so the textarea is unmounted and remounted once per
+  // dictation; a handle computed only at mount would hand the parent a
+  // detached node for the rest of the session, and its three focus calls
+  // (empty submit, caret back after Enhance, example chip) would quietly
+  // do nothing.
+  React.useImperativeHandle(ref, () => localRef.current as HTMLTextAreaElement);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [attachment, setAttachment] = React.useState<string | null>(null);
 
@@ -320,34 +323,44 @@ const PromptCard = React.forwardRef<
   });
   const listening = voice.status === "listening";
 
+  // `listening` is in the deps because Cancel leaves the draft exactly
+  // as it was: the textarea comes back at its default rows and nothing
+  // about the value changed, so only the swap itself can re-grow it.
   React.useEffect(() => {
     const el = localRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, [value]);
-
-  // The mic button is one of the controls the listening view replaces,
-  // so the click that opened the session leaves focus on a removed
-  // element. Park it on the view itself: the live region is read, and
-  // Tab carries on into Cancel / Stop & review rather than restarting
-  // at the top of the page.
-  const viewRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (listening) viewRef.current?.focus();
-  }, [listening]);
+  }, [value, listening]);
 
   // Leaving the listening view takes the textarea's place back, so put
   // the caret where typing continues — at the end of the draft, after
   // whatever the transcript just appended.
-  const returnToComposer = () => {
+  const returnToComposer = React.useCallback(() => {
     requestAnimationFrame(() => {
       const el = localRef.current;
       if (!el) return;
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
     });
-  };
+  }, []);
+
+  // The mic button is one of the controls the listening view replaces,
+  // so the click that opened the session leaves focus on a removed
+  // element. Park it on the view itself: the live region is read, and
+  // Tab carries on into Cancel / Stop & review rather than restarting
+  // at the top of the page. Coming back out is the same problem in
+  // reverse, and it is not only Cancel / Stop that gets there — a
+  // session also ends by itself (a silence timeout, the OS taking the
+  // microphone), which would drop focus on <body>. So the transition
+  // owns the hand-back, not the two buttons.
+  const viewRef = React.useRef<HTMLDivElement>(null);
+  const wasListening = React.useRef(false);
+  React.useEffect(() => {
+    if (listening) viewRef.current?.focus();
+    else if (wasListening.current) returnToComposer();
+    wasListening.current = listening;
+  }, [listening, returnToComposer]);
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -370,22 +383,18 @@ const PromptCard = React.forwardRef<
   // belong to Cancel / Stop & review. The two overrides keep the card's
   // own box (1 px neutral border, 20 px padding) so nothing shifts on
   // the swap; the component's own default is a 1.5 px brand border at
-  // 16 px, which is right where it isn't standing in for a card.
+  // 16 px, which is right where it isn't standing in for a card. The
+  // view merges its classes through `cn()`, so these simply replace the
+  // defaults — no `!` needed to out-shout them.
   if (listening) {
     return (
       <div ref={viewRef} tabIndex={-1} className="outline-none">
         <VoiceListening
           levels={voice.levels}
           interim={voice.interim}
-          onCancel={() => {
-            voice.cancel();
-            returnToComposer();
-          }}
-          onStop={() => {
-            voice.stop();
-            returnToComposer();
-          }}
-          className="!border !border-border !p-[20px]"
+          onCancel={voice.cancel}
+          onStop={voice.stop}
+          className="border border-border p-[20px]"
         />
       </div>
     );
@@ -470,15 +479,20 @@ const PromptCard = React.forwardRef<
       </div>
 
       {/* Why the last session produced nothing. It is derived from the
-          hook's status, so the next successful start clears it. */}
-      {voiceError && (
-        <p
-          role="status"
-          className="mt-[10px] px-[4px] text-sm text-text-error"
-        >
-          {voiceError}
-        </p>
-      )}
+          hook's status, so the next successful start clears it. The
+          region is always in the DOM — a live region mounted together
+          with its text is announced by no screen reader, because there
+          was nothing there to watch change. Empty it carries no margin,
+          so nothing below it moves. */}
+      <p
+        role="status"
+        className={cn(
+          "px-[4px] text-sm text-text-error",
+          voiceError && "mt-[10px]",
+        )}
+      >
+        {voiceError}
+      </p>
     </div>
   );
 });

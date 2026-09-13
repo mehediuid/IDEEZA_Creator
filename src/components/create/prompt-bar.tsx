@@ -19,6 +19,7 @@ import {
   PlusSignIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
@@ -44,22 +45,16 @@ export function PromptBar({
   });
   const listening = voice.status === "listening";
 
-  // Auto-grow the textarea up to ~5 lines.
+  // Auto-grow the textarea up to ~5 lines. `listening` is in the deps
+  // because Cancel leaves the draft exactly as it was: the textarea
+  // comes back at its default rows and nothing about the value changed,
+  // so only the swap itself can re-grow it.
   React.useEffect(() => {
     const el = taRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-  }, [value]);
-
-  // The mic is one of the controls the listening view replaces, so the
-  // click that opened the session leaves focus on a removed element.
-  // Park it on the view: the live region is read and Tab carries on
-  // into Cancel / Stop & review.
-  const viewRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (listening) viewRef.current?.focus();
-  }, [listening]);
+  }, [value, listening]);
 
   const send = () => {
     const trimmed = value.trim();
@@ -97,14 +92,30 @@ export function PromptBar({
   // Leaving the listening view hands the textarea its place back, so
   // put the caret where typing continues — after whatever the
   // transcript just appended.
-  const returnToComposer = () => {
+  const returnToComposer = React.useCallback(() => {
     requestAnimationFrame(() => {
       const el = taRef.current;
       if (!el) return;
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
     });
-  };
+  }, []);
+
+  // The mic is one of the controls the listening view replaces, so the
+  // click that opened the session leaves focus on a removed element.
+  // Park it on the view: the live region is read and Tab carries on
+  // into Cancel / Stop & review. Coming back out is the same problem in
+  // reverse, and Cancel / Stop are not the only way out — a session also
+  // ends by itself (a silence timeout, the OS taking the microphone),
+  // which would drop focus on <body>. So the transition owns the
+  // hand-back, not the two buttons.
+  const viewRef = React.useRef<HTMLDivElement>(null);
+  const wasListening = React.useRef(false);
+  React.useEffect(() => {
+    if (listening) viewRef.current?.focus();
+    else if (wasListening.current) returnToComposer();
+    wasListening.current = listening;
+  }, [listening, returnToComposer]);
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -133,14 +144,8 @@ export function PromptBar({
         <VoiceListening
           levels={voice.levels}
           interim={voice.interim}
-          onCancel={() => {
-            voice.cancel();
-            returnToComposer();
-          }}
-          onStop={() => {
-            voice.stop();
-            returnToComposer();
-          }}
+          onCancel={voice.cancel}
+          onStop={voice.stop}
         />
       </div>
     );
@@ -219,12 +224,20 @@ export function PromptBar({
       </div>
 
       {/* Why the last session produced nothing. It is derived from the
-          hook's status, so the next successful start clears it. */}
-      {voiceError && (
-        <p role="status" className="mt-[8px] px-[4px] text-sm text-text-error">
-          {voiceError}
-        </p>
-      )}
+          hook's status, so the next successful start clears it. The
+          region is always in the DOM — a live region mounted together
+          with its text is announced by no screen reader, because there
+          was nothing there to watch change. Empty it carries no margin,
+          so nothing below it moves. Same offset as the home card's. */}
+      <p
+        role="status"
+        className={cn(
+          "px-[4px] text-sm text-text-error",
+          voiceError && "mt-[10px]",
+        )}
+      >
+        {voiceError}
+      </p>
     </div>
   );
 }

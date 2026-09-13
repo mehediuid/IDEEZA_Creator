@@ -24,6 +24,7 @@ import {
   Cancel01Icon,
   Mic01Icon,
 } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
 import { Icon } from "@/components/dashboard/icon";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
@@ -56,11 +57,22 @@ export function ImageEditorModal({
     },
   });
   const listening = voice.status === "listening";
+  // Taken off the hook result so the effect below can depend on the
+  // callback itself — it is stable, where `voice` is a new object every
+  // render.
+  const { cancel: cancelSession } = voice;
 
-  // Focus the edit box on open.
+  // Focus the edit box on open — and end any session on the way out.
+  // The chat renders this overlay unconditionally and it only
+  // short-circuits on `!open`, so it never unmounts and the hook's own
+  // unmount teardown never runs: closing mid-dictation would otherwise
+  // leave the recogniser listening, the microphone stream open (the OS
+  // indicator still lit) and the meter's frame loop running, and a later
+  // natural `onend` would append the transcript into a closed overlay.
   React.useEffect(() => {
     if (open) requestAnimationFrame(() => inputRef.current?.focus());
-  }, [open]);
+    else cancelSession();
+  }, [open, cancelSession]);
 
   // Esc closes.
   React.useEffect(() => {
@@ -72,34 +84,46 @@ export function ImageEditorModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Auto-grow the edit box.
+  // Auto-grow the edit box. `listening` and `open` are in the deps
+  // because both unmount the box while the draft stays put: Cancel
+  // leaves the text exactly as it was, so only the swap back can
+  // re-grow it.
   React.useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-  }, [text]);
-
-  // The mic is one of the controls the listening view replaces, so the
-  // click that opened the session leaves focus on a removed element.
-  // Park it on the view: the live region is read and Tab carries on
-  // into Cancel / Stop & review.
-  const viewRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (listening) viewRef.current?.focus();
-  }, [listening]);
+  }, [text, listening, open]);
 
   // Leaving the listening view hands the edit box its place back, so
   // put the caret where typing continues — after whatever the
   // transcript just appended.
-  const returnToComposer = () => {
+  const returnToComposer = React.useCallback(() => {
     requestAnimationFrame(() => {
       const el = inputRef.current;
       if (!el) return;
       el.focus();
       el.setSelectionRange(el.value.length, el.value.length);
     });
-  };
+  }, []);
+
+  // The mic is one of the controls the listening view replaces, so the
+  // click that opened the session leaves focus on a removed element.
+  // Park it on the view: the live region is read and Tab carries on
+  // into Cancel / Stop & review. Coming back out is the same problem in
+  // reverse, and Cancel / Stop are not the only way out — a session also
+  // ends by itself (a silence timeout, the OS taking the microphone),
+  // which would drop focus on <body>. So the transition owns the
+  // hand-back, not the two buttons. Closing the overlay ends a session
+  // too, and there the edit box is gone, so the focus call finds
+  // nothing and takes nothing away from the page behind.
+  const viewRef = React.useRef<HTMLDivElement>(null);
+  const wasListening = React.useRef(false);
+  React.useEffect(() => {
+    if (listening) viewRef.current?.focus();
+    else if (wasListening.current) returnToComposer();
+    wasListening.current = listening;
+  }, [listening, returnToComposer]);
 
   // Closed on the server and on the first client render alike (it only
   // ever opens from a click), so the document guard can't desync
@@ -177,14 +201,8 @@ export function ImageEditorModal({
             <VoiceListening
               levels={voice.levels}
               interim={voice.interim}
-              onCancel={() => {
-                voice.cancel();
-                returnToComposer();
-              }}
-              onStop={() => {
-                voice.stop();
-                returnToComposer();
-              }}
+              onCancel={voice.cancel}
+              onStop={voice.stop}
               className="mx-auto w-full max-w-[640px]"
             />
           </div>
@@ -250,15 +268,20 @@ export function ImageEditorModal({
         )}
 
         {/* Why the last session produced nothing. It is derived from the
-            hook's status, so the next successful start clears it. */}
-        {voiceError && (
-          <p
-            role="status"
-            className="mx-auto mt-[10px] w-full max-w-[640px] text-center text-sm text-text-error"
-          >
-            {voiceError}
-          </p>
-        )}
+            hook's status, so the next successful start clears it. The
+            region is always in the DOM — a live region mounted together
+            with its text is announced by no screen reader, because there
+            was nothing there to watch change. Empty it carries no
+            margin, so the hint below it doesn't move. */}
+        <p
+          role="status"
+          className={cn(
+            "mx-auto w-full max-w-[640px] text-center text-sm text-text-error",
+            voiceError && "mt-[10px]",
+          )}
+        >
+          {voiceError}
+        </p>
 
         <p className="mt-[10px] text-center text-sm text-text-tertiary">
           Refining evolves the same concept. To start over from your prompt,
