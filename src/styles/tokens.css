@@ -254,6 +254,12 @@
   --color-bg-surface-raised: var(--color-gray-100);
   --color-bg-subtle: var(--color-gray-100);
   --color-bg-inverse: var(--color-gray-900);
+  /* Task 8 (SI03b/SI04b) — a toast is dark in BOTH themes, unlike
+   * --color-bg-inverse above (which deliberately flips per theme for
+   * tooltip/panel "inverse of the page" uses elsewhere). Light: gray-900
+   * surface; dark theme redefines this to a raised near-black so the toast
+   * still reads as elevated against the dark page. */
+  --color-bg-toast: var(--color-gray-900);
   --color-bg-overlay: var(--color-gray-900);
   --color-bg-brand: var(--color-violet-600);
   --color-bg-brand-hover: var(--color-violet-700);
@@ -288,6 +294,7 @@
   --color-text-tertiary: var(--color-gray-400);
   --color-text-disabled: var(--color-gray-300);
   --color-text-inverse: var(--color-white);
+  --color-text-on-toast: var(--color-white);
   --color-text-on-brand: var(--color-white);
   --color-text-brand: var(--color-violet-600);
   --color-text-blue: var(--color-blue-600);
@@ -478,6 +485,9 @@
   --color-bg-surface-raised: var(--color-gray-800);
   --color-bg-subtle: var(--color-gray-800);
   --color-bg-inverse: var(--color-gray-50);
+  /* Task 8 — a raised near-black, not the light --color-bg-inverse above, so
+   * the toast still reads as its own dark surface against the dark page. */
+  --color-bg-toast: var(--color-gray-800);
   --color-bg-overlay: var(--color-gray-950);
   --color-bg-brand: var(--color-violet-500);
   --color-bg-brand-hover: var(--color-violet-400);
@@ -506,6 +516,7 @@
   --color-text-tertiary: var(--color-gray-500);
   --color-text-disabled: var(--color-gray-600);
   --color-text-inverse: var(--color-gray-900);
+  --color-text-on-toast: var(--color-white);
   --color-text-brand: var(--color-violet-300);
   --color-text-blue: var(--color-blue-300);
   --color-text-link: var(--color-blue-400);
@@ -588,6 +599,8 @@
     --color-bg-surface: var(--color-gray-900);
     --color-bg-surface-raised: var(--color-gray-800);
     --color-bg-subtle: var(--color-gray-800);
+    /* Task 8 — keep the system-dark path in sync with [data-theme="dark"]. */
+    --color-bg-toast: var(--color-gray-800);
     --color-bg-brand: var(--color-violet-500);
     --color-bg-brand-hover: var(--color-violet-400);
     --color-bg-brand-pressed: var(--color-violet-300);
@@ -601,6 +614,7 @@
     --color-text-secondary: var(--color-gray-300);
     --color-text-tertiary: var(--color-gray-500);
     --color-text-disabled: var(--color-gray-600);
+    --color-text-on-toast: var(--color-white);
 
     --color-border-default: var(--color-gray-800);
     --color-border-strong: var(--color-gray-600);
