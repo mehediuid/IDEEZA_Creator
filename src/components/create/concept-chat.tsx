@@ -13,17 +13,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft01Icon,
-  Clock01Icon,
-} from "@hugeicons/core-free-icons";
 import Link from "next/link";
-import { Icon } from "@/components/dashboard/icon";
-import {
-  deriveTitle,
-  useCreateHistory,
-  type ChatSession,
-} from "@/lib/create/history";
+import { deriveTitle, useCreateHistory } from "@/lib/create/history";
 import { useCreatePlan } from "@/lib/create/plan";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
@@ -41,7 +32,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     failAssistantTurn,
     setTurnProgress,
     startBuild,
-    buildsForChat,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
 
@@ -175,11 +165,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 
   // The most-recent READY assistant turn — what a prompt-bar submission
-  // evolves from, with its label so the hint can say "refines Concept N".
-  // If nothing is ready yet (the first generation is still pending),
-  // refinement degrades to a fresh take so the user is never blocked.
-  const { latestReadyTurn, latestReadyConceptLabel } = React.useMemo(() => {
-    if (!chat) return { latestReadyTurn: null, latestReadyConceptLabel: "" };
+  // evolves from. If nothing is ready yet (the first generation is still
+  // pending), refinement degrades to a fresh take so the user is never
+  // blocked.
+  const latestReadyTurn = React.useMemo(() => {
+    if (!chat) return null;
     let last: Extract<
       (typeof chat.turns)[number],
       { role: "assistant" }
@@ -189,11 +179,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         last = t;
       }
     }
-    return {
-      latestReadyTurn: last,
-      latestReadyConceptLabel: last ? (labels.get(last.id) ?? "1") : "",
-    };
-  }, [chat, labels]);
+    return last;
+  }, [chat]);
 
   // The concept open in the editor, and which refine of it the next edit
   // will be — the editor names the number the result will carry.
@@ -375,11 +362,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <ChatHeader chat={chat} buildCount={buildsForChat(chat.id).length} />
-
-      {/* Thread — scrolls; prompt bar is pinned below. */}
+      {/* Thread — scrolls; prompt bar is pinned below. No page header:
+          the app shell's sidebar carries navigation and the thread's
+          first user turn already says what this chat is about. */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[760px] px-[24px] py-[32px]">
+        <div className="mx-auto w-full max-w-[640px] px-[24px] py-[32px]">
           <ChatThread
             chat={chat}
             onRegenerateAt={handleRegenerate}
@@ -389,23 +376,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         </div>
       </div>
 
-      <div className="border-t border-border bg-bg-page">
-        <div className="mx-auto w-full max-w-[760px] px-[24px] py-[16px]">
-          <PromptBar
-            onSubmit={handleUserSubmit}
-            busy={chat.turns.some(
-              (t) => t.role === "assistant" && t.status === "pending",
-            )}
-            placeholder={
-              latestReadyTurn
-                ? "Describe a change to refine, or regenerate for a fresh take…"
-                : "Describe the concept you want to see…"
-            }
-          />
-          <p className="mt-[8px] text-center text-2xs font-medium text-text-tertiary">
-            {latestReadyTurn
-              ? `Typing a change refines Concept ${latestReadyConceptLabel}. Use Regenerate for a fresh take. One chat can produce many builds.`
-              : "Start by describing the concept. Refine and regenerate as many times as you like."}
+      <div className="bg-bg-page">
+        <div className="mx-auto w-full max-w-[640px] px-[24px] py-[16px]">
+          {/* Never disabled while a concept renders — describing the next
+              change shouldn't wait on the current one. */}
+          <PromptBar onSubmit={handleUserSubmit} />
+          <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
+            Start by describing the concept. Refine and regenerate as many
+            times as you like.
           </p>
         </div>
       </div>
@@ -429,43 +407,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         onSubmitEdit={handleSubmitEdit}
       />
     </div>
-  );
-}
-
-function ChatHeader({
-  chat,
-  buildCount,
-}: {
-  chat: ChatSession;
-  buildCount: number;
-}) {
-  return (
-    <header className="flex items-center gap-[16px] border-b border-border bg-bg-page px-[24px] py-[12px]">
-      <Link
-        href="/"
-        aria-label="Back to Home"
-        className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        <Icon icon={ArrowLeft01Icon} />
-      </Link>
-      <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          Concept chat
-        </p>
-        <h1 className="truncate text-md font-semibold text-text-primary">
-          {chat.title}
-        </h1>
-      </div>
-      {buildCount > 0 && (
-        <Link
-          href="/history/builds"
-          className="inline-flex h-[32px] items-center gap-[8px] rounded-full border border-border bg-bg-surface px-[12px] text-2xs font-bold uppercase tracking-wider text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          <Icon icon={Clock01Icon} size={14} />
-          {buildCount} build{buildCount === 1 ? "" : "s"}
-        </Link>
-      )}
-    </header>
   );
 }
 

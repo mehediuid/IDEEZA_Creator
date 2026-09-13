@@ -105,7 +105,7 @@ function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
       <p
-        className="max-w-[560px] whitespace-pre-wrap rounded-2xl rounded-br-md bg-bg-brand-subtle px-[18px] py-[12px] text-md text-text-primary"
+        className="max-w-[456px] whitespace-pre-wrap rounded-2xl rounded-br-[4px] border border-border bg-bg-surface px-[18px] py-[12px] text-md text-text-secondary"
         role="comment"
         aria-label="Your prompt"
       >

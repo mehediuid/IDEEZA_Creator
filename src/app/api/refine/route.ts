@@ -40,6 +40,15 @@ async function refineWithAI(prompt: string): Promise<string> {
     if (!text || text.startsWith("{") || text.startsWith("[") || text.length > 900) {
       return "";
     }
+    // The provider answers 200 with prose when the shared key is out of
+    // budget or rate-limited. That prose is not a brief — fall through to
+    // the deterministic template rather than pasting it into the user's box.
+    if (
+      /\b(api key|key budget|rate limit|quota|too many requests)\b/i.test(text) ||
+      /pollinations\.ai/i.test(text)
+    ) {
+      return "";
+    }
     return text.replace(/^["']+|["']+$/g, "").trim();
   } catch {
     clearTimeout(timer);

@@ -1,46 +1,47 @@
 "use client";
 
-// PromptBar — bottom-pinned chat input. Same toolbar shape as the home
-// hero prompt card so the chat feels like a continuation of the home
-// flow. Auto-refine + voice + attach are present per spec §4a.
+// PromptBar — the chat composer, pinned under the thread. Same controls
+// as the home hero prompt card (`+` attach · mic dictation · Enhance ·
+// ai-magic send) so the chat reads as a continuation of the home flow;
+// the send stays icon-only here because the thread already says what a
+// submission does.
+//
+// It is never disabled while a generation is in flight — a user may
+// describe the next change while the current concept renders.
 
 import * as React from "react";
 import {
-  ArrowRight01Icon,
+  AiMagicIcon,
   Attachment01Icon,
+  Cancel01Icon,
   MagicWand01Icon,
   Mic01Icon,
+  PlusSignIcon,
+  Refresh01Icon,
 } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-
-const REFINE_STORAGE_KEY = "ideeza:dashboard:hero:refine-on";
+import { useVoiceInput } from "@/lib/voice/use-voice-input";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
 
 export function PromptBar({
   onSubmit,
-  busy,
-  placeholder = "Describe a change, or ask for a fresh take…",
+  placeholder = "Describe your electronics project...",
 }: {
   onSubmit: (text: string) => void;
-  busy: boolean;
   placeholder?: string;
 }) {
   const [value, setValue] = React.useState("");
-  const [refineOn, setRefineOn] = React.useState(true);
+  const [attachment, setAttachment] = React.useState<string | null>(null);
+  const [refining, setRefining] = React.useState(false);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
-  // Share the auto-refine preference with the home hero.
-  React.useEffect(() => {
-    try {
-      const v = window.localStorage.getItem(REFINE_STORAGE_KEY);
-      if (v === "0") setRefineOn(false);
-    } catch {}
-  }, []);
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem(REFINE_STORAGE_KEY, refineOn ? "1" : "0");
-    } catch {}
-  }, [refineOn]);
+  // Dictation appends what was said to whatever is already typed.
+  const voice = useVoiceInput({
+    onFinal: (said) => {
+      setValue((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said));
+    },
+  });
+  const listening = voice.status === "listening";
 
   // Auto-grow the textarea up to ~5 lines.
   React.useEffect(() => {
@@ -52,9 +53,50 @@ export function PromptBar({
 
   const send = () => {
     const trimmed = value.trim();
-    if (!trimmed || busy) return;
+    if (!trimmed || refining) return;
     onSubmit(trimmed);
     setValue("");
+    setAttachment(null);
+  };
+
+  // Enhance — rewrites the current draft into a concrete brief via
+  // /api/refine (the same endpoint the home prompt card uses), then drops
+  // it back in the box.
+  const enhance = async () => {
+    const trimmed = value.trim();
+    if (!trimmed || refining) return;
+    setRefining(true);
+    try {
+      const res = await fetch("/api/refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      const data = (await res.json()) as { refined?: string };
+      if (data.refined && data.refined.trim()) {
+        setValue(data.refined.trim());
+        requestAnimationFrame(() => taRef.current?.focus());
+      }
+    } catch {
+      // keep the original draft on failure
+    } finally {
+      setRefining(false);
+    }
+  };
+
+  const toggleVoice = () => {
+    if (listening) {
+      voice.stop();
+      return;
+    }
+    voice.start();
+    taRef.current?.focus();
+  };
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) setAttachment(f.name);
+    e.target.value = "";
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -64,8 +106,10 @@ export function PromptBar({
     }
   };
 
+  const hasText = value.trim().length > 0;
+
   return (
-    <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border-strong">
+    <div className="rounded-2xl border-1-5 border-border bg-bg-surface focus-within:border-border-brand">
       <label htmlFor="chat-prompt" className="sr-only">
         Continue the concept conversation
       </label>
@@ -77,9 +121,26 @@ export function PromptBar({
         onKeyDown={onKey}
         placeholder={placeholder}
         rows={2}
-        disabled={busy}
-        className="block w-full resize-none bg-transparent px-[20px] pt-[16px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary disabled:opacity-60"
+        className="block w-full resize-none bg-transparent px-[20px] pt-[16px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
       />
+
+      {attachment && (
+        <div className="px-[20px] pb-[4px]">
+          <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
+            <Icon icon={Attachment01Icon} size={14} />
+            <span className="max-w-[280px] truncate">{attachment}</span>
+            <button
+              type="button"
+              onClick={() => setAttachment(null)}
+              aria-label="Remove attachment"
+              className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              <Icon icon={Cancel01Icon} size={14} />
+            </button>
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
         <div className="flex items-center gap-[4px]">
           <input
@@ -87,83 +148,149 @@ export function PromptBar({
             type="file"
             accept="image/*"
             className="sr-only"
-            aria-hidden
             tabIndex={-1}
-            onChange={(e) => (e.target.value = "")}
+            onChange={onPickFile}
           />
-          <ToolbarButton
+          <ToolbarIconButton
             ariaLabel="Attach a reference image"
             onClick={() => fileRef.current?.click()}
-          >
-            <Icon icon={Attachment01Icon} />
-          </ToolbarButton>
-          <ToolbarButton ariaLabel="Use voice input">
-            <Icon icon={Mic01Icon} />
-          </ToolbarButton>
+            icon={PlusSignIcon}
+          />
+          <ToolbarIconButton
+            ariaLabel={
+              !voice.supported
+                ? "Voice input isn't supported in this browser"
+                : listening
+                  ? "Stop voice input"
+                  : "Use voice input"
+            }
+            onClick={voice.supported ? toggleVoice : undefined}
+            icon={Mic01Icon}
+            active={listening}
+            disabled={!voice.supported}
+          />
         </div>
+
         <div className="flex items-center gap-[8px]">
-          <RefinePill on={refineOn} onClick={() => setRefineOn((v) => !v)} />
-          <button
-            type="button"
-            onClick={send}
-            disabled={busy || !value.trim()}
-            aria-label="Send"
-            title="Send (Enter)"
-            className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-full bg-violet-600 text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Icon icon={ArrowRight01Icon} size={20} strokeWidth={2} />
-          </button>
+          <EnhanceButton
+            onClick={enhance}
+            refining={refining}
+            disabled={!hasText || refining}
+          />
+          <SendButton onClick={send} hasText={hasText} refining={refining} />
         </div>
       </div>
     </div>
   );
 }
 
-function ToolbarButton({
-  children,
+function ToolbarIconButton({
   ariaLabel,
   onClick,
+  icon,
+  active,
+  disabled,
 }: {
-  children: React.ReactNode;
   ariaLabel: string;
   onClick?: () => void;
+  icon: IconValue;
+  active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={ariaLabel}
+      aria-pressed={active}
       title={ariaLabel}
-      className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={[
+        "inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg outline-none transition-colors duration-fast",
+        "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40",
+        active
+          ? "bg-bg-brand-subtle text-text-brand"
+          : "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
+      ].join(" ")}
     >
-      {children}
+      <Icon icon={icon} />
     </button>
   );
 }
 
-function RefinePill({
-  on,
+function EnhanceButton({
   onClick,
+  refining,
+  disabled,
 }: {
-  on: boolean;
   onClick: () => void;
+  refining: boolean;
+  disabled: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-pressed={on}
-      aria-label={on ? "Enhance prompt is on" : "Enhance prompt is off"}
+      disabled={disabled}
+      aria-label="Enhance the prompt with AI"
+      title="Rewrite your draft into a clearer, concrete brief"
       className={[
-        "inline-flex h-[40px] items-center gap-[8px] rounded-lg px-[12px] text-sm font-medium outline-none transition-colors duration-fast",
-        "focus-visible:ring-2 focus-visible:ring-border-focus",
-        on
+        "inline-flex h-[40px] items-center gap-[8px] rounded-lg px-[16px] text-md font-medium outline-none transition-colors duration-fast",
+        "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-50",
+        refining
           ? "bg-bg-brand-subtle text-text-brand"
           : "text-text-secondary hover:bg-bg-surface-raised",
       ].join(" ")}
     >
-      <Icon icon={MagicWand01Icon} />
-      Enhance prompt
+      <Icon
+        icon={refining ? Refresh01Icon : MagicWand01Icon}
+        className={
+          refining ? "animate-spin motion-reduce:animate-none" : undefined
+        }
+      />
+      {refining ? "Enhancing…" : "Enhance"}
+    </button>
+  );
+}
+
+// Icon-only here, unlike the home card's labelled "Generate": in the
+// chat the thread above already says what a submission does. Quiet and
+// disabled with nothing typed, the brand's primary once there is a draft.
+function SendButton({
+  onClick,
+  hasText,
+  refining,
+}: {
+  onClick: () => void;
+  hasText: boolean;
+  refining: boolean;
+}) {
+  if (!hasText || refining) {
+    const why = refining
+      ? "Enhancing your draft…"
+      : "Describe your project first";
+    return (
+      <button
+        type="button"
+        disabled
+        aria-disabled
+        aria-label={`Send — ${why.toLowerCase()}`}
+        title={why}
+        className="inline-flex h-[40px] w-[40px] cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
+      >
+        <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Send"
+      title="Send (Enter)"
+      className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg bg-button-primary-bg text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+    >
+      <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
     </button>
   );
 }
