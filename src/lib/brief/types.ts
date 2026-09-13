@@ -350,16 +350,25 @@ export function stepsFor(intent: Intent | null, share: boolean): BriefStepId[] {
     : ["idea", "form", "success"];
 }
 
-// Steps used to be stored as 1–4. A draft saved then still opens on the step
-// it reached.
-const STEP_BY_NUMBER: readonly BriefStepId[] = ["idea", "preview", "form", "success"];
+/**
+ * Every step there is, in the order they can appear. A sequence is a subset of
+ * this, so it is what places a step the running sequence doesn't hold (the
+ * regenerate hand-off forces "preview" whatever the intent) — and, because
+ * drafts used to store the step as 1–4, what a stored number means.
+ */
+export const STEP_ORDER: readonly BriefStepId[] = [
+  "idea",
+  "preview",
+  "form",
+  "success",
+];
 
 export function normalizeStep(v: unknown): BriefStepId {
-  if (typeof v === "string" && (STEP_BY_NUMBER as readonly string[]).includes(v)) {
+  if (typeof v === "string" && (STEP_ORDER as readonly string[]).includes(v)) {
     return v as BriefStepId;
   }
   if (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4) {
-    return STEP_BY_NUMBER[v - 1];
+    return STEP_ORDER[v - 1];
   }
   return "idea";
 }

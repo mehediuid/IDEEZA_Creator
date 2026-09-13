@@ -48,7 +48,10 @@ ideeza-creator-panel/
    │  ├─ manual/             manual project creation + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
    │  ├─ video-jobs/         background render/video jobs + indicator
-   │  ├─ brief/              Add Brief: step-1-idea → 2-video → 3-mint → 4-success
+   │  ├─ brief/              Add Brief: brief-app (the intent-aware sequence) + brief-rail,
+   │  │                      step-1-idea · step-2-video (preview) · step-3-mint (the form) ·
+   │  │                      step-4-success, review-modal (preview / approve), regenerate-confirm,
+   │  │                      prompt-help-modal, ar-record-panel
    │  ├─ pcb/                ★ PCB module (schematic + PCB editor) — see below
    │  ├─ code/               Code module: Monaco dev-editor + Blockly + AI chat
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
@@ -67,6 +70,9 @@ ideeza-creator-panel/
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
+   │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
+   │  │                      the wizard and the rail both read — + the stored-draft
+   │  │                      migration), gas.ts, wallet.ts, video-prompt.ts, qr.ts
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store)

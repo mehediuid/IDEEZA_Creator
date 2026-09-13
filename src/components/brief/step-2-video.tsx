@@ -14,7 +14,7 @@
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { BriefCard } from "./brief-app";
-import type { BriefState, MediaType, Scene } from "./brief-app";
+import type { BriefState, Intent, MediaType, Scene } from "./brief-app";
 import { ArRecordPanel } from "./ar-record-panel";
 import {
   useVideoJobs,
@@ -31,6 +31,22 @@ function autoVideoPrompt(productName: string, productDescription: string): strin
 
 const LOCK_REASON = "A listing needs a preview clip";
 
+// When this step is the last one, Continue is the commit — so it says what it
+// commits to. A sale always has the mint setup after it, so it keeps carrying
+// the maker forward.
+const FINAL_CTA: Record<Intent, string> = {
+  sell: "Continue to mint setup",
+  give: "Give to community and post to Innovations",
+  save: "Save as Private",
+};
+
+/** What the commit is doing while it runs — a give mints, a save stores. */
+const BUSY_CTA: Record<Intent, string> = {
+  sell: "Minting…",
+  give: "Minting…",
+  save: "Saving…",
+};
+
 export function Step2Video({
   state,
   generatingStoryboard,
@@ -41,6 +57,8 @@ export function Step2Video({
   onContinue,
   onSkip,
   onBack,
+  isLastStep,
+  minting,
   onPromptHelp,
 }: {
   state: BriefState;
@@ -52,6 +70,10 @@ export function Step2Video({
   onContinue: () => void;
   onSkip: () => void;
   onBack: () => void;
+  /** Is this preview the last thing to answer — so Continue commits? */
+  isLastStep: boolean;
+  /** The commit is in flight: the CTA says so and takes no second press. */
+  minting: boolean;
   /** Opens the prompt-help modal. Omitted = the help link isn't offered. */
   onPromptHelp?: () => void;
 }) {
@@ -103,6 +125,21 @@ export function Step2Video({
     state.productName || "your product",
     state.productDescription || "what it does",
   );
+
+  const intent = (state.intent || "sell") as Intent;
+  // Forward from here is either "start the render and stay" or "carry on" —
+  // and when this preview is the last step, carrying on IS the commit, so the
+  // button names what it commits to rather than saying "Continue".
+  const startsRender = effectiveMediaType === "ai" && canStartRender;
+  // Starting the render leaves you standing here, so that press is never the
+  // commit whatever the sequence says.
+  const commits = isLastStep && !startsRender;
+  const forwardLabel = isLastStep ? FINAL_CTA[intent] : "Continue to mint setup";
+  // The way past media belongs to a step you can still come back from. On a
+  // last-step preview "Skip media" would mint the whole brief behind a word
+  // that promises the opposite — the Skip card above still sets the same
+  // choice, and the CTA then says what it does.
+  const offerSkip = !skipLocked && !isLastStep;
 
   return (
     <BriefCard onBack={onBack}>
@@ -441,8 +478,9 @@ export function Step2Video({
                 a render that never needs this tab to stay open. */}
             {state.storyboardGenerated && !generatingStoryboard && (
               <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
-                You can stay here and wait, or continue to the mint setup in
-                parallel — the render keeps running either way.
+                {isLastStep
+                  ? "You can stay here and wait, or go ahead now — the render keeps running either way."
+                  : "You can stay here and wait, or continue to the mint setup in parallel — the render keeps running either way."}
               </div>
             )}
           </>
@@ -479,7 +517,12 @@ export function Step2Video({
               {state.storyboardGenerated &&
                 !renderStarted &&
                 "Storyboard ready · Continue to start render."}
-              {renderStarted && "Render in flight · you can leave any time."}
+              {/* The line above the rule already says the render keeps
+                  running, so on the last step this would be the same fact
+                  twice — and the commit needs the width to read in one line. */}
+              {renderStarted &&
+                !isLastStep &&
+                "Render in flight · you can leave any time."}
             </span>
           ) : effectiveMediaType === null ? (
             <span style={{ fontSize: 12, color: C.body }}>
@@ -497,9 +540,9 @@ export function Step2Video({
                   ? "Clip received from your phone."
                   : "Waiting for the clip from your phone."}
               </span>
-              {!skipLocked && <SkipMediaLink onClick={onSkip} />}
+              {offerSkip && <SkipMediaLink onClick={onSkip} />}
             </div>
-          ) : !skipLocked && effectiveMediaType !== "skip" ? (
+          ) : offerSkip && effectiveMediaType !== "skip" ? (
             <SkipMediaLink onClick={onSkip} />
           ) : (
             <span />
@@ -515,31 +558,75 @@ export function Step2Video({
                 onClick={() => {
                   // AI flow w/ storyboard → kick off render and stay here.
                   // AR (clip in hand) / Skip flows → just navigate forward.
-                  if (effectiveMediaType === "ai" && canStartRender) {
+                  if (startsRender) {
                     onStartRender();
                   } else if (canContinueWithoutRender) {
                     onContinue();
                   }
                 }}
-                disabled={!canStartRender && !canContinueWithoutRender}
+                disabled={
+                  (!canStartRender && !canContinueWithoutRender) || minting
+                }
                 title={continueBlockedReason}
                 style={primaryFooterButton(
-                  canStartRender || canContinueWithoutRender,
+                  (canStartRender || canContinueWithoutRender) && !minting,
                 )}
               >
-                Continue
-                <ChevronRight />
+                <ForwardLabel
+                  busy={minting}
+                  intent={intent}
+                  commits={commits}
+                  label={commits ? FINAL_CTA[intent] : "Continue"}
+                />
               </button>
             </span>
           ) : (
-            <button onClick={onContinue} style={primaryFooterButton(true)}>
-              Continue to mint setup
-              <ChevronRight />
+            <button
+              onClick={onContinue}
+              disabled={minting}
+              style={primaryFooterButton(!minting)}
+            >
+              <ForwardLabel
+                busy={minting}
+                intent={intent}
+                commits={isLastStep}
+                label={forwardLabel}
+              />
             </button>
           )}
         </div>
       </div>
     </BriefCard>
+  );
+}
+
+// What the footer's one filled button says: the commit while it runs, else its
+// label. A chevron only where there is somewhere further to go — a commit ends
+// the brief, so it carries none.
+function ForwardLabel({
+  busy,
+  intent,
+  label,
+  commits,
+}: {
+  busy: boolean;
+  intent: Intent;
+  label: string;
+  commits: boolean;
+}) {
+  if (busy) {
+    return (
+      <>
+        <Spinner />
+        {BUSY_CTA[intent]}
+      </>
+    );
+  }
+  return (
+    <>
+      {label}
+      {commits ? null : <ChevronRight />}
+    </>
   );
 }
 

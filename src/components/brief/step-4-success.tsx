@@ -24,17 +24,42 @@ const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   save: "Saved",
 };
 
-const SUBLINE_LIVE_BY_INTENT: Record<Intent, string> = {
-  sell: "Your video is final and your listing is on the marketplace. Buyers can see it now.",
-  give: "Your video is final and the drop is open. Your community can claim it.",
-  save: "Stored in your library. Pick it up any time.",
-};
+/** The Innovations post is its own outcome — it happens on any of the three. */
+const POSTED = " Your post is up on Innovations.";
 
-const SUBLINE_PENDING_BY_INTENT: Record<Intent, string> = {
-  sell: "We&apos;ll publish your listing the moment the video finishes — no extra action needed.",
-  give: "We&apos;ll open the drop the moment the video finishes — no extra action needed.",
-  save: "Stored in your library. Pick it up any time.",
-};
+/**
+ * What the mint produced, read against the sequence this brief really ran: a
+ * give or a save only makes a clip when it also posts to Innovations, so the
+ * video is named only where there is one to name.
+ */
+function liveSubline(intent: Intent, hasClip: boolean, share: boolean): string {
+  const base =
+    intent === "sell"
+      ? hasClip
+        ? "Your video is final and your listing is on the marketplace. Buyers can see it now."
+        : "Your listing is on the marketplace. Buyers can see it now."
+      : intent === "give"
+        ? hasClip
+          ? "Your video is final and the drop is open. Your community can claim it."
+          : "The drop is open. Your community can claim it."
+        : "Stored in your library. Pick it up any time.";
+  return share ? base + POSTED : base;
+}
+
+/** Minted, with the render still running — what happens without you. */
+function pendingSubline(intent: Intent, share: boolean): string {
+  const base =
+    intent === "sell"
+      ? "We’ll publish your listing the moment the video finishes — no extra action needed."
+      : intent === "give"
+        ? "We’ll open the drop the moment the video finishes — no extra action needed."
+        : "Stored in your library. Pick it up any time.";
+  return share
+    ? intent === "save"
+      ? "Stored in your library. We’ll post it to Innovations the moment the video finishes."
+      : base + " The Innovations post goes up with it."
+    : base;
+}
 
 export function Step4Success({
   state,
@@ -59,8 +84,8 @@ export function Step4Success({
     ? HEADING_LIVE_BY_INTENT[intent]
     : "Mint complete";
   const subline = isLive
-    ? SUBLINE_LIVE_BY_INTENT[intent]
-    : SUBLINE_PENDING_BY_INTENT[intent];
+    ? liveSubline(intent, willRenderVideo || !!state.arClip, state.shareToNewsfeed)
+    : pendingSubline(intent, state.shareToNewsfeed);
 
   return (
     <div
@@ -127,8 +152,9 @@ export function Step4Success({
             marginTop: 6,
             maxWidth: 460,
           }}
-          dangerouslySetInnerHTML={{ __html: subline }}
-        />
+        >
+          {subline}
+        </p>
       </div>
 
       {/* Inline progress while we wait for the video to finalize */}

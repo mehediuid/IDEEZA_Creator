@@ -1,17 +1,31 @@
 "use client";
 
-// ReviewModal — full-screen overlay for the final video approval step.
-// Primary CTA "Looks good · continue to mint" sets videoReviewed=true and
-// closes the modal so the Pay button can light up. Secondary CTA opens the
-// regenerate-confirm dialog.
+// ReviewModal — the clip, full-screen, in the two places a maker meets it.
+//
+//  preview (the default) — opened from the product card on the form step:
+//    "Auto-Generated Preview" over the clip, with the render's own state as a
+//    badge and a Regenerate that asks before it spends the credit. Nothing to
+//    approve here: the card is a way to watch what is about to be minted.
+//  approve — opened from the global render indicator when a render lands:
+//    the same clip with the decision on it ("Looks good · continue to mint"),
+//    which is what sets videoReviewed and lets the Pay button light up.
+//
+// Regenerate is the caller's to carry out in both (it owns the prompt); the
+// preview variant puts the existing RegenerateConfirm in front of it, since
+// the card it opens from has no confirm of its own.
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
+import { RegenerateConfirm } from "./regenerate-confirm";
+
+export type ReviewVariant = "approve" | "preview";
 
 export function ReviewModal({
   open,
   prompt,
   quality,
+  variant = "preview",
+  ready = true,
   onApprove,
   onRegenerate,
   onClose,
@@ -19,14 +33,37 @@ export function ReviewModal({
   open: boolean;
   prompt: string;
   quality: "low" | "high";
+  /** Which modal this is — see the note above. */
+  variant?: ReviewVariant;
+  /** Has the clip finished rendering? Drives the preview variant's badge. */
+  ready?: boolean;
   onApprove: () => void;
   onRegenerate: () => void;
   onClose: () => void;
 }) {
   const [playing, setPlaying] = React.useState(false);
+  // Only the preview variant asks first — the approve variant's caller owns
+  // the confirm, and stacking two would ask the same question twice.
+  const [confirmRegen, setConfirmRegen] = React.useState(false);
+
+  // The preview variant carries no × (the badge sits where it would), so the
+  // keyboard needs a way out of it. The confirm on top goes first.
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (confirmRegen) setConfirmRegen(false);
+      else onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, confirmRegen, onClose]);
+
   if (!open) return null;
+  const isPreview = variant === "preview";
 
   return (
+    <>
     <div
       onClick={onClose}
       style={{
@@ -46,6 +83,7 @@ export function ReviewModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="review-title"
+        data-review-variant={variant}
         style={{
           width: "100%",
           maxWidth: 640,
@@ -58,17 +96,21 @@ export function ReviewModal({
           gap: 18,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <h2 id="review-title" style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>
-            Review your video
+            {isPreview ? "Auto-Generated Preview" : "Review your video"}
           </h2>
-          <button
-            onClick={onClose}
-            aria-label="Close review"
-            style={{ background: "transparent", border: "none", color: C.body, fontSize: 18, cursor: "pointer", padding: 4, lineHeight: 1 }}
-          >
-            ×
-          </button>
+          {isPreview ? (
+            <ReadyBadge ready={ready} />
+          ) : (
+            <button
+              onClick={onClose}
+              aria-label="Close review"
+              style={{ background: "transparent", border: "none", color: C.body, fontSize: 18, cursor: "pointer", padding: 4, lineHeight: 1 }}
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <div
@@ -157,29 +199,31 @@ export function ReviewModal({
           Watch the full clip before approving. Once you mint, this is the version that ships with the listing.
         </div>
 
-        <button
-          onClick={() => { onApprove(); onClose(); }}
-          style={{
-            padding: "14px 24px",
-            background: "var(--color-violet-600)",
-            color: "var(--color-text-on-brand)",
-            border: "none",
-            borderRadius: "var(--radius-3xl)",
-            fontSize: 15,
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            boxShadow: "0 6px 24px -6px rgba(124, 45, 185, .4)",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 13l4 4 10-10" />
-          </svg>
-          Looks good · continue to mint
-        </button>
+        {!isPreview && (
+          <button
+            onClick={() => { onApprove(); onClose(); }}
+            style={{
+              padding: "14px 24px",
+              background: "var(--color-violet-600)",
+              color: "var(--color-text-on-brand)",
+              border: "none",
+              borderRadius: "var(--radius-3xl)",
+              fontSize: 15,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              boxShadow: "0 6px 24px -6px rgba(124, 45, 185, .4)",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 13l4 4 10-10" />
+            </svg>
+            Looks good · continue to mint
+          </button>
+        )}
 
         <div
           style={{
@@ -191,9 +235,14 @@ export function ReviewModal({
             gap: 12,
           }}
         >
-          <div style={{ fontSize: 12, color: C.body }}>Not happy with the result?</div>
+          <div style={{ fontSize: 12, color: C.body }}>
+            {isPreview ? "Made from your 3D model" : "Not happy with the result?"}
+          </div>
           <button
-            onClick={onRegenerate}
+            onClick={() => {
+              if (isPreview) setConfirmRegen(true);
+              else onRegenerate();
+            }}
             style={{
               padding: "10px 18px",
               background: "transparent",
@@ -211,12 +260,47 @@ export function ReviewModal({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 0 1 15-6.7L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-15 6.7L3 16 M3 21v-5h5" />
             </svg>
-            Edit prompt &amp; regenerate
+            {isPreview ? "Regenerate" : "Edit prompt & regenerate"}
           </button>
         </div>
 
         <style>{`@keyframes ix-rm-pulse { 0%,100% { opacity:1 } 50% { opacity:.6 } }`}</style>
       </div>
     </div>
+    {/* Outside the backdrop: cancelling the confirm must not bubble a click
+        into the overlay under it and take the clip away too. */}
+    <RegenerateConfirm
+      open={confirmRegen}
+      onCancel={() => setConfirmRegen(false)}
+      onConfirm={() => {
+        setConfirmRegen(false);
+        onRegenerate();
+      }}
+    />
+    </>
+  );
+}
+
+/** Where the clip is: finished and watchable, or still coming. */
+function ReadyBadge({ ready }: { ready: boolean }) {
+  return (
+    <span
+      data-review-badge={ready ? "ready" : "rendering"}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        background: ready
+          ? "var(--color-bg-success-subtle)"
+          : "var(--color-bg-warning-subtle)",
+        color: ready ? "var(--color-text-success)" : "var(--color-text-warning)",
+      }}
+    >
+      {ready ? "Ready" : "Rendering"}
+    </span>
   );
 }

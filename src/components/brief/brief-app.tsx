@@ -33,6 +33,7 @@ import { stepHref, useManualProjects } from "@/lib/manual/projects";
 import { useCreateHistory } from "@/lib/create/history";
 import {
   DEFAULT_STATE,
+  STEP_ORDER,
   normalizeBrief,
   normalizeStep,
   stepsFor,
@@ -265,11 +266,6 @@ function applyRegen(s: BriefState, regen: RegenRequest): BriefState {
     mediaType: "ai",
   };
 }
-
-// Every step there is, in the order they can appear. Only used to place a step
-// a sequence doesn't run (the regenerate hand-off forces "preview" whatever
-// the intent), so Continue and Back still move exactly one step from it.
-const STEP_ORDER: BriefStepId[] = ["idea", "preview", "form", "success"];
 
 /** Where `step` sits in `seq` — or, off-sequence, the entry just before it. */
 function seqIndex(
@@ -742,6 +738,8 @@ export function BriefApp() {
                 onContinue={goNext}
                 onSkip={skipMedia}
                 onBack={goBack}
+                isLastStep={isLastStep}
+                minting={minting}
                 onPromptHelp={() => setPromptHelpOpen(true)}
               />
             )}

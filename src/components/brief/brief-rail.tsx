@@ -12,6 +12,7 @@ import { useStepNav, RAIL_KEY_TO_STEP } from "@/components/manual/use-step-nav";
 import { C } from "@/lib/pcb/colors";
 import {
   BRIEF_FORM_LABEL,
+  STEP_ORDER,
   type BriefStepId,
   type Intent,
 } from "@/lib/brief/types";
@@ -46,6 +47,16 @@ export function BriefRail({
   const items = buildRail(null, "brief");
   const { go: goStep, activeProject } = useStepNav();
   const currentIndex = steps.indexOf(current);
+  // A step can be standing outside the sequence it belongs to — the
+  // regenerate hand-off forces "preview" whatever the intent runs. Then there
+  // is no index to compare against, so the rows are ranked by the canonical
+  // step order instead; without this the rail blanked (nothing done, nothing
+  // active) exactly when the user was dropped into the middle of it.
+  const currentRank = STEP_ORDER.indexOf(current);
+  const isDone = (id: BriefStepId, i: number) =>
+    currentIndex >= 0
+      ? i < currentIndex
+      : STEP_ORDER.indexOf(id) < currentRank;
 
   return (
     <div
@@ -78,10 +89,8 @@ export function BriefRail({
       >
         {steps.map((id, i) => {
           const active = i === currentIndex;
-          // Before the current step = answered; after it = not reached yet. An
-          // index of -1 (a step forced in from outside the sequence) leaves
-          // every row "ahead", which is the honest reading.
-          const done = currentIndex >= 0 && i < currentIndex;
+          // Before the current step = answered; after it = not reached yet.
+          const done = isDone(id, i);
           const canGo = Boolean(onGo) && done;
           return (
             <button
@@ -89,7 +98,12 @@ export function BriefRail({
               type="button"
               data-brief-step={id}
               aria-current={active ? "step" : undefined}
-              disabled={!canGo}
+              // The step you are on is announced, so it has to stay in the tab
+              // order to be heard — `disabled` would both silence it and take
+              // it out. It is inert either way; only the rows still ahead are
+              // really unavailable.
+              disabled={!canGo && !active}
+              aria-disabled={canGo ? undefined : true}
               onClick={canGo ? () => onGo?.(id) : undefined}
               className="ix-brief-step"
               style={{
@@ -231,7 +245,7 @@ export function BriefRail({
       </nav>
 
       <style>{`
-        .ix-brief-step:not(:disabled):hover span:first-child {
+        .ix-brief-step:not(:disabled):not([aria-disabled]):hover span:first-child {
           background: var(--color-bg-brand-subtle);
           color: var(--color-text-brand);
         }

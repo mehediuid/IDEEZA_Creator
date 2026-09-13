@@ -159,6 +159,7 @@ export function GlobalRenderIndicator() {
       {reviewingJob && (
         <ReviewModal
           open={true}
+          variant="approve"
           prompt={reviewingJob.prompt}
           quality={reviewingJob.quality}
           onApprove={() => acknowledge(reviewingJob.id)}
