@@ -25,76 +25,36 @@ import { C } from "@/lib/pcb/colors";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProductFlow } from "@/components/product-flow/product-flow-provider";
 import { useManualProjects } from "@/lib/manual/projects";
+import {
+  DEFAULT_STATE,
+  normalizeBrief,
+  type BriefState,
+  type Intent,
+  type Scene,
+} from "@/lib/brief/types";
 
-export type Intent = "sell" | "give" | "save";
-export type MediaType = "ai" | "ar" | "skip";
-export type Quality = "low" | "high";
-export type Network = "ethereum" | "polygon" | "solana";
-export type ListingType = "buyNow" | "auction" | "bundle" | "offers";
-export type Token = "ETH" | "MATIC" | "SOL" | "USDC" | "USDT" | "WETH";
-
-export const TOKENS_BY_NETWORK: Record<Network, Token[]> = {
-  ethereum: ["ETH", "WETH", "USDC", "USDT"],
-  polygon: ["MATIC", "USDC", "USDT"],
-  solana: ["SOL", "USDC"],
-};
-
-export const LISTING_TYPES: { id: ListingType; label: string; sub: string }[] =
-  [
-    { id: "buyNow", label: "Buy Now", sub: "One-click purchase at fixed price" },
-    { id: "auction", label: "Auction", sub: "Highest bidder wins after timer" },
-    { id: "bundle", label: "Bundle", sub: "Sell multiple items together" },
-    { id: "offers", label: "Offers", sub: "Accept buyer-submitted offers" },
-  ];
-
-export type Scene = {
-  id: string;
-  label: string;
-  timeRange: string;
-  visual: string;
-  bgAudio: string;
-  musicCue: string;
-  speech: string;
-};
-
-export type BriefState = {
-  // Step 1
-  projectId: string;
-  productName: string;
-  productDescription: string;
-  intent: Intent | null;
-  // Step 2
-  mediaType: MediaType;
-  videoPrompt: string;
-  audioPrompt: string;
-  audioAutoGenerate: boolean;
-  quality: Quality;
-  scenes: Scene[];
-  storyboardGenerated: boolean;
-  // Step 3 — common
-  network: Network;
-  collection: string;
-  // Sell-only
-  listingType: ListingType;
-  token: Token;
-  price: string;
-  royalties: number;
-  // Give-only
-  recipientCommunity?: string;
-  distributionRule?: string;
-  // Save-only
-  blockchainMint?: boolean;
-  // Confirms + share
-  confirmGasFees: boolean;
-  confirmOwnership: boolean;
-  shareToNewsfeed: boolean;
-  // Result tracking. videoJobId is set as soon as Step 2 → Step 3 transition
-  // happens (so progress is visible on Step 3 from the moment user arrives).
-  // mintedAt is set when Pay completes. A listing "goes live" when BOTH are
-  // truthy AND the linked video job has stage === 'done'.
-  mintedAt: number | null;
-  videoJobId: string | null;
-};
+// The state model, its vocabulary and the stored-draft migration live in
+// `@/lib/brief/types` (pure — no React in its import graph). Re-exported here
+// so the steps keep importing them from the module they belong to.
+export {
+  DEFAULT_STATE,
+  LICENSES,
+  LISTING_TYPES,
+  NETWORKS,
+  TOKENS_BY_NETWORK,
+  normalizeBrief,
+} from "@/lib/brief/types";
+export type {
+  BriefState,
+  Intent,
+  License,
+  ListingType,
+  MediaType,
+  Network,
+  Quality,
+  Scene,
+  Token,
+} from "@/lib/brief/types";
 
 // Brief drafts are scoped PER PROJECT so finishing one project's brief never
 // leaks its Step 4 state into another. The bare key below is the pre-scoping
@@ -110,41 +70,16 @@ function draftKey(projectId: string): string {
 const REGEN_REQUEST_KEY = "ideeza:brief:regenerate";
 const REGEN_EVENT = "ideeza:brief-regenerate";
 
-const DEFAULT_STATE: BriefState = {
-  projectId: "",
-  productName: "",
-  productDescription: "",
-  intent: null,
-  mediaType: "ai",
-  videoPrompt: "",
-  audioPrompt: "",
-  audioAutoGenerate: true,
-  quality: "low",
-  scenes: [],
-  storyboardGenerated: false,
-  network: "ethereum",
-  collection: "",
-  listingType: "buyNow",
-  token: "ETH",
-  price: "",
-  royalties: 10,
-  recipientCommunity: "",
-  distributionRule: "First-come-first-serve",
-  blockchainMint: false,
-  confirmGasFees: false,
-  confirmOwnership: false,
-  shareToNewsfeed: false,
-  mintedAt: null,
-  videoJobId: null,
-};
-
+// Every read migrates: a draft stored before the testnet move (Ethereum /
+// Polygon / Solana, Bundle / Offers listings) comes back on the live model
+// rather than opening with a chain the app can no longer mint on.
 function readFromStorage(projectId: string): { state: BriefState; step: number } {
   try {
     const raw = window.localStorage.getItem(draftKey(projectId));
     if (raw) {
-      const parsed = JSON.parse(raw) as { state?: BriefState; step?: number };
+      const parsed = JSON.parse(raw) as { state?: unknown; step?: number };
       return {
-        state: { ...DEFAULT_STATE, ...(parsed.state || {}) },
+        state: normalizeBrief(parsed.state),
         step: parsed.step ?? 1,
       };
     }

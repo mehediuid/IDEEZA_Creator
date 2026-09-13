@@ -11,6 +11,7 @@ import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import {
   LISTING_TYPES,
+  NETWORKS,
   TOKENS_BY_NETWORK,
   type BriefState,
   type Intent,
@@ -18,12 +19,6 @@ import {
   type Token,
 } from "./brief-app";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-
-const NETWORKS: { id: BriefState["network"]; label: string; sub: string }[] = [
-  { id: "ethereum", label: "Ethereum", sub: "ETH" },
-  { id: "polygon", label: "Polygon", sub: "MATIC" },
-  { id: "solana", label: "Solana", sub: "SOL" },
-];
 
 const HEADING_BY_INTENT: Record<Intent, string> = {
   sell: "Ready to sell",
@@ -509,9 +504,9 @@ function SellFields({
         <div style={{ display: "flex", gap: 8 }}>
           {NETWORKS.map((n) => (
             <Pill
-              key={n.id}
-              selected={state.network === n.id}
-              onClick={() => onNetwork(n.id)}
+              key={n.value}
+              selected={state.network === n.value}
+              onClick={() => onNetwork(n.value)}
             >
               {n.label}
             </Pill>
@@ -621,9 +616,9 @@ function GiveFields({
         <div style={{ display: "flex", gap: 8 }}>
           {NETWORKS.map((n) => (
             <Pill
-              key={n.id}
-              selected={state.network === n.id}
-              onClick={() => onChange({ network: n.id })}
+              key={n.value}
+              selected={state.network === n.value}
+              onClick={() => onChange({ network: n.value })}
             >
               {n.label}
             </Pill>
@@ -711,9 +706,9 @@ function SaveFields({
             <div style={{ display: "flex", gap: 8 }}>
               {NETWORKS.map((n) => (
                 <Pill
-                  key={n.id}
-                  selected={state.network === n.id}
-                  onClick={() => onChange({ network: n.id })}
+                  key={n.value}
+                  selected={state.network === n.value}
+                  onClick={() => onChange({ network: n.value })}
                 >
                   {n.label}
                 </Pill>
