@@ -1,19 +1,26 @@
 "use client";
 
-// ImageEditorModal — full-screen concept editor (Google "Describe edits" style).
+// ImageEditorModal — the refine overlay (Ai-Flow frame 05).
 //
-// Opened from a concept card's Refine action. Shows the chosen image large; the
-// "Describe edits" bar at the bottom evolves THAT image, keeping the same
-// concept (the orchestrator drives the refine). Submitting an edit CLOSES the
-// editor — the refine then lands in the chat thread, where the user watches it
-// render and can reopen Refine on the result to iterate.
+// Opened from a concept card's Refine action. It portals to <body> and
+// blurs the WHOLE page behind it — sidebar included — so the concept
+// being refined is the only thing in focus; anchored inside the chat
+// column it would have left the navigation crisp beside it.
 //
-// A11y: role=dialog + aria-modal, Esc + click-outside close, the edit box is
-// focused on open, every control is labelled, voice has a keyboard/click path.
+// The header says which concept is being refined and where the result
+// will land; the composer evolves THAT image, keeping the same concept
+// (the orchestrator drives the refine). Submitting an edit CLOSES the
+// overlay — the refine then lands in the chat thread, where the user
+// watches it render and can reopen Refine on the result to iterate.
+//
+// A11y: role=dialog + aria-modal, Esc + click-outside close, the edit box
+// is focused on open, every control is labelled, voice has a
+// keyboard/click path.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import {
-  ArrowRight01Icon,
+  AiMagicIcon,
   Cancel01Icon,
   Mic01Icon,
 } from "@hugeicons/core-free-icons";
@@ -23,7 +30,6 @@ import { useVoiceInput } from "@/lib/voice/use-voice-input";
 export function ImageEditorModal({
   open,
   image,
-  title,
   conceptLabel,
   nextRefineIndex,
   onClose,
@@ -31,7 +37,6 @@ export function ImageEditorModal({
 }: {
   open: boolean;
   image: string | null;
-  title: string;
   // The concept being refined — "2", or "1.1" for a refine of a refine.
   conceptLabel: string;
   // Which refine of this concept the result will be, so the editor can
@@ -83,7 +88,10 @@ export function ImageEditorModal({
     inputRef.current?.focus();
   };
 
-  if (!open) return null;
+  // Closed on the server and on the first client render alike (it only
+  // ever opens from a click), so the document guard can't desync
+  // hydration — it just keeps the portal off the server render.
+  if (!open || typeof document === "undefined") return null;
 
   const canSubmit = text.trim().length > 0;
   const submit = () => {
@@ -92,28 +100,34 @@ export function ImageEditorModal({
     setText("");
   };
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-label={`Refining Concept ${conceptLabel}`}
-      className="fixed inset-0 z-modal flex flex-col bg-bg-page/95 backdrop-blur-sm"
+      data-testid="refine-overlay"
+      className="fixed inset-0 z-modal flex flex-col bg-bg-page/75 backdrop-blur-md"
     >
-      {/* Top bar */}
-      <header className="flex items-center gap-[12px] px-[20px] py-[16px]">
+      {/* Top bar — close, what is being refined, where it lands. */}
+      <header className="flex items-start gap-[12px] px-[20px] py-[16px]">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close editor"
-          className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           <Icon icon={Cancel01Icon} size={20} />
         </button>
-        <p className="min-w-0 flex-1 truncate text-md font-medium text-text-primary">
-          {title}
-        </p>
-        <span className="shrink-0 rounded-full bg-bg-brand-subtle px-[10px] py-[4px] text-2xs font-bold uppercase tracking-wider text-text-brand">
-          Refining Concept {conceptLabel}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-lg font-bold tracking-tight text-text-primary">
+            Refining Concept {conceptLabel}
+          </p>
+          <p className="mt-[2px] truncate text-sm text-text-secondary">
+            {`The result lands in your chat as Concept ${conceptLabel}.${nextRefineIndex} — the original stays untouched.`}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-solid border-border-brand bg-bg-brand-subtle px-[10px] py-[4px] text-2xs font-bold uppercase tracking-wider text-text-brand">
+          Concept {conceptLabel}
         </span>
       </header>
 
@@ -129,18 +143,18 @@ export function ImageEditorModal({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image}
-              alt={`Concept ${conceptLabel}: ${title}`}
-              className="max-h-[calc(100dvh-220px)] w-auto rounded-xl object-contain"
+              alt={`Concept ${conceptLabel}`}
+              className="max-h-[calc(100dvh-240px)] w-auto rounded-xl object-contain"
             />
           </div>
         )}
       </div>
 
-      {/* Describe-edits bar */}
+      {/* Composer */}
       <div className="px-[24px] pb-[28px] pt-[12px]">
-        <div className="mx-auto flex w-full max-w-[760px] items-end gap-[6px] rounded-3xl border border-border bg-bg-surface p-[8px]">
+        <div className="mx-auto flex w-full max-w-[640px] items-end gap-[6px] rounded-2xl border-1-5 border-border bg-bg-surface p-[8px] focus-within:border-border-brand">
           <label htmlFor="img-edit" className="sr-only">
-            Describe the edit you want
+            Describe a change to this image
           </label>
           <textarea
             id="img-edit"
@@ -154,8 +168,8 @@ export function ImageEditorModal({
               }
             }}
             rows={1}
-            placeholder="Describe edits"
-            className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent px-[12px] py-[8px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary disabled:opacity-60"
+            placeholder="Describe a change to this image…"
+            className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent px-[12px] py-[8px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
           />
           <button
             type="button"
@@ -171,7 +185,7 @@ export function ImageEditorModal({
             aria-pressed={listening}
             title="Voice input"
             className={[
-              "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full outline-none transition-colors duration-fast",
+              "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast",
               "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40",
               listening
                 ? "bg-bg-brand-subtle text-text-brand"
@@ -180,21 +194,33 @@ export function ImageEditorModal({
           >
             <Icon icon={Mic01Icon} />
           </button>
+          {/* The same ai-magic send the prompt bar carries, so the two
+              composers read as one control. Off until there is a change
+              described. */}
           <button
             type="button"
             onClick={submit}
             disabled={!canSubmit}
-            aria-label="Apply edit"
-            title="Apply edit"
-            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-violet-600 text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-50"
+            aria-disabled={!canSubmit}
+            aria-label={
+              canSubmit ? "Apply this change" : "Describe a change first"
+            }
+            title={canSubmit ? "Apply (Enter)" : "Describe a change first"}
+            className={
+              canSubmit
+                ? "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg bg-button-primary-bg text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                : "inline-flex h-[40px] w-[40px] shrink-0 cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
+            }
           >
-            <Icon icon={ArrowRight01Icon} size={20} strokeWidth={2} />
+            <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
           </button>
         </div>
-        <p className="mt-[8px] text-center text-2xs font-medium text-text-tertiary">
-          {`The result lands in your chat as Concept ${conceptLabel}.${nextRefineIndex} — the original stays untouched.`}
+        <p className="mt-[10px] text-center text-sm text-text-tertiary">
+          Refining evolves the same concept. To start over from your prompt,
+          use Regenerate instead.
         </p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

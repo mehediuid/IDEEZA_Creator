@@ -21,7 +21,8 @@ ideeza-creator-panel/
 └─ src/
    ├─ app/                   Next App Router — routes & layouts
    │  ├─ layout.tsx          Root layout (ThemeProvider, fonts, global CSS)
-   │  ├─ api/                Server API routes
+   │  ├─ api/                Server API routes (concept/generate · concept/summarize
+   │  │                      · refine · build/start · three/generate)
    │  ├─ (dashboard)/        Home + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
    │  │   └─ innovations/[slug]/      community feed + detail
@@ -36,7 +37,8 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
-   │  ├─ create/             build-shell/status, concept-chat, chat-thread,
+   │  ├─ create/             build-shell/status, build-simulator, concept-chat,
+   │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
    │  ├─ projects/           my-projects, project-details
@@ -56,7 +58,11 @@ ideeza-creator-panel/
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
-   │  ├─ create/             history.tsx, plan.tsx (build-plan data)
+   │  ├─ create/             history.tsx (chats + build jobs), credits.tsx
+   │  │                      (credits ledger), concept.ts (concept/parts model),
+   │  │                      build-artifacts.ts (per-artifact build output),
+   │  │                      plan.tsx (build-plan data)
+   │  ├─ voice/              use-voice-input.ts (one dictation hook, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store)
    │  ├─ three/              providers.ts (three.js setup)

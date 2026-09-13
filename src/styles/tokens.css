@@ -393,6 +393,7 @@
   --color-icon-blue: var(--color-blue-500);
   --color-icon-success: var(--color-green-600);
   --color-icon-warning: var(--color-yellow-600);
+  --color-icon-info: var(--color-blue-600);
   --color-icon-error: var(--color-red-500);
   --color-icon-ai: var(--color-violet-500);
 
@@ -533,6 +534,7 @@
   --color-icon-blue: var(--color-blue-400);
   --color-icon-success: var(--color-green-400);
   --color-icon-warning: var(--color-yellow-400);
+  --color-icon-info: var(--color-blue-400);
   --color-icon-error: var(--color-red-400);
   --color-icon-ai: var(--color-violet-300);
 

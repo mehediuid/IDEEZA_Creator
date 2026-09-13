@@ -152,6 +152,8 @@ export const ideezaPreset = {
           "warning-subtle": "var(--color-bg-warning-subtle)",
           error: "var(--color-bg-error)",
           "error-subtle": "var(--color-bg-error-subtle)",
+          info: "var(--color-bg-info)",
+          "info-subtle": "var(--color-bg-info-subtle)",
           ai: "var(--color-bg-ai)",
           "ai-subtle": "var(--color-bg-ai-subtle)",
         },

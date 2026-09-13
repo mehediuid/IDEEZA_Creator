@@ -42,6 +42,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { BUILD_COST, useCredits } from "@/lib/create/credits";
 import {
   minutesLeft,
+  statusOf,
   useCreateHistory,
   type BuildJob,
   type ChatTurn,
@@ -281,8 +282,11 @@ function SentToBuildRow({ buildId }: { buildId: string }) {
 
 // One sentence per build state: what it is doing, then what that means
 // for the user.
+// The stored `status` only speaks for the two states the items can't
+// express (queued, and a system failure) — everything else is derived
+// from the artifacts themselves, so the line reads statusOf(job).
 function buildStatusLine(job: BuildJob): string {
-  switch (job.status) {
+  switch (statusOf(job)) {
     case "queued":
       return job.blocked === "credits"
         ? "Paused · top up credits to start"
@@ -395,7 +399,13 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
       type="button"
       onClick={copy}
       data-testid="copy-prompt"
-      aria-label={copied ? "Copied" : "Copy prompt"}
+      aria-label={
+        failed
+          ? "Copy failed — select the text instead"
+          : copied
+            ? "Copied"
+            : "Copy prompt"
+      }
       title={
         failed
           ? "Copy failed — select the text instead"

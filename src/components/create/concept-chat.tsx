@@ -14,7 +14,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Cancel01Icon, Clock01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { deriveTitle, useCreateHistory } from "@/lib/create/history";
+import type { ConceptSummary } from "@/lib/create/concept";
 import { useCreatePlan } from "@/lib/create/plan";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
@@ -43,6 +46,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     prompt: string;
   } | null>(null);
   const [submittingBuild, setSubmittingBuild] = React.useState(false);
+  // Set when a confirmed build went into the queue behind another one —
+  // the notice above the prompt bar is the only place that says so at
+  // the moment it happens (the concept's own row carries it afterwards).
+  const [queuedNotice, setQueuedNotice] = React.useState<string | null>(null);
   // Full-screen image editor: editorTurnId is the concept currently shown in
   // the lightbox (null = closed). Submitting an edit closes the editor; the
   // refine then continues in the thread (pending → ready), where the user can
@@ -330,40 +337,49 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [chat, editorTurnId, appendUserTurn, appendAssistantTurn, runGeneration],
   );
 
-  const handleConfirmBuild = React.useCallback(async () => {
-    if (!chat || !confirmFor) return;
-    setSubmittingBuild(true);
-    try {
-      await fetch("/api/build/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+  const handleConfirmBuild = React.useCallback(
+    async (concept: ConceptSummary) => {
+      if (!chat || !confirmFor) return;
+      setSubmittingBuild(true);
+      try {
+        await fetch("/api/build/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chatId: chat.id,
+            turnId: confirmFor.turnId,
+            imageUrl: confirmFor.imageUrl,
+            prompt: confirmFor.prompt,
+          }),
+        }).catch(() => null);
+        // The concept as the summarizer read it in the dialog — the same
+        // title, parts line and parts the user just approved, so every
+        // deliverable is derived from what was on screen.
+        const job = startBuild({
           chatId: chat.id,
           turnId: confirmFor.turnId,
           imageUrl: confirmFor.imageUrl,
           prompt: confirmFor.prompt,
-        }),
-      }).catch(() => null);
-      const job = startBuild({
-        chatId: chat.id,
-        turnId: confirmFor.turnId,
-        imageUrl: confirmFor.imageUrl,
-        prompt: confirmFor.prompt,
-        // The concept summary lands here once the confirm dialog reads
-        // /api/concept/summarize; until then the build carries the
-        // title we can derive and an empty parts list rather than an
-        // invented one.
-        conceptNumber: labels.get(confirmFor.turnId) ?? "1",
-        title: deriveTitle(confirmFor.prompt),
-        summary: "",
-        parts: [],
-      });
-      router.push(`/build/${job.id}`);
-    } finally {
-      setSubmittingBuild(false);
-      setConfirmFor(null);
-    }
-  }, [chat, confirmFor, labels, startBuild, router]);
+          conceptNumber: labels.get(confirmFor.turnId) ?? "1",
+          title: concept.title || deriveTitle(confirmFor.prompt),
+          summary: concept.summary,
+          parts: concept.parts,
+        });
+        // A queued build isn't building yet, so we stay in the chat and
+        // say so beside the concept that started it — the build page
+        // would only show a waiting room.
+        if (job.status === "queued") {
+          setQueuedNotice(job.id);
+          return;
+        }
+        router.push(`/build/${job.id}`);
+      } finally {
+        setSubmittingBuild(false);
+        setConfirmFor(null);
+      }
+    },
+    [chat, confirmFor, labels, startBuild, router],
+  );
 
   if (!hydrated) {
     return <LoadingShell />;
@@ -399,6 +415,30 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
       <div className="bg-bg-page">
         <div className="mx-auto w-full max-w-[640px] px-[24px] py-[16px]">
+          {queuedNotice && (
+            <div
+              role="status"
+              data-testid="queued-notice"
+              className="mb-[12px] flex items-center gap-[10px] rounded-xl border border-solid border-border bg-bg-subtle px-[14px] py-[10px] text-sm text-text-secondary"
+            >
+              <Icon icon={Clock01Icon} size={16} />
+              Queued — one build ahead of you
+              <Link
+                href={`/build/${queuedNotice}`}
+                className="ml-auto font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                View build
+              </Link>
+              <button
+                type="button"
+                onClick={() => setQueuedNotice(null)}
+                aria-label="Dismiss"
+                className="inline-flex h-[24px] w-[24px] items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
+            </div>
+          )}
           {/* Never disabled while a concept renders — describing the next
               change shouldn't wait on the current one. */}
           <PromptBar onSubmit={handleUserSubmit} />
@@ -411,6 +451,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
       <ConfirmBuildDialog
         open={confirmFor !== null}
+        turnId={confirmFor?.turnId ?? ""}
+        conceptLabel={
+          confirmFor ? (labels.get(confirmFor.turnId) ?? "1") : "1"
+        }
         conceptImageUrl={confirmFor?.imageUrl}
         conceptPrompt={confirmFor?.prompt ?? ""}
         submitting={submittingBuild}
@@ -421,7 +465,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       <ImageEditorModal
         open={editorTurnId !== null && editorImage !== null}
         image={editorImage}
-        title={chat.title}
         conceptLabel={editorConceptLabel}
         nextRefineIndex={editorNextRefineIndex}
         onClose={() => setEditorTurnId(null)}
