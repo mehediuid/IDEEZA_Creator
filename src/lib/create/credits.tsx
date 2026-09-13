@@ -59,7 +59,11 @@ function loadStored(): CreditsState {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedState();
     const parsed = JSON.parse(raw) as Partial<CreditsState>;
-    if (typeof parsed.balance !== "number" || !Array.isArray(parsed.ledger)) {
+    if (
+      typeof parsed.balance !== "number" ||
+      Number.isNaN(parsed.balance) ||
+      !Array.isArray(parsed.ledger)
+    ) {
       return seedState();
     }
     return { balance: parsed.balance, ledger: parsed.ledger };
@@ -83,20 +87,33 @@ export function applyEntry(
   };
 }
 
-// Charges `cost` (default BUILD_COST) credits for `buildId`. Idempotent:
-// a buildId already charged returns the state unchanged with ok:true
-// (it IS charged — callers don't need to distinguish "just now" from
-// "already"). Returns ok:false, state unchanged, when the balance can't
-// cover the cost.
+// Number of open (not-yet-refunded) charges for `buildId`: the count of
+// "build" ledger entries minus the count of "refund" ledger entries. A
+// build can be charged again once every prior charge on it has been
+// refunded — this is what lets charge -> refund -> charge deduct twice
+// while charge -> charge and refund -> refund each stay a no-op.
+function openCharges(state: CreditsState, buildId: string): number {
+  let open = 0;
+  for (const e of state.ledger) {
+    if (e.buildId !== buildId) continue;
+    if (e.reason === "build") open += 1;
+    else if (e.reason === "refund") open -= 1;
+  }
+  return open;
+}
+
+// Charges `cost` (default BUILD_COST) credits for `buildId`. Idempotent
+// while a charge is open: calling again before it's refunded returns the
+// state unchanged with ok:true (it IS charged — callers don't need to
+// distinguish "just now" from "already"). Once refunded, the same
+// buildId can be charged again. Returns ok:false, state unchanged, when
+// the balance can't cover the cost.
 export function chargeState(
   state: CreditsState,
   buildId: string,
   cost: number = BUILD_COST,
 ): { state: CreditsState; ok: boolean } {
-  const alreadyCharged = state.ledger.some(
-    (e) => e.reason === "build" && e.buildId === buildId,
-  );
-  if (alreadyCharged) return { state, ok: true };
+  if (openCharges(state, buildId) > 0) return { state, ok: true };
   if (state.balance < cost) return { state, ok: false };
   const entry: CreditEntry = {
     id: makeId(),
@@ -108,21 +125,19 @@ export function chargeState(
   return { state: applyEntry(state, entry), ok: true };
 }
 
-// Refunds the charge for `buildId` — used when a full build fails for a
-// system reason. ok:true exactly once per charged buildId: false when
-// there was no charge to refund, or it was already refunded.
+// Refunds the most recent open charge for `buildId` — used when a full
+// build fails for a system reason. ok:true exactly once per open charge:
+// false when there is no open charge to refund (never charged, or
+// already refunded).
 export function refundState(
   state: CreditsState,
   buildId: string,
 ): { state: CreditsState; ok: boolean } {
-  const charge = state.ledger.find(
+  if (openCharges(state, buildId) <= 0) return { state, ok: false };
+  const charge = state.ledger.findLast(
     (e) => e.reason === "build" && e.buildId === buildId,
   );
   if (!charge) return { state, ok: false };
-  const alreadyRefunded = state.ledger.some(
-    (e) => e.reason === "refund" && e.buildId === buildId,
-  );
-  if (alreadyRefunded) return { state, ok: false };
   const entry: CreditEntry = {
     id: makeId(),
     delta: -charge.delta,
