@@ -12,8 +12,6 @@
 import * as React from "react";
 import {
   AiMagicIcon,
-  Attachment01Icon,
-  Cancel01Icon,
   MagicWand01Icon,
   Mic01Icon,
   PlusSignIcon,
@@ -32,10 +30,8 @@ export function PromptBar({
   placeholder?: string;
 }) {
   const [value, setValue] = React.useState("");
-  const [attachment, setAttachment] = React.useState<string | null>(null);
   const [refining, setRefining] = React.useState(false);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
-  const fileRef = React.useRef<HTMLInputElement>(null);
 
   // Dictation appends what was said to whatever is already typed.
   const voice = useVoiceInput({
@@ -61,7 +57,6 @@ export function PromptBar({
     if (!trimmed || refining) return;
     onSubmit(trimmed);
     setValue("");
-    setAttachment(null);
   };
 
   // Enhance — rewrites the current draft into a concrete brief via
@@ -117,12 +112,6 @@ export function PromptBar({
     wasListening.current = listening;
   }, [listening, returnToComposer]);
 
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) setAttachment(f.name);
-    e.target.value = "";
-  };
-
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -168,37 +157,12 @@ export function PromptBar({
           className="block w-full resize-none bg-transparent px-[20px] pt-[16px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
         />
 
-        {attachment && (
-          <div className="px-[20px] pb-[4px]">
-            <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
-              <Icon icon={Attachment01Icon} size={14} />
-              <span className="max-w-[280px] truncate">{attachment}</span>
-              <button
-                type="button"
-                onClick={() => setAttachment(null)}
-                aria-label="Remove attachment"
-                className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={Cancel01Icon} size={14} />
-              </button>
-            </span>
-          </div>
-        )}
-
         <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
           <div className="flex items-center gap-[4px]">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              tabIndex={-1}
-              onChange={onPickFile}
-            />
             <ToolbarIconButton
-              ariaLabel="Attach a reference image"
-              onClick={() => fileRef.current?.click()}
+              ariaLabel="Attach a reference image — not sent to the generator yet"
               icon={PlusSignIcon}
+              disabled
             />
             <ToolbarIconButton
               ariaLabel={

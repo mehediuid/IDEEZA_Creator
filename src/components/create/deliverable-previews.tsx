@@ -18,19 +18,24 @@ import {
 } from "@/lib/create/build-artifacts";
 import type { ConceptPartCategory } from "@/lib/create/concept";
 
-// ─────────────────────── what each artifact ships ──────────────────
+// ─────────────────────── what each artifact covers ──────────────────
+//
+// This panel has no download or export control — the review step is a
+// preview, not a delivery mechanism. So every line here describes what
+// the artifact *covers* (what was designed, what it accounts for),
+// never a file format or a document you could take away, per CLAUDE.md
+// §6 ("no promises without delivery").
 
 export const WHAT_SHIPS: Record<BuildItemKind, string[]> = {
   "3d": [
-    "STL + STEP files",
+    "3D enclosure model, sized to the board",
     "Print settings: PETG, 0.2 mm layer",
     "Mount points sized for the PCB",
   ],
   pcb: [
-    "Schematic (PDF + KiCad)",
-    "2-layer layout",
-    "Gerber bundle",
-    "Bill of materials with stock links",
+    "Schematic, converted into a 2-layer board layout",
+    "Placement and copper routing between every part",
+    "Bill of materials for this board",
   ],
   code: [
     "Arduino-style sketch, fully commented",
@@ -45,11 +50,8 @@ export const WHAT_SHIPS: Record<BuildItemKind, string[]> = {
     "Continuity test checklist",
   ],
   parts: [
-    "Bill of materials (CSV)",
-    "Reference designators",
-    "Footprints and 3D models",
-    "Datasheet links",
-    "Supplier part numbers",
+    "Every part — category, name, reference and quantity",
+    "Grouped by function, quantities per board",
   ],
 };
 

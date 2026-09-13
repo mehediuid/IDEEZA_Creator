@@ -26,15 +26,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { MintedBadge } from "./minted-badge";
-import { postAppreciate, postSave, type Project } from "@/lib/feed";
-
-function formatCount(n: number): string {
-  if (n >= 1000) {
-    const v = n / 1000;
-    return `${v.toFixed(v >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
-  }
-  return String(n);
-}
+import { formatCount, postAppreciate, postSave, type Project } from "@/lib/feed";
 
 export function ProjectCard({ project }: { project: Project }) {
   const router = useRouter();

@@ -30,6 +30,7 @@ import {
   Bookmark02Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { formatCount } from "@/lib/feed";
 
 // ───────────────────────── content (from Figma) ─────────────────────────
 
@@ -92,14 +93,6 @@ const LEGAL_INFO: Array<{ label: string; value: string; link?: boolean }> = [
   { label: "Copyright", value: "USPTO", link: true },
   { label: "Trademark", value: "Attorney Name : David", link: true },
 ];
-
-function formatCount(n: number): string {
-  if (n >= 1000) {
-    const v = n / 1000;
-    return `${v.toFixed(v >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
-  }
-  return String(n);
-}
 
 // ───────────────────────── page ─────────────────────────
 

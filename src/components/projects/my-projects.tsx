@@ -24,6 +24,7 @@ import {
   HelpCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { formatCount } from "@/lib/feed";
 
 // ───────────────────────── data model ─────────────────────────
 
@@ -112,14 +113,6 @@ const NFTS: NftItem[] = [
 ];
 
 // ───────────────────────── helpers ─────────────────────────
-
-function formatCount(n: number): string {
-  if (n >= 1000) {
-    const v = n / 1000;
-    return `${v.toFixed(v >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
-  }
-  return String(n);
-}
 
 function tabCount(id: TabId): number {
   if (id === "all") return PROJECTS.length;

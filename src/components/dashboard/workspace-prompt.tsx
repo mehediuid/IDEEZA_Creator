@@ -14,8 +14,6 @@ import {
   Activity01Icon,
   AiMagicIcon,
   ArrowRight01Icon,
-  Attachment01Icon,
-  Cancel01Icon,
   CheckListIcon,
   DeliveryBox01Icon,
   FavouriteIcon,
@@ -30,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
-import { PROJECTS, type Project } from "@/lib/feed";
+import { formatCount, PROJECTS, type Project } from "@/lib/feed";
 import { MintedBadge } from "@/components/newsfeed/minted-badge";
 import { BuildManuallyInfo } from "./build-manually-info";
 import { ProjectInfoModal } from "./project-info-modal";
@@ -60,16 +58,6 @@ const CHIPS_SHOWN = 3;
 const INSPIRATION: Project[] = PROJECTS.slice(0, 4);
 
 const AI_PLACEHOLDER = "Describe your electronics project...";
-
-// 3.9k / 142 — the feed's own formatting, so a count reads the same here
-// as it does on the Innovations grid.
-function formatCount(n: number): string {
-  if (n >= 1000) {
-    const v = n / 1000;
-    return `${v.toFixed(v >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
-  }
-  return String(n);
-}
 
 export function WorkspacePrompt() {
   const router = useRouter();
@@ -311,8 +299,6 @@ const PromptCard = React.forwardRef<
   // (empty submit, caret back after Enhance, example chip) would quietly
   // do nothing.
   React.useImperativeHandle(ref, () => localRef.current as HTMLTextAreaElement);
-  const fileRef = React.useRef<HTMLInputElement>(null);
-  const [attachment, setAttachment] = React.useState<string | null>(null);
 
   // Dictation appends what was said to whatever is already typed.
   const voice = useVoiceInput({
@@ -361,12 +347,6 @@ const PromptCard = React.forwardRef<
     else if (wasListening.current) returnToComposer();
     wasListening.current = listening;
   }, [listening, returnToComposer]);
-
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) setAttachment(f.name);
-    e.target.value = "";
-  };
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -417,37 +397,12 @@ const PromptCard = React.forwardRef<
           className="block w-full resize-none bg-transparent px-[20px] pt-[20px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
         />
 
-        {attachment && (
-          <div className="px-[20px] pb-[4px]">
-            <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
-              <Icon icon={Attachment01Icon} size={14} />
-              <span className="max-w-[280px] truncate">{attachment}</span>
-              <button
-                type="button"
-                onClick={() => setAttachment(null)}
-                aria-label="Remove attachment"
-                className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={Cancel01Icon} size={14} />
-              </button>
-            </span>
-          </div>
-        )}
-
         <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
           <div className="flex items-center gap-[4px]">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              tabIndex={-1}
-              onChange={onPickFile}
-            />
             <ToolbarIconButton
-              ariaLabel="Attach a reference image"
-              onClick={() => fileRef.current?.click()}
+              ariaLabel="Attach a reference image — not sent to the generator yet"
               icon={PlusSignIcon}
+              disabled
             />
             <ToolbarIconButton
               ariaLabel={

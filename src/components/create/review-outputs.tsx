@@ -160,7 +160,7 @@ function ReviewPanel({ job }: { job: BuildJob }) {
               {shown === "parts" && <PartsSummary job={job} />}
               <section>
                 <h3 className="text-2xs font-bold tracking-wider text-text-secondary">
-                  WHAT SHIPS
+                  WHAT THIS COVERS
                 </h3>
                 <ul role="list" className="mt-4 flex flex-col items-start gap-3">
                   {WHAT_SHIPS[shown].map((line) => (

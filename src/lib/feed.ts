@@ -83,6 +83,17 @@ export const SORTS: { id: SortKey; label: string }[] = [
   { id: "newest", label: "Newest" },
 ];
 
+// 3.9k / 142 — shared by every surface that shows a project's counts
+// (the feed cards, My projects, project details, the dashboard "Get
+// inspired" rail), so a count reads the same everywhere.
+export function formatCount(n: number): string {
+  if (n >= 1000) {
+    const v = n / 1000;
+    return `${v.toFixed(v >= 10 ? 0 : 1).replace(/\.0$/, "")}k`;
+  }
+  return String(n);
+}
+
 export const PAGE_SIZE = 12;
 export const DEFAULTS: FeedParams = {
   mode: "discover",
