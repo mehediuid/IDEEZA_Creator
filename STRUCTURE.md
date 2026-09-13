@@ -23,8 +23,9 @@ ideeza-creator-panel/
    │  ├─ layout.tsx          Root layout (ThemeProvider, fonts, global CSS)
    │  ├─ api/                Server API routes (concept/generate · concept/summarize
    │  │                      · refine · build/start · three/generate · and others)
-   │  ├─ (dashboard)/        Home + Innovations
+   │  ├─ (dashboard)/        Home + Parts + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
+   │  │   ├─ parts/                   "/parts" — Parts & agile module (builds' BOMs)
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/[id]/           "/projects" — My projects + details
@@ -40,7 +41,8 @@ ideeza-creator-panel/
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
-   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived)
+   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
+   │  │                      parts-page (/parts — one BOM card per finished build)
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
    │  ├─ projects/           my-projects, project-details
    │  ├─ manual/             manual project creation + step navigation

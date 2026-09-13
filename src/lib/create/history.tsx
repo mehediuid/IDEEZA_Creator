@@ -1064,8 +1064,14 @@ function computeRollup(items: BuildItem[]): BuildRollup {
 }
 
 // Spec §7b — what counts as "needs the user's attention" for a build:
-//   • ready (no outcome yet) — must review and pick an outcome
-//   • partial / failed       — at least one item failed; retry needed
+//   • ready, not yet reviewed — must be opened and taken somewhere
+//   • partial / failed        — at least one item failed; retry needed
+//
+// "Reviewed" is either outcome the review shell offers: an explicit
+// `outcome`, or the `projectId` that Save Project / Advance Edit set
+// when the build becomes a real project. Without the second one a saved
+// build keeps asking to be reviewed forever — the work is done and the
+// bell is still lit.
 export function buildAttention(job: BuildJob): BuildAttention | null {
   // One naming rule for every message: the build's own title, and only
   // when it has none, a title derived from the prompt that started it.
@@ -1085,7 +1091,7 @@ export function buildAttention(job: BuildJob): BuildAttention | null {
     };
   }
   const rollup = rollupBuild(job);
-  if (rollup.status === "ready" && !job.outcome) {
+  if (rollup.status === "ready" && !job.outcome && !job.projectId) {
     return {
       job,
       reason: "review",
