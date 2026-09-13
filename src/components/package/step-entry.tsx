@@ -17,7 +17,7 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { usePackageActions, usePackageDraft } from "@/lib/package/store";
 import { UNITS, entrySub, fmt, fromDisplay, type PathId, type Unit } from "@/lib/package/types";
 import { FAMILIES, FIELDS, familyById, padsFor, silkFor } from "@/lib/package/wizard";
-import { Field,  StepHeading } from "./editor-chrome";
+import { Breadcrumb, Field,  StepHeading } from "./editor-chrome";
 import { ImportFields, ImportResult } from "./step-import";
 
 type Card = {
@@ -133,6 +133,12 @@ function FamilyPicker() {
 
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
+      <Breadcrumb
+        items={[
+          { label: "New Package", onClick: () => actions.patch({ path: null }) },
+          { label: "Part Wizard" },
+        ]}
+      />
       <StepHeading title="Pick a package family">
         {FAMILIES.length} parametric families across 8 pin arrangements. Picking one pre-fills its reference prefix,
         mount type and the parameters its arrangement needs.
@@ -182,6 +188,13 @@ function WizardParams() {
 
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
+      <Breadcrumb
+        items={[
+          { label: "New Package", onClick: () => actions.patch({ path: null, wizard: null }) },
+          { label: "Part Wizard", onClick: () => actions.patch({ wizard: null }) },
+          { label: family.label },
+        ]}
+      />
       <StepHeading title={family.label}>
         Reference prefix <b>{family.prefix}</b> · {family.mount} · generated body height {family.bodyHeight} mm. Adjust
         parameters — the preview updates live.

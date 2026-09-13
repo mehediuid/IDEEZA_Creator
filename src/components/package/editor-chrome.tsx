@@ -220,6 +220,50 @@ export function FieldGrid({ children, cols = 2 }: { children: React.ReactNode; c
   return <div className={cols === 2 ? "grid grid-cols-2 gap-[var(--spacing-5)]" : "flex flex-col gap-[var(--spacing-5)]"}>{children}</div>;
 }
 
+/** Where you are inside a step that has sub-screens, and the way back out.
+ *
+ *  Step 1 is three screens deep on the wizard and import paths, and the only
+ *  way back was the footer's Back button in the far bottom-left corner — a
+ *  long way from where the eye is, and it says nothing about where you are.
+ *  Each crumb before the last is a real control that returns to that screen;
+ *  the last is the screen you are on, so it is text, not a link. */
+export function Breadcrumb({ items }: { items: { label: string; onClick?: () => void }[] }) {
+  return (
+    <nav aria-label="Breadcrumb" className="-mt-[var(--spacing-4)]">
+      <ol className="flex flex-wrap items-center gap-[var(--spacing-1)]">
+        {items.map((it, i) => {
+          const last = i === items.length - 1;
+          return (
+            <li key={it.label} className="flex items-center gap-[var(--spacing-1)]">
+              {it.onClick && !last ? (
+                <button
+                  type="button"
+                  onClick={it.onClick}
+                  className="inline-flex min-h-[24px] cursor-pointer items-center rounded-[var(--radius-md)] px-[var(--spacing-2)] font-display text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  {it.label}
+                </button>
+              ) : (
+                <span
+                  aria-current={last ? "page" : undefined}
+                  className="inline-flex min-h-[24px] items-center px-[var(--spacing-2)] font-display text-sm font-medium text-text-primary"
+                >
+                  {it.label}
+                </span>
+              )}
+              {last ? null : (
+                <span aria-hidden className="font-display text-sm text-text-tertiary">
+                  /
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 /** The heading block every step opens with. */
 export function StepHeading({ title, children }: { title: string; children?: React.ReactNode }) {
   return (

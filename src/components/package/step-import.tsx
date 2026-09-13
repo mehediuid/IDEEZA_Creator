@@ -13,8 +13,9 @@ import { Attachment01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Banner, Button } from "@/components/ideeza";
 import { Icon } from "@/components/dashboard/icon";
 import { FootprintThumb, SymbolThumb } from "./package-thumbs";
+import { Breadcrumb } from "./editor-chrome";
 import { usePackageActions, usePackageDraft } from "@/lib/package/store";
-import { electricalPads, fpPads, symPins, type PackageDraft } from "@/lib/package/types";
+import { electricalPads, symPins } from "@/lib/package/types";
 import { componentBodyColor } from "@/lib/pcb/pcb-3d";
 import { parseKicadMod, parseKicadSym, parseStepHeader } from "@/lib/package/kicad";
 import { StepHeading } from "./editor-chrome";
@@ -104,6 +105,9 @@ export function ImportFields() {
 
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
+      <Breadcrumb
+        items={[{ label: "New Package", onClick: () => actions.patch({ path: null }) }, { label: "Import" }]}
+      />
       <StepHeading title="Import an existing part">
         Three discrete files, each parsed for a specific purpose — this is deliberately not “attach any CAD file and
         hope”. One of the symbol or footprint is required; the STEP body is optional.
@@ -189,6 +193,13 @@ export function ImportResult() {
 
   return (
     <div className="flex flex-col gap-[var(--spacing-10)]">
+      <Breadcrumb
+        items={[
+          { label: "New Package", onClick: () => actions.patch({ path: null, imported: null }) },
+          { label: "Import", onClick: () => actions.patch({ imported: null }) },
+          { label: "Parsed" },
+        ]}
+      />
       <StepHeading title="Parsed">
         This is what came out of the files. Nothing is final — the Symbol and Footprint steps are next, and both are
         fully editable.
