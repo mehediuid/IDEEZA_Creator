@@ -5,28 +5,36 @@
 // at the rates the design was drawn against. The UI must present them as an
 // estimate ("Gas is an estimate at current network rates") — inventing a live
 // number would be worse than stating a reference one.
+//
+// Minting happens on test networks (`Network`), so the fee is quoted in the
+// chain's own test coin and carries no dollar figure: test ETH and test MATIC
+// are handed out by faucets and not traded, so any $ amount would be invented.
+// The label names the chain the user actually picked — it used to say
+// "Ethereum" for a Base Sepolia mint.
 
 import type { Network, Token } from "./types";
 
 export type GasEstimate = {
   native: Token;
   fee: number;
-  usd: number;
+  /** Names the chain the fee is paid on, e.g. "Network fee (Base Sepolia)". */
   label: string;
+  /** What that fee is worth — on a test network, nothing. */
+  note: string;
 };
 
 const RATES: Record<Network, GasEstimate> = {
   baseSepolia: {
     native: "ETH",
     fee: 0.00104,
-    usd: 3.9,
-    label: "Network fee (Ethereum)",
+    label: "Network fee (Base Sepolia)",
+    note: "test ETH — no real cost",
   },
   mumbai: {
     native: "MATIC",
     fee: 0.021,
-    usd: 0.02,
-    label: "Network fee (Polygon)",
+    label: "Network fee (Mumbai)",
+    note: "test MATIC — no real cost",
   },
 };
 

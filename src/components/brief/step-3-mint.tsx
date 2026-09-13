@@ -13,21 +13,25 @@
 // tracked by the GlobalRenderIndicator visible on every page.
 
 import * as React from "react";
-import { SelectMenu, type SelectOption } from "@/components/ideeza";
+import { Checkbox, SelectMenu, type SelectOption } from "@/components/ideeza";
 import { C } from "@/lib/pcb/colors";
+import { BriefCard } from "./brief-app";
+// The model itself, not `brief-app`'s re-export of it: these are read at module
+// scope (the option lists below), which only worked while some other import
+// happened to evaluate `@/lib/brief/types` first.
 import {
   BRIEF_FORM_LABEL,
-  BriefCard,
   LICENSES,
   LISTING_TYPES,
   NETWORKS,
   TOKENS_BY_NETWORK,
+  stepsFor,
   type BriefState,
   type Intent,
   type License,
   type Network,
   type Token,
-} from "./brief-app";
+} from "@/lib/brief/types";
 import { ReviewModal } from "./review-modal";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { estimateGas, formatTotal } from "@/lib/brief/gas";
@@ -52,6 +56,17 @@ const MINT_FEE = 4;
 const MAX_STORY = 500;
 /** The collection row that creates one instead of choosing one. */
 const NEW_COLLECTION = "__new__";
+/** The chain picker's placeholder — one string, all three forms. */
+const BLOCKCHAIN_PLACEHOLDER = "Choose your prefer blockchain";
+
+/**
+ * What a royalty may be, in one place: the field's hint, its validation and the
+ * reason under the CTA all read these, so the three can't disagree the way the
+ * hint ("2 – 100"), the placeholder ("Maximum is 10%") and the clamp (100) did.
+ * One decimal place, because 2.5% is a rate makers really set.
+ */
+const ROYALTY_MIN = 2;
+const ROYALTY_MAX = 10;
 
 /** The note under the story, when a clip is still to come after this form. */
 const CLIP_NOTE = "Next you will make a short clip — Innovations posts need one.";
@@ -61,43 +76,12 @@ const NETWORK_OPTIONS: SelectOption<Network>[] = NETWORKS.map((n) => ({
   label: n.label,
 }));
 
-// What each licence actually asks of whoever picks the work up — one line, in
-// the ⓘ beside the row, because the names alone don't tell a maker apart.
-// The ids are the model's (`LICENSES`); the wording is this form's.
-const LICENSE_TERMS: Record<License, { label: string; info: string }> = {
-  boost1: {
-    label: "Boost Software License — Version 1.0",
-    info: "Permissive; no attribution required in binaries.",
-  },
-  bsd2: {
-    label: "BSD 2-Clause License",
-    info: "Permissive; keep the copyright notice.",
-  },
-  bsd3: {
-    label: "BSD 3-Clause License",
-    info: "Permissive; no endorsement using the author's name.",
-  },
-  cc: {
-    label: "Creative Commons Legal Code",
-    info: "For documentation and media; choose the variant when you publish.",
-  },
-  gpl2: {
-    label: "GNU General Public License — Version 2",
-    info: "Copyleft; derivatives must stay open under GPL.",
-  },
-  lgpl21: {
-    label: "GNU Lesser General Public License — Version 2.1",
-    info: "Copyleft for the library only; linking apps may stay closed.",
-  },
-  mit: {
-    label: "MIT License",
-    info: "Permissive; keep the notice, no warranty.",
-  },
-};
-
+// Name and terms both come from the model — the ⓘ beside each row is the
+// `info` line, because the names alone don't tell a maker them apart.
 const LICENSE_OPTIONS: SelectOption<License>[] = LICENSES.map((l) => ({
   value: l.value,
-  ...LICENSE_TERMS[l.value],
+  label: l.label,
+  info: l.info,
 }));
 
 const isAmount = (v: string) => !!v.trim() && Number(v) > 0;
@@ -113,6 +97,26 @@ const decimal = (v: string) => {
   return dot < 0
     ? kept
     : kept.slice(0, dot + 1) + kept.slice(dot + 1).replace(/\./g, "");
+};
+
+/**
+ * A percentage as it is typed: digits and at most one decimal place. It does
+ * NOT correct the number — typing "1" on the way to "10" used to be clamped to
+ * "2" under the cursor, so a maker aiming at 10% shipped 20%. Whether the
+ * figure is in range is `firstMissing`'s answer, said out loud under the CTA.
+ */
+const percent = (v: string) => {
+  const kept = decimal(v);
+  const dot = kept.indexOf(".");
+  return dot < 0 ? kept : kept.slice(0, dot + 2);
+};
+
+/** The royalty typed, or null when it isn't a number yet. */
+const royaltyOf = (v: string): number | null => {
+  const t = v.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 };
 
 /**
@@ -175,7 +179,10 @@ function firstMissing(s: BriefState, intent: Intent, now: number): string | null
     } else if (!isAmount(s.price)) {
       return "Set the price.";
     }
-    if (!s.royalties) return "Set the royalties percentage.";
+    const royalty = royaltyOf(s.royalties);
+    if (royalty === null) return "Set the royalties percentage.";
+    if (royalty < ROYALTY_MIN || royalty > ROYALTY_MAX)
+      return `Royalties must be between ${ROYALTY_MIN} and ${ROYALTY_MAX}%.`;
     if (!s.understandGas)
       return "Confirm you understand the network gas fee.";
     if (!s.confirmOwnership)
@@ -199,6 +206,7 @@ export function Step3Mint({
   onBack,
   onMint,
   onNext,
+  onPreview,
   isLastStep,
   minting,
   projectName,
@@ -210,6 +218,12 @@ export function Step3Mint({
   onMint: () => void;
   /** One step along the sequence — the preview, when Innovations added one. */
   onNext: () => void;
+  /**
+   * Go to the clip's own step, wherever it sits — the wizard's `setStep`, when
+   * it passes one. Without it the step is worked out from the sequence below,
+   * so this stays optional.
+   */
+  onPreview?: () => void;
   /** Is this form the last thing to answer before the mint? */
   isLastStep: boolean;
   minting: boolean;
@@ -237,6 +251,16 @@ export function Step3Mint({
   const watchable = !!state.arClip || videoDone;
 
   const gas = estimateGas(state.network);
+
+  // Where the clip's own step sits. Selling puts the preview BEFORE this form,
+  // but a give or save that posts to Innovations puts it after — so
+  // regenerating can't just be "one step back", which landed on the idea.
+  // `isLastStep` is belt and braces: a form that is last has nothing ahead of
+  // it but the mint, and Regenerate must never pay for anything.
+  const seq = stepsFor(state.intent, state.shareToNewsfeed);
+  const previewIsAhead =
+    !isLastStep && seq.indexOf("preview") > seq.indexOf("form");
+  const goToPreview = onPreview ?? (previewIsAhead ? onNext : onBack);
 
   const listingLabel =
     LISTING_TYPES.find((l) => l.id === state.listingType)?.label ?? "";
@@ -317,13 +341,16 @@ export function Step3Mint({
                 value={`${listingAmount} ${state.token}`}
               />
             )}
+            {/* The chain the user picked, by name, and what its coin is worth:
+                a testnet's is handed out by a faucet, so quoting a dollar
+                figure for it would be inventing a cost. */}
             <CostRow
               label={gas.label}
               value={
                 <>
                   {gas.fee} {gas.native}{" "}
                   <span style={{ color: "var(--color-text-tertiary)" }}>
-                    ≈ ${gas.usd.toFixed(2)}
+                    {gas.note}
                   </span>
                 </>
               }
@@ -443,9 +470,10 @@ export function Step3Mint({
         quality={state.quality}
         onApprove={() => setReviewOpen(false)}
         onRegenerate={() => {
-          // Regenerating is Step 2's job — that is where the prompt lives.
+          // Regenerating is the preview step's job — that is where the prompt
+          // lives — so go there, not "one step back".
           setReviewOpen(false);
-          onBack();
+          goToPreview();
         }}
         onClose={() => setReviewOpen(false)}
       />
@@ -730,8 +758,10 @@ function SellFields({
 
   const isAuction = state.listingType === "auction";
 
+  // `sub` says what each listing type does — the model carries it, and the
+  // option builder used to drop it on the floor.
   const listingOptions: SelectOption<BriefState["listingType"]>[] =
-    LISTING_TYPES.map((l) => ({ value: l.id, label: l.label }));
+    LISTING_TYPES.map((l) => ({ value: l.id, label: l.label, sub: l.sub }));
   const tokenOptions: SelectOption<Token>[] = TOKENS_BY_NETWORK[
     state.network
   ].map((t) => ({ value: t, label: t }));
@@ -754,7 +784,7 @@ function SellFields({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SelectMenu
         label="Blockchain Mint"
-        placeholder="Choose your prefer blockchain"
+        placeholder={BLOCKCHAIN_PLACEHOLDER}
         value={state.network}
         onChange={pickNetwork}
         options={NETWORK_OPTIONS}
@@ -905,29 +935,23 @@ function SellFields({
         </div>
       )}
 
-      <Field label="Royalties (%)" hint="2 – 100" controlId={royaltyId}>
+      <Field
+        label="Royalties (%)"
+        hint={`Between ${ROYALTY_MIN} and ${ROYALTY_MAX}% — one decimal place.`}
+        controlId={royaltyId}
+      >
         <input
           id={royaltyId}
           className="ix-brief-field"
-          value={state.royalties ? String(state.royalties) : ""}
-          onChange={(e) => {
-            const digits = e.target.value.replace(/[^\d]/g, "");
-            onChange({
-              royalties: digits ? Math.max(2, Math.min(100, Number(digits))) : 0,
-            });
-          }}
-          inputMode="numeric"
+          value={state.royalties}
+          onChange={(e) => onChange({ royalties: percent(e.target.value) })}
+          inputMode="decimal"
           placeholder="Suggested: 2%, 2.5%, 5% Maximum is 10%"
           style={inputStyle}
         />
       </Field>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <Check
-          label="Instant Mint (Gas fee Applicable)"
-          checked={state.instantMint}
-          onChange={(v) => onChange({ instantMint: v })}
-        />
         <Check
           label="I understand a network gas fee is added at mint"
           checked={state.understandGas}
@@ -959,7 +983,7 @@ function GiveFields({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SelectMenu
         label="Blockchain Mint"
-        placeholder="Choose your prefer blockchain"
+        placeholder={BLOCKCHAIN_PLACEHOLDER}
         value={state.network}
         onChange={(n) => {
           reread(n);
@@ -1016,7 +1040,7 @@ function SaveFields({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SelectMenu
         label="Blockchain Mint"
-        placeholder="Choose your prefer blockchain"
+        placeholder={BLOCKCHAIN_PLACEHOLDER}
         value={state.network}
         onChange={(n) => {
           reread(n);
@@ -1341,9 +1365,10 @@ function Field({
 }
 
 /**
- * A real checkbox under a drawn box: the input carries the role, the state and
- * the keyboard (Space toggles it, Tab reaches it); the box is only the
- * picture, and the `.ix-s3-check` rule lends it the input's focus ring.
+ * A real checkbox under the design system's box: the input carries the role,
+ * the state and the keyboard (Space toggles it, Tab reaches it), so the box is
+ * only the picture — `decorative`, or it would announce a second checkbox
+ * around the first. The `.ix-s3-check` rule lends it the input's focus ring.
  */
 function Check({
   label,
@@ -1381,40 +1406,7 @@ function Check({
           opacity: 0,
         }}
       />
-      <span
-        aria-hidden
-        style={{
-          width: 18,
-          height: 18,
-          borderRadius: 4,
-          border: `var(--border-width-1-5) solid ${
-            checked ? "var(--color-violet-600)" : "var(--color-border-default)"
-          }`,
-          background: checked
-            ? "var(--color-violet-600)"
-            : "var(--color-bg-surface)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flex: "0 0 18px",
-          transition: "background .14s, border-color .14s",
-        }}
-      >
-        {checked && (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-text-on-brand)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M5 13l4 4 10-10" />
-          </svg>
-        )}
-      </span>
+      <Checkbox checked={checked} decorative />
       {label}
     </label>
   );

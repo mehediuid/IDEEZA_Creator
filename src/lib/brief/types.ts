@@ -43,14 +43,46 @@ export type License =
   | "lgpl21"
   | "mit";
 
-export const LICENSES: { value: License; label: string }[] = [
-  { value: "boost1", label: "Boost Software License 1.0" },
-  { value: "bsd2", label: "BSD 2-Clause License" },
-  { value: "bsd3", label: "BSD 3-Clause License" },
-  { value: "cc", label: "Creative Commons" },
-  { value: "gpl2", label: "GNU General Public License v2.0" },
-  { value: "lgpl21", label: "GNU Lesser General Public License v2.1" },
-  { value: "mit", label: "MIT License" },
+// The name each licence is picked by, and what it actually asks of whoever
+// picks the work up — the names alone don't tell a maker them apart, so the
+// `info` line rides the row's ⓘ. One list: the form used to keep a second copy
+// of the wording, which meant the label here was written and never read.
+export const LICENSES: { value: License; label: string; info: string }[] = [
+  {
+    value: "boost1",
+    label: "Boost Software License — Version 1.0",
+    info: "Permissive; no attribution required in binaries.",
+  },
+  {
+    value: "bsd2",
+    label: "BSD 2-Clause License",
+    info: "Permissive; keep the copyright notice.",
+  },
+  {
+    value: "bsd3",
+    label: "BSD 3-Clause License",
+    info: "Permissive; no endorsement using the author's name.",
+  },
+  {
+    value: "cc",
+    label: "Creative Commons Legal Code",
+    info: "For documentation and media; choose the variant when you publish.",
+  },
+  {
+    value: "gpl2",
+    label: "GNU General Public License — Version 2",
+    info: "Copyleft; derivatives must stay open under GPL.",
+  },
+  {
+    value: "lgpl21",
+    label: "GNU Lesser General Public License — Version 2.1",
+    info: "Copyleft for the library only; linking apps may stay closed.",
+  },
+  {
+    value: "mit",
+    label: "MIT License",
+    info: "Permissive; keep the notice, no warranty.",
+  },
 ];
 
 export type Scene = {
@@ -105,16 +137,12 @@ export type BriefState = {
   minBid: string;
   auctionBuyNow: string;
   expiresAt: string; // datetime-local value, e.g. "2026-01-18T14:30"
-  royalties: number;
-  // Give-only
-  recipientCommunity?: string;
-  distributionRule?: string;
-  // Save-only
-  blockchainMint?: boolean;
+  // What was typed, not what it was corrected to: the field holds the digits
+  // as they are entered (one decimal place) and the form states the range it
+  // has to land in, rather than rewriting "1" to "2" under the cursor.
+  royalties: string;
   // Confirms + share
-  instantMint: boolean;
   understandGas: boolean;
-  confirmGasFees: boolean;
   confirmOwnership: boolean;
   shareToNewsfeed: boolean;
   // Result tracking. videoJobId is set as soon as Step 2 → Step 3 transition
@@ -152,13 +180,8 @@ export const DEFAULT_STATE: BriefState = {
   minBid: "",
   auctionBuyNow: "",
   expiresAt: "",
-  royalties: 10,
-  recipientCommunity: "",
-  distributionRule: "First-come-first-serve",
-  blockchainMint: false,
-  instantMint: false,
+  royalties: "10",
   understandGas: false,
-  confirmGasFees: false,
   confirmOwnership: false,
   shareToNewsfeed: false,
   mintedAt: null,
@@ -191,10 +214,6 @@ function str(v: unknown, fallback: string): string {
 
 function bool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
-}
-
-function num(v: unknown, fallback: number): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
 function oneOf<T extends string>(v: unknown, allowed: readonly T[], fallback: T): T {
@@ -237,6 +256,14 @@ function normalizeArClip(v: unknown): ArClip | null {
       ? c.receivedAt
       : 0;
   return url && receivedAt ? { url, receivedAt } : null;
+}
+
+// Royalties used to be stored as a number, with 0 standing for "nothing typed
+// yet" — so an older draft's 0 reads as an empty field rather than as a rate of
+// zero, which was never a value the form accepted.
+function normalizeRoyalties(v: unknown): string {
+  if (typeof v === "number") return Number.isFinite(v) && v > 0 ? String(v) : "";
+  return str(v, DEFAULT_STATE.royalties);
 }
 
 /**
@@ -304,13 +331,8 @@ export function normalizeBrief(parsed: unknown): BriefState {
     minBid: str(s.minBid, DEFAULT_STATE.minBid),
     auctionBuyNow: str(s.auctionBuyNow, DEFAULT_STATE.auctionBuyNow),
     expiresAt: str(s.expiresAt, DEFAULT_STATE.expiresAt),
-    royalties: num(s.royalties, DEFAULT_STATE.royalties),
-    recipientCommunity: str(s.recipientCommunity, DEFAULT_STATE.recipientCommunity ?? ""),
-    distributionRule: str(s.distributionRule, DEFAULT_STATE.distributionRule ?? ""),
-    blockchainMint: bool(s.blockchainMint, DEFAULT_STATE.blockchainMint ?? false),
-    instantMint: bool(s.instantMint, DEFAULT_STATE.instantMint),
+    royalties: normalizeRoyalties(s.royalties),
     understandGas: bool(s.understandGas, DEFAULT_STATE.understandGas),
-    confirmGasFees: bool(s.confirmGasFees, DEFAULT_STATE.confirmGasFees),
     confirmOwnership: bool(s.confirmOwnership, DEFAULT_STATE.confirmOwnership),
     shareToNewsfeed: bool(s.shareToNewsfeed, DEFAULT_STATE.shareToNewsfeed),
     mintedAt: typeof s.mintedAt === "number" && Number.isFinite(s.mintedAt)
