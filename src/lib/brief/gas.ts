@@ -38,8 +38,7 @@ export function estimateGas(network: Network): GasEstimate {
 // Trims a fixed-point amount to its significant tail: 0.001040 → "0.00104",
 // 4.000000 → "4". Keeps the total readable without printing false precision.
 function trim(value: number): string {
-  const fixed = value.toFixed(6);
-  return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 /** e.g. `formatTotal(4, estimateGas("baseSepolia"))` → "4 IDZ + 0.00104 ETH". */

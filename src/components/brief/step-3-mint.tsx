@@ -19,6 +19,7 @@ import {
   type Token,
 } from "./brief-app";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { estimateGas, formatTotal } from "@/lib/brief/gas";
 
 const HEADING_BY_INTENT: Record<Intent, string> = {
   sell: "Ready to sell",
@@ -62,6 +63,12 @@ export function Step3Mint({
   const willRenderVideo =
     state.mediaType === "ai" && state.storyboardGenerated;
   const videoDone = job?.stage === "done";
+
+  const gas = estimateGas(state.network);
+  const willIncurGas =
+    intent === "sell" ||
+    (intent === "save" && state.blockchainMint) ||
+    intent === "give";
 
   const formReady = (() => {
     if (!state.confirmGasFees || !state.confirmOwnership) return false;
@@ -271,13 +278,18 @@ export function Step3Mint({
           />
         )}
         <CostRow
-          label={`Network (${state.network.toUpperCase()})`}
+          label={gas.label}
           value={
-            intent === "sell" ||
-            (intent === "save" && state.blockchainMint) ||
-            intent === "give"
-              ? "~ 0.001 gas"
-              : "Not minted"
+            willIncurGas ? (
+              <>
+                {gas.fee} {gas.native}{" "}
+                <span style={{ color: "var(--color-text-tertiary)" }}>
+                  ≈ ${gas.usd.toFixed(2)}
+                </span>
+              </>
+            ) : (
+              "Not minted"
+            )
           }
         />
         <div
@@ -287,7 +299,11 @@ export function Step3Mint({
             margin: "4px 0",
           }}
         />
-        <CostRow label="Total to pay now" value={`${MINT_FEE} IDZ`} bold />
+        <CostRow
+          label="Total to pay now"
+          value={willIncurGas ? formatTotal(MINT_FEE, gas) : `${MINT_FEE} IDZ`}
+          bold
+        />
       </div>
 
       {/* Pay button — enabled the moment the form is valid. Minting just locks
@@ -947,7 +963,7 @@ function CostRow({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   return (

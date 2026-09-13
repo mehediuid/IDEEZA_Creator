@@ -85,8 +85,13 @@ function sanitize(rows: unknown, network: Network): WalletCollection[] | null {
 /** Every collection on `network`, seeding (and persisting) on first read. */
 export function readCollections(network: Network): WalletCollection[] {
   const store = readStore();
-  const stored = sanitize(store[network], network);
-  if (stored) return stored;
+  const raw = store[network];
+  const stored = sanitize(raw, network);
+  // A stored array whose rows were all invalid sanitizes to `[]`, which is
+  // truthy — without this check the picker would silently stay empty forever
+  // instead of re-seeding like a missing/corrupt store does.
+  const allRowsInvalid = stored !== null && stored.length === 0 && Array.isArray(raw) && raw.length > 0;
+  if (stored && !allRowsInvalid) return stored;
   const seeded = seedFor(network);
   writeStore({ ...store, [network]: seeded });
   return seeded;

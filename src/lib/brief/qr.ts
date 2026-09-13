@@ -27,6 +27,9 @@ const EC_M: readonly [number, number, number, number, number][] = [
 // mode + character-count header).
 const BYTE_CAPACITY = [14, 26, 42, 62, 84, 106, 122, 152, 180, 213];
 
+/** Largest UTF-8 payload `qrMatrix`/`qrSvgPath` can encode (version 10, ECC M). */
+export const QR_MAX_BYTES = BYTE_CAPACITY[BYTE_CAPACITY.length - 1];
+
 // Row/column centres of the alignment patterns, per version.
 const ALIGNMENT: readonly number[][] = [
   [],
@@ -119,8 +122,16 @@ function pickVersion(byteLength: number): number {
     if (byteLength <= BYTE_CAPACITY[v - 1]) return v;
   }
   throw new Error(
-    `QR: ${byteLength} bytes exceeds the ${BYTE_CAPACITY[9]}-byte capacity of version 10 (ECC M)`,
+    `QR: ${byteLength} bytes exceeds the ${QR_MAX_BYTES}-byte capacity of version 10 (ECC M)`,
   );
+}
+
+/**
+ * True if `text`'s UTF-8 byte length fits within `QR_MAX_BYTES`, so a caller
+ * can check before rendering instead of catching `qrMatrix`/`qrSvgPath`'s throw.
+ */
+export function qrFits(text: string): boolean {
+  return toUtf8Bytes(text).length <= QR_MAX_BYTES;
 }
 
 function dataCodewordCount(version: number): number {
@@ -327,6 +338,11 @@ const QUIET = 4;
  * One SVG path covering every dark module, plus the 4-module quiet zone the
  * spec requires (so the returned `size` can be used as the viewBox directly and
  * the code scans without the caller adding padding).
+ *
+ * The quiet zone is empty coordinate space, not a drawn rectangle — the path
+ * only has `M`oves for dark modules. The caller must paint a light background
+ * across the full `size` (viewBox) or the quiet zone won't exist and the code
+ * won't scan.
  */
 export function qrSvgPath(
   text: string,
