@@ -60,6 +60,19 @@ export function Step2Video({
   // Sell / Give must ship something to look at, so "Add later" is locked for
   // them. Recording from a phone counts — AR is available to every intent.
   const skipLocked = state.intent === "sell" || state.intent === "give";
+
+  // A locked Skip can't still count as "the" selection. A stored "skip" from
+  // before the user switched intent (Save → pick Skip → Back → switch to
+  // Sell) must not silently carry forward once Skip is locked — it reads as
+  // no choice made yet, same as a fresh Step 2.
+  const effectiveMediaType: MediaType | null =
+    skipLocked && state.mediaType === "skip" ? null : state.mediaType;
+
+  // The subtitle's recommendation to record is a separate question from
+  // whether Skip happens to be locked for this intent, even though today
+  // both read the same intents.
+  const videoRecommended = state.intent === "sell" || state.intent === "give";
+
   const hasPrompt = state.videoPrompt.trim().length > 0;
   const canGenerateStoryboard = hasPrompt && !generatingStoryboard;
 
@@ -72,9 +85,15 @@ export function Step2Video({
     : null;
   const renderStarted = !!job;
 
-  const canStartRender = state.mediaType === "ai" && state.storyboardGenerated;
+  const canStartRender =
+    effectiveMediaType === "ai" && state.storyboardGenerated;
+  // TODO(Task 6): AR continues unconditionally here, but BriefState carries no
+  // recorded-clip field yet — Task 6 adds the AR panel and its clip state
+  // (e.g. a `state.arClipUrl` / `state.arClipRecorded`). Once that lands, gate
+  // this on that field so a sell/give listing can't reach mint with an AR
+  // selection but no clip actually captured.
   const canContinueWithoutRender =
-    state.mediaType === "ar" || state.mediaType === "skip";
+    effectiveMediaType === "ar" || effectiveMediaType === "skip";
 
   const filledPrompt = autoVideoPrompt(
     state.productName || "your product",
@@ -97,7 +116,7 @@ export function Step2Video({
             Pick your preview
           </h1>
           <p style={{ fontSize: 13, color: C.body, marginTop: 6 }}>
-            {skipLocked
+            {videoRecommended
               ? state.intent === "sell"
                 ? "Generate a storyboard for your listing — your 10s video starts rendering when you continue."
                 : "Generate a storyboard for the drop — your 10s video starts rendering when you continue."
@@ -117,7 +136,7 @@ export function Step2Video({
             label="AR"
             sub="Record from your phone"
             status="available"
-            selected={state.mediaType === "ar"}
+            selected={effectiveMediaType === "ar"}
             onClick={() => onChange({ mediaType: "ar" })}
             icon={
               <svg
@@ -141,7 +160,7 @@ export function Step2Video({
             label="AI"
             sub="Generate from a prompt"
             status="recommended"
-            selected={state.mediaType === "ai"}
+            selected={effectiveMediaType === "ai"}
             onClick={() => onChange({ mediaType: "ai" })}
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -157,7 +176,7 @@ export function Step2Video({
             status={skipLocked ? "locked" : "available"}
             locked={skipLocked}
             lockReason={LOCK_REASON}
-            selected={state.mediaType === "skip"}
+            selected={effectiveMediaType === "skip"}
             onClick={() => {
               if (!skipLocked) onChange({ mediaType: "skip" });
             }}
@@ -179,7 +198,7 @@ export function Step2Video({
           />
         </div>
 
-        {state.mediaType === "ai" && (
+        {effectiveMediaType === "ai" && (
           <>
             <FieldGroup
               label="What should the video show?"
@@ -241,7 +260,7 @@ export function Step2Video({
                 onChange={(e) => onChange({ audioPrompt: e.target.value })}
                 placeholder={
                   state.audioAutoGenerate
-                    ? "Auto: ambient + soft synth (override if you want)"
+                    ? "Auto — currently generating ambient + soft synth"
                     : "Describe soundscape - ambient noise, music mood, speech tone..."
                 }
                 rows={2}
@@ -251,6 +270,7 @@ export function Step2Video({
                 label="Auto Generate Audio"
                 on={state.audioAutoGenerate}
                 onChange={(v) => onChange({ audioAutoGenerate: v })}
+                hint="Suggests a soundscape only — unlike the video toggle, it doesn't write into the field above."
               />
             </FieldGroup>
 
@@ -424,7 +444,7 @@ export function Step2Video({
           </>
         )}
 
-        {state.mediaType === "ar" && (
+        {effectiveMediaType === "ar" && (
           <div
             style={{
               padding: 24,
@@ -461,7 +481,7 @@ export function Step2Video({
           </div>
         )}
 
-        {state.mediaType === "skip" && (
+        {effectiveMediaType === "skip" && (
           <div style={{ fontSize: 13, color: C.body }}>
             You can add media later from the project dashboard. Continue to set
             up the mint.
@@ -478,7 +498,7 @@ export function Step2Video({
             gap: 16,
           }}
         >
-          {state.mediaType === "ai" ? (
+          {effectiveMediaType === "ai" ? (
             <span style={{ fontSize: 12, color: C.body }}>
               {!state.storyboardGenerated &&
                 "Type a prompt and generate the storyboard."}
@@ -487,7 +507,12 @@ export function Step2Video({
                 "Storyboard ready · Continue to start render."}
               {renderStarted && "Render in flight · you can leave any time."}
             </span>
-          ) : !skipLocked && state.mediaType !== "skip" ? (
+          ) : effectiveMediaType === null ? (
+            <span style={{ fontSize: 12, color: C.body }}>
+              Skip isn't available for this listing — choose AR or generate an
+              AI storyboard to continue.
+            </span>
+          ) : !skipLocked && effectiveMediaType !== "skip" ? (
             <button
               onClick={onSkip}
               style={{
@@ -512,7 +537,7 @@ export function Step2Video({
               onClick={() => {
                 // AI flow w/ storyboard → kick off render and stay here.
                 // AR / Skip flows → just navigate forward.
-                if (state.mediaType === "ai" && canStartRender) {
+                if (effectiveMediaType === "ai" && canStartRender) {
                   onStartRender();
                 } else if (canContinueWithoutRender) {
                   onContinue();
@@ -1240,66 +1265,90 @@ function ToggleRow({
   label,
   on,
   onChange,
+  hint,
 }: {
   label: string;
   on: boolean;
   onChange: (v: boolean) => void;
+  /** Short explanation shown under the row, when the toggle's effect isn't obvious from its label alone. */
+  hint?: string;
 }) {
+  const labelId = React.useId();
   return (
     <div
       style={{
         display: "flex",
-        justifyContent: "flex-end",
-        alignItems: "center",
-        gap: 8,
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 4,
       }}
     >
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        onClick={() => onChange(!on)}
+      <div
         style={{
-          width: 34,
-          height: 20,
-          padding: 0,
-          borderRadius: 10,
-          border: "none",
-          background: on
-            ? "var(--color-violet-600)"
-            : "var(--color-bg-surface-raised)",
-          position: "relative",
-          cursor: "pointer",
-          transition: "background .14s",
-          flex: "0 0 34px",
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 8,
         }}
       >
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-labelledby={labelId}
+          onClick={() => onChange(!on)}
+          style={{
+            width: 34,
+            height: 20,
+            padding: 0,
+            borderRadius: 10,
+            border: "none",
+            background: on
+              ? "var(--color-violet-600)"
+              : "var(--color-bg-surface-raised)",
+            position: "relative",
+            cursor: "pointer",
+            transition: "background .14s",
+            flex: "0 0 34px",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 2,
+              left: on ? 16 : 2,
+              width: 16,
+              height: 16,
+              background: "var(--color-bg-surface)",
+              borderRadius: "50%",
+              boxShadow: "var(--elevation-1)",
+              transition: "left .14s",
+            }}
+          />
+        </button>
+        <span
+          id={labelId}
+          style={{
+            fontSize: 13,
+            color: "var(--color-text-secondary)",
+            fontWeight: 500,
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      {hint && (
         <span
           style={{
-            position: "absolute",
-            top: 2,
-            left: on ? 16 : 2,
-            width: 16,
-            height: 16,
-            background: "var(--color-bg-surface)",
-            borderRadius: "50%",
-            boxShadow: "var(--elevation-1)",
-            transition: "left .14s",
+            fontSize: 11,
+            color: C.body,
+            maxWidth: 320,
+            textAlign: "right",
           }}
-        />
-      </button>
-      <span
-        onClick={() => onChange(!on)}
-        style={{
-          fontSize: 13,
-          color: "var(--color-text-secondary)",
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
-      >
-        {label}
-      </span>
+        >
+          {hint}
+        </span>
+      )}
     </div>
   );
 }
