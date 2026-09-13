@@ -15,7 +15,8 @@
 
 import * as React from "react";
 import type { ChatSession, ChatTurn } from "@/lib/create/history";
-import { ImageTurn } from "./image-turn";
+import { BUILD_COST, useCredits } from "@/lib/create/credits";
+import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 
 // Label every concept by its lineage, not by its position: a fresh take
 // counts up ("1", "2", …) and a refine hangs off the concept it evolves
@@ -61,6 +62,27 @@ export function ChatThread({
   // name the same thing.
   const labels = React.useMemo(() => conceptLabels(chat.turns), [chat.turns]);
 
+  // The credit gate is explained ONCE, under the newest concept the user
+  // could still have built — every greyed "Use this concept" above it
+  // has the same reason, and repeating the notice per card would say it
+  // down the whole conversation. It sits inside the thread (not below
+  // it) so the auto-scroll to the newest turn carries it into view.
+  // The rendered balance, not canAfford(): the provider refreshes that
+  // ref in its own effect, which runs after ours, so it reads a render
+  // behind here (build-simulator.tsx reads it the same way).
+  const { hydrated: creditsHydrated, balance } = useCredits();
+  const bannerAfterId = React.useMemo(() => {
+    if (!creditsHydrated || balance >= BUILD_COST) return null;
+    let id: string | null = null;
+    for (const t of chat.turns) {
+      if (t.role !== "assistant" || t.status !== "ready" || t.usedForBuild) {
+        continue;
+      }
+      id = t.id;
+    }
+    return id;
+  }, [chat.turns, creditsHydrated, balance]);
+
   // Auto-scroll to the newest turn so the latest result is in view.
   const endRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -84,21 +106,20 @@ export function ChatThread({
             ? labels.get(turn.parentTurnId)
             : undefined;
         return (
-          <div
-            key={turn.id}
-            className="flex"
-            aria-label={`Concept ${label}`}
-          >
-            <ImageTurn
-              turn={turn}
-              conceptLabel={label}
-              parentConceptLabel={parentLabel}
-              regenerating={regeneratingFrom?.has(turn.id) ?? false}
-              onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
-              onUseThis={() => onUseTurn(turn.id)}
-              onRefine={() => onRefineTurn(turn.id)}
-            />
-          </div>
+          <React.Fragment key={turn.id}>
+            <div className="flex" aria-label={`Concept ${label}`}>
+              <ImageTurn
+                turn={turn}
+                conceptLabel={label}
+                parentConceptLabel={parentLabel}
+                regenerating={regeneratingFrom?.has(turn.id) ?? false}
+                onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
+                onUseThis={() => onUseTurn(turn.id)}
+                onRefine={() => onRefineTurn(turn.id)}
+              />
+            </div>
+            {turn.id === bannerAfterId && <InsufficientCreditsBanner />}
+          </React.Fragment>
         );
       })}
       <div ref={endRef} />

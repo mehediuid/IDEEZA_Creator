@@ -18,12 +18,20 @@
 //
 // Styling: Refine and Regenerate are outlined, "Use this concept" is
 // the one primary violet CTA on the card.
+//
+// Two states replace that action row. When the balance can't cover a
+// build the price line names the shortfall and the CTA is off (the
+// thread carries one InsufficientCreditsBanner saying why). Once the
+// concept has been sent to build the row becomes the build's own
+// status line — see SentToBuildRow.
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Alert02Icon,
   ArrowRight01Icon,
   CheckmarkBadge01Icon,
+  Coins01Icon,
   Copy01Icon,
   InformationCircleIcon,
   MagicWand01Icon,
@@ -31,8 +39,13 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { BUILD_COST } from "@/lib/create/credits";
-import type { ChatTurn } from "@/lib/create/history";
+import { BUILD_COST, useCredits } from "@/lib/create/credits";
+import {
+  minutesLeft,
+  useCreateHistory,
+  type BuildJob,
+  type ChatTurn,
+} from "@/lib/create/history";
 
 const COST_HINT = `Generating the full product uses ${BUILD_COST} credits. Refining stays free.`;
 
@@ -57,6 +70,14 @@ export function ImageTurn({
   onRefine: () => void;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
+  // The rendered balance, not canAfford(): that reads a ref the provider
+  // refreshes in its OWN effect, and a provider's effects run after its
+  // children's — so from here the ref is a render behind (the build
+  // simulator reads the balance the same way, for the same reason).
+  // Before the ledger has read storage its balance is 0, so the gate
+  // waits for `hydrated` rather than greying every card on load.
+  const { hydrated: creditsHydrated, balance } = useCredits();
+  const shortOnCredits = creditsHydrated && balance < BUILD_COST;
 
   if (turn.status === "pending") {
     return (
@@ -108,7 +129,17 @@ export function ImageTurn({
       ) : null}
 
       <div className="flex items-center gap-[8px]">
-        <p className="min-w-0 flex-1 truncate text-sm text-text-tertiary">
+        {/* Truncated while the card is still a choice — the row has to
+            leave space for three controls. Once the concept is building
+            the row is a status line, so the prompt it was sent with is
+            shown whole. */}
+        <p
+          className={
+            turn.usedForBuild
+              ? "min-w-0 flex-1 text-sm text-text-tertiary"
+              : "min-w-0 flex-1 truncate text-sm text-text-tertiary"
+          }
+        >
           <span className="font-semibold text-text-secondary">Prompt: </span>
           {turn.prompt}
         </p>
@@ -119,10 +150,7 @@ export function ImageTurn({
 
       <div className="flex flex-wrap items-center gap-[8px]">
         {turn.usedForBuild ? (
-          <span className="inline-flex h-[36px] items-center gap-[6px] rounded-lg bg-bg-brand-subtle px-[12px] text-2xs font-bold uppercase tracking-wider text-text-brand">
-            <Icon icon={CheckmarkBadge01Icon} size={14} />
-            Sent to build
-          </span>
+          <SentToBuildRow buildId={turn.usedForBuild} />
         ) : (
           <>
             <button
@@ -155,13 +183,24 @@ export function ImageTurn({
               <Icon icon={Refresh01Icon} />
               Regenerate
             </button>
-            <span className="inline-flex items-center gap-[4px] text-sm text-text-tertiary">
+            {/* When the balance can't cover a build the price line says
+                what the balance IS — the gap is the reason the CTA is
+                off, and naming it here saves a trip to the ledger. */}
+            <span
+              data-testid="cost-label"
+              className={
+                shortOnCredits
+                  ? "inline-flex items-center gap-[4px] text-sm text-text-error"
+                  : "inline-flex items-center gap-[4px] text-sm text-text-tertiary"
+              }
+            >
               Cost: {BUILD_COST} credits
+              {shortOnCredits ? ` · you have ${balance}` : ""}
               <button
                 type="button"
                 aria-label={COST_HINT}
                 title={COST_HINT}
-                className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-full outline-none transition-colors duration-fast hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 <Icon icon={InformationCircleIcon} size={14} />
               </button>
@@ -169,11 +208,18 @@ export function ImageTurn({
             <button
               type="button"
               onClick={onUseThis}
+              disabled={shortOnCredits}
+              aria-disabled={shortOnCredits}
               aria-label={`Use Concept ${conceptLabel} and start the full build`}
-              className="ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+              title={shortOnCredits ? "Not enough credits" : undefined}
+              className={
+                shortOnCredits
+                  ? "ml-auto inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[14px] text-sm font-semibold text-text-disabled"
+                  : "ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+              }
             >
               Use this concept
-              <Icon icon={ArrowRight01Icon} />
+              {!shortOnCredits && <Icon icon={ArrowRight01Icon} />}
             </button>
           </>
         )}
@@ -183,6 +229,103 @@ export function ImageTurn({
 }
 
 // ───────────────────── parts ─────────────────────
+
+function SentChip() {
+  return (
+    <span className="inline-flex h-[36px] items-center gap-[6px] rounded-lg bg-bg-success-subtle px-[12px] text-2xs font-bold uppercase tracking-wider text-text-success">
+      <Icon icon={CheckmarkBadge01Icon} size={14} />
+      Sent to build
+    </span>
+  );
+}
+
+// The action row of a concept that has been sent to build: the chip says
+// it left the chat, the line beside it says where the build has got to,
+// and the link is the way back to it. The status is read from the job
+// itself (never stored on the turn), so it is whatever the build really
+// is right now — the simulator writes progress into the store every
+// tick, which is what moves the "minutes left" figure here.
+function SentToBuildRow({ buildId }: { buildId: string }) {
+  const { getBuild } = useCreateHistory();
+  const job = getBuild(buildId);
+
+  // A chat kept from an earlier session can name a build this browser no
+  // longer holds. The turn is still sent — there is just nothing to open.
+  if (!job) return <SentChip />;
+
+  return (
+    <>
+      <SentChip />
+      <span
+        data-testid="build-status-line"
+        className="min-w-0 text-sm text-text-tertiary"
+      >
+        {buildStatusLine(job)}
+      </span>
+      <Link
+        href={`/build/${job.id}`}
+        aria-label="View this build"
+        className={`ml-auto ${OUTLINE_BUTTON}`}
+      >
+        View build
+        <Icon icon={ArrowRight01Icon} />
+      </Link>
+    </>
+  );
+}
+
+// One sentence per build state: what it is doing, then what that means
+// for the user.
+function buildStatusLine(job: BuildJob): string {
+  switch (job.status) {
+    case "queued":
+      return job.blocked === "credits"
+        ? "Paused · top up credits to start"
+        : "Queued · starts when the current build finishes";
+    case "running":
+      return `Building now · about ${minutesLeft(job)} minutes left`;
+    case "ready":
+      return "Build ready · review your deliverables";
+    case "partial":
+      return "Needs a retry · open the build";
+    case "failed":
+      return "Build failed · open the build";
+  }
+}
+
+// Shown once per thread while the balance can't cover a build — every
+// ready card's CTA is off, and one notice explains all of them. The
+// thread places it under the newest concept that could still be built
+// (see chat-thread.tsx); per card it would repeat the same sentence
+// down the whole conversation.
+export function InsufficientCreditsBanner() {
+  return (
+    <aside
+      role="note"
+      data-testid="credits-banner"
+      className="flex w-full max-w-[640px] items-start gap-[12px] rounded-2xl border border-[var(--color-border-warning)] bg-bg-warning-subtle p-[16px]"
+    >
+      <span className="mt-[2px] shrink-0 text-[var(--color-icon-warning)]">
+        <Icon icon={Coins01Icon} size={20} />
+      </span>
+      <div className="flex min-w-0 flex-col gap-[4px]">
+        <p className="text-md font-semibold text-text-primary">
+          Not enough credits to build this
+        </p>
+        <p className="text-sm text-text-secondary">
+          Generating the full product costs {BUILD_COST} credits. Exploring and
+          refining concepts stays free.
+        </p>
+        <Link
+          href="/history#credits"
+          className="w-fit text-sm font-semibold text-text-warning underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+        >
+          Top up credits →
+        </Link>
+      </div>
+    </aside>
+  );
+}
 
 function ConceptHeader({
   conceptLabel,
