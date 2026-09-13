@@ -45,3 +45,4 @@ next-env.d.ts
 
 # /impeccable critique snapshots — local tool output, not product code
 .impeccable/
+.superpowers/
