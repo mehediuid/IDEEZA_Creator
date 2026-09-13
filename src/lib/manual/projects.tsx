@@ -19,6 +19,7 @@
 // active selection.
 
 import * as React from "react";
+import type { BuildJob } from "@/lib/create/history";
 
 export type ManualProjectStatus = "draft" | "completed";
 
@@ -56,6 +57,9 @@ export type ManualProject = {
   createdAt: number;
   updatedAt: number;
   flowState: ManualFlowState;
+  // The AI build this project was created from (Save Project / Advance
+  // Edit on the review surface). Absent for a hand-made project.
+  buildId?: string;
 };
 
 const PROJECTS_KEY = "ideeza:manual:projects";
@@ -148,6 +152,10 @@ type Ctx = {
   findBySlug: (slug: string) => ManualProject | null;
   // Mutations
   createProject: (input: { name: string; description: string }) => ManualProject;
+  // The project a finished AI build becomes. One project per build: a
+  // build that already carries a live `projectId` gets that project
+  // back rather than a second copy of itself.
+  projectFromBuild: (job: BuildJob) => ManualProject;
   selectProject: (id: string) => void;
   updateProject: (id: string, patch: Partial<Omit<ManualProject, "id">>) => void;
   markStepCompleted: (id: string, step: keyof ManualFlowState) => void;
@@ -167,6 +175,9 @@ export function ManualProjectsProvider({
     null,
   );
   const [hydrated, setHydrated] = React.useState(false);
+  // Projects made from an AI build in this session, by build id — see
+  // projectFromBuild.
+  const builtFrom = React.useRef(new Map<string, ManualProject>());
 
   React.useEffect(() => {
     const stored = normalizeProjects(loadJSON<ManualProject[]>(PROJECTS_KEY, []));
@@ -230,6 +241,34 @@ export function ManualProjectsProvider({
     [],
   );
 
+  // The build's own words become the project: its title is the project
+  // name and the product being built, its concept prompt the
+  // description. Nothing is invented here — the review surface passes
+  // the job it is showing.
+  const projectFromBuild = React.useCallback(
+    (job: BuildJob) => {
+      const existing = job.projectId
+        ? projects.find((p) => p.id === job.projectId)
+        : undefined;
+      if (existing) return existing;
+      // `projects` is React state, so two presses inside one tick would
+      // both read the list from before the first one and make the build
+      // two projects. This is what keeps one build to one project.
+      const already = builtFrom.current.get(job.id);
+      if (already) return already;
+      const created = createProject({
+        name: job.title,
+        description: job.conceptPrompt,
+      });
+      const patch = { productName: job.title, buildId: job.id };
+      updateProject(created.id, patch);
+      const project = { ...created, ...patch };
+      builtFrom.current.set(job.id, project);
+      return project;
+    },
+    [projects, createProject, updateProject],
+  );
+
   const markStepCompleted = React.useCallback(
     (id: string, step: keyof ManualFlowState) => {
       setProjects((arr) =>
@@ -279,6 +318,7 @@ export function ManualProjectsProvider({
     activeProject,
     findBySlug,
     createProject,
+    projectFromBuild,
     selectProject,
     updateProject,
     markStepCompleted,

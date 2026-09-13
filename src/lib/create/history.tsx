@@ -454,6 +454,9 @@ type Ctx = {
   // the simulator on each tick.
   promoteQueued: () => void;
   setBuildOutcome: (buildId: string, outcome: BuildOutcome) => void;
+  // Records the ManualProject this build became, so Save Project /
+  // Advance Edit create one project per build and reuse it after that.
+  setBuildProject: (buildId: string, projectId: string) => void;
   setBuildModel: (buildId: string, glbUrl: string) => void;
   getBuild: (buildId: string) => BuildJob | null;
   buildsForChat: (chatId: string) => BuildJob[];
@@ -921,6 +924,19 @@ export function CreateHistoryProvider({
     [],
   );
 
+  const setBuildProject = React.useCallback(
+    (buildId: string, projectId: string) => {
+      setBuilds((arr) =>
+        arr.map((b) =>
+          b.id === buildId
+            ? { ...b, projectId, updatedAt: Date.now() }
+            : b,
+        ),
+      );
+    },
+    [],
+  );
+
   const setBuildModel = React.useCallback((buildId: string, glbUrl: string) => {
     setBuilds((arr) =>
       arr.map((b) =>
@@ -991,6 +1007,7 @@ export function CreateHistoryProvider({
     blockForCredits,
     promoteQueued,
     setBuildOutcome,
+    setBuildProject,
     setBuildModel,
     getBuild,
     buildsForChat,

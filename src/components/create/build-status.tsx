@@ -472,8 +472,10 @@ function statusTone(
   status: BuildItem["status"],
   systemFailure: boolean,
 ): string {
-  if (systemFailure) return "text-text-tertiary";
+  // A row that got to "ready" before the job died stays green — the
+  // artifact really was produced; greying it would deny the work.
   if (status === "ready") return "text-text-success";
+  if (systemFailure) return "text-text-tertiary";
   if (status === "failed") return "text-text-error";
   if (status === "skipped" || status === "pending") return "text-text-tertiary";
   return "text-text-secondary";

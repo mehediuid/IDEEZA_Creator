@@ -1,64 +1,65 @@
 "use client";
 
-// ReviewOutputs — Phase 2's final view, shown when all build items are
-// ready. The user reviews each deliverable, then picks one of three
-// outcomes (spec §6):
-//   • Save as Private   — off-chain draft, no wallet, no KYC
-//   • Give to community — showcase + mint (wallet/gas)
-//   • Sell on marketplace — mint + KYC (KYC failure → retry)
+// ReviewOutputs — the last view of a build (Ai-Flow frames 15 / DL-02 /
+// DL-03 / Wiring / Parts). One pill tab per deliverable the build really
+// produced, the artifact itself on the left, what ships with it on the
+// right, and the two things a finished build can become:
 //
-// Wallet / KYC are stubbed inline. Real chain calls hook into
-// /api/projects later; the route already accepts the outcome.
+//   • Save Project  — the build becomes a ManualProject, listed under
+//                     My projects.
+//   • Advance Edit  — the same project, opened straight in the PCB
+//                     editor.
+//
+// One project per build: both routes go through `projectFromBuild`, so
+// pressing either twice reuses the project rather than making a second
+// one. What happens to the design after that — private, community,
+// marketplace — is the Brief module's step, not this surface's.
 
 import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Cancel01Icon,
-  CheckListIcon,
-  CheckmarkBadge01Icon,
-  CodeIcon,
-  CpuIcon,
-  CubeIcon,
-  ElectricWireIcon,
+  CheckmarkCircle02Icon,
+  FloppyDiskIcon,
   HelpCircleIcon,
-  PackageIcon,
-  ShoppingBag01Icon,
-  User02Icon,
-  Wallet01Icon,
+  PencilEdit02Icon,
 } from "@hugeicons/core-free-icons";
-import Link from "next/link";
-import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { ModelViewer } from "@/components/3d/model-viewer";
 import {
   ITEM_LABELS,
+  ITEM_KINDS,
   useCreateHistory,
   type BuildItemKind,
   type BuildJob,
-  type BuildOutcome,
 } from "@/lib/create/history";
-
-const KIND_ICON: Record<BuildItemKind, IconValue> = {
-  "3d": CubeIcon,
-  pcb: CpuIcon,
-  code: CodeIcon,
-  wiring: ElectricWireIcon,
-  parts: PackageIcon,
-};
-
-const KIND_BLURB: Record<BuildItemKind, string> = {
-  "3d":
-    "The printable enclosure: where things mount, how it closes, the tolerances. Open it in your slicer.",
-  pcb:
-    "The circuit board: the schematic, layout, and the parts to buy. Send it to a fab as Gerbers.",
-  code:
-    "The firmware: starter code wired to the parts in the PCB, ready to flash and modify.",
-  wiring:
-    "The harness: which pin goes to which pin, so the parts outside the board connect the right way round.",
-  parts:
-    "The bill of materials: every part, its reference on the board, and how many you need to order.",
-};
+import { stepHref, useManualProjects } from "@/lib/manual/projects";
+import {
+  FirmwarePreview,
+  PartsPreview,
+  PartsSummary,
+  PcbPreview,
+  WHAT_SHIPS,
+  WiringPreview,
+} from "./deliverable-previews";
 
 export function ReviewOutputs({ job }: { job: BuildJob }) {
+  // The panel reads `?tab=` for a deep link (a project card links
+  // straight at its parts list), which needs a boundary so the route can
+  // still be pre-rendered. The build view only renders once the store
+  // has hydrated in the browser, so the fallback is never seen.
+  return (
+    <React.Suspense fallback={null}>
+      <ReviewPanel job={job} />
+    </React.Suspense>
+  );
+}
+
+function ReviewPanel({ job }: { job: BuildJob }) {
+  const router = useRouter();
+  const query = useSearchParams();
+  const { setBuildProject } = useCreateHistory();
+  const { projectFromBuild, selectProject } = useManualProjects();
+
   // An artifact an older build never produced has nothing to review, so
   // it gets no tab — a deliverable panel for something that was never
   // made would be a lie.
@@ -66,316 +67,174 @@ export function ReviewOutputs({ job }: { job: BuildJob }) {
     () => job.items.filter((i) => i.status !== "skipped"),
     [job.items],
   );
-  const [active, setActive] = React.useState<BuildItemKind>(
-    () => (deliverables[0] ?? job.items[0]).kind,
-  );
-  const [picking, setPicking] = React.useState<BuildOutcome | null>(null);
-  const { setBuildOutcome } = useCreateHistory();
 
-  // If the active tab isn't one of the real deliverables (a migrated
-  // job, or one whose items changed underneath), fall back to the first
-  // that is.
+  const [picked, setPicked] = React.useState<BuildItemKind | null>(null);
+  const linked = query.get("tab");
+  const wanted = picked ?? ITEM_KINDS.find((k) => k === linked) ?? null;
+  // Falls back to the first real deliverable when the link (or a job
+  // whose items changed underneath) names one this build doesn't have.
   const shown =
-    deliverables.some((i) => i.kind === active) || !deliverables.length
-      ? active
-      : deliverables[0].kind;
+    deliverables.find((i) => i.kind === wanted)?.kind ??
+    deliverables[0]?.kind ??
+    null;
+
+  // The project this build becomes — created on the first press and
+  // handed back on every one after it, so Save Project and Advance Edit
+  // are two doors into one project rather than two projects.
+  const ensureProject = React.useCallback(() => {
+    const project = projectFromBuild(job);
+    if (project.id !== job.projectId) setBuildProject(job.id, project.id);
+    return project;
+  }, [job, projectFromBuild, setBuildProject]);
 
   return (
-    <div className="flex flex-col gap-[24px]">
-      {/* Outputs panel */}
-      <section
-        aria-labelledby="outputs-heading"
-        className="overflow-hidden rounded-2xl border border-border bg-bg-surface"
-      >
-        <header className="flex items-center justify-between gap-[16px] border-b border-border px-[20px] py-[14px]">
-          <div>
-            <p className="text-2xs font-bold uppercase tracking-wider text-text-brand">
-              Build ready
-            </p>
-            <h2
-              id="outputs-heading"
-              className="mt-[2px] text-xl font-bold tracking-tight text-text-primary"
-            >
-              Review your deliverables
-            </h2>
-          </div>
-        </header>
-
-        {deliverables.length === 0 ? (
-          <div className="flex flex-col items-center gap-[10px] px-[20px] py-[48px] text-center">
-            <Icon icon={HelpCircleIcon} size={28} />
-            <p className="max-w-[380px] text-sm text-text-secondary">
-              This build has no deliverables to review — generate a new full
-              product from a concept.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Tab strip */}
-            <div
-              role="tablist"
-              aria-label="Deliverables"
-              className="flex items-center gap-[4px] border-b border-border px-[12px] pt-[12px]"
-            >
-              {deliverables.map((item) => {
-                const isActive = shown === item.kind;
-                return (
-                  <button
-                    key={item.kind}
-                    role="tab"
-                    type="button"
-                    aria-selected={isActive}
-                    aria-controls={`output-panel-${item.kind}`}
-                    id={`output-tab-${item.kind}`}
-                    onClick={() => setActive(item.kind)}
-                    className={[
-                      "inline-flex h-[36px] items-center gap-[8px] rounded-t-lg px-[14px] text-md font-medium outline-none transition-colors duration-fast",
-                      "focus-visible:ring-2 focus-visible:ring-border-focus",
-                      isActive
-                        ? "bg-bg-page font-semibold text-text-primary"
-                        : "text-text-secondary hover:text-text-primary",
-                    ].join(" ")}
-                  >
-                    <Icon icon={KIND_ICON[item.kind]} />
-                    {ITEM_LABELS[item.kind]}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Active panel */}
-            {deliverables.map((item) => (
-              <div
-                key={item.kind}
-                id={`output-panel-${item.kind}`}
-                role="tabpanel"
-                aria-labelledby={`output-tab-${item.kind}`}
-                hidden={shown !== item.kind}
-                className="bg-bg-page p-[20px]"
-              >
-                <DeliverablePreview kind={item.kind} modelGlbUrl={job.modelGlbUrl} />
-                <div className="mt-[16px] flex items-start gap-[10px] rounded-lg border border-border bg-bg-surface p-[14px]">
-                  <Icon icon={HelpCircleIcon} />
-                  <p className="text-sm text-text-secondary">
-                    <span className="font-semibold text-text-primary">
-                      What is this?{" "}
-                    </span>
-                    {KIND_BLURB[item.kind]}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-      </section>
-
-      {/* Outcome picker */}
-      <section
-        aria-labelledby="outcome-heading"
-        className="rounded-2xl border border-border bg-bg-surface p-[20px]"
-      >
+    <section
+      aria-labelledby="review-heading"
+      className="overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface"
+    >
+      <header className="px-10 pb-6 pt-8">
+        <p className="text-2xs font-bold uppercase tracking-wider text-text-brand">
+          Build ready
+        </p>
         <h2
-          id="outcome-heading"
-          className="text-md font-semibold text-text-primary"
+          id="review-heading"
+          className="mt-1 text-xl font-bold tracking-tight text-text-primary"
         >
-          What do you want to do with this build?
+          Review your deliverables
         </h2>
-        <p className="mt-[4px] text-sm text-text-tertiary">
-          Saving privately stays off-chain. Sharing or selling mints on-chain
-          authorship; selling also requires KYC.
-        </p>
-        {job.outcome ? (
-          <OutcomeBadge outcome={job.outcome} />
-        ) : (
-          <ul
-            role="list"
-            className="mt-[16px] grid gap-[12px] md:grid-cols-3"
+      </header>
+
+      {shown === null ? (
+        <div className="flex flex-col items-center gap-5 px-10 pb-24 pt-4 text-center">
+          <Icon icon={HelpCircleIcon} size={28} />
+          <p className="max-w-[380px] text-sm text-text-secondary">
+            This build has no deliverables to review — generate a new full
+            product from a concept.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div
+            role="tablist"
+            aria-label="Deliverables"
+            className="flex flex-wrap items-center gap-4 px-10 pb-6"
           >
-            <OutcomeCard
-              icon={CheckListIcon}
-              title="Save as Private"
-              detail="Off-chain draft. No wallet, no KYC."
-              requirementHint="Stays in your projects only."
-              onClick={() => setPicking("private")}
-            />
-            <OutcomeCard
-              icon={User02Icon}
-              title="Give to community"
-              detail="Showcase + mint authorship on-chain."
-              requirementHint="Wallet needed · No KYC."
-              onClick={() => setPicking("community")}
-            />
-            <OutcomeCard
-              icon={ShoppingBag01Icon}
-              title="Sell on marketplace"
-              detail="List for sale with on-chain proof."
-              requirementHint="Wallet + KYC needed."
-              onClick={() => setPicking("sell")}
-              primary
-            />
-          </ul>
-        )}
-      </section>
+            {deliverables.map((item) => {
+              const isActive = shown === item.kind;
+              return (
+                <button
+                  key={item.kind}
+                  id={`review-tab-${item.kind}`}
+                  role="tab"
+                  type="button"
+                  aria-selected={isActive}
+                  aria-controls="review-tabpanel"
+                  onClick={() => setPicked(item.kind)}
+                  className={[
+                    "inline-flex h-[36px] items-center rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast",
+                    "focus-visible:ring-2 focus-visible:ring-border-focus",
+                    isActive
+                      ? "bg-bg-brand text-text-on-brand"
+                      : "text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
+                  ].join(" ")}
+                >
+                  {ITEM_LABELS[item.kind]}
+                </button>
+              );
+            })}
+          </div>
 
-      {picking && (
-        <OutcomeDialog
-          outcome={picking}
-          onCancel={() => setPicking(null)}
-          onConfirm={async () => {
-            await fetch("/api/projects", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ buildId: job.id, outcome: picking }),
-            }).catch(() => null);
-            setBuildOutcome(job.id, picking);
-            setPicking(null);
-          }}
-        />
+          <div
+            id="review-tabpanel"
+            role="tabpanel"
+            aria-labelledby={`review-tab-${shown}`}
+            className="grid gap-8 px-10 pb-10 md:grid-cols-[minmax(0,1fr)_260px]"
+          >
+            {/* A wiring map or a long BOM is taller than the card; it
+                scrolls inside the panel instead of stretching the page
+                away from the two actions below. */}
+            <div className="max-h-[520px] min-w-0 overflow-auto rounded-xl">
+              <DeliverablePanel kind={shown} job={job} />
+            </div>
+            <aside className="flex flex-col gap-8 rounded-xl border border-solid border-border bg-bg-surface p-8">
+              {shown === "parts" && <PartsSummary job={job} />}
+              <section>
+                <h3 className="text-2xs font-bold tracking-wider text-text-secondary">
+                  WHAT SHIPS
+                </h3>
+                <ul role="list" className="mt-4 flex flex-col items-start gap-3">
+                  {WHAT_SHIPS[shown].map((line) => (
+                    <li
+                      key={line}
+                      className="inline-flex items-center gap-3 rounded-full bg-bg-subtle px-4 py-2 text-sm text-text-secondary"
+                    >
+                      <Icon icon={CheckmarkCircle02Icon} size={14} className="shrink-0" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </aside>
+          </div>
+
+          <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
+            <p className="text-sm text-text-secondary">
+              {deliverables.length === ITEM_KINDS.length
+                ? "All five pieces are ready. Choose what happens to this build next."
+                : "Every piece this build made is ready. Choose what happens to this build next."}
+            </p>
+            <div className="flex items-center gap-6">
+              <button
+                type="button"
+                onClick={() => {
+                  ensureProject();
+                  router.push("/projects");
+                }}
+                className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={FloppyDiskIcon} size={18} />
+                Save Project
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const project = ensureProject();
+                  // The editor pages work on the active project, so it
+                  // has to be this one before we land there.
+                  selectProject(project.id);
+                  router.push(stepHref(project, "pcb"));
+                }}
+                className="inline-flex h-[40px] items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={PencilEdit02Icon} size={18} />
+                Advance Edit
+              </button>
+            </div>
+          </footer>
+        </>
       )}
-    </div>
+    </section>
   );
 }
 
-function OutcomeCard({
-  icon,
-  title,
-  detail,
-  requirementHint,
-  onClick,
-  primary,
-}: {
-  icon: IconValue;
-  title: string;
-  detail: string;
-  requirementHint: string;
-  onClick: () => void;
-  primary?: boolean;
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        className={[
-          "flex h-full w-full flex-col items-start gap-[10px] rounded-xl border p-[16px] text-left outline-none transition-colors duration-fast",
-          "focus-visible:ring-2 focus-visible:ring-border-focus",
-          primary
-            ? "border-border-brand bg-bg-brand-subtle hover:bg-bg-brand-subtle"
-            : "border-border bg-bg-page hover:border-border-strong",
-        ].join(" ")}
-      >
-        <span
-          aria-hidden
-          className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg bg-bg-surface text-text-brand"
-        >
-          <Icon icon={icon} />
-        </span>
-        <p className="text-md font-semibold text-text-primary">{title}</p>
-        <p className="text-sm text-text-secondary">{detail}</p>
-        <p className="mt-auto text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          {requirementHint}
-        </p>
-      </button>
-    </li>
-  );
-}
-
-function OutcomeBadge({ outcome }: { outcome: BuildOutcome }) {
-  const labels: Record<BuildOutcome, string> = {
-    private: "Saved as Private",
-    community: "Shared with community · Minted",
-    sell: "Listed for sale · Minted",
-  };
-  return (
-    <div className="mt-[16px] flex items-center gap-[12px] rounded-xl border border-border bg-bg-brand-subtle px-[16px] py-[14px]">
-      <Icon icon={CheckmarkBadge01Icon} />
-      <p className="text-md font-semibold text-text-brand">
-        {labels[outcome]}
-      </p>
-      <Link
-        href="/"
-        className="ml-auto text-sm font-semibold text-text-secondary underline-offset-2 hover:text-text-primary hover:underline"
-      >
-        Back to Home
-      </Link>
-    </div>
-  );
-}
-
-function DeliverablePreview({
+function DeliverablePanel({
   kind,
-  modelGlbUrl,
+  job,
 }: {
   kind: BuildItemKind;
-  modelGlbUrl?: string;
+  job: BuildJob;
 }) {
+  if (kind === "pcb") return <PcbPreview job={job} />;
+  if (kind === "code") return <FirmwarePreview job={job} />;
+  if (kind === "wiring") return <WiringPreview job={job} />;
+  if (kind === "parts") return <PartsPreview job={job} />;
   return (
-    <div className="grid gap-[12px] md:grid-cols-2">
-      <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-border bg-bg-surface-raised">
-        {kind === "3d" && modelGlbUrl ? (
-          <ModelViewer url={modelGlbUrl} />
-        ) : kind === "3d" ? (
-          <GeneratingModel />
-        ) : (
-          <div className="flex h-full items-center justify-center text-text-tertiary">
-            <Icon icon={KIND_ICON[kind]} size={48} />
-          </div>
-        )}
-      </div>
-      <div className="flex flex-col gap-[10px] rounded-lg border border-border bg-bg-surface p-[16px]">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          What ships
-        </p>
-        <ul role="list" className="flex flex-col gap-[6px] text-sm text-text-secondary">
-          {kind === "3d" && (
-            <>
-              <PreviewLine>STL + STEP files</PreviewLine>
-              <PreviewLine>Print settings: PETG, 0.2mm layer</PreviewLine>
-              <PreviewLine>Mount points sized for the PCB</PreviewLine>
-            </>
-          )}
-          {kind === "pcb" && (
-            <>
-              <PreviewLine>Schematic (PDF + KiCad)</PreviewLine>
-              <PreviewLine>2-layer layout · Gerber bundle</PreviewLine>
-              <PreviewLine>Bill of materials with stock links</PreviewLine>
-            </>
-          )}
-          {kind === "code" && (
-            <>
-              <PreviewLine>Arduino-style sketch, fully commented</PreviewLine>
-              <PreviewLine>Library list pinned to versions</PreviewLine>
-              <PreviewLine>Wiring map to the PCB pins</PreviewLine>
-            </>
-          )}
-          {kind === "wiring" && (
-            <>
-              <PreviewLine>Pin-to-pin connection list</PreviewLine>
-              <PreviewLine>Power, ground and signal nets separated</PreviewLine>
-              <PreviewLine>Harness diagram for off-board parts</PreviewLine>
-            </>
-          )}
-          {kind === "parts" && (
-            <>
-              <PreviewLine>Every part with its board reference</PreviewLine>
-              <PreviewLine>Quantities, actives and passives counted</PreviewLine>
-              <PreviewLine>Exportable as CSV for your supplier</PreviewLine>
-            </>
-          )}
-        </ul>
-        {kind === "3d" && modelGlbUrl && (
-          <a
-            href={modelGlbUrl}
-            download
-            className="mt-[2px] inline-flex h-[34px] w-fit items-center gap-[8px] rounded-lg border border-border bg-bg-page px-[12px] text-sm font-semibold text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v12 M7 11l5 5 5-5 M5 21h14" />
-            </svg>
-            Download .glb
-          </a>
-        )}
-      </div>
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-solid border-border bg-bg-surface-raised">
+      {job.modelGlbUrl ? (
+        <ModelViewer url={job.modelGlbUrl} />
+      ) : (
+        <GeneratingModel />
+      )}
     </div>
   );
 }
@@ -385,7 +244,7 @@ function DeliverablePreview({
 // finishes the mesh, so this keeps the panel honest until the model lands.
 function GeneratingModel() {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-[10px] text-text-tertiary">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-text-tertiary">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="ix-modelspin">
         <circle cx="12" cy="12" r="9" stroke="var(--color-border)" strokeWidth="2.5" />
         <path d="M21 12a9 9 0 0 0-9-9" stroke="var(--color-text-brand)" strokeWidth="2.5" strokeLinecap="round" />
@@ -395,199 +254,3 @@ function GeneratingModel() {
     </div>
   );
 }
-
-function PreviewLine({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-[8px]">
-      <span aria-hidden className="mt-[3px] inline-flex text-text-brand">
-        <Icon icon={CheckmarkBadge01Icon} size={14} />
-      </span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
-function OutcomeDialog({
-  outcome,
-  onCancel,
-  onConfirm,
-}: {
-  outcome: BuildOutcome;
-  onCancel: () => void;
-  onConfirm: () => Promise<void>;
-}) {
-  const [busy, setBusy] = React.useState(false);
-  const config = OUTCOME_DIALOG[outcome];
-
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="outcome-dialog-title"
-      onClick={onCancel}
-      className="fixed inset-0 z-modal flex items-center justify-center px-[16px] py-[24px]"
-    >
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-bg-page/60 backdrop-blur-sm"
-      />
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[520px] overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-3"
-      >
-        <header className="flex items-start gap-[16px] border-b border-border px-[20px] py-[16px]">
-          <span
-            aria-hidden
-            className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand"
-          >
-            <Icon icon={config.icon} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2
-              id="outcome-dialog-title"
-              className="text-lg font-bold tracking-tight text-text-primary"
-            >
-              {config.title}
-            </h2>
-            <p className="mt-[2px] text-sm text-text-secondary">
-              {config.subtitle}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label="Close"
-            className="inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            <Icon icon={Cancel01Icon} />
-          </button>
-        </header>
-
-        <div className="flex flex-col gap-[10px] px-[20px] py-[16px]">
-          {config.steps.map((step, i) => (
-            <div
-              key={i}
-              className="flex items-start gap-[12px] rounded-lg border border-border bg-bg-page p-[12px]"
-            >
-              <span
-                aria-hidden
-                className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-bg-surface-raised text-text-secondary"
-              >
-                <Icon icon={step.icon} size={14} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-text-primary">
-                  {step.title}
-                </p>
-                <p className="text-2xs text-text-tertiary">{step.detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <footer className="flex items-center justify-end gap-[12px] border-t border-border px-[20px] py-[14px]">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex h-[36px] items-center rounded-lg border border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            Not yet
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await onConfirm();
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-wait disabled:opacity-70"
-          >
-            {busy ? "Working…" : config.confirmLabel}
-          </button>
-        </footer>
-      </div>
-    </div>
-  );
-}
-
-const OUTCOME_DIALOG: Record<
-  BuildOutcome,
-  {
-    icon: IconValue;
-    title: string;
-    subtitle: string;
-    confirmLabel: string;
-    steps: Array<{ icon: IconValue; title: string; detail: string }>;
-  }
-> = {
-  private: {
-    icon: CheckListIcon,
-    title: "Save this build as Private",
-    subtitle:
-      "Stays in your account. No wallet, no KYC, no marketplace listing.",
-    confirmLabel: "Save as Private",
-    steps: [
-      {
-        icon: CheckListIcon,
-        title: "Saved off-chain",
-        detail: "Keep iterating, share later if you want.",
-      },
-    ],
-  },
-  community: {
-    icon: User02Icon,
-    title: "Share with the community",
-    subtitle:
-      "Mints on-chain authorship so the work is provably yours. Gas paid by you.",
-    confirmLabel: "Mint and share",
-    steps: [
-      {
-        icon: Wallet01Icon,
-        title: "Connect a wallet",
-        detail: "Used to sign the mint and pay network gas.",
-      },
-      {
-        icon: CheckmarkBadge01Icon,
-        title: "Mint authorship",
-        detail: "Your address is recorded as the creator. No buyer required.",
-      },
-    ],
-  },
-  sell: {
-    icon: ShoppingBag01Icon,
-    title: "List for sale",
-    subtitle:
-      "Mints authorship and lists for sale. KYC is required because money will change hands.",
-    confirmLabel: "Start KYC and list",
-    steps: [
-      {
-        icon: Wallet01Icon,
-        title: "Connect a wallet",
-        detail: "Used to sign the mint and receive payment.",
-      },
-      {
-        icon: User02Icon,
-        title: "Complete KYC",
-        detail:
-          "Identity check. If it fails you can retry; listing is blocked until it passes.",
-      },
-      {
-        icon: ShoppingBag01Icon,
-        title: "Mint and list",
-        detail: "Listing appears on the IDEEZA marketplace.",
-      },
-    ],
-  },
-};
