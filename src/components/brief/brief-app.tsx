@@ -1,11 +1,15 @@
 "use client";
 
-// /brief — 4-step minimal "invisible wizard".
+// /brief — a minimal "invisible wizard" whose steps depend on the intent.
 //
-//  Step 1: idea + intent
-//  Step 2: storyboard (preview frames — fast, ~10s gen)
-//  Step 3: intent-aware mint setup + Pay
-//  Step 4: mint success — listing is live, video renders in background
+//  idea:    the idea + what the maker wants to do with it
+//  preview: storyboard (preview frames — fast, ~10s gen)
+//  form:    intent-aware mint setup + Pay
+//  success: mint done — listing is live, video renders in background
+//
+// The order is `stepsFor(intent, shareToNewsfeed)`: selling puts the clip
+// before the terms, giving and saving go straight to the form and only make a
+// clip when the maker also posts to Innovations.
 //
 // The 20-min video render NO LONGER blocks any of these steps. Storyboard is
 // the immediate preview; the full 10s video kicks off only after Pay and lives
@@ -30,7 +34,10 @@ import { useCreateHistory } from "@/lib/create/history";
 import {
   DEFAULT_STATE,
   normalizeBrief,
+  normalizeStep,
+  stepsFor,
   type BriefState,
+  type BriefStepId,
   type Scene,
 } from "@/lib/brief/types";
 
@@ -38,16 +45,20 @@ import {
 // `@/lib/brief/types` (pure — no React in its import graph). Re-exported here
 // so the steps keep importing them from the module they belong to.
 export {
+  BRIEF_FORM_LABEL,
   DEFAULT_STATE,
   LICENSES,
   LISTING_TYPES,
   NETWORKS,
   TOKENS_BY_NETWORK,
   normalizeBrief,
+  normalizeStep,
+  stepsFor,
 } from "@/lib/brief/types";
 export type {
   ArClip,
   BriefState,
+  BriefStepId,
   Intent,
   License,
   ListingType,
@@ -68,7 +79,8 @@ function draftKey(projectId: string): string {
 // Cross-page handoff slot written by the GlobalRenderIndicator when the user
 // picks "Regenerate" on a finished video job. Brief reads it on mount AND on
 // the `ideeza:brief-regenerate` window event, restores the old prompt/quality
-// into BriefState, clears the storyboard + videoJobId, and snaps to Step 2.
+// into BriefState, clears the storyboard + videoJobId, and snaps to the preview
+// step.
 const REGEN_REQUEST_KEY = "ideeza:brief:regenerate";
 const REGEN_EVENT = "ideeza:brief-regenerate";
 // Hand-off slot written when Step 1 attaches the build to a project that turns
@@ -84,18 +96,21 @@ const HANDOFF_KEPT_NOTICE =
 // Every read migrates: a draft stored before the testnet move (Ethereum /
 // Polygon / Solana, Bundle / Offers listings) comes back on the live model
 // rather than opening with a chain the app can no longer mint on.
-function readFromStorage(projectId: string): { state: BriefState; step: number } {
+// A draft written before the steps had names carries `step` as 1–4 —
+// `normalizeStep` brings it back on the current vocabulary, so an older draft
+// still opens on the step it reached.
+function readFromStorage(projectId: string): { state: BriefState; step: BriefStepId } {
   try {
     const raw = window.localStorage.getItem(draftKey(projectId));
     if (raw) {
-      const parsed = JSON.parse(raw) as { state?: unknown; step?: number };
+      const parsed = JSON.parse(raw) as { state?: unknown; step?: unknown };
       return {
         state: normalizeBrief(parsed.state),
-        step: parsed.step ?? 1,
+        step: normalizeStep(parsed.step),
       };
     }
   } catch {}
-  return { state: DEFAULT_STATE, step: 1 };
+  return { state: DEFAULT_STATE, step: "idea" };
 }
 
 // Does a stored draft hold work of its own? Anything the user answered on Step
@@ -123,7 +138,7 @@ function draftHasWork(s: BriefState): boolean {
 // mint stamp are not another project's to inherit. And a target that already
 // holds a brief of its own keeps it: this returns false and the caller says so
 // instead of replacing that project's work.
-function seedDraft(projectId: string, s: BriefState, step: number): boolean {
+function seedDraft(projectId: string, s: BriefState, step: BriefStepId): boolean {
   try {
     const raw = window.localStorage.getItem(draftKey(projectId));
     const prev = raw
@@ -157,7 +172,7 @@ function releaseProjectChoice(projectId: string) {
   try {
     const raw = window.localStorage.getItem(draftKey(projectId));
     if (!raw) return;
-    const parsed = JSON.parse(raw) as { state?: unknown; step?: number };
+    const parsed = JSON.parse(raw) as { state?: unknown; step?: unknown };
     const prev = normalizeBrief(parsed.state);
     window.localStorage.setItem(
       draftKey(projectId),
@@ -168,7 +183,7 @@ function releaseProjectChoice(projectId: string) {
           newProjectName: "",
           newProjectDescription: "",
         },
-        step: parsed.step ?? 1,
+        step: normalizeStep(parsed.step),
       }),
     );
   } catch {}
@@ -251,6 +266,37 @@ function applyRegen(s: BriefState, regen: RegenRequest): BriefState {
   };
 }
 
+// Every step there is, in the order they can appear. Only used to place a step
+// a sequence doesn't run (the regenerate hand-off forces "preview" whatever
+// the intent), so Continue and Back still move exactly one step from it.
+const STEP_ORDER: BriefStepId[] = ["idea", "preview", "form", "success"];
+
+/** Where `step` sits in `seq` — or, off-sequence, the entry just before it. */
+function seqIndex(
+  seq: BriefStepId[],
+  step: BriefStepId,
+): { i: number; exact: boolean } {
+  const i = seq.indexOf(step);
+  if (i >= 0) return { i, exact: true };
+  const rank = STEP_ORDER.indexOf(step);
+  let before = -1;
+  seq.forEach((s, idx) => {
+    if (STEP_ORDER.indexOf(s) < rank) before = idx;
+  });
+  return { i: before, exact: false };
+}
+
+function stepAfter(seq: BriefStepId[], step: BriefStepId): BriefStepId | null {
+  const { i } = seqIndex(seq, step);
+  return seq[i + 1] ?? null;
+}
+
+function stepBefore(seq: BriefStepId[], step: BriefStepId): BriefStepId | null {
+  const { i, exact } = seqIndex(seq, step);
+  if (!exact) return seq[i] ?? null;
+  return i > 0 ? seq[i - 1] : null;
+}
+
 export function BriefApp() {
   const router = useRouter();
   const { createJob, markMinted } = useVideoJobs();
@@ -265,7 +311,7 @@ export function BriefApp() {
   } = useManualProjects();
   const { builds } = useCreateHistory();
   const [state, setState] = React.useState<BriefState>(DEFAULT_STATE);
-  const [step, setStep] = React.useState(1);
+  const [step, setStep] = React.useState<BriefStepId>("idea");
   const [hydrated, setHydrated] = React.useState(false);
   const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
@@ -303,7 +349,7 @@ export function BriefApp() {
     const regen = readRegenRequest();
     if (regen) {
       normalized = applyRegen(normalized, regen);
-      nextStep = 2;
+      nextStep = "preview";
     }
     setState(normalized);
     setStep(nextStep);
@@ -321,7 +367,7 @@ export function BriefApp() {
       const regen = readRegenRequest();
       if (!regen) return;
       setState((s) => applyRegen(s, regen));
-      setStep(2);
+      setStep("preview");
     };
     window.addEventListener(REGEN_EVENT, handler);
     return () => window.removeEventListener(REGEN_EVENT, handler);
@@ -362,6 +408,38 @@ export function BriefApp() {
   const patch = (next: Partial<BriefState>) =>
     setState((s) => ({ ...s, ...next }));
 
+  // The steps this brief runs. Recomputed from the two answers that decide
+  // them, so ticking "Share to Innovations" mid-form really does add the
+  // preview step rather than only changing a label.
+  const seq = React.useMemo(
+    () => stepsFor(state.intent, state.shareToNewsfeed),
+    [state.intent, state.shareToNewsfeed],
+  );
+  // Is this the last thing to answer before the mint? The step CTAs read it
+  // for their wording — the handler below is what actually decides.
+  const isLastStep = stepAfter(seq, step) === "success";
+
+  // Unticking it takes that step away again — and the user may be standing on
+  // it. When the sequence really changes and the current step is no longer in
+  // it, walk BACK through the sequence they were on to the nearest step the
+  // new one still has: never forward, which would skip a question. Only on a
+  // change, so a step set deliberately from outside (the regenerate hand-off
+  // snaps to the preview) is left where it was put.
+  const seqRef = React.useRef<BriefStepId[] | null>(null);
+  React.useEffect(() => {
+    if (!hydrated) return;
+    const before = seqRef.current;
+    seqRef.current = seq;
+    if (!before || before.join() === seq.join()) return;
+    setStep((cur) => {
+      if (seq.includes(cur)) return cur;
+      for (let i = before.indexOf(cur) - 1; i >= 0; i--) {
+        if (seq.includes(before[i])) return before[i];
+      }
+      return seq[0];
+    });
+  }, [seq, hydrated]);
+
   // Step 1 edits the product name into local state (smooth, controlled input)
   // AND writes it straight through to the project so the editor chrome shows
   // the same name on every step. Written on change — no reactive round-trip,
@@ -393,7 +471,9 @@ export function BriefApp() {
     );
   };
 
-  const goToStep2 = () => {
+  // Step 1's Continue. Where it lands is the intent's business: selling goes
+  // to the preview, giving and saving straight to the form.
+  const continueFromIdea = () => {
     // One press, one project.
     if (continuingRef.current) return;
 
@@ -429,14 +509,19 @@ export function BriefApp() {
       next = { ...next, projectId: targetId };
     }
 
+    // Where the brief opens on the other side: the step this intent runs after
+    // the idea, so a seeded hand-off lands exactly where staying put would.
+    const afterIdea =
+      stepAfter(stepsFor(next.intent, next.shareToNewsfeed), "idea") ?? "idea";
+
     // The URL is what says which project the editor is in — the workspace
     // gate reads the slug and remounts the Brief per project. So attaching the
     // build elsewhere is a navigation, with the draft seeded first so the
-    // remount opens on Step 2 carrying what was just typed.
+    // remount opens on the next step carrying what was just typed.
     if (targetId !== activeProjectId) {
       // Unless that project already has a brief of its own — then its draft
       // wins, we only open it, and Step 1 there explains what happened.
-      if (seedDraft(targetId, next, 2)) {
+      if (seedDraft(targetId, next, afterIdea)) {
         // The product being built belongs to the project it lands in.
         updateProject(targetId, { productName: next.productName });
       } else {
@@ -451,7 +536,7 @@ export function BriefApp() {
     continuingRef.current = false;
     setContinuing(false);
     setState(next);
-    setStep(2);
+    setStep(afterIdea);
   };
 
   // Storyboard generation — 10-second mock. Produces 3 hero scenes that act as
@@ -535,28 +620,13 @@ export function BriefApp() {
     }
   };
 
-  // Pure navigation. Render (if any) was kicked off by startRender already.
-  // For Save with AR/Skip media there's no render and this is the only Step 3
-  // transition the user makes.
-  const goToStep3 = () => setStep(3);
-
-  const skipMedia = () => {
-    // Only Save intent can skip media; Sell/Give require AI for the storyboard.
-    if (state.intent === "sell" || state.intent === "give") return;
-    patch({
-      mediaType: "skip",
-      scenes: [],
-      storyboardGenerated: false,
-    });
-    setStep(3);
-  };
-
   // Mint — just locks the listing data. It does NOT make the project live.
-  // Live = mint complete AND videoJob.stage === 'done'. Step 4 (and the global
-  // indicator) reconcile the two and notify the user when both conditions hit.
-  // We also stamp the linked job as minted so a future regenerate from the
-  // indicator uses the in-place modal flow (no /brief navigation).
-  const mint = () => {
+  // Live = mint complete AND videoJob.stage === 'done'. The success step (and
+  // the global indicator) reconcile the two and notify the user when both
+  // conditions hit. We also stamp the linked job as minted so a future
+  // regenerate from the indicator uses the in-place modal flow (no /brief
+  // navigation). One function, whichever step in the sequence is the last one.
+  const commit = () => {
     setMinting(true);
     window.setTimeout(() => {
       if (state.videoJobId) markMinted(state.videoJobId);
@@ -569,8 +639,34 @@ export function BriefApp() {
       if (activeProjectId) setStatus(activeProjectId, "completed");
       setState((s) => ({ ...s, mintedAt: Date.now() }));
       setMinting(false);
-      setStep(4);
+      setStep("success");
     }, 1400);
+  };
+
+  // One step along the sequence. Success isn't a step you walk into — it is
+  // what the mint produces — so the last step's Continue commits instead.
+  // Any render was kicked off by startRender already.
+  const goNext = () => {
+    const target = stepAfter(seq, step);
+    if (!target) return;
+    if (target === "success") commit();
+    else setStep(target);
+  };
+
+  const goBack = () => {
+    const target = stepBefore(seq, step);
+    if (target) setStep(target);
+  };
+
+  const skipMedia = () => {
+    // Only Save intent can skip media; Sell/Give require AI for the storyboard.
+    if (state.intent === "sell" || state.intent === "give") return;
+    patch({
+      mediaType: "skip",
+      scenes: [],
+      storyboardGenerated: false,
+    });
+    goNext();
   };
 
   const updateScene = (id: string, p: Partial<Scene>) =>
@@ -582,7 +678,15 @@ export function BriefApp() {
   return (
     <EditorShell>
       <TopBar />
-      <BriefRail topOffset={62} />
+      <BriefRail
+        steps={seq}
+        current={step}
+        intent={state.intent}
+        // Backwards only, and only while there is still something to change:
+        // once it is minted the brief is a record, not a form.
+        onGo={step === "success" ? undefined : setStep}
+        topOffset={62}
+      />
 
       <div
         style={{
@@ -611,7 +715,7 @@ export function BriefApp() {
           {handoffKept ? <HandoffNotice /> : null}
 
           <Crossfade keyName={`step-${step}`}>
-            {step === 1 && (
+            {step === "idea" && (
               <Step1Idea
                 projects={projects}
                 projectChoice={state.projectChoice}
@@ -624,10 +728,10 @@ export function BriefApp() {
                 busy={continuing}
                 onChange={handleStep1Change}
                 onBack={() => router.push("/projects")}
-                onContinue={goToStep2}
+                onContinue={continueFromIdea}
               />
             )}
-            {step === 2 && (
+            {step === "preview" && (
               <Step2Video
                 state={state}
                 generatingStoryboard={generatingStoryboard}
@@ -635,25 +739,25 @@ export function BriefApp() {
                 onSceneChange={updateScene}
                 onGenerateStoryboard={generateStoryboard}
                 onStartRender={startRender}
-                onContinue={goToStep3}
+                onContinue={goNext}
                 onSkip={skipMedia}
-                onBack={() => setStep(1)}
+                onBack={goBack}
                 onPromptHelp={() => setPromptHelpOpen(true)}
               />
             )}
-            {step === 3 && (
+            {step === "form" && (
               <Step3Mint
                 state={state}
                 onChange={patch}
-                onBack={() =>
-                  setStep(state.mediaType === "skip" ? 1 : 2)
-                }
-                onMint={mint}
+                onBack={goBack}
+                onMint={commit}
+                onNext={goNext}
+                isLastStep={isLastStep}
                 minting={minting}
                 projectName={activeProject?.name ?? ""}
               />
             )}
-            {step === 4 && (
+            {step === "success" && (
               <Step4Success
                 state={state}
                 onBrowse={(href) => router.push(href)}
@@ -664,7 +768,7 @@ export function BriefApp() {
         </div>
 
         <PromptHelpModal
-          open={promptHelpOpen && step === 2}
+          open={promptHelpOpen && step === "preview"}
           productName={state.productName}
           productDescription={state.productDescription}
           onUse={(prompt) =>
@@ -674,7 +778,7 @@ export function BriefApp() {
           onClose={() => setPromptHelpOpen(false)}
         />
 
-        {hydrated && step < 4 && (
+        {hydrated && step !== "success" && (
           <div
             style={{
               position: "fixed",

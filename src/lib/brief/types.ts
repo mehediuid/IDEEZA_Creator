@@ -319,3 +319,47 @@ export function normalizeBrief(parsed: unknown): BriefState {
     videoJobId: typeof s.videoJobId === "string" ? s.videoJobId : null,
   };
 }
+
+// ── Step sequencing ────────────────────────────────────────────────────────
+// The Brief doesn't run one fixed wizard: what a maker is doing decides which
+// steps they are asked for, and in which order.
+
+export type BriefStepId = "idea" | "preview" | "form" | "success";
+
+/** The form step's own name, per intent — the rail and the CTA both use it. */
+export const BRIEF_FORM_LABEL: Record<Intent, string> = {
+  sell: "Ready to sell",
+  give: "Give to community",
+  save: "Save as Private",
+};
+
+/**
+ * The steps this brief really runs, in order.
+ *
+ * Selling is a listing, so the clip is part of what is being sold and comes
+ * before the terms. Giving or saving needs no clip at all — the maker goes
+ * straight from the idea to the form — unless they also post it to
+ * Innovations, which does need one, so the preview slots in after the form
+ * that asked for it.
+ */
+export function stepsFor(intent: Intent | null, share: boolean): BriefStepId[] {
+  if (!intent) return ["idea"];
+  if (intent === "sell") return ["idea", "preview", "form", "success"];
+  return share
+    ? ["idea", "form", "preview", "success"]
+    : ["idea", "form", "success"];
+}
+
+// Steps used to be stored as 1–4. A draft saved then still opens on the step
+// it reached.
+const STEP_BY_NUMBER: readonly BriefStepId[] = ["idea", "preview", "form", "success"];
+
+export function normalizeStep(v: unknown): BriefStepId {
+  if (typeof v === "string" && (STEP_BY_NUMBER as readonly string[]).includes(v)) {
+    return v as BriefStepId;
+  }
+  if (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 4) {
+    return STEP_BY_NUMBER[v - 1];
+  }
+  return "idea";
+}

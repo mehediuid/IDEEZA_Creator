@@ -87,13 +87,20 @@ export function Step3Mint({
   onChange,
   onBack,
   onMint,
+  onNext,
+  isLastStep,
   minting,
   projectName,
 }: {
   state: BriefState;
   onChange: (patch: Partial<BriefState>) => void;
   onBack: () => void;
+  /** Commit — mint and finish. Only ever the CTA when this form is last. */
   onMint: () => void;
+  /** One step along the sequence — the preview, when Innovations added one. */
+  onNext: () => void;
+  /** Is this form the last thing to answer before the mint? */
+  isLastStep: boolean;
   minting: boolean;
   projectName: string;
 }) {
@@ -132,8 +139,11 @@ export function Step3Mint({
   const missing = firstMissing(state, intent);
   const formReady = !missing;
   const canPay = formReady && !minting;
-  const ctaLabel =
-    intent === "save" && !state.blockchainMint
+  // Sharing to Innovations puts a clip between this form and the mint, so the
+  // CTA carries the form on rather than paying for something not made yet.
+  const ctaLabel = !isLastStep
+    ? "Continue to video ›"
+    : intent === "save" && !state.blockchainMint
       ? `Pay ${MINT_FEE} IDZ and save`
       : `Pay ${MINT_FEE} IDZ and go live`;
 
@@ -255,7 +265,7 @@ export function Step3Mint({
             on a wrapper the cursor can still reach. */}
         <span title={missing ?? undefined} style={{ display: "flex" }}>
           <button
-            onClick={onMint}
+            onClick={isLastStep ? onMint : onNext}
             disabled={!canPay}
             title={missing ?? undefined}
             aria-describedby={missing ? reasonId : undefined}
@@ -288,7 +298,7 @@ export function Step3Mint({
               </>
             ) : (
               <>
-                <WalletIcon />
+                {isLastStep ? <WalletIcon /> : null}
                 {ctaLabel}
               </>
             )}
