@@ -19,7 +19,8 @@ import {
   PlusSignIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
-import { useVoiceInput } from "@/lib/voice/use-voice-input";
+import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
+import { VoiceListening } from "@/components/voice/voice-listening";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 
 export function PromptBar({
@@ -50,6 +51,15 @@ export function PromptBar({
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [value]);
+
+  // The mic is one of the controls the listening view replaces, so the
+  // click that opened the session leaves focus on a removed element.
+  // Park it on the view: the live region is read and Tab carries on
+  // into Cancel / Stop & review.
+  const viewRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (listening) viewRef.current?.focus();
+  }, [listening]);
 
   const send = () => {
     const trimmed = value.trim();
@@ -84,13 +94,16 @@ export function PromptBar({
     }
   };
 
-  const toggleVoice = () => {
-    if (listening) {
-      voice.stop();
-      return;
-    }
-    voice.start();
-    taRef.current?.focus();
+  // Leaving the listening view hands the textarea its place back, so
+  // put the caret where typing continues — after whatever the
+  // transcript just appended.
+  const returnToComposer = () => {
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
   };
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,79 +120,111 @@ export function PromptBar({
   };
 
   const hasText = value.trim().length > 0;
+  const voiceError = voiceErrorMessage(voice.status);
+
+  // While the microphone is open the bar IS the listening view — the
+  // textarea and its toolbar would otherwise be taking clicks that
+  // belong to Cancel / Stop & review. No box override here: the click
+  // that opens a session puts focus inside the bar, so its border is
+  // already the 1.5 px brand one the view draws by default.
+  if (listening) {
+    return (
+      <div ref={viewRef} tabIndex={-1} className="outline-none">
+        <VoiceListening
+          levels={voice.levels}
+          interim={voice.interim}
+          onCancel={() => {
+            voice.cancel();
+            returnToComposer();
+          }}
+          onStop={() => {
+            voice.stop();
+            returnToComposer();
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border-1-5 border-border bg-bg-surface focus-within:border-border-brand">
-      <label htmlFor="chat-prompt" className="sr-only">
-        Continue the concept conversation
-      </label>
-      <textarea
-        id="chat-prompt"
-        ref={taRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={onKey}
-        placeholder={placeholder}
-        rows={2}
-        className="block w-full resize-none bg-transparent px-[20px] pt-[16px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
-      />
+    <div>
+      <div className="rounded-2xl border-1-5 border-border bg-bg-surface focus-within:border-border-brand">
+        <label htmlFor="chat-prompt" className="sr-only">
+          Continue the concept conversation
+        </label>
+        <textarea
+          id="chat-prompt"
+          ref={taRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={onKey}
+          placeholder={placeholder}
+          rows={2}
+          className="block w-full resize-none bg-transparent px-[20px] pt-[16px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
+        />
 
-      {attachment && (
-        <div className="px-[20px] pb-[4px]">
-          <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
-            <Icon icon={Attachment01Icon} size={14} />
-            <span className="max-w-[280px] truncate">{attachment}</span>
-            <button
-              type="button"
-              onClick={() => setAttachment(null)}
-              aria-label="Remove attachment"
-              className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <Icon icon={Cancel01Icon} size={14} />
-            </button>
-          </span>
-        </div>
-      )}
+        {attachment && (
+          <div className="px-[20px] pb-[4px]">
+            <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
+              <Icon icon={Attachment01Icon} size={14} />
+              <span className="max-w-[280px] truncate">{attachment}</span>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                aria-label="Remove attachment"
+                className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
+            </span>
+          </div>
+        )}
 
-      <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
-        <div className="flex items-center gap-[4px]">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            tabIndex={-1}
-            onChange={onPickFile}
-          />
-          <ToolbarIconButton
-            ariaLabel="Attach a reference image"
-            onClick={() => fileRef.current?.click()}
-            icon={PlusSignIcon}
-          />
-          <ToolbarIconButton
-            ariaLabel={
-              !voice.supported
-                ? "Voice input isn't supported in this browser"
-                : listening
-                  ? "Stop voice input"
-                  : "Use voice input"
-            }
-            onClick={voice.supported ? toggleVoice : undefined}
-            icon={Mic01Icon}
-            active={listening}
-            disabled={!voice.supported}
-          />
-        </div>
+        <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
+          <div className="flex items-center gap-[4px]">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={onPickFile}
+            />
+            <ToolbarIconButton
+              ariaLabel="Attach a reference image"
+              onClick={() => fileRef.current?.click()}
+              icon={PlusSignIcon}
+            />
+            <ToolbarIconButton
+              ariaLabel={
+                voice.supported
+                  ? "Use voice input"
+                  : "Voice input isn't supported in this browser"
+              }
+              onClick={voice.supported ? voice.start : undefined}
+              icon={Mic01Icon}
+              disabled={!voice.supported}
+            />
+          </div>
 
-        <div className="flex items-center gap-[8px]">
-          <EnhanceButton
-            onClick={enhance}
-            refining={refining}
-            disabled={!hasText || refining}
-          />
-          <SendButton onClick={send} hasText={hasText} refining={refining} />
+          <div className="flex items-center gap-[8px]">
+            <EnhanceButton
+              onClick={enhance}
+              refining={refining}
+              disabled={!hasText || refining}
+            />
+            <SendButton onClick={send} hasText={hasText} refining={refining} />
+          </div>
         </div>
       </div>
+
+      {/* Why the last session produced nothing. It is derived from the
+          hook's status, so the next successful start clears it. */}
+      {voiceError && (
+        <p role="status" className="mt-[8px] px-[4px] text-sm text-text-error">
+          {voiceError}
+        </p>
+      )}
     </div>
   );
 }
@@ -188,13 +233,11 @@ function ToolbarIconButton({
   ariaLabel,
   onClick,
   icon,
-  active,
   disabled,
 }: {
   ariaLabel: string;
   onClick?: () => void;
   icon: IconValue;
-  active?: boolean;
   disabled?: boolean;
 }) {
   return (
@@ -203,14 +246,11 @@ function ToolbarIconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      aria-pressed={active}
       title={ariaLabel}
       className={[
         "inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg outline-none transition-colors duration-fast",
         "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40",
-        active
-          ? "bg-bg-brand-subtle text-text-brand"
-          : "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
+        "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
       ].join(" ")}
     >
       <Icon icon={icon} />

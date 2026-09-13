@@ -27,7 +27,8 @@ import {
   ViewIcon,
 } from "@hugeicons/core-free-icons";
 import { useCreateHistory } from "@/lib/create/history";
-import { useVoiceInput } from "@/lib/voice/use-voice-input";
+import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
+import { VoiceListening } from "@/components/voice/voice-listening";
 import { PROJECTS, type Project } from "@/lib/feed";
 import { MintedBadge } from "@/components/newsfeed/minted-badge";
 import { BuildManuallyInfo } from "./build-manually-info";
@@ -326,13 +327,26 @@ const PromptCard = React.forwardRef<
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [value]);
 
-  const toggleVoice = () => {
-    if (listening) {
-      voice.stop();
-      return;
-    }
-    voice.start();
-    localRef.current?.focus();
+  // The mic button is one of the controls the listening view replaces,
+  // so the click that opened the session leaves focus on a removed
+  // element. Park it on the view itself: the live region is read, and
+  // Tab carries on into Cancel / Stop & review rather than restarting
+  // at the top of the page.
+  const viewRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (listening) viewRef.current?.focus();
+  }, [listening]);
+
+  // Leaving the listening view takes the textarea's place back, so put
+  // the caret where typing continues — at the end of the draft, after
+  // whatever the transcript just appended.
+  const returnToComposer = () => {
+    requestAnimationFrame(() => {
+      const el = localRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
   };
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -349,85 +363,122 @@ const PromptCard = React.forwardRef<
   };
 
   const canRefine = value.trim().length >= 6 && !refining;
+  const voiceError = voiceErrorMessage(voice.status);
+
+  // While the microphone is open the card IS the listening view — the
+  // textarea and its toolbar would otherwise be taking clicks that
+  // belong to Cancel / Stop & review. The two overrides keep the card's
+  // own box (1 px neutral border, 20 px padding) so nothing shifts on
+  // the swap; the component's own default is a 1.5 px brand border at
+  // 16 px, which is right where it isn't standing in for a card.
+  if (listening) {
+    return (
+      <div ref={viewRef} tabIndex={-1} className="outline-none">
+        <VoiceListening
+          levels={voice.levels}
+          interim={voice.interim}
+          onCancel={() => {
+            voice.cancel();
+            returnToComposer();
+          }}
+          onStop={() => {
+            voice.stop();
+            returnToComposer();
+          }}
+          className="!border !border-border !p-[20px]"
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border">
-      <label htmlFor="ws-prompt" className="sr-only">
-        Describe your electronics project
-      </label>
-      <textarea
-        id="ws-prompt"
-        ref={localRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKey}
-        placeholder={placeholder}
-        rows={3}
-        className="block w-full resize-none bg-transparent px-[20px] pt-[20px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
-      />
+    <div>
+      <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border">
+        <label htmlFor="ws-prompt" className="sr-only">
+          Describe your electronics project
+        </label>
+        <textarea
+          id="ws-prompt"
+          ref={localRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKey}
+          placeholder={placeholder}
+          rows={3}
+          className="block w-full resize-none bg-transparent px-[20px] pt-[20px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
+        />
 
-      {attachment && (
-        <div className="px-[20px] pb-[4px]">
-          <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
-            <Icon icon={Attachment01Icon} size={14} />
-            <span className="max-w-[280px] truncate">{attachment}</span>
-            <button
-              type="button"
-              onClick={() => setAttachment(null)}
-              aria-label="Remove attachment"
-              className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <Icon icon={Cancel01Icon} size={14} />
-            </button>
-          </span>
-        </div>
-      )}
+        {attachment && (
+          <div className="px-[20px] pb-[4px]">
+            <span className="inline-flex max-w-full items-center gap-[8px] rounded-lg border border-border bg-bg-surface-raised py-[6px] pl-[10px] pr-[6px] text-sm text-text-secondary">
+              <Icon icon={Attachment01Icon} size={14} />
+              <span className="max-w-[280px] truncate">{attachment}</span>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                aria-label="Remove attachment"
+                className="inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={Cancel01Icon} size={14} />
+              </button>
+            </span>
+          </div>
+        )}
 
-      <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
-        <div className="flex items-center gap-[4px]">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            tabIndex={-1}
-            onChange={onPickFile}
-          />
-          <ToolbarIconButton
-            ariaLabel="Attach a reference image"
-            onClick={() => fileRef.current?.click()}
-            icon={PlusSignIcon}
-          />
-          <ToolbarIconButton
-            ariaLabel={
-              !voice.supported
-                ? "Voice input isn't supported in this browser"
-                : listening
-                  ? "Stop voice input"
-                  : "Use voice input"
-            }
-            onClick={voice.supported ? toggleVoice : undefined}
-            icon={Mic01Icon}
-            active={listening}
-            disabled={!voice.supported}
-          />
-        </div>
-
-        <div className="flex items-center gap-[8px]">
-          {mode === "ai" && (
-            <RefineButton
-              onClick={onRefine}
-              refining={refining}
-              disabled={!canRefine}
+        <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
+          <div className="flex items-center gap-[4px]">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={onPickFile}
             />
-          )}
-          <SendButton
-            onClick={onSubmit}
-            submitting={submitting}
-            hasText={value.trim().length > 0}
-          />
+            <ToolbarIconButton
+              ariaLabel="Attach a reference image"
+              onClick={() => fileRef.current?.click()}
+              icon={PlusSignIcon}
+            />
+            <ToolbarIconButton
+              ariaLabel={
+                voice.supported
+                  ? "Use voice input"
+                  : "Voice input isn't supported in this browser"
+              }
+              onClick={voice.supported ? voice.start : undefined}
+              icon={Mic01Icon}
+              disabled={!voice.supported}
+            />
+          </div>
+
+          <div className="flex items-center gap-[8px]">
+            {mode === "ai" && (
+              <RefineButton
+                onClick={onRefine}
+                refining={refining}
+                disabled={!canRefine}
+              />
+            )}
+            <SendButton
+              onClick={onSubmit}
+              submitting={submitting}
+              hasText={value.trim().length > 0}
+            />
+          </div>
         </div>
       </div>
+
+      {/* Why the last session produced nothing. It is derived from the
+          hook's status, so the next successful start clears it. */}
+      {voiceError && (
+        <p
+          role="status"
+          className="mt-[10px] px-[4px] text-sm text-text-error"
+        >
+          {voiceError}
+        </p>
+      )}
     </div>
   );
 });
@@ -436,13 +487,11 @@ function ToolbarIconButton({
   ariaLabel,
   onClick,
   icon,
-  active,
   disabled,
 }: {
   ariaLabel: string;
   onClick?: () => void;
   icon: IconValue;
-  active?: boolean;
   disabled?: boolean;
 }) {
   return (
@@ -451,14 +500,11 @@ function ToolbarIconButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      aria-pressed={active}
       title={ariaLabel}
       className={[
         "inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg outline-none transition-colors duration-fast",
         "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40",
-        active
-          ? "bg-bg-brand-subtle text-text-brand"
-          : "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
+        "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
       ].join(" ")}
     >
       <Icon icon={icon} />

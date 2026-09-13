@@ -54,6 +54,8 @@ ideeza-creator-panel/
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
    │  ├─ preview/            Product Preview: three.js assembly, mates, instances
    │  ├─ wiring/             Wiring module: canvas, library, right panel, menu
+   │  ├─ voice/              voice-listening (what a composer becomes while the mic is
+   │  │                      open — dot, live waveform, Cancel / Stop & review)
    │  ├─ ideeza/             In-house design-system primitives (button, select, toggle…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
@@ -65,7 +67,7 @@ ideeza-creator-panel/
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
-   │  ├─ voice/              use-voice-input.ts (one dictation hook, every box)
+   │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store)
    │  ├─ three/              providers.ts (three.js setup)

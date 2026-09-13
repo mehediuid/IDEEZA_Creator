@@ -51,6 +51,18 @@ const LEVEL_SAMPLES = 78;
 // Sample at ~30 fps by taking every other animation frame.
 const FRAME_SKIP = 2;
 
+// What a composer says under itself when a session couldn't run. One
+// sentence per failing status, in one place, so the three boxes that
+// dictate can't word the same problem three different ways.
+// "unsupported" has no line: that mic is disabled with a tooltip, so a
+// sentence under a control the user can't reach would explain nothing.
+export function voiceErrorMessage(status: VoiceStatus): string | null {
+  if (status === "denied")
+    return "Microphone access was blocked — allow it in the browser to use voice.";
+  if (status === "failed") return "Voice input stopped unexpectedly — try again.";
+  return null;
+}
+
 function recognitionCtor(): (new () => SpeechRecognitionLike) | undefined {
   if (typeof window === "undefined") return undefined;
   const w = window as unknown as Record<string, unknown>;

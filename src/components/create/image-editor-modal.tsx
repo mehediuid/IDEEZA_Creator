@@ -25,7 +25,8 @@ import {
   Mic01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { useVoiceInput } from "@/lib/voice/use-voice-input";
+import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
+import { VoiceListening } from "@/components/voice/voice-listening";
 
 export function ImageEditorModal({
   open,
@@ -79,13 +80,25 @@ export function ImageEditorModal({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
 
-  const toggleVoice = () => {
-    if (listening) {
-      voice.stop();
-      return;
-    }
-    voice.start();
-    inputRef.current?.focus();
+  // The mic is one of the controls the listening view replaces, so the
+  // click that opened the session leaves focus on a removed element.
+  // Park it on the view: the live region is read and Tab carries on
+  // into Cancel / Stop & review.
+  const viewRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (listening) viewRef.current?.focus();
+  }, [listening]);
+
+  // Leaving the listening view hands the edit box its place back, so
+  // put the caret where typing continues — after whatever the
+  // transcript just appended.
+  const returnToComposer = () => {
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
   };
 
   // Closed on the server and on the first client render alike (it only
@@ -94,6 +107,7 @@ export function ImageEditorModal({
   if (!open || typeof document === "undefined") return null;
 
   const canSubmit = text.trim().length > 0;
+  const voiceError = voiceErrorMessage(voice.status);
   const submit = () => {
     if (!canSubmit) return;
     onSubmitEdit(text.trim());
@@ -152,69 +166,100 @@ export function ImageEditorModal({
 
       {/* Composer */}
       <div className="px-[24px] pb-[28px] pt-[12px]">
-        <div className="mx-auto flex w-full max-w-[640px] items-end gap-[6px] rounded-2xl border-1-5 border-border bg-bg-surface p-[8px] focus-within:border-border-brand">
-          <label htmlFor="img-edit" className="sr-only">
-            Describe a change to this image
-          </label>
-          <textarea
-            id="img-edit"
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
+        {/* While the microphone is open the composer IS the listening
+            view — its own controls would otherwise be taking clicks
+            that belong to Cancel / Stop & review. Only the width is
+            passed: the edit box is focused when the mic is clicked, so
+            the composer's border is already the 1.5 px brand one the
+            view draws by default. 640 px holds the 465 px waveform. */}
+        {listening ? (
+          <div ref={viewRef} tabIndex={-1} className="outline-none">
+            <VoiceListening
+              levels={voice.levels}
+              interim={voice.interim}
+              onCancel={() => {
+                voice.cancel();
+                returnToComposer();
+              }}
+              onStop={() => {
+                voice.stop();
+                returnToComposer();
+              }}
+              className="mx-auto w-full max-w-[640px]"
+            />
+          </div>
+        ) : (
+          <div className="mx-auto flex w-full max-w-[640px] items-end gap-[6px] rounded-2xl border-1-5 border-border bg-bg-surface p-[8px] focus-within:border-border-brand">
+            <label htmlFor="img-edit" className="sr-only">
+              Describe a change to this image
+            </label>
+            <textarea
+              id="img-edit"
+              ref={inputRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              rows={1}
+              placeholder="Describe a change to this image…"
+              className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent px-[12px] py-[8px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
+            />
+            <button
+              type="button"
+              onClick={voice.supported ? voice.start : undefined}
+              disabled={!voice.supported}
+              aria-label={
+                voice.supported
+                  ? "Use voice input"
+                  : "Voice input isn't supported in this browser"
               }
-            }}
-            rows={1}
-            placeholder="Describe a change to this image…"
-            className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent px-[12px] py-[8px] text-md leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
-          />
-          <button
-            type="button"
-            onClick={voice.supported ? toggleVoice : undefined}
-            disabled={!voice.supported}
-            aria-label={
-              !voice.supported
-                ? "Voice input isn't supported in this browser"
-                : listening
-                  ? "Stop voice input"
-                  : "Use voice input"
-            }
-            aria-pressed={listening}
-            title="Voice input"
-            className={[
-              "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast",
-              "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40",
-              listening
-                ? "bg-bg-brand-subtle text-text-brand"
-                : "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
-            ].join(" ")}
+              title="Voice input"
+              className={[
+                "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast",
+                "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-40",
+                "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
+              ].join(" ")}
+            >
+              <Icon icon={Mic01Icon} />
+            </button>
+            {/* The same ai-magic send the prompt bar carries, so the two
+                composers read as one control. Off until there is a change
+                described. */}
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!canSubmit}
+              aria-disabled={!canSubmit}
+              aria-label={
+                canSubmit ? "Apply this change" : "Describe a change first"
+              }
+              title={canSubmit ? "Apply (Enter)" : "Describe a change first"}
+              className={
+                canSubmit
+                  ? "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg bg-button-primary-bg text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                  : "inline-flex h-[40px] w-[40px] shrink-0 cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
+              }
+            >
+              <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
+            </button>
+          </div>
+        )}
+
+        {/* Why the last session produced nothing. It is derived from the
+            hook's status, so the next successful start clears it. */}
+        {voiceError && (
+          <p
+            role="status"
+            className="mx-auto mt-[10px] w-full max-w-[640px] text-center text-sm text-text-error"
           >
-            <Icon icon={Mic01Icon} />
-          </button>
-          {/* The same ai-magic send the prompt bar carries, so the two
-              composers read as one control. Off until there is a change
-              described. */}
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!canSubmit}
-            aria-disabled={!canSubmit}
-            aria-label={
-              canSubmit ? "Apply this change" : "Describe a change first"
-            }
-            title={canSubmit ? "Apply (Enter)" : "Describe a change first"}
-            className={
-              canSubmit
-                ? "inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg bg-button-primary-bg text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-                : "inline-flex h-[40px] w-[40px] shrink-0 cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
-            }
-          >
-            <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
-          </button>
-        </div>
+            {voiceError}
+          </p>
+        )}
+
         <p className="mt-[10px] text-center text-sm text-text-tertiary">
           Refining evolves the same concept. To start over from your prompt,
           use Regenerate instead.
