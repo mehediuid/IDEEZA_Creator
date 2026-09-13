@@ -195,7 +195,11 @@ export function BuildSimulator() {
       const next = oldestQueued(buildsRef.current);
       if (!next) return;
       if (affordable) promoteQueued();
-      else blockForCredits(next.id);
+      // Already parked for the same reason — don't re-issue the action
+      // every tick, which is what kept re-rendering the provider and
+      // rewriting localStorage while a credits-blocked build just sat
+      // there.
+      else if (next.blocked !== "credits") blockForCredits(next.id);
     }, TICK_MS);
     return () => window.clearInterval(t);
   }, [ready, affordable, updateBuildItem, promoteQueued, blockForCredits]);

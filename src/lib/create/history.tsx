@@ -155,9 +155,11 @@ export type BuildJob = {
 //     Community / Sell
 //   • partial / failed       — at least one item failed and is waiting
 //     for a retry
+//   • credits                — the queue reached it but the balance
+//     couldn't cover it; it's parked, waiting on a top-up
 export type BuildAttention = {
   job: BuildJob;
-  reason: "review" | "retry";
+  reason: "review" | "retry" | "credits";
   message: string;
 };
 
@@ -350,6 +352,36 @@ const ITEM_STATUS_VALUES: BuildItemStatus[] = [
   "skipped",
 ];
 
+// Only one build may be "running" at a time (spec: one build runs at a
+// time). A hand-edited or otherwise corrupted store can hold more than
+// one — hydrate must restore the invariant rather than let the queue
+// worker referee it, since `promoteQueued`/the simulator assume it
+// already holds. The oldest running job keeps running; the rest go back
+// to the queue with their items reset to pending, exactly like any other
+// demotion into "queued".
+function enforceSingleRunning(jobs: BuildJob[]): BuildJob[] {
+  const running = jobs.filter((j) => j.status === "running");
+  if (running.length <= 1) return jobs;
+  let oldest = running[0];
+  for (const j of running) {
+    if (j.createdAt < oldest.createdAt) oldest = j;
+  }
+  return jobs.map((j) =>
+    j.status === "running" && j.id !== oldest.id
+      ? {
+          ...j,
+          status: "queued" as const,
+          startedAt: undefined,
+          items: j.items.map((it) =>
+            it.status === "skipped"
+              ? it
+              : { ...it, status: "pending" as const, progress: 0 },
+          ),
+        }
+      : j,
+  );
+}
+
 // Deterministic placeholder image so refreshes don't reshuffle.
 // Picsum gives a real-looking photo per seed.
 function placeholderImage(seed: string): string {
@@ -457,7 +489,11 @@ export function CreateHistoryProvider({
   // older shape.
   React.useEffect(() => {
     setChats(loadJSON<ChatSession[]>(CHATS_KEY, []));
-    setBuilds(loadJSON<BuildJob[]>(BUILDS_KEY, []).map(normalizeJob));
+    setBuilds(
+      enforceSingleRunning(
+        loadJSON<BuildJob[]>(BUILDS_KEY, []).map(normalizeJob),
+      ),
+    );
     setHydrated(true);
   }, []);
 
@@ -813,26 +849,30 @@ export function CreateHistoryProvider({
   }, []);
 
   const blockForCredits = React.useCallback((buildId: string) => {
-    setBuilds((arr) =>
-      arr.map((b) => {
-        if (b.id !== buildId) return b;
-        // Already parked — don't rewrite state every tick.
-        if (b.status === "queued" && b.blocked === "credits") return b;
-        return {
-          ...b,
-          status: "queued" as const,
-          blocked: "credits" as const,
-          startedAt: undefined,
-          endedAt: undefined,
-          items: b.items.map((it) =>
-            it.status === "skipped"
-              ? it
-              : { ...it, status: "pending" as const, progress: 0 },
-          ),
-          updatedAt: Date.now(),
-        };
-      }),
-    );
+    setBuilds((arr) => {
+      const b = arr.find((x) => x.id === buildId);
+      // Not found, or already parked — return the same array reference
+      // (find-before-map, like promoteQueued) so this is a true no-op:
+      // nothing re-renders and nothing re-persists to localStorage.
+      if (!b || (b.status === "queued" && b.blocked === "credits")) return arr;
+      return arr.map((x) =>
+        x.id === buildId
+          ? {
+              ...x,
+              status: "queued" as const,
+              blocked: "credits" as const,
+              startedAt: undefined,
+              endedAt: undefined,
+              items: x.items.map((it) =>
+                it.status === "skipped"
+                  ? it
+                  : { ...it, status: "pending" as const, progress: 0 },
+              ),
+              updatedAt: Date.now(),
+            }
+          : x,
+      );
+    });
   }, []);
 
   const promoteQueued = React.useCallback(() => {
@@ -1013,6 +1053,13 @@ export function buildAttention(job: BuildJob): BuildAttention | null {
   // One naming rule for every message: the build's own title, and only
   // when it has none, a title derived from the prompt that started it.
   const name = shortTitle(job.title || deriveTitle(job.conceptPrompt));
+  if (job.blocked === "credits") {
+    return {
+      job,
+      reason: "credits",
+      message: `${name} is paused — top up credits to start it`,
+    };
+  }
   if (job.failure === "system") {
     return {
       job,

@@ -45,6 +45,8 @@ const KIND_ICON: Record<BuildItemKind, IconValue> = {
 export function BuildStatus({ job }: { job: BuildJob }) {
   const { updateBuildItem } = useCreateHistory();
   const rollup = rollupBuild(job);
+  const blockedForCredits = job.blocked === "credits";
+  const systemFailure = job.failure === "system";
 
   return (
     <div className="flex flex-col gap-[24px]">
@@ -74,7 +76,7 @@ export function BuildStatus({ job }: { job: BuildJob }) {
           </div>
         </div>
 
-        <StatusBadge rollup={rollup} />
+        <StatusBadge rollup={rollup} blockedForCredits={blockedForCredits} />
       </section>
 
       {/* Per-item progress */}
@@ -83,6 +85,8 @@ export function BuildStatus({ job }: { job: BuildJob }) {
           <BuildItemRow
             key={item.kind}
             item={item}
+            blockedForCredits={blockedForCredits}
+            systemFailure={systemFailure}
             onRetry={() => {
               updateBuildItem(job.id, item.kind, {
                 status: "building",
@@ -94,17 +98,30 @@ export function BuildStatus({ job }: { job: BuildJob }) {
       </ul>
 
       {/* Leave hint */}
-      {rollup.status !== "ready" && (
+      {blockedForCredits ? (
         <p className="text-center text-sm text-text-tertiary">
-          You can leave — the build keeps running and we&apos;ll notify you
-          when each piece is ready.{" "}
+          Not enough credits to start this build. Top up and it starts
+          automatically.{" "}
           <Link
-            href="/"
+            href="/history#credits"
             className="font-semibold text-text-brand underline-offset-2 hover:underline"
           >
-            Back to Home
+            Top up credits →
           </Link>
         </p>
+      ) : (
+        rollup.status !== "ready" && (
+          <p className="text-center text-sm text-text-tertiary">
+            You can leave — the build keeps running and we&apos;ll notify you
+            when each piece is ready.{" "}
+            <Link
+              href="/"
+              className="font-semibold text-text-brand underline-offset-2 hover:underline"
+            >
+              Back to Home
+            </Link>
+          </p>
+        )
       )}
     </div>
   );
@@ -112,9 +129,13 @@ export function BuildStatus({ job }: { job: BuildJob }) {
 
 function BuildItemRow({
   item,
+  blockedForCredits,
+  systemFailure,
   onRetry,
 }: {
   item: BuildItem;
+  blockedForCredits: boolean;
+  systemFailure: boolean;
   onRetry: () => void;
 }) {
   const tone = toneFor(item.status);
@@ -150,7 +171,7 @@ function BuildItemRow({
             {ITEM_LABELS[item.kind]}
           </p>
           <span className={["text-2xs font-bold uppercase tracking-wider", tone.text].join(" ")}>
-            {statusLabel(item.status, item.progress)}
+            {statusLabel(item.status, item.progress, blockedForCredits)}
           </span>
         </div>
         {skipped ? (
@@ -176,8 +197,18 @@ function BuildItemRow({
       {item.status === "failed" && (
         <button
           type="button"
-          onClick={onRetry}
-          className="inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          onClick={systemFailure ? undefined : onRetry}
+          disabled={systemFailure}
+          aria-disabled={systemFailure}
+          title={
+            systemFailure ? "Use Try this build again" : undefined
+          }
+          className={[
+            "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+            systemFailure
+              ? "cursor-not-allowed opacity-50"
+              : "hover:bg-bg-surface-raised",
+          ].join(" ")}
         >
           <Icon icon={Refresh01Icon} />
           Retry {ITEM_LABELS[item.kind]}
@@ -189,9 +220,18 @@ function BuildItemRow({
 
 function StatusBadge({
   rollup,
+  blockedForCredits,
 }: {
   rollup: ReturnType<typeof rollupBuild>;
+  blockedForCredits: boolean;
 }) {
+  if (blockedForCredits) {
+    return (
+      <span className="inline-flex h-[32px] items-center gap-[8px] rounded-full bg-bg-warning-subtle px-[14px] text-2xs font-bold uppercase tracking-wider text-text-warning">
+        Paused — needs credits
+      </span>
+    );
+  }
   if (rollup.status === "ready") {
     return (
       <span className="inline-flex h-[32px] items-center gap-[8px] rounded-full bg-bg-brand-subtle px-[14px] text-2xs font-bold uppercase tracking-wider text-text-brand">
@@ -213,12 +253,16 @@ function StatusBadge({
   );
 }
 
-function statusLabel(status: BuildItem["status"], progress: number): string {
+function statusLabel(
+  status: BuildItem["status"],
+  progress: number,
+  blockedForCredits: boolean,
+): string {
   if (status === "ready") return "Ready";
   if (status === "failed") return "Failed";
   // Not queued, not failed — an artifact this build never made.
   if (status === "skipped") return "Didn't run";
-  if (status === "pending") return "Queued";
+  if (status === "pending") return blockedForCredits ? "Waiting" : "Queued";
   return `${progress}%`;
 }
 

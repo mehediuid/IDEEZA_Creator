@@ -101,60 +101,72 @@ export function ReviewOutputs({ job }: { job: BuildJob }) {
           </div>
         </header>
 
-        {/* Tab strip */}
-        <div
-          role="tablist"
-          aria-label="Deliverables"
-          className="flex items-center gap-[4px] border-b border-border px-[12px] pt-[12px]"
-        >
-          {deliverables.map((item) => {
-            const isActive = shown === item.kind;
-            return (
-              <button
-                key={item.kind}
-                role="tab"
-                type="button"
-                aria-selected={isActive}
-                aria-controls={`output-panel-${item.kind}`}
-                id={`output-tab-${item.kind}`}
-                onClick={() => setActive(item.kind)}
-                className={[
-                  "inline-flex h-[36px] items-center gap-[8px] rounded-t-lg px-[14px] text-md font-medium outline-none transition-colors duration-fast",
-                  "focus-visible:ring-2 focus-visible:ring-border-focus",
-                  isActive
-                    ? "bg-bg-page font-semibold text-text-primary"
-                    : "text-text-secondary hover:text-text-primary",
-                ].join(" ")}
-              >
-                <Icon icon={KIND_ICON[item.kind]} />
-                {ITEM_LABELS[item.kind]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Active panel */}
-        {deliverables.map((item) => (
-          <div
-            key={item.kind}
-            id={`output-panel-${item.kind}`}
-            role="tabpanel"
-            aria-labelledby={`output-tab-${item.kind}`}
-            hidden={shown !== item.kind}
-            className="bg-bg-page p-[20px]"
-          >
-            <DeliverablePreview kind={item.kind} modelGlbUrl={job.modelGlbUrl} />
-            <div className="mt-[16px] flex items-start gap-[10px] rounded-lg border border-border bg-bg-surface p-[14px]">
-              <Icon icon={HelpCircleIcon} />
-              <p className="text-sm text-text-secondary">
-                <span className="font-semibold text-text-primary">
-                  What is this?{" "}
-                </span>
-                {KIND_BLURB[item.kind]}
-              </p>
-            </div>
+        {deliverables.length === 0 ? (
+          <div className="flex flex-col items-center gap-[10px] px-[20px] py-[48px] text-center">
+            <Icon icon={HelpCircleIcon} size={28} />
+            <p className="max-w-[380px] text-sm text-text-secondary">
+              This build has no deliverables to review — generate a new full
+              product from a concept.
+            </p>
           </div>
-        ))}
+        ) : (
+          <>
+            {/* Tab strip */}
+            <div
+              role="tablist"
+              aria-label="Deliverables"
+              className="flex items-center gap-[4px] border-b border-border px-[12px] pt-[12px]"
+            >
+              {deliverables.map((item) => {
+                const isActive = shown === item.kind;
+                return (
+                  <button
+                    key={item.kind}
+                    role="tab"
+                    type="button"
+                    aria-selected={isActive}
+                    aria-controls={`output-panel-${item.kind}`}
+                    id={`output-tab-${item.kind}`}
+                    onClick={() => setActive(item.kind)}
+                    className={[
+                      "inline-flex h-[36px] items-center gap-[8px] rounded-t-lg px-[14px] text-md font-medium outline-none transition-colors duration-fast",
+                      "focus-visible:ring-2 focus-visible:ring-border-focus",
+                      isActive
+                        ? "bg-bg-page font-semibold text-text-primary"
+                        : "text-text-secondary hover:text-text-primary",
+                    ].join(" ")}
+                  >
+                    <Icon icon={KIND_ICON[item.kind]} />
+                    {ITEM_LABELS[item.kind]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active panel */}
+            {deliverables.map((item) => (
+              <div
+                key={item.kind}
+                id={`output-panel-${item.kind}`}
+                role="tabpanel"
+                aria-labelledby={`output-tab-${item.kind}`}
+                hidden={shown !== item.kind}
+                className="bg-bg-page p-[20px]"
+              >
+                <DeliverablePreview kind={item.kind} modelGlbUrl={job.modelGlbUrl} />
+                <div className="mt-[16px] flex items-start gap-[10px] rounded-lg border border-border bg-bg-surface p-[14px]">
+                  <Icon icon={HelpCircleIcon} />
+                  <p className="text-sm text-text-secondary">
+                    <span className="font-semibold text-text-primary">
+                      What is this?{" "}
+                    </span>
+                    {KIND_BLURB[item.kind]}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </section>
 
       {/* Outcome picker */}
