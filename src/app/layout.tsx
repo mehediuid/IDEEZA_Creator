@@ -7,6 +7,7 @@ import { ProductFlowProvider } from "@/components/product-flow/product-flow-prov
 import { PcbProvider } from "@/lib/pcb/store";
 import { CreateHistoryProvider } from "@/lib/create/history";
 import { CreatePlanProvider } from "@/lib/create/plan";
+import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
 
 export const metadata: Metadata = {
@@ -38,12 +39,16 @@ export default function RootLayout({
                       hero (in the dashboard layout) can mint a new chat
                       session and route to it, AND the (create) routes
                       can read/mutate the same store. CreatePlanProvider
-                      powers the QuotaCard on /history. */}
+                      powers the QuotaCard on /history; CreditsProvider
+                      powers the Credits card beside it and is where a
+                      full-product build charges/refunds credits. */}
                   <CreatePlanProvider>
-                    <CreateHistoryProvider>
-                      {children}
-                      <GlobalRenderIndicator />
-                    </CreateHistoryProvider>
+                    <CreditsProvider>
+                      <CreateHistoryProvider>
+                        {children}
+                        <GlobalRenderIndicator />
+                      </CreateHistoryProvider>
+                    </CreditsProvider>
                   </CreatePlanProvider>
                 </VideoJobsProvider>
               </ProductFlowProvider>

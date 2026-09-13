@@ -35,6 +35,7 @@ import { HistoryTable, type HistoryRow } from "./history-table";
 import { HistoryRowDetail, generateSubSteps } from "./history-row-detail";
 import { Pagination, HISTORY_PAGE_SIZE } from "./pagination";
 import { QuotaCard } from "./quota-card";
+import { CreditsCard } from "./credits-card";
 
 type TabKey = "models" | "builds";
 
@@ -171,7 +172,10 @@ export function HistoryTabbedPage() {
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-[20px] px-[24px] py-[24px]">
-          <QuotaCard />
+          <div className="flex flex-col gap-[16px]">
+            <QuotaCard />
+            <CreditsCard />
+          </div>
 
           {!hydrated ? (
             <p className="text-md text-text-tertiary">Loading…</p>
