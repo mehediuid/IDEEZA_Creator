@@ -14,6 +14,7 @@
 // a second copy of that UI.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   useVideoJobs,
@@ -52,6 +53,17 @@ export function GlobalRenderIndicator() {
   const [regenFlowJob, setRegenFlowJob] = React.useState<VideoJob | null>(
     null,
   );
+
+  // The shared toast layer's "render" slot (src/app/layout.tsx) — queried
+  // after mount so this never touches `document` during SSR; the portal is
+  // skipped until it's found. Keeps this stack from painting over the build
+  // attention banner, which lives in the same layer's "attention" slot.
+  const [renderSlot, setRenderSlot] = React.useState<HTMLElement | null>(
+    null,
+  );
+  React.useEffect(() => {
+    setRenderSlot(document.getElementById("ideeza-toast-layer-render"));
+  }, []);
 
   // Regenerate has two paths based on whether the job has been minted:
   //  • !minted (still inside the brief flow): snapshot prompt + quality, drop
@@ -105,44 +117,44 @@ export function GlobalRenderIndicator() {
 
   return (
     <>
-      <div
-        style={{
-          position: "fixed",
-          top: 16,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: "var(--z-toast)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 8,
-        }}
-        role="status"
-        aria-live="polite"
-        aria-label="Video render status"
-      >
-        {stacked.map((j) => (
-          <ToastLine
-            key={j.id}
-            job={j}
-            onReview={() => setReviewingId(j.id)}
-            onCancel={() => dismiss(j.id)}
-            onRetry={() => setRegenConfirmFor(j.id)}
-            onDismiss={() => dismiss(j.id)}
-          />
-        ))}
+      {renderSlot &&
+        createPortal(
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 8,
+              pointerEvents: "auto",
+            }}
+            role="status"
+            aria-live="polite"
+            aria-label="Video render status"
+          >
+            {stacked.map((j) => (
+              <ToastLine
+                key={j.id}
+                job={j}
+                onReview={() => setReviewingId(j.id)}
+                onCancel={() => dismiss(j.id)}
+                onRetry={() => setRegenConfirmFor(j.id)}
+                onDismiss={() => dismiss(j.id)}
+              />
+            ))}
 
-        <style>{`
-          @keyframes ix-render-toast-in {
-            from { opacity: 0; transform: translateY(-6px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-          .ix-render-toast { animation: ix-render-toast-in .2s var(--motion-easing-decelerate); }
-          @media (prefers-reduced-motion: reduce) {
-            .ix-render-toast { animation: none; }
-          }
-        `}</style>
-      </div>
+            <style>{`
+              @keyframes ix-render-toast-in {
+                from { opacity: 0; transform: translateY(-6px); }
+                to   { opacity: 1; transform: translateY(0); }
+              }
+              .ix-render-toast { animation: ix-render-toast-in .2s var(--motion-easing-decelerate); }
+              @media (prefers-reduced-motion: reduce) {
+                .ix-render-toast { animation: none; }
+              }
+            `}</style>
+          </div>,
+          renderSlot,
+        )}
 
       {reviewingJob && (
         <ReviewModal
@@ -266,19 +278,7 @@ function ToastLine({
   return (
     <div
       className="ix-render-toast"
-      role={isDone ? "button" : undefined}
-      tabIndex={isDone ? 0 : undefined}
       onClick={isDone ? onReview : undefined}
-      onKeyDown={
-        isDone
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onReview();
-              }
-            }
-          : undefined
-      }
       style={{
         display: "flex",
         alignItems: "center",

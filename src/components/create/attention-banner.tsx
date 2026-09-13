@@ -16,9 +16,12 @@
 //     actually resolves the situation), so dismiss never hides the
 //     underlying signal.
 //   • Sits top-centre of the viewport (frame 20) so it can't occlude
-//     the prompt bar.
+//     the prompt bar — via the shared `ToastLayer` (src/app/layout.tsx),
+//     portalled into its "attention" slot so it can never overlap the
+//     video-render toasts, which live in the same layer's "render" slot.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -57,7 +60,15 @@ export function BuildAttentionBanner() {
     return () => cancelAnimationFrame(raf);
   }, [attentionKey]);
 
-  if (!topAttention) return null;
+  // The shared toast layer's "attention" slot — queried after mount so this
+  // never touches `document` during SSR; the portal is skipped until it's
+  // found.
+  const [slot, setSlot] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    setSlot(document.getElementById("ideeza-toast-layer-attention"));
+  }, []);
+
+  if (!topAttention || !slot) return null;
 
   const { job, reason } = topAttention;
 
@@ -101,12 +112,12 @@ export function BuildAttentionBanner() {
   const ctaLabel = reason === "credits" ? "Top up credits" : "Open build";
   const ctaHref = reason === "credits" ? "/history#credits" : `/build/${job.id}`;
 
-  return (
+  return createPortal(
     <div
       role="status"
       aria-live="polite"
       className={[
-        "fixed top-[16px] left-1/2 z-toast w-[540px] max-w-[calc(100vw-32px)] -translate-x-1/2",
+        "pointer-events-auto w-[540px] max-w-[calc(100vw-32px)]",
         "flex items-center gap-[12px] rounded-2xl border bg-bg-surface px-[16px] py-[12px] shadow-3",
         tone === "error"
           ? "border-[var(--color-border-error)]"
@@ -153,6 +164,7 @@ export function BuildAttentionBanner() {
       >
         <Icon icon={Cancel01Icon} />
       </button>
-    </div>
+    </div>,
+    slot,
   );
 }

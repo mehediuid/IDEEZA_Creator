@@ -16,6 +16,53 @@ export const metadata: Metadata = {
   description: "Creator dashboard built on the IDEEZA design system",
 };
 
+// ToastLayer — the one shared top-centre toast stack. GlobalRenderIndicator
+// and BuildAttentionBanner live in different React subtrees (one hangs off
+// the root, the other off nested route-group layouts) but must never paint
+// on top of each other, so each portals its card into its own labelled slot
+// here instead of self-positioning with `fixed`. Slot order is fixed
+// (attention above render) regardless of which tree renders first.
+function ToastLayer() {
+  return (
+    <div
+      id="ideeza-toast-layer"
+      style={{
+        position: "fixed",
+        top: 16,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: "var(--z-toast)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        id="ideeza-toast-layer-attention"
+        data-slot="attention"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 8,
+        }}
+      />
+      <div
+        id="ideeza-toast-layer-render"
+        data-slot="render"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 8,
+        }}
+      />
+    </div>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -61,6 +108,7 @@ export default function RootLayout({
             </ManualProjectsProvider>
           </PcbProvider>
         </ThemeProvider>
+        <ToastLayer />
       </body>
     </html>
   );
