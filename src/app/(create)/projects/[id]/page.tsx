@@ -1,7 +1,6 @@
-// /projects/[id] — "Project Details" surface from User Panel V2 (Figma
-// node 16838:306201). Thin server wrapper; the interactive detail view
-// lives in the ProjectDetails client component, rendered in the existing
-// IDEEZA design-system style.
+// /projects/[id] — one project's detail view. Thin server wrapper; the
+// id is resolved against the ManualProjects store inside ProjectDetails,
+// which shows a not-found state when nothing matches.
 
 import * as React from "react";
 import { ProjectDetails } from "@/components/projects/project-details";

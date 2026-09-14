@@ -32,6 +32,7 @@ import {
   type BuildJob,
   type ChatSession,
 } from "@/lib/create/history";
+import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { HistoryTable, type HistoryRow } from "./history-table";
 import { HistoryRowDetail, generateSubSteps } from "./history-row-detail";
 import { Pagination, HISTORY_PAGE_SIZE } from "./pagination";
@@ -60,6 +61,14 @@ export function HistoryTabbedPage() {
     retryBuildItem,
     attentionBuilds,
   } = useCreateHistory();
+  // A build that was saved with "Save Project" carries the project's id;
+  // the row names that project instead of leaving the column blank.
+  const { projects } = useManualProjects();
+  const projectById = React.useMemo(() => {
+    const map = new Map<string, ManualProject>();
+    for (const p of projects) map.set(p.id, p);
+    return map;
+  }, [projects]);
 
   // URL helpers — preserve other params when changing one.
   const buildHref = React.useCallback(
@@ -93,8 +102,13 @@ export function HistoryTabbedPage() {
   // tabular row would. Only Project/Product Generations uses the new
   // table layout from the design.
   const buildRows: HistoryRow[] = React.useMemo(
-    () => (active === "builds" ? builds.map((j) => buildToRow(j)) : []),
-    [active, builds],
+    () =>
+      active === "builds"
+        ? builds.map((j) =>
+            buildToRow(j, j.projectId ? projectById.get(j.projectId) : undefined),
+          )
+        : [],
+    [active, builds, projectById],
   );
 
   const pageCount = Math.max(
@@ -323,7 +337,7 @@ function formatChatTime(ts: number): string {
 
 // ─────────────────── Project/Product Generations row ───────────────
 
-function buildToRow(job: BuildJob): HistoryRow {
+function buildToRow(job: BuildJob, project?: ManualProject): HistoryRow {
   const rollup = rollupBuild(job);
   const status: HistoryRow["status"] =
     rollup.status === "failed" || rollup.status === "partial"
@@ -334,7 +348,8 @@ function buildToRow(job: BuildJob): HistoryRow {
   return {
     id: job.id,
     prompt: shorten(job.conceptPrompt),
-    projectName: undefined,
+    projectName: project?.name,
+    projectHref: project ? `/projects/${project.id}` : undefined,
     thumbnailUrl: job.conceptImageUrl,
     ts: job.updatedAt,
     status,

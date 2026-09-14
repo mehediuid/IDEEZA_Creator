@@ -1,139 +1,94 @@
 "use client";
 
-// MyProjects — the "My Projects" surface from User Panel V2 (Figma node
-// 16838:392921). Content is lifted from the Figma — the six filter tabs
-// (All / Public / Contributed / Private / Draft / Utility NFT), the
-// search + Sort By + Status toolbar, the project-card grid, the Utility
-// NFT card variant, and pagination — but everything is rendered with the
-// existing IDEEZA design-system tokens and the same patterns the Newsfeed
-// grid already uses (rounded-[12px] thumbnails, 2xs tabular-nums stats,
-// rounded-full controls). Nothing in the shared chrome is changed.
+// MyProjects — /projects. The visual shell is the "My Projects" surface
+// from User Panel V2 (Figma node 16838:392921): the tab row, the search
+// toolbar, the card grid and the pagination. Every value in it comes
+// from the real store — `useManualProjects()` for the projects and
+// `useCreateHistory()` for the build a project was generated from — so a
+// build saved with "Save Project" is on this page the moment the user
+// lands on it.
+//
+// Tabs the model can answer: All · Draft · Completed. The Figma's
+// Public / Contributed / Private tabs are gone — `ManualProject` carries
+// no visibility or collaborator field, so membership would have to be
+// invented. Utility NFT stays (minting is a real step in Add Brief) but
+// says plainly that nothing here has been minted yet rather than
+// showing a made-up list.
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  ViewIcon,
-  FavouriteIcon,
-  Comment01Icon,
-  MoreVerticalIcon,
+  CpuIcon,
   Search01Icon,
   ArrowDown01Icon,
   ArrowLeft01Icon,
   ArrowRight01Icon,
-  Copy01Icon,
-  HelpCircleIcon,
+  CheckmarkBadge01Icon,
+  PencilEdit01Icon,
+  File01Icon,
+  Hexagon01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
-import { formatCount } from "@/lib/feed";
+import { useCreateHistory } from "@/lib/create/history";
+import {
+  FLOW_STEPS,
+  STEP_LABELS,
+  completedCount,
+  firstIncompleteStep,
+  productLabel,
+  stepHref,
+  useManualProjects,
+  type ManualProject,
+} from "@/lib/manual/projects";
 
-// ───────────────────────── data model ─────────────────────────
+// ───────────────────────── tabs & sorts ─────────────────────────
 
-type TabId =
-  | "all"
-  | "public"
-  | "contributed"
-  | "private"
-  | "draft"
-  | "nft";
-
-type Scope = "public" | "contributed" | "private" | "draft";
-type Status = "idea" | "prototyping" | "purchased";
-
-type MyProject = {
-  id: string;
-  name: string;
-  image: string;
-  status: Status;
-  scope: Scope;
-  products: number;
-  views: number;
-  likes: number;
-  comments: number;
-  createdAt: number; // higher = newer (drives Newest/Oldest sort)
-};
-
-type NftItem = {
-  id: string;
-  title: string;
-  tokenId: string;
-  owner: string;
-  revealAt: string;
-  claimed: boolean;
-};
+type TabId = "all" | "draft" | "completed" | "nft";
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: "all", label: "All" },
-  { id: "public", label: "Public Projects" },
-  { id: "contributed", label: "Contributed Projects" },
-  { id: "private", label: "Private Projects" },
   { id: "draft", label: "Draft" },
+  { id: "completed", label: "Completed" },
   { id: "nft", label: "Utility NFT" },
 ];
 
 const SORTS = [
-  { id: "newest", label: "Newest to Oldest" },
-  { id: "oldest", label: "Oldest to Newest" },
-  { id: "views", label: "Most Viewed" },
-  { id: "likes", label: "Most Liked" },
+  { id: "recent", label: "Recently updated" },
+  { id: "oldest", label: "Oldest first" },
+  { id: "name", label: "Name A–Z" },
 ] as const;
 type SortId = (typeof SORTS)[number]["id"];
 
-const STATUSES = [
-  { id: "default", label: "Default" },
-  { id: "physical", label: "Physical NFT" },
-  { id: "virtual", label: "Virtual NFT" },
-  { id: "utility", label: "Utility NFT" },
-  { id: "sold", label: "Sold" },
-  { id: "due", label: "Payment Due" },
-] as const;
-type StatusId = (typeof STATUSES)[number]["id"];
+// Three across at the widest breakpoint — a full page is three rows.
+const PAGE_SIZE = 9;
 
-const IMG = "/innovations";
-
-const PROJECTS: MyProject[] = [
-  { id: "p1", name: "Robotic Arm w/ Haptics", image: `${IMG}/robotic-arm-with-haptics.png`, status: "prototyping", scope: "public", products: 2, views: 3988, likes: 35, comments: 35, createdAt: 10 },
-  { id: "p2", name: "Hexapod Walking Robot", image: `${IMG}/hexapod-walking-robot.png`, status: "idea", scope: "public", products: 2, views: 2410, likes: 48, comments: 12, createdAt: 9 },
-  { id: "p3", name: "Line-Following Rover", image: `${IMG}/line-following-micro-rover.png`, status: "purchased", scope: "public", products: 1, views: 5120, likes: 76, comments: 21, createdAt: 8 },
-  { id: "p4", name: "LoRa Weather Station", image: `${IMG}/lora-weather-station.png`, status: "purchased", scope: "public", products: 3, views: 1890, likes: 22, comments: 8, createdAt: 7 },
-  { id: "p5", name: "Self-Balancing Two-Wheeler", image: `${IMG}/self-balancing-two-wheeler.png`, status: "prototyping", scope: "contributed", products: 2, views: 4360, likes: 59, comments: 30, createdAt: 6 },
-  { id: "p6", name: "Quadruped Pet Companion", image: `${IMG}/quadruped-pet-companion.jpg`, status: "idea", scope: "contributed", products: 9, views: 7200, likes: 91, comments: 44, createdAt: 5 },
-  { id: "p7", name: "Swarm Beacon Drone", image: `${IMG}/swarm-beacon-drone.png`, status: "idea", scope: "private", products: 2, views: 980, likes: 14, comments: 3, createdAt: 4 },
-  { id: "p8", name: "E-Ink Smartwatch", image: `${IMG}/e-ink-smartwatch.png`, status: "prototyping", scope: "private", products: 1, views: 3310, likes: 41, comments: 18, createdAt: 3 },
-  { id: "p9", name: "Heart-Rate Fitness Band", image: `${IMG}/heart-rate-fitness-band.png`, status: "idea", scope: "draft", products: 2, views: 640, likes: 9, comments: 2, createdAt: 2 },
-  { id: "p10", name: "Smart Plant Watering Hub", image: `${IMG}/smart-plant-watering-hub.png`, status: "prototyping", scope: "draft", products: 3, views: 1520, likes: 27, comments: 11, createdAt: 1 },
-];
-
-const NFTS: NftItem[] = [
-  { id: "n1", title: "MJC ICOMPANY PRESELL CA…", tokenId: "44238", owner: "0x780…07887", revealAt: "Not Reveal", claimed: false },
-  { id: "n2", title: "MJC ICOMPANY PRESELL CA…", tokenId: "44239", owner: "0x780…07887", revealAt: "Not Reveal", claimed: true },
-  { id: "n3", title: "MJC ICOMPANY PRESELL CA…", tokenId: "44240", owner: "0x780…07887", revealAt: "Not Reveal", claimed: false },
-  { id: "n4", title: "MJC ICOMPANY PRESELL CA…", tokenId: "44241", owner: "0x780…07887", revealAt: "Not Reveal", claimed: true },
-  { id: "n5", title: "MJC ICOMPANY PRESELL CA…", tokenId: "44242", owner: "0x780…07887", revealAt: "Not Reveal", claimed: true },
-  { id: "n6", title: "MJC ICOMPANY PRESELL CA…", tokenId: "44243", owner: "0x780…07887", revealAt: "Not Reveal", claimed: false },
-];
-
-// ───────────────────────── helpers ─────────────────────────
-
-function tabCount(id: TabId): number {
-  if (id === "all") return PROJECTS.length;
-  if (id === "nft") return NFTS.length;
-  return PROJECTS.filter((p) => p.scope === id).length;
-}
-
-const STATUS_BADGE: Record<Status, { label: string; cls: string }> = {
-  idea: { label: "Idea", cls: "bg-bg-brand-subtle text-text-brand" },
-  prototyping: { label: "Prototyping", cls: "bg-bg-warning-subtle text-text-warning" },
-  purchased: { label: "Purchased", cls: "bg-bg-success-subtle text-text-success" },
-};
+const TOTAL_STEPS = FLOW_STEPS.length;
 
 // ───────────────────────── page ─────────────────────────
 
 export function MyProjects() {
-  const [tab, setTab] = React.useState<TabId>("public");
+  const { hydrated, projects, selectProject } = useManualProjects();
+  const { builds } = useCreateHistory();
+  const router = useRouter();
+
+  // "All" is the landing tab on purpose: a project saved from a finished
+  // build is a draft, and the user must see it without hunting a tab.
+  const [tab, setTab] = React.useState<TabId>("all");
   const [query, setQuery] = React.useState("");
-  const [sort, setSort] = React.useState<SortId>("newest");
-  const [status, setStatus] = React.useState<StatusId>("default");
+  const [sort, setSort] = React.useState<SortId>("recent");
   const [page, setPage] = React.useState(1);
+
+  // Concept image per build id — the card thumbnail for a project that
+  // came from an AI build. A hand-made project has none, and gets the
+  // placeholder rather than a borrowed picture.
+  const conceptImage = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const b of builds) {
+      if (b.conceptImageUrl) map.set(b.id, b.conceptImageUrl);
+    }
+    return map;
+  }, [builds]);
 
   // Switching scope or searching resets to the first page. Done in the
   // handlers (not an effect) to avoid a cascading-render setState-in-effect.
@@ -146,38 +101,50 @@ export function MyProjects() {
     setPage(1);
   };
 
-  const projects = React.useMemo(() => {
-    let list = PROJECTS.slice();
-    if (tab !== "all") list = list.filter((p) => p.scope === tab);
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q));
+  const counts = React.useMemo(
+    () => ({
+      all: projects.length,
+      draft: projects.filter((p) => p.status === "draft").length,
+      completed: projects.filter((p) => p.status === "completed").length,
+    }),
+    [projects],
+  );
+
+  const filtered = React.useMemo(() => {
+    if (tab === "nft") return [];
+    let list = projects.slice();
+    if (tab === "draft") list = list.filter((p) => p.status === "draft");
+    if (tab === "completed") list = list.filter((p) => p.status === "completed");
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) =>
+        [p.name, p.productName, p.description]
+          .filter(Boolean)
+          .some((v) => v.toLowerCase().includes(q)),
+      );
     }
     switch (sort) {
       case "oldest":
-        list.sort((a, b) => a.createdAt - b.createdAt);
+        list.sort((a, b) => a.updatedAt - b.updatedAt);
         break;
-      case "views":
-        list.sort((a, b) => b.views - a.views);
-        break;
-      case "likes":
-        list.sort((a, b) => b.likes - a.likes);
+      case "name":
+        list.sort((a, b) => a.name.localeCompare(b.name));
         break;
       default:
-        list.sort((a, b) => b.createdAt - a.createdAt);
+        list.sort((a, b) => b.updatedAt - a.updatedAt);
     }
     return list;
-  }, [tab, query, sort]);
+  }, [projects, tab, query, sort]);
 
-  const nftList = React.useMemo(() => {
-    if (tab !== "nft") return [];
-    if (!query.trim()) return NFTS;
-    const q = query.trim().toLowerCase();
-    return NFTS.filter((n) => n.title.toLowerCase().includes(q));
-  }, [tab, query]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const shownPage = Math.min(page, pageCount);
+  const start = (shownPage - 1) * PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + PAGE_SIZE);
 
-  const isNft = tab === "nft";
-  const shown = isNft ? nftList.length : projects.length;
+  const open = (project: ManualProject) => {
+    selectProject(project.id);
+    router.push(stepHref(project, firstIncompleteStep(project)));
+  };
 
   return (
     <div className="w-full px-[32px] py-[28px]">
@@ -186,8 +153,8 @@ export function MyProjects() {
           My projects
         </h1>
         <p className="mt-[4px] text-sm text-text-secondary">
-          Everything you&apos;ve created — switch scopes, search, and pick up
-          any project where you left off.
+          Everything you&apos;ve created — from an AI build you saved or a
+          project you started by hand. Pick up any of them where you left off.
         </p>
       </header>
 
@@ -199,6 +166,9 @@ export function MyProjects() {
       >
         {TABS.map((t) => {
           const active = tab === t.id;
+          // The store has no mint record, so the Utility NFT count is
+          // unknown rather than zero — "—" says so.
+          const count = t.id === "nft" ? "—" : counts[t.id];
           return (
             <button
               key={t.id}
@@ -222,14 +192,14 @@ export function MyProjects() {
                     : "bg-bg-surface-raised text-text-tertiary",
                 ].join(" ")}
               >
-                {tabCount(t.id)}
+                {count}
               </span>
             </button>
           );
         })}
       </div>
 
-      {/* Toolbar: search + Sort By + Status */}
+      {/* Toolbar: search + sort */}
       <div className="mt-[16px] flex flex-col gap-[12px] min-[860px]:flex-row min-[860px]:items-center">
         <form
           role="search"
@@ -246,9 +216,10 @@ export function MyProjects() {
             type="search"
             value={query}
             onChange={(e) => changeQuery(e.target.value)}
-            placeholder="Search by project name or tag"
+            placeholder="Search by project, product or description"
             aria-label="Search projects"
-            className="h-[40px] w-full rounded-full border border-border bg-bg-surface pl-[42px] pr-[16px] text-sm text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus placeholder:text-text-tertiary"
+            disabled={tab === "nft"}
+            className="h-[40px] w-full rounded-full border border-border bg-bg-surface pl-[42px] pr-[16px] text-sm text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus disabled:cursor-not-allowed disabled:opacity-50 placeholder:text-text-tertiary"
           />
         </form>
 
@@ -258,71 +229,88 @@ export function MyProjects() {
             value={sort}
             onChange={(v) => setSort(v as SortId)}
             options={SORTS}
-          />
-          <Select
-            label="Status"
-            value={status}
-            onChange={(v) => setStatus(v as StatusId)}
-            options={STATUSES}
+            disabled={tab === "nft"}
           />
         </div>
       </div>
 
-      {/* Count line */}
-      <p className="mt-[16px] text-sm font-medium text-text-secondary">
-        {shown} of {isNft ? 26 : 100} {isNft ? "Showing" : "Projects"}
-      </p>
-
-      {/* Grid */}
-      {isNft ? (
-        nftList.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <ul
-            role="list"
-            className="mt-[16px] grid grid-cols-1 gap-[24px] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
-          >
-            {nftList.map((n) => (
-              <li key={n.id}>
-                <NftCard item={n} />
-              </li>
-            ))}
-          </ul>
-        )
+      {!hydrated ? (
+        <p className="mt-[24px] text-sm text-text-tertiary">Loading…</p>
+      ) : tab === "nft" ? (
+        <NftEmptyState />
       ) : projects.length === 0 ? (
-        <EmptyState />
+        <NoProjectsState />
       ) : (
-        <ul
-          role="list"
-          className="mt-[16px] grid grid-cols-1 gap-[24px] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
-        >
-          {projects.map((p) => (
-            <li key={p.id}>
-              <ProjectCard project={p} />
-            </li>
-          ))}
-        </ul>
-      )}
+        <>
+          <p className="mt-[16px] text-sm font-medium text-text-secondary">
+            {filtered.length === projects.length
+              ? `${projects.length} ${projects.length === 1 ? "project" : "projects"}`
+              : `${filtered.length} of ${projects.length} ${projects.length === 1 ? "project" : "projects"}`}
+          </p>
 
-      {shown > 0 && <Pagination page={page} total={10} onChange={setPage} />}
+          {filtered.length === 0 ? (
+            <NoMatchState
+              onClear={() => {
+                changeQuery("");
+                changeTab("all");
+              }}
+            />
+          ) : (
+            <>
+              <ul
+                role="list"
+                className="mt-[16px] grid grid-cols-1 gap-[24px] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
+              >
+                {pageItems.map((p) => (
+                  <li key={p.id}>
+                    <ProjectCard
+                      project={p}
+                      image={p.buildId ? conceptImage.get(p.buildId) : undefined}
+                      onOpen={() => open(p)}
+                    />
+                  </li>
+                ))}
+              </ul>
+
+              {pageCount > 1 && (
+                <Pagination
+                  page={shownPage}
+                  pageCount={pageCount}
+                  onChange={setPage}
+                />
+              )}
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
 // ───────────────────────── project card ─────────────────────────
 
-function ProjectCard({ project }: { project: MyProject }) {
+function ProjectCard({
+  project,
+  image,
+  onOpen,
+}: {
+  project: ManualProject;
+  image?: string;
+  onOpen: () => void;
+}) {
   const [imgOk, setImgOk] = React.useState(true);
-  const badge = STATUS_BADGE[project.status];
+  const done = completedCount(project);
+  const next = firstIncompleteStep(project);
+  const completed = project.status === "completed";
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-[12px] border border-border bg-bg-surface">
+    <article className="flex h-full flex-col overflow-hidden rounded-[12px] border border-border bg-bg-surface">
       <div className="group/thumb relative aspect-[16/10] overflow-hidden bg-bg-surface-raised">
-        {imgOk ? (
+        {image && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={project.image}
-            alt={project.name}
+            src={image}
+            alt={`Concept image for ${project.name}`}
             loading="lazy"
             decoding="async"
             onError={() => setImgOk(false)}
@@ -333,162 +321,82 @@ function ProjectCard({ project }: { project: MyProject }) {
             aria-hidden
             className="absolute inset-0 flex items-center justify-center bg-bg-surface-raised text-text-tertiary"
           >
-            <Icon icon={ViewIcon} size={28} strokeWidth={1.4} />
+            <Icon icon={CpuIcon} size={28} strokeWidth={1.4} />
           </div>
         )}
 
-        {/* status badge — overlaid top-left */}
         <span
-          className={`absolute left-[10px] top-[10px] inline-flex h-[24px] items-center rounded-full px-[10px] text-2xs font-bold ${badge.cls}`}
+          className={[
+            "absolute left-[10px] top-[10px] inline-flex h-[24px] items-center gap-[6px] rounded-full px-[10px] text-2xs font-bold",
+            completed
+              ? "bg-bg-success-subtle text-text-success"
+              : "bg-bg-brand-subtle text-text-brand",
+          ].join(" ")}
         >
-          {badge.label}
+          <Icon
+            icon={completed ? CheckmarkBadge01Icon : PencilEdit01Icon}
+            size={12}
+          />
+          {completed ? "Completed" : "Draft"}
         </span>
-
-        {/* carousel dots */}
-        <div className="absolute inset-x-0 bottom-[10px] flex items-center justify-center gap-[5px]">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              aria-hidden
-              className={
-                i === 0
-                  ? "h-[6px] w-[14px] rounded-full bg-white"
-                  : "h-[6px] w-[6px] rounded-full bg-white/55"
-              }
-            />
-          ))}
-        </div>
       </div>
 
-      <div className="flex flex-col gap-[10px] p-[14px]">
+      <div className="flex flex-1 flex-col gap-[10px] p-[14px]">
         <div className="flex items-start justify-between gap-[10px]">
           <div className="min-w-0">
             <p className="truncate text-md font-medium text-text-primary">
               {project.name}
             </p>
-            <p className="mt-[2px] text-sm text-text-tertiary">
-              {project.products} {project.products === 1 ? "Product" : "Products"}
+            <p className="mt-[2px] truncate text-sm text-text-tertiary">
+              {productLabel(project)}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-[4px]">
-            <Link
-              href={`/projects/${project.id}`}
-              className="inline-flex h-[28px] items-center rounded-full px-[10px] text-sm font-semibold text-text-brand outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              View
-            </Link>
-            <button
-              type="button"
-              aria-label={`More options for ${project.name}`}
-              className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <Icon icon={MoreVerticalIcon} size={18} />
-            </button>
-          </div>
+          <Link
+            href={`/projects/${project.id}`}
+            className="inline-flex h-[28px] shrink-0 items-center rounded-full px-[10px] text-sm font-semibold text-text-brand outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            Details
+          </Link>
         </div>
 
-        <div className="flex items-center gap-[16px] text-2xs font-medium tabular-nums text-text-tertiary">
-          <Stat icon={ViewIcon} value={project.views} title="views" />
-          <Stat icon={FavouriteIcon} value={project.likes} title="appreciations" />
-          <Stat icon={Comment01Icon} value={project.comments} title="comments" />
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function Stat({
-  icon,
-  value,
-  title,
-}: {
-  icon: IconValue;
-  value: number;
-  title: string;
-}) {
-  return (
-    <span
-      className="inline-flex items-center gap-[5px]"
-      title={`${value} ${title}`}
-    >
-      <Icon icon={icon} size={14} strokeWidth={1.6} />
-      {formatCount(value)}
-    </span>
-  );
-}
-
-// ───────────────────────── NFT card ─────────────────────────
-
-function NftCard({ item }: { item: NftItem }) {
-  return (
-    <article className="flex flex-col overflow-hidden rounded-[12px] border border-border bg-bg-surface">
-      {/* Reveal placeholder — the "?" hex */}
-      <div className="relative flex aspect-[16/11] items-center justify-center overflow-hidden bg-gradient-to-br from-violet-700 to-violet-950">
-        <span className="absolute right-[10px] top-[10px] inline-flex h-[24px] items-center rounded-full bg-white/15 px-[10px] text-2xs font-bold text-white backdrop-blur">
-          NFT Reveal
-        </span>
-        <span
-          aria-hidden
-          className="inline-flex h-[64px] w-[64px] items-center justify-center rounded-[18px] bg-white/10 text-violet-100"
+        {/* Progress across the editor's seven steps — the one number the
+            model really carries about how far the project has got. */}
+        <div
+          role="progressbar"
+          aria-label={`${project.name} progress`}
+          aria-valuenow={done}
+          aria-valuemin={0}
+          aria-valuemax={TOTAL_STEPS}
+          className="h-[4px] w-full overflow-hidden rounded-full bg-bg-surface-raised"
         >
-          <Icon icon={HelpCircleIcon} size={40} strokeWidth={1.8} />
-        </span>
-      </div>
+          <div
+            className="h-full rounded-full bg-violet-500 transition-[width] duration-normal ease-decelerate"
+            style={{ width: `${(done / TOTAL_STEPS) * 100}%` }}
+          />
+        </div>
 
-      <div className="flex flex-col gap-[10px] p-[14px]">
-        <p className="truncate text-md font-medium text-text-primary">
-          {item.title}
-        </p>
-        <dl className="flex flex-col gap-[6px] text-sm">
-          <NftRow label="Token Id" value={item.tokenId} />
-          <NftRow label="Owner" value={item.owner} copyable />
-          <NftRow label="Reveal At" value={item.revealAt} />
-        </dl>
+        <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[4px] text-2xs font-medium text-text-tertiary">
+          <span className="inline-flex items-center gap-[5px] tabular-nums">
+            <Icon icon={File01Icon} size={13} strokeWidth={1.6} />
+            {done}/{TOTAL_STEPS} steps
+          </span>
+          {!completed && (
+            <span className="truncate">Next: {STEP_LABELS[next]}</span>
+          )}
+          <span className="ml-auto shrink-0">
+            Updated {formatTime(project.updatedAt)}
+          </span>
+        </div>
+
         <button
           type="button"
-          disabled={item.claimed}
-          className={[
-            "mt-[2px] inline-flex h-[40px] w-full items-center justify-center rounded-full text-sm font-bold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-            item.claimed
-              ? "cursor-not-allowed border border-border bg-bg-surface text-text-tertiary"
-              : "bg-violet-600 text-text-on-brand hover:bg-violet-500",
-          ].join(" ")}
+          onClick={onOpen}
+          className="mt-auto inline-flex h-[36px] w-full items-center justify-center rounded-lg border border-border bg-bg-surface text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
         >
-          {item.claimed ? "Claimed NFT" : "Claim NFT"}
+          {completed ? "Open in editor" : `Resume — ${STEP_LABELS[next]}`}
         </button>
       </div>
     </article>
-  );
-}
-
-function NftRow({
-  label,
-  value,
-  copyable,
-}: {
-  label: string;
-  value: string;
-  copyable?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-[10px]">
-      <dt className="text-text-tertiary">{label}</dt>
-      <dd className="inline-flex items-center gap-[6px] font-medium text-text-primary">
-        {value}
-        {copyable && (
-          <button
-            type="button"
-            aria-label={`Copy ${label}`}
-            onClick={() => {
-              navigator.clipboard?.writeText(value).catch(() => {});
-            }}
-            className="text-text-tertiary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            <Icon icon={Copy01Icon} size={14} />
-          </button>
-        )}
-      </dd>
-    </div>
   );
 }
 
@@ -499,11 +407,13 @@ function Select({
   value,
   onChange,
   options,
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: ReadonlyArray<{ id: string; label: string }>;
+  disabled?: boolean;
 }) {
   const id = `sel-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
@@ -514,13 +424,11 @@ function Select({
       <select
         id={id}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="h-[40px] appearance-none rounded-full border border-border bg-bg-surface pl-[14px] pr-[38px] text-sm font-medium text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus"
+        className="h-[40px] appearance-none rounded-full border border-border bg-bg-surface pl-[14px] pr-[38px] text-sm font-medium text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <option value={options[0].id} disabled hidden>
-          {label}
-        </option>
         {options.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}
@@ -539,15 +447,14 @@ function Select({
 
 function Pagination({
   page,
-  total,
+  pageCount,
   onChange,
 }: {
   page: number;
-  total: number;
+  pageCount: number;
   onChange: (p: number) => void;
 }) {
-  // Compact list: 1 2 3 … last (matches the Figma "‹ 1 2 3 … 10 ›").
-  const items: Array<number | "ellipsis"> = [1, 2, 3, "ellipsis", total];
+  const items = pageItemsFor(page, pageCount);
 
   const btn =
     "inline-flex h-[36px] min-w-[36px] items-center justify-center rounded-lg border px-[8px] text-sm font-medium outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
@@ -598,8 +505,8 @@ function Pagination({
       <button
         type="button"
         aria-label="Next page"
-        disabled={page >= total}
-        onClick={() => onChange(Math.min(total, page + 1))}
+        disabled={page >= pageCount}
+        onClick={() => onChange(Math.min(pageCount, page + 1))}
         className={`${btn} border-border bg-bg-surface text-text-secondary shadow-1 hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40`}
       >
         <Icon icon={ArrowRight01Icon} size={16} />
@@ -608,21 +515,118 @@ function Pagination({
   );
 }
 
-// ───────────────────────── empty ─────────────────────────
+// 1 … n-1 n n+1 … last — every rendered number is a page that exists.
+function pageItemsFor(
+  page: number,
+  pageCount: number,
+): Array<number | "ellipsis"> {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, i) => i + 1);
+  }
+  const out: Array<number | "ellipsis"> = [1];
+  const from = Math.max(2, page - 1);
+  const to = Math.min(pageCount - 1, page + 1);
+  if (from > 2) out.push("ellipsis");
+  for (let i = from; i <= to; i++) out.push(i);
+  if (to < pageCount - 1) out.push("ellipsis");
+  out.push(pageCount);
+  return out;
+}
 
-function EmptyState() {
+// ───────────────────────── empty states ─────────────────────────
+
+function EmptyShell({
+  icon,
+  title,
+  children,
+}: {
+  icon: IconValue;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mt-[16px] flex flex-col items-center gap-[10px] rounded-[12px] border border-border bg-bg-surface px-[24px] py-[48px] text-center">
+    <div className="mt-[24px] flex flex-col items-center gap-[10px] rounded-[12px] border border-border bg-bg-surface px-[24px] py-[48px] text-center">
       <span
         aria-hidden
         className="inline-flex h-[48px] w-[48px] items-center justify-center rounded-full bg-bg-brand-subtle text-text-brand"
       >
-        <Icon icon={Search01Icon} size={20} />
+        <Icon icon={icon} size={20} />
       </span>
-      <p className="text-md font-semibold text-text-primary">No projects found</p>
-      <p className="max-w-[420px] text-sm text-text-secondary">
-        Nothing matches this view yet. Try a different tab or clear your search.
-      </p>
+      <p className="text-md font-semibold text-text-primary">{title}</p>
+      {children}
     </div>
   );
+}
+
+function NoProjectsState() {
+  return (
+    <EmptyShell icon={File01Icon} title="No projects yet">
+      <p className="max-w-[460px] text-sm text-text-secondary">
+        A project starts on Home. Describe an idea and{" "}
+        <strong className="font-semibold text-text-primary">
+          Generate with AI
+        </strong>
+        , then press <strong className="font-semibold text-text-primary">Save
+        Project</strong> on the finished build — or pick{" "}
+        <strong className="font-semibold text-text-primary">
+          Build manually
+        </strong>{" "}
+        to start from an empty board. Either way it lands here.
+      </p>
+      <Link
+        href="/"
+        className="mt-[8px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        Go to Home
+      </Link>
+    </EmptyShell>
+  );
+}
+
+function NoMatchState({ onClear }: { onClear: () => void }) {
+  return (
+    <EmptyShell icon={Search01Icon} title="Nothing in this view">
+      <p className="max-w-[420px] text-sm text-text-secondary">
+        No project matches this tab and search.
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="mt-[8px] inline-flex h-[36px] items-center rounded-lg border border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        Show all projects
+      </button>
+    </EmptyShell>
+  );
+}
+
+function NftEmptyState() {
+  return (
+    <EmptyShell icon={Hexagon01Icon} title="No minted projects yet">
+      <p className="max-w-[460px] text-sm text-text-secondary">
+        A design becomes a Utility NFT in the{" "}
+        <strong className="font-semibold text-text-primary">Add Brief</strong>{" "}
+        step of the editor — idea, video, mint. Nothing has been minted from
+        this browser, so there is nothing to list here.
+      </p>
+    </EmptyShell>
+  );
+}
+
+// ───────────────────────── format ─────────────────────────
+
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

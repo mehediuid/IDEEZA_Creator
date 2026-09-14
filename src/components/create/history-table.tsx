@@ -31,6 +31,9 @@ export type HistoryRow = {
   id: string;
   prompt: string;
   projectName?: string;
+  // Where the project name links — /projects/<id> for the project this
+  // build was saved as. Absent when the build hasn't become one yet.
+  projectHref?: string;
   thumbnailUrl?: string;
   ts: number;
   status: "done" | "progress" | "error";
@@ -157,13 +160,24 @@ function Row({
         {String(serial).padStart(2, "0")}
       </div>
 
-      {/* Prompt */}
+      {/* Prompt — the project the build was saved as leads, when it has
+          one, so a finished build says what it became. The link must not
+          also toggle the row. */}
       <div role="cell" className="min-w-0">
-        {row.projectName && (
-          <p className="truncate text-2xs font-bold text-text-brand">
-            [{row.projectName}]
-          </p>
-        )}
+        {row.projectName &&
+          (row.projectHref ? (
+            <Link
+              href={row.projectHref}
+              onClick={(e) => e.stopPropagation()}
+              className="block truncate rounded-sm text-2xs font-bold text-text-brand underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {row.projectName}
+            </Link>
+          ) : (
+            <p className="truncate text-2xs font-bold text-text-brand">
+              {row.projectName}
+            </p>
+          ))}
         <p className="truncate text-md text-text-primary">{row.prompt}</p>
       </div>
 
