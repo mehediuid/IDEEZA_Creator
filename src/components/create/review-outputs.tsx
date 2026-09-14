@@ -23,6 +23,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowRight02Icon,
   CheckmarkCircle02Icon,
   FloppyDiskIcon,
   HelpCircleIcon,
@@ -211,7 +212,10 @@ function ReviewPanel({ job }: { job: BuildJob }) {
                     onClick={() => router.push(`/build/${job.id}/brief`)}
                     className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
-                    <Icon icon={FloppyDiskIcon} size={18} />
+                    {/* Carrying on, not saving again — the floppy belongs to
+                        "Save Project", which is the button this one replaces
+                        once the build has a project. */}
+                    <Icon icon={ArrowRight02Icon} size={18} />
                     Continue Brief
                   </button>
                   <button

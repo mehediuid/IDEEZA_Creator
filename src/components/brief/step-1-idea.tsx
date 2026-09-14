@@ -120,19 +120,19 @@ export function Step1Idea({
     !projectChoice
       ? "Choose a project for this build, or start a new one."
       : isNew && !newProjectName.trim()
-      ? "Name the new project to continue."
-      : // A stored choice can outlive the project it names (deleted, or a
-        // browser that no longer holds it) — say so rather than letting
-        // Continue do nothing.
-        !isNew && !chosen
-        ? "That project isn't available any more — choose another."
-        : !productName.trim()
-          ? "Add a product name to continue."
-          : !productDescription.trim()
-            ? "Add the one-line description to continue."
-            : !intent
-              ? "Pick how you want to share it."
-              : null;
+        ? "Name the new project to continue."
+        : // A stored choice can outlive the project it names (deleted, or a
+          // browser that no longer holds it) — say so rather than letting
+          // Continue do nothing.
+          !isNew && !chosen
+          ? "That project isn't available any more — choose another."
+          : !productName.trim()
+            ? "Add a product name to continue."
+            : !productDescription.trim()
+              ? "Add the one-line description to continue."
+              : !intent
+                ? "Pick how you want to share it."
+                : null;
   const canContinue = !missing && !busy;
 
   return (
