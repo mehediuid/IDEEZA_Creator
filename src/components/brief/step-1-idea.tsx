@@ -8,9 +8,8 @@ import * as React from "react";
 import { SelectMenu, type SelectOption } from "@/components/ideeza";
 import type { ManualProject } from "@/lib/manual/projects";
 import { C } from "@/lib/pcb/colors";
+import { BRIEF_DESC_MAX as MAX_DESC } from "@/lib/brief/types";
 import { BriefCard, type Intent } from "./brief-app";
-
-const MAX_DESC = 140;
 
 const INTENTS: {
   id: Intent;
@@ -116,7 +115,11 @@ export function Step1Idea({
   // The first thing still missing, top-down through the form — it is both what
   // disables Continue and what its tooltip says.
   const missing =
-    isNew && !newProjectName.trim()
+    // A build's brief starts with the chooser unanswered — it is the question
+    // this step exists to ask, so it is also the first thing Continue waits on.
+    !projectChoice
+      ? "Choose a project for this build, or start a new one."
+      : isNew && !newProjectName.trim()
       ? "Name the new project to continue."
       : // A stored choice can outlive the project it names (deleted, or a
         // browser that no longer holds it) — say so rather than letting

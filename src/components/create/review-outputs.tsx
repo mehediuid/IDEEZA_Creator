@@ -5,15 +5,20 @@
 // produced, the artifact itself on the left, what ships with it on the
 // right, and the two things a finished build can become:
 //
-//   • Save Project  — the build becomes a ManualProject, listed under
-//                     My projects.
-//   • Advance Edit  — the same project, opened straight in the PCB
-//                     editor.
+//   • Save Project  — opens this build's Brief (/build/<id>/brief), which
+//                     is where the build is given a project: Step 1's
+//                     chooser attaches it to an existing one or starts a
+//                     new one, then the outcome (sell / give / private)
+//                     runs from there.
+//   • Advance Edit  — skip the brief: make (or reuse) the project now and
+//                     open it straight in the PCB editor.
 //
-// One project per build: both routes go through `projectFromBuild`, so
-// pressing either twice reuses the project rather than making a second
-// one. What happens to the design after that — private, community,
-// marketplace — is the Brief module's step, not this surface's.
+// One project per build. Save Project makes nothing on its own — the
+// attachment is the maker's answer, not a side effect of pressing a
+// button — and Advance Edit goes through `projectFromBuild`, so pressing
+// it twice reuses the project rather than making a second one. Once the
+// build carries a project the footer says so and offers the ways on
+// instead of repeating the two first-time actions.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -58,7 +63,7 @@ function ReviewPanel({ job }: { job: BuildJob }) {
   const router = useRouter();
   const query = useSearchParams();
   const { setBuildProject } = useCreateHistory();
-  const { projectFromBuild, selectProject } = useManualProjects();
+  const { projects, projectFromBuild, selectProject } = useManualProjects();
 
   // An artifact an older build never produced has nothing to review, so
   // it gets no tab — a deliverable panel for something that was never
@@ -78,14 +83,25 @@ function ReviewPanel({ job }: { job: BuildJob }) {
     deliverables[0]?.kind ??
     null;
 
-  // The project this build becomes — created on the first press and
-  // handed back on every one after it, so Save Project and Advance Edit
-  // are two doors into one project rather than two projects.
-  const ensureProject = React.useCallback(() => {
+  // The project this build already belongs to — the Brief's Step 1 (or
+  // Advance Edit) is what put it there. A stored id whose project is gone
+  // reads as unsaved, so the footer can't point at a project that isn't
+  // in this browser any more.
+  const saved = React.useMemo(
+    () => (job.projectId ? projects.find((p) => p.id === job.projectId) ?? null : null),
+    [job.projectId, projects],
+  );
+
+  // Advance Edit's project: created on the first press and handed back on
+  // every one after it. Selecting it is explicit — the editor pages work
+  // on the active project, so landing there means switching to it, but
+  // nothing else on this surface moves it under the user.
+  const openInEditor = React.useCallback(() => {
     const project = projectFromBuild(job);
     if (project.id !== job.projectId) setBuildProject(job.id, project.id);
-    return project;
-  }, [job, projectFromBuild, setBuildProject]);
+    selectProject(project.id);
+    router.push(stepHref(project, "pcb"));
+  }, [job, projectFromBuild, setBuildProject, selectProject, router]);
 
   return (
     <section
@@ -178,38 +194,63 @@ function ReviewPanel({ job }: { job: BuildJob }) {
           </div>
 
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
-            <p className="text-sm text-text-secondary">
-              {deliverables.length === ITEM_KINDS.length
-                ? "All five pieces are ready. Choose what happens to this build next."
-                : "Every piece this build made is ready. Choose what happens to this build next."}
-            </p>
-            <div className="flex items-center gap-6">
-              <button
-                type="button"
-                onClick={() => {
-                  ensureProject();
-                  router.push("/projects");
-                }}
-                className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={FloppyDiskIcon} size={18} />
-                Save Project
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const project = ensureProject();
-                  // The editor pages work on the active project, so it
-                  // has to be this one before we land there.
-                  selectProject(project.id);
-                  router.push(stepHref(project, "pcb"));
-                }}
-                className="inline-flex h-[40px] items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={PencilEdit02Icon} size={18} />
-                Advance Edit
-              </button>
-            </div>
+            {saved ? (
+              <>
+                <p className="inline-flex items-center gap-4 text-sm text-text-secondary">
+                  <Icon
+                    icon={CheckmarkCircle02Icon}
+                    size={16}
+                    className="shrink-0 text-text-success"
+                  />
+                  Saved to {saved.name}. Pick the brief back up, or open the
+                  project to keep editing.
+                </p>
+                <div className="flex items-center gap-6">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/build/${job.id}/brief`)}
+                    className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    <Icon icon={FloppyDiskIcon} size={18} />
+                    Continue Brief
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openInEditor}
+                    className="inline-flex h-[40px] items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    <Icon icon={PencilEdit02Icon} size={18} />
+                    Open Project
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-text-secondary">
+                  {deliverables.length === ITEM_KINDS.length
+                    ? "All five pieces are ready. Choose what happens to this build next."
+                    : "Every piece this build made is ready. Choose what happens to this build next."}
+                </p>
+                <div className="flex items-center gap-6">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/build/${job.id}/brief`)}
+                    className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    <Icon icon={FloppyDiskIcon} size={18} />
+                    Save Project
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openInEditor}
+                    className="inline-flex h-[40px] items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                  >
+                    <Icon icon={PencilEdit02Icon} size={18} />
+                    Advance Edit
+                  </button>
+                </div>
+              </>
+            )}
           </footer>
         </>
       )}

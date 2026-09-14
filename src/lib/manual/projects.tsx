@@ -151,6 +151,10 @@ type Ctx = {
   activeProject: ManualProject | null;
   findBySlug: (slug: string) => ManualProject | null;
   // Mutations
+  // Makes the record. Which project the editor is working on is a separate,
+  // deliberate act (`selectProject`, or landing on /project/<slug>/…) — a
+  // create that also switched the active project moved every editor route
+  // out from under the user as a side effect of saving something.
   createProject: (input: { name: string; description: string }) => ManualProject;
   // The project a finished AI build becomes. One project per build: a
   // build that already carries a live `projectId` gets that project
@@ -218,7 +222,6 @@ export function ManualProjectsProvider({
         flowState: { ...EMPTY_FLOW_STATE },
       };
       setProjects((arr) => [project, ...arr]);
-      setActiveProjectId(project.id);
       return project;
     },
     [projects],
@@ -244,7 +247,8 @@ export function ManualProjectsProvider({
   // The build's own words become the project: its title is the project
   // name and the product being built, its concept prompt the
   // description. Nothing is invented here — the review surface passes
-  // the job it is showing.
+  // the job it is showing. Making the record is all this does: the
+  // caller decides whether the editor should switch to it.
   const projectFromBuild = React.useCallback(
     (job: BuildJob) => {
       const existing = job.projectId

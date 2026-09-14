@@ -7,6 +7,17 @@
 //  form:    intent-aware mint setup + Pay
 //  success: mint done — listing is live, video renders in background
 //
+// Two homes, one wizard:
+//
+//  • /project/<slug>/brief — the project's own Brief, inside the editor
+//    chrome (top bar, step rail, module rail). The project is already
+//    chosen; Step 1's chooser can only hand the product to another one.
+//  • /build/<id>/brief     — where "Save Project" lands a finished AI
+//    build. There is no project yet: Step 1's chooser is what creates or
+//    picks one, so the shell is the dashboard's (sidebar + "← Back" over
+//    one card) with no rails, and the draft is keyed by the build until
+//    that answer moves it onto the project.
+//
 // The order is `stepsFor(intent, shareToNewsfeed)`: selling puts the clip
 // before the terms, giving and saving go straight to the form and only make a
 // clip when the maker also posts to Innovations.
@@ -30,10 +41,13 @@ import { C } from "@/lib/pcb/colors";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProductFlow } from "@/components/product-flow/product-flow-provider";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
-import { useCreateHistory } from "@/lib/create/history";
+import { useCreateHistory, type BuildJob } from "@/lib/create/history";
 import {
+  BRIEF_DESC_MAX,
   DEFAULT_STATE,
   STEP_ORDER,
+  briefDraftKey,
+  buildDraftScope,
   normalizeBrief,
   normalizeStep,
   stepsFor,
@@ -71,12 +85,12 @@ export type {
 } from "@/lib/brief/types";
 
 // Brief drafts are scoped PER PROJECT so finishing one project's brief never
-// leaks its Step 4 state into another. The bare key below is the pre-scoping
-// global draft — read once for cleanup, then removed.
+// leaks its Step 4 state into another — or, for a brief opened on a build that
+// has no project yet, per build (`briefDraftKey` / `buildDraftScope`). The bare
+// key below is the pre-scoping global draft — read once for cleanup, then
+// removed.
 const LEGACY_DRAFT_KEY = "ideeza:brief:draft";
-function draftKey(projectId: string): string {
-  return `ideeza:brief:draft:${projectId}`;
-}
+const draftKey = briefDraftKey;
 // Cross-page handoff slot written by the GlobalRenderIndicator when the user
 // picks "Regenerate" on a finished video job. Brief reads it on mount AND on
 // the `ideeza:brief-regenerate` window event, restores the old prompt/quality
@@ -100,9 +114,9 @@ const HANDOFF_KEPT_NOTICE =
 // A draft written before the steps had names carries `step` as 1–4 —
 // `normalizeStep` brings it back on the current vocabulary, so an older draft
 // still opens on the step it reached.
-function readFromStorage(projectId: string): { state: BriefState; step: BriefStepId } {
+function readFromStorage(scope: string): { state: BriefState; step: BriefStepId } {
   try {
-    const raw = window.localStorage.getItem(draftKey(projectId));
+    const raw = window.localStorage.getItem(draftKey(scope));
     if (raw) {
       const parsed = JSON.parse(raw) as { state?: unknown; step?: unknown };
       return {
@@ -112,6 +126,35 @@ function readFromStorage(projectId: string): { state: BriefState; step: BriefSte
     }
   } catch {}
   return { state: DEFAULT_STATE, step: "idea" };
+}
+
+function clearDraft(scope: string) {
+  try {
+    window.localStorage.removeItem(draftKey(scope));
+  } catch {}
+}
+
+// What a build already knows, filled in so Step 1 isn't asking the maker to
+// retype it: the build's title is the product (and the name a new project
+// would take), its summary the one line. Only ever fills a blank — an answer
+// the maker has edited is theirs, and survives every reload.
+//
+// The chooser starts UNANSWERED here, which the stored draft has to be able to
+// say: a build belongs to no project until this step, so defaulting it to
+// "make a new one" would put words in the maker's mouth. `""` is that answer,
+// and only an untouched default is turned into it.
+function seedFromBuild(s: BriefState, job: BuildJob): BriefState {
+  const unanswered = s.projectChoice === "new" && !s.newProjectName.trim();
+  const oneLine = (job.summary || job.conceptPrompt).trim();
+  return {
+    ...s,
+    projectChoice: unanswered ? "" : s.projectChoice,
+    newProjectName: s.newProjectName.trim() ? s.newProjectName : job.title,
+    productName: s.productName.trim() ? s.productName : job.title,
+    productDescription: s.productDescription.trim()
+      ? s.productDescription
+      : oneLine.slice(0, BRIEF_DESC_MAX),
+  };
 }
 
 // Does a stored draft hold work of its own? Anything the user answered on Step
@@ -202,24 +245,29 @@ function releaseProjectChoice(projectId: string) {
 }
 
 // `from` is the project the answers were typed in — they stay in ITS draft, so
-// the notice on the other side can say where to go back for them.
-function noteHandoffKept(projectId: string, from: string) {
+// the notice on the other side can say where to go back for them. `fromBuild`
+// says the answers came from a build instead, which has no brief of its own to
+// send anyone back to: what it kept is the attachment.
+type HandoffKept = { from: string; fromBuild: boolean };
+
+function noteHandoffKept(projectId: string, from: string, fromBuild = false) {
   try {
     window.localStorage.setItem(
       HANDOFF_KEPT_KEY,
-      JSON.stringify({ projectId, from, at: Date.now() }),
+      JSON.stringify({ projectId, from, fromBuild, at: Date.now() }),
     );
   } catch {}
 }
 
 // Read once, on the project the hand-off landed in.
-function readHandoffKept(projectId: string): { from: string } | null {
+function readHandoffKept(projectId: string): HandoffKept | null {
   try {
     const raw = window.localStorage.getItem(HANDOFF_KEPT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as {
       projectId?: string;
       from?: string;
+      fromBuild?: boolean;
       at?: number;
     };
     const stale =
@@ -230,7 +278,10 @@ function readHandoffKept(projectId: string): { from: string } | null {
       return null;
     }
     window.localStorage.removeItem(HANDOFF_KEPT_KEY);
-    return { from: typeof parsed.from === "string" ? parsed.from : "" };
+    return {
+      from: typeof parsed.from === "string" ? parsed.from : "",
+      fromBuild: parsed.fromBuild === true,
+    };
   } catch {
     return null;
   }
@@ -242,9 +293,9 @@ function readHandoffKept(projectId: string): { from: string } | null {
 // than a choice, so a draft saved before the chooser existed doesn't offer to
 // make a second copy of the project you are already in.
 function withDefaultProjectChoice(s: BriefState, activeProjectId: string): BriefState {
-  return s.projectChoice === "new" && !s.newProjectName.trim()
-    ? { ...s, projectChoice: activeProjectId }
-    : s;
+  const unanswered =
+    !s.projectChoice || (s.projectChoice === "new" && !s.newProjectName.trim());
+  return unanswered ? { ...s, projectChoice: activeProjectId } : s;
 }
 
 type RegenRequest = {
@@ -310,7 +361,7 @@ function stepBefore(seq: BriefStepId[], step: BriefStepId): BriefStepId | null {
   return i > 0 ? seq[i - 1] : null;
 }
 
-export function BriefApp() {
+export function BriefApp({ buildId }: { buildId?: string }) {
   const router = useRouter();
   const { createJob, markMinted } = useVideoJobs();
   const { markCompleted: markFlowStep } = useProductFlow();
@@ -319,13 +370,28 @@ export function BriefApp() {
     activeProjectId,
     projects,
     createProject,
+    selectProject,
     setStatus,
     updateProject,
   } = useManualProjects();
-  const { builds } = useCreateHistory();
+  const { builds, getBuild, setBuildProject } = useCreateHistory();
+  const job = buildId ? getBuild(buildId) : null;
+  // The project this brief belongs to. On a build that is whichever project
+  // Step 1 attached it to — nothing until then, which is the whole reason
+  // build mode exists.
+  const scopeProjectId = buildId ? (job?.projectId ?? null) : activeProjectId;
+  // …and where its draft lives: the project's key once there is one, the
+  // build's before that.
+  const scope =
+    scopeProjectId ?? (buildId ? buildDraftScope(buildId) : null);
   const [state, setState] = React.useState<BriefState>(DEFAULT_STATE);
   const [step, setStep] = React.useState<BriefStepId>("idea");
-  const [hydrated, setHydrated] = React.useState(false);
+  // Which scope the state in hand was loaded for. A plain boolean let the
+  // persist effect fire once with the previous scope's answers under the new
+  // scope's key — which, when the new key is a project that already holds a
+  // brief, wrote over it.
+  const [hydratedScope, setHydratedScope] = React.useState<string | null>(null);
+  const hydrated = scope !== null && hydratedScope === scope;
   const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
   // Step 2's "Need to prompt help?" — a view, not an answer, so it stays out
@@ -342,24 +408,30 @@ export function BriefApp() {
   // one-shot, so the ref keeps the read to once per project: StrictMode runs
   // the hydration effect twice in dev and the second pass would otherwise find
   // the notice already consumed and clear it again.
-  const [handoffKept, setHandoffKept] = React.useState<{ from: string } | null>(
+  const [handoffKept, setHandoffKept] = React.useState<HandoffKept | null>(
     null,
   );
   const handoffReadFor = React.useRef<string | null>(null);
 
-  // Hydration is PER PROJECT: load THIS project's brief draft (or a fresh Step
-  // 1 if it has none). The cross-page regenerate handoff still applies on top.
-  // Keyed by activeProjectId so a different project never inherits another's
-  // draft — this is what makes a new project start a brand-new brief.
+  // Hydration is PER SCOPE: load THIS project's (or this build's) brief draft,
+  // or a fresh Step 1 if it has none. The cross-page regenerate handoff still
+  // applies on top. Keyed by the scope so a different project never inherits
+  // another's draft — this is what makes a new project start a brand-new
+  // brief, and what moves a build's draft onto the project it is attached to.
   React.useEffect(() => {
-    if (!activeProjectId) return;
+    if (!scope) return;
     // One-time cleanup of the pre-scoping global draft so a stale Step 4 from
     // an earlier build can't leak into a fresh project.
     try {
       window.localStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch {}
-    const { state: loaded, step: loadedStep } = readFromStorage(activeProjectId);
-    let normalized: BriefState = withDefaultProjectChoice(loaded, activeProjectId);
+    const { state: loaded, step: loadedStep } = readFromStorage(scope);
+    let normalized: BriefState = scopeProjectId
+      ? withDefaultProjectChoice(loaded, scopeProjectId)
+      : loaded;
+    // Unattached, this brief is the build's: fill in what the build already
+    // knows rather than asking for it again.
+    if (!scopeProjectId && job) normalized = seedFromBuild(normalized, job);
     let nextStep = loadedStep;
     const regen = readRegenRequest();
     if (regen) {
@@ -368,12 +440,16 @@ export function BriefApp() {
     }
     setState(normalized);
     setStep(nextStep);
-    if (handoffReadFor.current !== activeProjectId) {
-      handoffReadFor.current = activeProjectId;
-      setHandoffKept(readHandoffKept(activeProjectId));
+    if (scopeProjectId && handoffReadFor.current !== scopeProjectId) {
+      handoffReadFor.current = scopeProjectId;
+      setHandoffKept(readHandoffKept(scopeProjectId));
     }
-    setHydrated(true);
-  }, [activeProjectId]);
+    setHydratedScope(scope);
+    // `job` is only read to fill blanks on the first load of a build's own
+    // draft; re-running when the store re-issues the object would fight the
+    // maker's edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope, scopeProjectId]);
 
   // Same-page regenerate handoff: the page doesn't re-mount when the indicator
   // navigates to /brief from /brief, so we also listen for the event.
@@ -389,24 +465,28 @@ export function BriefApp() {
   }, []);
 
   React.useEffect(() => {
-    if (!hydrated || !activeProjectId) return;
+    if (!hydrated || !scope) return;
     // Don't persist until the loaded state belongs to this project — guards a
     // transient cross-write while the active project changes mid-flight.
-    if (state.projectId && state.projectId !== activeProjectId) return;
+    if (scopeProjectId && state.projectId && state.projectId !== scopeProjectId)
+      return;
     try {
       window.localStorage.setItem(
-        draftKey(activeProjectId),
+        draftKey(scope),
         JSON.stringify({ state, step }),
       );
     } catch {}
-  }, [state, step, hydrated, activeProjectId]);
+  }, [state, step, hydrated, scope, scopeProjectId]);
 
   // Adopt the active project's identity + product name ONCE per project (keyed
   // on the project id). Typing the name in Step 1 writes the other way (via
   // handleStep1Change) — this effect must NOT re-run on those edits, or the
   // synced value would fight the user mid-type (the cursor jumps / reverts).
+  // Only for the project this brief is scoped to: a build's brief must not
+  // adopt the name of whichever project the editor happens to have open.
   React.useEffect(() => {
-    if (!hydrated || !activeProject) return;
+    if (!hydrated || !activeProject || activeProject.id !== scopeProjectId)
+      return;
     setState((s) =>
       s.projectId === activeProject.id &&
       s.productName === activeProject.productName
@@ -418,7 +498,7 @@ export function BriefApp() {
           },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, activeProject?.id]);
+  }, [hydrated, activeProject?.id, scopeProjectId]);
 
   const patch = (next: Partial<BriefState>) =>
     setState((s) => ({ ...s, ...next }));
@@ -466,10 +546,10 @@ export function BriefApp() {
     patch(next);
     if (
       next.productName !== undefined &&
-      activeProjectId &&
-      state.projectChoice === activeProjectId
+      scopeProjectId &&
+      state.projectChoice === scopeProjectId
     ) {
-      updateProject(activeProjectId, { productName: next.productName });
+      updateProject(scopeProjectId, { productName: next.productName });
     }
   };
 
@@ -505,17 +585,24 @@ export function BriefApp() {
     // The name the target project already carries — what its own draft would
     // hold without anyone having typed a thing (see `draftHasWork`).
     let targetProductName = "";
+    // Freshly made here, so its draft is this build's to seed and its record
+    // can say which build it came from.
+    let created = false;
     if (state.projectChoice === "new") {
       if (!state.newProjectName.trim()) return;
       continuingRef.current = true;
       setContinuing(true);
-      const created = createProject({
+      const madeProject = createProject({
         name: state.newProjectName.trim(),
-        description: state.newProjectDescription.trim(),
+        // A project made from a build keeps the concept that started it when
+        // the maker didn't write a description of their own.
+        description:
+          state.newProjectDescription.trim() || job?.conceptPrompt.trim() || "",
       });
-      targetId = created.id;
-      targetSlug = created.slug;
-      next = { ...next, projectChoice: created.id, projectId: created.id };
+      created = true;
+      targetId = madeProject.id;
+      targetSlug = madeProject.slug;
+      next = { ...next, projectChoice: madeProject.id, projectId: madeProject.id };
     } else {
       // Step 1 blocks Continue on a choice that matches no project and says
       // why; this is the last line of defence, not a silent no-op.
@@ -532,6 +619,36 @@ export function BriefApp() {
     // the idea, so a seeded hand-off lands exactly where staying put would.
     const afterIdea =
       stepAfter(stepsFor(next.intent, next.shareToNewsfeed), "idea") ?? "idea";
+
+    // On a build, this answer is the attachment: the build gets its project,
+    // the project is the one the editor now works on (an explicit act, here,
+    // rather than a side effect of saving), and the draft moves from the
+    // build's key onto the project's — so the rest of the brief runs on the
+    // project, in this same shell, and /project/<slug>/brief opens on exactly
+    // where this left off.
+    if (buildId) {
+      if (seedDraft(targetId, next, afterIdea, targetProductName)) {
+        updateProject(targetId, {
+          productName: next.productName,
+          // Only a project made from this build carries it as its origin:
+          // stamping an existing project would claim it was this build's all
+          // along, and its product count would drop by one.
+          ...(created ? { buildId } : null),
+        });
+      } else {
+        // That project already has a brief in progress — it keeps it, and the
+        // notice on the next render says so. The build is attached either way.
+        noteHandoffKept(targetId, job?.title ?? "", true);
+      }
+      clearDraft(buildDraftScope(buildId));
+      setBuildProject(buildId, targetId);
+      selectProject(targetId);
+      // The scope change re-hydrates this brief on the project's draft, which
+      // already holds `next` at `afterIdea`.
+      continuingRef.current = false;
+      setContinuing(false);
+      return;
+    }
 
     // The URL is what says which project the editor is in — the workspace
     // gate reads the slug and remounts the Brief per project. So attaching the
@@ -691,48 +808,17 @@ export function BriefApp() {
       scenes: s.scenes.map((sc) => (sc.id === id ? { ...sc, ...p } : sc)),
     }));
 
-  return (
-    <EditorShell>
-      <TopBar />
-      <BriefRail
-        steps={seq}
-        current={step}
-        intent={state.intent}
-        // Backwards only, and only while there is still something to change:
-        // once it is minted the brief is a record, not a form. The write
-        // itself locks it too — a rail click mid-commit navigated away and
-        // the commit then yanked the user to success behind their back.
-        onGo={step === "success" || minting ? undefined : setStep}
-        topOffset={62}
-      />
+  // The wizard itself — the same steps, whichever shell they are standing in.
+  const body = (
+    <>
+      {/* Above the card rather than inside Step 1: the kept brief opens on
+          whichever step it had reached, so a Step-1-only notice would go
+          unread exactly when the user most needs it. */}
+      {handoffKept ? (
+        <HandoffNotice from={handoffKept.from} fromBuild={handoffKept.fromBuild} />
+      ) : null}
 
-      <div
-        style={{
-          position: "absolute",
-          top: 62,
-          bottom: 0,
-          left: 74,
-          right: 0,
-          background: "var(--color-bg-page)",
-          overflowY: "auto",
-        }}
-      >
-        <div
-          style={{
-            minHeight: "100%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "var(--spacing-6)",
-            padding: "64px 32px",
-          }}
-        >
-          {/* Above the card rather than inside Step 1: the kept brief opens on
-              whichever step it had reached, so a Step-1-only notice would go
-              unread exactly when the user most needs it. */}
-          {handoffKept ? <HandoffNotice from={handoffKept.from} /> : null}
-
-          <Crossfade keyName={`step-${step}`}>
+      <Crossfade keyName={`step-${step}`}>
             {step === "idea" && (
               <Step1Idea
                 projects={projects}
@@ -745,7 +831,11 @@ export function BriefApp() {
                 intent={state.intent}
                 busy={continuing}
                 onChange={handleStep1Change}
-                onBack={() => router.push("/projects")}
+                // Back is where this brief was opened from: the build's
+                // review, or My projects.
+                onBack={() =>
+                  router.push(buildId ? `/build/${buildId}` : "/projects")
+                }
                 onContinue={continueFromIdea}
               />
             )}
@@ -784,46 +874,48 @@ export function BriefApp() {
                 projectName={activeProject?.name ?? ""}
               />
             )}
-          </Crossfade>
-        </div>
+      </Crossfade>
+    </>
+  );
 
-        <PromptHelpModal
-          open={promptHelpOpen && step === "preview"}
-          productName={state.productName}
-          productDescription={state.productDescription}
-          onUse={(prompt) =>
-            // Hand-authored now — the auto toggle must not overwrite it.
-            patch({ videoPrompt: prompt, autoGenerateVideo: false })
-          }
-          onClose={() => setPromptHelpOpen(false)}
-        />
+  const chrome = (
+    <>
+      <PromptHelpModal
+        open={promptHelpOpen && step === "preview"}
+        productName={state.productName}
+        productDescription={state.productDescription}
+        onUse={(prompt) =>
+          // Hand-authored now — the auto toggle must not overwrite it.
+          patch({ videoPrompt: prompt, autoGenerateVideo: false })
+        }
+        onClose={() => setPromptHelpOpen(false)}
+      />
 
-        {hydrated && step !== "success" && (
-          <div
+      {hydrated && step !== "success" && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 16,
+            right: 24,
+            fontSize: 11,
+            color: C.body,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            opacity: 0.6,
+          }}
+        >
+          <span
             style={{
-              position: "fixed",
-              bottom: 16,
-              right: 24,
-              fontSize: 11,
-              color: C.body,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              opacity: 0.6,
+              width: 6,
+              height: 6,
+              background: "var(--color-green-500)",
+              borderRadius: "50%",
             }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                background: "var(--color-green-500)",
-                borderRadius: "50%",
-              }}
-            />
-            Auto-saved
-          </div>
-        )}
-      </div>
+          />
+          Auto-saved
+        </div>
+      )}
 
       <style>{`
         @keyframes ix-brief-in {
@@ -836,6 +928,73 @@ export function BriefApp() {
         }
         .ix-brief-back:hover { color: var(--color-text-primary); }
       `}</style>
+    </>
+  );
+
+  // A build's brief runs in the dashboard shell the (create) layout already
+  // provides — the global sidebar, a "← Back" link over one card. No module
+  // rail and no step rail: there is no project to switch modules inside yet,
+  // and Back is the only way through a card that is one question long.
+  if (buildId) {
+    return (
+      <div
+        data-brief-shell="build"
+        style={{
+          minHeight: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "var(--spacing-6)",
+          padding: "40px 32px 64px",
+        }}
+      >
+        {body}
+        {chrome}
+      </div>
+    );
+  }
+
+  return (
+    <EditorShell>
+      <TopBar />
+      <BriefRail
+        steps={seq}
+        current={step}
+        intent={state.intent}
+        // Backwards only, and only while there is still something to change:
+        // once it is minted the brief is a record, not a form. The write
+        // itself locks it too — a rail click mid-commit navigated away and
+        // the commit then yanked the user to success behind their back.
+        onGo={step === "success" || minting ? undefined : setStep}
+        topOffset={62}
+      />
+
+      <div
+        data-brief-shell="project"
+        style={{
+          position: "absolute",
+          top: 62,
+          bottom: 0,
+          left: 74,
+          right: 0,
+          background: "var(--color-bg-page)",
+          overflowY: "auto",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--spacing-6)",
+            padding: "64px 32px",
+          }}
+        >
+          {body}
+        </div>
+        {chrome}
+      </div>
     </EditorShell>
   );
 }
@@ -908,7 +1067,13 @@ export function BriefCard({
  * and where those answers are, since nothing was thrown away: they are still
  * in the brief they were typed in, one project away.
  */
-function HandoffNotice({ from }: { from: string }) {
+function HandoffNotice({
+  from,
+  fromBuild,
+}: {
+  from: string;
+  fromBuild?: boolean;
+}) {
   return (
     <div
       role="status"
@@ -943,9 +1108,11 @@ function HandoffNotice({ from }: { from: string }) {
       </svg>
       <span>
         {HANDOFF_KEPT_NOTICE}{" "}
-        {from
-          ? `What you just typed is still in ${from}'s brief — open that project to carry on there.`
-          : "What you just typed is still in the brief you came from — open that project to carry on there."}
+        {fromBuild
+          ? `${from ? `“${from}”` : "The build"} is attached to it all the same — carry on from where that brief left off.`
+          : from
+            ? `What you just typed is still in ${from}'s brief — open that project to carry on there.`
+            : "What you just typed is still in the brief you came from — open that project to carry on there."}
       </span>
     </div>
   );

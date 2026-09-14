@@ -11,6 +11,23 @@ export type Intent = "sell" | "give" | "save";
 export type MediaType = "ai" | "ar" | "skip";
 export type Quality = "low" | "high";
 
+/** How long the "one line · what does it do?" answer may be. */
+export const BRIEF_DESC_MAX = 140;
+
+// ── Where a draft is stored ────────────────────────────────────────────────
+// A brief opened on a project is that project's, and is keyed by its id. A
+// brief opened on a finished AI build has no project yet — Step 1's chooser is
+// what creates or picks one — so it is keyed by the build until that answer,
+// when the draft moves to the project's own key and stays there.
+
+export function briefDraftKey(scope: string): string {
+  return `ideeza:brief:draft:${scope}`;
+}
+
+export function buildDraftScope(buildId: string): string {
+  return `build:${buildId}`;
+}
+
 // Minting happens on testnets today — a mainnet chain in this list would claim
 // something the app doesn't do.
 export type Network = "baseSepolia" | "mumbai";
@@ -289,11 +306,14 @@ export function normalizeBrief(parsed: unknown): BriefState {
   const allowed = TOKENS_BY_NETWORK[network];
   const token: Token = oneOf(s.token, allowed, allowed[0]);
 
+  // An empty string is a real answer here — "nothing chosen yet", which is
+  // where a brief opened on a build starts, so it must survive a reload
+  // instead of falling back to "make a new project".
   const projectChoice = str(s.projectChoice, DEFAULT_STATE.projectChoice);
 
   return {
     projectId: str(s.projectId, DEFAULT_STATE.projectId),
-    projectChoice: projectChoice || DEFAULT_STATE.projectChoice,
+    projectChoice,
     newProjectName: str(s.newProjectName, DEFAULT_STATE.newProjectName),
     newProjectDescription: str(
       s.newProjectDescription,
