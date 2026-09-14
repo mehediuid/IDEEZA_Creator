@@ -11,9 +11,9 @@
 // Tabs the model can answer: All · Draft · Completed. The Figma's
 // Public / Contributed / Private tabs are gone — `ManualProject` carries
 // no visibility or collaborator field, so membership would have to be
-// invented. Utility NFT stays (minting is a real step in Add Brief) but
-// says plainly that nothing here has been minted yet rather than
-// showing a made-up list.
+// invented. Utility NFT lists projects whose own Brief draft really has
+// `mintedAt !== null` (read via `briefDraftKey`/`normalizeBrief`), and says
+// plainly that nothing has been minted yet when that set is empty.
 
 import * as React from "react";
 import Link from "next/link";
@@ -41,6 +41,8 @@ import {
   useManualProjects,
   type ManualProject,
 } from "@/lib/manual/projects";
+import { briefDraftKey, normalizeBrief } from "@/lib/brief/types";
+import { formatRelativeTime } from "@/lib/utils";
 
 // ───────────────────────── tabs & sorts ─────────────────────────
 
@@ -90,14 +92,19 @@ export function MyProjects() {
     return map;
   }, [builds]);
 
-  // Switching scope or searching resets to the first page. Done in the
-  // handlers (not an effect) to avoid a cascading-render setState-in-effect.
+  // Switching scope, searching or resorting all reset to the first page —
+  // whatever changes what the grid shows must also stop pointing at a page
+  // that may no longer exist.
   const changeTab = (id: TabId) => {
     setTab(id);
     setPage(1);
   };
   const changeQuery = (q: string) => {
     setQuery(q);
+    setPage(1);
+  };
+  const changeSort = (id: SortId) => {
+    setSort(id);
     setPage(1);
   };
 
@@ -110,8 +117,34 @@ export function MyProjects() {
     [projects],
   );
 
+  // Utility NFT membership — read from each project's own Brief draft
+  // (`briefDraftKey` + `normalizeBrief`, both exported for exactly this).
+  // `null` means "not read yet"; read in an effect (not during render) so
+  // the first frame stays server/client-consistent, then hydrates from
+  // localStorage like everything else on this page.
+  const [mintedIds, setMintedIds] = React.useState<Set<string> | null>(null);
+  React.useEffect(() => {
+    if (!hydrated) return;
+    const minted = new Set<string>();
+    for (const p of projects) {
+      try {
+        const raw = window.localStorage.getItem(briefDraftKey(p.id));
+        if (raw) {
+          const parsed = JSON.parse(raw) as { state?: unknown };
+          if (normalizeBrief(parsed.state).mintedAt !== null) minted.add(p.id);
+        }
+      } catch {
+        // Corrupt/missing draft reads as "not minted" — never fatal here.
+      }
+    }
+    setMintedIds(minted);
+  }, [hydrated, projects]);
+
   const filtered = React.useMemo(() => {
-    if (tab === "nft") return [];
+    if (tab === "nft") {
+      if (!mintedIds) return [];
+      return projects.filter((p) => mintedIds.has(p.id));
+    }
     let list = projects.slice();
     if (tab === "draft") list = list.filter((p) => p.status === "draft");
     if (tab === "completed") list = list.filter((p) => p.status === "completed");
@@ -134,7 +167,12 @@ export function MyProjects() {
         list.sort((a, b) => b.updatedAt - a.updatedAt);
     }
     return list;
-  }, [projects, tab, query, sort]);
+  }, [projects, tab, query, sort, mintedIds]);
+
+  // Whether the current view is narrower than "everything" — drives the
+  // count line's wording below (item can't just compare list lengths: a
+  // filter that happens to match every project must still read as filtered).
+  const filterApplied = tab !== "all" || query.trim().length > 0;
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const shownPage = Math.min(page, pageCount);
@@ -161,14 +199,20 @@ export function MyProjects() {
       {/* Tabs */}
       <div
         role="tablist"
-        aria-label="Project scope"
+        aria-label="Filter projects by status"
         className="flex flex-wrap items-center gap-[8px] border-b border-border pb-[16px]"
       >
         {TABS.map((t) => {
           const active = tab === t.id;
-          // The store has no mint record, so the Utility NFT count is
-          // unknown rather than zero — "—" says so.
-          const count = t.id === "nft" ? "—" : counts[t.id];
+          // Counts read straight from the store, so they must wait for it
+          // like everything else on this page — "—" rather than a false
+          // "0" while hydration is still in flight. Utility NFT additionally
+          // waits on its own mint-status read (see mintedIds above).
+          const count = !hydrated
+            ? "—"
+            : t.id === "nft"
+              ? (mintedIds ? mintedIds.size : "—")
+              : counts[t.id];
           return (
             <button
               key={t.id}
@@ -227,34 +271,36 @@ export function MyProjects() {
           <Select
             label="Sort By"
             value={sort}
-            onChange={(v) => setSort(v as SortId)}
+            onChange={(v) => changeSort(v as SortId)}
             options={SORTS}
             disabled={tab === "nft"}
           />
         </div>
       </div>
 
-      {!hydrated ? (
+      {!hydrated || (tab === "nft" && !mintedIds) ? (
         <p className="mt-[24px] text-sm text-text-tertiary">Loading…</p>
-      ) : tab === "nft" ? (
-        <NftEmptyState />
       ) : projects.length === 0 ? (
         <NoProjectsState />
       ) : (
         <>
           <p className="mt-[16px] text-sm font-medium text-text-secondary">
-            {filtered.length === projects.length
+            {!filterApplied
               ? `${projects.length} ${projects.length === 1 ? "project" : "projects"}`
               : `${filtered.length} of ${projects.length} ${projects.length === 1 ? "project" : "projects"}`}
           </p>
 
           {filtered.length === 0 ? (
-            <NoMatchState
-              onClear={() => {
-                changeQuery("");
-                changeTab("all");
-              }}
-            />
+            tab === "nft" ? (
+              <NftEmptyState />
+            ) : (
+              <NoMatchState
+                onClear={() => {
+                  changeQuery("");
+                  changeTab("all");
+                }}
+              />
+            )
           ) : (
             <>
               <ul
@@ -384,7 +430,7 @@ function ProjectCard({
             <span className="truncate">Next: {STEP_LABELS[next]}</span>
           )}
           <span className="ml-auto shrink-0">
-            Updated {formatTime(project.updatedAt)}
+            Updated {formatRelativeTime(project.updatedAt)}
           </span>
         </div>
 
@@ -611,22 +657,4 @@ function NftEmptyState() {
       </p>
     </EmptyShell>
   );
-}
-
-// ───────────────────────── format ─────────────────────────
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return d.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }

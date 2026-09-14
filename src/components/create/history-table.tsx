@@ -169,6 +169,7 @@ function Row({
             <Link
               href={row.projectHref}
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
               className="block truncate rounded-sm text-2xs font-bold text-text-brand underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
             >
               {row.projectName}

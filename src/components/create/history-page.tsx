@@ -33,6 +33,7 @@ import {
   type ChatSession,
 } from "@/lib/create/history";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { formatRelativeTime } from "@/lib/utils";
 import { HistoryTable, type HistoryRow } from "./history-table";
 import { HistoryRowDetail, generateSubSteps } from "./history-row-detail";
 import { Pagination, HISTORY_PAGE_SIZE } from "./pagination";
@@ -312,27 +313,11 @@ function ChatRow({
           </p>
         </div>
         <span className="text-sm text-text-tertiary">
-          {formatChatTime(chat.updatedAt)}
+          {formatRelativeTime(chat.updatedAt)}
         </span>
       </Link>
     </li>
   );
-}
-
-function formatChatTime(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return d.toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 // ─────────────────── Project/Product Generations row ───────────────

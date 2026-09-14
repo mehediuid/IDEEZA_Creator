@@ -132,7 +132,7 @@ export function ProjectDetails({ id }: { id: string }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={build.conceptImageUrl}
-                alt={`Concept image this project was generated from`}
+                alt={`Concept image for ${project.name}`}
                 className="block max-h-[360px] w-full object-cover"
               />
             </div>
@@ -266,12 +266,9 @@ function Deliverables({ build }: { build: BuildJob }) {
       </p>
 
       <ul role="list" className="mt-[14px] flex flex-col gap-[8px]">
-        {build.items.map((item) => (
-          <li key={item.kind}>
-            <Link
-              href={`/build/${build.id}?tab=${item.kind}`}
-              className="flex items-center gap-[14px] rounded-xl border border-border bg-bg-surface p-[14px] outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
+        {build.items.map((item) => {
+          const content = (
+            <>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-md font-semibold text-text-primary">
                   {ITEM_LABELS[item.kind]}
@@ -281,12 +278,28 @@ function Deliverables({ build }: { build: BuildJob }) {
                 </p>
               </div>
               <ItemStatus item={item} />
-              <span aria-hidden className="shrink-0 text-text-tertiary">
-                <Icon icon={ArrowRight01Icon} size={18} />
-              </span>
-            </Link>
-          </li>
-        ))}
+            </>
+          );
+          return (
+            <li key={item.kind}>
+              {item.status === "skipped" ? (
+                <div className="flex items-center gap-[14px] rounded-xl border border-border bg-bg-surface p-[14px] opacity-70">
+                  {content}
+                </div>
+              ) : (
+                <Link
+                  href={`/build/${build.id}?tab=${item.kind}`}
+                  className="flex items-center gap-[14px] rounded-xl border border-border bg-bg-surface p-[14px] outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  {content}
+                  <span aria-hidden className="shrink-0 text-text-tertiary">
+                    <Icon icon={ArrowRight01Icon} size={18} />
+                  </span>
+                </Link>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="mt-[14px] flex flex-wrap items-center gap-[10px]">
