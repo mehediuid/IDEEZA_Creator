@@ -332,7 +332,7 @@ export function InsufficientCreditsBanner() {
         </p>
         <Link
           href="/history#credits"
-          className="w-fit text-sm font-semibold text-text-warning underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="w-fit text-sm font-semibold text-text-warning no-underline outline-none transition-opacity duration-fast hover:opacity-80 focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           Top up credits →
         </Link>

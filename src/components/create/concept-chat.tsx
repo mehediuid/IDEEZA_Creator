@@ -472,7 +472,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               {queuedNoticeText(queuedNoticeJob, builds)}
               <Link
                 href={`/build/${queuedNotice}`}
-                className="ml-auto font-semibold text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="ml-auto font-semibold text-text-brand no-underline outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 View build
               </Link>

@@ -235,7 +235,7 @@ export function ProjectDetails({ id }: { id: string }) {
               {build ? (
                 <Link
                   href={`/build/${build.id}`}
-                  className="inline-flex items-center gap-[4px] rounded-sm font-semibold text-text-brand underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                  className="inline-flex items-center gap-[4px] rounded-sm font-semibold text-text-brand no-underline outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
                   AI build
                   <Icon icon={ArrowUpRight01Icon} size={14} />

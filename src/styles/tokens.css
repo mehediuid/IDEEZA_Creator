@@ -297,8 +297,13 @@
   --color-text-on-toast: var(--color-white);
   --color-text-on-brand: var(--color-white);
   --color-text-brand: var(--color-violet-600);
+  /* Hover for text that is itself the control (links, inline actions). Hover
+   * used to be an underline; it is a colour step now, so the letterforms stay
+   * put and nothing shifts under the pointer. */
+  --color-text-brand-hover: var(--color-violet-700);
   --color-text-blue: var(--color-blue-600);
   --color-text-link: var(--color-blue-600);
+  --color-text-link-hover: var(--color-blue-700);
   --color-text-success: var(--color-green-700);
   --color-text-warning: var(--color-yellow-700);
   --color-text-error: var(--color-red-600);
@@ -518,8 +523,10 @@
   --color-text-inverse: var(--color-gray-900);
   --color-text-on-toast: var(--color-white);
   --color-text-brand: var(--color-violet-300);
+  --color-text-brand-hover: var(--color-violet-200);
   --color-text-blue: var(--color-blue-300);
   --color-text-link: var(--color-blue-400);
+  --color-text-link-hover: var(--color-blue-300);
   --color-text-success: var(--color-green-400);
   --color-text-warning: var(--color-yellow-400);
   --color-text-error: var(--color-red-400);

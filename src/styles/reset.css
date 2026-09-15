@@ -67,10 +67,14 @@ button {
 a {
   color: var(--color-text-link);
   text-decoration: none;
+  transition: color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
+/* Hover is a colour step, never an underline: an underline appearing under
+ * the pointer nudges the text's own box and reads as a second style rather
+ * than a state. */
 a:hover {
-  text-decoration: underline;
+  color: var(--color-text-link-hover);
 }
 
 :focus-visible {

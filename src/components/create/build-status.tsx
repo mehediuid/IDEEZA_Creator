@@ -332,7 +332,7 @@ export function BuildStatus({ job }: { job: BuildJob }) {
         <p className="text-sm text-text-tertiary">{row.footer}</p>
         <Link
           href={row.footerLink.href}
-          className="mt-[4px] inline-block text-sm font-semibold text-text-link outline-none underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+          className="mt-[4px] inline-block text-sm font-semibold text-text-link no-underline outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           {row.footerLink.label}
         </Link>
