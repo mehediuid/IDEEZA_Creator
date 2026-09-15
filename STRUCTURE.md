@@ -27,8 +27,7 @@ ideeza-creator-panel/
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
    │  │   │   ├─ new/                 "/parts/new" — New Package authoring flow
-   │  │   │   ├─ [id]/                "/parts/<id>" — one part + its land pattern
-   │  │   │   └─ builds/              "/parts/builds" — the BOM of every finished build
+   │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/[id]/           "/projects" — My projects + details
@@ -44,8 +43,7 @@ ideeza-creator-panel/
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
-   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
-   │  │                      parts-page (/parts/builds — one BOM card per finished build)
+   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived)
    │  ├─ package/            ★ New Package flow — shell + step rail, the two canvas
    │  │                      editors (symbol/footprint), 3D placement, finalize,
    │  │                      confirmation, and the chrome both editors share
