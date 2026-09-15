@@ -5,7 +5,10 @@
 // parse is deliberately tolerant: a library file carries far more than this
 // flow models (alternates, custom pad primitives, zones), and anything not
 // understood is skipped rather than failing the whole import — the result
-// screen then reports honestly what did and didn't come through.
+// screen then reports honestly what did and didn't come through. Tolerant is
+// not the same as lenient: a value the model cannot hold as it stands (an
+// alphanumeric pin/pad designator) is refused and named in that report, never
+// rewritten into something that fits.
 //
 // Only the geometry this flow can actually edit is imported. A `.step` body is
 // a CAD kernel problem, so it is recorded but not tessellated (see the spec's
@@ -114,6 +117,29 @@ const PIN_TYPE_MAP: Record<string, PinType> = {
  *  Y axis is flipped. */
 const SYM_SCALE = 10;
 
+/** A KiCad pin/pad designator is free text — `1`, `A1`, `MP`, `GND`. This flow
+ *  numbers pins with a whole number, and matches a pad to its pin by that
+ *  number, so anything else cannot be carried as it stands. It is refused
+ *  rather than rewritten: stripping the letters off a BGA's `A1`/`B1` makes
+ *  them the same pin, which silently changes what the part is. */
+function designatorNumber(txt: string): number | null {
+  const t = txt.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const n = parseInt(t, 10);
+  return n > 0 ? n : null;
+}
+
+/** One note for a whole class of refusals — a BGA would otherwise push a
+ *  hundred lines onto the result screen. */
+function refusedNote(what: "pin" | "pad", labels: string[]): string {
+  const shown = labels.slice(0, 8).map((n) => `"${n}"`).join(", ");
+  const rest = labels.length - 8;
+  const tail = rest > 0 ? `${shown} and ${rest} more` : shown;
+  return labels.length === 1
+    ? `1 ${what} dropped — its number ${tail} is not a whole number from 1, and this flow matches pads to pins by number`
+    : `${labels.length} ${what}s dropped — their numbers ${tail} are not whole numbers from 1, and this flow matches pads to pins by number`;
+}
+
 export type SymImport = {
   name: string | null;
   prefix: string | null;
@@ -149,6 +175,7 @@ export function parseKicadSym(src: string): SymImport {
   const objects: SymObj[] = [];
   const xs: number[] = [];
   const ys: number[] = [];
+  const refusedPins: string[] = [];
 
   for (const pin of pinNodes) {
     const at = firstOf(pin, "at");
@@ -158,9 +185,9 @@ export function parseKicadSym(src: string): SymImport {
     const len = numAt(firstOf(pin, "length"), 1, 2.54) * SYM_SCALE;
     const nm = childValue(pin, "name") ?? "";
     const numTxt = childValue(pin, "number") ?? "";
-    const num = parseInt(numTxt.replace(/[^0-9]/g, ""), 10);
-    if (!Number.isFinite(num) || num <= 0) {
-      skipped.push(`pin "${numTxt || nm}" has no numeric number`);
+    const num = designatorNumber(numTxt);
+    if (num === null) {
+      refusedPins.push(numTxt.trim() || nm || "(unnumbered)");
       continue;
     }
     const etype = PIN_TYPE_MAP[String(pin[1] ?? "").toLowerCase()] ?? "Unspecified";
@@ -181,6 +208,8 @@ export function parseKicadSym(src: string): SymImport {
     xs.push(x);
     ys.push(y);
   }
+
+  if (refusedPins.length) skipped.push(refusedNote("pin", refusedPins));
 
   for (const r of findAll(top, "rectangle")) {
     const s = firstOf(r, "start");
@@ -278,16 +307,26 @@ export function parseKicadMod(src: string): FpImport {
   // an SMD part with a mounting hole is still an SMD part.
   let electricalTht = 0;
   let mech = 0;
+  const refusedPads: string[] = [];
 
   for (const p of findAll(root, "pad")) {
-    const numTxt = typeof p[1] === "string" ? p[1] : "";
+    const numTxt = (typeof p[1] === "string" ? p[1] : "").trim();
     const type = String(p[2] ?? "");
     const shape = String(p[3] ?? "");
     const at = firstOf(p, "at");
     const size = firstOf(p, "size");
     const drillNode = firstOf(p, "drill");
-    const num = parseInt(numTxt.replace(/[^0-9]/g, ""), 10);
-    const isMech = type === "np_thru_hole" || !Number.isFinite(num) || num <= 0;
+    const num = designatorNumber(numTxt);
+    // KiCad numbers a mechanical hole with an empty string, and says the same
+    // thing again in `np_thru_hole` — both are real mounting pads. A pad
+    // numbered anything *else* is an electrical pad this flow cannot carry, and
+    // filing it as a mounting hole would quietly drop it out of the pin/pad
+    // match, so it is refused and named instead.
+    if (num === null && numTxt !== "" && type !== "np_thru_hole") {
+      refusedPads.push(numTxt);
+      continue;
+    }
+    const isMech = type === "np_thru_hole" || num === null;
     const sh = padShape(type, shape);
     if (isMech) mech += 1;
     else if (sh.startsWith("THT")) electricalTht += 1;
@@ -360,6 +399,7 @@ export function parseKicadMod(src: string): FpImport {
     }
   }
 
+  if (refusedPads.length) skipped.push(refusedNote("pad", refusedPads));
   if (findAll(root, "fp_arc").length) skipped.push("footprint arcs (not imported)");
   if (findAll(root, "zone").length) skipped.push("zones (out of scope for a part)");
   if (findAll(root, "model").length) skipped.push("3D model reference (attach a STEP file instead)");

@@ -146,7 +146,12 @@ export function readPersonalParts(): CatalogPart[] {
  *
  *  `kind` is `component` on purpose: the schematic canvas renders known symbol
  *  kinds, so an authored symbol places a generic component glyph until
- *  placed-objects.tsx can draw stored symbol geometry. */
+ *  placed-objects.tsx can draw stored symbol geometry.
+ *
+ *  The row keeps the package's **stored** id, the one library.ts wrote and the
+ *  /parts pages address it by. An id built from the array index renumbers every
+ *  later package when one is deleted, which silently repoints the Favourites
+ *  and Recents lists (both keyed on this id) at a different part. */
 export function readPersonalPackages(): CatalogPart[] {
   if (typeof window === "undefined") return [];
   try {
@@ -155,8 +160,13 @@ export function readPersonalPackages(): CatalogPart[] {
     if (!Array.isArray(v)) return [];
     return v
       .filter((x) => x && typeof x.name === "string" && x.name.trim())
-      .map((x, i) => ({
-        id: `pkg_${i}_${String(x.name).replace(/\s+/g, "").slice(0, 20)}`,
+      .map((x) => ({
+        // A record written before ids were stored falls back to its name and
+        // version — still stable under a delete, unlike the index.
+        id:
+          typeof x.id === "string" && x.id.trim()
+            ? x.id
+            : `pkg_${String(x.name).replace(/\s+/g, "").slice(0, 20)}_v${Number(x.version) || 1}`,
         part: String(x.name),
         pkg: String(x.mounting || "—"),
         mfr: "Personal",

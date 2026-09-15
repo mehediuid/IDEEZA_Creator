@@ -224,14 +224,79 @@ export const fpPads = (d: PackageDraft): FpPad[] => d.footprint.filter((o): o is
  *  symbol has pins without that being an error. */
 export const electricalPads = (d: PackageDraft): FpPad[] => fpPads(d).filter((p) => p.padKind !== "Mounting");
 
-export type PinPadMatch = { ok: boolean; pins: number; pads: number; unmapped: number[] };
+export type PinPadMatch = {
+  ok: boolean;
+  pins: number;
+  pads: number;
+  /** Symbol pins no electrical pad answers to. */
+  unmapped: number[];
+  /** Numbers used by more than one symbol pin. */
+  duplicatePins: number[];
+  /** Numbers claimed by more than one electrical pad. */
+  duplicatePads: number[];
+  /** Why the match fails, in the gate's own voice — null when it holds. */
+  reason: string | null;
+};
 
+const dupes = (nums: number[]): number[] => {
+  const seen = new Set<number>();
+  const twice = new Set<number>();
+  for (const n of nums) (seen.has(n) ? twice : seen).add(n);
+  return [...twice].sort((a, b) => a - b);
+};
+
+const list = (nums: number[]) => nums.join(", ");
+
+/** Counts and coverage are not enough: a pad answers to exactly one pin and a
+ *  pin is answered by exactly one pad, so the numbers have to be unique on both
+ *  sides. Four pins numbered 1,1,2,2 against four pads numbered 1,2,1,2 cover
+ *  each other perfectly and are still not a part anyone can build. */
 export function pinPadMatch(d: PackageDraft): PinPadMatch {
   const pins = symPins(d);
   const pads = electricalPads(d);
-  const covered = new Set(pads.map((p) => p.pin).filter((n): n is number => typeof n === "number"));
+  const padNums = pads.map((p) => p.pin).filter((n): n is number => typeof n === "number");
+  const covered = new Set(padNums);
   const unmapped = pins.filter((p) => !covered.has(p.num)).map((p) => p.num);
-  return { ok: pins.length > 0 && pads.length === pins.length && unmapped.length === 0, pins: pins.length, pads: pads.length, unmapped };
+  const duplicatePins = dupes(pins.map((p) => p.num));
+  const duplicatePads = dupes(padNums);
+
+  // Each reason says what it is and that it stops the flow — the gate really
+  // does block, so "review before continuing" would be under-stating it.
+  const n = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  const reason = !pins.length
+    ? "No symbol pins yet — add pins on the Symbol step before continuing"
+    : duplicatePins.length
+      ? `Pin number${duplicatePins.length === 1 ? "" : "s"} ${list(duplicatePins)} ${duplicatePins.length === 1 ? "is" : "are each"} used by more than one pin — give every pin its own number before you can continue`
+      : duplicatePads.length
+        ? `More than one pad answers to pin${duplicatePads.length === 1 ? "" : "s"} ${list(duplicatePads)} — give every electrical pad its own pin number before you can continue`
+        : unmapped.length
+          ? `Pin${unmapped.length === 1 ? "" : "s"} ${list(unmapped)} ${unmapped.length === 1 ? "has" : "have"} no pad — every pin needs one before you can continue`
+          : pads.length !== pins.length
+            ? `${n(pads.length, "electrical pad")} against ${n(pins.length, "pin")} — the two have to match before you can continue`
+            : null;
+
+  return { ok: reason === null, pins: pins.length, pads: pads.length, unmapped, duplicatePins, duplicatePads, reason };
+}
+
+/** The Mounting field is the author's statement about how the part meets the
+ *  board; the pads are the physical fact. Nothing reconciled them, so a record
+ *  could say SMD over through-hole pads. A part with *both* kinds is real (a
+ *  through-hole connector with surface-mount tabs), so only a total
+ *  contradiction blocks — the mixed case is said out loud and left alone. */
+export function mountingCheck(d: PackageDraft): { blocking: boolean; text: string } | null {
+  const pads = electricalPads(d);
+  if (!pads.length) return null;
+  const tht = pads.filter((p) => p.shape.startsWith("THT")).length;
+  const smd = pads.length - tht;
+  if (d.mounting === "SMD" && tht > 0) {
+    return smd === 0
+      ? { blocking: true, text: `Mounting says SMD, but every electrical pad is through-hole — set Mounting to THT, or change the pads` }
+      : { blocking: false, text: `Mounting says SMD, but ${tht} of ${pads.length} electrical pads are through-hole` };
+  }
+  if (d.mounting === "THT" && tht === 0) {
+    return { blocking: true, text: `Mounting says THT, but every electrical pad is surface-mount — set Mounting to SMD, or change the pads` };
+  }
+  return null;
 }
 
 /** The next free pin number, so placing a pin never collides or leaves a gap. */
@@ -298,7 +363,9 @@ export function blockedReason(step: StepId, d: PackageDraft): string | null {
   if (step === "symbol") return symPins(d).length > 0 ? null : "Place at least one pin — the footprint's pads are matched to them";
   if (step === "footprint") {
     const m = pinPadMatch(d);
-    return m.ok ? null : `${m.pads} electrical pad${m.pads === 1 ? "" : "s"} vs. ${m.pins} pin${m.pins === 1 ? "" : "s"} — review before continuing`;
+    if (m.reason) return m.reason;
+    const mount = mountingCheck(d);
+    return mount?.blocking ? mount.text : null;
   }
   if (step === "place3d") return null;
   if (step === "finalize") {
