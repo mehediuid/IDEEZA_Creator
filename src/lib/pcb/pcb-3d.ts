@@ -14,6 +14,19 @@ export const BOARD_COLOR_HEX: Record<string, string> = {
   Yellow: "#c8a93a",
   Purple: "#5a2d82",
 };
+/** Component body colour by designator prefix — reads like the real part.
+ *  Lives here with the other physical-appearance maps so the PCB 3D scene and
+ *  the part-authoring flow's 3D placement can't drift apart on what a body
+ *  looks like. */
+export function componentBodyColor(desig: string | undefined): string {
+  const c = (desig ?? "").trim().charAt(0).toUpperCase();
+  if (c === "R") return "#23262d"; // black chip resistor
+  if (c === "C") return "#c9a15a"; // tan MLCC
+  if (c === "L") return "#33373f"; // inductor
+  if (c === "D") return "#101216"; // glass/black diode
+  return "#181b21"; // IC / default black body
+}
+
 export const PAD_COLOR_HEX: Record<string, string> = {
   Gold: "#e0b24a",
   Goldsmith: "#d9a441",

@@ -3997,53 +3997,34 @@ function ImportImageModal() {
   );
 }
 
-// #79 — New ▸ Part: authors a part into the personal library, which the picker's
-// Personal rail lists and can place. (The rail was empty until now.)
+// New ▸ Part opens the real authoring flow (/parts/new): Symbol → Footprint →
+// 3D Placement → Finalize. It used to be a five-field form that wrote a
+// catalogue row and said outright that drawing a symbol "needs the symbol
+// editor, which isn't built yet" — that editor exists now, so this dialog's
+// job is just to say what is about to happen before leaving the board.
 function NewPartModal() {
   const actions = usePcbActions();
-  const [name, setName] = React.useState("");
-  const [mpn, setMpn] = React.useState("");
-  const [pkg, setPkg] = React.useState("0805");
-  const [maker, setMaker] = React.useState("");
-  const [symbol, setSymbol] = React.useState("resistor");
-  const SYMBOLS = ["resistor", "resistorBox", "capacitor", "inductor", "diode", "crystal", "opamp", "component"];
-  const label: React.CSSProperties = { width: 110, flex: "0 0 auto", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" };
-  const row = (n: string, node: React.ReactNode) => (
-    <div key={n} style={{ display: "flex", alignItems: "center", gap: "var(--spacing-6)" }}>
-      <span style={label}>{n}</span><div style={{ flex: 1 }}>{node}</div>
-    </div>
-  );
-  const input = (v: string, set: (s: string) => void, ph = "") => (
-    <input value={v} placeholder={ph} onChange={(e) => set(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "var(--spacing-4) var(--spacing-5)", border: "var(--border-width-1) solid var(--color-border-default)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)", background: "var(--color-bg-surface)", outline: "none", fontFamily: "inherit" }} />
-  );
-  const save = () => {
-    const part = { name: name.trim(), mpn: mpn.trim(), pkg: pkg.trim(), maker: maker.trim(), symbol };
-    try {
-      const raw = window.localStorage.getItem("ideeza:pcb:personalParts");
-      const list = raw ? (JSON.parse(raw) as unknown[]) : [];
-      window.localStorage.setItem("ideeza:pcb:personalParts", JSON.stringify([...(Array.isArray(list) ? list : []), part]));
-    } catch {}
-    actions.flashToast(`Saved ${part.name || "part"} to your personal library`);
-    actions.closeModal();
-    actions.openPicker("Parts");
-  };
+  const steps = ["Symbol — pins, body graphics, designator", "Footprint — pads matched to those pins", "3D Placement — a body against the pads", "Finalize — name, category, private or published"];
   return (
     <Overlay>
       <Card width={470}>
-        <Header title="New part" onClose={actions.closeModal} padding="18px 22px" />
+        <Header title="Author a new package" onClose={actions.closeModal} padding="18px 22px" />
         <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
-          {row("Name", input(name, setName, "e.g. 10k 1% thin film"))}
-          {row("MPN", input(mpn, setMpn, "manufacturer part number"))}
-          {row("Package", input(pkg, setPkg))}
-          {row("Manufacturer", input(maker, setMaker))}
-          {row("Symbol", <DsSelect value={symbol} options={SYMBOLS.map((v) => ({ label: v, value: v }))} onChange={setSymbol} />)}
+          <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
+            This opens the package flow, which walks four steps and files the result in your library:
+          </div>
+          <ol style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)", margin: 0, paddingLeft: "var(--spacing-10)" }}>
+            {steps.map((t) => (
+              <li key={t} style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{t}</li>
+            ))}
+          </ol>
           <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>
-            The part is stored in this browser and appears under <b>Personal</b> in Place a Part, ready to place with the symbol you picked. Drawing a brand-new symbol needs the symbol editor, which isn&#39;t built yet.
+            The board stays saved — it auto-saves as you work — and the finished package appears under <b>Personal</b> in Place a Part.
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "var(--spacing-5)", padding: "var(--spacing-7) var(--spacing-10) var(--spacing-9)", borderTop: "var(--border-width-1) solid var(--color-border-subtle)" }}>
           <Button hierarchy="secondary" size="md" onClick={actions.closeModal}>Cancel</Button>
-          <Button hierarchy="primary" size="md" disabled={!name.trim()} onClick={save}>Save part</Button>
+          <Button hierarchy="primary" size="md" onClick={() => { actions.closeModal(); window.location.href = "/parts/new"; }}>Open package flow</Button>
         </div>
       </Card>
     </Overlay>

@@ -37,6 +37,25 @@ export const ideezaPreset = {
         "7xl": "var(--font-size-7xl)",
         "8xl": "var(--font-size-8xl)",
       },
+      lineHeight: {
+        "2xs": "var(--line-height-2xs)",
+        xs: "var(--line-height-xs)",
+        sm: "var(--line-height-sm)",
+        md: "var(--line-height-md)",
+        lg: "var(--line-height-lg)",
+        xl: "var(--line-height-xl)",
+        "2xl": "var(--line-height-2xl)",
+        "3xl": "var(--line-height-3xl)",
+        "4xl": "var(--line-height-4xl)",
+        "5xl": "var(--line-height-5xl)",
+        relaxed: "var(--line-height-relaxed)",
+      },
+      letterSpacing: {
+        tight: "var(--letter-spacing-tight)",
+        normal: "var(--letter-spacing-normal)",
+        wide: "var(--letter-spacing-wide)",
+        caps: "var(--letter-spacing-caps)",
+      },
       fontWeight: {
         regular: "var(--font-weight-regular)",
         medium: "var(--font-weight-medium)",
@@ -131,6 +150,11 @@ export const ideezaPreset = {
           800: "var(--color-violet-800)",
           900: "var(--color-violet-900)",
           950: "var(--color-violet-950)",
+        },
+        // Semantic — pads (material, not layer identity)
+        pad: {
+          copper: "var(--color-pad-copper)",
+          mechanical: "var(--color-pad-mechanical)",
         },
         // Semantic — bg
         bg: {

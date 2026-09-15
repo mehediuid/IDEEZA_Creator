@@ -25,7 +25,10 @@ ideeza-creator-panel/
    │  │                      · refine · build/start · three/generate · and others)
    │  ├─ (dashboard)/        Home + Parts + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
-   │  │   ├─ parts/                   "/parts" — Parts & agile module (builds' BOMs)
+   │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
+   │  │   │   ├─ new/                 "/parts/new" — New Package authoring flow
+   │  │   │   ├─ [id]/                "/parts/<id>" — one part + its land pattern
+   │  │   │   └─ builds/              "/parts/builds" — the BOM of every finished build
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/[id]/           "/projects" — My projects + details
@@ -42,7 +45,11 @@ ideeza-creator-panel/
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
    │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
-   │  │                      parts-page (/parts — one BOM card per finished build)
+   │  │                      parts-page (/parts/builds — one BOM card per finished build)
+   │  ├─ package/            ★ New Package flow — shell + step rail, the two canvas
+   │  │                      editors (symbol/footprint), 3D placement, finalize,
+   │  │                      confirmation, and the chrome both editors share
+   │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
    │  ├─ projects/           my-projects, project-details
    │  ├─ manual/             manual project creation + step navigation
@@ -59,13 +66,17 @@ ideeza-creator-panel/
    │  ├─ wiring/             Wiring module: canvas, library, right panel, menu
    │  ├─ voice/              voice-listening (what a composer becomes while the mic is
    │  │                      open — dot, live waveform, Cancel / Stop & review)
-   │  ├─ ideeza/             In-house design-system primitives (button, select, toggle…)
+   │  ├─ ideeza/             In-house design-system primitives (button, select, toggle,
+   │  │                      text-input, slider, banner, select-menu…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
    │  └─ theme-provider.tsx · theme-toggle.tsx
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
+   │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
+   │  │                      units), store, wizard (24 families), kicad parsers,
+   │  │                      library (save/publish, version lock)
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),

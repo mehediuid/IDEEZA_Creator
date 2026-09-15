@@ -16,3 +16,7 @@ export { SearchInput, type SearchInputProps } from "./search-input";
 export { Checkbox, Radio, type CheckboxProps, type RadioProps } from "./checkbox";
 export { Toggle, type ToggleProps } from "./toggle";
 export { NumberInput, type NumberInputProps } from "./number-input";
+export { TextInput, Textarea, type TextInputProps, type TextareaProps } from "./text-input";
+export { Slider, type SliderProps } from "./slider";
+export { Banner, type BannerProps, type BannerTone } from "./banner";
+export { Segmented, type SegmentedProps, type SegmentedOption, type SegmentedSize } from "./segmented";

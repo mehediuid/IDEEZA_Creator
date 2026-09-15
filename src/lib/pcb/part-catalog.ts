@@ -82,6 +82,9 @@ const PERSONAL_PARTS_KEY = "ideeza:pcb:personalParts";
 // Modules the user captured from a selection via Project ▸ New ▸ Agile Module —
 // the captured objects travel with the row, so placing one re-creates the block.
 const PERSONAL_MODULES_KEY = "ideeza:pcb:personalModules";
+// Packages authored through the New Package flow — the full record (symbol,
+// footprint, 3D body, visibility, version) written by lib/package/library.ts.
+const PERSONAL_PACKAGES_KEY = "ideeza:pcb:personalPackages";
 const RECENTS_MAX = 12;
 
 function readList(key: string): string[] {
@@ -104,8 +107,13 @@ function writeList(key: string, v: string[]) {
 
 export const readFavorites = () => readList(FAVORITES_KEY);
 export const readRecents = () => readList(RECENTS_KEY);
-/** Parts the user authored — empty until the part editor exists. */
-export const readPersonal = () => [...readList(PERSONAL_KEY), ...readPersonalParts().map((p) => p.id)];
+/** Parts and packages the user authored — via New ▸ Part, or the full New
+ *  Package flow at /parts/new. */
+export const readPersonal = () => [
+  ...readList(PERSONAL_KEY),
+  ...readPersonalParts().map((p) => p.id),
+  ...readPersonalPackages().map((p) => p.id),
+];
 
 /** Catalogue rows the user authored (New ▸ Part), newest last. */
 export function readPersonalParts(): CatalogPart[] {
@@ -131,8 +139,40 @@ export function readPersonalParts(): CatalogPart[] {
   }
 }
 
-/** The catalogue plus the user's own parts — one list for every query. */
-export const allParts = (): CatalogPart[] => [...PART_CATALOG, ...readPersonalParts()];
+/** Packages authored through the New Package flow (/parts/new), surfaced as
+ *  catalogue rows so the picker's Personal rail, every filter and the search
+ *  treat them like any other part. The full package (symbol geometry, pads, 3D
+ *  body) lives under `ideeza:pcb:personalPackages`; this is the row view of it.
+ *
+ *  `kind` is `component` on purpose: the schematic canvas renders known symbol
+ *  kinds, so an authored symbol places a generic component glyph until
+ *  placed-objects.tsx can draw stored symbol geometry. */
+export function readPersonalPackages(): CatalogPart[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PERSONAL_PACKAGES_KEY);
+    const v = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((x) => x && typeof x.name === "string" && x.name.trim())
+      .map((x, i) => ({
+        id: `pkg_${i}_${String(x.name).replace(/\s+/g, "").slice(0, 20)}`,
+        part: String(x.name),
+        pkg: String(x.mounting || "—"),
+        mfr: "Personal",
+        price: "—",
+        stock: "own",
+        features: [String(x.category || "Personal"), x.visibility === "community" ? "Published" : "Private"].filter(Boolean),
+        kind: "component",
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** The catalogue plus the user's own parts and authored packages — one list for
+ *  every query. */
+export const allParts = (): CatalogPart[] => [...PART_CATALOG, ...readPersonalParts(), ...readPersonalPackages()];
 
 /** An Agile Module the user captured, with the objects it was captured from. */
 export type PersonalModule = AgileModule & { objects: Record<string, unknown>[] };

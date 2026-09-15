@@ -121,6 +121,32 @@
   --font-size-7xl: 60px;
   --font-size-8xl: 72px;
 
+  /* ── Line height ────────────────────────────────────────────── */
+  /* Named to PAIR with --font-size-*: text-md wants leading-md. (The Figma
+     collection offsets the two scales — line/height/5xl sits with
+     font/size/4xl — which reads as a mismatch at every call site, so the
+     pairing is made explicit here.) `relaxed` is the multi-line prose variant
+     for any size. */
+  --line-height-2xs: 15px;
+  --line-height-xs: 16px;
+  --line-height-sm: 18px;
+  --line-height-md: 20px;
+  --line-height-lg: 24px;
+  --line-height-xl: 26px;
+  --line-height-2xl: 28px;
+  --line-height-3xl: 32px;
+  --line-height-4xl: 36px;
+  --line-height-5xl: 40px;
+  --line-height-relaxed: 1.55;
+
+  /* ── Letter spacing ─────────────────────────────────────────── */
+  --letter-spacing-tight: -0.5px;
+  --letter-spacing-normal: 0px;
+  --letter-spacing-wide: 0.1px;
+  /* Uppercase micro-labels need air between letters to stay legible at 10–11px;
+     they are all over the editor panels and the flow's section headings. */
+  --letter-spacing-caps: 0.5px;
+
   /* ── Spacing (Desktop) ──────────────────────────────────────── */
   --spacing-0: 0;
   --spacing-1: 2px;
@@ -291,8 +317,15 @@
   /* Text */
   --color-text-primary: var(--color-gray-900);
   --color-text-secondary: var(--color-gray-600);
-  --color-text-tertiary: var(--color-gray-400);
-  --color-text-disabled: var(--color-gray-300);
+  /* Tertiary is the workhorse of every panel: table headers, field hints, unit
+   * chips, counts, placeholders. It was gray-400, which measures 2.34-2.56:1 on
+   * the surfaces it actually sits on — a WCAG 1.4.3 failure across the whole
+   * app, and a drift from the design system, whose own colour/text/tertiary is
+   * #475569. Restored to the DS value (7.56:1). Disabled follows it down one
+   * step so it still reads as inactive while staying legible — 1.48:1 meant you
+   * could not read what a greyed control said. */
+  --color-text-tertiary: var(--color-gray-600);
+  --color-text-disabled: var(--color-gray-400);
   --color-text-inverse: var(--color-white);
   --color-text-on-toast: var(--color-white);
   --color-text-on-brand: var(--color-white);
@@ -396,9 +429,17 @@
      1.4.11 asks 3:1 for a UI edge, and 38% ink clears it in both themes. */
   --color-canvas-card-border: color-mix(in srgb, var(--color-text-primary) 50%, transparent);
 
+  /* Pads — a land pattern is copper you solder to, so it reads as the metal
+   * rather than borrowing a layer identity: --color-pcb-top-copper is red
+   * because the *board* locks Top = red, which says nothing about a single
+   * part. The footprint editor, its previews and the 3D placement all read
+   * these, so the three can never disagree about what a pad looks like. */
+  --color-pad-copper: var(--color-orange-600);
+  --color-pad-mechanical: var(--color-gray-500);
+
   /* Icons */
   --color-icon-default: var(--color-gray-600);
-  --color-icon-secondary: var(--color-gray-400);
+  --color-icon-secondary: var(--color-gray-500);
   --color-icon-disabled: var(--color-gray-300);
   --color-icon-on-brand: var(--color-white);
   --color-icon-brand: var(--color-violet-600);
@@ -518,8 +559,8 @@
   /* Text */
   --color-text-primary: var(--color-gray-50);
   --color-text-secondary: var(--color-gray-300);
-  --color-text-tertiary: var(--color-gray-500);
-  --color-text-disabled: var(--color-gray-600);
+  --color-text-tertiary: var(--color-gray-400);
+  --color-text-disabled: var(--color-gray-500);
   --color-text-inverse: var(--color-gray-900);
   --color-text-on-toast: var(--color-white);
   --color-text-brand: var(--color-violet-300);
@@ -543,6 +584,11 @@
   --color-border-ai: var(--color-violet-400);
   --color-border-success: var(--color-green-400);
   --color-border-warning: var(--color-yellow-400);
+
+  /* Pads — see the light block. Lifted one step so the metal still reads
+   * against the dark sheet. */
+  --color-pad-copper: var(--color-orange-500);
+  --color-pad-mechanical: var(--color-gray-400);
 
   /* Icons */
   --color-icon-default: var(--color-gray-400);
@@ -619,14 +665,17 @@
 
     --color-text-primary: var(--color-gray-50);
     --color-text-secondary: var(--color-gray-300);
-    --color-text-tertiary: var(--color-gray-500);
-    --color-text-disabled: var(--color-gray-600);
+    --color-text-tertiary: var(--color-gray-400);
+    --color-text-disabled: var(--color-gray-500);
     --color-text-on-toast: var(--color-white);
 
     --color-border-default: var(--color-gray-800);
     --color-border-strong: var(--color-gray-600);
     --color-border-subtle: var(--color-gray-700);
     --color-border-focus: var(--color-violet-400);
+
+    --color-pad-copper: var(--color-orange-500);
+    --color-pad-mechanical: var(--color-gray-400);
 
     --elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.5);
     --elevation-2: 0px 2px 4px 0px rgba(0, 0, 0, 0.6);
