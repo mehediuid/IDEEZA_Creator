@@ -18,6 +18,14 @@
 // away for anyone who wants pictures; the list is the default because it is
 // the faster way to find something.
 //
+// **The view has an address.** Section and query live in the URL
+// (`/parts?section=ics&q=buck`), not in component state, so a filtered library
+// is linkable, shareable, and comes back intact when you open a part and press
+// Back. Picking a section is a real navigation (a `<Link>`, one history entry);
+// typing replaces the current entry rather than pushing one per keystroke.
+// Because the section IS the address, the rail is honestly a `<nav>` and the
+// current row honestly carries `aria-current="page"`.
+//
 // Everything is a real query over the existing catalogue (part-catalog.ts)
 // plus the packages authored through the flow (lib/package/library.ts). The
 // user-owned lists live in localStorage, so they are read through
@@ -26,10 +34,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { PlusSignIcon } from "@hugeicons/core-free-icons";
-import { Button, SearchInput } from "@/components/ideeza";
+import { useSearchParams } from "next/navigation";
+import { GridViewIcon, ListViewIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { SearchInput, buttonVariants } from "@/components/ideeza";
 import { Icon } from "@/components/dashboard/icon";
-import { DsIcon } from "@/lib/pcb/icons";
 import { glyphFor } from "@/lib/pcb/glyphs";
 import { MODULE_CATALOG, PART_CATALOG, readPersonalModules, readPersonalParts, type AgileModule, type CatalogPart } from "@/lib/pcb/part-catalog";
 import { readPackages, type SavedPackage } from "@/lib/package/library";
@@ -48,10 +56,12 @@ const subscribeStorage = (cb: () => void) => {
 const librarySnapshot = () => LS_KEYS.map((k) => window.localStorage.getItem(k) ?? "").join("\u0000");
 const libraryServerSnapshot = () => "";
 
-// The list/grid choice is a per-viewer convenience, remembered in this browser.
-// It goes through the same external-store pattern rather than a state
-// initialiser, so the server and the first client paint agree (always "list")
-// and the stored choice applies on hydration instead of after it.
+// The list/grid choice is a per-viewer convenience, remembered in this browser
+// rather than put in the URL: it says how you like to look at a library, not
+// which library you are looking at. It goes through the same external-store
+// pattern rather than a state initialiser, so the server and the first client
+// paint agree (always "list") and the stored choice applies on hydration
+// instead of after it.
 type View = "list" | "grid";
 const VIEW_KEY = "ideeza:parts:view";
 const viewListeners = new Set<() => void>();
@@ -78,25 +88,46 @@ const writeView = (v: View) => {
 };
 
 // ── the model the page renders ──────────────────────────────────────────────
-/** Symbol kind → the rail section it files under, in the order the rail lists
- *  them. Anything the catalogue grows that is not named here lands in Other,
- *  so a new kind can never vanish from the page. */
-const KIND_SECTION: Record<string, string> = {
-  resistor: "Resistors",
-  resistorBox: "Resistors",
-  capacitor: "Capacitors",
-  inductor: "Inductors",
-  diode: "Diodes",
-  transistor: "Transistors",
-  opamp: "ICs",
-  ic: "ICs",
-  crystal: "Crystals",
-  connector: "Connectors",
-};
-const KIND_ORDER = ["Resistors", "Capacitors", "Inductors", "Diodes", "Transistors", "ICs", "Crystals", "Connectors", "Other"];
 const ALL = "all";
 const MODULES = "modules";
 const MINE = "mine";
+
+/** The rail's kind sections, in the order it lists them. The key is what the
+ *  URL carries, so it is a slug; the label is what a reader sees, and the two
+ *  are defined together so a link and a heading can never disagree. */
+const KIND_SECTIONS: { key: string; label: string }[] = [
+  { key: "resistors", label: "Resistors" },
+  { key: "capacitors", label: "Capacitors" },
+  { key: "inductors", label: "Inductors" },
+  { key: "diodes", label: "Diodes" },
+  { key: "transistors", label: "Transistors" },
+  { key: "ics", label: "ICs" },
+  { key: "crystals", label: "Crystals" },
+  { key: "connectors", label: "Connectors" },
+  { key: "other", label: "Other" },
+];
+
+/** Symbol kind → the rail section it files under. Anything the catalogue grows
+ *  that is not named here lands in Other, so a new kind can never vanish. */
+const KIND_SECTION: Record<string, string> = {
+  resistor: "resistors",
+  resistorBox: "resistors",
+  capacitor: "capacitors",
+  inductor: "inductors",
+  diode: "diodes",
+  transistor: "transistors",
+  opamp: "ics",
+  ic: "ics",
+  crystal: "crystals",
+  connector: "connectors",
+};
+
+const SECTION_LABEL: Record<string, string> = {
+  [ALL]: "All parts",
+  [MODULES]: "Agile Modules",
+  [MINE]: "My packages",
+  ...Object.fromEntries(KIND_SECTIONS.map((s) => [s.key, s.label])),
+};
 
 type Item = {
   id: string;
@@ -115,7 +146,7 @@ type Item = {
 };
 
 function sectionOfKind(kind: string) {
-  return KIND_SECTION[kind] ?? "Other";
+  return KIND_SECTION[kind] ?? "other";
 }
 
 function buildItems(
@@ -199,46 +230,113 @@ function Thumb({ item, size }: { item: Item; size: "row" | "card" }) {
   return <PartGlyph kind={item.kind ?? "component"} className={cls} />;
 }
 
-/** Three lines — the list glyph. Drawn here rather than borrowed, so it cannot
- *  be mistaken for the app's menu or navigator icons. */
-const ListGlyph = () => (
-  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden>
-    <path d="M4 7h16M4 12h16M4 17h16" />
-  </svg>
-);
+// ── section navigation ──────────────────────────────────────────────────────
+// One implementation, two shapes: the column the wide layout shows and the
+// scrolling chip strip a phone shows. They were two copies of the same model
+// with the same states written out twice, which is how they drift.
+type SectionRow = { key: string; label: string; count: number };
+type SectionGroup = { group: string; items: SectionRow[] };
 
-// ── rail ────────────────────────────────────────────────────────────────────
-type RailRow = { key: string; label: string; count: number };
+/** The address of a section, carrying the query along so changing section
+ *  never silently drops what you typed. */
+function sectionHref(key: string, q: string) {
+  const p = new URLSearchParams();
+  if (key !== ALL) p.set("section", key);
+  if (q) p.set("q", q);
+  const s = p.toString();
+  return s ? `/parts?${s}` : "/parts";
+}
 
-function Rail({ rows, active, onPick }: { rows: { group: string; items: RailRow[] }[]; active: string; onPick: (k: string) => void }) {
+// Selection and hover have to read on a near-white page too: two adjacent
+// greys carry ~1.05:1 of fill contrast, so the *edge* does the separating.
+// Current = the brand, which is what the app's own strips and filter chips
+// already use for "this one"; hover = a neutral edge one step stronger than
+// the page, never the brand, so "what you'd pick" can't be read as "picked".
+const NAV_BASE =
+  "cursor-pointer border font-display no-underline outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
+const NAV_ON = "border-border-brand bg-bg-brand-subtle font-medium text-text-brand";
+const NAV_OFF =
+  "border-transparent text-text-secondary hover:border-border-strong hover:bg-bg-surface-raised hover:text-text-primary";
+
+function SectionLink({ row, active, q, variant }: { row: SectionRow; active: boolean; q: string; variant: "rail" | "chips" }) {
+  return (
+    <Link
+      href={sectionHref(row.key, q)}
+      scroll={false}
+      aria-current={active ? "page" : undefined}
+      data-section={row.key}
+      className={[
+        NAV_BASE,
+        active ? NAV_ON : NAV_OFF,
+        variant === "rail"
+          ? "flex h-[32px] w-full items-center justify-between gap-[var(--spacing-4)] rounded-[var(--radius-lg)] px-[var(--spacing-4)] text-left text-sm"
+          : // A chip never shrinks — half a word is worse than a scroll — and
+            // it is a snap point, so a flick can't leave one cut in half.
+            "inline-flex h-[32px] shrink-0 snap-start items-center gap-[var(--spacing-3)] rounded-[var(--radius-full)] px-[var(--spacing-5)] text-sm",
+      ].join(" ")}
+    >
+      <span className={variant === "rail" ? "truncate" : "whitespace-nowrap"}>{row.label}</span>
+      <span className={["shrink-0 font-mono text-xs", active ? "text-text-brand" : "text-text-tertiary"].join(" ")}>{row.count}</span>
+    </Link>
+  );
+}
+
+function SectionNav({ groups, active, q, variant }: { groups: SectionGroup[]; active: string; q: string; variant: "rail" | "chips" }) {
+  // The strip scrolls, so it says so: the edge it can still scroll toward
+  // fades out instead of ending in a hard cut mid-word.
+  const stripRef = React.useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = React.useState({ left: false, right: false });
+  React.useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const read = () =>
+      setEdges({
+        left: el.scrollLeft > 2,
+        right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+      });
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", read);
+      ro.disconnect();
+    };
+  }, [groups, variant]);
+
+  if (variant === "chips") {
+    const fade =
+      edges.left || edges.right
+        ? `linear-gradient(to right, ${edges.left ? "transparent" : "#000"} 0, #000 28px, #000 calc(100% - 28px), ${edges.right ? "transparent" : "#000"} 100%)`
+        : undefined;
+    return (
+      <nav aria-label="Library sections">
+        <div
+          ref={stripRef}
+          data-section-strip
+          className="-mx-[var(--spacing-12)] flex snap-x snap-mandatory gap-[var(--spacing-2)] overflow-x-auto px-[var(--spacing-12)]"
+          style={{ maskImage: fade, WebkitMaskImage: fade }}
+        >
+          {groups.flatMap((g) => g.items).map((r) => (
+            <SectionLink key={r.key} row={r} active={r.key === active} q={q} variant="chips" />
+          ))}
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <nav aria-label="Library sections" className="flex flex-col gap-[var(--spacing-6)] lg:sticky lg:top-[var(--spacing-8)] lg:self-start">
-      {rows.map((g) => (
+      {groups.map((g) => (
         <div key={g.group} className="flex flex-col gap-[var(--spacing-1)]">
           {g.group ? (
             <span className="px-[var(--spacing-4)] pb-[var(--spacing-2)] font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
               {g.group}
             </span>
           ) : null}
-          {g.items.map((r) => {
-            const on = r.key === active;
-            return (
-              <button
-                key={r.key}
-                type="button"
-                aria-current={on ? "true" : undefined}
-                onClick={() => onPick(r.key)}
-                className={[
-                  "flex h-[32px] w-full cursor-pointer items-center justify-between gap-[var(--spacing-4)] rounded-[var(--radius-lg)] px-[var(--spacing-4)] text-left outline-none",
-                  "font-display text-sm transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                  on ? "bg-bg-subtle font-medium text-text-primary" : "text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary",
-                ].join(" ")}
-              >
-                <span className="truncate">{r.label}</span>
-                <span className={["shrink-0 font-mono text-xs", on ? "text-text-secondary" : "text-text-tertiary"].join(" ")}>{r.count}</span>
-              </button>
-            );
-          })}
+          {g.items.map((r) => (
+            <SectionLink key={r.key} row={r} active={r.key === active} q={q} variant="rail" />
+          ))}
         </div>
       ))}
     </nav>
@@ -252,8 +350,8 @@ function Row({ item }: { item: Item }) {
       <Link
         href={`/parts/${item.id}`}
         className={[
-          "grid h-[52px] grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-[var(--spacing-6)] rounded-[var(--radius-lg)] px-[var(--spacing-4)] outline-none",
-          "text-text-secondary transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
+          "grid h-[52px] grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-[var(--spacing-6)] rounded-[var(--radius-lg)] border border-transparent px-[var(--spacing-4)] outline-none",
+          "text-text-secondary transition-colors duration-fast hover:border-border-strong hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",
         ].join(" ")}
       >
         <Thumb item={item} size="row" />
@@ -282,7 +380,13 @@ function Card({ item }: { item: Item }) {
         </span>
         <span className="flex min-w-0 flex-col gap-[var(--spacing-1)] p-[var(--spacing-5)]">
           <span className="truncate font-display text-sm font-medium leading-sm text-text-primary">{item.name}</span>
-          <span className="truncate font-display text-xs leading-xs text-text-tertiary">{item.secondary}</span>
+          {/* The card carries the same right-hand fact the row does — a price,
+              a module's part count, a package's version. It used to drop it,
+              so switching to grid quietly lost a column. */}
+          <span className="flex min-w-0 items-baseline justify-between gap-[var(--spacing-3)]">
+            <span className="truncate font-display text-xs leading-xs text-text-tertiary">{item.secondary}</span>
+            {item.right ? <span className="shrink-0 font-mono text-xs text-text-secondary">{item.right}</span> : null}
+          </span>
         </span>
       </Link>
     </li>
@@ -291,8 +395,31 @@ function Card({ item }: { item: Item }) {
 
 // ── page ────────────────────────────────────────────────────────────────────
 export function PartsLibrary() {
-  const [q, setQ] = React.useState("");
-  const [section, setSection] = React.useState<string>(ALL);
+  const searchParams = useSearchParams();
+  const urlSection = searchParams.get("section") ?? ALL;
+  const section = SECTION_LABEL[urlSection] ? urlSection : ALL;
+  const urlQ = searchParams.get("q") ?? "";
+
+  // The URL is the address of the view, but the field keeps its own copy so a
+  // keystroke never waits on a router update. Typing *replaces* the current
+  // history entry (a word typed one letter at a time must not cost eight Back
+  // presses); the ref remembers what we wrote, so a real navigation — Back,
+  // Forward, a pasted link — is told apart from our own echo and adopted.
+  const [q, setQ] = React.useState(urlQ);
+  const written = React.useRef(urlQ);
+  React.useEffect(() => {
+    if (urlQ !== written.current) {
+      written.current = urlQ;
+      setQ(urlQ);
+    }
+  }, [urlQ]);
+
+  const onQuery = (next: string) => {
+    setQ(next);
+    written.current = next;
+    window.history.replaceState(null, "", sectionHref(section, next));
+  };
+
   const view = React.useSyncExternalStore(subscribeView, readView, () => "list" as View);
 
   const stored = React.useSyncExternalStore(subscribeStorage, librarySnapshot, libraryServerSnapshot);
@@ -322,21 +449,21 @@ export function PartsLibrary() {
   // before you pick a section — the rail is a summary of the results, not of
   // the whole catalogue.
   const count = (pred: (i: Item) => boolean) => matched.filter(pred).length;
-  const partSections = KIND_ORDER.filter((s) => items.some((i) => i.section === s));
-  const rail = [
+  const partSections = KIND_SECTIONS.filter((s) => items.some((i) => i.section === s.key));
+  const groups: SectionGroup[] = [
     {
       group: "",
-      items: [{ key: ALL, label: "All parts", count: count((i) => i.section !== MODULES && i.section !== MINE) }],
+      items: [{ key: ALL, label: SECTION_LABEL[ALL], count: count((i) => i.section !== MODULES && i.section !== MINE) }],
     },
     {
       group: "By kind",
-      items: partSections.map((s) => ({ key: s, label: s, count: count((i) => i.section === s) })),
+      items: partSections.map((s) => ({ key: s.key, label: s.label, count: count((i) => i.section === s.key) })),
     },
     {
       group: "Yours",
       items: [
-        { key: MODULES, label: "Agile Modules", count: count((i) => i.section === MODULES) },
-        { key: MINE, label: "My packages", count: count((i) => i.section === MINE) },
+        { key: MODULES, label: SECTION_LABEL[MODULES], count: count((i) => i.section === MODULES) },
+        { key: MINE, label: SECTION_LABEL[MINE], count: count((i) => i.section === MINE) },
       ],
     },
   ];
@@ -344,55 +471,34 @@ export function PartsLibrary() {
   const shown = matched.filter((i) =>
     section === ALL ? i.section !== MODULES && i.section !== MINE : i.section === section,
   );
-  const activeLabel = rail.flatMap((g) => g.items).find((r) => r.key === section)?.label ?? "All parts";
+  const activeLabel = SECTION_LABEL[section];
 
   return (
     <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-[var(--spacing-8)] px-[var(--spacing-12)] py-[var(--spacing-12)]">
       <header className="flex flex-wrap items-center justify-between gap-[var(--spacing-6)]">
         <h1 className="font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">Parts &amp; Agile Module</h1>
-        <Button
-          hierarchy="primary"
-          size="md"
-          onClick={() => {
-            window.location.href = "/parts/new";
-          }}
-          iconLeading={<Icon icon={PlusSignIcon} size={16} />}
-        >
+        {/* Going somewhere is a link — it gets a hover href, a middle-click and
+            a client-side transition, like every other navigation on the page. */}
+        <Link href="/parts/new" className={buttonVariants({ hierarchy: "primary", size: "md" })}>
+          <span className="inline-flex size-[16px] shrink-0 items-center justify-center">
+            <Icon icon={PlusSignIcon} size={16} />
+          </span>
           New package
-        </Button>
+        </Link>
       </header>
 
-      <SearchInput value={q} onValueChange={setQ} placeholder="Search by part number, package, manufacturer or feature…" aria-label="Search the library" />
+      <SearchInput value={q} onValueChange={onQuery} placeholder="Search by part number, package, manufacturer or feature…" aria-label="Search the library" />
 
       <div className="grid grid-cols-1 gap-[var(--spacing-8)] lg:grid-cols-[200px_minmax(0,1fr)]">
-        {/* Below lg the rail is a scrolling strip of the same buttons, so the
-            sections stay one tap away on a phone. */}
-        <div className="-mx-[var(--spacing-12)] overflow-x-auto px-[var(--spacing-12)] lg:mx-0 lg:overflow-visible lg:px-0">
-          <div className="min-w-max lg:min-w-0">
-            <div className="flex gap-[var(--spacing-2)] lg:hidden">
-              {rail.flatMap((g) => g.items).map((r) => {
-                const on = r.key === section;
-                return (
-                  <button
-                    key={r.key}
-                    type="button"
-                    aria-current={on ? "true" : undefined}
-                    onClick={() => setSection(r.key)}
-                    className={[
-                      "inline-flex h-[32px] cursor-pointer items-center gap-[var(--spacing-3)] rounded-[var(--radius-full)] px-[var(--spacing-5)] outline-none",
-                      "font-display text-sm transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                      on ? "bg-bg-subtle font-medium text-text-primary" : "text-text-secondary hover:bg-bg-surface-raised",
-                    ].join(" ")}
-                  >
-                    {r.label}
-                    <span className="font-mono text-xs text-text-tertiary">{r.count}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="hidden lg:block">
-              <Rail rows={rail} active={section} onPick={setSection} />
-            </div>
+        {/* Below lg the sections are a scrolling chip strip, so they stay one
+            tap away on a phone; above it they are the column. One component
+            draws both. */}
+        <div className="min-w-0">
+          <div className="lg:hidden">
+            <SectionNav groups={groups} active={section} q={q} variant="chips" />
+          </div>
+          <div className="hidden lg:block">
+            <SectionNav groups={groups} active={section} q={q} variant="rail" />
           </div>
         </div>
 
@@ -404,8 +510,8 @@ export function PartsLibrary() {
             <div role="group" aria-label="View" className="flex items-center gap-[var(--spacing-1)]">
               {(
                 [
-                  ["list", "List", <ListGlyph key="l" />],
-                  ["grid", "Grid", <DsIcon key="g" name="grid" size={16} strokeWidth={1.8} />],
+                  ["list", "List", ListViewIcon],
+                  ["grid", "Grid", GridViewIcon],
                 ] as const
               ).map(([v, label, glyph]) => {
                 const on = view === v;
@@ -418,12 +524,12 @@ export function PartsLibrary() {
                     title={`${label} view`}
                     onClick={() => writeView(v)}
                     className={[
-                      "inline-flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] outline-none",
+                      "inline-flex h-[28px] w-[28px] cursor-pointer items-center justify-center rounded-[var(--radius-md)] border outline-none",
                       "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                      on ? "bg-bg-subtle text-text-primary" : "text-text-tertiary hover:bg-bg-surface-raised hover:text-text-primary",
+                      on ? NAV_ON : ["text-text-tertiary", NAV_OFF].join(" "),
                     ].join(" ")}
                   >
-                    {glyph}
+                    <Icon icon={glyph} size={16} strokeWidth={1.8} />
                   </button>
                 );
               })}
@@ -441,7 +547,9 @@ export function PartsLibrary() {
                   : a symbol, a footprint and a 3D body, kept here until you publish it.
                 </>
               ) : needle ? (
-                <>Nothing in {activeLabel.toLowerCase()} matches “{q}”.</>
+                // The section's real label — lower-casing it turned
+                // "My packages" into "my packages" and "ICs" into "ics".
+                <>Nothing in {activeLabel} matches “{q}”.</>
               ) : (
                 <>Nothing here yet.</>
               )}
