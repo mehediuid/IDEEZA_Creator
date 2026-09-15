@@ -15,7 +15,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ideeza";
+import { Button, buttonVariants } from "@/components/ideeza";
 import { Icon } from "@/components/dashboard/icon";
 import { glyphFor } from "@/lib/pcb/glyphs";
 import { FOOTPRINT } from "@/lib/pcb/schematic-to-pcb";
@@ -31,16 +31,25 @@ const subscribeStorage = (cb: () => void) => {
 };
 const snapshot = () => LS_KEYS.map((k) => window.localStorage.getItem(k) ?? "").join(" ");
 const serverSnapshot = () => "";
+// Whether the browser store has been read yet. React hands `getServerSnapshot`
+// to the hydration render as well, so this is false for the first client paint
+// and true from the next — which is exactly the moment the library, and with it
+// the identity of an id, becomes knowable. Everything that depends on
+// localStorage is gated on it: reading the store straight during render makes
+// the first client paint disagree with the server's, and React does not patch a
+// mismatched tree up (a `disabled` button stays disabled forever).
+const clientKnown = () => true;
+const serverUnknown = () => false;
 
 type Found =
   | { type: "part"; part: CatalogPart; own: boolean }
   | { type: "module"; module: AgileModule; own: boolean }
   | { type: "package"; pkg: SavedPackage };
 
-function find(id: string): Found | null {
-  const personalParts = readPersonalParts();
-  const personalModules = readPersonalModules();
-  const pkg = readPackages().find((p) => p.id === id);
+function find(id: string, storeKnown: boolean): Found | null {
+  const personalParts = storeKnown ? readPersonalParts() : [];
+  const personalModules = storeKnown ? readPersonalModules() : [];
+  const pkg = storeKnown ? readPackages().find((p) => p.id === id) : undefined;
   if (pkg) return { type: "package", pkg };
   const part = [...PART_CATALOG, ...personalParts].find((p) => p.id === id);
   if (part) return { type: "part", part, own: personalParts.some((p) => p.id === id) };
@@ -61,7 +70,7 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 function Frame({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <figure className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-3)]">
-      <div className="aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-xl)] border border-border bg-bg-subtle p-[var(--spacing-7)]">
+      <div className="aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-xl)] border border-border-strong bg-bg-subtle p-[var(--spacing-7)]">
         {children}
       </div>
       <figcaption className="font-display text-sm font-regular text-text-tertiary">{label}</figcaption>
@@ -113,18 +122,42 @@ function PartGlyph({ kind }: { kind: string }) {
 
 export function PartDetail({ id }: { id: string }) {
   const stored = React.useSyncExternalStore(subscribeStorage, snapshot, serverSnapshot);
+  const storeKnown = React.useSyncExternalStore(subscribeStorage, clientKnown, serverUnknown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const found = React.useMemo(() => find(id), [id, stored]);
+  const found = React.useMemo(() => find(id, storeKnown), [id, storeKnown, stored]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const board = React.useMemo(() => activeBoardHref(), [stored]);
+  const board = React.useMemo(() => (storeKnown ? activeBoardHref() : null), [storeKnown, stored]);
+  const open = <OpenBoard board={board} known={storeKnown} />;
 
   if (!found) {
+    // A catalogue part still resolves on the server, so reaching here without
+    // the store means the id is *unresolved*, not absent. Asserting "Not found"
+    // would ship a heading the server cannot stand behind and flip it a beat
+    // later, so the page says it is still looking and offers no action.
+    if (!storeKnown) {
+      return (
+        <Shell name="Looking this up…" visibility={null}>
+          <Note>
+            Personal parts, captured modules and authored packages live in this browser, so this page can only say
+            what <code>{id}</code> names once the library has been read.
+          </Note>
+        </Shell>
+      );
+    }
+    // Nothing to place, so no place action — a greyed one here would blame a
+    // missing project for an id that does not exist.
     return (
-      <Shell name="Not found" badge="—" visibility={null} board={null}>
+      <Shell name="Not found" visibility={null}>
         <Note>
           Nothing in the library has the id <code>{id}</code>. Personal parts, captured modules and authored packages
           live in this browser, so a link to one of them will not resolve anywhere else.
         </Note>
+        <Link
+          href="/parts"
+          className={buttonVariants({ hierarchy: "secondary", size: "lg", className: "w-fit no-underline" })}
+        >
+          Browse the library
+        </Link>
       </Shell>
     );
   }
@@ -136,7 +169,7 @@ export function PartDetail({ id }: { id: string }) {
         name={p.name}
         badge="Package"
         visibility={p.visibility === "community" ? "public" : "private"}
-        board={board}
+        action={open}
         description={p.description}
       >
         <Panel title="Geometry">
@@ -180,9 +213,12 @@ export function PartDetail({ id }: { id: string }) {
 
   if (found.type === "module") {
     const m = found.module;
-    const byMpn = new Map([...PART_CATALOG, ...readPersonalParts()].map((p) => [p.part, p]));
+    // Gated like every other store read: a personal part sharing an MPN with a
+    // catalogue one would otherwise rewrite this row between the server's paint
+    // and the client's, which is the same mismatch the action used to suffer.
+    const byMpn = new Map([...PART_CATALOG, ...(storeKnown ? readPersonalParts() : [])].map((p) => [p.part, p]));
     return (
-      <Shell name={m.name} badge="Agile Module" visibility={found.own ? "private" : "public"} board={board} description={m.summary}>
+      <Shell name={m.name} badge="Agile Module" visibility={found.own ? "private" : "public"} action={open} description={m.summary}>
         <Panel title={`Built from ${m.parts.length} part${m.parts.length === 1 ? "" : "s"}`}>
           <ul role="list" className="flex flex-col gap-[var(--spacing-3)]">
             {m.parts.map((mpn) => {
@@ -237,7 +273,7 @@ export function PartDetail({ id }: { id: string }) {
   const converted = FOOTPRINT[p.kind];
   const land = landPatternFor(p.pkg);
   return (
-    <Shell name={p.part} badge="Part" visibility={found.own ? "private" : "public"} board={board}>
+    <Shell name={p.part} badge="Part" visibility={found.own ? "private" : "public"} action={open}>
       <Panel title="Geometry">
         <div className="flex flex-wrap gap-[var(--spacing-6)]">
           <Frame label="Symbol — what the schematic places">
@@ -258,7 +294,7 @@ export function PartDetail({ id }: { id: string }) {
             ["Package", p.pkg],
             ["Unit price", p.price],
             ["Stock", p.stock],
-            ["Land pattern", land ? `${land.count} pads · ${land.family}` : "not modelled"],
+            ["Land pattern", land ? `${land.count} pads` : "not modelled"],
           ]}
         />
       </Panel>
@@ -293,7 +329,46 @@ export function PartDetail({ id }: { id: string }) {
   );
 }
 
-/** The editor a Place action would open — only when a project is actually open. */
+/**
+ * The one thing this page can honestly do with a board: open it.
+ *
+ * It used to read **Place on a board** and then only navigate — the editor arms
+ * a placement from its own Place-a-Part dialog and reads no hand-off from
+ * outside (no pending-place key, no query parameter, nothing read on mount), so
+ * a control with that verb could not keep its word. Naming it for what it does
+ * beats a button that lands you on a board with the part still to find. The
+ * board's own library is one dialog away, and the tooltip says which.
+ *
+ * It is a link, like every other navigation on this page: hover shows the
+ * destination and middle-click opens a tab, neither of which a click handler
+ * calling `window.location` can offer. With no project open there is nowhere to
+ * go, so it greys out as a button and says why.
+ */
+function OpenBoard({ board, known }: { board: string | null; known: boolean }) {
+  if (!board) {
+    return (
+      <Button
+        hierarchy="primary"
+        size="lg"
+        disabled
+        title={known ? "Open a project first — there is no board to open" : "Reading the open project…"}
+      >
+        Open the board
+      </Button>
+    );
+  }
+  return (
+    <Link
+      href={board}
+      title="Opens this project's board — place it there from Insert ▸ Place a Part"
+      className={buttonVariants({ hierarchy: "primary", size: "lg", className: "no-underline" })}
+    >
+      Open the board
+    </Link>
+  );
+}
+
+/** The editor the Open action goes to — only when a project is actually open. */
 function activeBoardHref(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -312,14 +387,15 @@ function Shell({
   badge,
   visibility,
   description,
-  board,
+  action,
   children,
 }: {
   name: string;
-  badge: string;
+  badge?: string;
   visibility: "public" | "private" | null;
   description?: string;
-  board: string | null;
+  /** Only the states that have something to act on pass one. */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -338,9 +414,11 @@ function Shell({
             <h1 className="min-w-0 break-words font-display text-2xl font-semibold leading-2xl tracking-tight text-text-primary">
               {name}
             </h1>
-            <span className="rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium text-text-secondary">
-              {badge}
-            </span>
+            {badge ? (
+              <span className="rounded-[var(--radius-md)] bg-bg-subtle px-[var(--spacing-4)] py-[var(--spacing-1)] font-display text-xs font-medium text-text-secondary">
+                {badge}
+              </span>
+            ) : null}
             {visibility ? (
               <span
                 className={[
@@ -357,19 +435,7 @@ function Shell({
           ) : null}
         </div>
 
-        {/* Placing needs a board to place onto, so with no project open the
-            action greys out and says why rather than going nowhere. */}
-        <Button
-          hierarchy="primary"
-          size="lg"
-          disabled={!board}
-          title={board ? "Open the board and place it from Insert ▸ Place a Part" : "Open a project first — there is no board to place onto"}
-          onClick={() => {
-            if (board) window.location.href = board;
-          }}
-        >
-          Place on a board
-        </Button>
+        {action}
       </header>
 
       {children}
