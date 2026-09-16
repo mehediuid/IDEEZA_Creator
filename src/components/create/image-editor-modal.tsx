@@ -144,7 +144,7 @@ export function ImageEditorModal({
       aria-modal="true"
       aria-label={`Refining Concept ${conceptLabel}`}
       data-testid="refine-overlay"
-      className="fixed inset-0 z-modal flex flex-col bg-bg-page/75 backdrop-blur-md"
+      className="fixed inset-0 z-modal flex flex-col bg-[color-mix(in_srgb,var(--color-bg-overlay)_78%,transparent)] backdrop-blur-md"
     >
       {/* Top bar — close, what is being refined, where it lands. */}
       <header className="flex items-start gap-[12px] px-[20px] py-[16px]">

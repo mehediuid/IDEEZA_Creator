@@ -212,7 +212,7 @@ export function ConfirmBuildDialog({
     >
       <div
         aria-hidden
-        className="absolute inset-0 bg-bg-page/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] backdrop-blur-sm"
       />
 
       <div
@@ -331,7 +331,7 @@ export function ConfirmBuildDialog({
         </div>
 
         {/* Actions */}
-        <footer className="flex items-center justify-end gap-[12px] border-t border-solid border-border bg-bg-page/40 px-[24px] py-[16px]">
+        <footer className="flex items-center justify-end gap-[12px] border-t border-solid border-border bg-bg-subtle px-[24px] py-[16px]">
           <button
             type="button"
             onClick={onCancel}
@@ -362,7 +362,7 @@ export function ConfirmBuildDialog({
         {shortOnCredits && (
           <p
             data-testid="credits-blocked-reason"
-            className="border-t border-solid border-border bg-bg-page/40 px-[24px] py-[10px] text-center text-sm text-text-secondary"
+            className="border-t border-solid border-border bg-bg-subtle px-[24px] py-[10px] text-center text-sm text-text-secondary"
           >
             Not enough credits —{" "}
             <Link

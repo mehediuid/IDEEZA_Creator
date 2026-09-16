@@ -221,7 +221,7 @@ export function CommandPalette({
     >
       <div
         aria-hidden
-        className="absolute inset-0 bg-bg-page/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] backdrop-blur-sm"
       />
 
       <div

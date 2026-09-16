@@ -281,7 +281,7 @@ function Action({ row }: { row: HistoryRow }) {
         type="button"
         onClick={row.onRetry}
         aria-label="Try Again"
-        className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-bg-error-subtle px-[14px] text-sm font-semibold text-text-error outline-none transition-colors duration-fast hover:bg-bg-error-subtle/80 focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-bg-error-subtle px-[14px] text-sm font-semibold text-text-error outline-none transition-colors duration-fast hover:bg-[color-mix(in_srgb,var(--color-bg-error-subtle)_72%,var(--color-bg-surface))] focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={Refresh01Icon} />
         Try Again
