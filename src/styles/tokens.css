@@ -668,6 +668,13 @@
     --color-text-tertiary: var(--color-gray-400);
     --color-text-disabled: var(--color-gray-500);
     --color-text-on-toast: var(--color-white);
+    /* Same rule as the tokens above: the system-dark path mirrors
+     * [data-theme="dark"], so nothing paints its light value for the frame
+     * before ThemeProvider stamps the attribute. */
+    --color-text-brand-hover: var(--color-violet-200);
+    --color-text-link-hover: var(--color-blue-300);
+    --color-icon-secondary: var(--color-gray-500);
+    --color-icon-info: var(--color-blue-400);
 
     --color-border-default: var(--color-gray-800);
     --color-border-strong: var(--color-gray-600);

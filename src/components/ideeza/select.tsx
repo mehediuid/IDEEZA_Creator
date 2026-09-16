@@ -15,8 +15,19 @@
 // closes and moves on. Focus stays on the trigger and the active option is
 // named by `aria-activedescendant`, the pattern that keeps typing and
 // arrowing in one place.
+//
+// The panel portals to <body> with `position: fixed`, measured off the
+// trigger and clamped into the viewport — the same treatment its sibling
+// `SelectMenu` uses, and for the same reason: this control lives inside the
+// package flow's `overflow-x-auto` tables and the PCB settings' scroll panes,
+// where an absolutely positioned panel was cut down to a sliver by the first
+// ancestor with `overflow` set. It flips above the trigger when the rows do
+// not fit below, shifts left of the right edge, and closes when an ancestor
+// scrolls or the window resizes, since the anchor it was measured from has
+// then moved out from under it.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 const SIZES: Record<string, string> = {
@@ -26,6 +37,15 @@ const SIZES: Record<string, string> = {
 };
 
 type Size = keyof typeof SIZES;
+
+/** Viewport margin, trigger↔panel gap and the panel's own height cap. */
+const MARGIN = 8;
+const GAP = 4;
+const MAX_PANEL_H = 280;
+
+type Pos = { top: number; left: number; width: number; maxH: number; ready: boolean };
+
+const clampTo = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
 
 export interface SelectOption {
   label: string;
@@ -66,6 +86,7 @@ export function Select({
   "aria-labelledby": ariaLabelledBy,
 }: SelectProps) {
   const [open, setOpen] = React.useState(false);
+  const [pos, setPos] = React.useState<Pos | null>(null);
   const ref = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -80,14 +101,58 @@ export function Select({
   // side effect that drifts as components re-render.
   const id = React.useId().replace(/:/g, "");
 
+  const close = React.useCallback(() => {
+    setOpen(false);
+    setPos(null);
+  }, []);
+
+  // The panel now lives in a portal, so "outside" has two insides: the field
+  // and the panel itself. An ancestor scroll or a resize moves the trigger the
+  // panel was measured against, so the panel closes rather than hanging in the
+  // wrong place.
   React.useEffect(() => {
     if (!open) return;
+    const inside = (n: Node) => !!ref.current?.contains(n) || !!listRef.current?.contains(n);
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (!inside(e.target as Node)) close();
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+    const onScroll = (e: Event) => {
+      if (listRef.current?.contains(e.target as Node)) return;
+      close();
+    };
+    document.addEventListener("mousedown", onDoc, true);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onDoc, true);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open, close]);
+
+  // Measure once the panel is mounted at the trigger's width, so the height
+  // read back is the height these rows really take: prefer below, flip above
+  // when they do not fit there and there is more room above, and cap to what
+  // the viewport really leaves.
+  React.useLayoutEffect(() => {
+    if (!open || !pos || pos.ready) return;
+    const t = triggerRef.current?.getBoundingClientRect();
+    const el = listRef.current;
+    if (!t || !el) return;
+    const natural = Math.min(el.scrollHeight, MAX_PANEL_H);
+    const below = window.innerHeight - t.bottom - GAP - MARGIN;
+    const above = t.top - GAP - MARGIN;
+    const flip = natural > below && above > below;
+    const maxH = Math.max(64, Math.min(natural, flip ? above : below));
+    const width = Math.min(t.width, window.innerWidth - MARGIN * 2);
+    setPos({
+      top: clampTo(flip ? t.top - GAP - maxH : t.bottom + GAP, MARGIN, Math.max(MARGIN, window.innerHeight - MARGIN - maxH)),
+      left: clampTo(t.left, MARGIN, Math.max(MARGIN, window.innerWidth - MARGIN - width)),
+      width,
+      maxH,
+      ready: true,
+    });
+  }, [open, pos]);
 
   // Keep the active option in view when arrowing past the panel's edge.
   React.useEffect(() => {
@@ -96,13 +161,21 @@ export function Select({
   }, [open, active, id]);
 
   const openAt = (i: number) => {
+    const r = triggerRef.current?.getBoundingClientRect();
     setActive(Math.max(0, Math.min(options.length - 1, i)));
+    setPos({
+      top: (r?.bottom ?? 0) + GAP,
+      left: r?.left ?? 0,
+      width: r?.width ?? 0,
+      maxH: MAX_PANEL_H,
+      ready: false,
+    });
     setOpen(true);
   };
   const commit = (i: number) => {
     const o = options[i];
     if (o) onChange?.(o.value);
-    setOpen(false);
+    close();
     triggerRef.current?.focus();
   };
 
@@ -133,11 +206,11 @@ export function Select({
         else openAt(selectedIndex < 0 ? 0 : selectedIndex);
         break;
       case "Escape":
-        if (open) { e.preventDefault(); setOpen(false); triggerRef.current?.focus(); }
+        if (open) { e.preventDefault(); close(); triggerRef.current?.focus(); }
         break;
       case "Tab":
         // Tab leaves the control, so the panel must not linger over the page.
-        if (open) setOpen(false);
+        if (open) close();
         break;
       default:
         break;
@@ -157,7 +230,7 @@ export function Select({
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
         disabled={disabled}
-        onClick={() => (open ? setOpen(false) : openAt(selectedIndex < 0 ? 0 : selectedIndex))}
+        onClick={() => (open ? close() : openAt(selectedIndex < 0 ? 0 : selectedIndex))}
         onKeyDown={onKeyDown}
         className={cn(
           "flex w-full items-center justify-between gap-[var(--spacing-5)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[color:var(--color-text-primary)] outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed disabled:opacity-50",
@@ -168,13 +241,24 @@ export function Select({
         <span className={cn("truncate", !selected && "text-[color:var(--color-text-tertiary)]")}>{selected ? selected.label : placeholder}</span>
         <Chevron />
       </button>
-      {open && options.length > 0 && (
+      {open && options.length > 0 && typeof document !== "undefined" && createPortal(
         <div
           ref={listRef}
           id={`${id}-list`}
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute left-0 right-0 top-[calc(100%+4px)] z-[120] max-h-[280px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] py-[var(--spacing-2)] shadow-[var(--elevation-5)]"
+          className="z-dropdown overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] py-[var(--spacing-2)] shadow-[var(--elevation-5)]"
+          style={{
+            position: "fixed",
+            top: pos?.top ?? -9999,
+            left: pos?.left ?? -9999,
+            width: pos?.width,
+            maxHeight: pos?.maxH ?? MAX_PANEL_H,
+            // Hidden, not unmounted, until it has been measured — the measure
+            // needs the real rows on the page, and a frame at the wrong
+            // position would read as a jump.
+            visibility: pos?.ready ? "visible" : "hidden",
+          }}
         >
           {options.map((o, i) => {
             const isSelected = o.value === value;
@@ -200,7 +284,8 @@ export function Select({
               </div>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -11,6 +11,20 @@
 //
 // Use ButtonGroup when the choice changes *what is shown*; use Segmented when
 // the choice *is* the data.
+//
+// Announcing `radiogroup` obliges it to behave like one, and it did not: every
+// option was a Tab stop and the arrow keys did nothing, so a screen reader
+// called this a radio group and then handed over a row of buttons. It is the
+// real contract now — the group is **one** Tab stop (roving tabindex, landing
+// on the chosen option), Arrow Left/Right/Up/Down move the choice and wrap,
+// Home/End jump to the ends. Selection follows focus, which is what a radio
+// group does and what makes arrowing feel like turning a dial.
+//
+// The chosen option is painted the way the rest of the app paints a chosen
+// segment — brand-subtle fill with brand text, as `ButtonGroup` and the PCB
+// right panel's own segmented control already do. It used to fill solid brand,
+// which made one state wear two looks inside one design system, and spent the
+// accent on a control that is not the page's primary action.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -48,10 +62,50 @@ export function Segmented<T extends string>({
   className,
 }: SegmentedProps<T>) {
   const s = SIZES[size];
+  const refs = React.useRef<(HTMLButtonElement | null)[]>([]);
+  // Nothing matching the value still leaves one Tab stop: the first option, so
+  // the group can always be reached and then arrowed.
+  const at = Math.max(0, options.findIndex((o) => o.value === value));
+
+  const move = (to: number) => {
+    const n = options.length;
+    if (!n) return;
+    const i = ((to % n) + n) % n;
+    onChange(options[i].value);
+    refs.current[i]?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    switch (e.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        e.preventDefault();
+        move(at + 1);
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        e.preventDefault();
+        move(at - 1);
+        break;
+      case "Home":
+        e.preventDefault();
+        move(0);
+        break;
+      case "End":
+        e.preventDefault();
+        move(options.length - 1);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div
       role="radiogroup"
       aria-label={label}
+      onKeyDown={onKeyDown}
       className={cn(
         "inline-flex w-fit self-start overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)]",
         disabled && "opacity-[var(--opacity-disabled)]",
@@ -64,9 +118,13 @@ export function Segmented<T extends string>({
         return (
           <button
             key={o.value}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
             type="button"
             role="radio"
             aria-checked={on}
+            tabIndex={i === at ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cn(
@@ -76,7 +134,7 @@ export function Segmented<T extends string>({
               s.text,
               i > 0 && "border-l border-[var(--color-border-default)]",
               on
-                ? "bg-[var(--color-bg-brand)] text-[color:var(--color-text-on-brand)]"
+                ? "bg-[var(--color-bg-brand-subtle)] text-[color:var(--color-text-brand)]"
                 : "bg-[var(--color-bg-surface)] text-[color:var(--color-text-secondary)] hover:bg-[var(--color-bg-surface-raised)] hover:text-[color:var(--color-text-primary)]",
             )}
             style={{ paddingInline: s.px }}

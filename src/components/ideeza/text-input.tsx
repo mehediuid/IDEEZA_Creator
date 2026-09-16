@@ -3,11 +3,19 @@
 // IDEEZA Design System — Text Input (+ Textarea)
 //
 // The field the DS was missing: every text field in the app was hand-rolled at
-// its call site, so no two agreed on height, radius or focus treatment. Sizes
-// follow the design system's unified field ramp — the same one A06 Select,
-// A07 Search and A12 Number Input document, so two controls of the same size
-// line up: 32 · radius/lg · px 10 │ 36 · radius/lg · px 10 │ 40 · radius/xl ·
-// px 12 │ 44 · radius/xl · px 12, value type 14/20 up to lg and 16/24 at xl.
+// its call site, so no two agreed on height, radius or focus treatment. Its own
+// ramp is sm 32 · radius/lg · px 10 │ md 36 · radius/lg · px 10 │ lg 40 ·
+// radius/xl · px 12 │ xl 44 · radius/xl · px 12, value type 14/20 up to lg and
+// 16/24 at xl — shared, as of today, with A07 Search alone.
+//
+// It is **not** yet the system-wide field ramp, and this comment used to claim
+// it was. A12 Number Input runs its own 30/38/44 on three sizes, and A06 Select
+// has no fixed height at all — it sizes by padding — so a `size="md"` TextInput
+// (36) beside a `size="md"` NumberInput (38) does not line up. Making the ramp
+// true means editing those two atoms, which changes the height of every numeric
+// field in the PCB modals and every Select in the editor; that is a design-system
+// decision with a visual diff across the app, not a comment fix, so the comment
+// is honest about the state of things until it is taken.
 //
 // `suffix` carries a unit adornment inside the field (mm · mil · °), which is
 // what a dimension field needs — the unit belongs to the value, not to a
@@ -27,6 +35,13 @@ const SIZES = {
 
 type Size = keyof typeof SIZES;
 
+// The focus ring is a literal `0 0 0 3px` rather than an `--elevation-*`: the
+// elevation scale is six drop shadows in rgba black, and none of them is a
+// flat 3px ring in a theme colour — a focus ring is a different thing from a
+// lift. A real token for it (`--ring-focus`) would be the right answer, and
+// minting one is the design-system owner's call, not an agent's. Until then
+// the same literal is written in Search, Select's menu and this field, so the
+// three at least agree.
 const shell = (invalid?: boolean, disabled?: boolean) =>
   cn(
     "flex items-stretch overflow-hidden border bg-[var(--color-input-bg)] transition-[border-color,box-shadow] duration-fast",

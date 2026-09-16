@@ -21,19 +21,17 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  AlertCircleIcon,
-  CancelCircleIcon,
   Clock01Icon,
   CodeIcon,
   CpuIcon,
   CubeIcon,
   ElectricWireIcon,
-  InformationCircleIcon,
   PackageIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
+import { Banner, type BannerTone } from "@/components/ideeza";
 import { BUILD_COST } from "@/lib/create/credits";
 import {
   ITEM_LABELS,
@@ -236,23 +234,16 @@ const BADGE_TONE: Record<StateTone, string> = {
   success: "bg-bg-success-subtle text-text-success",
 };
 
-const BANNER_TONE = {
-  info: {
-    box: "border-[var(--color-border-blue)] bg-bg-info-subtle",
-    icon: "text-[var(--color-icon-info)]",
-    glyph: InformationCircleIcon as IconValue,
-  },
-  warning: {
-    box: "border-[var(--color-border-warning)] bg-bg-warning-subtle",
-    icon: "text-[var(--color-icon-warning)]",
-    glyph: AlertCircleIcon as IconValue,
-  },
-  error: {
-    box: "border-border-error bg-bg-error-subtle",
-    icon: "text-[var(--color-icon-error)]",
-    glyph: CancelCircleIcon as IconValue,
-  },
-} as const;
+// The page's three banner states in the design system's own tones: the queue
+// is information, a partial failure is the one that asks something of the user,
+// a system failure is a failure. The page used to carry a second `Banner` of
+// its own — its own tone table, its own padding — beside the DS atom; the atom
+// is the one home now, and the state table keeps naming the states its way.
+const BANNER_TONE: Record<NonNullable<StateRow["banner"]>["tone"], BannerTone> = {
+  info: "info",
+  warning: "attention",
+  error: "error",
+};
 
 // The clock line is in whole minutes, so the page re-reads the clock on
 // a slow tick instead of at render — a render must never depend on
@@ -291,7 +282,11 @@ export function BuildStatus({ job }: { job: BuildJob }) {
     >
       <ConceptHeader job={job} row={row} />
 
-      {row.banner && <Banner banner={row.banner} />}
+      {row.banner && (
+        <Banner tone={BANNER_TONE[row.banner.tone]} title={row.banner.title}>
+          {row.banner.body}
+        </Banner>
+      )}
 
       <ul role="list" className="flex flex-col gap-[10px]">
         {job.items.map((item) => (
@@ -382,26 +377,6 @@ function ConceptHeader({ job, row }: { job: BuildJob; row: StateRow }) {
       >
         {row.badge.text}
       </span>
-    </div>
-  );
-}
-
-function Banner({ banner }: { banner: NonNullable<StateRow["banner"]> }) {
-  const tone = BANNER_TONE[banner.tone];
-  return (
-    <div
-      className={[
-        "flex items-start gap-[12px] rounded-xl border border-solid p-[14px]",
-        tone.box,
-      ].join(" ")}
-    >
-      <span className={["mt-[2px] shrink-0", tone.icon].join(" ")}>
-        <Icon icon={tone.glyph} size={20} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-md font-semibold text-text-primary">{banner.title}</p>
-        <p className="mt-[2px] text-sm text-text-secondary">{banner.body}</p>
-      </div>
     </div>
   );
 }
