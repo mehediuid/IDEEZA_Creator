@@ -473,16 +473,20 @@ export function SymbolCanvas({
           </g>
         );
       case "text": {
-        const brand = o.textKind !== "Free Text";
+        // Computed text (Designator · Value) is marked by weight alone. It used
+        // to paint in the brand violet, which on this canvas is the selection
+        // colour's own hue — so a Designator read as permanently selected, and
+        // one accent carried two meanings a metre apart.
+        const computed = o.textKind !== "Free Text";
         return (
           <text
             key={o.id}
             x={o.x}
             y={o.y}
             fontSize={o.size}
-            fill={o.id === selected ? selColor : brand ? "var(--color-text-brand)" : "var(--color-text-primary)"}
+            fill={o.id === selected ? selColor : "var(--color-text-primary)"}
             fontFamily="var(--font-family-body)"
-            fontWeight={brand ? 600 : 400}
+            fontWeight={computed ? 600 : 400}
             {...hit}
           >
             {textContent(o, draft) || "—"}

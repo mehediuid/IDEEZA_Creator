@@ -153,7 +153,7 @@ export function ImportFields() {
                     type="button"
                     onClick={() => setFiles((cur) => ({ ...cur, [s.id]: undefined }))}
                     aria-label={`Remove ${f.name}`}
-                    className="inline-flex h-[18px] w-[18px] shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-full)] text-text-tertiary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex h-[24px] w-[24px] shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-full)] text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
                     <Icon icon={Cancel01Icon} size={12} />
                   </button>

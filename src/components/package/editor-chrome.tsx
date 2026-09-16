@@ -22,12 +22,18 @@ export function EditorToolbar<T extends string>({
   tools,
   active,
   onPick,
+  onEscape,
   sub,
   trailing,
 }: {
   tools: readonly ToolDef<T>[];
   active: T;
   onPick: (id: T) => void;
+  /** Disarm — Esc from the toolbar itself, where focus sits after a tool is
+   *  picked. The canvas has always handled Esc, but with no Select row to
+   *  click, a keyboard user who armed a tool from here had no way back to the
+   *  resting state without first clicking the canvas. */
+  onEscape?: () => void;
   /** Inline sub-selector for the armed tool — rendered inside the toolbar. */
   sub?: React.ReactNode;
   trailing?: React.ReactNode;
@@ -36,6 +42,12 @@ export function EditorToolbar<T extends string>({
     <div
       role="toolbar"
       aria-label="Editor tools"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && onEscape) {
+          e.preventDefault();
+          onEscape();
+        }
+      }}
       className="flex flex-wrap items-center gap-[var(--spacing-2)] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-4)]"
     >
       {tools.map((t) => {

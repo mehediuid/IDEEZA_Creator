@@ -53,8 +53,12 @@ import {
 } from "./editor-chrome";
 import { FootprintCanvas, nextFreePin, padLabel } from "./footprint-canvas";
 
+// No Select row (UIUX-7/11): selecting is what the pointer does when nothing is
+// armed, and Esc returns here from any tool — a row for the thing that needs no
+// tool is a row that can only be redundant. `"select"` stays the model's name
+// for that resting state; it just has no button of its own, exactly as the PCB
+// and schematic palettes were fixed.
 const TOOLS: readonly ToolDef<FpTool>[] = [
-  { id: "select", label: "Select", icon: "toggleSel" },
   { id: "pad", label: "Add Pad", icon: "tPad" },
   { id: "line", label: "Line", icon: "pLine" },
   { id: "polyline", label: "Polyline", icon: "pPolyline" },
@@ -67,7 +71,7 @@ const TOOLS: readonly ToolDef<FpTool>[] = [
 ];
 
 const HINTS: Record<FpTool, string> = {
-  select: "Click a pad or shape to select it, then drag to move. Properties for the selection appear below.",
+  select: "Click a pad or shape to select it, then drag to move. Properties for the selection appear below. Esc comes back here from any tool.",
   pad: "Click to drop a pad. It takes the lowest symbol pin that has not got one yet. Mounting pads are mechanical and take no pin.",
   line: "Click to start, click again to finish. It lands on the Draw layer above.",
   polyline: "Click each vertex. Enter, a double-click, or clicking the first vertex closes the run.",
@@ -199,6 +203,7 @@ export function StepFootprint() {
         tools={TOOLS}
         active={fpTool}
         onPick={actions.setFpTool}
+        onEscape={() => actions.setFpTool("select")}
         sub={
           fpTool === "pad" ? (
             <ToolbarSelect

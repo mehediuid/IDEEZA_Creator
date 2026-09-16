@@ -470,16 +470,18 @@ export function FootprintCanvas({
         );
       }
       case "text": {
-        const brand = o.textKind !== "Free Text";
+        // As on the symbol sheet: computed text is marked by weight, not by the
+        // brand violet, which is the selection colour's hue on this canvas.
+        const computed = o.textKind !== "Free Text";
         return (
           <text
             key={o.id}
             x={sx(o.x)}
             y={sy(o.y)}
             fontSize={Math.max(9, toPx(o.size))}
-            fill={emph(o) ? stroke : brand ? "var(--color-text-brand)" : LAYER_INK[o.layer]}
+            fill={emph(o) ? stroke : LAYER_INK[o.layer]}
             fontFamily="var(--font-family-body)"
-            fontWeight={brand ? 600 : 400}
+            fontWeight={computed ? 600 : 400}
             {...hit}
           >
             {textContent(o, draft) || "—"}

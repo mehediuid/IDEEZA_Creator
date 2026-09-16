@@ -23,6 +23,10 @@ import { STEPS, STEP_LABEL, blockedReason, entrySub, stepIndex, stepReachable, t
 
 // One glyph per step, drawn for these steps (lib/pcb/icons.tsx) rather than
 // borrowing generic Hugeicons — a 2x2 grid does not say "land pattern".
+/** The footer's height, in one place: the bar itself and the toast that has to
+ *  clear it read the same number. */
+const FOOTER_H = "72px";
+
 const STEP_ICON: Record<StepId, string> = {
   package: "pkgPackage",
   symbol: "pkgSymbol",
@@ -277,7 +281,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
 
       {/* Footer — the confirmation carries its own actions, so it has none */}
       {done ? null : (
-      <footer className="flex h-[72px] shrink-0 items-center justify-between gap-[var(--spacing-6)] border-t border-border bg-bg-surface px-[var(--spacing-8)]">
+      <footer style={{ height: FOOTER_H }} className="flex shrink-0 items-center justify-between gap-[var(--spacing-6)] border-t border-border bg-bg-surface px-[var(--spacing-8)]">
         <Button
           hierarchy="secondary"
           size="lg"
@@ -319,11 +323,15 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
       </footer>
       )}
 
+      {/* The toast clears the footer by the footer's own height plus a gap,
+          derived rather than the hardcoded 88px it used to carry — the
+          confirmation has no footer, so the toast drops to the gap alone. */}
       {toast ? (
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed bottom-[88px] left-1/2 z-toast -translate-x-1/2 rounded-[var(--radius-lg)] bg-bg-inverse px-[var(--spacing-6)] py-[var(--spacing-4)] font-display text-sm text-text-inverse shadow-2"
+          style={{ bottom: `calc(${done ? "0px" : FOOTER_H} + var(--spacing-8))` }}
+          className="pointer-events-none fixed left-1/2 z-toast -translate-x-1/2 rounded-[var(--radius-lg)] bg-bg-inverse px-[var(--spacing-6)] py-[var(--spacing-4)] font-display text-sm text-text-inverse shadow-2"
         >
           {toast}
         </div>

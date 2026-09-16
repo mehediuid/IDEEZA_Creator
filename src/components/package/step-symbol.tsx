@@ -33,8 +33,12 @@ import {
 import { EditorBody, EditorToolbar, Field, FieldGrid, FieldSelect, SidePanel, StepHeading, ToolbarAction, ToolbarSelect, ToolbarToggle, type ToolDef } from "./editor-chrome";
 import { SymbolCanvas } from "./symbol-canvas";
 
+// No Select row (UIUX-7/11): selecting is what the pointer does when nothing is
+// armed, and Esc returns here from any tool — a row for the thing that needs no
+// tool is a row that can only be redundant. `"select"` stays the model's name
+// for that resting state; it just has no button of its own, exactly as the PCB
+// and schematic palettes were fixed.
 const TOOLS: readonly ToolDef<SymTool>[] = [
-  { id: "select", label: "Select", icon: "toggleSel" },
   { id: "pin", label: "Pin", icon: "pPin" },
   { id: "line", label: "Line", icon: "pLine" },
   { id: "polyline", label: "Polyline", icon: "pPolyline" },
@@ -47,7 +51,7 @@ const TOOLS: readonly ToolDef<SymTool>[] = [
 ];
 
 const HINTS: Record<SymTool, string> = {
-  select: "Click a pin or shape to select it. Drag its body to move, or drag a handle to resize or adjust length. Properties for the selection appear below.",
+  select: "Click a pin or shape to select it. Drag its body to move, or drag a handle to resize or adjust length. Properties for the selection appear below. Esc comes back here from any tool.",
   pin: "Click on the canvas to place a pin. It takes the next free number; rename and re-type it in the table below.",
   line: "Click to start, click again to finish.",
   polyline: "Click each vertex. Enter, a double-click, or clicking the first vertex closes the run. Esc cancels.",
@@ -97,6 +101,7 @@ export function StepSymbol() {
         tools={TOOLS}
         active={symTool}
         onPick={actions.setSymTool}
+        onEscape={() => actions.setSymTool("select")}
         sub={
           <ToolbarSelect
             label="Grid"

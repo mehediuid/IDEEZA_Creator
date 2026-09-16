@@ -152,7 +152,10 @@ function PathChooser() {
               ].join(" ")}
               style={{ borderWidth: "var(--border-width-1)" }}
             >
-              <span className={off ? "text-text-disabled" : "text-text-brand"}>
+              {/* The accent marks the card that is chosen. Painting all three
+                  violet spent the brand on decoration and left the chosen one
+                  with only its border to say so. */}
+              <span className={off ? "text-text-disabled" : selected ? "text-text-brand" : "text-text-secondary"}>
                 <Icon icon={c.icon} size={22} strokeWidth={1.8} />
               </span>
               <span className={["font-display text-lg font-semibold leading-lg", off ? "text-text-disabled" : "text-text-primary"].join(" ")}>
@@ -214,7 +217,10 @@ function FamilyPicker() {
               <FootprintThumb draft={{ symbol: [], footprint: padsFor(f, f.params) }} w={220} h={72} />
             </span>
             <span className="flex min-w-0 flex-col gap-[var(--spacing-1)]">
-              <span className="truncate font-display text-sm font-semibold leading-sm text-text-primary group-hover:text-text-brand">
+              {/* Hover is already answered by the card's border and lift;
+                  tinting the title with the brand made hovering look like
+                  having chosen. */}
+              <span className="truncate font-display text-sm font-semibold leading-sm text-text-primary">
                 {f.label}
               </span>
               <span className="truncate font-mono text-sm text-text-tertiary">
