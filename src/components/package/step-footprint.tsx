@@ -217,7 +217,7 @@ export function StepFootprint() {
         }
         trailing={
           <>
-            <ToolbarToggle on={draft.fpSnap} label="Snap" icon="tAlignGrid" onToggle={() => actions.patch({ fpSnap: !draft.fpSnap })} />
+            <ToolbarToggle on={draft.fpSnap} label="Snap" icon="snap" onToggle={() => actions.patch({ fpSnap: !draft.fpSnap })} />
             <ToolbarAction
               label="Delete"
               icon="del"

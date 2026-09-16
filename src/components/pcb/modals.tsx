@@ -49,6 +49,9 @@ import {
   PART_CATALOG,
 } from "@/lib/pcb/part-catalog";
 import { usePcbActions, usePcbState } from "@/lib/pcb/store";
+// The package flow's own step list, so this dialog cannot describe a different
+// flow from the one its button opens.
+import { STEPS as PKG_STEPS, STEP_LABEL as PKG_STEP_LABEL, type StepId } from "@/lib/package/types";
 import { useManualProjects } from "@/lib/manual/projects";
 import { exportGerberViaKicad, GERBER_LAYERS } from "@/lib/pcb/kicad-export";
 import {
@@ -3997,25 +4000,40 @@ function ImportImageModal() {
   );
 }
 
-// New ▸ Part opens the real authoring flow (/parts/new): Symbol → Footprint →
-// 3D Placement → Finalize. It used to be a five-field form that wrote a
-// catalogue row and said outright that drawing a symbol "needs the symbol
-// editor, which isn't built yet" — that editor exists now, so this dialog's
-// job is just to say what is about to happen before leaving the board.
+// New ▸ Part opens the real authoring flow (/parts/new). It used to be a
+// five-field form that wrote a catalogue row and said outright that drawing a
+// symbol "needs the symbol editor, which isn't built yet" — that editor exists
+// now, so this dialog's job is just to say what is about to happen before
+// leaving the board.
+//
+// The list is keyed off the flow's own `STEPS`, so the count in the sentence
+// and the rows below it come from the same place the flow's rail and its
+// "Step N of 5" readout do. Written out by hand it said "four steps" and
+// listed four, having dropped the step that picks how you start — so the
+// dialog promised one flow and the flow opened on another.
+const PART_STEP_NOTE: Record<StepId, string> = {
+  package: "how you want to start — a wizard family, an import, or a blank canvas",
+  symbol: "pins, body graphics, designator",
+  footprint: "pads matched to those pins",
+  place3d: "a body against the pads",
+  finalize: "name, category, and where it is filed",
+};
+
 function NewPartModal() {
   const actions = usePcbActions();
-  const steps = ["Symbol — pins, body graphics, designator", "Footprint — pads matched to those pins", "3D Placement — a body against the pads", "Finalize — name, category, private or published"];
   return (
     <Overlay>
       <Card width={470}>
         <Header title="Author a new package" onClose={actions.closeModal} padding="18px 22px" />
         <div style={{ padding: "var(--spacing-9) var(--spacing-12)", display: "flex", flexDirection: "column", gap: "var(--spacing-6)" }}>
           <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", lineHeight: 1.55 }}>
-            This opens the package flow, which walks four steps and files the result in your library:
+            This opens the package flow, which walks {PKG_STEPS.length} steps and files the result in your library:
           </div>
           <ol style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-4)", margin: 0, paddingLeft: "var(--spacing-10)" }}>
-            {steps.map((t) => (
-              <li key={t} style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>{t}</li>
+            {PKG_STEPS.map((id) => (
+              <li key={id} style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-primary)" }}>
+                {PKG_STEP_LABEL[id]} — {PART_STEP_NOTE[id]}
+              </li>
             ))}
           </ol>
           <div style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-tertiary)", lineHeight: 1.5 }}>

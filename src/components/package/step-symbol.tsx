@@ -113,7 +113,7 @@ export function StepSymbol() {
         }
         trailing={
           <>
-            <ToolbarToggle on={draft.symSnap} label="Snap" icon="tAlignGrid" onToggle={() => actions.patch({ symSnap: !draft.symSnap })} />
+            <ToolbarToggle on={draft.symSnap} label="Snap" icon="snap" onToggle={() => actions.patch({ symSnap: !draft.symSnap })} />
             <ToolbarAction
               label="Delete"
               icon="del"

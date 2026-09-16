@@ -122,9 +122,19 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       key: "F",
       items: [
         // New ▸ — five entries. Project reuses the manual create flow's
-        // Project Information dialog; Schematic adds a real sheet. The three
-        // that have no engine behind them yet are disabled with a reason
-        // rather than shipped as toasts.
+        // Project Information dialog and Schematic adds a real sheet.
+        //
+        // **Part** and **Agile Module** were greyed out with "needs the part
+        // editor — not built yet" and "needs the module editor — not built
+        // yet". Both editors exist: the package flow at /parts/new and the
+        // capture-a-selection dialog right here. Their two modals were written,
+        // registered and reachable by id, and nothing anywhere opened them —
+        // dead code behind a stale excuse, which reads to a user exactly like
+        // a feature that was never built. Both rows are live.
+        //
+        // Agile Module is captured from a selection, so with nothing selected
+        // it is greyed with *that* reason, which is a precondition rather than
+        // a missing engine. Board keeps its own, which is still true.
         item("New", {
           k: "Ctrl+N",
           icon: "page",
@@ -132,8 +142,15 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
             su("Project", "", { icon: "folder", onClick: () => actions.openModal("newProject") }),
             su("Board", "", { icon: "board", disabled: true, note: "One board per project for now — multi-board documents aren't modelled yet." }),
             su("Schematic", "", { icon: "page", onClick: () => { actions.addSheet(); actions.flashToast("New schematic sheet added"); actions.closeAll(); } }),
-            su("New Part", "", { icon: "pChip", disabled: true, note: "Needs the part editor — not built yet." }),
-            su("Agile Module", "", { icon: "tDevReuse", disabled: true, note: "Needs the module editor — not built yet." }),
+            su("Part…", "", { icon: "pChip", onClick: () => actions.openModal("newPart") }),
+            su("Agile Module…", "", {
+              icon: "tDevReuse",
+              disabled: !state.selectedIds.length,
+              note: state.selectedIds.length
+                ? undefined
+                : "Select the objects that make up the block first — a module is captured from a selection.",
+              onClick: () => actions.openModal("newModule"),
+            }),
           ],
         }),
         item("Load Sample Circuit", {
