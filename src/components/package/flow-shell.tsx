@@ -63,7 +63,15 @@ function useInertBehind(ref: React.RefObject<HTMLElement | null>) {
  *
  *  A real menu, not a painted one: the trigger is a button announcing
  *  `aria-haspopup`, the panel is a `menu` of `menuitem`s, arrows move between
- *  them, Escape closes and hands focus back to the trigger. */
+ *  them, Escape closes and hands focus back to the trigger.
+ *
+ *  Arrowing used to move a highlight and nothing else — the key handler sat on
+ *  the trigger, which kept focus, so Enter re-toggled the menu instead of
+ *  opening the row under the highlight. There was no way to reach a
+ *  destination from the keyboard at all. Focus now moves into the rows, which
+ *  is what a menu does: the arrows focus the next `menuitem`, Enter is the
+ *  link's own activation, Escape hands focus back to the trigger and Tab
+ *  closes on the way past. */
 const EXITS = [
   { href: "/", label: "Home", hint: "Dashboard" },
   { href: "/parts", label: "Parts & Agile Module", hint: "Where this flow started" },
@@ -75,6 +83,7 @@ function LogoMenu() {
   const [active, setActive] = React.useState(0);
   const wrap = React.useRef<HTMLDivElement>(null);
   const trigger = React.useRef<HTMLButtonElement>(null);
+  const items = React.useRef<(HTMLAnchorElement | null)[]>([]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -85,6 +94,17 @@ function LogoMenu() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
+  // The highlight and the focus are one thing, so the row Enter activates is
+  // always the row the eye is on. Focus is moved after the panel has painted.
+  React.useEffect(() => {
+    if (open) items.current[active]?.focus();
+  }, [open, active]);
+
+  const close = (toTrigger: boolean) => {
+    setOpen(false);
+    if (toTrigger) trigger.current?.focus();
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     const last = EXITS.length - 1;
     if (e.key === "ArrowDown") {
@@ -93,12 +113,17 @@ function LogoMenu() {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (!open) { setActive(last); setOpen(true); } else setActive((i) => (i <= 0 ? last : i - 1));
+    } else if (e.key === "Home" && open) {
+      e.preventDefault();
+      setActive(0);
+    } else if (e.key === "End" && open) {
+      e.preventDefault();
+      setActive(last);
     } else if (e.key === "Escape" && open) {
       e.preventDefault();
-      setOpen(false);
-      trigger.current?.focus();
+      close(true);
     } else if (e.key === "Tab" && open) {
-      setOpen(false);
+      close(false);
     }
   };
 
@@ -125,6 +150,7 @@ function LogoMenu() {
         <div
           role="menu"
           aria-label="Leave the flow"
+          onKeyDown={onKeyDown}
           className="absolute left-0 top-[calc(100%+6px)] z-toast w-[280px] rounded-[var(--radius-xl)] border border-border bg-bg-surface p-[var(--spacing-2)] shadow-[var(--elevation-5)]"
         >
           {EXITS.map((x, i) => (
@@ -132,6 +158,10 @@ function LogoMenu() {
               key={x.href}
               href={x.href}
               role="menuitem"
+              ref={(el) => {
+                items.current[i] = el;
+              }}
+              tabIndex={i === active ? 0 : -1}
               onMouseEnter={() => setActive(i)}
               onClick={() => setOpen(false)}
               className={[
@@ -176,7 +206,7 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
       {/* Top bar */}
       <header className="flex h-[56px] shrink-0 items-center gap-[var(--spacing-6)] border-b border-border bg-bg-surface px-[var(--spacing-8)]">
         <LogoMenu />
-        <span aria-hidden className="h-[20px] w-px bg-border-default" />
+        <span aria-hidden className="h-[20px] w-px bg-border" />
         <h1 className="font-display text-sm font-semibold text-text-primary">New Package</h1>
         <div className="flex-1" />
         <span className="font-mono text-xs text-text-tertiary">{done ? "Complete" : `Step ${i + 1} of ${STEPS.length}`}</span>

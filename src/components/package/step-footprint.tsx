@@ -43,7 +43,7 @@ import {
   EditorToolbar,
   Field,
   FieldGrid,
-  
+  FieldSelect,
   SidePanel,
   StepHeading,
   ToolbarAction,
@@ -172,7 +172,7 @@ export function StepFootprint() {
 
       <div className="flex flex-wrap items-end gap-[var(--spacing-8)]">
         <Field width="short" label="Mounting">
-          <Select
+          <FieldSelect
             value={draft.mounting}
             options={MOUNTINGS.map((m) => ({ label: m, value: m }))}
             onChange={(v) => actions.patch({ mounting: v as Mounting })}
@@ -187,7 +187,7 @@ export function StepFootprint() {
           />
         </Field>
         <Field width="short" label="Draw layer">
-          <Select
+          <FieldSelect
             value={draft.drawLayer}
             options={FP_LAYERS.map((l) => ({ label: l, value: l }))}
             onChange={(v) => actions.patch({ drawLayer: v as FpLayer })}
@@ -268,7 +268,7 @@ function FpProps({ obj }: { obj: FpObj }) {
   const layerField =
     obj.kind !== "pad" ? (
       <Field label="Layer">
-        <Select value={obj.layer} options={FP_LAYERS.map((l) => ({ label: l, value: l }))} onChange={(v) => set({ layer: v as FpLayer })} />
+        <FieldSelect value={obj.layer} options={FP_LAYERS.map((l) => ({ label: l, value: l }))} onChange={(v) => set({ layer: v as FpLayer })} />
       </Field>
     ) : null;
 
@@ -279,14 +279,14 @@ function FpProps({ obj }: { obj: FpObj }) {
       {obj.kind === "pad" ? (
         <>
           <Field label="Kind">
-            <Select
+            <FieldSelect
               value={obj.padKind}
               options={PAD_KINDS.map((k) => ({ label: k, value: k }))}
               onChange={(v) => set(padKindChange(obj, v as PadKind, nextFreePin(draft)))}
             />
           </Field>
           <Field label="Shape">
-            <Select
+            <FieldSelect
               value={obj.shape}
               options={PAD_SHAPES.map((s) => ({ label: s, value: s }))}
               onChange={(v) => {
@@ -320,7 +320,7 @@ function FpProps({ obj }: { obj: FpObj }) {
       {obj.kind === "text" ? (
         <>
           <Field label="Kind">
-            <Select value={obj.textKind} options={TEXT_KINDS.map((t) => ({ label: t, value: t }))} onChange={(v) => set({ textKind: v as TextKind })} />
+            <FieldSelect value={obj.textKind} options={TEXT_KINDS.map((t) => ({ label: t, value: t }))} onChange={(v) => set({ textKind: v as TextKind })} />
           </Field>
           <Field
             label="Content"
@@ -457,7 +457,7 @@ function PadTable() {
                 key={p.id}
                 className={[
                   "border-b border-border-subtle transition-colors",
-                  p.id === selected ? "bg-bg-brand-subtle" : "hover:bg-bg-surface-raised/50",
+                  p.id === selected ? "bg-bg-brand-subtle" : "hover:bg-bg-surface-raised",
                 ].join(" ")}
               >
                 <td className="w-[56px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
@@ -476,6 +476,7 @@ function PadTable() {
                 <td className="w-[124px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <Select
                     size="sm"
+                    aria-label={`Pad ${padLabel(draft, p.id)} kind`}
                     value={p.padKind}
                     options={PAD_KINDS.map((k) => ({ label: k, value: k }))}
                     onChange={(v) => actions.updateFp(p.id, padKindChange(p, v as PadKind, nextFreePin(draft)))}
@@ -484,6 +485,7 @@ function PadTable() {
                 <td className="w-[128px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <Select
                     size="sm"
+                    aria-label={`Pad ${padLabel(draft, p.id)} shape`}
                     value={p.shape}
                     options={PAD_SHAPES.map((s) => ({ label: s, value: s }))}
                     onChange={(v) => {

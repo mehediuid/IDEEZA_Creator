@@ -19,11 +19,11 @@
 // other step, so the primary action never moves.
 
 import * as React from "react";
-import { Radio, Select, Textarea, TextInput } from "@/components/ideeza";
+import { Radio, Textarea, TextInput } from "@/components/ideeza";
 import { usePackageActions, usePackageDraft } from "@/lib/package/store";
 import { CATEGORIES, type Category, type Visibility, electricalPads, symPins } from "@/lib/package/types";
 import { nextVersion } from "@/lib/package/library";
-import { Field, StepHeading } from "./editor-chrome";
+import { Field, FieldSelect, StepHeading } from "./editor-chrome";
 
 const VIS: { id: Visibility; title: string; body: string; why?: string }[] = [
   {
@@ -65,8 +65,8 @@ export function StepFinalize() {
             />
           </Field>
 
-          <Field width="short" label="Category" htmlFor="pkg-category" hint="One functional taxonomy — this is what search and filters use later.">
-            <Select
+          <Field width="short" label="Category" hint="One functional taxonomy — this is what search and filters use later.">
+            <FieldSelect
               value={draft.category}
               placeholder="Choose a category…"
               options={CATEGORIES.map((c) => ({ label: c, value: c }))}

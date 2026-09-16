@@ -67,6 +67,53 @@ export function StepEntry() {
 function PathChooser() {
   const draft = usePackageDraft();
   const actions = usePackageActions();
+  const refs = React.useRef<(HTMLButtonElement | null)[]>([]);
+
+  // A radiogroup is one Tab stop, not one per option — three cards each taking
+  // a stop is a row of buttons wearing radio roles. Before a path is picked
+  // nothing is checked, so the stop is the first card that can be chosen.
+  //
+  // Selection deliberately does **not** follow focus here, though that is the
+  // usual radiogroup behaviour: picking a path immediately swaps this screen
+  // for that path's own sub-screen and clears whatever the previous path had
+  // filled in, so arrowing past a card would throw away a chosen family.
+  // Arrows move focus, Space and Enter choose — the escape ARIA allows when
+  // following focus has a real cost.
+  const pickable = CARDS.map((c, i) => (c.unavailable ? -1 : i)).filter((i) => i >= 0);
+  const chosen = CARDS.findIndex((c) => c.id === draft.path && !c.unavailable);
+  const at = chosen >= 0 ? chosen : (pickable[0] ?? 0);
+
+  const move = (delta: number) => {
+    if (!pickable.length) return;
+    const here = pickable.indexOf(at);
+    const next = pickable[(((here < 0 ? 0 : here + delta) % pickable.length) + pickable.length) % pickable.length];
+    refs.current[next]?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        e.preventDefault();
+        move(1);
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        e.preventDefault();
+        move(-1);
+        break;
+      case "Home":
+        e.preventDefault();
+        refs.current[pickable[0] ?? 0]?.focus();
+        break;
+      case "End":
+        e.preventDefault();
+        refs.current[pickable[pickable.length - 1] ?? 0]?.focus();
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <div className="flex flex-col gap-[var(--spacing-12)]">
@@ -75,8 +122,8 @@ function PathChooser() {
         just filled in differently depending on where you start.
       </StepHeading>
 
-      <div role="radiogroup" aria-label="Starting path" className="grid grid-cols-1 gap-[var(--spacing-6)] md:grid-cols-3">
-        {CARDS.map((c) => {
+      <div role="radiogroup" aria-label="Starting path" onKeyDown={onKeyDown} className="grid grid-cols-1 gap-[var(--spacing-6)] md:grid-cols-3">
+        {CARDS.map((c, i) => {
           const selected = draft.path === c.id;
           const off = !!c.unavailable;
           return (
@@ -84,6 +131,10 @@ function PathChooser() {
               key={c.id}
               type="button"
               role="radio"
+              ref={(el) => {
+                refs.current[i] = el;
+              }}
+              tabIndex={i === at ? 0 : -1}
               aria-checked={selected}
               aria-disabled={off || undefined}
               disabled={off}

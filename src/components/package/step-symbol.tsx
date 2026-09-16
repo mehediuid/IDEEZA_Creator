@@ -30,7 +30,7 @@ import {
   type TextKind,
   symPins,
 } from "@/lib/package/types";
-import { EditorBody, EditorToolbar, Field, FieldGrid,  SidePanel, StepHeading, ToolbarAction, ToolbarSelect, ToolbarToggle, type ToolDef } from "./editor-chrome";
+import { EditorBody, EditorToolbar, Field, FieldGrid, FieldSelect, SidePanel, StepHeading, ToolbarAction, ToolbarSelect, ToolbarToggle, type ToolDef } from "./editor-chrome";
 import { SymbolCanvas } from "./symbol-canvas";
 
 const TOOLS: readonly ToolDef<SymTool>[] = [
@@ -178,7 +178,7 @@ function SymProps({ obj }: { obj: SymObj }) {
             <TextInput value={obj.name} onValueChange={(v) => set({ name: v })} />
           </Field>
           <Field label="Electrical type">
-            <Select
+            <FieldSelect
               value={obj.etype}
               options={PIN_TYPES.map((t) => ({ label: t, value: t }))}
               onChange={(v) => set({ etype: v as PinType })}
@@ -201,7 +201,7 @@ function SymProps({ obj }: { obj: SymObj }) {
       {obj.kind === "text" ? (
         <>
           <Field label="Kind">
-            <Select
+            <FieldSelect
               value={obj.textKind}
               options={TEXT_KINDS.map((t) => ({ label: t, value: t }))}
               onChange={(v) => set({ textKind: v as TextKind })}
@@ -364,7 +364,7 @@ function PinTable() {
                 key={p.id}
                 className={[
                   "border-b border-border-subtle transition-colors",
-                  p.id === selected ? "bg-bg-brand-subtle" : "hover:bg-bg-surface-raised/50",
+                  p.id === selected ? "bg-bg-brand-subtle" : "hover:bg-bg-surface-raised",
                 ].join(" ")}
               >
                 <td className="w-[64px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
@@ -384,6 +384,7 @@ function PinTable() {
                 <td className="w-[190px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <Select
                     size="sm"
+                    aria-label={`Pin ${p.num} electrical type`}
                     value={p.etype}
                     options={PIN_TYPES.map((t) => ({ label: t, value: t }))}
                     onChange={(v) => actions.updateSym(p.id, { etype: v as PinType })}

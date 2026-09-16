@@ -60,13 +60,13 @@ export function EditorToolbar<T extends string>({
       })}
       {sub ? (
         <>
-          <span aria-hidden className="mx-[var(--spacing-2)] h-[28px] w-px bg-border-default" />
+          <span aria-hidden className="mx-[var(--spacing-2)] h-[28px] w-px bg-border" />
           {sub}
         </>
       ) : null}
       {trailing ? (
         <>
-          <span aria-hidden className="mx-[var(--spacing-2)] h-[28px] w-px bg-border-default" />
+          <span aria-hidden className="mx-[var(--spacing-2)] h-[28px] w-px bg-border" />
           {trailing}
         </>
       ) : null}
@@ -154,13 +154,17 @@ export function ToolbarSelect({
   onChange: (v: string) => void;
   width?: number;
 }) {
+  // A <label> around a Select names nothing: the control it wraps is a
+  // <button role="combobox">, and `label`'s implicit association only reaches
+  // labelable elements (input · select · textarea · button-as-form-control).
+  // The text stays visible and the name is carried explicitly.
   return (
-    <label className="flex items-center gap-[var(--spacing-4)]">
-      <span className="font-display text-2xs font-medium uppercase tracking-caps text-text-tertiary">{label}</span>
+    <div className="flex items-center gap-[var(--spacing-4)]">
+      <span aria-hidden className="font-display text-2xs font-medium uppercase tracking-caps text-text-tertiary">{label}</span>
       <span style={{ width }}>
-        <Select value={value} options={options} onChange={onChange} size="sm" />
+        <Select aria-label={label} value={value} options={options} onChange={onChange} size="sm" />
       </span>
-    </label>
+    </div>
   );
 }
 
@@ -205,6 +209,20 @@ const FIELD_WIDTH = {
   full: undefined,
 } as const;
 
+/** The id of the label a `Field` printed, so a control `<label for>` cannot
+ *  reach can still be named by it. A Select renders a `<button role="combobox">`
+ *  — not a labelable element — so every Select in this flow was announced as an
+ *  unnamed combobox while a perfectly good label sat right above it. */
+const FieldLabelId = React.createContext<string | undefined>(undefined);
+
+/** A Select that takes its accessible name from the `Field` it sits in. Use it
+ *  wherever a Select is inside a Field; a Select outside one still has to carry
+ *  its own `aria-label`. */
+export function FieldSelect(props: React.ComponentProps<typeof Select>) {
+  const labelId = React.useContext(FieldLabelId);
+  return <Select aria-labelledby={props["aria-label"] ? undefined : labelId} {...props} />;
+}
+
 /** Label-over-control, the form rhythm the flow's screenshots use. */
 export function Field({
   label,
@@ -214,18 +232,21 @@ export function Field({
   children,
 }: {
   label: string;
+  /** Only for a control `<label for>` really reaches — an input or a textarea.
+   *  Anything else is named through the context this Field provides. */
   htmlFor?: string;
   hint?: string;
   width?: keyof typeof FIELD_WIDTH;
   children: React.ReactNode;
 }) {
+  const labelId = `${React.useId().replace(/:/g, "")}-label`;
   return (
     <div className="flex min-w-0 flex-col gap-[var(--spacing-3)]">
-      <label htmlFor={htmlFor} className="font-display text-sm font-medium leading-sm text-text-secondary">
+      <label id={labelId} htmlFor={htmlFor} className="font-display text-sm font-medium leading-sm text-text-secondary">
         {label}
       </label>
       <div className="min-w-0" style={{ maxWidth: FIELD_WIDTH[width] }}>
-        {children}
+        <FieldLabelId.Provider value={labelId}>{children}</FieldLabelId.Provider>
       </div>
       {hint ? (
         <span className="max-w-[440px] font-display text-sm font-regular leading-sm text-text-tertiary">{hint}</span>
