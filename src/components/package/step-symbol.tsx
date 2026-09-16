@@ -331,6 +331,54 @@ function SymProps({ obj }: { obj: SymObj }) {
 }
 
 // ── Pin table ───────────────────────────────────────────────────────────────
+/** A pin number is an identity, not a live parameter, so it commits on blur or
+ *  Enter rather than on every keystroke.
+ *
+ *  It used to write straight through `onValueChange`. Typing `12` over `3`
+ *  therefore committed `1` first — and if pin 1 existed, the store refused it
+ *  with "Pin 1 already exists" and the `2` landed on a field that had snapped
+ *  back, so the number you could reach depended on which numbers were taken.
+ *  `parseInt` also took `3x` as 3 and `0` as a silent 1. The buffer holds what
+ *  was typed until the edit is finished, then the value is either a whole
+ *  number 1 or greater — or it is refused by name and the field returns to the
+ *  pin's real number.
+ */
+function PinNumberField({ pin }: { pin: Extract<SymObj, { kind: "pin" }> }) {
+  const actions = usePackageActions();
+  const [typed, setTyped] = React.useState<string | null>(null);
+
+  const commit = (raw: string) => {
+    setTyped(null);
+    const text = raw.trim();
+    if (!text || text === String(pin.num)) return;
+    if (!/^\d+$/.test(text) || Number(text) < 1) {
+      actions.flash(`Pin numbers are whole numbers from 1 — "${raw.trim()}" is not one`);
+      return;
+    }
+    actions.renumberPin(pin.id, Number(text));
+  };
+
+  return (
+    <TextInput
+      size="sm"
+      inputMode="numeric"
+      aria-label={`Pin ${pin.num} number`}
+      value={typed ?? String(pin.num)}
+      onValueChange={setTyped}
+      onBlur={(e) => commit(e.currentTarget.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit(e.currentTarget.value);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setTyped(null);
+        }
+      }}
+    />
+  );
+}
+
 function PinTable() {
   const { draft, selected } = usePackageState();
   const actions = usePackageActions();
@@ -368,15 +416,7 @@ function PinTable() {
                 ].join(" ")}
               >
                 <td className="w-[64px] px-[var(--spacing-3)] py-[var(--spacing-3)]">
-                  <TextInput
-                    size="sm"
-                    aria-label={`Pin ${p.num} number`}
-                    value={String(p.num)}
-                    onValueChange={(v) => {
-                      const n = parseInt(v, 10);
-                      if (Number.isFinite(n) && n > 0) actions.renumberPin(p.id, n);
-                    }}
-                  />
+                  <PinNumberField pin={p} />
                 </td>
                 <td className="px-[var(--spacing-3)] py-[var(--spacing-3)]">
                   <TextInput size="sm" aria-label={`Pin ${p.num} name`} value={p.name} onValueChange={(v) => actions.updateSym(p.id, { name: v })} />

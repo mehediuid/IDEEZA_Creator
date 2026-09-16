@@ -28,9 +28,11 @@ import {
   entrySub,
   initialDraft,
   loadDraft,
+  loadStep,
   newId,
   nextPinNumber,
   saveDraft,
+  saveStep,
   stepIndex,
   symPins,
 } from "./types";
@@ -118,9 +120,11 @@ export function PackageProvider({ children }: { children: React.ReactNode }) {
     const saved = loadDraft();
     // Reading localStorage in the state initialiser would render different
     // markup on the server and the client, and React 19 does not patch a
-    // mismatch up — so the draft is hydrated here, once, on purpose.
+    // mismatch up — so the draft is hydrated here, once, on purpose. The step
+    // comes back with it, clamped to what this draft really opens, so the
+    // flow reopens where it was left instead of always on step 1.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState((s) => ({ ...s, draft: saved }));
+    setState((s) => ({ ...s, draft: saved, step: loadStep(saved) }));
   }, []);
 
   const dirty = React.useRef(false);
@@ -129,6 +133,13 @@ export function PackageProvider({ children }: { children: React.ReactNode }) {
     const t = window.setTimeout(() => saveDraft(stateRef.current.draft), 300);
     return () => window.clearTimeout(t);
   }, [state.draft]);
+
+  // Written on every step change, including the hydrating one — writing back
+  // the step just read is a no-op, and skipping it would lose the step of a
+  // flow the user opens and leaves without touching anything.
+  React.useEffect(() => {
+    saveStep(state.step);
+  }, [state.step]);
 
   const toastTimer = React.useRef<number | null>(null);
   // `renumberPin` reports a collision through `flash`, which is defined in the
@@ -246,9 +257,17 @@ export function PackageProvider({ children }: { children: React.ReactNode }) {
         patch({ symbol: [...d.symbol, ...made] });
       },
 
-      renumberPin: (id, numRaw) => {
+      renumberPin: (id, num) => {
         const d = stateRef.current.draft;
-        const num = Math.max(1, Math.round(numRaw));
+        // Refuse rather than coerce. `Math.max(1, Math.round(n))` used to sit
+        // here, so 0 silently became pin 1 and a NaN — which `Math.max` passes
+        // straight through — was written into the pin *and* every pad pointing
+        // at it. A pin number is an identity; landing on a different one than
+        // the one asked for is worse than not moving at all.
+        if (!Number.isInteger(num) || num < 1) {
+          actionsRef.current?.flash("Pin numbers are whole numbers from 1");
+          return;
+        }
         const taken = symPins(d).some((p) => p.num === num && p.id !== id);
         if (taken) {
           actionsRef.current?.flash(`Pin ${num} already exists`);
@@ -271,7 +290,9 @@ export function PackageProvider({ children }: { children: React.ReactNode }) {
         const rec = savePackage(d);
         clearDraft();
         dirty.current = false;
-        merge({ done: rec, selected: null });
+        // The draft is filed, so the next visit starts a new package rather
+        // than reopening on the step this one finished at.
+        merge({ done: rec, selected: null, step: STEPS[0] });
       },
 
       reset: () => {

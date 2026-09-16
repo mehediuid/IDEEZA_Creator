@@ -472,6 +472,35 @@ export function clearDraft(): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(DRAFT_KEY);
+    window.localStorage.removeItem(STEP_KEY);
+  } catch {}
+}
+
+// The step is stored beside the draft, not inside it: it is where you were,
+// not what you made, and the draft's sanitizer is about the part's own shape.
+// Without this the flow claimed in its own menu that "leaving here and coming
+// back picks up where you left off" and then reopened on step 1 every time —
+// the part survived, the place in the flow did not.
+const STEP_KEY = "ideeza:package:step";
+
+export function loadStep(d: PackageDraft): StepId {
+  if (typeof window === "undefined") return STEPS[0];
+  try {
+    const raw = window.localStorage.getItem(STEP_KEY);
+    const step = (STEPS as readonly string[]).includes(raw ?? "") ? (raw as StepId) : STEPS[0];
+    // A draft edited elsewhere (or a stale key) could name a step its own gates
+    // no longer allow, so the stored step is clamped to the furthest one this
+    // draft really opens.
+    return stepReachable(step, d) ? step : STEPS[0];
+  } catch {
+    return STEPS[0];
+  }
+}
+
+export function saveStep(s: StepId): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STEP_KEY, s);
   } catch {}
 }
 
