@@ -3,13 +3,20 @@
 // Step 5 — Finalize.
 //
 // One name, one category, one visibility decision — made after the part already
-// exists, not before. Every new package starts private; publishing is a
-// deliberate, separate choice made here, and a published package is locked at
-// version 1 so a later edit becomes a new version rather than changing what
-// other people's designs depend on.
+// exists, not before. Every new package starts private, and private is the only
+// destination there is: IDEEZA has no backend yet, so a saved package lives in
+// this browser's localStorage and nobody else can reach it. Publishing is
+// therefore offered but **disabled with the reason** rather than dressed up —
+// a control that files a part under "Community" while no community can see it
+// is a stub wearing a checkbox.
 //
-// The Save / Publish action itself lives in the flow footer, where Next sits on
-// every other step, so the primary action never moves.
+// Versioning, by contrast, is real: the store is append-only by (name,
+// version), so re-saving under a name that already exists files v2 and leaves
+// v1 where it is. That applies to every save, not only a published one — the
+// copy used to tie it to publishing, which was never how the store worked.
+//
+// The Save action itself lives in the flow footer, where Next sits on every
+// other step, so the primary action never moves.
 
 import * as React from "react";
 import { Radio, Select, Textarea, TextInput } from "@/components/ideeza";
@@ -18,16 +25,17 @@ import { CATEGORIES, type Category, type Visibility, electricalPads, symPins } f
 import { nextVersion } from "@/lib/package/library";
 import { Field, StepHeading } from "./editor-chrome";
 
-const VIS: { id: Visibility; title: string; body: string }[] = [
+const VIS: { id: Visibility; title: string; body: string; why?: string }[] = [
   {
     id: "private",
     title: "Save privately",
-    body: "Stays in your personal library. You can publish it later from the confirmation screen.",
+    body: "Goes into your personal library on this browser, and shows up under Personal the next time you place a part.",
   },
   {
     id: "community",
     title: "Publish to community",
-    body: "Listed for anyone to reuse, and locked at version 1 — a later edit creates a new version instead.",
+    why: "There is no community library to publish to yet — everything IDEEZA saves today stays in this browser.",
+    body: "Would list the package for anyone to reuse.",
   },
 ];
 
@@ -87,17 +95,27 @@ export function StepFinalize() {
             <div role="radiogroup" aria-labelledby="pkg-visibility-label" className="flex flex-col gap-[var(--spacing-4)]">
               {VIS.map((v) => {
                 const on = draft.visibility === v.id;
+                // Greyed with the reason, the way every other unbuilt control in
+                // this app is — never hidden, so the decision that is coming is
+                // still visible, and never live, so it cannot lie.
+                const off = !!v.why;
                 return (
                   <button
                     key={v.id}
                     type="button"
                     role="radio"
                     aria-checked={on}
+                    disabled={off}
+                    title={v.why}
                     onClick={() => actions.patch({ visibility: v.id })}
                     className={[
-                      "flex cursor-pointer items-start gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border p-[var(--spacing-6)] text-left outline-none",
+                      "flex items-start gap-[var(--spacing-5)] rounded-[var(--radius-xl)] border p-[var(--spacing-6)] text-left outline-none",
                       "transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                      on ? "border-border-brand bg-bg-surface shadow-1" : "border-border bg-bg-surface hover:border-border-strong",
+                      off
+                        ? "cursor-not-allowed border-border bg-bg-surface"
+                        : on
+                          ? "cursor-pointer border-border-brand bg-bg-surface shadow-1"
+                          : "cursor-pointer border-border bg-bg-surface hover:border-border-strong",
                     ].join(" ")}
                     style={{ borderWidth: "var(--border-width-1)" }}
                   >
@@ -105,8 +123,22 @@ export function StepFinalize() {
                       <Radio decorative checked={on} />
                     </span>
                     <span className="flex min-w-0 flex-col gap-[var(--spacing-1)]">
-                      <span className="font-display text-md font-semibold text-text-primary">{v.title}</span>
-                      <span className="font-display text-sm font-regular leading-relaxed text-text-secondary">{v.body}</span>
+                      <span
+                        className={[
+                          "font-display text-md font-semibold",
+                          off ? "text-text-disabled" : "text-text-primary",
+                        ].join(" ")}
+                      >
+                        {v.title}
+                      </span>
+                      <span
+                        className={[
+                          "font-display text-sm font-regular leading-relaxed",
+                          off ? "text-text-tertiary" : "text-text-secondary",
+                        ].join(" ")}
+                      >
+                        {v.why ?? v.body}
+                      </span>
                     </span>
                   </button>
                 );
@@ -132,11 +164,11 @@ export function StepFinalize() {
               <span className="font-mono text-xs text-text-primary">{v}</span>
             </div>
           ))}
-          {version > 1 ? (
-            <p className="font-display text-sm font-regular leading-sm text-text-tertiary">
-              A package with this name already exists — saving files this as a new version rather than replacing it.
-            </p>
-          ) : null}
+          <p className="font-display text-sm font-regular leading-sm text-text-tertiary">
+            {version > 1
+              ? `A package called this already exists at v${version - 1}. Saving files this as v${version} and leaves the earlier one where it is — the library never overwrites.`
+              : "The library never overwrites: re-saving under this name later files a new version beside this one."}
+          </p>
         </aside>
       </div>
     </div>

@@ -2,9 +2,14 @@
 
 // Confirmation — the last screen in the flow, not a redirect elsewhere.
 //
-// A short summary of what was filed, phrased by visibility: a private package
-// is told it can still be published, a public one is told it is now locked at
-// version 1. From here you can start another package or go to the library.
+// A short summary of what was filed and where it really went: this browser's
+// local library, which is the only library IDEEZA has until there is a backend.
+// The screen used to offer publishing "later" from here, and there is no
+// control here or anywhere else that publishes anything — so it says what did
+// happen instead of what might. The `published` branch is kept for a record
+// saved before the community option was greyed out; it too now says where that
+// record actually is. From here you can start another package or go to the
+// library.
 
 import * as React from "react";
 import Link from "next/link";
@@ -29,8 +34,8 @@ export function StepConfirm({ saved }: { saved: SavedPackage }) {
         </h2>
         <p className="max-w-[620px] font-display text-md font-regular leading-relaxed text-text-secondary">
           {published
-            ? "It is listed in the community library for anyone to reuse, and locked at version 1 — editing it later creates a new version rather than changing what other designs depend on."
-            : "It is in your personal library and shows up under Personal when you place a part. You can publish it to the community later."}
+            ? `It is marked for the community, but there is no community library to reach yet, so for now it sits in this browser\u2019s library like every other package \u2014 under Personal when you place a part. It is filed as v${saved.version}; re-saving under this name later files the next version beside it.`
+            : `It is in your library on this browser and shows up under Personal when you place a part. It is filed as v${saved.version}; re-saving under this name later files the next version beside it rather than replacing it.`}
         </p>
       </div>
 

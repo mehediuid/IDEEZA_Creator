@@ -269,9 +269,9 @@ export function FlowShell({ children }: { children: React.ReactNode }) {
               size="lg"
               onClick={actions.finish}
               disabled={!!blocked}
-              title={blocked ?? (draft.visibility === "community" ? "Publish to the community library" : "Save to your personal library")}
+              title={blocked ?? "Save to your library on this browser"}
             >
-              {draft.visibility === "community" ? "Publish" : "Save"}
+              Save
             </Button>
           ) : (
             <Button

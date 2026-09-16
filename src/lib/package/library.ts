@@ -1,9 +1,13 @@
-// Where a finished package goes.
+// Where a finished package goes: this browser's localStorage, which is the only
+// library IDEEZA has until there is a backend. "Community" is a value the model
+// can hold and a destination nothing can reach, so Finalize greys that choice
+// out with the reason rather than filing parts under a library nobody can see.
 //
-// Every new package starts private; publishing is the deliberate, separate
-// choice made on Finalize. A published package is locked at version 1 — a later
-// edit has to create a new version rather than changing what other people's
-// designs already depend on, so the store is append-only by (name, version).
+// The store is **append-only by (name, version)** and that part is real, for
+// every package: re-saving under a name that already exists files the next
+// version and leaves the earlier one untouched, so nothing a design already
+// points at is edited out from under it. This used to be described as a
+// consequence of publishing; it was never conditional on it.
 //
 // The rows are also surfaced to the Place-a-Part picker's Personal rail through
 // part-catalog.ts, so an authored package is a real, findable part rather than
@@ -29,7 +33,7 @@ export type SavedPackage = {
   category: Category;
   description: string;
   visibility: Visibility;
-  /** Locked at 1 on publish; a later edit is a new version, not an overwrite. */
+  /** 1 for a new name, n+1 for a re-save — the store never overwrites. */
   version: number;
   createdAt: string;
   /** How the part's data got here — reported on the confirmation screen. */
