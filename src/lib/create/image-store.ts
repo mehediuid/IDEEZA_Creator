@@ -121,6 +121,10 @@ const BLOB_PREFIX = "concept-images";
  *  bearer differs, and the store id always rides its own header because it
  *  is not encoded in an OIDC token. */
 function blobAuth(): { token: string; storeId: string } | null {
+  // Why this is logged: a store that cannot authenticate looks exactly like a
+  // store that is not configured — both fall through to the disk driver and,
+  // on a read-only filesystem, both surface as the same generic failure.
+  // Knowing which is the difference between a five-minute fix and a hunt.
   const rw = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (rw) {
     // vercel_blob_rw_<storeId>_<secret>
@@ -136,6 +140,14 @@ function blobAuth(): { token: string; storeId: string } | null {
         : stored,
     };
   }
+  console.error(
+    "[blob] no credentials — BLOB_READ_WRITE_TOKEN:",
+    Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+    "VERCEL_OIDC_TOKEN:",
+    Boolean(process.env.VERCEL_OIDC_TOKEN),
+    "BLOB_STORE_ID:",
+    Boolean(process.env.BLOB_STORE_ID),
+  );
   return null;
 }
 

@@ -217,7 +217,11 @@ export async function GET(req: NextRequest) {
         provider: step.rendered.provider,
         contentType: step.rendered.contentType,
       });
-    } catch {
+    } catch (err) {
+      // The user gets one honest sentence; the operator needs the detail, and
+      // swallowing it here is what turned a storage misconfiguration into a
+      // guessing game.
+      console.error("[concept] storing the render failed:", err);
       return failed(new RenderError("storage"));
     }
     return NextResponse.json({ status: "ready", imageUrl: stored.url });
