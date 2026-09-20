@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
       prompt,
       imageUrl: imageUrl || undefined,
       seed: typeof body.seed === "number" ? body.seed : undefined,
+      // Concept images are served by this app, and the image-to-3D provider
+      // fetches them from its own servers, so it needs to know where we are.
+      origin: request.nextUrl.origin,
     });
     return NextResponse.json(result);
   } catch (err) {

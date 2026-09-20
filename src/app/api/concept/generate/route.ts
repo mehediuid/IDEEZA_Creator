@@ -1,109 +1,90 @@
 // POST /api/concept/generate
 //
-// Phase 1 concept image generation — REAL, prompt-driven, via Pollinations.
-// The returned image actually reflects the prompt.
-//
-// Rendering a NEW image is no longer anonymous: Pollinations bills each
-// generation against an account balance and refuses an unauthenticated
-// caller with 402 INSUFFICIENT_BALANCE (wrapped in its own 500). So the
-// warm request carries POLLINATIONS_TOKEN when one is set, the same
-// env-key-or-degrade shape the 3D module's MESHY_API_KEY uses. Reading an
-// image it has ALREADY rendered is still free and unauthenticated, which
-// is why the browser can load the returned URL with no token of its own.
+// Phase 1 concept image generation — REAL, prompt-driven, and free.
 //
 //   • fresh   — generate from the prompt with a new random seed (each fresh
 //               take / regenerate is a genuinely different image).
-//   • refine  — evolve the parent: append the requested change to the parent's
-//               prompt and keep its seed, so it stays the same concept, changed.
+//   • refine  — evolve the parent: append the requested change to the
+//               parent's prompt and keep its seed, so it stays the same
+//               concept, changed.
 //
-// We "warm" the image server-side (wait until Pollinations has actually
-// rendered it) before returning the URL, so the UI's existing pending → ready
-// flow shows the shimmer until the image is genuinely available, then the
-// <img> loads it from the CDN cache instantly.
+// The generator itself lives in lib/create/image-gen.ts, which hands back
+// BYTES. Those bytes are stored (lib/create/image-store.ts) and this route
+// returns a URL of our own. That is a deliberate change from the original
+// design, which passed the generator's URL straight through: every free
+// generator now returns either bytes or a link that expires — the AI Horde's
+// is presigned for thirty minutes — while this URL is written into the
+// user's localStorage chat history and rendered again days later.
+//
+// Runtime is nodejs rather than edge because the store writes to disk.
 //
 // Request:  { prompt: string, kind: "fresh" | "refine", parentImageUrl?: string }
 // Response: { imageUrl: string }
-//           | { error, reason: "provider-credit" | "busy" } on failure,
-//             which the card turns into the sentence for that reason.
+//           | { error, reason: "provider-credit" | "busy" | "unreachable"
+//                      | "parent-lost" } on failure, which the card turns into
+//             the sentence for that reason.
 
 import { NextResponse } from "next/server";
+import {
+  PROMPT_BUDGET,
+  RenderError,
+  generate,
+  type FailReason,
+} from "@/lib/create/image-gen";
+import { idFromUrl, put, readMeta, urlFor } from "@/lib/create/image-store";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
-const POLLINATIONS = "https://image.pollinations.ai/prompt";
-const MAX_ATTEMPTS = 3;
-const TIMEOUT_MS = 35_000;
-
-/** Why a render did not happen. The two are different to the user: one
- *  clears by itself, the other cannot be retried into working. */
-type WarmResult = "ok" | "busy" | "unpaid";
-
-// Server-side only. The token must never reach the returned URL — that URL
-// is stored in the chat and loaded by the browser, so a token in its query
-// string would be handed to every reader of the thread.
-function authHeaders(): Record<string, string> {
-  const token = process.env.POLLINATIONS_TOKEN?.trim();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function enhance(prompt: string): string {
-  return `${prompt.slice(0, 320)}, product concept render, photoreal, high detail, clean studio background, no text`;
-}
-
-function pollinationsUrl(prompt: string, seed: string | number): string {
-  return `${POLLINATIONS}/${encodeURIComponent(prompt.slice(0, 400))}?width=640&height=480&nologo=true&model=flux&seed=${seed}`;
-}
-
-// Recover the prompt + seed from a previously-issued Pollinations URL so a
-// refine can evolve the same concept.
-function parseParent(url: string): { prompt: string; seed: string } {
+/** Recover a parent's prompt and seed so a refine evolves the same concept.
+ *  Our own URLs carry an id into the store; a Pollinations URL from before
+ *  this change encodes them in its path, and those are still sitting in
+ *  people's chats, so both are read. */
+async function parentOf(
+  url: string,
+): Promise<{ prompt: string; seed: string } | null> {
+  const id = idFromUrl(url);
+  if (id) {
+    const meta = await readMeta(id);
+    return meta ? { prompt: meta.prompt, seed: meta.seed } : null;
+  }
   try {
-    const u = new URL(url);
+    const u = new URL(url, "http://localhost");
     const i = u.pathname.indexOf("/prompt/");
-    const raw = i >= 0 ? u.pathname.slice(i + "/prompt/".length) : "";
+    if (i < 0) return null;
+    const raw = u.pathname.slice(i + "/prompt/".length);
+    if (!raw) return null;
     return {
-      prompt: raw ? decodeURIComponent(raw) : "",
+      prompt: decodeURIComponent(raw),
       seed: u.searchParams.get("seed") || "1",
     };
   } catch {
-    return { prompt: "", seed: "1" };
+    return null;
   }
 }
 
-// Fetch the image once so generation completes + the CDN caches it. Retries a
-// busy queue (429) and a transient 5xx; a billing refusal returns at once.
-async function warm(url: string): Promise<WarmResult> {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    try {
-      const res = await fetch(url, {
-        signal: ctrl.signal,
-        headers: { Accept: "image/*", ...authHeaders() },
-      });
-      clearTimeout(timer);
-      const ct = res.headers.get("content-type") || "";
-      if (res.ok && ct.startsWith("image/")) return "ok";
-      // Pollinations reports a billing refusal as its OWN 500 carrying the
-      // upstream 402 in the body, so the status alone cannot tell a busy
-      // queue from a request that can never be served. Retrying this one
-      // spends two minutes of spinner to arrive at the same answer.
-      if (res.status === 402 || ct.includes("json")) {
-        const body = await res.text().catch(() => "");
-        if (res.status === 402 || /INSUFFICIENT_BALANCE|\b402\b/.test(body)) {
-          return "unpaid";
-        }
-      }
-      if (!(res.status === 429 || res.status >= 500)) return "busy";
-    } catch {
-      clearTimeout(timer);
-    }
-    if (attempt < MAX_ATTEMPTS) await sleep(2500 * attempt);
-  }
-  return "busy";
-}
+// One row per way this can fail, because the card says a different sentence
+// for each and the user needs a different instruction from each.
+const COPY: Record<
+  FailReason,
+  { error: string; reason: string; status: number }
+> = {
+  unpaid: {
+    error:
+      "The image service refused the render — the account it bills has no credit.",
+    reason: "provider-credit",
+    status: 402,
+  },
+  busy: {
+    error: "Image generation is busy — try again in a moment.",
+    reason: "busy",
+    status: 503,
+  },
+  unreachable: {
+    error: "Couldn't reach the image generator.",
+    reason: "unreachable",
+    status: 502,
+  },
+};
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -134,42 +115,50 @@ export async function POST(req: Request) {
     );
   }
 
-  let finalPrompt: string;
-  let seed: string | number;
+  let finalPrompt = prompt;
+  // A fresh take is a different image every time, so it gets a new seed.
+  let seed = String(Math.floor(Math.random() * 1_000_000_000));
   if (kind === "refine" && parentImageUrl) {
-    const parent = parseParent(parentImageUrl);
-    finalPrompt = parent.prompt
-      ? `${parent.prompt.slice(0, 300)}, ${prompt.slice(0, 80)}`
-      : enhance(prompt);
+    const parent = await parentOf(parentImageUrl);
+    if (!parent) {
+      // Rendering the change on its own would answer "make it matte black"
+      // with a matte black anything, bill a credit for it and label it a
+      // refine of a concept it has nothing to do with. Saying so is the
+      // only honest answer, and it is what gets the credit refunded.
+      return NextResponse.json(
+        {
+          error:
+            "The concept this refines is no longer on the server, so there was nothing to evolve.",
+          reason: "parent-lost",
+        },
+        { status: 409 },
+      );
+    }
+    // Composed inside enhance()'s budget rather than over it. The cut happens
+    // before the boilerplate is appended, so whatever overflows is the change
+    // the user just typed — and a refine chain grows the parent every time,
+    // which would silently eat more of it with each pass.
+    const change = prompt.slice(0, 80);
+    finalPrompt = `${parent.prompt.slice(0, PROMPT_BUDGET - change.length - 2)}, ${change}`;
     seed = parent.seed; // same seed → same concept, evolved by the change
-  } else {
-    finalPrompt = enhance(prompt);
-    seed = Math.floor(Math.random() * 1_000_000_000); // fresh take each time
   }
 
-  const imageUrl = pollinationsUrl(finalPrompt, seed);
-  const result = await warm(imageUrl);
-  // The reason travels to the client, because "try again in a moment" and
-  // "this cannot work until someone tops the account up" are different
-  // instructions and the card has to give the right one.
-  if (result === "unpaid") {
+  try {
+    const rendered = await generate(finalPrompt, seed);
+    const id = await put(rendered.bytes, {
+      prompt: finalPrompt,
+      seed: rendered.seed,
+      provider: rendered.provider,
+      contentType: rendered.contentType,
+    });
+    return NextResponse.json({ imageUrl: urlFor(id) });
+  } catch (err) {
+    const reason: FailReason =
+      err instanceof RenderError ? err.reason : "unreachable";
+    const copy = COPY[reason];
     return NextResponse.json(
-      {
-        error:
-          "The image service refused the render — the account it bills has no credit.",
-        reason: "provider-credit",
-      },
-      { status: 402 },
+      { error: copy.error, reason: copy.reason },
+      { status: copy.status },
     );
   }
-  if (result !== "ok") {
-    return NextResponse.json(
-      {
-        error: "Image generation is busy — try again in a moment.",
-        reason: "busy",
-      },
-      { status: 503 },
-    );
-  }
-  return NextResponse.json({ imageUrl });
 }

@@ -8,12 +8,15 @@
 //               whole flow (prompt → concept image → 3D viewer) is visible and
 //               testable immediately, with a short simulated "generating" pass.
 //
-// A text prompt is first turned into a concept image via Pollinations (the
-// same service the concept chat uses — rendering a new image bills an
-// account, so POLLINATIONS_TOKEN is sent when set; reading one it has
-// already rendered stays free and keyless), then that image is fed to
-// image-to-3D. Image-to-3D is one reliable call (vs. Meshy's two-step
+// A text prompt is first turned into a concept image by the same free
+// generator the concept chat uses (lib/create/image-gen.ts — the AI Horde by
+// default, no account needed), and the bytes are stored by lib/create/
+// image-store.ts, so this module and the chat produce the same kind of URL.
+// That image is then fed to image-to-3D. Image-to-3D is one reliable call (vs. Meshy's two-step
 // text-to-3D), so this path is simpler AND keeps the image step free.
+
+import { generate } from "@/lib/create/image-gen";
+import { put, urlFor } from "@/lib/create/image-store";
 
 export type ThreeProvider = "meshy" | "demo";
 export type TaskStatus = "queued" | "generating" | "ready" | "failed";
@@ -33,54 +36,45 @@ export type PollResult = {
   error?: string;
 };
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─────────────────────────── concept image ─────────────────────────────
-
-const POLLINATIONS = "https://image.pollinations.ai/prompt";
 
 function enhanceForModel(prompt: string): string {
   // A clean, centered, single object on a plain background gives image-to-3D
   // the best chance at a coherent mesh.
-  return `${prompt.slice(0, 280)}, single product, centered, full object in frame, plain seamless studio background, soft even lighting, photoreal, high detail, no text`;
+  return `${prompt.slice(0, 200)}, single product, centered, full object in frame, plain seamless studio background, soft even lighting`;
 }
 
-export function conceptImageUrl(prompt: string, seed: number): string {
-  const p = encodeURIComponent(enhanceForModel(prompt));
-  return `${POLLINATIONS}/${p}?width=768&height=768&nologo=true&model=flux&seed=${seed}`;
+/** Render a concept image and keep it. Returns the app-relative URL, the same
+ *  shape the concept chat stores — see image-store.ts for why the bytes are
+ *  ours rather than the provider's link. */
+export async function renderConceptImage(prompt: string): Promise<string> {
+  const rendered = await generate(
+    enhanceForModel(prompt),
+    String(Math.floor(Math.random() * 1_000_000_000)),
+  );
+  const id = await put(rendered.bytes, {
+    prompt,
+    seed: rendered.seed,
+    provider: rendered.provider,
+    contentType: rendered.contentType,
+  });
+  return urlFor(id);
 }
 
-// Ask Pollinations to actually render the image before we hand the URL to the
-// 3D provider (so the provider's fetch hits a ready image, not a cold miss).
-// Best-effort: if warming fails we still return the URL — the provider's own
-// fetch will trigger the (deterministic) render.
-//
-// The token rides the header, never the URL: the URL is handed to the 3D
-// provider and shown in the browser.
-function pollinationsAuth(): Record<string, string> {
-  const token = process.env.POLLINATIONS_TOKEN?.trim();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-export async function warmImage(url: string): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 30_000);
-      const res = await fetch(url, {
-        signal: ctrl.signal,
-        headers: pollinationsAuth(),
-      });
-      clearTimeout(t);
-      if (res.ok && (res.headers.get("content-type") ?? "").startsWith("image")) {
-        return;
-      }
-    } catch {
-      // fall through to retry
-    }
-    await sleep(1500);
+/** Meshy fetches the image from its own servers, so it needs an absolute URL
+ *  it can actually reach. Our images are served from this app, so the caller
+ *  has to say where this app is. */
+function absolute(url: string, origin: string | undefined): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!origin) {
+    throw new Error(
+      "image-to-3D needs an absolute image URL — pass the request origin",
+    );
   }
+  return new URL(url, origin).toString();
 }
+
 
 // ─────────────────────────── Meshy provider ────────────────────────────
 
@@ -183,24 +177,23 @@ export async function createTask(input: {
   prompt?: string;
   imageUrl?: string;
   seed?: number;
+  /** Where this app is reachable, for the provider that fetches the image. */
+  origin?: string;
 }): Promise<CreateResult> {
-  const seed = input.seed ?? Math.floor(Math.random() * 1_000_000);
   let imageUrl = input.imageUrl?.trim() || "";
-  const freshImage = !imageUrl;
   if (!imageUrl) {
     const prompt = (input.prompt ?? "").trim();
     if (!prompt) throw new Error("need a prompt or an image");
-    imageUrl = conceptImageUrl(prompt, seed);
+    imageUrl = await renderConceptImage(prompt);
   }
 
   const provider = activeProvider();
   if (provider === "meshy") {
-    // Make sure the (deterministic) Pollinations image has actually rendered
-    // before Meshy fetches it. The latency here is dwarfed by Meshy's own
-    // multi-minute generation, so it's effectively free — and it avoids handing
-    // Meshy a cold URL. (Skipped when the caller passed a ready image.)
-    if (freshImage) await warmImage(imageUrl);
-    const taskId = await meshyCreate(imageUrl);
+    // Meshy fetches the image itself, so a path relative to this app is no
+    // use to it — and every concept image is now served from this app.
+    // Honest limit: on a host the outside world cannot reach (localhost, a
+    // private network) there is no URL that works, and Meshy will fail.
+    const taskId = await meshyCreate(absolute(imageUrl, input.origin));
     return { provider, taskId, imageUrl };
   }
   // Demo: return instantly so the UI can show the concept image right away

@@ -37,7 +37,12 @@ export type AssistantTurnKind = "fresh" | "refine";
  *  sentence for each, because only one of them is worth retrying and only
  *  one of them is the user's own balance. An older turn carries none, and
  *  reads as the generic failure it was stored as. */
-export type ConceptFailReason = "provider-credit" | "busy" | "credits";
+export type ConceptFailReason =
+  | "provider-credit"
+  | "busy"
+  | "unreachable"
+  | "parent-lost"
+  | "credits";
 
 export type ChatTurn =
   | {
