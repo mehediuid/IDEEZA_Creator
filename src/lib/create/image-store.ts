@@ -32,6 +32,7 @@
 // /tmp would not have saved it either — the next request can land on another
 // instance, and the image would 404.
 
+import { headers } from "next/headers";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -120,18 +121,32 @@ const BLOB_PREFIX = "concept-images";
  *  BLOB_STORE_ID separately. The request is otherwise identical — only the
  *  bearer differs, and the store id always rides its own header because it
  *  is not encoded in an OIDC token. */
-function blobAuth(): { token: string; storeId: string } | null {
-  // Why this is logged: a store that cannot authenticate looks exactly like a
-  // store that is not configured — both fall through to the disk driver and,
-  // on a read-only filesystem, both surface as the same generic failure.
-  // Knowing which is the difference between a five-minute fix and a hunt.
+/** The OIDC token is NOT an environment variable in a deployed function. The
+ *  platform injects it as the `x-vercel-oidc-token` REQUEST HEADER, and the
+ *  env var exists only as the local-development fallback — which is exactly
+ *  why the store wrote happily from a laptop and fell through to the disk in
+ *  production. Read out of @vercel/oidc 3.8.8:
+ *
+ *    getContext().headers?.["x-vercel-oidc-token"] ?? process.env.VERCEL_OIDC_TOKEN
+ */
+async function oidcToken(): Promise<string | null> {
+  try {
+    const fromHeader = (await headers()).get("x-vercel-oidc-token")?.trim();
+    if (fromHeader) return fromHeader;
+  } catch {
+    // Called outside a request scope; the env fallback is all there is.
+  }
+  return process.env.VERCEL_OIDC_TOKEN?.trim() || null;
+}
+
+async function blobAuth(): Promise<{ token: string; storeId: string } | null> {
   const rw = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (rw) {
     // vercel_blob_rw_<storeId>_<secret>
     return { token: rw, storeId: rw.split("_")[3] ?? "" };
   }
-  const oidc = process.env.VERCEL_OIDC_TOKEN?.trim();
   const stored = process.env.BLOB_STORE_ID?.trim();
+  const oidc = stored ? await oidcToken() : null;
   if (oidc && stored) {
     return {
       token: oidc,
@@ -140,18 +155,22 @@ function blobAuth(): { token: string; storeId: string } | null {
         : stored,
     };
   }
+  // A store that cannot authenticate looks exactly like one that is not
+  // configured: both fall through to the disk driver and, on a read-only
+  // filesystem, both surface as the same generic failure. Knowing which is
+  // the difference between a five-minute fix and a hunt.
   console.error(
-    "[blob] no credentials — BLOB_READ_WRITE_TOKEN:",
-    Boolean(process.env.BLOB_READ_WRITE_TOKEN),
-    "VERCEL_OIDC_TOKEN:",
-    Boolean(process.env.VERCEL_OIDC_TOKEN),
-    "BLOB_STORE_ID:",
-    Boolean(process.env.BLOB_STORE_ID),
+    "[blob] no credentials — rwToken:",
+    Boolean(rw),
+    "storeId:",
+    Boolean(stored),
+    "oidc:",
+    Boolean(oidc),
   );
   return null;
 }
 
-type BlobAuth = NonNullable<ReturnType<typeof blobAuth>>;
+type BlobAuth = { token: string; storeId: string };
 
 function blobHeaders(auth: BlobAuth): Record<string, string> {
   return {
@@ -229,7 +248,7 @@ export async function put(
   const contentType = safeType(meta.contentType);
   const record: ImageMeta = { ...meta, contentType, ts: Date.now() };
 
-  const auth = blobAuth();
+  const auth = await blobAuth();
   if (auth) {
     await blobPut(auth, imagePath(id), bytes, contentType);
     await blobPut(auth, metaPath(id), JSON.stringify(record), "application/json");
@@ -267,7 +286,7 @@ export async function readMeta(url: string): Promise<ImageMeta | null> {
 
 async function readRecord(id: string): Promise<Partial<ImageMeta> | null> {
   if (!ID.test(id)) return null;
-  const auth = blobAuth();
+  const auth = await blobAuth();
   if (auth) {
     const bytes = await blobGet(auth, metaPath(id)).catch(() => null);
     if (!bytes) return null;
@@ -294,7 +313,7 @@ export async function read(
   const meta = await readMeta(urlFor(id));
   if (!meta) return null;
 
-  const auth = blobAuth();
+  const auth = await blobAuth();
   if (auth) {
     const bytes = await blobGet(auth, imagePath(id)).catch(() => null);
     // The stored type wins over whatever the transport reports: it is the one
