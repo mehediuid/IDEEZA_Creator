@@ -88,3 +88,130 @@ export function parseCompanions(raw: unknown): CompanionPlan | null {
 // The cost of a selection lives with the prices it is made of, in
 // credits.tsx — see `estimateFor`. This module is imported by an edge
 // route, so it stays free of the client-only store.
+
+// ─────────────────── the rule, for when no model answers ───────────────────
+//
+// The header above says the fallback is no companions, and that was right
+// while a model was answering: an unparseable reply is not evidence of a
+// system. But the text provider this app used has stopped serving, so every
+// build now takes that path, and the feature reads as "your product needs
+// nothing" when in truth nothing ran. Silence that looks like an answer is
+// its own kind of lie.
+//
+// So there is a second answer below the model: a small table of the product
+// families where a companion really is a SEPARATE product, matched on the
+// prompt. It is deliberately narrow and deliberately conservative — no match
+// means single product, which is still the common case and still the honest
+// default. It cannot invent: every companion it offers is written here, by
+// hand, for a family where the answer is not in doubt. A drone is flown with
+// a controller; earbuds live in a case.
+//
+// This is a rule, not a judgement. It knows nothing the table does not say,
+// and the model takes precedence the moment one is reachable again.
+
+// Plurals are spelled out on every head noun: a prompt says "wireless
+// earbuds", and \bearbud\b does not match that — a missing "s?" silently
+// drops an entire product family with no error anywhere.
+type Rule = {
+  /** What the prompt has to mention. */
+  match: RegExp;
+  /** Ruled out even when `match` hits — a phrase that means the companion is
+   *  already inside this product rather than beside it. */
+  unless?: RegExp;
+  companions: { name: string; why: string }[];
+};
+
+const RULES: Rule[] = [
+  {
+    match: /\b(drones?|quadcopters?|quadrotors?|uavs?|multirotors?|rc (planes?|cars?|boats?|trucks?|helicopters?))\b/i,
+    companions: [
+      {
+        name: "Remote controller",
+        why: "The craft is flown from a separate handheld unit with its own radio and battery.",
+      },
+      {
+        name: "Battery charger",
+        why: "Flight packs are charged off the aircraft, in their own balance charger.",
+      },
+    ],
+  },
+  {
+    match: /\b(earbuds?|earphones?|earpieces?|in-ear|tws)\b/i,
+    companions: [
+      {
+        name: "Charging case",
+        why: "The buds are stored and recharged in a case that carries its own cell.",
+      },
+    ],
+  },
+  {
+    match: /\b(sensor nodes?|soil sensors?|weather stations?|field sensors?|remote sensors?|lora nodes?|mesh nodes?|wireless sensors?)\b/i,
+    companions: [
+      {
+        name: "Base station",
+        why: "The nodes report to a receiver that holds the radio link and the uplink.",
+      },
+    ],
+  },
+  {
+    match: /\b(smart locks?|door locks?|doorbells?|intercoms?)\b/i,
+    companions: [
+      {
+        name: "Indoor chime",
+        why: "The outdoor unit needs something inside the house to announce a caller.",
+      },
+      {
+        name: "Key fob",
+        why: "A separate credential to open the lock without a phone.",
+      },
+    ],
+  },
+  {
+    match: /\b(robot vacuums?|robotic vacuums?|lawn ?mower robots?|robot mowers?)\b/i,
+    companions: [
+      {
+        name: "Charging dock",
+        why: "The robot returns to a powered base to recharge and park itself.",
+      },
+    ],
+  },
+  {
+    match: /\b(fitness (bands?|trackers?)|smart ?watch(es)?|wearables?|activity bands?)\b/i,
+    // A watch with a plain USB port charges from a cable, which is not a
+    // product of its own.
+    unless: /\busb[- ]?c?\s*(port|charging|cable)\b/i,
+    companions: [
+      {
+        name: "Charging dock",
+        why: "A sealed wearable takes power through its own contact dock rather than a socket.",
+      },
+    ],
+  },
+  {
+    match: /\b(wireless microphones?|lav(alier)? mics?|body ?packs?|clip-on mics?)\b/i,
+    companions: [
+      {
+        name: "Receiver unit",
+        why: "The transmitter is worn; the audio has to arrive somewhere with its own output.",
+      },
+    ],
+  },
+];
+
+/** The deterministic answer, when no model is reachable. Conservative by
+ *  construction: anything outside the table is a single product. */
+export function classifyByRule(text: string): CompanionPlan {
+  for (const rule of RULES) {
+    if (!rule.match.test(text)) continue;
+    if (rule.unless?.test(text)) continue;
+    return {
+      isSystem: true,
+      companions: rule.companions.map((c) => ({
+        id: companionId(c.name),
+        name: c.name,
+        why: c.why,
+      })),
+    };
+  }
+  return SINGLE_PRODUCT;
+}

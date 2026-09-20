@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import {
-  SINGLE_PRODUCT,
+  classifyByRule,
   parseCompanions,
   type CompanionPlan,
 } from "@/lib/create/companions";
@@ -95,6 +95,10 @@ export async function POST(req: Request) {
   // The title is what the summarizer decided this product *is*, so it is
   // the better subject for the question when we have one.
   const ask = title ? `${title}. ${prompt}` : prompt;
-  const plan = (await classifyWithAI(ask)) ?? SINGLE_PRODUCT;
+  // The model first — it is the only one that can reason about a product the
+  // table has never heard of. When it cannot answer, the rule does, and when
+  // the rule has nothing either the answer is a single product, which is both
+  // the honest default and the common case.
+  const plan = (await classifyWithAI(ask)) ?? classifyByRule(ask);
   return NextResponse.json(plan);
 }
