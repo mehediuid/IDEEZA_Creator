@@ -20,7 +20,9 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
+  Cancel01Icon,
   Clock01Icon,
   CodeIcon,
   CpuIcon,
@@ -37,6 +39,8 @@ import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
   elapsedMinutes,
+  isOverrunning,
+  productsOf,
   queuedAhead,
   rollupBuild,
   statusOf,
@@ -72,8 +76,9 @@ export type StateRow = {
   // credits pause, where the one thing that moves the build on is a
   // top-up.
   footerLink: { label: string; href: string };
-  // The whole-build retry, offered only when the whole build died.
-  actions?: "retryAll";
+  // The whole-build action this state offers: the retry after a system
+  // failure, or the cancel a queued build is allowed (Part 4 §4.6).
+  actions?: "retryAll" | "cancelQueued";
 };
 
 const HOME_LINK = { label: "Back to home", href: "/" } as const;
@@ -89,10 +94,25 @@ function minutes(n: number): string {
   return `${n} ${n === 1 ? "minute" : "minutes"}`;
 }
 
+// The artifacts in that state, named for the copy. On a multi-product
+// build (§4.4) the product is named too, because "the PCB step failed"
+// would not say whose — and §4.4.9's whole point is that the user should
+// see where the problem is.
 function labelsOf(job: BuildJob, status: BuildItem["status"]): string[] {
-  return job.items
-    .filter((i) => i.status === status)
-    .map((i) => ITEM_LABELS[i.kind]);
+  const products = productsOf(job);
+  const multi = products.length > 1;
+  const out: string[] = [];
+  for (const product of products) {
+    for (const item of product.items) {
+      if (item.status !== status) continue;
+      out.push(
+        multi
+          ? `${product.name} ${ITEM_LABELS[item.kind]}`
+          : ITEM_LABELS[item.kind],
+      );
+    }
+  }
+  return out;
 }
 
 // What this build is, said once. Everything the page renders — badge,
@@ -119,6 +139,7 @@ export function stateRowFor(
         body: "Top up and it starts automatically. Nothing is charged until it does.",
       },
       meta: "Waiting for credits",
+      actions: "cancelQueued",
       footer: "Your place in the queue is kept — nothing else is needed from you.",
       footerLink: { label: "Top up credits →", href: "/history#credits" },
     };
@@ -139,6 +160,7 @@ export function stateRowFor(
         } Credits are only charged once your build starts.`,
       },
       meta: "Free plan runs one build at a time",
+      actions: "cancelQueued",
       footer: next
         ? "You're next in the queue. We'll start automatically and notify you — no need to wait here."
         : "We'll start it automatically and notify you — no need to wait here.",
@@ -268,7 +290,10 @@ export function useMinuteClock(): number {
 }
 
 export function BuildStatus({ job }: { job: BuildJob }) {
-  const { builds, retryBuildItem, retryBuild } = useCreateHistory();
+  const { builds, retryBuildItem, retryBuild, cancelBuild, failBuildSystem } =
+    useCreateHistory();
+  const router = useRouter();
+  const products = productsOf(job);
   const now = useMinuteClock();
   const row = stateRowFor(job, now, queuedAhead(job, builds));
   // The whole build died, so no single row failed to generate — none of
@@ -282,27 +307,115 @@ export function BuildStatus({ job }: { job: BuildJob }) {
     >
       <ConceptHeader job={job} row={row} />
 
+      {/* Part 4 §4.6 — past roughly twice the estimate the job has stopped
+          looking like one that will finish. Unlike the queued cancel, this
+          one IS owed a refund: the build is running, so it has been
+          charged. Marking it a system failure is what returns the money —
+          the simulator's own refund effect watches for exactly that, so
+          there is one refund path rather than a second one here. */}
+      {isOverrunning(job, now) && (
+        <div className="flex flex-col gap-[10px] rounded-xl border border-solid border-[var(--color-border-warning)] bg-bg-warning-subtle p-[14px]">
+          <div>
+            <p className="text-md font-semibold text-text-primary">
+              This build is taking much longer than expected
+            </p>
+            <p className="mt-[2px] text-sm text-text-secondary">
+              It has run past twice its estimate. You can stop it and get your{" "}
+              {BUILD_COST} credits back.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => failBuildSystem(job.id)}
+            className="inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={Cancel01Icon} size={16} />
+            Stop and refund
+          </button>
+        </div>
+      )}
+
       {row.banner && (
         <Banner tone={BANNER_TONE[row.banner.tone]} title={row.banner.title}>
           {row.banner.body}
         </Banner>
       )}
 
-      <ul role="list" className="flex flex-col gap-[10px]">
-        {job.items.map((item) => (
-          <BuildItemRow
-            key={item.kind}
-            item={item}
-            systemFailure={systemFailure}
-            onRetry={() => retryBuildItem(job.id, item.kind)}
-          />
-        ))}
-      </ul>
+      {/* §4.7 — one group per product. A single-product build is the
+          bare list it has always been; a multi-product one names each
+          product above its own five artifacts, because §4.4.9 wants the
+          user to see *where* a problem is, not just that there is one. */}
+      {products.length === 1 ? (
+        <ul role="list" className="flex flex-col gap-[10px]">
+          {job.items.map((item) => (
+            <BuildItemRow
+              key={item.kind}
+              item={item}
+              systemFailure={systemFailure}
+              onRetry={() => retryBuildItem(job.id, item.kind)}
+            />
+          ))}
+        </ul>
+      ) : (
+        <div className="flex flex-col gap-[16px]">
+          {products.map((product) => (
+            <section
+              key={product.id}
+              aria-label={product.name}
+              data-testid="build-product"
+              className="flex flex-col gap-[10px]"
+            >
+              {/* No glyph: PackageIcon already means the Parts artifact
+                  two rows below, and one glyph may not carry two
+                  meanings. The label alone is what names a product. */}
+              <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
+                {product.name}
+              </h3>
+              <ul role="list" className="flex flex-col gap-[10px]">
+                {product.items.map((item) => (
+                  <BuildItemRow
+                    key={item.kind}
+                    item={item}
+                    systemFailure={systemFailure}
+                    onRetry={() =>
+                      retryBuildItem(job.id, item.kind, product.id)
+                    }
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
 
       <p className="flex items-center gap-[8px] text-sm text-text-tertiary">
         <Icon icon={Clock01Icon} size={14} />
         {row.meta}
       </p>
+
+      {/* Part 4 §4.6 — cancellation is offered in the queue and nowhere
+          else. Nothing has been charged yet (credits are taken when a
+          build starts), so the line says that instead of promising a
+          refund there is no charge behind. */}
+      {row.actions === "cancelQueued" && (
+        <div className="flex flex-col items-center gap-[6px]">
+          <button
+            type="button"
+            onClick={() => {
+              cancelBuild(job.id);
+              router.push(`/chat/${job.chatId}`);
+            }}
+            className="inline-flex h-[40px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={Cancel01Icon} size={16} />
+            Cancel this build
+          </button>
+          <p className="text-sm text-text-tertiary">
+            Nothing has been charged yet — credits are taken when a build
+            starts.
+          </p>
+        </div>
+      )}
 
       {row.actions === "retryAll" && (
         <div className="flex flex-wrap items-center justify-center gap-[12px]">

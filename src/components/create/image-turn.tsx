@@ -39,17 +39,20 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { BUILD_COST, useCredits } from "@/lib/create/credits";
+import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import {
   minutesLeft,
   statusOf,
   useCreateHistory,
   type BuildJob,
   type ChatTurn,
+  type ConceptFailReason,
 } from "@/lib/create/history";
 import { useMinuteClock } from "./build-status";
 
-const COST_HINT = `Generating the full product uses ${BUILD_COST} credits. Refining stays free.`;
+const COST_HINT = `Generating the full product uses ${BUILD_COST} credits. Every concept render — a first draft, a refine or a regenerate — uses ${CONCEPT_COST}.`;
+/** Said on both concept controls when the balance cannot cover a render. */
+const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
 
 const OUTLINE_BUTTON =
   "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
@@ -59,6 +62,7 @@ export function ImageTurn({
   conceptLabel,
   parentConceptLabel,
   regenerating = false,
+  preparing = false,
   onRegenerate,
   onUseThis,
   onRefine,
@@ -67,6 +71,10 @@ export function ImageTurn({
   conceptLabel: string;
   parentConceptLabel?: string;
   regenerating?: boolean;
+  /** Pressing Use this concept reads the concept back and asks whether it
+   *  is part of a multi-product system — two model round-trips before the
+   *  gate can open. The button says so rather than looking ignored. */
+  preparing?: boolean;
   onRegenerate: () => void;
   onUseThis: () => void;
   onRefine: () => void;
@@ -80,6 +88,9 @@ export function ImageTurn({
   // waits for `hydrated` rather than greying every card on load.
   const { hydrated: creditsHydrated, balance } = useCredits();
   const shortOnCredits = creditsHydrated && balance < BUILD_COST;
+  // A render is far cheaper than a build, so the two gates are separate:
+  // a balance of 2 still refines, it just cannot start a build yet.
+  const shortForRender = creditsHydrated && balance < CONCEPT_COST;
   const costHintId = React.useId();
 
   if (turn.status === "pending") {
@@ -93,7 +104,13 @@ export function ImageTurn({
     );
   }
   if (turn.status === "failed") {
-    return <FailedImageTurn onRetry={onRegenerate} />;
+    return (
+      <FailedImageTurn
+        reason={turn.failReason}
+        onRetry={onRegenerate}
+        disabled={shortForRender}
+      />
+    );
   }
 
   // status === "ready"
@@ -108,8 +125,14 @@ export function ImageTurn({
         <button
           type="button"
           onClick={onRefine}
-          aria-label={`Refine Concept ${conceptLabel} — open the image editor`}
-          className="block w-full overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          disabled={shortForRender}
+          aria-label={
+            shortForRender
+              ? `Concept ${conceptLabel} — ${NO_RENDER.toLowerCase()}`
+              : `Refine Concept ${conceptLabel} — open the image editor`
+          }
+          title={shortForRender ? NO_RENDER : undefined}
+          className="block w-full overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -124,7 +147,17 @@ export function ImageTurn({
           <p className="text-sm text-text-tertiary">
             Couldn&apos;t load this image.
           </p>
-          <button type="button" onClick={onRegenerate} className={OUTLINE_BUTTON}>
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={shortForRender}
+            title={shortForRender ? NO_RENDER : undefined}
+            className={
+              shortForRender
+                ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none"
+                : OUTLINE_BUTTON
+            }
+          >
             <Icon icon={Refresh01Icon} />
             Regenerate
           </button>
@@ -159,9 +192,14 @@ export function ImageTurn({
             <button
               type="button"
               onClick={onRefine}
+              disabled={shortForRender}
               aria-label={`Refine Concept ${conceptLabel} in the editor`}
-              title="Open the editor — describe edits to this image"
-              className={OUTLINE_BUTTON}
+              title={
+                shortForRender
+                  ? NO_RENDER
+                  : "Open the editor — describe edits to this image"
+              }
+              className={shortForRender ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none" : OUTLINE_BUTTON}
             >
               <Icon icon={MagicWand01Icon} />
               Refine
@@ -169,18 +207,23 @@ export function ImageTurn({
             <button
               type="button"
               onClick={regenerating ? () => {} : onRegenerate}
-              aria-disabled={regenerating}
+              disabled={shortForRender}
+              aria-disabled={regenerating || shortForRender}
               aria-pressed={regenerating}
               aria-label={`Regenerate a fresh take of Concept ${conceptLabel}`}
               title={
-                regenerating
-                  ? "A fresh take is rendering below"
-                  : "Fresh take — ignores the current image"
+                shortForRender
+                  ? NO_RENDER
+                  : regenerating
+                    ? "A fresh take is rendering below"
+                    : "Fresh take — ignores the current image"
               }
               className={
-                regenerating
-                  ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border-strong bg-bg-subtle px-[12px] text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                  : OUTLINE_BUTTON
+                shortForRender
+                  ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none"
+                  : regenerating
+                    ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border-strong bg-bg-subtle px-[12px] text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                    : OUTLINE_BUTTON
               }
             >
               <Icon icon={Refresh01Icon} />
@@ -215,18 +258,41 @@ export function ImageTurn({
             <button
               type="button"
               onClick={onUseThis}
-              disabled={shortOnCredits}
-              aria-disabled={shortOnCredits}
+              disabled={shortOnCredits || preparing}
+              aria-disabled={shortOnCredits || preparing}
+              aria-busy={preparing}
               aria-label={`Use Concept ${conceptLabel} and start the full build`}
-              title={shortOnCredits ? "Not enough credits" : undefined}
+              title={
+                shortOnCredits
+                  ? "Not enough credits"
+                  : preparing
+                    ? "Reading the concept back…"
+                    : undefined
+              }
               className={
                 shortOnCredits
                   ? "ml-auto inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[14px] text-sm font-semibold text-text-disabled"
-                  : "ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+                  : preparing
+                    ? "ml-auto inline-flex h-[36px] cursor-wait items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand opacity-80"
+                    : "ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
               }
             >
-              Use this concept
-              {!shortOnCredits && <Icon icon={ArrowRight01Icon} />}
+              {preparing ? (
+                <>
+                  <span
+                    aria-hidden
+                    className="inline-flex motion-safe:animate-spin"
+                  >
+                    <Icon icon={Refresh01Icon} size={14} />
+                  </span>
+                  Preparing…
+                </>
+              ) : (
+                <>
+                  Use this concept
+                  {!shortOnCredits && <Icon icon={ArrowRight01Icon} />}
+                </>
+              )}
             </button>
           </>
         )}
@@ -327,8 +393,8 @@ export function InsufficientCreditsBanner() {
           Not enough credits to build this
         </p>
         <p className="text-sm text-text-secondary">
-          Generating the full product costs {BUILD_COST} credits. Exploring and
-          refining concepts stays free.
+          Generating the full product costs {BUILD_COST} credits, and each
+          concept render costs {CONCEPT_COST}.
         </p>
         <Link
           href="/history#credits"
@@ -470,7 +536,32 @@ function PendingImageTurn({
   );
 }
 
-function FailedImageTurn({ onRetry }: { onRetry: () => void }) {
+// What went wrong, in the words that tell the reader what to do about it.
+// A provider that will not render until its account is topped up cannot be
+// retried into working, and saying "try again" there wastes the user's
+// time on a loop that has one answer — so that case says so and offers the
+// retry as the long shot it is, not as the fix.
+const FAIL_COPY: Record<NonNullable<ConceptFailReason>, string> = {
+  "provider-credit":
+    "The image service turned the render down — the account it bills has run out of credit. Trying again won't help until it's topped up. Nothing was charged; your credit balance is unchanged.",
+  busy: "The image service was busy and didn't finish in time. Nothing was charged — your credit balance is unchanged.",
+  credits:
+    "Your credit balance ran out before this render started. Nothing was charged.",
+};
+
+const FAIL_FALLBACK =
+  "The request didn't reach the model. Nothing was charged — your credit balance is unchanged.";
+
+function FailedImageTurn({
+  reason,
+  onRetry,
+  disabled,
+}: {
+  reason?: ConceptFailReason;
+  onRetry: () => void;
+  /** A retry is a fresh render, so it costs one like any other. */
+  disabled?: boolean;
+}) {
   return (
     <div
       role="alert"
@@ -483,14 +574,19 @@ function FailedImageTurn({ onRetry }: { onRetry: () => void }) {
         <p className="text-md font-semibold text-text-primary">
           Couldn&apos;t draft that concept
         </p>
-        <p className="text-sm text-text-tertiary">
-          The request didn&apos;t reach the model. Nothing was charged — your
-          credit balance is unchanged.
+        <p className="text-sm leading-relaxed text-text-tertiary">
+          {reason ? FAIL_COPY[reason] : FAIL_FALLBACK}
         </p>
         <button
           type="button"
           onClick={onRetry}
-          className="mt-[4px] inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          disabled={disabled}
+          title={disabled ? NO_RENDER : undefined}
+          className={
+            disabled
+              ? "mt-[4px] inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[14px] text-sm font-semibold text-text-disabled outline-none"
+              : "mt-[4px] inline-flex h-[36px] w-fit items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          }
         >
           <Icon icon={Refresh01Icon} />
           Try again

@@ -26,6 +26,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { formatCount, PROJECTS, type Project } from "@/lib/feed";
@@ -62,6 +63,12 @@ const AI_PLACEHOLDER = "Describe your electronics project...";
 export function WorkspacePrompt() {
   const router = useRouter();
   const { createChat } = useCreateHistory();
+  // The first concept costs a render like any other, so the send is shut
+  // here rather than letting the chat open and fail its opening turn.
+  // The rendered balance, not canAfford(): the provider refreshes that ref
+  // in its own effect, which runs after this child's.
+  const { hydrated: creditsHydrated, balance } = useCredits();
+  const canRender = !creditsHydrated || balance >= CONCEPT_COST;
   const [mode, setMode] = React.useState<Mode>("ai");
   const [prompt, setPrompt] = React.useState("");
   const [refining, setRefining] = React.useState(false);
@@ -82,6 +89,7 @@ export function WorkspacePrompt() {
       taRef.current?.focus();
       return;
     }
+    if (!canRender) return;
     setSubmitting(true);
     try {
       const session = createChat(trimmed);
@@ -163,6 +171,7 @@ export function WorkspacePrompt() {
               mode={mode}
               onRefine={handleRefine}
               refining={refining}
+              canRender={canRender}
             />
           ) : (
             <BuildManuallyInfo onCreate={() => setProjectModalOpen(true)} />
@@ -286,9 +295,11 @@ const PromptCard = React.forwardRef<
     mode: Mode;
     onRefine: () => void;
     refining: boolean;
+    /** False when the balance cannot cover one concept render. */
+    canRender: boolean;
   }
 >(function PromptCard(
-  { value, onChange, onSubmit, submitting, placeholder, mode, onRefine, refining },
+  { value, onChange, onSubmit, submitting, placeholder, mode, onRefine, refining, canRender },
   ref,
 ) {
   const localRef = React.useRef<HTMLTextAreaElement | null>(null);
@@ -428,6 +439,7 @@ const PromptCard = React.forwardRef<
               onClick={onSubmit}
               submitting={submitting}
               hasText={value.trim().length > 0}
+              canRender={canRender}
             />
           </div>
         </div>
@@ -523,21 +535,26 @@ function SendButton({
   onClick,
   submitting,
   hasText,
+  canRender,
 }: {
+  canRender: boolean;
   onClick: () => void;
   submitting: boolean;
   hasText: boolean;
 }) {
   const label = "Generate project";
 
-  if (!hasText) {
+  if (!hasText || !canRender) {
+    const why = !hasText
+      ? "describe your project first"
+      : "not enough credits to render a concept";
     return (
       <button
         type="button"
         disabled
         aria-disabled
-        aria-label={`${label} — describe your project first`}
-        title="Describe your project first"
+        aria-label={`${label} — ${why}`}
+        title={why.charAt(0).toUpperCase() + why.slice(1)}
         className="inline-flex h-[40px] w-[40px] cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
       >
         <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />

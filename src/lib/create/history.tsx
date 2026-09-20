@@ -33,6 +33,12 @@ export type AssistantImageStatus = "pending" | "ready" | "failed";
 //                starting over.
 export type AssistantTurnKind = "fresh" | "refine";
 
+/** Why a concept render failed, when we know. The card says a different
+ *  sentence for each, because only one of them is worth retrying and only
+ *  one of them is the user's own balance. An older turn carries none, and
+ *  reads as the generic failure it was stored as. */
+export type ConceptFailReason = "provider-credit" | "busy" | "credits";
+
 export type ChatTurn =
   | {
       id: string;
@@ -54,6 +60,8 @@ export type ChatTurn =
       // refinement chain is visible while scrolling.
       parentTurnId?: string;
       status: AssistantImageStatus;
+      // Set with status "failed" — see ConceptFailReason.
+      failReason?: ConceptFailReason;
       // How far the render has visibly got, 0–100. Ticked by the chat
       // orchestrator while the turn is pending and set to 100 the moment
       // the image lands, so the card shows real motion instead of an
@@ -64,6 +72,10 @@ export type ChatTurn =
       // does NOT lock the chat, since spec §1 says one chat can produce
       // many builds).
       usedForBuild?: string; // build id
+      // Part 4 §4.4 — the companion product this concept is for, by its
+      // `companionId`. Absent on the primary concept, which is the
+      // product the chat started from and is always included.
+      companionOf?: string;
       ts: number;
     };
 
@@ -102,6 +114,24 @@ export type BuildItem = {
   progress: number; // 0–100
 };
 
+/** Part 4 §4.4 — a companion product built alongside the primary one.
+ *  The primary stays on the job itself (§4.4.4: "the original concept is
+ *  always included and cannot be deselected"), so this list holds only
+ *  the extras. Each carries its own concept and its own five artifacts,
+ *  because §4.4.9 wants a badge per product, not per project. */
+export type BuildProduct = {
+  /** The `companionId` the picker selected it by. */
+  id: string;
+  /** "Remote controller" — what the classifier called it. */
+  name: string;
+  conceptImageUrl: string;
+  conceptPrompt: string;
+  title: string;
+  summary: string;
+  parts: ConceptPart[];
+  items: BuildItem[];
+};
+
 export type BuildJob = {
   id: string;
   chatId: string;
@@ -135,6 +165,9 @@ export type BuildJob = {
   // ManualProject.
   projectId?: string;
   items: BuildItem[];
+  /** §4.4.8 — all products live in one project, so they live in one job
+   *  too. Empty on every single-product build, which is most of them. */
+  companions: BuildProduct[];
   createdAt: number;
   updatedAt: number;
   // The user pressed "Dismiss" on the attention banner for this build.
@@ -226,6 +259,34 @@ function liveItems(items: BuildItem[]): BuildItem[] {
   return items.filter((i) => i.status !== "skipped");
 }
 
+/** Every artifact in the job — the primary product's and each
+ *  companion's (§4.4). A multi-product build is not finished until all of
+ *  its products are, so every rollup reads this rather than `job.items`. */
+export function allItems(job: BuildJob): BuildItem[] {
+  const extra = job.companions ?? [];
+  if (!extra.length) return job.items;
+  return [...job.items, ...extra.flatMap((c) => c.items)];
+}
+
+/** The products a build covers, primary first. §4.7 opens each into its
+ *  own tabs, and §4.4.9 gives each its own badge, so both surfaces walk
+ *  this rather than special-casing the primary. */
+export function productsOf(job: BuildJob): BuildProduct[] {
+  return [
+    {
+      id: "primary",
+      name: job.title,
+      conceptImageUrl: job.conceptImageUrl,
+      conceptPrompt: job.conceptPrompt,
+      title: job.title,
+      summary: job.summary,
+      parts: job.parts,
+      items: job.items,
+    },
+    ...(job.companions ?? []),
+  ];
+}
+
 // The build's state as its items describe it. `statusOf` prefers the
 // stored status for the two states items can't express (queued, and a
 // whole-build system failure).
@@ -242,7 +303,9 @@ function deriveStatus(items: BuildItem[]): BuildStatus {
 
 export function statusOf(job: BuildJob): BuildStatus {
   if (job.status === "queued" || job.status === "failed") return job.status;
-  return deriveStatus(job.items);
+  // Across every product: a build with a finished drone and a still-
+  // running remote is running, not ready.
+  return deriveStatus(allItems(job));
 }
 
 // How many builds are really waiting in front of this one: queued jobs
@@ -273,20 +336,32 @@ export function elapsedMinutes(job: BuildJob, now: number = Date.now()): number 
   return Math.max(0, Math.floor((end - job.startedAt) / 60_000));
 }
 
+/** Part 4 §4.6 — "if the job exceeds roughly twice expected duration".
+ *  A running job past that has stopped behaving like one that is going to
+ *  finish, so the card stops waiting quietly and offers the way out. Only
+ *  a running job can overrun: a queued one has not started its clock, and
+ *  a finished one has stopped it. */
+export function isOverrunning(job: BuildJob, now: number = Date.now()): boolean {
+  if (statusOf(job) !== "running") return false;
+  return elapsedMinutes(job, now) > job.estimateMin * 2;
+}
+
 // The estimate scaled by what's left to do. Never says "0 minutes left"
 // while work remains — the smallest honest answer is 1 — and never
 // counts down for work that has stopped: a system failure, or a partial
 // build sitting on a failed artifact with nothing still in flight.
 export function minutesLeft(job: BuildJob, now: number = Date.now()): number {
   if (statusOf(job) === "failed") return 0;
-  const working = liveItems(job.items).some(
+  const working = liveItems(allItems(job)).some(
     (i) => i.status === "building" || i.status === "pending",
   );
   if (!working) return 0;
   // The job has already been closed out (ready / partial) — anything
   // still marked building is stale, so there's nothing to wait for.
   if (job.endedAt !== undefined && job.endedAt <= now) return 0;
-  const remaining = (100 - progressOf(job.items)) / 100;
+  // Across every product, so a two-product build does not read as
+  // half-finished the moment the primary lands.
+  const remaining = (100 - progressOf(allItems(job))) / 100;
   if (remaining <= 0) return 0;
   return Math.max(1, Math.round(job.estimateMin * remaining));
 }
@@ -296,14 +371,18 @@ export function minutesLeft(job: BuildJob, now: number = Date.now()): number {
 // Stored builds predate the five-artifact model, the queue and the
 // concept summary. Bring each one forward on hydrate — never at render,
 // so what the UI reads is what's in storage.
-function normalizeJob(raw: BuildJob): BuildJob {
-  const stored = raw as Partial<BuildJob> & { items?: BuildItem[] };
+// One product's five artifacts, brought forward from storage. An item's
+// own fields are storage too — a hand-edited or half-written build must
+// not reach the UI with a NaN bar width or a status nothing renders. A
+// kind that is absent reads as `skipped`, so the five rows are always
+// there and one never silently disappears.
+//
+// Shared by the primary and by every companion product (§4.4), which is
+// why it is a function rather than inline in normalizeJob.
+function normalizeItems(raw: unknown): BuildItem[] {
   const byKind = new Map<BuildItemKind, BuildItem>();
-  for (const item of stored.items ?? []) {
+  for (const item of Array.isArray(raw) ? (raw as BuildItem[]) : []) {
     if (!item || !ITEM_KINDS.includes(item.kind)) continue;
-    // An item's own fields are storage too — a hand-edited or
-    // half-written build must not reach the UI with a NaN bar width or
-    // a status nothing renders.
     const progress = Number(item.progress);
     byKind.set(item.kind, {
       kind: item.kind,
@@ -315,18 +394,40 @@ function normalizeJob(raw: BuildJob): BuildJob {
         : 0,
     });
   }
-  const items: BuildItem[] = ITEM_KINDS.map(
+  return ITEM_KINDS.map(
     (kind) =>
       byKind.get(kind) ?? { kind, status: "skipped" as const, progress: 0 },
   );
+}
+
+function normalizeJob(raw: BuildJob): BuildJob {
+  const stored = raw as Partial<BuildJob> & { items?: BuildItem[] };
+  const items = normalizeItems(stored.items);
   const prompt = stored.conceptPrompt ?? "";
   const status: BuildStatus =
     stored.status && STATUS_VALUES.includes(stored.status)
       ? stored.status
       : deriveStatus(items);
+  // A build stored before companions existed has none, and a hand-edited
+  // entry must not reach the UI with a product that has no artifacts.
+  const companions: BuildProduct[] = Array.isArray(stored.companions)
+    ? stored.companions
+        .filter((c) => c && typeof c.id === "string" && c.id.trim())
+        .map((c) => ({
+          id: c.id,
+          name: String(c.name ?? c.title ?? c.id),
+          conceptImageUrl: String(c.conceptImageUrl ?? ""),
+          conceptPrompt: String(c.conceptPrompt ?? ""),
+          title: String(c.title ?? c.name ?? ""),
+          summary: String(c.summary ?? ""),
+          parts: Array.isArray(c.parts) ? c.parts : [],
+          items: normalizeItems(c.items),
+        }))
+    : [];
   return {
     ...(stored as BuildJob),
     items,
+    companions,
     title: stored.title || deriveTitle(prompt),
     summary: stored.summary ?? "",
     parts: Array.isArray(stored.parts) ? stored.parts : [],
@@ -412,6 +513,7 @@ type Ctx = {
       prompt: string;
       kind: AssistantTurnKind;
       parentTurnId?: string;
+      companionOf?: string;
     },
   ) => { chatId: string; turnId: string };
   resolveAssistantTurn: (
@@ -419,7 +521,11 @@ type Ctx = {
     turnId: string,
     imageUrl: string,
   ) => void;
-  failAssistantTurn: (chatId: string, turnId: string) => void;
+  failAssistantTurn: (
+    chatId: string,
+    turnId: string,
+    reason?: ConceptFailReason,
+  ) => void;
   setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
@@ -433,15 +539,26 @@ type Ctx = {
     title: string;
     summary: string;
     parts: ConceptPart[];
+    companions?: Omit<BuildProduct, "items">[];
   }) => BuildJob;
   updateBuildItem: (
     buildId: string,
     kind: BuildItemKind,
     patch: Partial<BuildItem>,
+    productId?: string,
   ) => void;
-  retryBuildItem: (buildId: string, kind: BuildItemKind) => void;
+  retryBuildItem: (
+    buildId: string,
+    kind: BuildItemKind,
+    productId?: string,
+  ) => void;
   // Whole-build retry, after a system failure took the job down.
   retryBuild: (buildId: string) => void;
+  // Part 4 §4.6 — cancellation is a queued-only action, and a no-op on
+  // anything else. A queued job has never been charged (the simulator
+  // charges on start), so there is nothing to put back and the copy says
+  // that rather than promising a refund.
+  cancelBuild: (buildId: string) => void;
   // The build died for a reason that isn't the user's: every artifact
   // fails and the job is marked failed. The refund is a separate step —
   // see markRefunded — so the flag can never claim money moved that
@@ -573,6 +690,7 @@ export function CreateHistoryProvider({
         prompt: string;
         kind: AssistantTurnKind;
         parentTurnId?: string;
+        companionOf?: string;
       },
     ) => {
       const turnId = makeId("turn");
@@ -590,6 +708,7 @@ export function CreateHistoryProvider({
                     prompt: input.prompt,
                     kind: input.kind,
                     parentTurnId: input.parentTurnId,
+                    companionOf: input.companionOf,
                     status: "pending",
                     ts: Date.now(),
                   },
@@ -624,7 +743,7 @@ export function CreateHistoryProvider({
   );
 
   const failAssistantTurn = React.useCallback(
-    (chatId: string, turnId: string) => {
+    (chatId: string, turnId: string, reason?: ConceptFailReason) => {
       setChats((arr) =>
         arr.map((c) => {
           if (c.id !== chatId) return c;
@@ -633,7 +752,7 @@ export function CreateHistoryProvider({
             updatedAt: Date.now(),
             turns: c.turns.map((t) =>
               t.id === turnId && t.role === "assistant"
-                ? { ...t, status: "failed" as const }
+                ? { ...t, status: "failed" as const, failReason: reason }
                 : t,
             ),
           };
@@ -682,6 +801,9 @@ export function CreateHistoryProvider({
       title: string;
       summary: string;
       parts: ConceptPart[];
+      /** §4.4 — the companion products whose concepts are ready. Absent
+       *  on every single-product build. */
+      companions?: Omit<BuildProduct, "items">[];
     }) => {
       const now = Date.now();
       const id = makeId("build");
@@ -706,6 +828,17 @@ export function CreateHistoryProvider({
           kind,
           status: busy ? ("pending" as const) : ("building" as const),
           progress: 0,
+        })),
+        // Every product gets the same five artifacts — §4.7 opens each one
+        // into its own 3D / PCB / Code / BOM tabs, so each needs its own
+        // set rather than a share of the primary's.
+        companions: (input.companions ?? []).map((c) => ({
+          ...c,
+          items: ITEM_KINDS.map((kind) => ({
+            kind,
+            status: busy ? ("pending" as const) : ("building" as const),
+            progress: 0,
+          })),
         })),
         createdAt: now,
         updatedAt: now,
@@ -732,32 +865,66 @@ export function CreateHistoryProvider({
   );
 
   const updateBuildItem = React.useCallback(
-    (buildId: string, kind: BuildItemKind, patch: Partial<BuildItem>) => {
+    (
+      buildId: string,
+      kind: BuildItemKind,
+      patch: Partial<BuildItem>,
+      // §4.4 — which product's artifact. "primary" (the default) is the
+      // job's own; anything else names a companion by its id. An id that
+      // matches no product leaves the job untouched rather than writing
+      // the patch somewhere it does not belong.
+      productId: string = "primary",
+    ) => {
       setBuilds((arr) =>
         arr.map((b) => {
           if (b.id !== buildId) return b;
-          const nextItems = b.items.map((it) =>
-            it.kind === kind ? { ...it, ...patch } : it,
-          );
+          const onPrimary = productId === "primary";
+          if (!onPrimary && !(b.companions ?? []).some((c) => c.id === productId)) {
+            return b;
+          }
+          const nextItems = onPrimary
+            ? b.items.map((it) => (it.kind === kind ? { ...it, ...patch } : it))
+            : b.items;
+          const nextCompanions = onPrimary
+            ? (b.companions ?? [])
+            : (b.companions ?? []).map((c) =>
+                c.id === productId
+                  ? {
+                      ...c,
+                      items: c.items.map((it) =>
+                        it.kind === kind ? { ...it, ...patch } : it,
+                      ),
+                    }
+                  : c,
+              );
+          // Every rollup below reads the whole job, not one product: a
+          // build is ready when all of its products are.
+          const allBefore = allItems(b);
+          const allAfter = allItems({
+            ...b,
+            items: nextItems,
+            companions: nextCompanions,
+          });
           // Re-arm attention whenever the *rollup* status changes: if a
           // user dismissed an earlier banner but the situation flips
           // (retry succeeded, new failure, build flipped to ready),
           // they should see the new state.
-          const wasRolled = computeRollup(b.items);
-          const nextRolled = computeRollup(nextItems);
+          const wasRolled = computeRollup(allBefore);
+          const nextRolled = computeRollup(allAfter);
           const statusChanged = wasRolled.status !== nextRolled.status;
           // Keep the job's own status in step with its items, except
           // for the two the items can't express: a queued build stays
           // queued until it's promoted, and a system failure stays
           // failed until the whole build is retried.
           const now = Date.now();
-          const derived = deriveStatus(nextItems);
+          const derived = deriveStatus(allAfter);
           const status =
             b.status === "queued" || b.status === "failed" ? b.status : derived;
           return {
             ...b,
             updatedAt: now,
             items: nextItems,
+            companions: nextCompanions,
             status,
             startedAt:
               status === "running" && !b.startedAt ? now : b.startedAt,
@@ -785,15 +952,25 @@ export function CreateHistoryProvider({
   // queue with that row pending and waits for promotion, exactly like
   // retryBuild.
   const retryBuildItem = React.useCallback(
-    (buildId: string, kind: BuildItemKind) => {
+    (buildId: string, kind: BuildItemKind, productId: string = "primary") => {
       const busy = buildsRef.current.some(
         (b) => b.status === "running" && b.id !== buildId,
       );
       if (!busy) {
-        updateBuildItem(buildId, kind, { status: "building", progress: 0 });
+        updateBuildItem(
+          buildId,
+          kind,
+          { status: "building", progress: 0 },
+          productId,
+        );
         return;
       }
       const now = Date.now();
+      const onPrimary = productId === "primary";
+      const requeue = (it: BuildItem) =>
+        it.kind === kind
+          ? { ...it, status: "pending" as const, progress: 0 }
+          : it;
       setBuilds((arr) =>
         arr.map((b) =>
           b.id === buildId
@@ -802,11 +979,14 @@ export function CreateHistoryProvider({
                 status: "queued" as const,
                 startedAt: undefined,
                 endedAt: undefined,
-                items: b.items.map((it) =>
-                  it.kind === kind
-                    ? { ...it, status: "pending" as const, progress: 0 }
-                    : it,
-                ),
+                items: onPrimary ? b.items.map(requeue) : b.items,
+                companions: onPrimary
+                  ? (b.companions ?? [])
+                  : (b.companions ?? []).map((c) =>
+                      c.id === productId
+                        ? { ...c, items: c.items.map(requeue) }
+                        : c,
+                    ),
                 updatedAt: now,
                 attentionDismissedAt: undefined,
               }
@@ -817,11 +997,30 @@ export function CreateHistoryProvider({
     [updateBuildItem],
   );
 
+  // Part 4 §4.6 — "allowed only in Queued state". Once generation has
+  // started it is unavailable, because cancel-then-refund would be the
+  // farming loop the spec warns about. The guard is inside the updater so
+  // a status that changed between the click and here still decides it.
+  const cancelBuild = React.useCallback((buildId: string) => {
+    setBuilds((arr) => {
+      const b = arr.find((x) => x.id === buildId);
+      if (!b || statusOf(b) !== "queued") return arr;
+      return arr.filter((x) => x.id !== buildId);
+    });
+  }, []);
+
   const retryBuild = React.useCallback((buildId: string) => {
     const now = Date.now();
     const busy = buildsRef.current.some(
       (b) => b.status === "running" && b.id !== buildId,
     );
+    // Every artifact starts over; whether it starts now or waits depends
+    // on whether another build already holds the worker.
+    const restart = (it: BuildItem): BuildItem => ({
+      ...it,
+      status: busy ? ("pending" as const) : ("building" as const),
+      progress: 0,
+    });
     setBuilds((arr) =>
       arr.map((b) => {
         if (b.id !== buildId) return b;
@@ -835,10 +1034,12 @@ export function CreateHistoryProvider({
           // The failed run was refunded, so the retry is charged again.
           creditsCharged: false,
           creditsRefunded: false,
-          items: b.items.map((it) => ({
-            ...it,
-            status: busy ? ("pending" as const) : ("building" as const),
-            progress: 0,
+          items: b.items.map(restart),
+          // §4.4 — a whole-build retry restarts the whole build, which is
+          // every product in it, not only the one the job started from.
+          companions: (b.companions ?? []).map((c) => ({
+            ...c,
+            items: c.items.map(restart),
           })),
           updatedAt: now,
           attentionDismissedAt: undefined,
@@ -849,6 +1050,13 @@ export function CreateHistoryProvider({
 
   // The failure alone. Whether the money went back is the ledger's
   // answer, recorded by markRefunded once refund() has actually run.
+  // An artifact that had already reached "ready" was really produced —
+  // the failure stopped the rest, it didn't undo that one.
+  const downed = (it: BuildItem): BuildItem =>
+    it.status === "skipped" || it.status === "ready"
+      ? it
+      : { ...it, status: "failed" as const };
+
   const failBuildSystem = React.useCallback((buildId: string) => {
     const now = Date.now();
     setBuilds((arr) =>
@@ -863,11 +1071,12 @@ export function CreateHistoryProvider({
           // An artifact that had already reached "ready" was really
           // produced — the failure stopped the rest, it didn't undo
           // that one.
-          items: b.items.map((it) =>
-            it.status === "skipped" || it.status === "ready"
-              ? it
-              : { ...it, status: "failed" as const },
-          ),
+          items: b.items.map(downed),
+          // The failure is the job's, so it takes every product with it.
+          companions: (b.companions ?? []).map((c) => ({
+            ...c,
+            items: c.items.map(downed),
+          })),
           updatedAt: now,
           attentionDismissedAt: undefined,
         };
@@ -1035,6 +1244,7 @@ export function CreateHistoryProvider({
     updateBuildItem,
     retryBuildItem,
     retryBuild,
+    cancelBuild,
     failBuildSystem,
     markCharged,
     markRefunded,
@@ -1080,7 +1290,10 @@ export type BuildRollup = {
 // the whole job down, so it outranks whatever the items say.
 export function rollupBuild(job: BuildJob): BuildRollup {
   if (job.status === "failed") return { status: "failed", progress: 0 };
-  return computeRollup(job.items);
+  // Across every product (§4.4): the shell swaps the status card for the
+  // review on this answer, and a build whose drone is finished while its
+  // remote is still rendering is not ready to review.
+  return computeRollup(allItems(job));
 }
 
 function computeRollup(items: BuildItem[]): BuildRollup {

@@ -24,13 +24,77 @@ import {
   queuedAhead,
   useCreateHistory,
   type BuildJob,
+  type BuildProduct,
+  type ChatTurn,
+  type ConceptFailReason,
 } from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
 import { useCreatePlan } from "@/lib/create/plan";
+import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
-import { ConfirmBuildDialog } from "./confirm-build-dialog";
+import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
+import type { CompanionTurn } from "./confirm-build-dialog";
+import {
+  SINGLE_PRODUCT,
+  companionId,
+  type Companion,
+  type CompanionPlan,
+} from "@/lib/create/companions";
+import { readGateDismissed } from "@/lib/create/gate-preference";
+
+// Part 4 §4.8 — "the list is generated once and locked for that concept",
+// so the answer is cached per turn and an in-flight request is shared. A
+// classifier that cannot be reached answers SINGLE_PRODUCT, which is both
+// the common case and the safe one: a wrong companion list sends the user
+// down a branch that costs credits.
+const companionCache = new Map<string, CompanionPlan>();
+const companionPending = new Map<string, Promise<CompanionPlan>>();
+
+function classifyCompanions(
+  turnId: string,
+  prompt: string,
+  title: string,
+): Promise<CompanionPlan> {
+  const cached = companionCache.get(turnId);
+  if (cached) return Promise.resolve(cached);
+  const inFlight = companionPending.get(turnId);
+  if (inFlight) return inFlight;
+  const request = (async (): Promise<CompanionPlan> => {
+    try {
+      const res = await fetch("/api/concept/companions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, title }),
+      });
+      if (!res.ok) return SINGLE_PRODUCT;
+      const data = (await res.json()) as Partial<CompanionPlan>;
+      if (data.isSystem !== true || !Array.isArray(data.companions)) {
+        return SINGLE_PRODUCT;
+      }
+      return { isSystem: true, companions: data.companions };
+    } catch {
+      return SINGLE_PRODUCT;
+    }
+  })();
+  companionPending.set(turnId, request);
+  request
+    .then((plan) => companionCache.set(turnId, plan))
+    .finally(() => companionPending.delete(turnId));
+  return request;
+}
 import { ImageEditorModal } from "./image-editor-modal";
+
+/** Thrown by `runGeneration` so the one catch below knows which of the
+ *  ways to fail it is looking at. An unknown reason is left undefined
+ *  rather than guessed at — the card has a sentence for that too. */
+class FailedRender extends Error {
+  readonly reason?: ConceptFailReason;
+  constructor(reason?: ConceptFailReason) {
+    super(reason ?? "render failed");
+    this.reason = reason;
+  }
+}
 
 export function ConceptChat({ chatId }: { chatId: string }) {
   const router = useRouter();
@@ -47,6 +111,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     startBuild,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
+  // Every concept render costs credits — the first draft, a refine and a
+  // regenerate alike. `canAfford` gates the three controls that start one;
+  // the charge itself happens in `runGeneration`, the single funnel all
+  // three go through, so there is one place money can move.
+  const { canAfford, charge, refund } = useCredits();
+  const canRender = canAfford(CONCEPT_COST);
 
   const chat = getChat(chatId);
 
@@ -65,7 +135,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // refine then continues in the thread (pending → ready), where the user can
   // watch it land and reopen Refine to iterate.
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
-
+  // Part 4 §4.4 — the companion products offered for the concept the gate
+  // is open on, and which of them are ticked. The concepts themselves live
+  // in the thread, so §4.8's "deselecting preserves the concept" needs
+  // nothing stored here.
+  const [companionPlan, setCompanionPlan] = React.useState<Companion[]>([]);
+  const [productTitle, setProductTitle] = React.useState("");
+  const [pickedCompanions, setPickedCompanions] = React.useState<Set<string>>(
+    () => new Set(),
+  );
+  // Which concept's "Use this concept" is waiting on the summarize +
+  // classify round-trips, so that one card's button can say so.
+  const [preparingTurnId, setPreparingTurnId] = React.useState<string | null>(
+    null,
+  );
   // The notice names one specific build — once it leaves the queue
   // (started, finished, or failed), there's nothing left for it to
   // point at. Derived from live build state each render (via `builds`,
@@ -200,17 +283,40 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // out of scope here (the QuotaCard makes the limit visible).
       incrementPrompt();
       try {
+        // Charged before the request, keyed by the turn the render will
+        // land in, so a retry of a different turn is its own charge. The
+        // controls are already disabled without the balance for it; this
+        // catches a balance that ran out between the click and here, and
+        // it throws so the one catch below handles both ways to fail.
+        if (!charge(turnId, CONCEPT_COST, "concept")) {
+          throw new FailedRender("credits");
+        }
         const res = await fetch("/api/concept/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(input),
         });
-        if (!res.ok) throw new Error("generation failed");
-        const data = (await res.json()) as { imageUrl?: string };
-        if (!data.imageUrl) throw new Error("missing imageUrl");
+        // The route says why it could not render, and the two reasons
+        // need different words on the card, so the reason is carried
+        // rather than flattened into one failure.
+        const data = (await res.json().catch(() => ({}))) as {
+          imageUrl?: string;
+          reason?: ConceptFailReason;
+        };
+        if (!res.ok) throw new FailedRender(data.reason);
+        if (!data.imageUrl) throw new FailedRender();
         resolveAssistantTurn(cid, turnId, data.imageUrl);
-      } catch {
-        failAssistantTurn(cid, turnId);
+      } catch (err) {
+        // Nothing was rendered, so nothing is owed. This is the concept
+        // counterpart of the build's system-failure refund: the user pays
+        // for output, not for an attempt. A no-op when the charge never
+        // landed, since a turn with no open charge has nothing to return.
+        refund(turnId);
+        failAssistantTurn(
+          cid,
+          turnId,
+          err instanceof FailedRender ? err.reason : undefined,
+        );
       } finally {
         // Ready or failed, the turn has left "pending": the Regenerate
         // that spawned it is free again and its entry has nothing left
@@ -220,6 +326,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [
       incrementPrompt,
+      charge,
+      refund,
       resolveAssistantTurn,
       failAssistantTurn,
       releaseRegenSource,
@@ -273,7 +381,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   const handleUserSubmit = React.useCallback(
     (text: string) => {
-      if (!chat) return;
+      if (!chat || !canAfford(CONCEPT_COST)) return;
       appendUserTurn(chat.id, text);
       // Prompt-bar submissions REFINE the latest ready concept (spec
       // §4b). They only fall back to "fresh" when nothing has rendered
@@ -299,6 +407,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [
       chat,
+      canAfford,
       latestReadyTurn,
       appendUserTurn,
       appendAssistantTurn,
@@ -308,7 +417,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   const handleRegenerate = React.useCallback(
     (sourcePrompt: string, sourceTurnId: string) => {
-      if (!chat) return;
+      if (!chat || !canAfford(CONCEPT_COST)) return;
       // Regenerate (spec §4c) is a FRESH take on the same prompt — it
       // ignores the existing image. No new user turn because the user
       // didn't retype anything.
@@ -322,21 +431,312 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         kind: "fresh",
       });
     },
-    [chat, appendAssistantTurn, runGeneration],
+    [chat, canAfford, appendAssistantTurn, runGeneration],
   );
 
+  // The one path from an approved concept to a booked build. Both the
+  // gate's Confirm and the skip that replaces it when the gate has been
+  // dismissed (spec §4.5) come through here, so a dismissed gate cannot
+  // start a different kind of build from the one the dialog starts.
+  const startBuildFor = React.useCallback(
+    async (
+      source: { turnId: string; imageUrl: string; prompt: string },
+      concept: ConceptSummary,
+      // §4.4 — the companion products whose concepts are ready. Empty on
+      // every single-product build.
+      companions: Omit<BuildProduct, "items">[] = [],
+    ) => {
+      if (!chat) return;
+      setSubmittingBuild(true);
+      try {
+        await fetch("/api/build/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chatId: chat.id,
+            turnId: source.turnId,
+            imageUrl: source.imageUrl,
+            prompt: source.prompt,
+          }),
+        }).catch(() => null);
+        // The concept as the summarizer read it — the same title, parts
+        // line and parts the gate would have shown, so every deliverable
+        // is derived from the concept that was approved.
+        const job = startBuild({
+          chatId: chat.id,
+          turnId: source.turnId,
+          imageUrl: source.imageUrl,
+          prompt: source.prompt,
+          conceptNumber: labels.get(source.turnId) ?? "1",
+          title: concept.title || deriveTitle(source.prompt),
+          summary: concept.summary,
+          parts: concept.parts,
+          companions,
+        });
+        // A queued build isn't building yet, so we stay in the chat and
+        // say so beside the concept that started it — the build page
+        // would only show a waiting room. Any earlier notice is for a
+        // build this new confirm has nothing to do with, so it's
+        // replaced (or cleared, if this one didn't queue) rather than
+        // left pointing at a stale job.
+        if (job.status === "queued") {
+          setQueuedNotice(job.id);
+          return;
+        }
+        setQueuedNotice(null);
+        router.push(`/build/${job.id}`);
+      } finally {
+        setSubmittingBuild(false);
+        setConfirmFor(null);
+      }
+    },
+    [chat, labels, startBuild, router],
+  );
+
+  // The step after the companion screen, and the whole of it on the
+  // ordinary single-product path: the gate, or the build straight away
+  // when the gate has been dismissed (§4.5).
+  const goToGate = React.useCallback(
+    (source: { turnId: string; imageUrl: string; prompt: string }) => {
+      if (readGateDismissed()) {
+        setSubmittingBuild(true);
+        void summarizeConcept(source.turnId, source.prompt).then((concept) =>
+          startBuildFor(source, concept),
+        );
+        return;
+      }
+      setConfirmFor(source);
+    },
+    [startBuildFor],
+  );
+
+  // Part 4 §4.4.2 — accepting a concept branches here: the flow asks
+  // whether this product is part of a multi-product system and, if it is,
+  // offers the other products before anything is generated. Most concepts
+  // are not (§4.4.3), and those users go straight on to the gate without
+  // ever seeing the screen.
   const handleUseTurn = React.useCallback(
     (turnId: string) => {
       if (!chat) return;
       const t = chat.turns.find((x) => x.id === turnId);
       if (!t || t.role !== "assistant" || !t.imageUrl) return;
-      setConfirmFor({
-        turnId: t.id,
-        imageUrl: t.imageUrl,
-        prompt: t.prompt,
-      });
+      // A companion's own concept does not branch again: §4.4.7 is flat,
+      // so a remote has no companions of its own.
+      const source = { turnId: t.id, imageUrl: t.imageUrl, prompt: t.prompt };
+      if (t.companionOf) {
+        goToGate(source);
+        return;
+      }
+      setPreparingTurnId(t.id);
+      void summarizeConcept(t.id, t.prompt)
+        .then((concept) =>
+          classifyCompanions(t.id, t.prompt, concept.title).then((plan) => ({
+            plan,
+            title: concept.title,
+          })),
+        )
+        .then(({ plan, title }) => {
+          setPreparingTurnId(null);
+          setProductTitle(title);
+          // §4.8 — "concept is preserved; re-selecting does not require
+          // regeneration": a companion whose concept already landed comes
+          // back ticked, because it was paid for and is going to be built
+          // unless the user says otherwise. Those concepts can only exist
+          // from an earlier pass, so the turns this callback closed over
+          // already hold them.
+          const alreadyRendered = new Set(
+            chat.turns
+              .filter(
+                (x) =>
+                  x.role === "assistant" &&
+                  x.status === "ready" &&
+                  !!x.companionOf,
+              )
+              .map((x) => (x.role === "assistant" ? x.companionOf! : "")),
+          );
+          setCompanionPlan(plan.companions);
+          setPickedCompanions(
+            new Set(
+              plan.companions
+                .filter((c) => alreadyRendered.has(c.id))
+                .map((c) => c.id),
+            ),
+          );
+          goToGate(source);
+        })
+        .catch(() => {
+          setPreparingTurnId(null);
+          goToGate(source);
+        });
+    },
+    [chat, goToGate],
+  );
+
+  // §4.4.2 — leaving the companion screen books ONE job for every product
+  // that is ready: the primary, plus each ticked companion whose concept
+  // has landed. A ticked companion with no concept is not built and is not
+  // reported as missing (§4.4.4: "unselected companions are simply not
+  // built"); its row already said it needs a concept first.
+  // The ticked companions whose concept has landed, summarised the way
+  // the primary is so every product's deliverables come from a real parts
+  // list rather than from its name. A ticked companion still waiting on
+  // its concept is simply not built (§4.4.4) — its row said it needs one.
+  const readyCompanionProducts = React.useCallback(async (): Promise<
+    Omit<BuildProduct, "items">[]
+  > => {
+    if (!chat) return [];
+    const turnFor = (id: string) => {
+      for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
+        const t = chat.turns[i];
+        if (
+          t.role === "assistant" &&
+          t.companionOf === id &&
+          t.status === "ready" &&
+          t.imageUrl
+        ) {
+          return t;
+        }
+      }
+      return null;
+    };
+    const ready = companionPlan
+      .filter((c) => pickedCompanions.has(c.id))
+      .map((c) => ({ companion: c, turn: turnFor(c.id) }))
+      .filter(
+        (x): x is { companion: Companion; turn: ChatTurn & { role: "assistant" } } =>
+          x.turn !== null,
+      );
+    return Promise.all(
+      ready.map(({ companion, turn }) =>
+        summarizeConcept(turn.id, turn.prompt).then((concept) => ({
+          id: companion.id,
+          name: companion.name,
+          conceptImageUrl: turn.imageUrl ?? "",
+          conceptPrompt: turn.prompt,
+          title: concept.title || companion.name,
+          summary: concept.summary,
+          parts: concept.parts,
+        })),
+      ),
+    );
+  }, [chat, companionPlan, pickedCompanions]);
+
+  // §4.4.3 — a product the classifier did not offer. It joins the same
+  // list, ticked, so the next step is the same "Generate concept" every
+  // other row takes; the AI's own entries are untouched, which is what
+  // §4.4.4's read-only rule is about. A name that collides with an
+  // existing row just selects that row rather than adding a twin.
+  const handleAddOwnCompanion = React.useCallback((name: string) => {
+    const id = companionId(name);
+    if (!id) return;
+    setCompanionPlan((prev) =>
+      prev.some((c) => c.id === id)
+        ? prev
+        : [...prev, { id, name: name.trim(), why: "You added this one." }],
+    );
+    setPickedCompanions((prev) => new Set(prev).add(id));
+  }, []);
+
+  // §4.4.4 — the row reads the live turn rather than a stored flag: the
+  // companion's concept IS a turn, so the dialog and the model can never
+  // disagree about whether one exists or how far it has got. The latest
+  // turn for that companion wins, so a regenerate moves the row back to
+  // rendering.
+  const companionConceptTurn = React.useCallback(
+    (id: string): CompanionTurn | null => {
+      if (!chat) return null;
+      for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
+        const t = chat.turns[i];
+        if (t.role !== "assistant" || t.companionOf !== id) continue;
+        return {
+          turnId: t.id,
+          status: t.status,
+          progress: t.progress ?? 0,
+          imageUrl: t.imageUrl,
+          prompt: t.prompt,
+        };
+      }
+      return null;
     },
     [chat],
+  );
+
+  // §4.4.5 — the companion's own loop, run from the dialog. A refine
+  // evolves the image that is on screen; a regenerate takes a fresh run at
+  // the same brief. Both append a turn carrying the same `companionOf`,
+  // so the row follows the newest one.
+  const handleRefineCompanion = React.useCallback(
+    (companion: Companion, change: string) => {
+      if (!chat || !canAfford(CONCEPT_COST)) return;
+      const current = companionConceptTurn(companion.id);
+      if (!current || current.status !== "ready") return;
+      const { turnId } = appendAssistantTurn(chat.id, {
+        prompt: change,
+        kind: "refine",
+        parentTurnId: current.turnId,
+        companionOf: companion.id,
+      });
+      kickedOff.current.add(turnId);
+      runGeneration(chat.id, turnId, {
+        prompt: change,
+        kind: "refine",
+        parentImageUrl: current.imageUrl,
+      });
+    },
+    [chat, canAfford, companionConceptTurn, appendAssistantTurn, runGeneration],
+  );
+
+  const handleRegenerateCompanion = React.useCallback(
+    (companion: Companion) => {
+      if (!chat || !confirmFor || !canAfford(CONCEPT_COST)) return;
+      const prompt = `${companion.name} for this ${productTitle}: ${confirmFor.prompt}`;
+      const { turnId } = appendAssistantTurn(chat.id, {
+        prompt,
+        kind: "fresh",
+        companionOf: companion.id,
+      });
+      kickedOff.current.add(turnId);
+      runGeneration(chat.id, turnId, { prompt, kind: "fresh" });
+    },
+    [
+      chat,
+      confirmFor,
+      productTitle,
+      canAfford,
+      appendAssistantTurn,
+      runGeneration,
+    ],
+  );
+
+
+  // §4.4.5 — a companion's concept is generated as part of THIS system,
+  // not as a standalone object: the prompt inherits the parent's own
+  // words so the two products read as a family. It lands in the thread
+  // like any other concept, with its own refine and regenerate.
+  const handleGenerateCompanion = React.useCallback(
+    (companion: Companion) => {
+      if (!chat || !confirmFor) return;
+      if (!canAfford(CONCEPT_COST)) return;
+      const prompt = `${companion.name} for this ${productTitle}: ${confirmFor.prompt}`;
+      const { turnId } = appendAssistantTurn(chat.id, {
+        prompt,
+        kind: "fresh",
+        companionOf: companion.id,
+      });
+      kickedOff.current.add(turnId);
+      runGeneration(chat.id, turnId, { prompt, kind: "fresh" });
+      // The dialog stays open: the row shows the render's own progress and
+      // then its preview. Closing it and asking the user to come back was
+      // two trips for one decision.
+    },
+    [
+      chat,
+      confirmFor,
+      productTitle,
+      canAfford,
+      appendAssistantTurn,
+      runGeneration,
+    ],
   );
 
   // Open the full-screen editor on a specific concept image.
@@ -350,7 +750,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // Refine on the result to keep iterating.
   const handleSubmitEdit = React.useCallback(
     (text: string) => {
-      if (!chat || !editorTurnId) return;
+      if (!chat || !editorTurnId || !canAfford(CONCEPT_COST)) return;
       const parent = chat.turns.find((x) => x.id === editorTurnId);
       if (
         !parent ||
@@ -377,55 +777,24 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // Close the editor — the refine continues in the thread below.
       setEditorTurnId(null);
     },
-    [chat, editorTurnId, appendUserTurn, appendAssistantTurn, runGeneration],
+    [
+      chat,
+      canAfford,
+      editorTurnId,
+      appendUserTurn,
+      appendAssistantTurn,
+      runGeneration,
+    ],
   );
+
 
   const handleConfirmBuild = React.useCallback(
     async (concept: ConceptSummary) => {
-      if (!chat || !confirmFor) return;
-      setSubmittingBuild(true);
-      try {
-        await fetch("/api/build/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chatId: chat.id,
-            turnId: confirmFor.turnId,
-            imageUrl: confirmFor.imageUrl,
-            prompt: confirmFor.prompt,
-          }),
-        }).catch(() => null);
-        // The concept as the summarizer read it in the dialog — the same
-        // title, parts line and parts the user just approved, so every
-        // deliverable is derived from what was on screen.
-        const job = startBuild({
-          chatId: chat.id,
-          turnId: confirmFor.turnId,
-          imageUrl: confirmFor.imageUrl,
-          prompt: confirmFor.prompt,
-          conceptNumber: labels.get(confirmFor.turnId) ?? "1",
-          title: concept.title || deriveTitle(confirmFor.prompt),
-          summary: concept.summary,
-          parts: concept.parts,
-        });
-        // A queued build isn't building yet, so we stay in the chat and
-        // say so beside the concept that started it — the build page
-        // would only show a waiting room. Any earlier notice is for a
-        // build this new confirm has nothing to do with, so it's
-        // replaced (or cleared, if this one didn't queue) rather than
-        // left pointing at a stale job.
-        if (job.status === "queued") {
-          setQueuedNotice(job.id);
-          return;
-        }
-        setQueuedNotice(null);
-        router.push(`/build/${job.id}`);
-      } finally {
-        setSubmittingBuild(false);
-        setConfirmFor(null);
-      }
+      if (!confirmFor) return;
+      const companions = await readyCompanionProducts();
+      await startBuildFor(confirmFor, concept, companions);
     },
-    [chat, confirmFor, labels, startBuild, router],
+    [confirmFor, readyCompanionProducts, startBuildFor],
   );
 
   if (!hydrated) {
@@ -453,6 +822,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           <ChatThread
             chat={chat}
             regeneratingFrom={regeneratingFrom}
+            preparingTurnId={preparingTurnId}
             onRegenerateAt={handleRegenerate}
             onUseTurn={handleUseTurn}
             onRefineTurn={handleOpenEditor}
@@ -488,14 +858,19 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           )}
           {/* Never disabled while a concept renders — describing the next
               change shouldn't wait on the current one. */}
-          <PromptBar onSubmit={handleUserSubmit} />
+          <PromptBar onSubmit={handleUserSubmit} canRender={canRender} />
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
-            Start by describing the concept. Refine and regenerate as many
-            times as you like.
+            {canRender
+              ? `Start by describing the concept. Each render costs ${CONCEPT_COST} credit${CONCEPT_COST === 1 ? "" : "s"} — refine and regenerate as often as you like.`
+              : "You are out of credits — top them up to render another concept."}
           </p>
         </div>
       </div>
 
+      {/* Part 4 §4.4.2 — the products this build covers are chosen here,
+          in the same dialog that confirms the build. One decision, one
+          surface: a separate screen in front of this one asked the user
+          to approve the same build twice. */}
       <ConfirmBuildDialog
         open={confirmFor !== null}
         turnId={confirmFor?.turnId ?? ""}
@@ -507,6 +882,21 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         submitting={submittingBuild}
         onCancel={() => setConfirmFor(null)}
         onConfirm={handleConfirmBuild}
+        companions={companionPlan}
+        selectedCompanions={pickedCompanions}
+        companionTurn={companionConceptTurn}
+        onToggleCompanion={(id) =>
+          setPickedCompanions((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          })
+        }
+        onGenerateCompanion={handleGenerateCompanion}
+        onRefineCompanion={handleRefineCompanion}
+        onRegenerateCompanion={handleRegenerateCompanion}
+        onAddCompanion={handleAddOwnCompanion}
       />
 
       <ImageEditorModal

@@ -25,9 +25,14 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 export function PromptBar({
   onSubmit,
   placeholder = "Describe your electronics project...",
+  canRender = true,
 }: {
   onSubmit: (text: string) => void;
   placeholder?: string;
+  /** False when the balance cannot cover one concept render. The send is
+   *  shut with that as its reason rather than letting a submit start a
+   *  turn the ledger will immediately fail. */
+  canRender?: boolean;
 }) {
   const [value, setValue] = React.useState("");
   const [refining, setRefining] = React.useState(false);
@@ -182,7 +187,12 @@ export function PromptBar({
               refining={refining}
               disabled={!hasText || refining}
             />
-            <SendButton onClick={send} hasText={hasText} refining={refining} />
+            <SendButton
+              onClick={send}
+              hasText={hasText}
+              refining={refining}
+              canRender={canRender}
+            />
           </div>
         </div>
       </div>
@@ -277,15 +287,19 @@ function SendButton({
   onClick,
   hasText,
   refining,
+  canRender,
 }: {
   onClick: () => void;
   hasText: boolean;
   refining: boolean;
+  canRender: boolean;
 }) {
-  if (!hasText || refining) {
-    const why = refining
-      ? "Enhancing your draft…"
-      : "Describe your project first";
+  if (!hasText || refining || !canRender) {
+    const why = !canRender
+      ? "Not enough credits to render a concept"
+      : refining
+        ? "Enhancing your draft…"
+        : "Describe your project first";
     return (
       <button
         type="button"

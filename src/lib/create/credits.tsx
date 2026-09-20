@@ -1,8 +1,12 @@
 "use client";
 
 // CreditsProvider — the user's local credits ledger. A full-product
-// build (3D + PCB + firmware) costs BUILD_COST credits; exploring and
-// refining concepts in chat stays free. There is no backend yet, so
+// build (3D + PCB + firmware) costs BUILD_COST credits, and every
+// concept render — the first draft, a refine and a regenerate alike —
+// costs CONCEPT_COST. Charging refines alone would have left the
+// loophole open: regenerate runs the same model for the same money, so
+// anyone avoiding the charge would just press that instead. There is no
+// backend yet, so
 // this is a local balance the user can top up for free — see
 // describeEntry's "topup" line, which says so plainly.
 //
@@ -17,11 +21,47 @@
 import * as React from "react";
 
 export const BUILD_COST = 4;
+/** What one concept render costs — first draft, refine or regenerate. */
+export const CONCEPT_COST = 1;
 
+/** Part 4 §4.4.6 — what a companion selection will cost, recomputed live
+ *  as the selection changes.
+ *
+ *  `toRender` counts only the companions that still need a concept: the
+ *  primary is already rendered and paid for, and a companion whose
+ *  concept exists has been paid for too (§4.8 — deselecting keeps the
+ *  concept, so re-selecting must not charge again).
+ *
+ *  The word *estimated* is load-bearing in the spec: refine and
+ *  regenerate counts cannot be known ahead, so this is the floor — what
+ *  the selection costs if nothing is refined. */
+export type CostEstimate = {
+  concepts: number;
+  conceptCost: number;
+  buildCost: number;
+  total: number;
+};
+
+export function estimateFor(toRender: number): CostEstimate {
+  const concepts = Math.max(0, Math.trunc(toRender));
+  const conceptCost = concepts * CONCEPT_COST;
+  return {
+    concepts,
+    conceptCost,
+    buildCost: BUILD_COST,
+    total: conceptCost + BUILD_COST,
+  };
+}
+
+/** The two debit reasons, as against `seed` / `topup` / `refund`. A charge
+ *  and its refund are matched by id, so both kinds refund the same way. */
+export type ChargeReason = "build" | "concept";
 export type CreditEntry = {
   id: string;
   delta: number;
-  reason: "seed" | "build" | "refund" | "topup";
+  reason: ChargeReason | "seed" | "refund" | "topup";
+  /** What was charged: a build id, or a concept turn id. The field keeps
+   *  its name because ledgers are already stored under it. */
   buildId?: string;
   ts: number;
 };
@@ -100,7 +140,7 @@ export function openCharges(ledger: CreditEntry[], buildId: string): number {
   let open = 0;
   for (const e of ledger) {
     if (e.buildId !== buildId) continue;
-    if (e.reason === "build") open += 1;
+    if (e.reason === "build" || e.reason === "concept") open += 1;
     else if (e.reason === "refund") open -= 1;
   }
   return open;
@@ -116,13 +156,14 @@ export function chargeState(
   state: CreditsState,
   buildId: string,
   cost: number = BUILD_COST,
+  reason: ChargeReason = "build",
 ): { state: CreditsState; ok: boolean } {
   if (openCharges(state.ledger, buildId) > 0) return { state, ok: true };
   if (state.balance < cost) return { state, ok: false };
   const entry: CreditEntry = {
     id: makeId(),
     delta: -cost,
-    reason: "build",
+    reason,
     buildId,
     ts: Date.now(),
   };
@@ -139,7 +180,9 @@ export function refundState(
 ): { state: CreditsState; ok: boolean } {
   if (openCharges(state.ledger, buildId) <= 0) return { state, ok: false };
   const charge = state.ledger.findLast(
-    (e) => e.reason === "build" && e.buildId === buildId,
+    (e) =>
+      (e.reason === "build" || e.reason === "concept") &&
+      e.buildId === buildId,
   );
   if (!charge) return { state, ok: false };
   const entry: CreditEntry = {
@@ -175,6 +218,8 @@ export function describeEntry(entry: CreditEntry): string {
       return `${sign}${amount} Top up`;
     case "build":
       return `${sign}${amount} Build${entry.buildId ? ` · ${entry.buildId}` : ""}`;
+    case "concept":
+      return `${sign}${amount} Concept render`;
     case "refund":
       return `${sign}${amount} Refund${entry.buildId ? ` · ${entry.buildId}` : ""}`;
   }
@@ -187,7 +232,7 @@ type Ctx = {
   balance: number;
   ledger: CreditEntry[];
   canAfford: (cost?: number) => boolean;
-  charge: (buildId: string, cost?: number) => boolean;
+  charge: (buildId: string, cost?: number, reason?: ChargeReason) => boolean;
   refund: (buildId: string) => boolean;
   topUp: (n: number) => void;
 };
@@ -226,10 +271,14 @@ export function CreditsProvider({
   );
 
   const charge = React.useCallback(
-    (buildId: string, cost: number = BUILD_COST) => {
+    (
+      buildId: string,
+      cost: number = BUILD_COST,
+      reason: ChargeReason = "build",
+    ) => {
       let ok = false;
       setState((prev) => {
-        const result = chargeState(prev, buildId, cost);
+        const result = chargeState(prev, buildId, cost, reason);
         ok = result.ok;
         return result.state;
       });

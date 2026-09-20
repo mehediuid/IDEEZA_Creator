@@ -46,6 +46,7 @@ export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
 export function ChatThread({
   chat,
   regeneratingFrom,
+  preparingTurnId,
   onRegenerateAt,
   onUseTurn,
   onRefineTurn,
@@ -54,6 +55,9 @@ export function ChatThread({
   // Turns whose Regenerate is still rendering its fresh take — the
   // orchestrator owns the child→source link, the card only reads it.
   regeneratingFrom?: ReadonlySet<string>;
+  /** The turn whose "Use this concept" is waiting on the two model calls
+   *  that have to answer before the gate can open. */
+  preparingTurnId?: string | null;
   onRegenerateAt: (sourcePrompt: string, sourceTurnId: string) => void;
   onUseTurn: (turnId: string) => void;
   onRefineTurn: (turnId: string) => void;
@@ -114,6 +118,7 @@ export function ChatThread({
                 parentConceptLabel={parentLabel}
                 regenerating={regeneratingFrom?.has(turn.id) ?? false}
                 onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
+                preparing={preparingTurnId === turn.id}
                 onUseThis={() => onUseTurn(turn.id)}
                 onRefine={() => onRefineTurn(turn.id)}
               />

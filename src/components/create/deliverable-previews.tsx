@@ -5,15 +5,17 @@
 // src/lib/create/build-artifacts.ts, so the board diagram, the wiring
 // map, the sketch and the BOM all describe one build. Nothing is
 // decorative: a block is a part, a line is a net, a table row is a BOM
-// row. These components are presentational — they read the job and
-// nothing else.
+// row. These components are presentational, and they read a *product*
+// rather than a job (§4.4): a companion's BOM is the companion's, so each
+// takes the `ArtifactSource` its artifact is derived from.
 
-import type { BuildItemKind, BuildJob } from "@/lib/create/history";
+import type { BuildItemKind } from "@/lib/create/history";
 import {
   bomFor,
   firmwareFor,
   netsFor,
   pcbMetaFor,
+  type ArtifactSource,
   type NetWire,
 } from "@/lib/create/build-artifacts";
 import type { ConceptPartCategory } from "@/lib/create/concept";
@@ -172,7 +174,7 @@ const PCB_BLOCK_H = 42;
 const PCB_GAP_X = 60;
 const PCB_GAP_Y = 34;
 
-export function PcbPreview({ job }: { job: BuildJob }) {
+export function PcbPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   const meta = pcbMetaFor(job);
   const nets = netsFor(job);
@@ -345,7 +347,7 @@ const W_LEGEND: [string, NetWire["cls"], number][] = [
 ];
 const W_LEGEND_W = 272 + 40 + 50;
 
-export function WiringPreview({ job }: { job: BuildJob }) {
+export function WiringPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   const nets = netsFor(job);
 
@@ -698,7 +700,7 @@ function tokenize(line: string): { text: string; tone: Tone }[] {
   return out;
 }
 
-export function FirmwarePreview({ job }: { job: BuildJob }) {
+export function FirmwarePreview({ job }: { job: ArtifactSource }) {
   const firmware = firmwareFor(job);
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-bg-brand-subtle">
@@ -736,7 +738,7 @@ export function FirmwarePreview({ job }: { job: BuildJob }) {
 
 // ────────────────────────────── parts ──────────────────────────────
 
-export function PartsPreview({ job }: { job: BuildJob }) {
+export function PartsPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-bg-surface">
@@ -795,7 +797,7 @@ export function PartsPreview({ job }: { job: BuildJob }) {
   );
 }
 
-export function PartsSummary({ job }: { job: BuildJob }) {
+export function PartsSummary({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   const rows: [string, number][] = [
     ["Unique parts", bom.unique],

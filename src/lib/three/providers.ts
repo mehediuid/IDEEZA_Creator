@@ -8,8 +8,10 @@
 //               whole flow (prompt → concept image → 3D viewer) is visible and
 //               testable immediately, with a short simulated "generating" pass.
 //
-// A text prompt is first turned into a concept image via Pollinations (free,
-// keyless — the same service the concept chat uses), then that image is fed to
+// A text prompt is first turned into a concept image via Pollinations (the
+// same service the concept chat uses — rendering a new image bills an
+// account, so POLLINATIONS_TOKEN is sent when set; reading one it has
+// already rendered stays free and keyless), then that image is fed to
 // image-to-3D. Image-to-3D is one reliable call (vs. Meshy's two-step
 // text-to-3D), so this path is simpler AND keeps the image step free.
 
@@ -52,12 +54,23 @@ export function conceptImageUrl(prompt: string, seed: number): string {
 // 3D provider (so the provider's fetch hits a ready image, not a cold miss).
 // Best-effort: if warming fails we still return the URL — the provider's own
 // fetch will trigger the (deterministic) render.
+//
+// The token rides the header, never the URL: the URL is handed to the 3D
+// provider and shown in the browser.
+function pollinationsAuth(): Record<string, string> {
+  const token = process.env.POLLINATIONS_TOKEN?.trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function warmImage(url: string): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 30_000);
-      const res = await fetch(url, { signal: ctrl.signal });
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: pollinationsAuth(),
+      });
       clearTimeout(t);
       if (res.ok && (res.headers.get("content-type") ?? "").startsWith("image")) {
         return;

@@ -34,11 +34,15 @@ import { ModelViewer } from "@/components/3d/model-viewer";
 import {
   ITEM_LABELS,
   ITEM_KINDS,
+  productsOf,
   useCreateHistory,
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
+import type { ArtifactSource } from "@/lib/create/build-artifacts";
+import { confidenceFor } from "@/lib/create/confidence";
+import { ConfidenceBadge } from "./confidence-badge";
 import {
   FirmwarePreview,
   PartsPreview,
@@ -69,10 +73,26 @@ function ReviewPanel({ job }: { job: BuildJob }) {
   // An artifact an older build never produced has nothing to review, so
   // it gets no tab — a deliverable panel for something that was never
   // made would be a lie.
+  // §4.7 — a build covers one product or several, and each product opens
+  // into its own tabs. The product switcher only appears when there is
+  // more than one; a single-product build is the surface it always was.
+  const products = React.useMemo(() => productsOf(job), [job]);
+  const [productId, setProductId] = React.useState("primary");
+  const product =
+    products.find((x) => x.id === productId) ?? products[0];
   const deliverables = React.useMemo(
-    () => job.items.filter((i) => i.status !== "skipped"),
-    [job.items],
+    () => product.items.filter((i) => i.status !== "skipped"),
+    [product.items],
   );
+  // §4.3 — one badge per product (§4.4.9), computed from the products
+  // themselves so the badge on screen is what the checker returned.
+  const confidence = React.useMemo(
+    () => confidenceFor(job, products),
+    [job, products],
+  );
+  const productConfidence =
+    confidence.byProduct.find((c) => c.productId === product.id) ??
+    confidence.byProduct[0];
 
   const [picked, setPicked] = React.useState<BuildItemKind | null>(null);
   const linked = query.get("tab");
@@ -119,6 +139,19 @@ function ReviewPanel({ job }: { job: BuildJob }) {
         >
           Review your deliverables
         </h2>
+        {/* §4.3 + §4.4.9 — the product's own tier, and on a multi-product
+            build the project's headline is the lowest of them, which this
+            badge already is because the switcher lands on that product's
+            own state. The list opens under it. */}
+        <div className="mt-4">
+          {/* Keyed by product: switching products is looking at a
+              different thing, so the list closes rather than carrying one
+              product's open state onto another's issues. */}
+          <ConfidenceBadge
+            key={productConfidence.productId}
+            confidence={productConfidence}
+          />
+        </div>
       </header>
 
       {shown === null ? (
@@ -131,6 +164,40 @@ function ReviewPanel({ job }: { job: BuildJob }) {
         </div>
       ) : (
         <>
+          {products.length > 1 && (
+            <div
+              role="tablist"
+              aria-label="Products in this build"
+              data-testid="product-switcher"
+              className="mx-10 mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-solid border-border bg-bg-subtle p-2"
+            >
+              {products.map((x) => {
+                const on = x.id === product.id;
+                return (
+                  <button
+                    key={x.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={on}
+                    onClick={() => {
+                      setProductId(x.id);
+                      setPicked(null);
+                    }}
+                    className={[
+                      "inline-flex h-[32px] items-center rounded-lg px-5 text-sm font-semibold outline-none transition-colors duration-fast",
+                      "focus-visible:ring-2 focus-visible:ring-border-focus",
+                      on
+                        ? "bg-bg-surface text-text-primary shadow-1"
+                        : "text-text-secondary hover:text-text-primary",
+                    ].join(" ")}
+                  >
+                    {x.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div
             role="tablist"
             aria-label="Deliverables"
@@ -171,10 +238,10 @@ function ReviewPanel({ job }: { job: BuildJob }) {
                 scrolls inside the panel instead of stretching the page
                 away from the two actions below. */}
             <div className="max-h-[520px] min-w-0 overflow-auto rounded-xl">
-              <DeliverablePanel kind={shown} job={job} />
+              <DeliverablePanel kind={shown} product={product} job={job} />
             </div>
             <aside className="flex flex-col gap-8 rounded-xl border border-solid border-border bg-bg-surface p-8">
-              {shown === "parts" && <PartsSummary job={job} />}
+              {shown === "parts" && <PartsSummary job={product} />}
               <section>
                 <h3 className="text-2xs font-bold tracking-wider text-text-secondary">
                   WHAT THIS COVERS
@@ -264,15 +331,22 @@ function ReviewPanel({ job }: { job: BuildJob }) {
 
 function DeliverablePanel({
   kind,
+  product,
   job,
 }: {
   kind: BuildItemKind;
+  /** The product being reviewed — the primary, or one of its companions
+   *  (§4.7). Every artifact below is derived from this product's own
+   *  parts, so a remote's BOM is the remote's. */
+  product: ArtifactSource;
+  /** Still the job, for the one thing that is the job's and not a
+   *  product's: the generated 3D model. */
   job: BuildJob;
 }) {
-  if (kind === "pcb") return <PcbPreview job={job} />;
-  if (kind === "code") return <FirmwarePreview job={job} />;
-  if (kind === "wiring") return <WiringPreview job={job} />;
-  if (kind === "parts") return <PartsPreview job={job} />;
+  if (kind === "pcb") return <PcbPreview job={product} />;
+  if (kind === "code") return <FirmwarePreview job={product} />;
+  if (kind === "wiring") return <WiringPreview job={product} />;
+  if (kind === "parts") return <PartsPreview job={product} />;
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-solid border-border bg-bg-surface-raised">
       {job.modelGlbUrl ? (

@@ -24,6 +24,7 @@
 
 import * as React from "react";
 import {
+  productsOf,
   useCreateHistory,
   type BuildItemKind,
   type BuildJob,
@@ -176,16 +177,21 @@ export function BuildSimulator() {
       for (const b of buildsRef.current) {
         if (b.status !== "running") continue;
         running = true;
-        for (const item of b.items) {
-          if (item.status !== "building") continue;
-          const next = Math.min(
-            100,
-            item.progress + TICK_PROGRESS - PER_ITEM_JITTER[item.kind],
-          );
-          if (next >= 100) {
-            updateBuildItem(b.id, item.kind, { status: "ready", progress: 100 });
-          } else {
-            updateBuildItem(b.id, item.kind, { progress: next });
+        // Every product's artifacts, not just the primary's: a
+        // multi-product build (§4.4) is not finished until the companion
+        // is, and a companion whose bar never moved would read as stuck.
+        for (const product of productsOf(b)) {
+          for (const item of product.items) {
+            if (item.status !== "building") continue;
+            const next = Math.min(
+              100,
+              item.progress + TICK_PROGRESS - PER_ITEM_JITTER[item.kind],
+            );
+            const patch =
+              next >= 100
+                ? { status: "ready" as const, progress: 100 }
+                : { progress: next };
+            updateBuildItem(b.id, item.kind, patch, product.id);
           }
         }
       }
