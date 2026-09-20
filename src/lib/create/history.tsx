@@ -41,6 +41,7 @@ export type ConceptFailReason =
   | "provider-credit"
   | "busy"
   | "unreachable"
+  | "storage"
   | "parent-lost"
   | "credits";
 
@@ -67,6 +68,11 @@ export type ChatTurn =
       status: AssistantImageStatus;
       // Set with status "failed" — see ConceptFailReason.
       failReason?: ConceptFailReason;
+      // The render in flight, as the generate route’s opaque job token.
+      // Kept on the turn, and so in localStorage, because a render outlives
+      // the page: reloading mid-render must pick the same job back up rather
+      // than start — and charge for — a second one.
+      renderJob?: string;
       // How far the render has visibly got, 0–100. Ticked by the chat
       // orchestrator while the turn is pending and set to 100 the moment
       // the image lands, so the card shows real motion instead of an
@@ -531,6 +537,7 @@ type Ctx = {
     turnId: string,
     reason?: ConceptFailReason,
   ) => void;
+  setTurnJob: (chatId: string, turnId: string, job: string) => void;
   setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
@@ -758,6 +765,28 @@ export function CreateHistoryProvider({
             turns: c.turns.map((t) =>
               t.id === turnId && t.role === "assistant"
                 ? { ...t, status: "failed" as const, failReason: reason }
+                : t,
+            ),
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  // The job token for a render in flight. Written once, as soon as the
+  // generator accepts the work, so a reload can resume that job instead of
+  // submitting another.
+  const setTurnJob = React.useCallback(
+    (chatId: string, turnId: string, job: string) => {
+      setChats((arr) =>
+        arr.map((c) => {
+          if (c.id !== chatId) return c;
+          return {
+            ...c,
+            turns: c.turns.map((t) =>
+              t.id === turnId && t.role === "assistant"
+                ? { ...t, renderJob: job }
                 : t,
             ),
           };
@@ -1243,6 +1272,7 @@ export function CreateHistoryProvider({
     appendAssistantTurn,
     resolveAssistantTurn,
     failAssistantTurn,
+    setTurnJob,
     setTurnProgress,
     getChat,
     startBuild,

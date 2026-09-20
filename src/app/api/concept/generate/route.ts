@@ -1,37 +1,37 @@
-// POST /api/concept/generate
+// /api/concept/generate — concept image generation, free and non-blocking.
 //
-// Phase 1 concept image generation — REAL, prompt-driven, and free.
+//   POST { prompt, kind: "fresh" | "refine", parentImageUrl? }
+//        → { job }                  hands the work to the generator, returns at once
+//   GET  ?job=<token>
+//        → { status: "pending", queuePosition?, waitSeconds? }
+//        | { status: "ready", imageUrl }
+//        | { error, reason } on failure
 //
-//   • fresh   — generate from the prompt with a new random seed (each fresh
-//               take / regenerate is a genuinely different image).
-//   • refine  — evolve the parent: append the requested change to the
-//               parent's prompt and keep its seed, so it stays the same
-//               concept, changed.
+// It used to block for the whole render and return the image. That works on a
+// long-lived server and cannot work on a serverless host: a render measures
+// 32-62s against a function budget far shorter than that, so the function is
+// killed before the generator answers and the user is shown a failure for a
+// render that was in fact fine. The create-then-poll shape here is the same
+// one /api/three/generate already uses for the 3D provider.
 //
-// The generator itself lives in lib/create/image-gen.ts, which hands back
-// BYTES. Those bytes are stored (lib/create/image-store.ts) and this route
-// returns a URL of our own. That is a deliberate change from the original
-// design, which passed the generator's URL straight through: every free
-// generator now returns either bytes or a link that expires — the AI Horde's
-// is presigned for thirty minutes — while this URL is written into the
-// user's localStorage chat history and rendered again days later.
+// The job token carries everything needed to resume — provider, the
+// provider's own handle, the composed prompt, the seed, the start time —
+// because the invocation that starts a render is not the one that finishes
+// it, and they share no memory. Nothing secret is in it: it is the user's own
+// prompt, and this app has no accounts.
 //
-// Runtime is nodejs rather than edge because the store writes to disk.
-//
-// Request:  { prompt: string, kind: "fresh" | "refine", parentImageUrl?: string }
-// Response: { imageUrl: string }
-//           | { error, reason: "provider-credit" | "busy" | "unreachable"
-//                      | "parent-lost" } on failure, which the card turns into
-//             the sentence for that reason.
+// Runtime is nodejs rather than edge because the store may touch the disk.
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import {
   PROMPT_BUDGET,
   RenderError,
-  generate,
+  pollRender,
+  startRender,
   type FailReason,
+  type RenderJob,
 } from "@/lib/create/image-gen";
-import { idFromUrl, put, readMeta, urlFor } from "@/lib/create/image-store";
+import { put, readMeta } from "@/lib/create/image-store";
 
 export const runtime = "nodejs";
 
@@ -42,11 +42,10 @@ export const runtime = "nodejs";
 async function parentOf(
   url: string,
 ): Promise<{ prompt: string; seed: string } | null> {
-  const id = idFromUrl(url);
-  if (id) {
-    const meta = await readMeta(id);
-    return meta ? { prompt: meta.prompt, seed: meta.seed } : null;
-  }
+  const meta = await readMeta(url);
+  if (meta) return { prompt: meta.prompt, seed: meta.seed };
+  // Not ours: a Pollinations URL from before the store existed, which encodes
+  // the prompt and seed in its own path.
   try {
     const u = new URL(url, "http://localhost");
     const i = u.pathname.indexOf("/prompt/");
@@ -84,7 +83,46 @@ const COPY: Record<
     reason: "unreachable",
     status: 502,
   },
+  storage: {
+    error:
+      "The image was generated, but we couldn't store it — so there is nothing to show.",
+    reason: "storage",
+    status: 500,
+  },
 };
+
+function failed(err: unknown) {
+  const reason: FailReason =
+    err instanceof RenderError ? err.reason : "unreachable";
+  const copy = COPY[reason];
+  return NextResponse.json(
+    { error: copy.error, reason: copy.reason },
+    { status: copy.status },
+  );
+}
+
+const encodeJob = (job: RenderJob) =>
+  Buffer.from(JSON.stringify(job), "utf8").toString("base64url");
+
+function decodeJob(token: string): RenderJob | null {
+  try {
+    const raw = JSON.parse(
+      Buffer.from(token, "base64url").toString("utf8"),
+    ) as Partial<RenderJob>;
+    if (
+      (raw.provider !== "aihorde" && raw.provider !== "pollinations") ||
+      typeof raw.ref !== "string" ||
+      typeof raw.prompt !== "string" ||
+      typeof raw.seed !== "string" ||
+      typeof raw.startedAt !== "number"
+    ) {
+      return null;
+    }
+    return raw as RenderJob;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
   let body: unknown;
@@ -134,31 +172,56 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    // Composed inside enhance()'s budget rather than over it. The cut happens
-    // before the boilerplate is appended, so whatever overflows is the change
-    // the user just typed — and a refine chain grows the parent every time,
-    // which would silently eat more of it with each pass.
+    // Composed inside the generator's own budget rather than over it. The cut
+    // lands before the boilerplate is appended, so whatever overflows is the
+    // change the user just typed — and a refine chain grows the parent every
+    // time, which would silently eat more of it with each pass.
     const change = prompt.slice(0, 80);
     finalPrompt = `${parent.prompt.slice(0, PROMPT_BUDGET - change.length - 2)}, ${change}`;
     seed = parent.seed; // same seed → same concept, evolved by the change
   }
 
   try {
-    const rendered = await generate(finalPrompt, seed);
-    const id = await put(rendered.bytes, {
-      prompt: finalPrompt,
-      seed: rendered.seed,
-      provider: rendered.provider,
-      contentType: rendered.contentType,
-    });
-    return NextResponse.json({ imageUrl: urlFor(id) });
+    const job = await startRender(finalPrompt, seed);
+    return NextResponse.json({ job: encodeJob(job) });
   } catch (err) {
-    const reason: FailReason =
-      err instanceof RenderError ? err.reason : "unreachable";
-    const copy = COPY[reason];
-    return NextResponse.json(
-      { error: copy.error, reason: copy.reason },
-      { status: copy.status },
-    );
+    return failed(err);
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const job = decodeJob(req.nextUrl.searchParams.get("job") ?? "");
+  if (!job) {
+    return NextResponse.json({ error: "Unknown job" }, { status: 400 });
+  }
+
+  try {
+    const step = await pollRender(job);
+    if (step.status === "pending") {
+      return NextResponse.json({
+        status: "pending",
+        queuePosition: step.queuePosition,
+        waitSeconds: step.waitSeconds,
+      });
+    }
+    // Stored on the way through: the generator's own link is presigned and
+    // dies within the hour, while this URL goes into the user's chat history.
+    // Its own try: a failure here is OURS, and collapsing it into the
+    // provider's reason told users the service was unreachable when it had
+    // just done the work.
+    let stored: { url: string };
+    try {
+      stored = await put(step.rendered.bytes, {
+        prompt: job.prompt,
+        seed: step.rendered.seed,
+        provider: step.rendered.provider,
+        contentType: step.rendered.contentType,
+      });
+    } catch {
+      return failed(new RenderError("storage"));
+    }
+    return NextResponse.json({ status: "ready", imageUrl: stored.url });
+  } catch (err) {
+    return failed(err);
   }
 }

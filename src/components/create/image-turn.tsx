@@ -547,6 +547,8 @@ const FAIL_COPY: Record<NonNullable<ConceptFailReason>, string> = {
   busy: "The image service was busy and didn't finish in time. Nothing was charged — your credit balance is unchanged.",
   unreachable:
     "Couldn't reach the image service at all. Nothing was charged — your credit balance is unchanged.",
+  storage:
+    "The image was generated, but we couldn't store it, so there is nothing to show. That is a fault on our side, not yours — nothing was charged.",
   "parent-lost":
     "The concept this was refining is no longer stored, so there was nothing to evolve. Nothing was charged — start a fresh concept instead.",
   credits:

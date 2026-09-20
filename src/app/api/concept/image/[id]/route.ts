@@ -27,8 +27,12 @@ export async function GET(
     headers: {
       "Content-Type": image.contentType,
       // The bytes at an id never change — the id is minted per render — so
-      // this can be cached as hard as the browser allows.
-      "Cache-Control": "public, max-age=31536000, immutable",
+      // this is cached as hard as both caches allow. s-maxage is not
+      // decoration: a CDN in front of this only caches a function response
+      // when one of s-maxage / stale-while-revalidate is present, so without
+      // it every view of every image in every chat, forever, woke a function.
+      "Cache-Control":
+        "public, max-age=31536000, s-maxage=31536000, immutable",
       // The bytes came from an outside provider; served from this origin they
       // must never be sniffed into something executable.
       "X-Content-Type-Options": "nosniff",

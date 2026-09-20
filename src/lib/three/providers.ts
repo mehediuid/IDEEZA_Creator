@@ -16,7 +16,7 @@
 // text-to-3D), so this path is simpler AND keeps the image step free.
 
 import { generate } from "@/lib/create/image-gen";
-import { put, urlFor } from "@/lib/create/image-store";
+import { put } from "@/lib/create/image-store";
 
 export type ThreeProvider = "meshy" | "demo";
 export type TaskStatus = "queued" | "generating" | "ready" | "failed";
@@ -53,13 +53,13 @@ export async function renderConceptImage(prompt: string): Promise<string> {
     enhanceForModel(prompt),
     String(Math.floor(Math.random() * 1_000_000_000)),
   );
-  const id = await put(rendered.bytes, {
+  const stored = await put(rendered.bytes, {
     prompt,
     seed: rendered.seed,
     provider: rendered.provider,
     contentType: rendered.contentType,
   });
-  return urlFor(id);
+  return stored.url;
 }
 
 /** Meshy fetches the image from its own servers, so it needs an absolute URL

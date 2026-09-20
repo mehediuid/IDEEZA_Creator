@@ -34,8 +34,14 @@ export type Rendered = {
 
 export type ProviderId = "aihorde" | "pollinations";
 
-/** Why a render did not happen. `unpaid` is not retryable; the other two are. */
-export type FailReason = "busy" | "unpaid" | "unreachable";
+/** Why a render did not happen.
+ *
+ *  `unpaid` cannot be retried into working. `busy` and `unreachable` can.
+ *  `storage` is ours, not the provider’s: the image was generated and then
+ *  we failed to keep it. Saying "could not reach the image service" there
+ *  would be a false statement, and it sends whoever debugs it at the wrong
+ *  system. */
+export type FailReason = "busy" | "unpaid" | "unreachable" | "storage";
 
 export class RenderError extends Error {
   readonly reason: FailReason;
@@ -58,10 +64,47 @@ export function activeProvider(): ProviderId {
   return env("POLLINATIONS_TOKEN") ? "pollinations" : "aihorde";
 }
 
-export function generate(prompt: string, seed: string): Promise<Rendered> {
+/** A render in flight. Everything needed to pick it back up is in here and
+ *  nothing is held in memory, because the process that starts a render is not
+ *  the one that finishes it: on a serverless host each poll is a fresh
+ *  invocation, and there is no shared heap between them. */
+export type RenderJob = {
+  provider: ProviderId;
+  /** The provider’s own handle. Empty where the provider has no job to hold. */
+  ref: string;
+  prompt: string;
+  seed: string;
+  startedAt: number;
+};
+
+export type RenderProgress =
+  | { status: "pending"; queuePosition?: number; waitSeconds?: number }
+  | { status: "ready"; rendered: Rendered };
+
+/** Hand the work to the provider and return at once. The caller polls. */
+export function startRender(prompt: string, seed: string): Promise<RenderJob> {
   return activeProvider() === "pollinations"
-    ? pollinations(prompt, seed)
-    : aiHorde(prompt, seed);
+    ? pollinationsStart(prompt, seed)
+    : hordeStart(prompt, seed);
+}
+
+/** Has it landed? Throws RenderError when it never will. */
+export function pollRender(job: RenderJob): Promise<RenderProgress> {
+  if (Date.now() - job.startedAt > HORDE_BUDGET_MS) {
+    throw new RenderError("busy", "the queue did not finish in time");
+  }
+  return job.provider === "pollinations" ? pollinationsPoll(job) : hordePoll(job);
+}
+
+/** Start and wait. Only for a caller that can block for a minute — which a
+ *  serverless function cannot, so the concept route does not use this. */
+export async function generate(prompt: string, seed: string): Promise<Rendered> {
+  const job = await startRender(prompt, seed);
+  for (;;) {
+    const step = await pollRender(job);
+    if (step.status === "ready") return step.rendered;
+    await sleep(POLL_MS);
+  }
 }
 
 /** What the generator is told beyond the user's own words: a product concept
@@ -177,6 +220,7 @@ type HordeCheck = {
   faulted?: boolean;
   is_possible?: boolean;
   wait_time?: number;
+  queue_position?: number;
 };
 
 type HordeStatus = {
@@ -231,7 +275,7 @@ function submitBody(prompt: string, seed: string, w: number, h: number) {
   });
 }
 
-async function aiHorde(prompt: string, seed: string): Promise<Rendered> {
+async function hordeStart(prompt: string, seed: string): Promise<RenderJob> {
   let res: Response;
   try {
     res = await hordeFetch("/generate/async", {
@@ -265,56 +309,64 @@ async function aiHorde(prompt: string, seed: string): Promise<Rendered> {
   }
 
   const submitted = (await res.json().catch(() => ({}))) as { id?: string };
-  const jobId = submitted.id;
-  if (!jobId) throw new RenderError("unreachable", "no job id");
+  if (!submitted.id) throw new RenderError("unreachable", "no job id");
+  return {
+    provider: "aihorde",
+    ref: submitted.id,
+    prompt,
+    seed,
+    startedAt: Date.now(),
+  };
+}
 
-  const deadline = Date.now() + HORDE_BUDGET_MS;
-  for (;;) {
-    if (Date.now() > deadline) {
-      await hordeFetch(`/generate/status/${jobId}`, { method: "DELETE" }).catch(
-        () => undefined,
-      );
-      throw new RenderError("busy", "the queue did not finish in time");
-    }
-    await sleep(POLL_MS);
-
-    let check: HordeCheck;
-    try {
-      const r = await hordeFetch(`/generate/check/${jobId}`);
-      check = (await r.json()) as HordeCheck;
-    } catch {
-      continue; // a dropped poll is not a failed render
-    }
-    if (check.faulted) throw new RenderError("unreachable", "the job faulted");
-    // `is_possible` false means no worker on the network can serve this job —
-    // waiting cannot fix it, so say so now rather than at the deadline.
-    if (check.is_possible === false) {
-      throw new RenderError("busy", "no worker can serve this request");
-    }
-    if (!check.done) continue;
-
-    // Guarded like the check above: the render has already been paid for in
-    // GPU time by then, so one bad response here must not discard it.
-    let status: HordeStatus;
-    try {
-      const r = await hordeFetch(`/generate/status/${jobId}`);
-      status = (await r.json()) as HordeStatus;
-    } catch {
-      continue;
-    }
-    const gen = status.generations?.[0];
-    if (!gen?.img) continue;
-
-    // The img field is a presigned URL that dies in thirty minutes, so this
-    // download is not an optimisation — it is the only chance to keep it.
-    const bytes = await download(gen.img);
+async function hordePoll(job: RenderJob): Promise<RenderProgress> {
+  let check: HordeCheck;
+  try {
+    const r = await hordeFetch(`/generate/check/${job.ref}`);
+    check = (await r.json()) as HordeCheck;
+  } catch {
+    // A dropped poll is not a failed render; the next one will say.
+    return { status: "pending" };
+  }
+  if (check.faulted) throw new RenderError("unreachable", "the job faulted");
+  // `is_possible` false means no worker on the network can serve this job —
+  // waiting cannot fix it, so say so now rather than at the deadline.
+  if (check.is_possible === false) {
+    throw new RenderError("busy", "no worker can serve this request");
+  }
+  if (!check.done) {
+    // Real queue information, so the card can stop guessing.
     return {
-      bytes: bytes.body,
-      contentType: bytes.contentType,
-      seed: gen.seed || seed,
-      provider: "aihorde",
+      status: "pending",
+      queuePosition: check.queue_position,
+      waitSeconds: check.wait_time,
     };
   }
+
+  // Guarded like the check above: the render has already been paid for in
+  // GPU time by then, so one bad response here must not discard it.
+  let status: HordeStatus;
+  try {
+    const r = await hordeFetch(`/generate/status/${job.ref}`);
+    status = (await r.json()) as HordeStatus;
+  } catch {
+    return { status: "pending" };
+  }
+  const gen = status.generations?.[0];
+  if (!gen?.img) return { status: "pending" };
+
+  // The img field is a presigned URL that dies in thirty minutes, so this
+  // download is not an optimisation — it is the only chance to keep it.
+  const bytes = await download(gen.img);
+  return {
+    status: "ready",
+    rendered: {
+      bytes: bytes.body,
+      contentType: bytes.contentType,
+      seed: gen.seed || job.seed,
+      provider: "aihorde",
+    },
+  };
 }
 
 // ──────────────────────────── Pollinations ───────────────────────────
@@ -325,34 +377,60 @@ export function pollinationsUrl(prompt: string, seed: string): string {
   return `${POLLINATIONS}/${encodeURIComponent(prompt.slice(0, 400))}?width=640&height=480&nologo=true&model=flux&seed=${seed}`;
 }
 
-async function pollinations(prompt: string, seed: string): Promise<Rendered> {
-  const url = pollinationsUrl(enhance(prompt), seed);
+/** Pollinations has no job to submit: its URL is deterministic, so the same
+ *  GET both starts the render and collects it. Polling the same URL is
+ *  therefore the whole mechanism — each attempt is given a short deadline so
+ *  no single poll outlives its own serverless invocation. */
+async function pollinationsStart(
+  prompt: string,
+  seed: string,
+): Promise<RenderJob> {
+  return {
+    provider: "pollinations",
+    ref: "",
+    prompt,
+    seed,
+    startedAt: Date.now(),
+  };
+}
+
+const POLLINATIONS_ATTEMPT_MS = 12_000;
+
+async function pollinationsPoll(job: RenderJob): Promise<RenderProgress> {
+  const url = pollinationsUrl(enhance(job.prompt), job.seed);
+  const seed = job.seed;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 60_000);
+  const timer = setTimeout(() => ctrl.abort(), POLLINATIONS_ATTEMPT_MS);
   let res: Response;
   try {
     res = await fetch(url, {
       signal: ctrl.signal,
       headers: {
         Accept: "image/*",
-        // The token rides the header, never the URL: we hand the URL on and
-        // it is persisted in the user's chat.
+        // The token rides the header, never the URL: the URL is theirs, not
+        // ours, and we do not hand a secret to a third party in a query
+        // string that lands in their logs.
         Authorization: `Bearer ${env("POLLINATIONS_TOKEN")}`,
       },
     });
   } catch {
     clearTimeout(timer);
-    throw new RenderError("unreachable", "could not reach pollinations");
+    // A timed-out attempt means it is still rendering, not that it failed:
+    // the next poll hits the same deterministic URL, warm.
+    return { status: "pending" };
   }
   clearTimeout(timer);
 
   const ct = res.headers.get("content-type") || "";
   if (res.ok && ct.startsWith("image/")) {
     return {
-      bytes: new Uint8Array(await res.arrayBuffer()),
-      contentType: ct,
-      seed,
-      provider: "pollinations",
+      status: "ready",
+      rendered: {
+        bytes: new Uint8Array(await res.arrayBuffer()),
+        contentType: ct,
+        seed,
+        provider: "pollinations",
+      },
     };
   }
   // A billing refusal arrives as their own 500 carrying the upstream 402, so

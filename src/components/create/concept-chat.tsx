@@ -85,6 +85,34 @@ function classifyCompanions(
 }
 import { ImageEditorModal } from "./image-editor-modal";
 
+const POLL_MS = 2_500;
+/** Longer than the generator’s own budget, so the server is what gives up
+ *  first and the card gets a reason rather than this bare timeout. */
+const POLL_CEILING_MS = 180_000;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Ask the route whether the render has landed, until it has. The route is
+ *  the one holding the deadline; this loop only stops waiting if it somehow
+ *  never answers. */
+async function pollUntilReady(job: string): Promise<string> {
+  const deadline = Date.now() + POLL_CEILING_MS;
+  for (;;) {
+    if (Date.now() > deadline) throw new FailedRender("busy");
+    await wait(POLL_MS);
+    const res = await fetch(
+      `/api/concept/generate?job=${encodeURIComponent(job)}`,
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: string;
+      imageUrl?: string;
+      reason?: ConceptFailReason;
+    };
+    if (!res.ok) throw new FailedRender(data.reason);
+    if (data.status === "ready" && data.imageUrl) return data.imageUrl;
+  }
+}
+
 /** Thrown by `runGeneration` so the one catch below knows which of the
  *  ways to fail it is looking at. An unknown reason is left undefined
  *  rather than guessed at — the card has a sentence for that too. */
@@ -107,6 +135,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     appendAssistantTurn,
     resolveAssistantTurn,
     failAssistantTurn,
+    setTurnJob,
     setTurnProgress,
     startBuild,
   } = useCreateHistory();
@@ -188,6 +217,26 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     });
   }, []);
 
+  /** Pick a render back up after a reload. No charge: this turn was paid for
+   *  when it was submitted, and the job it is waiting on is the same one. */
+  const resumeGeneration = React.useCallback(
+    async (cid: string, turnId: string, job: string) => {
+      try {
+        resolveAssistantTurn(cid, turnId, await pollUntilReady(job));
+      } catch (err) {
+        refund(turnId);
+        failAssistantTurn(
+          cid,
+          turnId,
+          err instanceof FailedRender ? err.reason : undefined,
+        );
+      } finally {
+        releaseRegenSource(turnId);
+      }
+    },
+    [refund, resolveAssistantTurn, failAssistantTurn, releaseRegenSource],
+  );
+
   // Auto-run any pending assistant turns. This handles:
   //   • the home→chat redirect (initial fresh turn comes in pending),
   //   • turns the user kicked off then refreshed away from before they
@@ -212,6 +261,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           : null;
       const parentImageUrl =
         parent && parent.role === "assistant" ? parent.imageUrl : undefined;
+      // A turn that already holds a job was submitted before this page load —
+      // resuming it is the difference between watching the render you paid
+      // for and paying for a second one.
+      if (turn.renderJob) {
+        resumeGeneration(chat.id, turn.id, turn.renderJob);
+        continue;
+      }
       runGeneration(chat.id, turn.id, {
         prompt: turn.prompt,
         kind: turn.kind,
@@ -296,16 +352,19 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(input),
         });
-        // The route says why it could not render, and the two reasons
-        // need different words on the card, so the reason is carried
-        // rather than flattened into one failure.
+        // The route says why it could not render, and each reason needs
+        // different words on the card, so the reason is carried rather than
+        // flattened into one failure.
         const data = (await res.json().catch(() => ({}))) as {
-          imageUrl?: string;
+          job?: string;
           reason?: ConceptFailReason;
         };
         if (!res.ok) throw new FailedRender(data.reason);
-        if (!data.imageUrl) throw new FailedRender();
-        resolveAssistantTurn(cid, turnId, data.imageUrl);
+        if (!data.job) throw new FailedRender();
+        // Written before the first poll: from here the render belongs to the
+        // turn, not to this page load.
+        setTurnJob(cid, turnId, data.job);
+        resolveAssistantTurn(cid, turnId, await pollUntilReady(data.job));
       } catch (err) {
         // Nothing was rendered, so nothing is owed. This is the concept
         // counterpart of the build's system-failure refund: the user pays
@@ -328,11 +387,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       incrementPrompt,
       charge,
       refund,
+      setTurnJob,
       resolveAssistantTurn,
       failAssistantTurn,
       releaseRegenSource,
     ],
   );
+
 
   // One lineage label per concept — the same map the thread renders from,
   // so every surface names a concept identically.
