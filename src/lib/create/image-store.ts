@@ -14,20 +14,23 @@
 // robust — the URL is an opaque id now, and nothing has to be reverse
 // engineered.
 //
-// TWO DRIVERS, chosen by what is configured:
+// TWO DRIVERS, chosen by what is configured, both answering at the same app
+// URL (/api/concept/image/<id>) so nothing downstream knows which is in use:
 //
-//   blob — Vercel Blob, when BLOB_READ_WRITE_TOKEN is set. Its REST API takes
-//          a plain fetch with a bearer token, so this needs no SDK. The URL it
-//          returns is public and permanent, and it is what goes in the chat.
-//   disk — otherwise: the server's own filesystem, served back through
-//          /api/concept/image/<id>. Right for local development and for a
-//          long-lived server with a volume.
+//   blob — Vercel Blob. Its REST API takes a plain fetch, so this needs no
+//          SDK. The store is PRIVATE: a blob URL returns 403 to the open
+//          internet and 200 to us, so the image route reads it with our own
+//          credentials and serves the bytes. That is the better default — a
+//          concept render is the maker's own idea, not public material — and
+//          it costs one function call per image per CDN edge, which the
+//          route's s-maxage then caches away.
+//   disk — otherwise: the server's own filesystem. Right for local work and
+//          for a long-lived server with a volume.
 //
-// The disk driver is what shipped first, and it is why image generation broke
-// on the live site: a serverless function's filesystem is read-only apart
-// from /tmp, so `put` threw EACCES and the route reported a failed render for
-// a render that had actually worked. /tmp would not have saved it either —
-// the next request can land on another instance, and the image would 404.
+// The disk driver is why image generation broke on the live site: a
+// serverless filesystem is read-only apart from /tmp, so `put` threw EACCES.
+// /tmp would not have saved it either — the next request can land on another
+// instance, and the image would 404.
 
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -70,18 +73,21 @@ function extFor(contentType: string): string {
 
 /** Ids are minted here and only here, so this pattern is the whole contract.
  *  It is also the path-traversal guard: an id off the wire is never used to
- *  build a path until it matches. */
+ *  build a path or a URL until it matches. */
 const ID = /^[0-9a-f]{32}$/;
 
-function blobToken(): string | null {
-  const t = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  return t && t.length > 0 ? t : null;
+/** The app-facing URL. One place builds it, so the route that serves an image
+ *  and the route that stores one cannot disagree — and it is the same shape
+ *  whichever driver is behind it. */
+export function urlFor(id: string): string {
+  return `/api/concept/image/${id}`;
 }
 
-/** Named so a surface can state which store is in use rather than implying
- *  every install behaves the same. */
-export function activeStore(): "blob" | "disk" {
-  return blobToken() ? "blob" : "disk";
+/** Recover the id from one of our URLs; null for anything else — an old
+ *  Pollinations link still sitting in someone's chat, say. */
+export function idFromUrl(url: string): string | null {
+  const m = /\/api\/concept\/image\/([0-9a-f]{32})(?:[?#]|$)/.exec(url);
+  return m ? m[1] : null;
 }
 
 // ─────────────────────────────── disk ────────────────────────────────
@@ -98,37 +104,78 @@ function dir(): string {
 // Taken from @vercel/blob 2.8.0 rather than from memory: the API moved host
 // and shape, and the older `PUT https://blob.vercel-storage.com/<pathname>`
 // with x-api-version 7 still authenticates, which makes a stale integration
-// look healthy right up until it does not store anything.
+// look healthy right up until it stores nothing.
 const BLOB_API = "https://vercel.com/api/blob";
 const BLOB_API_VERSION = "12";
 /** Under one prefix so the store stays legible beside anything else the
  *  project keeps there. */
 const BLOB_PREFIX = "concept-images";
 
-/** The store id is the fourth segment of the token
- *  (vercel_blob_rw_<storeId>_<secret>), which is how the SDK reads it too. */
-function blobStoreId(): string {
-  return (blobToken() ?? "").split("_")[3] ?? "";
+/** How this deployment proves it may use the store.
+ *
+ *  Two shapes, both read out of the SDK rather than assumed. A classic
+ *  read-write token carries its own store id as its fourth segment. A store
+ *  connected through the newer integration issues no such token at all: the
+ *  project gets a short-lived OIDC token, refreshed per invocation, plus
+ *  BLOB_STORE_ID separately. The request is otherwise identical — only the
+ *  bearer differs, and the store id always rides its own header because it
+ *  is not encoded in an OIDC token. */
+function blobAuth(): { token: string; storeId: string } | null {
+  const rw = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  if (rw) {
+    // vercel_blob_rw_<storeId>_<secret>
+    return { token: rw, storeId: rw.split("_")[3] ?? "" };
+  }
+  const oidc = process.env.VERCEL_OIDC_TOKEN?.trim();
+  const stored = process.env.BLOB_STORE_ID?.trim();
+  if (oidc && stored) {
+    return {
+      token: oidc,
+      storeId: stored.startsWith("store_")
+        ? stored.slice("store_".length)
+        : stored,
+    };
+  }
+  return null;
 }
 
-/** One PUT. `x-add-random-suffix: 0` keeps the pathname exactly as given,
- *  which is what lets the sidecar be found from the image's own URL. */
+type BlobAuth = NonNullable<ReturnType<typeof blobAuth>>;
+
+function blobHeaders(auth: BlobAuth): Record<string, string> {
+  return {
+    authorization: `Bearer ${auth.token}`,
+    "x-api-version": BLOB_API_VERSION,
+    "x-vercel-blob-store-id": auth.storeId,
+  };
+}
+
+/** Where a pathname ends up. Derived rather than remembered, so an id is all
+ *  the app has to carry — and checked against the URL the API returns on
+ *  every write, so if the host shape ever changes this fails loudly at the
+ *  write instead of quietly 404ing at every later read. */
+function blobUrl(storeId: string, pathname: string): string {
+  return `https://${storeId.toLowerCase()}.private.blob.vercel-storage.com/${pathname}`;
+}
+
+/** The image carries no extension: the id alone locates it and its type is
+ *  kept in the sidecar, which is the same id plus .json. */
+const imagePath = (id: string) => `${BLOB_PREFIX}/${id}`;
+const metaPath = (id: string) => `${BLOB_PREFIX}/${id}.json`;
+
 async function blobPut(
+  auth: BlobAuth,
   pathname: string,
   body: Uint8Array | string,
   contentType: string,
-): Promise<string> {
+): Promise<void> {
   const params = new URLSearchParams({ pathname });
   const res = await fetch(`${BLOB_API}/?${params}`, {
     method: "PUT",
     headers: {
-      authorization: `Bearer ${blobToken()}`,
-      "x-api-version": BLOB_API_VERSION,
-      "x-vercel-blob-store-id": blobStoreId(),
-      // Public on purpose: the browser loads the image straight from the
-      // store, and the sidecar is read back the same way. Proxying either
-      // through a function would spend an invocation per view.
-      "x-vercel-blob-access": "public",
+      ...blobHeaders(auth),
+      // Private on purpose. A concept render is the maker's own idea, and the
+      // image route hands it back to them with our credentials.
+      "x-vercel-blob-access": "private",
       "x-add-random-suffix": "0",
       "x-allow-overwrite": "0",
       "x-content-type": contentType,
@@ -137,19 +184,26 @@ async function blobPut(
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`blob put ${res.status}: ${detail.slice(0, 160)}`);
+    throw new Error(`blob put ${res.status}: ${detail.slice(0, 200)}`);
   }
-  const data = (await res.json()) as { url?: string; downloadUrl?: string };
-  const url = data.url ?? data.downloadUrl;
-  if (!url) throw new Error("blob put: no url in the response");
-  return url;
+  const data = (await res.json()) as { url?: string };
+  const expected = blobUrl(auth.storeId, pathname);
+  if (data.url && data.url !== expected) {
+    throw new Error(
+      `blob put: the store answered ${data.url}, which this build cannot derive from an id — the URL shape has changed`,
+    );
+  }
 }
 
-/** The sidecar sits beside the image under the same id, so its URL is the
- *  image's with the extension swapped — no second lookup, and nothing extra
- *  to carry in the chat. */
-function sidecarUrlFor(imageUrl: string): string {
-  return imageUrl.replace(/\.[a-z0-9]+(?=$|[?#])/i, ".json");
+async function blobGet(
+  auth: BlobAuth,
+  pathname: string,
+): Promise<Uint8Array | null> {
+  const res = await fetch(blobUrl(auth.storeId, pathname), {
+    headers: blobHeaders(auth),
+  });
+  if (!res.ok) return null;
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 // ──────────────────────────── the seam ───────────────────────────────
@@ -162,93 +216,84 @@ export async function put(
   const id = randomUUID().replace(/-/g, "");
   const contentType = safeType(meta.contentType);
   const record: ImageMeta = { ...meta, contentType, ts: Date.now() };
-  const ext = extFor(contentType);
 
-  if (blobToken()) {
-    const url = await blobPut(
-      `${BLOB_PREFIX}/${id}.${ext}`,
-      bytes,
-      contentType,
-    );
-    // The sidecar carries the user's own prompt and is public like the image
-    // it describes; its name is a random uuid, so it is not enumerable.
-    await blobPut(
-      `${BLOB_PREFIX}/${id}.json`,
-      JSON.stringify(record),
-      "application/json",
-    );
-    return { id, url };
+  const auth = blobAuth();
+  if (auth) {
+    await blobPut(auth, imagePath(id), bytes, contentType);
+    await blobPut(auth, metaPath(id), JSON.stringify(record), "application/json");
+    return { id, url: urlFor(id) };
   }
 
   const base = dir();
   await mkdir(base, { recursive: true });
-  await writeFile(path.join(base, `${id}.${ext}`), bytes);
+  await writeFile(path.join(base, `${id}.${extFor(contentType)}`), bytes);
   await writeFile(path.join(base, `${id}.json`), JSON.stringify(record), "utf8");
-  return { id, url: `/api/concept/image/${id}` };
+  return { id, url: urlFor(id) };
 }
 
-/** Recover an image's metadata from the URL the chat stored. Returns null for
- *  a URL this store did not write — an old Pollinations link, say — which the
+/** Read an image's metadata back from the URL the chat stored. Null for a URL
+ *  this store did not write — an old Pollinations link, say — which the
  *  caller handles rather than guessing. */
 export async function readMeta(url: string): Promise<ImageMeta | null> {
-  const record = await (url.startsWith("http")
-    ? readBlobMeta(url)
-    : readDiskMeta(url));
-  if (!record) return null;
-  if (typeof record.prompt !== "string" || typeof record.seed !== "string") {
+  const id = idFromUrl(url);
+  if (!id) return null;
+  const raw = await readRecord(id);
+  if (!raw) return null;
+  if (typeof raw.prompt !== "string" || typeof raw.seed !== "string") {
     return null;
   }
   return {
-    prompt: record.prompt,
-    seed: record.seed,
-    provider: String(record.provider ?? "unknown"),
-    // Normalised on the way out too: a sidecar is a file someone could edit,
+    prompt: raw.prompt,
+    seed: raw.seed,
+    provider: String(raw.provider ?? "unknown"),
+    // Normalised on the way out too: a sidecar is data someone could edit,
     // and it must not decide a response header.
-    contentType: safeType(String(record.contentType ?? FALLBACK_TYPE)),
-    ts: Number(record.ts ?? 0),
+    contentType: safeType(String(raw.contentType ?? FALLBACK_TYPE)),
+    ts: Number(raw.ts ?? 0),
   };
 }
 
-async function readBlobMeta(url: string): Promise<Partial<ImageMeta> | null> {
-  if (!/\/(?:[^/]+\/)?[0-9a-f]{32}\.[a-z0-9]+(?:$|[?#])/i.test(url)) return null;
+async function readRecord(id: string): Promise<Partial<ImageMeta> | null> {
+  if (!ID.test(id)) return null;
+  const auth = blobAuth();
+  if (auth) {
+    const bytes = await blobGet(auth, metaPath(id)).catch(() => null);
+    if (!bytes) return null;
+    try {
+      return JSON.parse(new TextDecoder().decode(bytes)) as Partial<ImageMeta>;
+    } catch {
+      return null;
+    }
+  }
   try {
-    const res = await fetch(sidecarUrlFor(url), { cache: "no-store" });
-    if (!res.ok) return null;
-    return (await res.json()) as Partial<ImageMeta>;
+    return JSON.parse(
+      await readFile(path.join(dir(), `${id}.json`), "utf8"),
+    ) as Partial<ImageMeta>;
   } catch {
     return null;
   }
 }
 
-async function readDiskMeta(url: string): Promise<Partial<ImageMeta> | null> {
-  const id = idFromUrl(url);
-  if (!id) return null;
-  try {
-    const raw = await readFile(path.join(dir(), `${id}.json`), "utf8");
-    return JSON.parse(raw) as Partial<ImageMeta>;
-  } catch {
-    return null;
-  }
-}
-
-/** Recover the id from one of our own disk URLs; null for anything else. */
-export function idFromUrl(url: string): string | null {
-  const m = /\/api\/concept\/image\/([0-9a-f]{32})(?:[?#]|$)/.exec(url);
-  return m ? m[1] : null;
-}
-
-/** Read the bytes back. Disk only — a blob is served by Vercel directly, and
- *  proxying it through a function would spend an invocation to no end. */
+/** The bytes, for the route that serves them. */
 export async function read(
   id: string,
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
   if (!ID.test(id)) return null;
-  const record = await readDiskMeta(`/api/concept/image/${id}`);
-  if (!record) return null;
-  const contentType = safeType(String(record.contentType ?? FALLBACK_TYPE));
+  const meta = await readMeta(urlFor(id));
+  if (!meta) return null;
+
+  const auth = blobAuth();
+  if (auth) {
+    const bytes = await blobGet(auth, imagePath(id)).catch(() => null);
+    // The stored type wins over whatever the transport reports: it is the one
+    // this store normalised on the way in.
+    return bytes ? { bytes, contentType: meta.contentType } : null;
+  }
   try {
-    const bytes = await readFile(path.join(dir(), `${id}.${extFor(contentType)}`));
-    return { bytes: new Uint8Array(bytes), contentType };
+    const bytes = await readFile(
+      path.join(dir(), `${id}.${extFor(meta.contentType)}`),
+    );
+    return { bytes: new Uint8Array(bytes), contentType: meta.contentType };
   } catch {
     return null;
   }
