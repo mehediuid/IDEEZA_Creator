@@ -275,6 +275,13 @@ function submitBody(prompt: string, seed: string, w: number, h: number) {
   });
 }
 
+/** The horde accepts two submissions a second and answers a third with
+ *  429 {"message":"2 per 1 second"}. A multi-product build starts every
+ *  product at once, so this is reached by design rather than by abuse — and
+ *  a published rate limit is something to wait out, not a failed render. */
+const SUBMIT_ATTEMPTS = 4;
+const SUBMIT_BACKOFF_MS = 900;
+
 async function hordeStart(prompt: string, seed: string): Promise<RenderJob> {
   let res: Response;
   try {
@@ -282,6 +289,13 @@ async function hordeStart(prompt: string, seed: string): Promise<RenderJob> {
       method: "POST",
       body: submitBody(prompt, seed, WIDTH, HEIGHT),
     });
+    for (let attempt = 1; attempt < SUBMIT_ATTEMPTS && res.status === 429; attempt += 1) {
+      await sleep(SUBMIT_BACKOFF_MS * attempt);
+      res = await hordeFetch("/generate/async", {
+        method: "POST",
+        body: submitBody(prompt, seed, WIDTH, HEIGHT),
+      });
+    }
     if (res.status === 403) {
       // The cap floats with load, so the same size that worked an hour ago
       // can be refused now. One smaller attempt is worth more to the user

@@ -270,31 +270,37 @@ export function CreditsProvider({
     [],
   );
 
+  // Both of these answer their caller immediately, so the decision is taken
+  // against the ref and the ref is advanced in the same breath. Reading the
+  // answer out of a setState updater instead — which is what these used to do
+  // — only works while one charge happens per tick: React runs the updater
+  // when it renders, not when you call it, so the second and third charge of
+  // the same tick returned a stale false and a real render was refused as
+  // "not enough credits". A multi-product build charges three times in one
+  // tick, which is how that surfaced.
   const charge = React.useCallback(
     (
       buildId: string,
       cost: number = BUILD_COST,
       reason: ChargeReason = "build",
     ) => {
-      let ok = false;
-      setState((prev) => {
-        const result = chargeState(prev, buildId, cost, reason);
-        ok = result.ok;
-        return result.state;
-      });
-      return ok;
+      const result = chargeState(stateRef.current, buildId, cost, reason);
+      if (result.ok) {
+        stateRef.current = result.state;
+        setState(result.state);
+      }
+      return result.ok;
     },
     [],
   );
 
   const refund = React.useCallback((buildId: string) => {
-    let ok = false;
-    setState((prev) => {
-      const result = refundState(prev, buildId);
-      ok = result.ok;
-      return result.state;
-    });
-    return ok;
+    const result = refundState(stateRef.current, buildId);
+    if (result.ok) {
+      stateRef.current = result.state;
+      setState(result.state);
+    }
+    return result.ok;
   }, []);
 
   const topUp = React.useCallback((n: number) => {

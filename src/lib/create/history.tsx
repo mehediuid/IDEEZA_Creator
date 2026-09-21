@@ -13,6 +13,7 @@
 // `useCreateHistory()`.
 
 import * as React from "react";
+import type { Companion } from "./companions";
 import {
   deriveTitle,
   type ConceptPart,
@@ -45,11 +46,46 @@ export type ConceptFailReason =
   | "parent-lost"
   | "credits";
 
+/** What the flow asks before it spends anything.
+ *
+ *  A prompt used to go straight to a render. It does not any more: the two
+ *  decisions that shape a build — which project it belongs to, and whether
+ *  the idea is one product or several — are cheap to ask and expensive to
+ *  get wrong, and asking them first means the first image is already the
+ *  right image. Nothing is charged until this turn is answered. */
+export type SetupAnswer = {
+  /** An existing project, when the build is one product and the maker
+   *  picked one. Empty when they are making a new project. */
+  projectId: string;
+  /** The name for a new project. §4.4.8 puts every product of a system in
+   *  one project, so a multi-product build always takes this path. */
+  projectName: string;
+  /** companionId of every additional product the maker ticked. */
+  picked: string[];
+};
+
 export type ChatTurn =
   | {
       id: string;
       role: "user";
       text: string;
+      ts: number;
+    }
+  | {
+      id: string;
+      role: "setup";
+      /** The prompt these questions are about. */
+      prompt: string;
+      /** "loading" while the classifier runs, "asking" once the questions
+        *  can be shown, "answered" after — the card then reads the decision
+        *  back rather than disappearing, so the thread still explains
+        *  itself. */
+      status: "loading" | "asking" | "answered";
+      /** What the classifier offered. Empty for an ordinary single product.
+       *  Filled when the turn is created, from the prompt alone, so the
+       *  questions can be asked before a single credit moves. */
+      companions: Companion[];
+      answer?: SetupAnswer;
       ts: number;
     }
   | {
@@ -538,6 +574,16 @@ type Ctx = {
     reason?: ConceptFailReason,
   ) => void;
   setTurnJob: (chatId: string, turnId: string, job: string) => void;
+  setSetupCompanions: (
+    chatId: string,
+    turnId: string,
+    companions: Companion[],
+  ) => void;
+  answerSetupTurn: (
+    chatId: string,
+    turnId: string,
+    answer: SetupAnswer,
+  ) => void;
   setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
@@ -654,12 +700,14 @@ export function CreateHistoryProvider({
       title: deriveTitle(initialPrompt),
       turns: [
         { id: makeId("turn"), role: "user", text: initialPrompt, ts: now },
+        // Questions, not a render. The first image costs a credit and is
+        // shaped by the answers, so it waits for them.
         {
           id: makeId("turn"),
-          role: "assistant",
+          role: "setup",
           prompt: initialPrompt,
-          kind: "fresh",
-          status: "pending",
+          status: "loading",
+          companions: [],
           ts: now + 1,
         },
       ],
@@ -769,6 +817,50 @@ export function CreateHistoryProvider({
             ),
           };
         }),
+      );
+    },
+    [],
+  );
+
+  // The classifier has come back: the questions can be asked now.
+  const setSetupCompanions = React.useCallback(
+    (chatId: string, turnId: string, companions: Companion[]) => {
+      setChats((arr) =>
+        arr.map((c) =>
+          c.id !== chatId
+            ? c
+            : {
+                ...c,
+                turns: c.turns.map((t) =>
+                  t.id === turnId && t.role === "setup" && t.status === "loading"
+                    ? { ...t, companions, status: "asking" as const }
+                    : t,
+                ),
+              },
+        ),
+      );
+    },
+    [],
+  );
+
+  // The maker has answered. The card stops asking and starts reading the
+  // decision back; the orchestrator watches for this and starts the renders.
+  const answerSetupTurn = React.useCallback(
+    (chatId: string, turnId: string, answer: SetupAnswer) => {
+      setChats((arr) =>
+        arr.map((c) =>
+          c.id !== chatId
+            ? c
+            : {
+                ...c,
+                updatedAt: Date.now(),
+                turns: c.turns.map((t) =>
+                  t.id === turnId && t.role === "setup"
+                    ? { ...t, answer, status: "answered" as const }
+                    : t,
+                ),
+              },
+        ),
       );
     },
     [],
@@ -1273,6 +1365,8 @@ export function CreateHistoryProvider({
     resolveAssistantTurn,
     failAssistantTurn,
     setTurnJob,
+    setSetupCompanions,
+    answerSetupTurn,
     setTurnProgress,
     getChat,
     startBuild,

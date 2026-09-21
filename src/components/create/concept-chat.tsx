@@ -27,10 +27,12 @@ import {
   type BuildProduct,
   type ChatTurn,
   type ConceptFailReason,
+  type SetupAnswer,
 } from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { useManualProjects } from "@/lib/manual/projects";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
@@ -136,6 +138,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     resolveAssistantTurn,
     failAssistantTurn,
     setTurnJob,
+    setSetupCompanions,
+    answerSetupTurn,
     setTurnProgress,
     startBuild,
   } = useCreateHistory();
@@ -148,6 +152,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const canRender = canAfford(CONCEPT_COST);
 
   const chat = getChat(chatId);
+
+  // The projects a single-product build could join. A multi-product build
+  // always makes a new one (§4.4.8 puts a system in one project), so this
+  // list is only ever offered for the single case.
+  const { projects } = useManualProjects();
+  const setupProjects = React.useMemo(
+    () => projects.map((p) => ({ id: p.id, name: p.name })),
+    [projects],
+  );
 
   const [confirmFor, setConfirmFor] = React.useState<{
     turnId: string;
@@ -217,6 +230,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     });
   }, []);
 
+
   /** Pick a render back up after a reload. No charge: this turn was paid for
    *  when it was submitted, and the job it is waiting on is the same one. */
   const resumeGeneration = React.useCallback(
@@ -236,6 +250,141 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [refund, resolveAssistantTurn, failAssistantTurn, releaseRegenSource],
   );
+
+  const runGeneration = React.useCallback(
+    async (
+      cid: string,
+      turnId: string,
+      input: {
+        prompt: string;
+        kind: "fresh" | "refine";
+        parentImageUrl?: string;
+      },
+    ) => {
+      // Every generation kick — first run, refine, or regenerate —
+      // counts against the user's daily prompt quota. The plan store
+      // silently no-ops past the cap; surfacing a friendly cap UI is
+      // out of scope here (the QuotaCard makes the limit visible).
+      incrementPrompt();
+      try {
+        // Charged before the request, keyed by the turn the render will
+        // land in, so a retry of a different turn is its own charge. The
+        // controls are already disabled without the balance for it; this
+        // catches a balance that ran out between the click and here, and
+        // it throws so the one catch below handles both ways to fail.
+        if (!charge(turnId, CONCEPT_COST, "concept")) {
+          throw new FailedRender("credits");
+        }
+        const res = await fetch("/api/concept/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        // The route says why it could not render, and each reason needs
+        // different words on the card, so the reason is carried rather than
+        // flattened into one failure.
+        const data = (await res.json().catch(() => ({}))) as {
+          job?: string;
+          reason?: ConceptFailReason;
+        };
+        if (!res.ok) throw new FailedRender(data.reason);
+        if (!data.job) throw new FailedRender();
+        // Written before the first poll: from here the render belongs to the
+        // turn, not to this page load.
+        setTurnJob(cid, turnId, data.job);
+        resolveAssistantTurn(cid, turnId, await pollUntilReady(data.job));
+      } catch (err) {
+        // Nothing was rendered, so nothing is owed. This is the concept
+        // counterpart of the build's system-failure refund: the user pays
+        // for output, not for an attempt. A no-op when the charge never
+        // landed, since a turn with no open charge has nothing to return.
+        refund(turnId);
+        failAssistantTurn(
+          cid,
+          turnId,
+          err instanceof FailedRender ? err.reason : undefined,
+        );
+      } finally {
+        // Ready or failed, the turn has left "pending": the Regenerate
+        // that spawned it is free again and its entry has nothing left
+        // to say.
+        releaseRegenSource(turnId);
+      }
+    },
+    [
+      incrementPrompt,
+      charge,
+      refund,
+      setTurnJob,
+      resolveAssistantTurn,
+      failAssistantTurn,
+      releaseRegenSource,
+    ],
+  );
+
+  // The questions are answered: now the renders start, one per product the
+  // maker kept. The primary is the concept they described; each companion
+  // inherits its parent’s words so the family reads as one design.
+  const handleAnswerSetup = React.useCallback(
+    (turnId: string, answer: SetupAnswer) => {
+      if (!chat) return;
+      const setup = chat.turns.find(
+        (t) => t.id === turnId && t.role === "setup",
+      );
+      if (!setup || setup.role !== "setup") return;
+      answerSetupTurn(chat.id, turnId, answer);
+
+      // Only the turns are created here. Starting them is the auto-run
+      // effect’s job, and it has the guard that stops a turn being rendered
+      // — and charged — twice; kicking them off from here as well would
+      // slip straight past it.
+      appendAssistantTurn(chat.id, { prompt: setup.prompt, kind: "fresh" });
+      for (const id of answer.picked) {
+        const companion = setup.companions.find((c) => c.id === id);
+        if (!companion) continue;
+        // The companion inherits the parent’s words, so the products read
+        // as one family rather than three unrelated objects.
+        appendAssistantTurn(chat.id, {
+          prompt: `${companion.name} for ${setup.prompt}`,
+          kind: "fresh",
+          companionOf: companion.id,
+        });
+      }
+    },
+    [chat, answerSetupTurn, appendAssistantTurn],
+  );
+
+  // A setup turn arrives with nothing in it: the classifier runs here, once,
+  // and the questions appear when it answers. It reads the prompt only — no
+  // image has been drawn and no credit has moved.
+  const classified = React.useRef<Set<string>>(new Set());
+  React.useEffect(() => {
+    if (!hydrated || !chat) return;
+    for (const turn of chat.turns) {
+      if (turn.role !== "setup" || turn.status !== "loading") continue;
+      if (classified.current.has(turn.id)) continue;
+      classified.current.add(turn.id);
+      const cid = chat.id;
+      const tid = turn.id;
+      const prompt = turn.prompt;
+      void (async () => {
+        try {
+          const res = await fetch("/api/concept/companions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt }),
+          });
+          const plan = (await res.json()) as { companions?: Companion[] };
+          setSetupCompanions(cid, tid, plan.companions ?? []);
+        } catch {
+          // No classification is not an error: it means no companions were
+          // found, which is the ordinary single-product answer.
+          setSetupCompanions(cid, tid, []);
+        }
+      })();
+    }
+  }, [hydrated, chat, setSetupCompanions]);
+
 
   // Auto-run any pending assistant turns. This handles:
   //   • the home→chat redirect (initial fresh turn comes in pending),
@@ -323,76 +472,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     };
   }, []);
 
-  const runGeneration = React.useCallback(
-    async (
-      cid: string,
-      turnId: string,
-      input: {
-        prompt: string;
-        kind: "fresh" | "refine";
-        parentImageUrl?: string;
-      },
-    ) => {
-      // Every generation kick — first run, refine, or regenerate —
-      // counts against the user's daily prompt quota. The plan store
-      // silently no-ops past the cap; surfacing a friendly cap UI is
-      // out of scope here (the QuotaCard makes the limit visible).
-      incrementPrompt();
-      try {
-        // Charged before the request, keyed by the turn the render will
-        // land in, so a retry of a different turn is its own charge. The
-        // controls are already disabled without the balance for it; this
-        // catches a balance that ran out between the click and here, and
-        // it throws so the one catch below handles both ways to fail.
-        if (!charge(turnId, CONCEPT_COST, "concept")) {
-          throw new FailedRender("credits");
-        }
-        const res = await fetch("/api/concept/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(input),
-        });
-        // The route says why it could not render, and each reason needs
-        // different words on the card, so the reason is carried rather than
-        // flattened into one failure.
-        const data = (await res.json().catch(() => ({}))) as {
-          job?: string;
-          reason?: ConceptFailReason;
-        };
-        if (!res.ok) throw new FailedRender(data.reason);
-        if (!data.job) throw new FailedRender();
-        // Written before the first poll: from here the render belongs to the
-        // turn, not to this page load.
-        setTurnJob(cid, turnId, data.job);
-        resolveAssistantTurn(cid, turnId, await pollUntilReady(data.job));
-      } catch (err) {
-        // Nothing was rendered, so nothing is owed. This is the concept
-        // counterpart of the build's system-failure refund: the user pays
-        // for output, not for an attempt. A no-op when the charge never
-        // landed, since a turn with no open charge has nothing to return.
-        refund(turnId);
-        failAssistantTurn(
-          cid,
-          turnId,
-          err instanceof FailedRender ? err.reason : undefined,
-        );
-      } finally {
-        // Ready or failed, the turn has left "pending": the Regenerate
-        // that spawned it is free again and its entry has nothing left
-        // to say.
-        releaseRegenSource(turnId);
-      }
-    },
-    [
-      incrementPrompt,
-      charge,
-      refund,
-      setTurnJob,
-      resolveAssistantTurn,
-      failAssistantTurn,
-      releaseRegenSource,
-    ],
-  );
 
 
   // One lineage label per concept — the same map the thread renders from,
@@ -884,6 +963,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             chat={chat}
             regeneratingFrom={regeneratingFrom}
             preparingTurnId={preparingTurnId}
+          projects={setupProjects}
+          onAnswerSetup={handleAnswerSetup}
             onRegenerateAt={handleRegenerate}
             onUseTurn={handleUseTurn}
             onRefineTurn={handleOpenEditor}

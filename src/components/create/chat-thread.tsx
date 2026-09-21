@@ -14,9 +14,14 @@
 // chain while scrolling.
 
 import * as React from "react";
-import type { ChatSession, ChatTurn } from "@/lib/create/history";
+import type {
+  ChatSession,
+  ChatTurn,
+  SetupAnswer,
+} from "@/lib/create/history";
 import { BUILD_COST, useCredits } from "@/lib/create/credits";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
+import { SetupTurn, type SetupProject } from "./setup-turn";
 
 // Label every concept by its lineage, not by its position: a fresh take
 // counts up ("1", "2", …) and a refine hangs off the concept it evolves
@@ -47,10 +52,14 @@ export function ChatThread({
   chat,
   regeneratingFrom,
   preparingTurnId,
+  projects,
+  onAnswerSetup,
   onRegenerateAt,
   onUseTurn,
   onRefineTurn,
 }: {
+  projects: SetupProject[];
+  onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
   chat: ChatSession;
   // Turns whose Regenerate is still rendering its fresh take — the
   // orchestrator owns the child→source link, the card only reads it.
@@ -103,6 +112,20 @@ export function ChatThread({
       {chat.turns.map((turn) => {
         if (turn.role === "user") {
           return <UserBubble key={turn.id} text={turn.text} />;
+        }
+        if (turn.role === "setup") {
+          return (
+            <div key={turn.id} className="flex">
+              <SetupTurn
+                prompt={turn.prompt}
+                status={turn.status}
+                companions={turn.companions}
+                answer={turn.answer}
+                projects={projects}
+                onAnswer={(a) => onAnswerSetup(turn.id, a)}
+              />
+            </div>
+          );
         }
         const label = labels.get(turn.id) ?? "1";
         const parentLabel =
