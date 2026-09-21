@@ -592,6 +592,7 @@ type Ctx = {
     turnId: string,
     answer: SetupAnswer,
   ) => void;
+  addSetupPick: (chatId: string, turnId: string, companionId: string) => void;
   setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
@@ -875,6 +876,39 @@ export function CreateHistoryProvider({
                 turns: c.turns.map((t) =>
                   t.id === turnId && t.role === "setup"
                     ? { ...t, answer, status: "answered" as const }
+                    : t,
+                ),
+              },
+        ),
+      );
+    },
+    [],
+  );
+
+  // A product the maker passed over at the question, taken up later. The
+  // offer does not expire: deciding not to build the charging case today is
+  // not deciding never to, and the classifier already found it — making them
+  // start a new chat to get it back would be losing work they had done.
+  const addSetupPick = React.useCallback(
+    (chatId: string, turnId: string, companionId: string) => {
+      setChats((arr) =>
+        arr.map((c) =>
+          c.id !== chatId
+            ? c
+            : {
+                ...c,
+                updatedAt: Date.now(),
+                turns: c.turns.map((t) =>
+                  t.id === turnId && t.role === "setup" && t.answer
+                    ? {
+                        ...t,
+                        answer: {
+                          ...t.answer,
+                          picked: t.answer.picked.includes(companionId)
+                            ? t.answer.picked
+                            : [...t.answer.picked, companionId],
+                        },
+                      }
                     : t,
                 ),
               },
@@ -1385,6 +1419,7 @@ export function CreateHistoryProvider({
     setTurnJob,
     setSetupDetails,
     answerSetupTurn,
+    addSetupPick,
     setTurnProgress,
     getChat,
     startBuild,

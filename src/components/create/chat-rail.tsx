@@ -143,7 +143,11 @@ function RailLine({
         {what}
         <Sub>
           Drawing
-          {typeof turn.progress === "number" ? ` · ${turn.progress}%` : "…"}
+          {/* Rounded: the ticker carries a fraction and a rail line is not
+              the place to print 28.667519999999996%. */}
+          {typeof turn.progress === "number"
+            ? ` · ${Math.round(turn.progress)}%`
+            : "…"}
         </Sub>
       </Status>
     );

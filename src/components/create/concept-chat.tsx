@@ -96,6 +96,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     setTurnJob,
     setSetupDetails,
     answerSetupTurn,
+    addSetupPick,
     setTurnProgress,
     startBuild,
   } = useCreateHistory();
@@ -359,6 +360,29 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     }
   }, [hydrated, chat, setSetupDetails]);
 
+
+  // A product the maker passed over at the question, taken up now. The
+  // turn is appended and the auto-run effect draws it, the same path every
+  // other concept takes — and the answer grows, so the gate and the build
+  // that follow include it without being told separately.
+  const handleAddProduct = React.useCallback(
+    (companionId: string) => {
+      if (!chat) return;
+      const setup = chat.turns.find(
+        (t) => t.role === "setup" && t.status === "answered",
+      );
+      if (!setup || setup.role !== "setup") return;
+      const companion = setup.companions.find((c) => c.id === companionId);
+      if (!companion) return;
+      addSetupPick(chat.id, setup.id, companionId);
+      appendAssistantTurn(chat.id, {
+        prompt: `${companion.name} for ${setup.prompt}`,
+        kind: "fresh",
+        companionOf: companionId,
+      });
+    },
+    [chat, addSetupPick, appendAssistantTurn],
+  );
 
   // Auto-run any pending assistant turns. This handles:
   //   • the home→chat redirect (initial fresh turn comes in pending),
@@ -981,6 +1005,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             onRegenerateAt={handleRegenerate}
             onUseTurn={handleUseTurn}
             onRefineTurn={handleOpenEditor}
+            onAddProduct={handleAddProduct}
           />
         </div>
       </main>

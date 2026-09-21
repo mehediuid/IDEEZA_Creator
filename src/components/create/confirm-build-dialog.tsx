@@ -419,7 +419,7 @@ export function ConfirmBuildDialog({
                           {turn?.status === "ready"
                             ? "Concept ready"
                             : turn?.status === "pending"
-                              ? `Rendering its concept… ${turn.progress}%`
+                              ? `Rendering its concept… ${Math.round(turn.progress ?? 0)}%`
                               : turn?.status === "failed"
                                 ? "That render didn't arrive — nothing was charged"
                                 : on
@@ -665,16 +665,18 @@ function ProductThumb({
 /** A render in flight. The bar is the turn's own progress, so the row
  *  cannot claim motion the render is not making. */
 function RenderingThumb({ progress }: { progress: number }) {
+  // The ticker carries a fraction; a 52px chip is not where to print it.
+  const pct = Math.round(progress);
   return (
     <span
       aria-hidden
       className="flex h-[44px] w-[52px] shrink-0 flex-col items-center justify-center gap-[4px] rounded-lg border border-solid border-border-brand bg-bg-brand-subtle"
     >
-      <span className="text-2xs font-bold text-text-brand">{progress}%</span>
+      <span className="text-2xs font-bold text-text-brand">{pct}%</span>
       <span className="h-[3px] w-[32px] overflow-hidden rounded-full bg-bg-surface">
         <span
           className="block h-full rounded-full bg-bg-brand transition-[width] duration-normal"
-          style={{ width: `${Math.max(4, progress)}%` }}
+          style={{ width: `${Math.max(4, pct)}%` }}
         />
       </span>
     </span>

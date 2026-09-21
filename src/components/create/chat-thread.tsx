@@ -57,6 +57,7 @@ export function ChatThread({
   onRegenerateAt,
   onUseTurn,
   onRefineTurn,
+  onAddProduct,
 }: {
   projects: SetupProject[];
   onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
@@ -70,6 +71,8 @@ export function ChatThread({
   onRegenerateAt: (sourcePrompt: string, sourceTurnId: string) => void;
   onUseTurn: (turnId: string) => void;
   onRefineTurn: (turnId: string) => void;
+  /** Take up a product the maker passed over at the question. */
+  onAddProduct: (companionId: string) => void;
 }) {
   // One label per concept, so a card, its breadcrumb and the editor all
   // name the same thing.
@@ -131,6 +134,18 @@ export function ChatThread({
   // One build, one action. A card per product each carrying "Use this
   // concept" asked for the same build once per product — and answering it
   // twice was the same answer both times.
+  // Offered, and not being built: no concept has been drawn for it and the
+  // answer did not include it.
+  const available = React.useMemo(() => {
+    if (setup?.role !== "setup" || setup.status !== "answered") return [];
+    const drawn = new Set(
+      chat.turns
+        .filter((t) => t.role === "assistant" && t.companionOf)
+        .map((t) => (t.role === "assistant" ? t.companionOf! : "")),
+    );
+    return setup.companions.filter((x) => !drawn.has(x.id));
+  }, [setup, chat.turns]);
+
   const buildable = products.find(
     (t) => t.status === "ready" && !t.companionOf,
   );
@@ -195,6 +210,43 @@ export function ChatThread({
               </div>
             ))}
           </div>
+
+          {/* Everything the classifier found that is not being built. The
+              answer at the question was "not now", which is not "never" —
+              and the offer is already paid for in thinking, so making them
+              start again to get it back would lose work they had done. */}
+          {available.length > 0 && (
+            <section className="flex w-full flex-col gap-[8px] border-t border-solid border-border pt-[20px]">
+              <h3 className="text-sm font-semibold text-text-primary">
+                Add another product to this project
+              </h3>
+              <ul role="list" className="flex flex-col gap-[2px]">
+                {available.map((a) => (
+                  <li
+                    key={a.id}
+                    data-testid="available-product"
+                    className="flex items-start gap-[12px] rounded-xl px-[12px] py-[10px] transition-colors duration-fast hover:bg-bg-subtle"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-md font-medium text-text-primary">
+                        {a.name}
+                      </span>
+                      <span className="mt-[1px] block text-sm leading-relaxed text-text-tertiary">
+                        {a.why}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onAddProduct(a.id)}
+                      className="mt-[2px] inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                    >
+                      Add · 1 credit
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {buildable && (
             <BuildAction

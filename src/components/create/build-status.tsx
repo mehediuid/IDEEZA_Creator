@@ -585,7 +585,7 @@ function statusLabel(
   if (status === "failed") return "Couldn't generate";
   if (status === "skipped") return "Didn't run";
   if (status === "pending") return "Waiting";
-  return `${progress}%`;
+  return `${Math.round(progress)}%`;
 }
 
 function statusTone(
