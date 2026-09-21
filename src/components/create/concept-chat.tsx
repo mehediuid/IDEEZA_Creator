@@ -37,8 +37,7 @@ import { ChatRail } from "./chat-rail";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
-import type { CompanionTurn } from "./confirm-build-dialog";
-import { companionId, type Companion } from "@/lib/create/companions";
+import type { Companion } from "@/lib/create/companions";
 import { readGateDismissed } from "@/lib/create/gate-preference";
 
 import { ImageEditorModal } from "./image-editor-modal";
@@ -139,7 +138,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // in the thread, so §4.8's "deselecting preserves the concept" needs
   // nothing stored here.
   const [companionPlan, setCompanionPlan] = React.useState<Companion[]>([]);
-  const [productTitle, setProductTitle] = React.useState("");
   const [pickedCompanions, setPickedCompanions] = React.useState<Set<string>>(
     () => new Set(),
   );
@@ -525,32 +523,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // §4b). They only fall back to "fresh" when nothing has rendered
       // yet (so the user isn't stuck on first load).
       if (latestReadyTurn) {
-        const { turnId } = appendAssistantTurn(chat.id, {
+        appendAssistantTurn(chat.id, {
           prompt: text,
           kind: "refine",
           parentTurnId: latestReadyTurn.id,
-        });
-        runGeneration(chat.id, turnId, {
-          prompt: text,
-          kind: "refine",
-          parentImageUrl: latestReadyTurn.imageUrl,
+          // A refine is a new take on the SAME product. Without this it
+          // landed under the primary, so refining the remote controller
+          // replaced the drone's card instead of its own.
+          companionOf: latestReadyTurn.companionOf,
         });
         return;
       }
-      const { turnId } = appendAssistantTurn(chat.id, {
-        prompt: text,
-        kind: "fresh",
-      });
-      runGeneration(chat.id, turnId, { prompt: text, kind: "fresh" });
+      appendAssistantTurn(chat.id, { prompt: text, kind: "fresh" });
     },
-    [
-      chat,
-      canAfford,
-      latestReadyTurn,
-      appendUserTurn,
-      appendAssistantTurn,
-      runGeneration,
-    ],
+    [chat, canAfford, latestReadyTurn, appendUserTurn, appendAssistantTurn],
   );
 
   const handleRegenerate = React.useCallback(
@@ -559,17 +545,17 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // Regenerate (spec §4c) is a FRESH take on the same prompt — it
       // ignores the existing image. No new user turn because the user
       // didn't retype anything.
+      const source = chat.turns.find((x) => x.id === sourceTurnId);
       const { turnId } = appendAssistantTurn(chat.id, {
         prompt: sourcePrompt,
         kind: "fresh",
+        // A fresh take on a companion is still that companion's.
+        companionOf:
+          source?.role === "assistant" ? source.companionOf : undefined,
       });
       setRegenSource((prev) => ({ ...prev, [turnId]: sourceTurnId }));
-      runGeneration(chat.id, turnId, {
-        prompt: sourcePrompt,
-        kind: "fresh",
-      });
     },
-    [chat, canAfford, appendAssistantTurn, runGeneration],
+    [chat, canAfford, appendAssistantTurn],
   );
 
   // The one path from an approved concept to a booked build. Both the
@@ -690,7 +676,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       void summarizeConcept(t.id, t.prompt)
         .then((concept) => {
           setPreparingTurnId(null);
-          setProductTitle(concept.title);
           goToGate(source);
         })
         .catch(() => {
@@ -750,123 +735,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     );
   }, [chat, companionPlan, pickedCompanions]);
 
-  // §4.4.3 — a product the classifier did not offer. It joins the same
-  // list, ticked, so the next step is the same "Generate concept" every
-  // other row takes; the AI's own entries are untouched, which is what
-  // §4.4.4's read-only rule is about. A name that collides with an
-  // existing row just selects that row rather than adding a twin.
-  const handleAddOwnCompanion = React.useCallback((name: string) => {
-    const id = companionId(name);
-    if (!id) return;
-    setCompanionPlan((prev) =>
-      prev.some((c) => c.id === id)
-        ? prev
-        : [...prev, { id, name: name.trim(), why: "You added this one." }],
-    );
-    setPickedCompanions((prev) => new Set(prev).add(id));
-  }, []);
-
-  // §4.4.4 — the row reads the live turn rather than a stored flag: the
-  // companion's concept IS a turn, so the dialog and the model can never
-  // disagree about whether one exists or how far it has got. The latest
-  // turn for that companion wins, so a regenerate moves the row back to
-  // rendering.
-  const companionConceptTurn = React.useCallback(
-    (id: string): CompanionTurn | null => {
-      if (!chat) return null;
-      for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
-        const t = chat.turns[i];
-        if (t.role !== "assistant" || t.companionOf !== id) continue;
-        return {
-          turnId: t.id,
-          status: t.status,
-          progress: t.progress ?? 0,
-          imageUrl: t.imageUrl,
-          prompt: t.prompt,
-        };
-      }
-      return null;
-    },
-    [chat],
-  );
-
-  // §4.4.5 — the companion's own loop, run from the dialog. A refine
-  // evolves the image that is on screen; a regenerate takes a fresh run at
-  // the same brief. Both append a turn carrying the same `companionOf`,
-  // so the row follows the newest one.
-  const handleRefineCompanion = React.useCallback(
-    (companion: Companion, change: string) => {
-      if (!chat || !canAfford(CONCEPT_COST)) return;
-      const current = companionConceptTurn(companion.id);
-      if (!current || current.status !== "ready") return;
-      const { turnId } = appendAssistantTurn(chat.id, {
-        prompt: change,
-        kind: "refine",
-        parentTurnId: current.turnId,
-        companionOf: companion.id,
-      });
-      kickedOff.current.add(turnId);
-      runGeneration(chat.id, turnId, {
-        prompt: change,
-        kind: "refine",
-        parentImageUrl: current.imageUrl,
-      });
-    },
-    [chat, canAfford, companionConceptTurn, appendAssistantTurn, runGeneration],
-  );
-
-  const handleRegenerateCompanion = React.useCallback(
-    (companion: Companion) => {
-      if (!chat || !confirmFor || !canAfford(CONCEPT_COST)) return;
-      const prompt = `${companion.name} for this ${productTitle}: ${confirmFor.prompt}`;
-      const { turnId } = appendAssistantTurn(chat.id, {
-        prompt,
-        kind: "fresh",
-        companionOf: companion.id,
-      });
-      kickedOff.current.add(turnId);
-      runGeneration(chat.id, turnId, { prompt, kind: "fresh" });
-    },
-    [
-      chat,
-      confirmFor,
-      productTitle,
-      canAfford,
-      appendAssistantTurn,
-      runGeneration,
-    ],
-  );
-
-
-  // §4.4.5 — a companion's concept is generated as part of THIS system,
-  // not as a standalone object: the prompt inherits the parent's own
-  // words so the two products read as a family. It lands in the thread
-  // like any other concept, with its own refine and regenerate.
-  const handleGenerateCompanion = React.useCallback(
-    (companion: Companion) => {
-      if (!chat || !confirmFor) return;
-      if (!canAfford(CONCEPT_COST)) return;
-      const prompt = `${companion.name} for this ${productTitle}: ${confirmFor.prompt}`;
-      const { turnId } = appendAssistantTurn(chat.id, {
-        prompt,
-        kind: "fresh",
-        companionOf: companion.id,
-      });
-      kickedOff.current.add(turnId);
-      runGeneration(chat.id, turnId, { prompt, kind: "fresh" });
-      // The dialog stays open: the row shows the render's own progress and
-      // then its preview. Closing it and asking the user to come back was
-      // two trips for one decision.
-    },
-    [
-      chat,
-      confirmFor,
-      productTitle,
-      canAfford,
-      appendAssistantTurn,
-      runGeneration,
-    ],
-  );
 
   // Open the full-screen editor on a specific concept image.
   const handleOpenEditor = React.useCallback((turnId: string) => {
@@ -890,18 +758,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         return;
       }
       appendUserTurn(chat.id, text);
-      const { turnId } = appendAssistantTurn(chat.id, {
+      appendAssistantTurn(chat.id, {
         prompt: text,
         kind: "refine",
         parentTurnId: editorTurnId,
-      });
-      // Drive generation here; mark kicked-off so the auto-run effect doesn't
-      // fire it a second time.
-      kickedOff.current.add(turnId);
-      runGeneration(chat.id, turnId, {
-        prompt: text,
-        kind: "refine",
-        parentImageUrl: parent.imageUrl,
+        companionOf: parent.companionOf,
       });
       // Close the editor — the refine continues in the thread below.
       setEditorTurnId(null);
@@ -912,7 +773,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       editorTurnId,
       appendUserTurn,
       appendAssistantTurn,
-      runGeneration,
     ],
   );
 
@@ -1017,29 +877,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       <ConfirmBuildDialog
         open={confirmFor !== null}
         turnId={confirmFor?.turnId ?? ""}
-        conceptLabel={
-          confirmFor ? (labels.get(confirmFor.turnId) ?? "1") : "1"
-        }
-        conceptImageUrl={confirmFor?.imageUrl}
         conceptPrompt={confirmFor?.prompt ?? ""}
+        products={pickedCompanions.size + 1}
         submitting={submittingBuild}
         onCancel={() => setConfirmFor(null)}
         onConfirm={handleConfirmBuild}
-        companions={companionPlan}
-        selectedCompanions={pickedCompanions}
-        companionTurn={companionConceptTurn}
-        onToggleCompanion={(id) =>
-          setPickedCompanions((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-          })
-        }
-        onGenerateCompanion={handleGenerateCompanion}
-        onRefineCompanion={handleRefineCompanion}
-        onRegenerateCompanion={handleRegenerateCompanion}
-        onAddCompanion={handleAddOwnCompanion}
       />
 
       <ImageEditorModal

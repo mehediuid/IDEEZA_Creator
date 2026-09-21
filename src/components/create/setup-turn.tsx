@@ -56,19 +56,18 @@ export function SetupTurn({
   // Everything offered starts ticked: the classifier only offers a companion
   // where the product genuinely needs one, so the default that matches the
   // finding is "yes", and unticking is the deliberate act.
-  const [picked, setPicked] = React.useState<Set<string>>(
-    () => new Set(companions.map((c) => c.id)),
-  );
+  //
+  // Derived, not synced. The classifier answers after this card is already on
+  // screen, and an effect that copied its list into state re-rendered to say
+  // what could simply be read — so the default is computed and state holds
+  // only what the maker has actually touched.
+  const [touched, setTouched] = React.useState<Set<string> | null>(null);
+  const picked = touched ?? new Set(companions.map((c) => c.id));
+  const setPicked = (next: (was: Set<string>) => Set<string>) =>
+    setTouched((was) => next(was ?? new Set(companions.map((c) => c.id))));
   const [step, setStep] = React.useState<"products" | "project">("products");
   const [projectId, setProjectId] = React.useState("");
   const [projectName, setProjectName] = React.useState("");
-
-  // The classifier answers after the card is already on screen, so the
-  // default selection is seeded when its list arrives.
-  const offered = companions.map((c) => c.id).join(",");
-  React.useEffect(() => {
-    setPicked(new Set(offered ? offered.split(",") : []));
-  }, [offered]);
 
   if (status === "loading") {
     return (
