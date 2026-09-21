@@ -24,6 +24,7 @@
 
 import * as React from "react";
 import {
+  isWorkingBuild,
   productsOf,
   useCreateHistory,
   type BuildItemKind,
@@ -116,7 +117,7 @@ export function BuildSimulator() {
   React.useEffect(() => {
     if (!ready) return;
     for (const b of builds) {
-      if (b.status !== "running" || b.creditsCharged) continue;
+      if (!isWorkingBuild(b) || b.creditsCharged) continue;
       // The ledger is the evidence, not charge()'s return value: that
       // is computed inside a setState updater React may not run
       // eagerly, so it can answer false for a charge that did apply.
@@ -175,7 +176,7 @@ export function BuildSimulator() {
       // Advance every running build, not just one on screen — there may
       // be no build page open at all.
       for (const b of buildsRef.current) {
-        if (b.status !== "running") continue;
+        if (!isWorkingBuild(b)) continue;
         running = true;
         // Every product's artifacts, not just the primary's: a
         // multi-product build (§4.4) is not finished until the companion

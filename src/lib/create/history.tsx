@@ -359,6 +359,56 @@ export function statusOf(job: BuildJob): BuildStatus {
   return deriveStatus(allItems(job));
 }
 
+/** Is this job actually occupying the single build worker?
+ *
+ *  Not `job.status === "running"`, which is what every caller used to ask.
+ *  Nothing ever writes a terminal status back onto a job — a build's
+ *  completion is derived from its items by `statusOf`/`rollupBuild` — so the
+ *  stored field reads "running" from the moment a build is promoted until
+ *  the end of time. The first build a browser ever finished therefore held
+ *  the worker for good: `startBuild` booked every later build as queued,
+ *  `promoteQueued` refused to promote it because something was still
+ *  "running", and the build sat on "Waiting" with every row spinning and
+ *  nothing behind it. `enforceSingleRunning` made it worse — the ghost was
+ *  the oldest "running" job, so a build that did start was demoted back
+ *  behind it.
+ *
+ *  The worker is held by work in flight, so that is what this asks: the
+ *  stored flag says the job was started, and the items say whether it is
+ *  still going. A freshly promoted job whose rows are all still pending
+ *  derives as "building", so it holds the worker from the first tick.
+ */
+export function isWorkingBuild(job: BuildJob): boolean {
+  return (
+    job.status === "running" &&
+    allItems(job).some((i) => i.status === "building")
+  );
+}
+
+/** Start every artifact that is still waiting — across every product, not
+ *  just the primary's five.
+ *
+ *  `promoteQueued` used to map `job.items` alone, so a promoted
+ *  multi-product build began with the primary building and each companion's
+ *  rows left pending forever. The tick only advances what is `building`, so
+ *  the primary finished, the companions never moved, the job never derived
+ *  as done, and it held the single worker for good: every build booked after
+ *  it came back queued and sat on "Waiting" with nothing behind it. */
+function startPendingItems(job: BuildJob): BuildJob {
+  const start = (it: BuildItem): BuildItem =>
+    it.status === "pending"
+      ? { ...it, status: "building" as const, progress: 0 }
+      : it;
+  return {
+    ...job,
+    items: job.items.map(start),
+    companions: (job.companions ?? []).map((c) => ({
+      ...c,
+      items: c.items.map(start),
+    })),
+  };
+}
+
 // How many builds are really waiting in front of this one: queued jobs
 // booked before it. The build currently running isn't "ahead in the
 // queue" — it's the one the queue is waiting on, which every caller
@@ -519,14 +569,14 @@ const ITEM_STATUS_VALUES: BuildItemStatus[] = [
 // to the queue with the work that was in flight reset to pending,
 // exactly like any other demotion into "queued".
 function enforceSingleRunning(jobs: BuildJob[]): BuildJob[] {
-  const running = jobs.filter((j) => j.status === "running");
+  const running = jobs.filter(isWorkingBuild);
   if (running.length <= 1) return jobs;
   let oldest = running[0];
   for (const j of running) {
     if (j.createdAt < oldest.createdAt) oldest = j;
   }
   return jobs.map((j) =>
-    j.status === "running" && j.id !== oldest.id
+    isWorkingBuild(j) && j.id !== oldest.id
       ? {
           ...j,
           status: "queued" as const,
@@ -987,7 +1037,7 @@ export function CreateHistoryProvider({
       const id = makeId("build");
       // One build runs at a time — a second one waits its turn rather
       // than competing for the same worker.
-      const busy = buildsRef.current.some((b) => b.status === "running");
+      const busy = buildsRef.current.some(isWorkingBuild);
       const job: BuildJob = {
         id,
         chatId: input.chatId,
@@ -1132,7 +1182,7 @@ export function CreateHistoryProvider({
   const retryBuildItem = React.useCallback(
     (buildId: string, kind: BuildItemKind, productId: string = "primary") => {
       const busy = buildsRef.current.some(
-        (b) => b.status === "running" && b.id !== buildId,
+        (b) => isWorkingBuild(b) && b.id !== buildId,
       );
       if (!busy) {
         updateBuildItem(
@@ -1190,7 +1240,7 @@ export function CreateHistoryProvider({
   const retryBuild = React.useCallback((buildId: string) => {
     const now = Date.now();
     const busy = buildsRef.current.some(
-      (b) => b.status === "running" && b.id !== buildId,
+      (b) => isWorkingBuild(b) && b.id !== buildId,
     );
     // Every artifact starts over; whether it starts now or waits depends
     // on whether another build already holds the worker.
@@ -1313,7 +1363,25 @@ export function CreateHistoryProvider({
 
   const promoteQueued = React.useCallback(() => {
     setBuilds((arr) => {
-      if (arr.some((b) => b.status === "running")) return arr;
+      if (arr.some(isWorkingBuild)) return arr;
+      const now = Date.now();
+      // A job left holding the worker with nothing in flight — the shape
+      // the old promotion produced, and the shape a build stored by an
+      // older version of this app still has. It is already started and
+      // already paid for, so it is picked up where it stopped rather than
+      // being sent to the back of a queue it is at the front of.
+      const stalled = arr.find(
+        (b) =>
+          b.status === "running" &&
+          allItems(b).some((i) => i.status === "pending"),
+      );
+      if (stalled) {
+        return arr.map((b) =>
+          b.id === stalled.id
+            ? { ...startPendingItems(b), updatedAt: now }
+            : b,
+        );
+      }
       // Oldest first — the queue is a queue.
       let next: BuildJob | null = null;
       for (const b of arr) {
@@ -1322,22 +1390,17 @@ export function CreateHistoryProvider({
       }
       if (!next) return arr;
       const promoted = next;
-      const now = Date.now();
       return arr.map((b) =>
         b.id === promoted.id
           ? {
-              ...b,
+              // Only what is waiting starts, and every product's waiting
+              // rows, not the primary's alone. A build that queued for a
+              // single retry keeps the artifacts it already delivered —
+              // restarting them would throw away real work.
+              ...startPendingItems(b),
               status: "running" as const,
               blocked: undefined,
               startedAt: now,
-              // Only what is waiting starts. A build that queued for a
-              // single retry keeps the artifacts it already delivered —
-              // restarting them would throw away real work.
-              items: b.items.map((it) =>
-                it.status === "pending"
-                  ? { ...it, status: "building" as const, progress: 0 }
-                  : it,
-              ),
               updatedAt: now,
             }
           : b,

@@ -90,11 +90,20 @@ export function WorkspacePrompt() {
       return;
     }
     if (!canRender) return;
+    // Busy, and it STAYS busy. The clear used to sit in a `finally` beside
+    // a `router.push` that is not awaited, so both updates landed in one
+    // tick, React resolved the queue back to false and bailed out: the
+    // button never painted its busy state once. Meanwhile the push fetches
+    // a route payload — hundreds of milliseconds, seconds in dev — and the
+    // concept render behind it takes the better part of a minute, so the
+    // very first press in the product looked like it had missed. This
+    // component unmounts on the navigation, so there is nothing to clear;
+    // if the push throws, the catch hands the control back.
     setSubmitting(true);
     try {
       const session = createChat(trimmed);
       router.push(`/chat/${session.id}`);
-    } finally {
+    } catch {
       setSubmitting(false);
     }
   };
@@ -567,12 +576,22 @@ function SendButton({
       type="button"
       onClick={onClick}
       disabled={submitting}
-      aria-label={label}
-      title={label}
+      aria-busy={submitting}
+      aria-label={submitting ? "Opening your concept chat…" : label}
+      title={submitting ? "Opening your concept chat…" : label}
       className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-button-primary-bg px-[16px] text-md font-semibold text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-wait disabled:opacity-60"
     >
-      Generate
-      <Icon icon={SparklesIcon} size={16} strokeWidth={1.8} />
+      {submitting ? "Opening…" : "Generate"}
+      <span
+        aria-hidden
+        className={submitting ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
+      >
+        <Icon
+          icon={submitting ? Refresh01Icon : SparklesIcon}
+          size={16}
+          strokeWidth={1.8}
+        />
+      </span>
     </button>
   );
 }

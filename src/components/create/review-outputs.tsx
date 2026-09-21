@@ -28,7 +28,9 @@ import {
   FloppyDiskIcon,
   HelpCircleIcon,
   PencilEdit02Icon,
+  Refresh01Icon,
 } from "@hugeicons/core-free-icons";
+import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { ModelViewer } from "@/components/3d/model-viewer";
 import {
@@ -152,12 +154,25 @@ function ReviewPanel({
   // every one after it. Selecting it is explicit — the editor pages work
   // on the active project, so landing there means switching to it, but
   // nothing else on this surface moves it under the user.
+  // Which footer control is taking the maker off this surface. All four
+  // navigate to a route whose payload has to be fetched, and the two editor
+  // ones pull the PCB module's chunk behind it, so the press is followed by
+  // a pause with nothing in it — the press has to say so or it reads as a
+  // click that missed. Never cleared: the navigation unmounts this surface.
+  const [leaving, setLeaving] = React.useState<null | "brief" | "editor">(null);
+
   const openInEditor = React.useCallback(() => {
+    setLeaving("editor");
     const project = projectFromBuild(job);
     if (project.id !== job.projectId) setBuildProject(job.id, project.id);
     selectProject(project.id);
     router.push(stepHref(project, "pcb"));
   }, [job, projectFromBuild, setBuildProject, selectProject, router]);
+
+  const openBrief = React.useCallback(() => {
+    setLeaving("brief");
+    router.push(`/build/${job.id}/brief`);
+  }, [job.id, router]);
 
   return (
     <section
@@ -330,25 +345,27 @@ function ReviewPanel({
                   project to keep editing.
                 </p>
                 <div className="flex items-center gap-6">
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/build/${job.id}/brief`)}
-                    className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                  <LeaveButton
+                    tone="primary"
+                    busy={leaving === "brief"}
+                    blocked={leaving !== null}
+                    onClick={openBrief}
+                    /* Carrying on, not saving again — the floppy belongs to
+                       "Save Project", which is the button this one replaces
+                       once the build has a project. */
+                    icon={ArrowRight02Icon}
                   >
-                    {/* Carrying on, not saving again — the floppy belongs to
-                        "Save Project", which is the button this one replaces
-                        once the build has a project. */}
-                    <Icon icon={ArrowRight02Icon} size={18} />
                     Continue Brief
-                  </button>
-                  <button
-                    type="button"
+                  </LeaveButton>
+                  <LeaveButton
+                    tone="quiet"
+                    busy={leaving === "editor"}
+                    blocked={leaving !== null}
                     onClick={openInEditor}
-                    className="inline-flex h-[40px] items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                    icon={PencilEdit02Icon}
                   >
-                    <Icon icon={PencilEdit02Icon} size={18} />
                     Open Project
-                  </button>
+                  </LeaveButton>
                 </div>
               </>
             ) : (
@@ -359,22 +376,24 @@ function ReviewPanel({
                     : "Every piece this build made is ready. Choose what happens to this build next."}
                 </p>
                 <div className="flex items-center gap-6">
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/build/${job.id}/brief`)}
-                    className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                  <LeaveButton
+                    tone="primary"
+                    busy={leaving === "brief"}
+                    blocked={leaving !== null}
+                    onClick={openBrief}
+                    icon={FloppyDiskIcon}
                   >
-                    <Icon icon={FloppyDiskIcon} size={18} />
                     Save Project
-                  </button>
-                  <button
-                    type="button"
+                  </LeaveButton>
+                  <LeaveButton
+                    tone="quiet"
+                    busy={leaving === "editor"}
+                    blocked={leaving !== null}
                     onClick={openInEditor}
-                    className="inline-flex h-[40px] items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                    icon={PencilEdit02Icon}
                   >
-                    <Icon icon={PencilEdit02Icon} size={18} />
                     Advance Edit
-                  </button>
+                  </LeaveButton>
                 </div>
               </>
             )}
@@ -428,5 +447,52 @@ function GeneratingModel() {
       <p className="text-sm font-medium text-text-secondary">Generating 3D model…</p>
       <style>{`.ix-modelspin{animation:ix-modelspin-kf 1s linear infinite}@keyframes ix-modelspin-kf{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ix-modelspin{animation:none}}`}</style>
     </div>
+  );
+}
+
+/** A footer control that leaves this surface. It spins and says "Opening…"
+ *  from the click, and every one of them is shut while any is under way —
+ *  two navigations at once is not a thing the maker can have meant. */
+function LeaveButton({
+  tone,
+  busy,
+  blocked,
+  onClick,
+  icon,
+  children,
+}: {
+  tone: "primary" | "quiet";
+  busy: boolean;
+  blocked: boolean;
+  onClick: () => void;
+  icon: IconValue;
+  children: React.ReactNode;
+}) {
+  const base =
+    "inline-flex h-[40px] items-center gap-4 rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
+  const paint =
+    tone === "primary"
+      ? "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover"
+      : "border border-solid border-border bg-bg-surface text-text-primary hover:bg-bg-surface-raised";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={blocked}
+      aria-busy={busy}
+      className={[
+        base,
+        paint,
+        blocked ? (busy ? "cursor-wait opacity-80" : "opacity-60") : "",
+      ].join(" ")}
+    >
+      <span
+        aria-hidden
+        className={busy ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
+      >
+        <Icon icon={busy ? Refresh01Icon : icon} size={18} />
+      </span>
+      {busy ? "Opening…" : children}
+    </button>
   );
 }

@@ -25,6 +25,7 @@ import {
   Coins01Icon,
   FlashIcon,
   InformationCircleIcon,
+  Refresh01Icon,
   ShieldKeyIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
@@ -58,6 +59,8 @@ export function summarizeConcept(
   turnId: string,
   prompt: string,
 ): Promise<ConceptSummary> {
+  const cached = summaryCache.get(turnId);
+  if (cached) return Promise.resolve(cached);
   const pending = pendingSummaries.get(turnId);
   if (pending) return pending;
   const request = (async (): Promise<ConceptSummary> => {
@@ -85,6 +88,11 @@ export function summarizeConcept(
     }
   })();
   pendingSummaries.set(turnId, request);
+  // The cache used to be written by the dialog's own effect, so a path that
+  // never opens the dialog — a dismissed gate — asked the model the same
+  // question twice for the same concept, once to read it back and once to
+  // file the build under it. The answer is filed here, where it is made.
+  void request.then((concept) => summaryCache.set(turnId, concept));
   request.finally(() => pendingSummaries.delete(turnId));
   return request;
 }
@@ -243,23 +251,44 @@ export function ConfirmBuildDialog({
           >
             Cancel
           </button>
+          {/* Busy is a spinner, not a word swap. Confirming reads each
+              product's concept back before the build can be booked, which is
+              a round-trip per product, and "Generate" quietly becoming
+              "Starting…" in the same violet button was easy to miss — people
+              pressed it again believing they had missed it. It keeps the
+              brand fill (this is still the primary action, now under way),
+              dims, takes the wait cursor and turns. */}
           <button
             type="button"
             data-testid="gate-confirm"
             disabled={blocked}
-            title={shortOnCredits ? "Not enough credits" : undefined}
+            aria-busy={submitting}
+            title={
+              shortOnCredits
+                ? "Not enough credits"
+                : submitting
+                  ? "Booking the build…"
+                  : undefined
+            }
             onClick={() => {
               if (dismiss) writeGateDismissed(true);
               onConfirm(concept);
             }}
             className={
-              blocked
+              shortOnCredits
                 ? "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
-                : "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                : submitting
+                  ? "inline-flex h-[40px] cursor-wait items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand opacity-80"
+                  : "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
             }
           >
-            <Icon icon={FlashIcon} size={16} />
-            {submitting ? "Starting…" : "Generate"}
+            <span
+              aria-hidden
+              className={submitting ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
+            >
+              <Icon icon={submitting ? Refresh01Icon : FlashIcon} size={16} />
+            </span>
+            {submitting ? "Starting the build…" : "Generate"}
           </button>
         </div>
       </div>

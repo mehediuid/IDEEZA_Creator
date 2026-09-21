@@ -596,6 +596,64 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // gate's Confirm and the skip that replaces it when the gate has been
   // dismissed (spec §4.5) come through here, so a dismissed gate cannot
   // start a different kind of build from the one the dialog starts.
+  // §4.4.2 — a build books ONE job for every product that is ready: the
+  // primary, plus each companion whose concept has landed, summarised the
+  // way the primary is so every product's deliverables come from a real
+  // parts list rather than from its name. A companion still waiting on its
+  // concept is simply not built (§4.4.4) — its row said it needs one.
+  //
+  // It takes the companions rather than reading them out of state, because
+  // one of its callers decides them in the very tick it calls: the gate's
+  // dismissed path runs inside the click that sets `companionPlan`, and
+  // React has not re-rendered yet, so reading state there saw the previous
+  // value — empty — and a dismissed gate booked a three-product project as
+  // one product, silently, at the price of three.
+  const companionProductsFor = React.useCallback(
+    async (
+      companions: Companion[],
+    ): Promise<Omit<BuildProduct, "items">[]> => {
+      if (!chat || !companions.length) return [];
+      const turnFor = (id: string) => {
+        for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
+          const t = chat.turns[i];
+          if (
+            t.role === "assistant" &&
+            t.companionOf === id &&
+            t.status === "ready" &&
+            t.imageUrl
+          ) {
+            return t;
+          }
+        }
+        return null;
+      };
+      const ready = companions
+        .map((c) => ({ companion: c, turn: turnFor(c.id) }))
+        .filter(
+          (
+            x,
+          ): x is {
+            companion: Companion;
+            turn: ChatTurn & { role: "assistant" };
+          } => x.turn !== null,
+        );
+      return Promise.all(
+        ready.map(({ companion, turn }) =>
+          summarizeConcept(turn.id, turn.prompt).then((concept) => ({
+            id: companion.id,
+            name: companion.name,
+            conceptImageUrl: turn.imageUrl ?? "",
+            conceptPrompt: turn.prompt,
+            title: concept.title || companion.name,
+            summary: concept.summary,
+            parts: concept.parts,
+          })),
+        ),
+      );
+    },
+    [chat],
+  );
+
   const startBuildFor = React.useCallback(
     async (
       source: { turnId: string; imageUrl: string; prompt: string },
@@ -657,18 +715,37 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // The step after the companion screen, and the whole of it on the
   // ordinary single-product path: the gate, or the build straight away
   // when the gate has been dismissed (§4.5).
+  // Awaitable, because on the dismissed path this IS the build: the caller
+  // has to keep its control busy until the job exists, not until this
+  // returns. The dialog path resolves immediately — opening it is the whole
+  // of the work.
   const goToGate = React.useCallback(
-    (source: { turnId: string; imageUrl: string; prompt: string }) => {
+    async (
+      source: { turnId: string; imageUrl: string; prompt: string },
+      // The products this build covers, settled at the question. Passed in
+      // rather than read from state: the caller decides them in the same
+      // tick it calls here, and state has not re-rendered yet.
+      decided: Companion[] = [],
+    ) => {
       if (readGateDismissed()) {
         setSubmittingBuild(true);
-        void summarizeConcept(source.turnId, source.prompt).then((concept) =>
-          startBuildFor(source, concept),
-        );
+        try {
+          const [concept, companions] = await Promise.all([
+            summarizeConcept(source.turnId, source.prompt),
+            // It used to pass none at all, so dismissing the gate once
+            // turned every later multi-product project into a
+            // single-product build — quietly, at the price of all of them.
+            companionProductsFor(decided),
+          ]);
+          await startBuildFor(source, concept, companions);
+        } finally {
+          setSubmittingBuild(false);
+        }
         return;
       }
       setConfirmFor(source);
     },
-    [startBuildFor],
+    [companionProductsFor, startBuildFor],
   );
 
   // Part 4 §4.4.2 — accepting a concept branches here: the flow asks
@@ -709,68 +786,21 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // before paying is a real decision — just not the same one.
       setPickedCompanions(new Set(decided.map((c) => c.id)));
 
+      // Busy until the gate is open, or — when the gate has been dismissed
+      // — until the build really exists. It used to clear the moment the
+      // concept came back and then start the rest of the work, so the
+      // button returned to its idle brand fill while a second round-trip
+      // and the build POST were still running; pressing it again in that
+      // window booked a second job for the same concept.
       setPreparingTurnId(t.id);
       void summarizeConcept(t.id, t.prompt)
-        .then((concept) => {
-          setPreparingTurnId(null);
-          goToGate(source);
-        })
-        .catch(() => {
-          setPreparingTurnId(null);
-          goToGate(source);
-        });
+        .catch(() => null)
+        .then(() => goToGate(source, decided))
+        .finally(() => setPreparingTurnId(null));
     },
     [chat, goToGate],
   );
 
-  // §4.4.2 — leaving the companion screen books ONE job for every product
-  // that is ready: the primary, plus each ticked companion whose concept
-  // has landed. A ticked companion with no concept is not built and is not
-  // reported as missing (§4.4.4: "unselected companions are simply not
-  // built"); its row already said it needs a concept first.
-  // The ticked companions whose concept has landed, summarised the way
-  // the primary is so every product's deliverables come from a real parts
-  // list rather than from its name. A ticked companion still waiting on
-  // its concept is simply not built (§4.4.4) — its row said it needs one.
-  const readyCompanionProducts = React.useCallback(async (): Promise<
-    Omit<BuildProduct, "items">[]
-  > => {
-    if (!chat) return [];
-    const turnFor = (id: string) => {
-      for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
-        const t = chat.turns[i];
-        if (
-          t.role === "assistant" &&
-          t.companionOf === id &&
-          t.status === "ready" &&
-          t.imageUrl
-        ) {
-          return t;
-        }
-      }
-      return null;
-    };
-    const ready = companionPlan
-      .filter((c) => pickedCompanions.has(c.id))
-      .map((c) => ({ companion: c, turn: turnFor(c.id) }))
-      .filter(
-        (x): x is { companion: Companion; turn: ChatTurn & { role: "assistant" } } =>
-          x.turn !== null,
-      );
-    return Promise.all(
-      ready.map(({ companion, turn }) =>
-        summarizeConcept(turn.id, turn.prompt).then((concept) => ({
-          id: companion.id,
-          name: companion.name,
-          conceptImageUrl: turn.imageUrl ?? "",
-          conceptPrompt: turn.prompt,
-          title: concept.title || companion.name,
-          summary: concept.summary,
-          parts: concept.parts,
-        })),
-      ),
-    );
-  }, [chat, companionPlan, pickedCompanions]);
 
 
   // Open the full-screen editor on a specific concept image.
@@ -822,10 +852,29 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const handleConfirmBuild = React.useCallback(
     async (concept: ConceptSummary) => {
       if (!confirmFor) return;
-      const companions = await readyCompanionProducts();
-      await startBuildFor(confirmFor, concept, companions);
+      // Busy on the click itself. Reading each product's concept back is a
+      // round-trip per product, and `startBuildFor` — which used to be the
+      // first thing to set this — only runs once they have all answered. So
+      // the press that begins seconds of work left the button reading
+      // "Generate", undimmed and apparently idle, and people pressed it
+      // again believing they had missed.
+      setSubmittingBuild(true);
+      try {
+        const companions = await companionProductsFor(
+          companionPlan.filter((c) => pickedCompanions.has(c.id)),
+        );
+        await startBuildFor(confirmFor, concept, companions);
+      } finally {
+        setSubmittingBuild(false);
+      }
     },
-    [confirmFor, readyCompanionProducts, startBuildFor],
+    [
+      confirmFor,
+      companionPlan,
+      pickedCompanions,
+      companionProductsFor,
+      startBuildFor,
+    ],
   );
 
   if (!hydrated) {
