@@ -52,10 +52,47 @@ export function describeFallback(prompt: string): string {
   return short ? `${short.charAt(0).toUpperCase()}${short.slice(1)}.` : "";
 }
 
+// What a maker types is a sentence about a system; what every surface here
+// needs is the name of one product. "A camera drone with a handheld remote
+// controller and a charging dock" was being shown as a product name, cut
+// mid-word at 56 characters, as the heading of a card, a tab and a rail
+// group — which is how "A camera drone with a handheld remote controller
+// and a c…" ended up naming a product three times on one screen.
+//
+// So the fallback reads the head of the phrase instead of its whole length:
+// the leading request ("build me", "I want") and article come off, the
+// phrase stops at the first word that starts a second clause, and the rest
+// is title-cased. It invents nothing — every word is the maker's own — it
+// just stops at the point where the sentence stops being a name.
+const TITLE_LEAD =
+  /^(?:(?:please|can you|could you)\s+)?(?:(?:i\s+(?:want|need|would like)(?:\s+to)?)\s+)?(?:(?:build|make|create|design|generate|draw)(?:\s+me)?\s+)?(?:a|an|the|my|our)\s+/i;
+const TITLE_STOP = new Set([
+  "with", "and", "that", "which", "who", "plus", "using", "for", "so",
+  "to", "featuring", "including", "but", "where", "when", "having",
+]);
+
 export function deriveTitle(prompt: string): string {
   const trimmed = prompt.trim().replace(/\s+/g, " ");
-  if (trimmed.length <= 56) return trimmed || "Untitled concept";
-  return `${trimmed.slice(0, 56)}…`;
+  if (!trimmed) return "Untitled concept";
+
+  const head = trimmed.replace(TITLE_LEAD, "").split(/[,;:.!?()–—]/)[0] ?? "";
+  const words: string[] = [];
+  for (const word of head.split(" ")) {
+    if (!word) continue;
+    if (TITLE_STOP.has(word.toLowerCase())) break;
+    words.push(word);
+    if (words.join(" ").length >= 40) break;
+  }
+
+  const name = words
+    // An acronym the maker typed stays as they typed it: NFC, USB, LED.
+    .map((w) => (w === w.toUpperCase() ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+
+  if (name.length >= 3) return name.length > 48 ? `${name.slice(0, 48)}…` : name;
+  // Nothing usable at the head — a bare "smart" or a single article — so
+  // fall back to the words themselves rather than to a made-up noun.
+  return trimmed.length <= 56 ? trimmed : `${trimmed.slice(0, 56)}…`;
 }
 
 // The summary line every surface shows under the title: the parts, in

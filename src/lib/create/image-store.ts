@@ -100,6 +100,40 @@ function dir(): string {
   );
 }
 
+async function diskPut(
+  id: string,
+  bytes: Uint8Array,
+  contentType: string,
+  record: ImageMeta,
+): Promise<void> {
+  const base = dir();
+  await mkdir(base, { recursive: true });
+  await writeFile(path.join(base, `${id}.${extFor(contentType)}`), bytes);
+  await writeFile(path.join(base, `${id}.json`), JSON.stringify(record), "utf8");
+}
+
+async function diskRecord(id: string): Promise<Partial<ImageMeta> | null> {
+  try {
+    return JSON.parse(
+      await readFile(path.join(dir(), `${id}.json`), "utf8"),
+    ) as Partial<ImageMeta>;
+  } catch {
+    return null;
+  }
+}
+
+async function diskRead(
+  id: string,
+  contentType: string,
+): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+  try {
+    const bytes = await readFile(path.join(dir(), `${id}.${extFor(contentType)}`));
+    return { bytes: new Uint8Array(bytes), contentType };
+  } catch {
+    return null;
+  }
+}
+
 // ──────────────────────────── Vercel Blob ────────────────────────────
 
 // Taken from @vercel/blob 2.8.0 rather than from memory: the API moved host
@@ -250,15 +284,27 @@ export async function put(
 
   const auth = await blobAuth();
   if (auth) {
-    await blobPut(auth, imagePath(id), bytes, contentType);
-    await blobPut(auth, metaPath(id), JSON.stringify(record), "application/json");
-    return { id, url: urlFor(id) };
+    try {
+      await blobPut(auth, imagePath(id), bytes, contentType);
+      await blobPut(
+        auth,
+        metaPath(id),
+        JSON.stringify(record),
+        "application/json",
+      );
+      return { id, url: urlFor(id) };
+    } catch (err) {
+      // Credentials that exist but do not work are worse than none at all:
+      // an OIDC token pulled into .env.local expires within the day, so every
+      // render on a developer's machine failed with "we couldn't store it"
+      // while a perfectly writable disk sat underneath. Fall through and let
+      // the disk answer. On a serverless filesystem it throws EROFS in turn,
+      // which is the real storage failure and is reported as one.
+      console.error("[image-store] blob put failed, falling back to disk", err);
+    }
   }
 
-  const base = dir();
-  await mkdir(base, { recursive: true });
-  await writeFile(path.join(base, `${id}.${extFor(contentType)}`), bytes);
-  await writeFile(path.join(base, `${id}.json`), JSON.stringify(record), "utf8");
+  await diskPut(id, bytes, contentType, record);
   return { id, url: urlFor(id) };
 }
 
@@ -289,20 +335,18 @@ async function readRecord(id: string): Promise<Partial<ImageMeta> | null> {
   const auth = await blobAuth();
   if (auth) {
     const bytes = await blobGet(auth, metaPath(id)).catch(() => null);
-    if (!bytes) return null;
-    try {
-      return JSON.parse(new TextDecoder().decode(bytes)) as Partial<ImageMeta>;
-    } catch {
-      return null;
+    if (bytes) {
+      try {
+        return JSON.parse(
+          new TextDecoder().decode(bytes),
+        ) as Partial<ImageMeta>;
+      } catch {
+        return null;
+      }
     }
+    // Written by the disk fallback above, so look there before giving up.
   }
-  try {
-    return JSON.parse(
-      await readFile(path.join(dir(), `${id}.json`), "utf8"),
-    ) as Partial<ImageMeta>;
-  } catch {
-    return null;
-  }
+  return diskRecord(id);
 }
 
 /** The bytes, for the route that serves them. */
@@ -318,14 +362,7 @@ export async function read(
     const bytes = await blobGet(auth, imagePath(id)).catch(() => null);
     // The stored type wins over whatever the transport reports: it is the one
     // this store normalised on the way in.
-    return bytes ? { bytes, contentType: meta.contentType } : null;
+    if (bytes) return { bytes, contentType: meta.contentType };
   }
-  try {
-    const bytes = await readFile(
-      path.join(dir(), `${id}.${extFor(meta.contentType)}`),
-    );
-    return { bytes: new Uint8Array(bytes), contentType: meta.contentType };
-  } catch {
-    return null;
-  }
+  return diskRead(id, meta.contentType);
 }

@@ -15,7 +15,6 @@
 //                                  queued notice instead
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Cancel01Icon, Clock01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -34,6 +33,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import { ChatRail } from "./chat-rail";
+import { BuildRail } from "./build-rail";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
@@ -82,7 +82,6 @@ class FailedRender extends Error {
 }
 
 export function ConceptChat({ chatId }: { chatId: string }) {
-  const router = useRouter();
   const {
     hydrated,
     builds,
@@ -152,6 +151,19 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // point at. Derived from live build state each render (via `builds`,
   // read fresh by `getBuild`) rather than mirrored into its own effect,
   // so it can't go stale on screen or trigger a cascading re-render.
+  // The build this chat started, if it has one. Derived rather than held
+  // in state, so a reload lands back on the build instead of an empty
+  // canvas — the job record already knows which chat it came from.
+  const activeBuild = React.useMemo(() => {
+    if (!chat) return null;
+    let latest: BuildJob | null = null;
+    for (const b of builds) {
+      if (b.chatId !== chat.id) continue;
+      if (!latest || b.createdAt > latest.createdAt) latest = b;
+    }
+    return latest;
+  }, [builds, chat]);
+
   const queuedNoticeJob = queuedNotice ? getBuild(queuedNotice) : null;
   const showQueuedNotice = queuedNoticeJob?.status === "queued";
 
@@ -625,18 +637,21 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // build this new confirm has nothing to do with, so it's
         // replaced (or cleared, if this one didn't queue) rather than
         // left pointing at a stale job.
-        if (job.status === "queued") {
-          setQueuedNotice(job.id);
-          return;
-        }
-        setQueuedNotice(null);
-        router.push(`/build/${job.id}`);
+        // The build does NOT leave the chat. It used to push /build/<id>,
+        // a separate full-screen page with a Back link, which threw away
+        // the conversation, the rail and the composer at the exact moment
+        // the work got interesting. The job is derived from this chat, so
+        // it simply takes over the canvas: the pipeline joins the rail and
+        // each piece appears as it lands, with the composer still there.
+        // A queued job is the same surface — every row reads Waiting —
+        // plus a line saying what it is waiting for.
+        setQueuedNotice(job.status === "queued" ? job.id : null);
       } finally {
         setSubmittingBuild(false);
         setConfirmFor(null);
       }
     },
-    [chat, labels, startBuild, router],
+    [chat, labels, startBuild],
   );
 
   // The step after the companion screen, and the whole of it on the
@@ -840,6 +855,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       <aside className="flex w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface">
         <div className="flex-1 overflow-y-auto">
           <ChatRail chat={chat} labels={labels} />
+          {/* The whole pipeline, stated the moment the build starts — every
+              piece of every product, including the ones that have not begun.
+              It belongs beside the work, not on a page of its own. */}
+          {activeBuild && (
+            <div className="border-t border-solid border-border">
+              <BuildRail
+                job={activeBuild}
+                activeProductId={focusedProduct}
+                onPickProduct={setFocusedProduct}
+              />
+            </div>
+          )}
         </div>
         <div className="border-t border-solid border-border">
           <div className="w-full px-[14px] py-[14px]">
@@ -850,13 +877,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               className="mb-[12px] flex items-center gap-[10px] rounded-xl border border-solid border-border bg-bg-subtle px-[14px] py-[10px] text-sm text-text-secondary"
             >
               <Icon icon={Clock01Icon} size={16} />
-              {queuedNoticeText(queuedNoticeJob, builds)}
-              <Link
-                href={`/build/${queuedNotice}`}
-                className="ml-auto font-semibold text-text-brand no-underline outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                View build
-              </Link>
+              <span className="flex-1">
+                {queuedNoticeText(queuedNoticeJob, builds)}
+              </span>
               <button
                 type="button"
                 onClick={() => setQueuedNotice(null)}
@@ -895,6 +918,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             onUseTurn={handleUseTurn}
             onRefineTurn={handleOpenEditor}
             onAddProduct={handleAddProduct}
+            job={activeBuild}
+            focusedProduct={focusedProduct}
+            onFocusProduct={setFocusedProduct}
           />
         </div>
       </main>

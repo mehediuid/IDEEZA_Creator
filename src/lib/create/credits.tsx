@@ -265,9 +265,18 @@ export function CreditsProvider({
     } catch {}
   }, [state, hydrated]);
 
+  // Read off state, not the ref. Every caller of this asks during render —
+  // the composer's helper line, the concept card's price line, the gate's
+  // Confirm — and the ref is advanced by an effect, which runs after the
+  // render that read it. So on the render right after hydration it still
+  // answered against a balance of 0, and nothing re-rendered afterwards to
+  // correct it: a chat holding 396 credits said "You are out of credits"
+  // with every control greyed out until something else happened to
+  // re-render it. The ref stays for charge/refund, which decide at event
+  // time and need to see their own charges inside one tick.
   const canAfford = React.useCallback(
-    (cost: number = BUILD_COST) => stateRef.current.balance >= cost,
-    [],
+    (cost: number = BUILD_COST) => state.balance >= cost,
+    [state.balance],
   );
 
   // Both of these answer their caller immediately, so the decision is taken

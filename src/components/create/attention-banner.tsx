@@ -73,6 +73,13 @@ export function BuildAttentionBanner() {
   // status/review surface itself IS the action they'd take.
   if (pathname.startsWith("/build/")) return null;
 
+  // And on the chat the build belongs to, for the same reason: the build
+  // runs there now — its pipeline is in that rail and its deliverables are
+  // on that canvas — so a toast saying it is ready, over a control offering
+  // to take the maker somewhere else, is offering them the page they are
+  // already standing on.
+  if (job.chatId && pathname === `/chat/${job.chatId}`) return null;
+
   // A system failure (the whole job died on our side, not the maker's)
   // gets its own tone and copy — it is not "a piece failed", it's
   // everything, and `failBuildSystem` marks every unfinished item
@@ -109,7 +116,15 @@ export function BuildAttentionBanner() {
         : `${job.title} is ready`;
 
   const ctaLabel = reason === "credits" ? "Top up credits" : "Open build";
-  const ctaHref = reason === "credits" ? "/history#credits" : `/build/${job.id}`;
+  // The build's home is the chat it was started from — that is where its
+  // pipeline and its output are. /build/<id> stays as the destination for a
+  // job whose chat this browser no longer holds.
+  const ctaHref =
+    reason === "credits"
+      ? "/history#credits"
+      : job.chatId
+        ? `/chat/${job.chatId}`
+        : `/build/${job.id}`;
 
   return createPortal(
     <div

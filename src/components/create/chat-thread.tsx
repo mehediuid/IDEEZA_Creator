@@ -15,6 +15,7 @@
 
 import * as React from "react";
 import type {
+  BuildJob,
   ChatSession,
   ChatTurn,
   SetupAnswer,
@@ -22,6 +23,7 @@ import type {
 import { BUILD_COST, useCredits } from "@/lib/create/credits";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
+import { ReviewOutputs } from "./review-outputs";
 
 // Label every concept by its lineage, not by its position: a fresh take
 // counts up ("1", "2", …) and a refine hangs off the concept it evolves
@@ -58,6 +60,9 @@ export function ChatThread({
   onUseTurn,
   onRefineTurn,
   onAddProduct,
+  job,
+  focusedProduct,
+  onFocusProduct,
 }: {
   projects: SetupProject[];
   onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
@@ -73,6 +78,14 @@ export function ChatThread({
   onRefineTurn: (turnId: string) => void;
   /** Take up a product the maker passed over at the question. */
   onAddProduct: (companionId: string) => void;
+  /** The build this chat started, once it has one. The canvas becomes the
+   *  build's own surface then — the deliverables arriving one by one —
+   *  rather than sending the maker to a page of its own. */
+  job?: BuildJob | null;
+  /** Which product the chat is looking at, shared with the rail and the
+   *  composer so all three name the same thing. */
+  focusedProduct?: string;
+  onFocusProduct?: (productId: string) => void;
 }) {
   // One label per concept, so a card, its breadcrumb and the editor all
   // name the same thing.
@@ -175,7 +188,22 @@ export function ChatThread({
         />
       )}
 
-      {products.length > 0 && (
+      {/* Once the build is running the canvas is the build: its products as
+          tabs, each deliverable as a tab under them, filling in as they
+          land. The concepts that got here are in the rail, in the order
+          they happened — the canvas shows the current state of the work,
+          which is now the output rather than the drawings of it. */}
+      {job && (
+        <div className="w-full">
+          <ReviewOutputs
+            job={job}
+            productId={focusedProduct}
+            onProductChange={onFocusProduct}
+          />
+        </div>
+      )}
+
+      {!job && products.length > 0 && (
         <>
           {projectName && (
             <header className="flex flex-col gap-[2px]">
