@@ -35,6 +35,7 @@ import {
   ITEM_LABELS,
   ITEM_KINDS,
   productsOf,
+  statusOf,
   useCreateHistory,
   type BuildItemKind,
   type BuildJob,
@@ -52,19 +53,39 @@ import {
   WiringPreview,
 } from "./deliverable-previews";
 
-export function ReviewOutputs({ job }: { job: BuildJob }) {
+export function ReviewOutputs({
+  job,
+  productId: controlledProductId,
+  onProductChange,
+}: {
+  job: BuildJob;
+  productId?: string;
+  onProductChange?: (id: string) => void;
+}) {
   // The panel reads `?tab=` for a deep link (a project card links
   // straight at its parts list), which needs a boundary so the route can
   // still be pre-rendered. The build view only renders once the store
   // has hydrated in the browser, so the fallback is never seen.
   return (
     <React.Suspense fallback={null}>
-      <ReviewPanel job={job} />
+      <ReviewPanel
+        job={job}
+        controlledProductId={controlledProductId}
+        onProductChange={onProductChange}
+      />
     </React.Suspense>
   );
 }
 
-function ReviewPanel({ job }: { job: BuildJob }) {
+function ReviewPanel({
+  job,
+  controlledProductId,
+  onProductChange,
+}: {
+  job: BuildJob;
+  controlledProductId?: string;
+  onProductChange?: (id: string) => void;
+}) {
   const router = useRouter();
   const query = useSearchParams();
   const { setBuildProject } = useCreateHistory();
@@ -77,7 +98,19 @@ function ReviewPanel({ job }: { job: BuildJob }) {
   // into its own tabs. The product switcher only appears when there is
   // more than one; a single-product build is the surface it always was.
   const products = React.useMemo(() => productsOf(job), [job]);
-  const [productId, setProductId] = React.useState("primary");
+  // Controlled when the shell shares the selection with the rail beside it,
+  // so picking a product in either moves both.
+  const [ownProductId, setOwnProductId] = React.useState("primary");
+  const productId = controlledProductId ?? ownProductId;
+  const setProductId = (id: string) => {
+    setOwnProductId(id);
+    onProductChange?.(id);
+  };
+  // The surface is live: it opens when the build starts and fills in as each
+  // piece lands, rather than withholding everything until the last one does.
+  // A piece nobody can look at yet says so in its own panel; the decisions at
+  // the foot wait for the whole build, because they act on all of it.
+  const building = statusOf(job) !== "ready";
   const product =
     products.find((x) => x.id === productId) ?? products[0];
   const deliverables = React.useMemo(
@@ -103,6 +136,8 @@ function ReviewPanel({ job }: { job: BuildJob }) {
     deliverables.find((i) => i.kind === wanted)?.kind ??
     deliverables[0]?.kind ??
     null;
+
+  const shownItem = deliverables.find((i) => i.kind === shown) ?? null;
 
   // The project this build already belongs to — the Brief's Step 1 (or
   // Advance Edit) is what put it there. A stored id whose project is gone
@@ -131,13 +166,13 @@ function ReviewPanel({ job }: { job: BuildJob }) {
     >
       <header className="px-10 pb-6 pt-8">
         <p className="text-2xs font-bold uppercase tracking-wider text-text-brand">
-          Build ready
+          {building ? "Building" : "Build ready"}
         </p>
         <h2
           id="review-heading"
           className="mt-1 text-xl font-bold tracking-tight text-text-primary"
         >
-          Review your deliverables
+          {building ? "Your deliverables, as they land" : "Review your deliverables"}
         </h2>
         {/* §4.3 + §4.4.9 — the product's own tier, and on a multi-product
             build the project's headline is the lowest of them, which this
@@ -238,7 +273,27 @@ function ReviewPanel({ job }: { job: BuildJob }) {
                 scrolls inside the panel instead of stretching the page
                 away from the two actions below. */}
             <div className="max-h-[520px] min-w-0 overflow-auto rounded-xl">
-              <DeliverablePanel kind={shown} product={product} job={job} />
+              {/* A piece that has not landed shows what it is doing rather
+                  than an empty frame — the rail beside this says the same
+                  thing, and disagreeing with it would be worse than silence. */}
+              {shownItem && shownItem.status !== "ready" ? (
+                <div className="flex h-[280px] flex-col items-center justify-center gap-[8px] rounded-xl border border-solid border-border bg-bg-subtle text-center">
+                  <p className="text-md font-medium text-text-secondary">
+                    {shownItem.status === "failed"
+                      ? "This piece couldn't be generated"
+                      : shownItem.status === "building"
+                        ? `Generating · ${Math.round(shownItem.progress)}%`
+                        : "Waiting to start"}
+                  </p>
+                  <p className="max-w-[40ch] text-sm text-text-tertiary">
+                    {shownItem.status === "failed"
+                      ? "The other pieces are unaffected — retry it from the build."
+                      : "It appears here the moment it lands."}
+                  </p>
+                </div>
+              ) : (
+                <DeliverablePanel kind={shown} product={product} job={job} />
+              )}
             </div>
             <aside className="flex flex-col gap-8 rounded-xl border border-solid border-border bg-bg-surface p-8">
               {shown === "parts" && <PartsSummary job={product} />}
@@ -261,6 +316,7 @@ function ReviewPanel({ job }: { job: BuildJob }) {
             </aside>
           </div>
 
+          {!building && (
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
             {saved ? (
               <>
@@ -323,6 +379,7 @@ function ReviewPanel({ job }: { job: BuildJob }) {
               </>
             )}
           </footer>
+          )}
         </>
       )}
     </section>

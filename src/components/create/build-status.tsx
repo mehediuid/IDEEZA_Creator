@@ -289,7 +289,18 @@ export function useMinuteClock(): number {
   return now;
 }
 
-export function BuildStatus({ job }: { job: BuildJob }) {
+export function BuildStatus({
+  job,
+  statesOnly = false,
+}: {
+  job: BuildJob;
+  /** Drop the concept strip and the artifact rows, keeping the states that
+   *  belong to the whole build — the banner, the queue notice, the cancel,
+   *  the overrun stop and the retries. Set where the rail already lists
+   *  every piece: two lists of the same five rows side by side is one list
+   *  too many. */
+  statesOnly?: boolean;
+}) {
   const { builds, retryBuildItem, retryBuild, cancelBuild, failBuildSystem } =
     useCreateHistory();
   const router = useRouter();
@@ -305,7 +316,7 @@ export function BuildStatus({ job }: { job: BuildJob }) {
       aria-label={row.sectionLabel}
       className={[CARD, "flex flex-col gap-[12px]"].join(" ")}
     >
-      <ConceptHeader job={job} row={row} />
+      {!statesOnly && <ConceptHeader job={job} row={row} />}
 
       {/* Part 4 §4.6 — past roughly twice the estimate the job has stopped
           looking like one that will finish. Unlike the queued cancel, this
@@ -345,7 +356,7 @@ export function BuildStatus({ job }: { job: BuildJob }) {
           bare list it has always been; a multi-product one names each
           product above its own five artifacts, because §4.4.9 wants the
           user to see *where* a problem is, not just that there is one. */}
-      {products.length === 1 ? (
+      {statesOnly ? null : products.length === 1 ? (
         <ul role="list" className="flex flex-col gap-[10px]">
           {job.items.map((item) => (
             <BuildItemRow

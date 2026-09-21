@@ -19,6 +19,7 @@ import {
   useCreateHistory,
   type BuildJob,
 } from "@/lib/create/history";
+import { BuildRail } from "./build-rail";
 import { BuildConceptCard, BuildStatus } from "./build-status";
 import { ReviewOutputs } from "./review-outputs";
 
@@ -90,6 +91,10 @@ export function BuildShell({ jobId }: { jobId: string }) {
   const { hydrated, getBuild } = useCreateHistory();
   const job = getBuild(jobId);
   useBuildModel(job);
+  // Shared between the rail and the canvas, so picking a product in one
+  // moves the other. Declared before the early returns — a hook after one
+  // is a hook that runs in a different order on the next render.
+  const [productId, setProductId] = React.useState("primary");
 
   if (!hydrated) return <LoadingShell />;
   if (!job) return <NotFoundShell />;
@@ -98,27 +103,45 @@ export function BuildShell({ jobId }: { jobId: string }) {
   const ready = rollup.status === "ready";
 
   return (
-    <div className="h-full overflow-y-auto">
-      {/* The review surface is a wider reading layout than the five
-          progress rows; the build states themselves are one 580px card. */}
-      <div
-        className={[
-          "mx-auto w-full px-[24px] py-[24px]",
-          ready ? "max-w-[920px]" : "max-w-[580px]",
-        ].join(" ")}
-      >
-        <BackLink job={job} />
-        <div className="mt-[12px] flex flex-col gap-[16px]">
-          {ready ? (
-            <>
-              <BuildConceptCard job={job} />
-              <ReviewOutputs job={job} />
-            </>
-          ) : (
-            <BuildStatus job={job} />
-          )}
+    <div className="flex h-full">
+      {/* Same two panes as the concept surface, for the same reason: the
+          pipeline is a small fixed list that never changes, and the work it
+          produces is what deserves the screen. The rail states the whole
+          pipeline from the start — every piece, including the ones that have
+          not begun — and the canvas fills in beside it as each one lands. The
+          page used to be the pipeline, full width, with nothing to look at
+          until the last piece finished. */}
+      <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-solid border-border bg-bg-surface">
+        <div className="px-[12px] pt-[16px]">
+          <BackLink job={job} />
         </div>
-      </div>
+        <BuildRail
+          job={job}
+          activeProductId={productId}
+          onPickProduct={setProductId}
+        />
+        {/* The whole-build states — queued, waiting on credits, a partial or
+            system failure, and the retries they carry — stay on the card
+            that was written for them; only the five-row list moved. */}
+        {!ready && (
+          <div className="px-[12px] pb-[16px]">
+            <BuildStatus job={job} statesOnly />
+          </div>
+        )}
+      </aside>
+
+      <main className="flex-1 overflow-y-auto bg-bg-page">
+        <div className="mx-auto w-full max-w-[920px] px-[24px] py-[24px]">
+          <div className="flex flex-col gap-[16px]">
+            <BuildConceptCard job={job} />
+            <ReviewOutputs
+              job={job}
+              productId={productId}
+              onProductChange={setProductId}
+            />
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
