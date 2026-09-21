@@ -25,9 +25,11 @@ export const runtime = "edge";
 const SYSTEM =
   "You turn a rough electronics project idea into a parts-level concept. " +
   "Reply with STRICT JSON and nothing else — no markdown, no code fence, no preamble — " +
-  'in the shape {"title": string, "summary": string, "parts": [{"name": string, "role": string, "category": string}]}. ' +
+  'in the shape {"title": string, "description": string, "summary": string, "parts": [{"name": string, "role": string, "category": string}]}. ' +
   "Give 4 to 6 parts: a microcontroller, the sensors and actuators the idea needs, power, and the connector. " +
   "title is at most 40 characters and names the product, not the sentence. " +
+  "description is ONE sentence, at most 140 characters, saying what the product is and does — " +
+  "no marketing, no adjectives it cannot support. " +
   'summary is the part names joined by " · ". ' +
   "role is a short phrase saying what that part does in this project. " +
   `category is exactly one of: ${CONCEPT_CATEGORIES.join(", ")}.`;
@@ -90,6 +92,7 @@ export async function POST(req: Request) {
   const concept = (await summarizeWithAI(prompt)) ?? fallbackConcept(prompt);
   return NextResponse.json({
     title: concept.title,
+    description: concept.description,
     // The summary is always the parts line, whoever wrote it, so the
     // card under the title can't disagree with the list beside it.
     summary: summaryFromParts(concept.parts),

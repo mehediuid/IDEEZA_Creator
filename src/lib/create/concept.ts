@@ -33,9 +33,24 @@ export type ConceptPart = {
 
 export type ConceptSummary = {
   title: string;
+  /** The part names joined by " · ". Useful, but it is an inventory, not a
+   *  description — which is why `description` exists beside it. */
   summary: string;
+  /** One plain line saying what the product IS. The maker typed a prompt,
+   *  not a product description, and every surface that lists a product
+   *  needs something to put under its name. */
+  description: string;
   parts: ConceptPart[];
 };
+
+/** What to say about a product when no model did. It repeats the maker's own
+ *  words rather than inventing a claim about the product — the one thing a
+ *  description here must never do is assert something nobody checked. */
+export function describeFallback(prompt: string): string {
+  const one = prompt.trim().replace(/\s+/g, " ").replace(/[.\s]+$/, "");
+  const short = one.length > 120 ? `${one.slice(0, 120).trimEnd()}…` : one;
+  return short ? `${short.charAt(0).toUpperCase()}${short.slice(1)}.` : "";
+}
 
 export function deriveTitle(prompt: string): string {
   const trimmed = prompt.trim().replace(/\s+/g, " ");
@@ -99,6 +114,7 @@ export function fallbackConcept(prompt: string): ConceptSummary {
   return {
     title: deriveTitle(prompt),
     summary: summaryFromParts(parts),
+    description: describeFallback(prompt),
     parts,
   };
 }
@@ -161,7 +177,11 @@ export function parseConcept(
   prompt: string,
 ): ConceptSummary | null {
   if (typeof raw !== "object" || raw === null) return null;
-  const obj = raw as { title?: unknown; parts?: unknown };
+  const obj = raw as {
+    title?: unknown;
+    description?: unknown;
+    parts?: unknown;
+  };
   if (!Array.isArray(obj.parts)) return null;
   const parts: ConceptPart[] = [];
   for (const entry of obj.parts) {
@@ -185,6 +205,10 @@ export function parseConcept(
   const title = String(obj.title ?? "").trim();
   return {
     title: title ? title.slice(0, 40) : deriveTitle(prompt),
+    description: (() => {
+      const d = String(obj.description ?? "").trim();
+      return d ? d.slice(0, 160) : describeFallback(prompt);
+    })(),
     summary: summaryFromParts(parts.slice(0, 6)),
     parts: parts.slice(0, 6),
   };

@@ -33,6 +33,7 @@ import type { ConceptSummary } from "@/lib/create/concept";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
+import { ChatRail } from "./chat-rail";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
@@ -138,7 +139,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     resolveAssistantTurn,
     failAssistantTurn,
     setTurnJob,
-    setSetupCompanions,
+    setSetupDetails,
     answerSetupTurn,
     setTurnProgress,
     startBuild,
@@ -354,9 +355,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [chat, answerSetupTurn, appendAssistantTurn],
   );
 
-  // A setup turn arrives with nothing in it: the classifier runs here, once,
-  // and the questions appear when it answers. It reads the prompt only — no
-  // image has been drawn and no credit has moved.
+  // A setup turn arrives with nothing in it. Two readings fill it, both from
+  // the prompt alone and both free: what this product IS — its name and the
+  // line under it, which the maker should not have to write — and what else
+  // it needs. No image has been drawn and no credit has moved.
   const classified = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
     if (!hydrated || !chat) return;
@@ -368,22 +370,39 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       const tid = turn.id;
       const prompt = turn.prompt;
       void (async () => {
-        try {
-          const res = await fetch("/api/concept/companions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt }),
-          });
-          const plan = (await res.json()) as { companions?: Companion[] };
-          setSetupCompanions(cid, tid, plan.companions ?? []);
-        } catch {
+        const ask = async (path: string) => {
+          try {
+            const res = await fetch(path, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt }),
+            });
+            return res.ok ? ((await res.json()) as Record<string, unknown>) : null;
+          } catch {
+            return null;
+          }
+        };
+        // Together, so the card appears once with everything on it.
+        const [plan, summary] = await Promise.all([
+          ask("/api/concept/companions"),
+          ask("/api/concept/summarize"),
+        ]);
+        setSetupDetails(cid, tid, {
           // No classification is not an error: it means no companions were
           // found, which is the ordinary single-product answer.
-          setSetupCompanions(cid, tid, []);
-        }
+          companions: (plan?.companions as Companion[] | undefined) ?? [],
+          productName:
+            typeof summary?.title === "string" ? summary.title : undefined,
+          // The description, not the parts line: this sits under the
+          // product’s name, where an inventory would read as noise.
+          productSummary:
+            typeof summary?.description === "string"
+              ? summary.description
+              : undefined,
+        });
       })();
     }
-  }, [hydrated, chat, setSetupCompanions]);
+  }, [hydrated, chat, setSetupDetails]);
 
 
   // Auto-run any pending assistant turns. This handles:
@@ -953,27 +972,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       : null;
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Thread — scrolls; prompt bar is pinned below. No page header:
-          the app shell's sidebar carries navigation and the thread's
-          first user turn already says what this chat is about. */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[640px] px-[24px] py-[32px]">
-          <ChatThread
-            chat={chat}
-            regeneratingFrom={regeneratingFrom}
-            preparingTurnId={preparingTurnId}
-          projects={setupProjects}
-          onAnswerSetup={handleAnswerSetup}
-            onRegenerateAt={handleRegenerate}
-            onUseTurn={handleUseTurn}
-            onRefineTurn={handleOpenEditor}
-          />
+    <div className="flex h-full">
+      {/* Two panes, the shape the work actually has: the rail on the left is
+          the running account — what was asked, what was decided, what is
+          happening right now — and the canvas beside it is where the work
+          appears, questions first and then the concepts. A render takes the
+          better part of a minute and a multi-product build runs several at
+          once, so the account of it needs its own column rather than
+          competing with the output for the same one. */}
+      <aside className="flex w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface">
+        <div className="flex-1 overflow-y-auto">
+          <ChatRail chat={chat} labels={labels} />
         </div>
-      </div>
-
-      <div className="bg-bg-page">
-        <div className="mx-auto w-full max-w-[640px] px-[24px] py-[16px]">
+        <div className="border-t border-solid border-border">
+          <div className="w-full px-[14px] py-[14px]">
           {showQueuedNotice && (
             <div
               role="status"
@@ -1006,8 +1018,26 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               ? `Start by describing the concept. Each render costs ${CONCEPT_COST} credit${CONCEPT_COST === 1 ? "" : "s"} — refine and regenerate as often as you like.`
               : "You are out of credits — top them up to render another concept."}
           </p>
+          </div>
         </div>
-      </div>
+      </aside>
+
+      {/* The canvas. The questions land here first, then the concepts —
+          side by side, because a system build draws several at once. */}
+      <main className="flex-1 overflow-y-auto bg-bg-page">
+        <div className="mx-auto w-full max-w-[880px] px-[32px] py-[32px]">
+          <ChatThread
+            chat={chat}
+            regeneratingFrom={regeneratingFrom}
+            preparingTurnId={preparingTurnId}
+            projects={setupProjects}
+            onAnswerSetup={handleAnswerSetup}
+            onRegenerateAt={handleRegenerate}
+            onUseTurn={handleUseTurn}
+            onRefineTurn={handleOpenEditor}
+          />
+        </div>
+      </main>
 
       {/* Part 4 §4.4.2 — the products this build covers are chosen here,
           in the same dialog that confirms the build. One decision, one

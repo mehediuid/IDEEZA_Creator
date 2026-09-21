@@ -81,10 +81,14 @@ export type ChatTurn =
         *  back rather than disappearing, so the thread still explains
         *  itself. */
       status: "loading" | "asking" | "answered";
-      /** What the classifier offered. Empty for an ordinary single product.
-       *  Filled when the turn is created, from the prompt alone, so the
-       *  questions can be asked before a single credit moves. */
+      /** What the classifier offered. Empty for an ordinary single product. */
       companions: Companion[];
+      /** The product the maker described, named and described by the model
+       *  rather than echoed back at them. The prompt is what they typed; a
+       *  product needs a name. Absent until the summary lands, and absent on
+       *  turns that predate it. */
+      productName?: string;
+      productSummary?: string;
       answer?: SetupAnswer;
       ts: number;
     }
@@ -574,10 +578,14 @@ type Ctx = {
     reason?: ConceptFailReason,
   ) => void;
   setTurnJob: (chatId: string, turnId: string, job: string) => void;
-  setSetupCompanions: (
+  setSetupDetails: (
     chatId: string,
     turnId: string,
-    companions: Companion[],
+    details: {
+      companions: Companion[];
+      productName?: string;
+      productSummary?: string;
+    },
   ) => void;
   answerSetupTurn: (
     chatId: string,
@@ -822,9 +830,19 @@ export function CreateHistoryProvider({
     [],
   );
 
-  // The classifier has come back: the questions can be asked now.
-  const setSetupCompanions = React.useCallback(
-    (chatId: string, turnId: string, companions: Companion[]) => {
+  // The reading has come back — what this product is, and what else it needs
+  // — so the questions can be asked. Written in one go, because a card that
+  // filled in halfway would ask before it knew what it was asking about.
+  const setSetupDetails = React.useCallback(
+    (
+      chatId: string,
+      turnId: string,
+      details: {
+        companions: Companion[];
+        productName?: string;
+        productSummary?: string;
+      },
+    ) => {
       setChats((arr) =>
         arr.map((c) =>
           c.id !== chatId
@@ -833,7 +851,7 @@ export function CreateHistoryProvider({
                 ...c,
                 turns: c.turns.map((t) =>
                   t.id === turnId && t.role === "setup" && t.status === "loading"
-                    ? { ...t, companions, status: "asking" as const }
+                    ? { ...t, ...details, status: "asking" as const }
                     : t,
                 ),
               },
@@ -1365,7 +1383,7 @@ export function CreateHistoryProvider({
     resolveAssistantTurn,
     failAssistantTurn,
     setTurnJob,
-    setSetupCompanions,
+    setSetupDetails,
     answerSetupTurn,
     setTurnProgress,
     getChat,

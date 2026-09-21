@@ -56,6 +56,7 @@ import {
 } from "@/lib/create/history";
 import { BUILD_COST, useCredits } from "@/lib/create/credits";
 import {
+  describeFallback,
   fallbackConcept,
   type ConceptSummary,
 } from "@/lib/create/concept";
@@ -125,7 +126,12 @@ export function summarizeConcept(turnId: string, prompt: string): Promise<Concep
       if (!data.title || !Array.isArray(data.parts) || !data.parts.length) {
         throw new Error("empty concept");
       }
-      return { title: data.title, summary: data.summary ?? "", parts: data.parts };
+      return {
+        title: data.title,
+        summary: data.summary ?? "",
+        description: data.description ?? describeFallback(prompt),
+        parts: data.parts,
+      };
     } catch {
       // The same deterministic concept the route falls back to, so a
       // build started offline still carries a real parts list.

@@ -34,6 +34,8 @@ export function SetupTurn({
   prompt,
   status,
   companions,
+  productName,
+  productSummary,
   answer,
   projects,
   onAnswer,
@@ -41,6 +43,11 @@ export function SetupTurn({
   prompt: string;
   status: "loading" | "asking" | "answered";
   companions: Companion[];
+  /** What the model called this product, and the line under it. The prompt
+   *  is what the maker typed; a product needs a name, and they should not
+   *  have to write it twice. */
+  productName?: string;
+  productSummary?: string;
   answer?: SetupAnswer;
   /** Existing projects a single-product build could join. */
   projects: SetupProject[];
@@ -52,6 +59,7 @@ export function SetupTurn({
   const [picked, setPicked] = React.useState<Set<string>>(
     () => new Set(companions.map((c) => c.id)),
   );
+  const [step, setStep] = React.useState<"products" | "project">("products");
   const [projectId, setProjectId] = React.useState("");
   const [projectName, setProjectName] = React.useState("");
 
@@ -84,31 +92,29 @@ export function SetupTurn({
   // the build can join a project that already exists.
   const extra = companions.filter((c) => picked.has(c.id));
   const multi = extra.length > 0;
-  const ready = multi
-    ? projectName.trim().length > 0
-    : projectId !== "" || projectName.trim().length > 0;
 
-  return (
-    <Card>
-      <Label>Before we draw anything</Label>
-      <h3 className="text-lg font-semibold text-text-primary">
-        Two things to settle first
-      </h3>
-      <p className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
-        Your first concept costs a credit, and these answers shape it. Nothing
-        is charged until you continue.
-      </p>
+  // One question at a time. The second question’s shape depends on the first
+  // answer — how many products there are decides whether there is a project
+  // to choose or a project to name — so showing both at once would be asking
+  // something before it is knowable.
+  const onProducts = step === "products" && companions.length > 0;
 
-      {companions.length > 0 && (
-        <Section
-          title="What this build includes"
-          hint="Your idea needs more than one product to work. Untick anything you don't want built."
+  if (onProducts) {
+    return (
+      <Card>
+        <Question
+          chip="Products"
+          ask="What should we build?"
+          note="Your idea needs more than one product to work. Everything ticked gets its own concept."
         >
           <Row
             checked
             disabled
-            title={titleFromPrompt(prompt)}
-            why="The product you described. Always included."
+            title={productName?.trim() || titleFromPrompt(prompt)}
+            why={
+              productSummary?.trim() ||
+              "The product you described. Always included."
+            }
           />
           {companions.map((c) => (
             <Row
@@ -126,14 +132,39 @@ export function SetupTurn({
               }
             />
           ))}
-        </Section>
-      )}
+        </Question>
+        <Footer
+          note={`${extra.length + 1} concept${extra.length ? "s" : ""} · ${extra.length + 1} credit${extra.length ? "s" : ""}`}
+          label="Continue"
+          ready
+          onGo={() => setStep("project")}
+        />
+      </Card>
+    );
+  }
 
-      <Section
-        title={multi ? "Name the project" : "Where does this go?"}
-        hint={
+  const ready = multi
+    ? projectName.trim().length > 0
+    : projectId !== "" || projectName.trim().length > 0;
+
+  return (
+    <Card>
+      {companions.length > 0 && (
+        <Decided
+          chip="Products"
+          text={`${extra.length + 1} product${extra.length ? "s" : ""}: ${[
+            productName?.trim() || titleFromPrompt(prompt),
+            ...extra.map((c) => c.name),
+          ].join(", ")}`}
+          onChange={() => setStep("products")}
+        />
+      )}
+      <Question
+        chip="Project"
+        ask={multi ? "What should the project be called?" : "Where does this go?"}
+        note={
           multi
-            ? `${extra.length + 1} products belong together, so they go in one new project. Name it.`
+            ? `${extra.length + 1} products belong together, so they go in one new project.`
             : "A single product can join a project you already have, or start a new one."
         }
       >
@@ -145,15 +176,15 @@ export function SetupTurn({
           />
         ) : (
           <>
-            {projects.map((p) => (
+            {projects.map((pr) => (
               <Row
-                key={p.id}
+                key={pr.id}
                 radio
-                checked={projectId === p.id}
-                title={p.name}
+                checked={projectId === pr.id}
+                title={pr.name}
                 why="Add this product to that project."
                 onToggle={() => {
-                  setProjectId(p.id);
+                  setProjectId(pr.id);
                   setProjectName("");
                 }}
               />
@@ -171,47 +202,26 @@ export function SetupTurn({
             {projectId === "" && projectName !== "" && (
               <NameField
                 value={projectName.trim()}
-                onChange={(v) => setProjectName(v)}
+                onChange={setProjectName}
                 placeholder="e.g. Bench tools"
               />
             )}
           </>
         )}
-      </Section>
-
-      <div className="flex items-center justify-end gap-[12px] pt-[4px]">
-        <span className="text-sm text-text-tertiary">
-          {multi
-            ? `${extra.length + 1} concepts · ${extra.length + 1} credits`
-            : "1 concept · 1 credit"}
-        </span>
-        <button
-          type="button"
-          disabled={!ready}
-          onClick={() =>
-            onAnswer({
-              projectId: multi ? "" : projectId,
-              projectName: projectName.trim(),
-              picked: extra.map((c) => c.id),
-            })
-          }
-          className={
-            ready
-              ? "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-              : "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled outline-none"
-          }
-          title={
-            ready
-              ? undefined
-              : multi
-                ? "Name the project first"
-                : "Pick a project first"
-          }
-        >
-          Start drawing
-          <Icon icon={ArrowRight01Icon} size={16} />
-        </button>
-      </div>
+      </Question>
+      <Footer
+        note={`${extra.length + 1} concept${extra.length ? "s" : ""} · ${extra.length + 1} credit${extra.length ? "s" : ""}`}
+        label="Start drawing"
+        ready={ready}
+        reason={multi ? "Name the project first" : "Pick a project first"}
+        onGo={() =>
+          onAnswer({
+            projectId: multi ? "" : projectId,
+            projectName: projectName.trim(),
+            picked: extra.map((c) => c.id),
+          })
+        }
+      />
     </Card>
   );
 }
@@ -256,6 +266,10 @@ function AnsweredCard({
 
 // ───────────────────────────── the pieces ─────────────────────────────
 
+// No card. The thread is already a column on a surface, and wrapping these
+// questions in a bordered panel — which then holds bordered rows — is a box
+// inside a box (CLAUDE.md §7). What separates this from the message above it
+// is space and one hairline, not another edge.
 function Card({
   children,
   muted = false,
@@ -267,8 +281,8 @@ function Card({
     <div
       data-testid="setup-turn"
       className={[
-        "flex w-full max-w-[640px] flex-col gap-[14px] rounded-2xl border border-solid p-[20px]",
-        muted ? "border-border bg-bg-subtle" : "border-border bg-bg-surface",
+        "flex w-full max-w-[640px] flex-col border-t border-solid border-border",
+        muted ? "gap-[10px] pt-[20px]" : "gap-[22px] pt-[28px]",
       ].join(" ")}
     >
       {children}
@@ -276,31 +290,94 @@ function Card({
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
-      {children}
-    </span>
-  );
-}
-
-function Section({
-  title,
-  hint,
+/** One question, in the shape a reader already knows: a small chip saying
+ *  what is being decided, the question itself in plain words, a line of
+ *  context under it, then the options as rows you can click. */
+function Question({
+  chip,
+  ask,
+  note,
   children,
 }: {
-  title: string;
-  hint: string;
+  chip: string;
+  ask: string;
+  note: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-[8px]">
-      <h4 className="text-md font-semibold text-text-primary">{title}</h4>
-      <p className="max-w-[62ch] text-sm leading-relaxed text-text-tertiary">
-        {hint}
+    <section className="flex flex-col gap-[10px]">
+      <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
+        {chip}
+      </span>
+      <h3 className="text-lg font-semibold text-text-primary">{ask}</h3>
+      <p className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
+        {note}
       </p>
-      <div className="flex flex-col gap-[6px] pt-[2px]">{children}</div>
+      <div className="flex flex-col gap-[2px] pt-[6px]">{children}</div>
     </section>
+  );
+}
+
+/** A question already answered, kept in view so the thread still reads as a
+ *  conversation — and reopenable, because an answer you cannot revise is a
+ *  trap rather than a question. */
+function Decided({
+  chip,
+  text,
+  onChange,
+}: {
+  chip: string;
+  text: string;
+  onChange: () => void;
+}) {
+  return (
+    <div className="flex items-baseline gap-[10px] text-sm">
+      <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
+        {chip}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-text-secondary">{text}</span>
+      <button
+        type="button"
+        onClick={onChange}
+        className="shrink-0 rounded text-sm font-medium text-text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        Change
+      </button>
+    </div>
+  );
+}
+
+function Footer({
+  note,
+  label,
+  ready,
+  reason,
+  onGo,
+}: {
+  note: string;
+  label: string;
+  ready: boolean;
+  reason?: string;
+  onGo: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-end gap-[12px] pt-[2px]">
+      <span className="text-sm text-text-tertiary">{note}</span>
+      <button
+        type="button"
+        disabled={!ready}
+        onClick={onGo}
+        title={ready ? undefined : reason}
+        className={
+          ready
+            ? "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+            : "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled outline-none"
+        }
+      >
+        {label}
+        <Icon icon={ArrowRight01Icon} size={16} />
+      </button>
+    </div>
   );
 }
 
@@ -329,11 +406,9 @@ function Row({
       disabled={disabled}
       onClick={onToggle}
       className={[
-        "flex w-full items-start gap-[10px] rounded-xl border border-solid p-[12px] text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-        checked
-          ? "border-border-brand bg-bg-brand-subtle"
-          : "border-border bg-bg-surface hover:border-border-strong",
-        disabled ? "cursor-default opacity-80" : "",
+        "flex w-full items-start gap-[12px] rounded-xl px-[12px] py-[10px] text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+        checked ? "bg-bg-brand-subtle" : "hover:bg-bg-subtle",
+        disabled ? "cursor-default" : "",
       ].join(" ")}
     >
       <span

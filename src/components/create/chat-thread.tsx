@@ -105,14 +105,14 @@ export function ChatThread({
   return (
     <div
       role="log"
-      aria-label="Concept conversation"
+      aria-label="Concepts"
       aria-live="polite"
-      className="flex flex-col gap-[24px]"
+      className="flex flex-col items-start gap-[28px]"
     >
       {chat.turns.map((turn) => {
-        if (turn.role === "user") {
-          return <UserBubble key={turn.id} text={turn.text} />;
-        }
+        // The maker’s own words are in the rail beside this. Repeating them
+        // on the canvas would push the work they are about off the screen.
+        if (turn.role === "user") return null;
         if (turn.role === "setup") {
           return (
             <div key={turn.id} className="flex">
@@ -120,6 +120,8 @@ export function ChatThread({
                 prompt={turn.prompt}
                 status={turn.status}
                 companions={turn.companions}
+                productName={turn.productName}
+                productSummary={turn.productSummary}
                 answer={turn.answer}
                 projects={projects}
                 onAnswer={(a) => onAnswerSetup(turn.id, a)}
@@ -155,16 +157,3 @@ export function ChatThread({
   );
 }
 
-function UserBubble({ text }: { text: string }) {
-  return (
-    <div className="flex justify-end">
-      <p
-        className="max-w-[456px] whitespace-pre-wrap rounded-2xl rounded-br-[4px] border border-border bg-bg-surface px-[18px] py-[12px] text-md text-text-secondary"
-        role="comment"
-        aria-label="Your prompt"
-      >
-        {text}
-      </p>
-    </div>
-  );
-}
