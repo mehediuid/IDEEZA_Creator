@@ -65,6 +65,7 @@ export function ImageTurn({
   preparing = false,
   onRegenerate,
   onUseThis,
+  showUse = true,
   onRefine,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
@@ -77,6 +78,10 @@ export function ImageTurn({
   preparing?: boolean;
   onRegenerate: () => void;
   onUseThis: () => void;
+  /** Whether this card carries the build action. False on a canvas showing
+   *  several products of ONE build: the action belongs to the build, and a
+   *  copy on every product asks for the same thing twice. */
+  showUse?: boolean;
   onRefine: () => void;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
@@ -232,68 +237,72 @@ export function ImageTurn({
             {/* When the balance can't cover a build the price line says
                 what the balance IS — the gap is the reason the CTA is
                 off, and naming it here saves a trip to the ledger. */}
-            <span
-              data-testid="cost-label"
-              className={
-                shortOnCredits
-                  ? "inline-flex items-center gap-[4px] text-sm text-text-error"
-                  : "inline-flex items-center gap-[4px] text-sm text-text-tertiary"
-              }
-            >
-              Cost: {BUILD_COST} credits
-              {shortOnCredits ? ` · you have ${balance}` : ""}
+            {showUse && (
+              <>
+              <span
+                data-testid="cost-label"
+                className={
+                  shortOnCredits
+                    ? "inline-flex items-center gap-[4px] text-sm text-text-error"
+                    : "inline-flex items-center gap-[4px] text-sm text-text-tertiary"
+                }
+              >
+                Cost: {BUILD_COST} credits
+                {shortOnCredits ? ` · you have ${balance}` : ""}
+                <button
+                  type="button"
+                  aria-label={COST_HINT}
+                  title={COST_HINT}
+                  aria-describedby={costHintId}
+                  className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-full outline-none transition-colors duration-fast hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  <Icon icon={InformationCircleIcon} size={14} />
+                </button>
+                <span id={costHintId} className="sr-only">
+                  {COST_HINT}
+                </span>
+              </span>
               <button
                 type="button"
-                aria-label={COST_HINT}
-                title={COST_HINT}
-                aria-describedby={costHintId}
-                className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-full outline-none transition-colors duration-fast hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
+                onClick={onUseThis}
+                disabled={shortOnCredits || preparing}
+                aria-disabled={shortOnCredits || preparing}
+                aria-busy={preparing}
+                aria-label={`Use Concept ${conceptLabel} and start the full build`}
+                title={
+                  shortOnCredits
+                    ? "Not enough credits"
+                    : preparing
+                      ? "Reading the concept back…"
+                      : undefined
+                }
+                className={
+                  shortOnCredits
+                    ? "ml-auto inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[14px] text-sm font-semibold text-text-disabled"
+                    : preparing
+                      ? "ml-auto inline-flex h-[36px] cursor-wait items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand opacity-80"
+                      : "ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+                }
               >
-                <Icon icon={InformationCircleIcon} size={14} />
+                {preparing ? (
+                  <>
+                    <span
+                      aria-hidden
+                      className="inline-flex motion-safe:animate-spin"
+                    >
+                      <Icon icon={Refresh01Icon} size={14} />
+                    </span>
+                    Preparing…
+                  </>
+                ) : (
+                  <>
+                    Use this concept
+                    {!shortOnCredits && <Icon icon={ArrowRight01Icon} />}
+                  </>
+                )}
               </button>
-              <span id={costHintId} className="sr-only">
-                {COST_HINT}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={onUseThis}
-              disabled={shortOnCredits || preparing}
-              aria-disabled={shortOnCredits || preparing}
-              aria-busy={preparing}
-              aria-label={`Use Concept ${conceptLabel} and start the full build`}
-              title={
-                shortOnCredits
-                  ? "Not enough credits"
-                  : preparing
-                    ? "Reading the concept back…"
-                    : undefined
-              }
-              className={
-                shortOnCredits
-                  ? "ml-auto inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[14px] text-sm font-semibold text-text-disabled"
-                  : preparing
-                    ? "ml-auto inline-flex h-[36px] cursor-wait items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand opacity-80"
-                    : "ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-              }
-            >
-              {preparing ? (
-                <>
-                  <span
-                    aria-hidden
-                    className="inline-flex motion-safe:animate-spin"
-                  >
-                    <Icon icon={Refresh01Icon} size={14} />
-                  </span>
-                  Preparing…
                 </>
-              ) : (
-                <>
-                  Use this concept
-                  {!shortOnCredits && <Icon icon={ArrowRight01Icon} />}
-                </>
-              )}
-            </button>
+            )}
           </>
         )}
       </div>

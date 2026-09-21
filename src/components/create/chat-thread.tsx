@@ -102,6 +102,41 @@ export function ChatThread({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chat.turns.length]);
 
+  // The canvas shows the CURRENT state of the build, not its history: one
+  // card per product, each the latest concept for it. Every refine used to
+  // stack another card here, so a two-product build with a few refines
+  // became a column nobody could see the shape of. The history is not
+  // lost — the rail beside this records every render as it happened.
+  const products = React.useMemo(() => {
+    const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
+    for (const t of chat.turns) {
+      if (t.role !== "assistant") continue;
+      latest.set(t.companionOf ?? "primary", t);
+    }
+    // Primary first; the companions keep the order they were offered in.
+    const primary = latest.get("primary");
+    const rest = [...latest.entries()]
+      .filter(([k]) => k !== "primary")
+      .map(([, t]) => t);
+    return primary ? [primary, ...rest] : rest;
+  }, [chat.turns]);
+
+  const setup = React.useMemo(
+    () => chat.turns.find((t) => t.role === "setup"),
+    [chat.turns],
+  );
+  const projectName =
+    setup?.role === "setup" ? (setup.answer?.projectName ?? "") : "";
+
+  // One build, one action. A card per product each carrying "Use this
+  // concept" asked for the same build once per product — and answering it
+  // twice was the same answer both times.
+  const buildable = products.find(
+    (t) => t.status === "ready" && !t.companionOf,
+  );
+  const allReady =
+    products.length > 0 && products.every((t) => t.status === "ready");
+
   return (
     <div
       role="log"
@@ -109,50 +144,121 @@ export function ChatThread({
       aria-live="polite"
       className="flex flex-col items-start gap-[28px]"
     >
-      {chat.turns.map((turn) => {
-        // The maker’s own words are in the rail beside this. Repeating them
-        // on the canvas would push the work they are about off the screen.
-        if (turn.role === "user") return null;
-        if (turn.role === "setup") {
-          return (
-            <div key={turn.id} className="flex">
-              <SetupTurn
-                prompt={turn.prompt}
-                status={turn.status}
-                companions={turn.companions}
-                productName={turn.productName}
-                productSummary={turn.productSummary}
-                answer={turn.answer}
-                projects={projects}
-                onAnswer={(a) => onAnswerSetup(turn.id, a)}
-              />
-            </div>
-          );
-        }
-        const label = labels.get(turn.id) ?? "1";
-        const parentLabel =
-          turn.kind === "refine" && turn.parentTurnId
-            ? labels.get(turn.parentTurnId)
-            : undefined;
-        return (
-          <React.Fragment key={turn.id}>
-            <div className="flex" aria-label={`Concept ${label}`}>
-              <ImageTurn
-                turn={turn}
-                conceptLabel={label}
-                parentConceptLabel={parentLabel}
-                regenerating={regeneratingFrom?.has(turn.id) ?? false}
-                onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
-                preparing={preparingTurnId === turn.id}
-                onUseThis={() => onUseTurn(turn.id)}
-                onRefine={() => onRefineTurn(turn.id)}
-              />
-            </div>
-            {turn.id === bannerAfterId && <InsufficientCreditsBanner />}
-          </React.Fragment>
-        );
-      })}
+      {/* The questions, while they are still questions. Once they are
+          answered the rail carries the decision, and a read-back of it at the
+          top of the canvas says the same thing twice in the same eyeful. */}
+      {setup?.role === "setup" && setup.status !== "answered" && (
+        <SetupTurn
+          prompt={setup.prompt}
+          status={setup.status}
+          companions={setup.companions}
+          productName={setup.productName}
+          productSummary={setup.productSummary}
+          answer={setup.answer}
+          projects={projects}
+          onAnswer={(a) => onAnswerSetup(setup.id, a)}
+        />
+      )}
+
+      {products.length > 0 && (
+        <>
+          {projectName && (
+            <header className="flex flex-col gap-[2px]">
+              <h2 className="text-lg font-semibold text-text-primary">
+                {projectName}
+              </h2>
+              <p className="text-sm text-text-tertiary">
+                {products.length} product{products.length === 1 ? "" : "s"} in
+                this project
+              </p>
+            </header>
+          )}
+
+          <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-[20px]">
+            {products.map((turn) => (
+              <div key={turn.id} aria-label={`Concept ${labels.get(turn.id) ?? "1"}`}>
+                <ImageTurn
+                  turn={turn}
+                  conceptLabel={labels.get(turn.id) ?? "1"}
+                  parentConceptLabel={
+                    turn.kind === "refine" && turn.parentTurnId
+                      ? labels.get(turn.parentTurnId)
+                      : undefined
+                  }
+                  regenerating={regeneratingFrom?.has(turn.id) ?? false}
+                  onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
+                  preparing={preparingTurnId === turn.id}
+                  onUseThis={() => onUseTurn(turn.id)}
+                  onRefine={() => onRefineTurn(turn.id)}
+                  showUse={false}
+                />
+              </div>
+            ))}
+          </div>
+
+          {buildable && (
+            <BuildAction
+              products={products.length}
+              allReady={allReady}
+              preparing={preparingTurnId === buildable.id}
+              onBuild={() => onUseTurn(buildable.id)}
+            />
+          )}
+          {bannerAfterId && <InsufficientCreditsBanner />}
+        </>
+      )}
       <div ref={endRef} />
+    </div>
+  );
+}
+
+/** The one decision the canvas offers: build what is on it. Held back until
+ *  every product has a concept, because a build books a job per product and
+ *  a product with nothing drawn has nothing to build from. */
+function BuildAction({
+  products,
+  allReady,
+  preparing,
+  onBuild,
+}: {
+  products: number;
+  allReady: boolean;
+  preparing: boolean;
+  onBuild: () => void;
+}) {
+  const { hydrated, balance } = useCredits();
+  const cost = BUILD_COST * products;
+  const short = hydrated && balance < cost;
+  const blocked = short || !allReady || preparing;
+  return (
+    <div className="flex w-full items-center gap-[12px] border-t border-solid border-border pt-[20px]">
+      <p className="text-sm text-text-tertiary">
+        {allReady
+          ? `Engineering ${products} product${products === 1 ? "" : "s"} · ${cost} credits`
+          : "Waiting for every concept to land"}
+        {short ? ` · you have ${balance}` : ""}
+      </p>
+      <button
+        type="button"
+        data-testid="build-action"
+        onClick={onBuild}
+        disabled={blocked}
+        aria-busy={preparing}
+        title={
+          short
+            ? "Not enough credits"
+            : !allReady
+              ? "One of the concepts is still rendering"
+              : undefined
+        }
+        className={
+          blocked
+            ? "ml-auto inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
+            : "ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+        }
+      >
+        {preparing ? "Preparing…" : "Generate the full product"}
+      </button>
     </div>
   );
 }

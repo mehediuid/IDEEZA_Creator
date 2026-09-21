@@ -38,54 +38,9 @@ import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
 import type { CompanionTurn } from "./confirm-build-dialog";
-import {
-  SINGLE_PRODUCT,
-  companionId,
-  type Companion,
-  type CompanionPlan,
-} from "@/lib/create/companions";
+import { companionId, type Companion } from "@/lib/create/companions";
 import { readGateDismissed } from "@/lib/create/gate-preference";
 
-// Part 4 §4.8 — "the list is generated once and locked for that concept",
-// so the answer is cached per turn and an in-flight request is shared. A
-// classifier that cannot be reached answers SINGLE_PRODUCT, which is both
-// the common case and the safe one: a wrong companion list sends the user
-// down a branch that costs credits.
-const companionCache = new Map<string, CompanionPlan>();
-const companionPending = new Map<string, Promise<CompanionPlan>>();
-
-function classifyCompanions(
-  turnId: string,
-  prompt: string,
-  title: string,
-): Promise<CompanionPlan> {
-  const cached = companionCache.get(turnId);
-  if (cached) return Promise.resolve(cached);
-  const inFlight = companionPending.get(turnId);
-  if (inFlight) return inFlight;
-  const request = (async (): Promise<CompanionPlan> => {
-    try {
-      const res = await fetch("/api/concept/companions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, title }),
-      });
-      if (!res.ok) return SINGLE_PRODUCT;
-      const data = (await res.json()) as Partial<CompanionPlan>;
-      if (data.isSystem !== true || !Array.isArray(data.companions)) {
-        return SINGLE_PRODUCT;
-      }
-      return { isSystem: true, companions: data.companions };
-    } catch {
-      return SINGLE_PRODUCT;
-    }
-  })();
-  companionPending.set(turnId, request);
-  request
-    .then((plan) => companionCache.set(turnId, plan))
-    .finally(() => companionPending.delete(turnId));
-  return request;
-}
 import { ImageEditorModal } from "./image-editor-modal";
 
 const POLL_MS = 2_500;
@@ -686,41 +641,32 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         goToGate(source);
         return;
       }
+      // What this build contains was settled before anything was drawn, in
+      // the setup question, and every product it names already has a concept
+      // in the thread. Classifying again here asked the model the same
+      // question a second time and got a different answer — a list the maker
+      // had never seen, with their own decision thrown away. The gate reads
+      // the decision; it does not retake it.
+      const setup = chat.turns.find(
+        (x) => x.role === "setup" && x.status === "answered" && x.answer,
+      );
+      const decided =
+        setup && setup.role === "setup" && setup.answer
+          ? setup.companions.filter((c) =>
+              setup.answer!.picked.includes(c.id),
+            )
+          : [];
+      setCompanionPlan(decided);
+      // Ticked, because each of these was chosen and drawn already. The box
+      // is still there: building a product costs again, so dropping one
+      // before paying is a real decision — just not the same one.
+      setPickedCompanions(new Set(decided.map((c) => c.id)));
+
       setPreparingTurnId(t.id);
       void summarizeConcept(t.id, t.prompt)
-        .then((concept) =>
-          classifyCompanions(t.id, t.prompt, concept.title).then((plan) => ({
-            plan,
-            title: concept.title,
-          })),
-        )
-        .then(({ plan, title }) => {
+        .then((concept) => {
           setPreparingTurnId(null);
-          setProductTitle(title);
-          // §4.8 — "concept is preserved; re-selecting does not require
-          // regeneration": a companion whose concept already landed comes
-          // back ticked, because it was paid for and is going to be built
-          // unless the user says otherwise. Those concepts can only exist
-          // from an earlier pass, so the turns this callback closed over
-          // already hold them.
-          const alreadyRendered = new Set(
-            chat.turns
-              .filter(
-                (x) =>
-                  x.role === "assistant" &&
-                  x.status === "ready" &&
-                  !!x.companionOf,
-              )
-              .map((x) => (x.role === "assistant" ? x.companionOf! : "")),
-          );
-          setCompanionPlan(plan.companions);
-          setPickedCompanions(
-            new Set(
-              plan.companions
-                .filter((c) => alreadyRendered.has(c.id))
-                .map((c) => c.id),
-            ),
-          );
+          setProductTitle(concept.title);
           goToGate(source);
         })
         .catch(() => {
