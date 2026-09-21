@@ -132,6 +132,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // the lightbox (null = closed). Submitting an edit closes the editor; the
   // refine then continues in the thread (pending → ready), where the user can
   // watch it land and reopen Refine to iterate.
+  const [focusedProduct, setFocusedProduct] = React.useState("primary");
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
   // Part 4 §4.4 — the companion products offered for the concept the gate
   // is open on, and which of them are ticked. The concepts themselves live
@@ -373,6 +374,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       const companion = setup.companions.find((c) => c.id === companionId);
       if (!companion) return;
       addSetupPick(chat.id, setup.id, companionId);
+      setFocusedProduct(companionId);
       appendAssistantTurn(chat.id, {
         prompt: `${companion.name} for ${setup.prompt}`,
         kind: "fresh",
@@ -481,19 +483,35 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // evolves from. If nothing is ready yet (the first generation is still
   // pending), refinement degrades to a fresh take so the user is never
   // blocked.
+  // Which product the composer is talking about. It used to be "the last
+  // turn that happened to finish", which with more than one product is not a
+  // choice at all — the drone and its remote render in parallel, so whichever
+  // crossed the line last became the thing your next sentence refined. That
+  // was usually the first card, and never something the maker had picked.
+  //
+  // It is the product they last acted on instead: pressed Refine or
+  // Regenerate on, or added. The primary until then, and the composer says
+  // which so it is never a guess.
   const latestReadyTurn = React.useMemo(() => {
     if (!chat) return null;
-    let last: Extract<
-      (typeof chat.turns)[number],
-      { role: "assistant" }
-    > | null = null;
+    type Ready = Extract<(typeof chat.turns)[number], { role: "assistant" }>;
+    let last: Ready | null = null;
+    let fallback: Ready | null = null;
     for (const t of chat.turns) {
-      if (t.role === "assistant" && t.status === "ready" && t.imageUrl) {
-        last = t;
-      }
+      if (t.role !== "assistant" || t.status !== "ready" || !t.imageUrl) continue;
+      fallback = t;
+      if ((t.companionOf ?? "primary") === focusedProduct) last = t;
     }
-    return last;
-  }, [chat]);
+    return last ?? fallback;
+  }, [chat, focusedProduct]);
+
+  /** What the composer will refine, by name, for the line under it. */
+  const focusedName = React.useMemo(() => {
+    const setup = chat?.turns.find((t) => t.role === "setup");
+    if (setup?.role !== "setup") return null;
+    if (focusedProduct === "primary") return setup.productName?.trim() || null;
+    return setup.companions.find((c) => c.id === focusedProduct)?.name ?? null;
+  }, [chat, focusedProduct]);
 
   // The concept open in the editor, and which refine of it the next edit
   // will be — the editor names the number the result will carry.
@@ -542,6 +560,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const handleRegenerate = React.useCallback(
     (sourcePrompt: string, sourceTurnId: string) => {
       if (!chat || !canAfford(CONCEPT_COST)) return;
+      const acted = chat.turns.find((x) => x.id === sourceTurnId);
+      if (acted?.role === "assistant") {
+        setFocusedProduct(acted.companionOf ?? "primary");
+      }
       // Regenerate (spec §4c) is a FRESH take on the same prompt — it
       // ignores the existing image. No new user turn because the user
       // didn't retype anything.
@@ -737,9 +759,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
 
   // Open the full-screen editor on a specific concept image.
-  const handleOpenEditor = React.useCallback((turnId: string) => {
-    setEditorTurnId(turnId);
-  }, []);
+  const handleOpenEditor = React.useCallback(
+    (turnId: string) => {
+      const t = chat?.turns.find((x) => x.id === turnId);
+      if (t?.role === "assistant") setFocusedProduct(t.companionOf ?? "primary");
+      setEditorTurnId(turnId);
+    },
+    [chat],
+  );
 
   // Submit an edit from the editor — refine the SHOWN image (same concept,
   // evolved by the change) and CLOSE the editor. The refine runs in the
@@ -845,7 +872,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           <PromptBar onSubmit={handleUserSubmit} canRender={canRender} />
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
             {canRender
-              ? `Start by describing the concept. Each render costs ${CONCEPT_COST} credit${CONCEPT_COST === 1 ? "" : "s"} — refine and regenerate as often as you like.`
+              ? focusedName
+                ? `What you type refines ${focusedName}. Use Refine on another card to switch.`
+                : `Start by describing the concept. Each render costs ${CONCEPT_COST} credit${CONCEPT_COST === 1 ? "" : "s"} — refine and regenerate as often as you like.`
               : "You are out of credits — top them up to render another concept."}
           </p>
           </div>
