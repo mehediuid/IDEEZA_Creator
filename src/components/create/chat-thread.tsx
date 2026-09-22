@@ -199,6 +199,7 @@ export function ChatThread({
             job={job}
             productId={focusedProduct}
             onProductChange={onFocusProduct}
+            projectName={projectName}
           />
         </div>
       )}

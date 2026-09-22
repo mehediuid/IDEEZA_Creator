@@ -25,8 +25,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight02Icon,
   CheckmarkCircle02Icon,
+  ConnectIcon,
   FloppyDiskIcon,
   HelpCircleIcon,
+  MobileProgramming01Icon,
   PencilEdit02Icon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
@@ -59,10 +61,16 @@ export function ReviewOutputs({
   job,
   productId: controlledProductId,
   onProductChange,
+  projectName,
 }: {
   job: BuildJob;
   productId?: string;
   onProductChange?: (id: string) => void;
+  /** The project these products belong to, when the surface knows it — the
+   *  chat does, from the answer at the question. The build page does not, so
+   *  it falls back to the project this build was saved into, and then to the
+   *  primary product's own title. */
+  projectName?: string;
 }) {
   // The panel reads `?tab=` for a deep link (a project card links
   // straight at its parts list), which needs a boundary so the route can
@@ -74,6 +82,7 @@ export function ReviewOutputs({
         job={job}
         controlledProductId={controlledProductId}
         onProductChange={onProductChange}
+        projectName={projectName}
       />
     </React.Suspense>
   );
@@ -83,10 +92,12 @@ function ReviewPanel({
   job,
   controlledProductId,
   onProductChange,
+  projectName,
 }: {
   job: BuildJob;
   controlledProductId?: string;
   onProductChange?: (id: string) => void;
+  projectName?: string;
 }) {
   const router = useRouter();
   const query = useSearchParams();
@@ -150,6 +161,11 @@ function ReviewPanel({
     [job.projectId, projects],
   );
 
+  // What the card is about. The project the maker named, which is what the
+  // rail beside it already calls this work; then the project it was saved
+  // into; then the primary product, for a build that has neither.
+  const heading = projectName?.trim() || saved?.name || job.title;
+
   // Advance Edit's project: created on the first press and handed back on
   // every one after it. Selecting it is explicit — the editor pages work
   // on the active project, so landing there means switching to it, but
@@ -179,21 +195,27 @@ function ReviewPanel({
       aria-labelledby="review-heading"
       className="overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface"
     >
-      <header className="px-10 pb-6 pt-8">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-brand">
-          {building ? "Building" : "Build ready"}
-        </p>
-        <h2
-          id="review-heading"
-          className="mt-1 text-xl font-bold tracking-tight text-text-primary"
-        >
-          {building ? "Your deliverables, as they land" : "Review your deliverables"}
-        </h2>
+      {/* The eyebrow carries the state and the heading carries the subject.
+          It used to spend the heading on "Review your deliverables", which
+          describes the surface the maker is already looking at — the tabs,
+          the panels and the footer all say that — while the one thing the
+          card could not tell you was which project this is. */}
+      <header className="flex flex-wrap items-start justify-between gap-6 px-10 pb-6 pt-8">
+        <div className="min-w-0">
+          <p className="text-2xs font-bold uppercase tracking-wider text-text-brand">
+            {building ? "Building" : "Build ready"}
+          </p>
+          <h2
+            id="review-heading"
+            className="mt-1 truncate text-xl font-bold tracking-tight text-text-primary"
+          >
+            {heading}
+          </h2>
         {/* §4.3 + §4.4.9 — the product's own tier, and on a multi-product
             build the project's headline is the lowest of them, which this
             badge already is because the switcher lands on that product's
             own state. The list opens under it. */}
-        <div className="mt-4">
+          <div className="mt-4">
           {/* Keyed by product: switching products is looking at a
               different thing, so the list closes rather than carrying one
               product's open state onto another's issues. */}
@@ -201,6 +223,18 @@ function ReviewPanel({
             key={productConfidence.productId}
             confidence={productConfidence}
           />
+          </div>
+        </div>
+
+        {/* What this project could become next, beside the project it is
+            about. They are a tier below the footer's Save Project — that is
+            the decision this card exists to take — so they wear the quiet
+            outline the card already uses for Advance Edit, one size down.
+            Neither has an engine behind it yet, so each is greyed and says
+            so rather than accepting a press and doing nothing. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <HeaderAction icon={ConnectIcon} label="Add Network" />
+          <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>
 
@@ -493,6 +527,28 @@ function LeaveButton({
         <Icon icon={busy ? Refresh01Icon : icon} size={18} />
       </span>
       {busy ? "Opening…" : children}
+    </button>
+  );
+}
+
+/** A next step this project could take, offered from the card's own header.
+ *  Quiet by design: the footer's Save Project is the decision this surface
+ *  exists to take, and a second solid button beside the heading would argue
+ *  with it. Disabled with its reason while there is no engine behind it —
+ *  the convention this app uses everywhere rather than accepting a press
+ *  and doing nothing with it. */
+function HeaderAction({ icon, label }: { icon: IconValue; label: string }) {
+  const reason = `${label} isn't built yet`;
+  return (
+    <button
+      type="button"
+      disabled
+      title={reason}
+      aria-label={`${label} — ${reason}`}
+      className="inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-semibold text-text-disabled"
+    >
+      <Icon icon={icon} size={16} />
+      {label}
     </button>
   );
 }
