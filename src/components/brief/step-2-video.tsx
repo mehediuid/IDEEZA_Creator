@@ -8,7 +8,8 @@
 // block this flow at all.
 //
 // Every intent can record from a phone (AR) or generate from a prompt (AI).
-// Only "Add later" (Skip) is locked for Sell / Give — a listing needs a
+// Only "Add later" (Skip) is locked for Sell and for anything being posted
+// to Innovations — a listing needs a
 // preview clip.
 
 import * as React from "react";
@@ -29,7 +30,8 @@ function autoVideoPrompt(productName: string, productDescription: string): strin
   return `Cinematic product reveal of ${productName}: ${productDescription}. Slow orbit, soft studio light, 10 seconds.`;
 }
 
-const LOCK_REASON = "A listing needs a preview clip";
+const LOCK_LISTING = "A listing needs a preview clip";
+const LOCK_POST = "An Innovations post needs a preview clip";
 
 // When this step is the last one, Continue is the commit — so it says what it
 // commits to. A sale always has the mint setup after it, so it keeps carrying
@@ -80,7 +82,11 @@ export function Step2Video({
 
   // Sell / Give must ship something to look at, so "Add later" is locked for
   // them. Recording from a phone counts — AR is available to every intent.
-  const skipLocked = state.intent === "sell" || state.intent === "give";
+  // A listing needs a clip, and so does an Innovations post — the feed shows
+  // video cards. Everything else may skip: a give with no post and a private
+  // save are files, and a 10-second render nobody will watch is work for
+  // nothing. Give used to be locked whether or not it was being posted.
+  const skipLocked = state.intent === "sell" || state.shareToNewsfeed;
 
   // A locked Skip can't still count as "the" selection. A stored "skip" from
   // before the user switched intent (Save → pick Skip → Back → switch to
@@ -216,7 +222,9 @@ export function Step2Video({
             sub="Add later"
             status={skipLocked ? "locked" : "available"}
             locked={skipLocked}
-            lockReason={LOCK_REASON}
+            lockReason={
+              state.intent === "sell" ? LOCK_LISTING : LOCK_POST
+            }
             selected={effectiveMediaType === "skip"}
             onClick={() => {
               if (!skipLocked) onChange({ mediaType: "skip" });

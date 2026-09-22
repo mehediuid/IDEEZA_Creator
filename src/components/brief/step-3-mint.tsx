@@ -257,7 +257,7 @@ export function Step3Mint({
   // regenerating can't just be "one step back", which landed on the idea.
   // `isLastStep` is belt and braces: a form that is last has nothing ahead of
   // it but the mint, and Regenerate must never pay for anything.
-  const seq = stepsFor(state.intent, state.shareToNewsfeed);
+  const seq = stepsFor(state.intent);
   const previewIsAhead =
     !isLastStep && seq.indexOf("preview") > seq.indexOf("form");
   const goToPreview = onPreview ?? (previewIsAhead ? onNext : onBack);

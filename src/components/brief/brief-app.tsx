@@ -18,7 +18,7 @@
 //    one card) with no rails, and the draft is keyed by the build until
 //    that answer moves it onto the project.
 //
-// The order is `stepsFor(intent, shareToNewsfeed)`: selling puts the clip
+// The order is `stepsFor(intent)`: selling puts the clip
 // before the terms, giving and saving go straight to the form and only make a
 // clip when the maker also posts to Innovations.
 //
@@ -681,10 +681,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   // The steps this brief runs. Recomputed from the two answers that decide
   // them, so ticking "Share to Innovations" mid-form really does add the
   // preview step rather than only changing a label.
-  const seq = React.useMemo(
-    () => stepsFor(state.intent, state.shareToNewsfeed),
-    [state.intent, state.shareToNewsfeed],
-  );
+  const seq = React.useMemo(() => stepsFor(state.intent), [state.intent]);
   // Is this the last thing to answer before the mint? The step CTAs read it
   // for their wording — the handler below is what actually decides.
   const isLastStep = stepAfter(seq, step) === "success";
@@ -810,7 +807,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // Where the brief opens on the other side: the step this intent runs after
     // the idea, so a seeded hand-off lands exactly where staying put would.
     const afterIdea =
-      stepAfter(stepsFor(next.intent, next.shareToNewsfeed), "idea") ?? "idea";
+      stepAfter(stepsFor(next.intent), "idea") ?? "idea";
 
     // On a build, this answer is the attachment: the build gets its project,
     // the project is the one the editor now works on (an explicit act, here,

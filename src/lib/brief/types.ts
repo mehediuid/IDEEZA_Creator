@@ -399,12 +399,17 @@ export const BRIEF_FORM_LABEL: Record<Intent, string> = {
  * Innovations, which does need one, so the preview slots in after the form
  * that asked for it.
  */
-export function stepsFor(intent: Intent | null, share: boolean): BriefStepId[] {
+export function stepsFor(intent: Intent | null): BriefStepId[] {
   if (!intent) return ["idea"];
   if (intent === "sell") return ["idea", "preview", "form", "success"];
-  return share
-    ? ["idea", "form", "preview", "success"]
-    : ["idea", "form", "success"];
+  // Give and save get the preview too, and always after the form — the clip
+  // is optional for them, and asking for one before they have said what they
+  // are doing with the design is asking for work nobody may ever look at.
+  // It used to appear only when "Share to Innovations" was ticked, which made
+  // the step read as missing: a maker who wanted a clip for a private build
+  // had no way to ask for one. Skipping is a card on the step now, not the
+  // absence of the step.
+  return ["idea", "form", "preview", "success"];
 }
 
 /**
