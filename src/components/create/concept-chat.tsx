@@ -37,7 +37,11 @@ import { BuildRail } from "./build-rail";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
-import type { Companion } from "@/lib/create/companions";
+import {
+  companionId as slugFor,
+  parseProductRequest,
+  type Companion,
+} from "@/lib/create/companions";
 import { readGateDismissed } from "@/lib/create/gate-preference";
 
 import { ImageEditorModal } from "./image-editor-modal";
@@ -95,6 +99,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     setSetupDetails,
     answerSetupTurn,
     addSetupPick,
+    addSetupProduct,
     setTurnProgress,
     startBuild,
   } = useCreateHistory();
@@ -549,6 +554,37 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     (text: string) => {
       if (!chat || !canAfford(CONCEPT_COST)) return;
       appendUserTurn(chat.id, text);
+
+      // Two different things get typed into this box, and treating them the
+      // same is what made the composer feel like a text field rather than an
+      // agent: "make it matte black" is a change to the product on screen,
+      // and "add a charger" is another product for the project. The second
+      // used to be refined into the first — asking for a charger redrew the
+      // phone — so it is read for what it is and started as its own product,
+      // with its own card, its own place in the rail and its own five
+      // deliverables when the build runs.
+      const asked = parseProductRequest(text);
+      const setup = chat.turns.find(
+        (t) => t.role === "setup" && t.status === "answered" && t.answer,
+      );
+      if (asked && setup && setup.role === "setup") {
+        const id = slugFor(asked.name);
+        const already = setup.companions.find((c) => c.id === id);
+        // Asking twice for the same product is not two products. The second
+        // ask draws it again, which is a regenerate of the one that exists.
+        addSetupProduct(chat.id, setup.id, {
+          id,
+          name: already?.name ?? asked.name,
+          why: already?.why ?? `You asked for ${asked.name.toLowerCase()}.`,
+        });
+        setFocusedProduct(id);
+        appendAssistantTurn(chat.id, {
+          prompt: `${asked.name} for ${setup.prompt}`,
+          kind: "fresh",
+          companionOf: id,
+        });
+        return;
+      }
       // Prompt-bar submissions REFINE the latest ready concept (spec
       // §4b). They only fall back to "fresh" when nothing has rendered
       // yet (so the user isn't stuck on first load).
@@ -566,7 +602,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       }
       appendAssistantTurn(chat.id, { prompt: text, kind: "fresh" });
     },
-    [chat, canAfford, latestReadyTurn, appendUserTurn, appendAssistantTurn],
+    [
+      chat,
+      canAfford,
+      latestReadyTurn,
+      appendUserTurn,
+      appendAssistantTurn,
+      addSetupProduct,
+    ],
   );
 
   const handleRegenerate = React.useCallback(
@@ -958,7 +1001,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
             {canRender
               ? focusedName
-                ? `What you type refines ${focusedName}. Use Refine on another card to switch.`
+                ? `What you type refines ${focusedName} — or ask for another product, like “add a charger”.`
                 : `Start by describing the concept. Each render costs ${CONCEPT_COST} credit${CONCEPT_COST === 1 ? "" : "s"} — refine and regenerate as often as you like.`
               : "You are out of credits — top them up to render another concept."}
           </p>

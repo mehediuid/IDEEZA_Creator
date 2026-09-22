@@ -669,6 +669,7 @@ type Ctx = {
     answer: SetupAnswer,
   ) => void;
   addSetupPick: (chatId: string, turnId: string, companionId: string) => void;
+  addSetupProduct: (chatId: string, turnId: string, companion: Companion) => void;
   setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
@@ -968,6 +969,42 @@ export function CreateHistoryProvider({
   // offer does not expire: deciding not to build the charging case today is
   // not deciding never to, and the classifier already found it — making them
   // start a new chat to get it back would be losing work they had done.
+  // A product the maker asked for in the composer, which the classifier never
+  // offered — §4.4.3's escape hatch, reached by typing rather than by a field.
+  // It joins the answered question's own list, so the canvas, the gate and the
+  // build all see it exactly like one that was offered.
+  const addSetupProduct = React.useCallback(
+    (chatId: string, turnId: string, companion: Companion) => {
+      setChats((arr) =>
+        arr.map((c) =>
+          c.id !== chatId
+            ? c
+            : {
+                ...c,
+                updatedAt: Date.now(),
+                turns: c.turns.map((t) =>
+                  t.id === turnId && t.role === "setup" && t.answer
+                    ? {
+                        ...t,
+                        companions: t.companions.some((x) => x.id === companion.id)
+                          ? t.companions
+                          : [...t.companions, companion],
+                        answer: {
+                          ...t.answer,
+                          picked: t.answer.picked.includes(companion.id)
+                            ? t.answer.picked
+                            : [...t.answer.picked, companion.id],
+                        },
+                      }
+                    : t,
+                ),
+              },
+        ),
+      );
+    },
+    [],
+  );
+
   const addSetupPick = React.useCallback(
     (chatId: string, turnId: string, companionId: string) => {
       setChats((arr) =>
@@ -1525,6 +1562,7 @@ export function CreateHistoryProvider({
     setSetupDetails,
     answerSetupTurn,
     addSetupPick,
+    addSetupProduct,
     setTurnProgress,
     getChat,
     startBuild,

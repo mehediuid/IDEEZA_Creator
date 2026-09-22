@@ -215,3 +215,85 @@ export function classifyByRule(text: string): CompanionPlan {
   }
   return SINGLE_PRODUCT;
 }
+
+// ─────────────── what the composer was actually asked for ───────────────
+
+// A sentence typed into the chat is one of two things, and the difference
+// matters more than anything else the composer does: "make it matte black"
+// is a change to the product on screen, and "add a charger" is another
+// product for the project. Both used to be refines, so asking for a charger
+// redrew the phone — the maker watched "Rendering concept 1.1" and got the
+// same product back with a charger in the picture, if they were lucky.
+//
+// This is a rule, not a model, for the reason `classifyByRule` is: the text
+// provider is not reliable enough to sit between a maker and their credits,
+// and a wrong answer here spends one either way. It is deliberately narrow —
+// anything it is not sure about is a refine, which is what the composer has
+// always done and what the helper line under it promises.
+
+/** Verbs that can open a request for a new thing. "Make" and "create" only
+ *  count with an article behind them: "make a charger" asks for a product,
+ *  "make it smaller" asks for a change. */
+const ASK_VERB =
+  "(?:add|include|attach|throw in|also add|now add|i(?:'d like| would like| also want| want| need)|we need|give me|design|build|create|make|generate)";
+
+/** The article is what separates a thing from a property. Without one, only
+ *  an explicitly additive opener ("add", "include", "also") may pass, so
+ *  "make it black" can never be read as a product called "black". */
+const ARTICLE = "(?:a|an|another|one more|the)";
+
+/** Words that name a property of the picture or a degree of one, never a
+ *  product. "Add more detail" and "add a drop shadow" are changes to what is
+ *  on screen, and both open exactly like a request for another thing. */
+const NOT_A_PRODUCT =
+  /^(?:more|less|extra|additional|some|better|bigger|smaller|brighter|darker|detail|details|colour|color|colours|colors|contrast|shadow|shadows|light|lighting|background|foreground|logo|text|label|sharpness|quality|resolution|size|angle|view|style)\b/i;
+
+const PRODUCT_ASK = new RegExp(
+  `^\\s*(?:(?:and|also|plus)\\s+)?(?:${ASK_VERB}\\s+)?(?:${ARTICLE}\\s+)?([a-z0-9][a-z0-9 \\-/]{1,44}?)\\s*(?:\\s(?:also|too|as well|please)\\b.*)?[.!]?\\s*$`,
+  "i",
+);
+
+/** Openers that are additive on their own, so the article may be dropped:
+ *  "add charger also" is as clear as "add a charger". */
+const ADDITIVE_OPENER = /^\s*(?:and\s+|also\s+|plus\s+)?(?:add|include|attach|throw in|also add|now add|we need|i\s+(?:also\s+)?need)\b/i;
+
+/** Words that mean the maker is talking about what is already on screen, so
+ *  the sentence is a change however it opens. */
+const REFERS_TO_SHOWN =
+  /\b(?:it|its|it's|this|that|them|these|those|the (?:image|picture|photo|concept|render|colour|color|design|model))\b/i;
+
+/** The product being asked for, or null when the sentence is a change to the
+ *  one on screen. The name comes back as the maker wrote it, trimmed. */
+export function parseProductRequest(text: string): { name: string } | null {
+  const line = text.trim().replace(/\s+/g, " ");
+  if (!line || line.length > 90) return null;
+  if (REFERS_TO_SHOWN.test(line)) return null;
+
+  const m = PRODUCT_ASK.exec(line);
+  if (!m) return null;
+
+  // "make charger" is ambiguous and "make black" is not a product, so a
+  // bare noun needs an opener that can only mean addition.
+  const hadArticle = new RegExp(
+    `(?:${ASK_VERB}|and|also|plus)\\s+${ARTICLE}\\s`,
+    "i",
+  ).test(line);
+  if (!hadArticle && !ADDITIVE_OPENER.test(line)) return null;
+  // A bare noun needs a verb too — "carrying case" on its own is a refine
+  // of the thing on screen, not a request for one.
+  const hadVerb = new RegExp(`^\\s*(?:(?:and|also|plus)\\s+)?${ASK_VERB}\\s`, "i").test(line);
+  const hadConjunction = /^\s*(?:and|also|plus)\s/i.test(line);
+  if (!hadVerb && !(hadConjunction && hadArticle)) return null;
+
+  const raw = m[1].trim().replace(/\s+(?:also|too|as well)$/i, "").trim();
+  if (raw.length < 3) return null;
+  if (NOT_A_PRODUCT.test(raw)) return null;
+  // A whole sentence is a brief, not a product name.
+  if (raw.split(" ").length > 5) return null;
+
+  const name = raw
+    .split(" ")
+    .map((w) => (w === w.toUpperCase() ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+  return { name };
+}
