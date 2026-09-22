@@ -115,6 +115,12 @@ export function Step1Idea({
   // because an answer you cannot revise is a trap rather than an answer.
   const [editingProject, setEditingProject] = React.useState(false);
   const readBack = !!projectDecided && !editingProject && !!projectChoice;
+  // §4.4.8 — a system's products live in ONE project, so a build carrying
+  // more than one was never offered an existing project to join: the setup
+  // question asked only for a name. Offering "Change" here would offer to
+  // move it somewhere the flow does not allow, so a multi-product build can
+  // rename its project and nothing else, and the chooser never appears.
+  const system = (otherProducts?.length ?? 0) > 0;
   const intentLabelId = React.useId();
 
   const options: SelectOption[] = React.useMemo(
@@ -170,7 +176,9 @@ export function Step1Idea({
               name={isNew ? newProjectName.trim() : (chosen?.name ?? "")}
               detail={
                 isNew
-                  ? "New project · created when you continue"
+                  ? system
+                    ? `New project · all ${(otherProducts?.length ?? 0) + 1} products go in it`
+                    : "New project · created when you continue"
                   : `Existing project · already has ${productCount(
                       chosen?.id ?? "",
                     )} ${
@@ -179,9 +187,10 @@ export function Step1Idea({
                         : "products"
                     }`
               }
+              actionLabel={system && isNew ? "Rename" : "Change"}
               onChange={() => setEditingProject(true)}
             />
-          ) : (
+          ) : system ? null : (
             <SelectMenu
               label="Choose Project"
               placeholder="Choose Project"
@@ -586,10 +595,15 @@ function OtherProducts({
 function DecidedProject({
   name,
   detail,
+  actionLabel,
   onChange,
 }: {
   name: string;
   detail: string;
+  /** "Change" where another project is a real option, "Rename" where the
+   *  project is fixed by the shape of the build and only its name is the
+   *  maker's to edit. */
+  actionLabel: string;
   onChange: () => void;
 }) {
   return (
@@ -652,7 +666,7 @@ function DecidedProject({
             cursor: "pointer",
           }}
         >
-          Change
+          {actionLabel}
         </button>
       </div>
     </div>
