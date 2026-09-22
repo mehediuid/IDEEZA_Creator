@@ -221,30 +221,27 @@ export function WorkspacePrompt() {
 
 // ────────────────────────────────── parts ───────────────────────────────
 
-// The soft violet wash behind the hero, breathing. Two blurred lobes of the
-// brand's own AI gradient — so it follows the theme rather than carrying its
-// own colour — drifting across each other on long, mismatched cycles, which
-// reads as light moving rather than a shape sliding. The opacity lives in
-// the keyframes, and both start at rest, so the global reduced-motion rule
-// (which pins an animation to its first frame) leaves exactly the still wash
-// that was here before. Decorative, never in the way: it is the light behind
-// a headline, and nothing below it moves.
+// The soft violet wash behind the hero — still, because it is the ground the
+// headline sits on. Over it, one small light travels along the top edge and
+// fades at both ends, so the loop has no seam. Decorative, never in the way:
+// nothing below the hero moves, and under reduced motion the light is simply
+// absent, leaving the wash exactly as it was.
 function HeroGlow() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 flex justify-center overflow-hidden"
+      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
     >
-      <div className="relative h-[420px] w-[1100px] max-w-[140%] -translate-y-[38%]">
+      <div className="flex justify-center">
         <div
-          className="ix-hero-glow-a absolute inset-0 rounded-full blur-[120px]"
+          className="h-[420px] w-[1100px] max-w-[140%] -translate-y-[38%] rounded-full opacity-25 blur-[120px]"
           style={{ backgroundImage: "var(--gradient-ai)" }}
         />
-        <div
-          className="ix-hero-glow-b absolute inset-x-[12%] inset-y-[8%] rounded-full blur-[140px]"
-          style={{ backgroundImage: "var(--gradient-brand)" }}
-        />
       </div>
+      <div
+        className="ix-hero-sweep absolute left-1/2 top-0 h-[190px] w-[380px] rounded-full blur-[90px]"
+        style={{ backgroundImage: "var(--gradient-brand)" }}
+      />
     </div>
   );
 }

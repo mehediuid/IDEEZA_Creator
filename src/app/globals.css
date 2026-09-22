@@ -102,64 +102,43 @@
 }
 
 
-/* The hero's violet wash, breathing.
+/* A small light travelling along the top of the hero.
  *
- * Two blurred lobes of the brand gradient drifting across each other on
- * long, mismatched cycles (29s and 41s, deliberately not a whole ratio, so
- * they never settle into a visible beat). Everything moves on `transform`
- * and `opacity` alone — GPU work, no layout, no paint of the 120px blur
- * again per frame.
+ * The wash underneath it is still — it is the ground the headline sits on,
+ * and a whole surface breathing is a room with a flickering bulb. What moves
+ * is one compact lobe crossing the top edge, fading in as it enters and out
+ * as it leaves, so the loop has no seam to notice.
  *
- * This is the one surface in the app where ambient motion earns its place:
- * it is the hero of the dashboard, the light behind a headline, not a
- * control. Nothing below it moves.
+ * Transform and opacity only: the blur is rasterised once and moved, never
+ * repainted per frame. Nothing below the hero moves.
  *
- * Both animations START at the resting position, because the global
- * reduced-motion rule in reset.css pins every animation to its first frame
- * — so a maker who asks for stillness gets exactly the wash that was here
- * before, not a lobe frozen mid-drift. */
-@keyframes ix-hero-drift-a {
+ * At rest — which is what a maker asking for reduced motion gets, since the
+ * global rule in reset.css ends an animation rather than holding a frame —
+ * it is invisible, leaving exactly the still wash that was here before.
+ */
+@keyframes ix-hero-sweep {
   0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.25;
+    transform: translate3d(calc(-50% - 42vw), -45%, 0);
+    opacity: 0;
   }
-  50% {
-    transform: translate3d(-4%, 2.5%, 0) scale(1.08);
-    opacity: 0.32;
+  14% {
+    opacity: 0.34;
+  }
+  86% {
+    opacity: 0.34;
   }
   100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.25;
+    transform: translate3d(calc(-50% + 42vw), -45%, 0);
+    opacity: 0;
   }
 }
 
-@keyframes ix-hero-drift-b {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.14;
-  }
-  50% {
-    transform: translate3d(6%, -3%, 0) scale(0.92);
-    opacity: 0.22;
-  }
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.14;
-  }
-}
-
-/* The resting values live HERE, not only in the keyframes. Reduced motion
- * ends the animation rather than holding a frame of it, so the element falls
- * back to its own styles — and with opacity only in the keyframes that meant
- * a full-strength violet blob for exactly the people who asked for calm. */
-.ix-hero-glow-a {
-  opacity: 0.25;
-  animation: ix-hero-drift-a 29s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-.ix-hero-glow-b {
-  opacity: 0.14;
-  animation: ix-hero-drift-b 41s ease-in-out infinite;
+.ix-hero-sweep {
+  /* The Y offset lives in the transform, not in a utility class: the
+     animation writes the whole property, so a `-translate-y` beside it would
+     be thrown away the moment the first frame ran. */
+  opacity: 0;
+  transform: translate3d(-50%, -45%, 0);
+  animation: ix-hero-sweep 22s ease-in-out infinite;
   will-change: transform, opacity;
 }
