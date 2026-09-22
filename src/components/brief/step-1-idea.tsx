@@ -63,6 +63,7 @@ export type Step1Patch = {
   newProjectDescription?: string;
   productName?: string;
   productDescription?: string;
+  otherProducts?: { name: string; description: string }[];
   intent?: Intent;
 };
 
@@ -263,7 +264,14 @@ export function Step1Idea({
               headline product; these came back named and described from the
               concept work, and are stored on the project with it. */}
           {otherProducts && otherProducts.length > 0 ? (
-            <OtherProducts products={otherProducts} />
+            <OtherProducts
+              products={otherProducts}
+              onSave={(i, next) =>
+                onChange({
+                  otherProducts: otherProducts.map((x, n) => (n === i ? next : x)),
+                })
+              }
+            />
           ) : null}
         </div>
 
@@ -519,15 +527,19 @@ function FieldLabel({
   );
 }
 
-/** The products saved alongside the headline one. Read-only: they were named
- *  by the model from concepts the maker already approved, and the place to
- *  rename one is the editor it opens into — a second column of inputs here
- *  would ask them to re-type work that is already done. */
+/** The products saved alongside the headline one — each editable in place.
+ *  They were named by the model from concepts the maker approved, which makes
+ *  them a good first draft and nothing more: a name read back wrong is one
+ *  the maker should be able to fix here, beside the one they are already
+ *  editing, rather than after the project exists. */
 function OtherProducts({
   products,
+  onSave,
 }: {
   products: { name: string; description: string }[];
+  onSave: (index: number, next: { name: string; description: string }) => void;
 }) {
+  const [editing, setEditing] = React.useState<number | null>(null);
   return (
     <div>
       <p
@@ -556,33 +568,153 @@ function OtherProducts({
           background: "var(--color-border)",
         }}
       >
-        {products.map((x) => (
+        {products.map((x, i) => (
           <li
-            key={x.name}
+            key={`${i}-${x.name}`}
             style={{ padding: "10px 14px", background: "var(--color-bg-surface)" }}
           >
-            <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text }}>
-              {x.name}
-            </span>
-            {x.description ? (
-              <span
-                style={{
-                  display: "block",
-                  marginTop: 2,
-                  fontSize: 12,
-                  lineHeight: 1.5,
-                  color: C.body,
+            {editing === i ? (
+              <ProductEditor
+                value={x}
+                onCancel={() => setEditing(null)}
+                onSave={(next) => {
+                  onSave(i, next);
+                  setEditing(null);
                 }}
-              >
-                {x.description}
-              </span>
-            ) : null}
+              />
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span
+                    style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text }}
+                  >
+                    {x.name}
+                  </span>
+                  {x.description ? (
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: 2,
+                        fontSize: 12,
+                        lineHeight: 1.5,
+                        color: C.body,
+                      }}
+                    >
+                      {x.description}
+                    </span>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEditing(i)}
+                  aria-label={`Edit ${x.name}`}
+                  style={{
+                    flexShrink: 0,
+                    height: 30,
+                    padding: "0 12px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--color-text-brand)",
+                    background: "transparent",
+                    border: "var(--border-width-1) solid var(--color-border)",
+                    borderRadius: "var(--radius-md)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Edit
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
       <p style={{ fontSize: 12, color: C.body, marginTop: 8 }}>
-        Saved with the project. You can rename them in the editor.
+        Saved with the project.
       </p>
+    </div>
+  );
+}
+
+/** One product's two fields, open in place. Save writes to the draft, so it
+ *  survives a reload and a step back; Cancel leaves the row as it was. */
+function ProductEditor({
+  value,
+  onSave,
+  onCancel,
+}: {
+  value: { name: string; description: string };
+  onSave: (next: { name: string; description: string }) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = React.useState(value.name);
+  const [description, setDescription] = React.useState(value.description);
+  const clean = name.trim();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <input
+        className="ix-brief-field"
+        value={name}
+        autoFocus
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Product name"
+        aria-label="Product name"
+        style={inputStyle}
+      />
+      <textarea
+        className="ix-brief-field"
+        value={description}
+        onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESC))}
+        placeholder="One line \u00b7 what does it do?"
+        aria-label="One line description"
+        rows={2}
+        style={{
+          ...inputStyle,
+          height: 60,
+          resize: "vertical",
+          paddingTop: 10,
+          paddingBottom: 10,
+          lineHeight: 1.5,
+          fontFamily: "inherit",
+        }}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          disabled={!clean}
+          title={clean ? undefined : "A product needs a name."}
+          onClick={() => onSave({ name: clean, description: description.trim() })}
+          style={{
+            height: 30,
+            padding: "0 14px",
+            fontSize: 13,
+            fontWeight: 600,
+            color: clean ? "var(--color-text-on-brand)" : "var(--color-text-disabled)",
+            background: clean ? "var(--color-bg-brand)" : "var(--color-bg-subtle)",
+            border: "none",
+            borderRadius: "var(--radius-md)",
+            cursor: clean ? "pointer" : "not-allowed",
+          }}
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            height: 30,
+            padding: "0 12px",
+            fontSize: 13,
+            fontWeight: 600,
+            color: C.body,
+            background: "transparent",
+            border: "var(--border-width-1) solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

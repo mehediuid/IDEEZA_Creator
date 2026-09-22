@@ -127,6 +127,12 @@ export type BriefState = {
   newProjectDescription: string;
   productName: string;
   productDescription: string;
+  /** The other products this build made, each editable here. §4.4.8 puts a
+   *  whole system in one project, so a drone's remote and its charger are
+   *  saved beside it — and the maker can correct any of their names or
+   *  descriptions before the project is written. Empty on a single-product
+   *  build and on every hand-made project. */
+  otherProducts: { name: string; description: string }[];
   intent: Intent | null;
   // Step 2
   mediaType: MediaType;
@@ -177,6 +183,7 @@ export const DEFAULT_STATE: BriefState = {
   newProjectDescription: "",
   productName: "",
   productDescription: "",
+  otherProducts: [],
   intent: null,
   mediaType: "ai",
   videoPrompt: "",
@@ -321,6 +328,14 @@ export function normalizeBrief(parsed: unknown): BriefState {
     ),
     productName: str(s.productName, DEFAULT_STATE.productName),
     productDescription: str(s.productDescription, DEFAULT_STATE.productDescription),
+    otherProducts: Array.isArray(s.otherProducts)
+      ? (s.otherProducts as unknown[])
+          .filter(
+            (x): x is { name: string; description?: string } =>
+              !!x && typeof (x as { name?: unknown }).name === "string",
+          )
+          .map((x) => ({ name: x.name, description: String(x.description ?? "") }))
+      : [],
     intent:
       typeof s.intent === "string" && (INTENTS as readonly string[]).includes(s.intent)
         ? (s.intent as Intent)

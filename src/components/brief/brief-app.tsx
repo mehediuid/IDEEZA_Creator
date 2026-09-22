@@ -213,6 +213,14 @@ function seedFromBuild(
     productDescription: s.productDescription.trim()
       ? s.productDescription
       : oneLine.slice(0, BRIEF_DESC_MAX),
+    // Seeded once, then the maker's own. Their edits are the draft's, so a
+    // reload or a step back does not put the model's wording back.
+    otherProducts: s.otherProducts.length
+      ? s.otherProducts
+      : (job.companions ?? []).map((x) => ({
+          name: (x.title || x.name).trim(),
+          description: (x.description || x.summary || "").trim(),
+        })),
   };
 }
 
@@ -806,7 +814,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                     name: next.productName,
                     description: next.productDescription,
                   },
-                  ...buildProducts.slice(1),
+                  ...next.otherProducts,
                 ],
               }
             : null),
@@ -1034,7 +1042,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                 productCount={productCount}
                 productName={state.productName}
                 productDescription={state.productDescription}
-                otherProducts={buildProducts.slice(1)}
+                otherProducts={state.otherProducts}
                 projectDecided={
                   !scopeProjectId &&
                   !!(job?.projectChoiceId || job?.projectChoiceName?.trim())
