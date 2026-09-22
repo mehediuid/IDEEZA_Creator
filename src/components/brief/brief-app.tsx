@@ -1035,6 +1035,10 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                 productName={state.productName}
                 productDescription={state.productDescription}
                 otherProducts={buildProducts.slice(1)}
+                projectDecided={
+                  !scopeProjectId &&
+                  !!(job?.projectChoiceId || job?.projectChoiceName?.trim())
+                }
                 intent={state.intent}
                 busy={continuing}
                 onChange={handleStep1Change}

@@ -75,6 +75,7 @@ export function Step1Idea({
   productName,
   productDescription,
   otherProducts,
+  projectDecided,
   intent,
   busy,
   onChange,
@@ -94,6 +95,11 @@ export function Step1Idea({
    *  Named and described by the model; empty on a single-product build and
    *  on every hand-made project. */
   otherProducts?: { name: string; description: string }[];
+  /** The project was already answered at the setup question, before any
+   *  concept was drawn — so this step reads it back rather than asking it
+   *  again. False on a hand-made project and on an older build that carries
+   *  no such answer, where the chooser IS the question. */
+  projectDecided?: boolean;
   intent: Intent | null;
   /** Continue has been answered and the hand-off is in flight. */
   busy?: boolean;
@@ -104,6 +110,11 @@ export function Step1Idea({
   const isNew = projectChoice === "new";
   const chosen = isNew ? null : projects.find((p) => p.id === projectChoice) ?? null;
   const reasonId = React.useId();
+  // An answer already given is read back, not asked again — the same shape
+  // the setup card in the chat uses. Pressing Change opens the real controls,
+  // because an answer you cannot revise is a trap rather than an answer.
+  const [editingProject, setEditingProject] = React.useState(false);
+  const readBack = !!projectDecided && !editingProject && !!projectChoice;
   const intentLabelId = React.useId();
 
   const options: SelectOption[] = React.useMemo(
@@ -154,20 +165,38 @@ export function Step1Idea({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SelectMenu
-            label="Choose Project"
-            placeholder="Choose Project"
-            value={projectChoice || null}
-            onChange={(v) => onChange({ projectChoice: v })}
-            options={options}
-            hint={
-              chosen
-                ? `This build will be added to ${chosen.name}.`
-                : "Attach this build to an existing project, or start a new one."
-            }
-          />
+          {readBack ? (
+            <DecidedProject
+              name={isNew ? newProjectName.trim() : (chosen?.name ?? "")}
+              detail={
+                isNew
+                  ? "New project · created when you continue"
+                  : `Existing project · already has ${productCount(
+                      chosen?.id ?? "",
+                    )} ${
+                      productCount(chosen?.id ?? "") === 1
+                        ? "product"
+                        : "products"
+                    }`
+              }
+              onChange={() => setEditingProject(true)}
+            />
+          ) : (
+            <SelectMenu
+              label="Choose Project"
+              placeholder="Choose Project"
+              value={projectChoice || null}
+              onChange={(v) => onChange({ projectChoice: v })}
+              options={options}
+              hint={
+                chosen
+                  ? `This build will be added to ${chosen.name}.`
+                  : "Attach this build to an existing project, or start a new one."
+              }
+            />
+          )}
 
-          {isNew ? (
+          {readBack ? null : isNew ? (
             <NewProjectPanel
               name={newProjectName}
               description={newProjectDescription}
@@ -545,6 +574,87 @@ function OtherProducts({
       <p style={{ fontSize: 12, color: C.body, marginTop: 8 }}>
         Saved with the project. You can rename them in the editor.
       </p>
+    </div>
+  );
+}
+
+/** The project, already answered. It was decided at the setup question before
+ *  a single concept was drawn, so presenting a chooser and a name field here
+ *  asks the maker the same thing a second time — which is what they saw: the
+ *  project named twice on one screen, once as a dropdown and once as a form.
+ *  This states it and offers the way back to the controls. */
+function DecidedProject({
+  name,
+  detail,
+  onChange,
+}: {
+  name: string;
+  detail: string;
+  onChange: () => void;
+}) {
+  return (
+    <div>
+      <p
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: C.body,
+          margin: "0 0 8px",
+        }}
+      >
+        Project
+      </p>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "12px 14px",
+          border: "var(--border-width-1) solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+          background: "var(--color-bg-surface)",
+        }}
+      >
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span
+            style={{
+              display: "block",
+              fontSize: 14,
+              fontWeight: 600,
+              color: C.text,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {name}
+          </span>
+          <span style={{ display: "block", marginTop: 2, fontSize: 12, color: C.body }}>
+            {detail}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={onChange}
+          className="ix-brief-change"
+          style={{
+            flexShrink: 0,
+            height: 32,
+            padding: "0 12px",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--color-text-brand)",
+            background: "transparent",
+            border: "var(--border-width-1) solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            cursor: "pointer",
+          }}
+        >
+          Change
+        </button>
+      </div>
     </div>
   );
 }
