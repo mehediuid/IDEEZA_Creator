@@ -74,6 +74,7 @@ export function Step1Idea({
   productCount,
   productName,
   productDescription,
+  otherProducts,
   intent,
   busy,
   onChange,
@@ -88,6 +89,11 @@ export function Step1Idea({
   productCount: (projectId: string) => number;
   productName: string;
   productDescription: string;
+  /** The other products this build made — a system goes into one project
+   *  (§4.4.8), so a drone's remote and its charger are saved alongside it.
+   *  Named and described by the model; empty on a single-product build and
+   *  on every hand-made project. */
+  otherProducts?: { name: string; description: string }[];
   intent: Intent | null;
   /** Continue has been answered and the hand-off is in flight. */
   busy?: boolean;
@@ -212,6 +218,15 @@ export function Step1Idea({
               </span>
             </>
           </FieldLabel>
+
+          {/* A system is one project holding several products, so the rest of
+              them are part of what is being saved — and the maker should see
+              what that is before they save it. The fields above are the
+              headline product; these came back named and described from the
+              concept work, and are stored on the project with it. */}
+          {otherProducts && otherProducts.length > 0 ? (
+            <OtherProducts products={otherProducts} />
+          ) : null}
         </div>
 
         <div
@@ -463,5 +478,73 @@ function FieldLabel({
       {children}
       {hint ? <span style={{ fontSize: 12, color: "var(--color-input-helper)" }}>{hint}</span> : null}
     </label>
+  );
+}
+
+/** The products saved alongside the headline one. Read-only: they were named
+ *  by the model from concepts the maker already approved, and the place to
+ *  rename one is the editor it opens into — a second column of inputs here
+ *  would ask them to re-type work that is already done. */
+function OtherProducts({
+  products,
+}: {
+  products: { name: string; description: string }[];
+}) {
+  return (
+    <div>
+      <p
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: C.body,
+          margin: "0 0 8px",
+        }}
+      >
+        Also in this project
+      </p>
+      <ul
+        style={{
+          listStyle: "none",
+          margin: 0,
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          border: "var(--border-width-1) solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+          overflow: "hidden",
+          background: "var(--color-border)",
+        }}
+      >
+        {products.map((x) => (
+          <li
+            key={x.name}
+            style={{ padding: "10px 14px", background: "var(--color-bg-surface)" }}
+          >
+            <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text }}>
+              {x.name}
+            </span>
+            {x.description ? (
+              <span
+                style={{
+                  display: "block",
+                  marginTop: 2,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  color: C.body,
+                }}
+              >
+                {x.description}
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <p style={{ fontSize: 12, color: C.body, marginTop: 8 }}>
+        Saved with the project. You can rename them in the editor.
+      </p>
+    </div>
   );
 }

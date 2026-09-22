@@ -43,6 +43,13 @@ export const EMPTY_FLOW_STATE: ManualFlowState = {
   brief: false,
 };
 
+/** One product inside a project — the name and the sentence the model wrote
+ *  for it, which is what the Brief shows and what My projects counts. */
+export type ManualProduct = {
+  name: string;
+  description: string;
+};
+
 export type ManualProject = {
   id: string;
   // URL-safe handle derived from the name (e.g. "my-drone-project"). Stable
@@ -53,6 +60,14 @@ export type ManualProject = {
   // editor chrome; shown as "Untitled product" until the user names it.
   productName: string;
   description: string;
+  /** Every product this project holds, named and described by the model.
+   *  §4.4.8 puts a whole system in one project, so a drone, its remote and
+   *  its charger are three products under one name — and `productName` alone
+   *  could only ever record the first of them. The headline product stays in
+   *  `productName`/`description` so every surface that reads those is
+   *  unchanged; this is the full list. Absent on a hand-made project, which
+   *  has the one product the maker typed. */
+  products?: ManualProduct[];
   status: ManualProjectStatus;
   createdAt: number;
   updatedAt: number;
@@ -136,11 +151,22 @@ function normalizeProjects(list: ManualProject[]): ManualProject[] {
     while (taken.has(slug)) slug = `${base}-${n++}`;
     taken.add(slug);
     const productName = p.productName ?? "";
+    const products = Array.isArray(p.products)
+      ? p.products
+          .filter((x): x is ManualProduct => !!x && typeof x.name === "string")
+          .map((x) => ({ name: x.name, description: String(x.description ?? "") }))
+      : undefined;
     // Backfill steps added after a project was saved (e.g. `assembly`,
     // UIUX-80) so flowState always carries every step key.
     const flowOk = p.flowState && FLOW_STEPS.every((s) => s in p.flowState);
     if (p.slug === slug && p.productName !== undefined && flowOk) return p;
-    return { ...p, slug, productName, flowState: { ...EMPTY_FLOW_STATE, ...(p.flowState ?? {}) } };
+    return {
+      ...p,
+      slug,
+      productName,
+      ...(products?.length ? { products } : null),
+      flowState: { ...EMPTY_FLOW_STATE, ...(p.flowState ?? {}) },
+    };
   });
 }
 

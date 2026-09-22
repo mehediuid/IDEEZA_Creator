@@ -646,6 +646,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             conceptPrompt: turn.prompt,
             title: concept.title || companion.name,
             summary: concept.summary,
+            description: concept.description,
             parts: concept.parts,
           })),
         ),
@@ -678,6 +679,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // The concept as the summarizer read it — the same title, parts
         // line and parts the gate would have shown, so every deliverable
         // is derived from the concept that was approved.
+        // The project was settled at the question — an existing one for a
+        // single product, a new one by name for a system. It rides the job so
+        // the Brief's Step 1 opens on that answer instead of an empty chooser
+        // asking the maker the same thing a second time.
+        const answered = chat.turns.find(
+          (t) => t.role === "setup" && t.status === "answered" && t.answer,
+        );
+        const decidedProject =
+          answered && answered.role === "setup" ? answered.answer : undefined;
         const job = startBuild({
           chatId: chat.id,
           turnId: source.turnId,
@@ -686,6 +696,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           conceptNumber: labels.get(source.turnId) ?? "1",
           title: concept.title || deriveTitle(source.prompt),
           summary: concept.summary,
+          description: concept.description,
+          projectChoiceId: decidedProject?.projectId,
+          projectChoiceName: decidedProject?.projectName,
           parts: concept.parts,
           companions,
         });

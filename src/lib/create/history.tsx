@@ -179,6 +179,10 @@ export type BuildProduct = {
   conceptPrompt: string;
   title: string;
   summary: string;
+  /** What this product IS, in a sentence the model wrote. `summary` is the
+   *  parts line, which is not a description: the Brief was filling its
+   *  "one line · what does it do?" with "ATmega328P · GPS Receiver · IMU …". */
+  description?: string;
   parts: ConceptPart[];
   items: BuildItem[];
 };
@@ -194,7 +198,17 @@ export type BuildJob = {
   // derived from (see build-artifacts.ts).
   title: string;
   summary: string;
+  /** The primary product's description, for the same reason the companions
+   *  carry one: `summary` is a parts line. */
+  description?: string;
   parts: ConceptPart[];
+  /** The project this build was always meant for, answered at the setup
+   *  question long before Save: an existing project by id, or the name typed
+   *  for a new one. Not `projectId`, which is only set once the build really
+   *  becomes a project — this is the maker's intent, carried so the Brief
+   *  does not ask them the same question a second time with an empty box. */
+  projectChoiceId?: string;
+  projectChoiceName?: string;
   // Which concept in the chat this build came from — "2", or "1.1" for
   // a refinement of the first.
   conceptNumber: string;
@@ -521,6 +535,9 @@ function normalizeJob(raw: BuildJob): BuildJob {
           conceptPrompt: String(c.conceptPrompt ?? ""),
           title: String(c.title ?? c.name ?? ""),
           summary: String(c.summary ?? ""),
+          ...(typeof c.description === "string" && c.description.trim()
+            ? { description: c.description }
+            : null),
           parts: Array.isArray(c.parts) ? c.parts : [],
           items: normalizeItems(c.items),
         }))
@@ -531,6 +548,15 @@ function normalizeJob(raw: BuildJob): BuildJob {
     companions,
     title: stored.title || deriveTitle(prompt),
     summary: stored.summary ?? "",
+    ...(typeof stored.description === "string" && stored.description.trim()
+      ? { description: stored.description }
+      : null),
+    ...(typeof stored.projectChoiceId === "string" && stored.projectChoiceId
+      ? { projectChoiceId: stored.projectChoiceId }
+      : null),
+    ...(typeof stored.projectChoiceName === "string" && stored.projectChoiceName
+      ? { projectChoiceName: stored.projectChoiceName }
+      : null),
     parts: Array.isArray(stored.parts) ? stored.parts : [],
     conceptNumber: stored.conceptNumber || "1",
     status,
@@ -655,6 +681,9 @@ type Ctx = {
     conceptNumber: string;
     title: string;
     summary: string;
+    description?: string;
+    projectChoiceId?: string;
+    projectChoiceName?: string;
     parts: ConceptPart[];
     companions?: Omit<BuildProduct, "items">[];
   }) => BuildJob;
@@ -1028,7 +1057,15 @@ export function CreateHistoryProvider({
       conceptNumber: string;
       title: string;
       summary: string;
+      /** The model's sentence about the product, kept apart from `summary`,
+       *  which is the parts line. */
+      description?: string;
       parts: ConceptPart[];
+      /** What the maker already answered at the setup question: an existing
+       *  project, or the name for the new one every multi-product build gets.
+       *  Carried onto the job so Save does not ask it again. */
+      projectChoiceId?: string;
+      projectChoiceName?: string;
       /** §4.4 — the companion products whose concepts are ready. Absent
        *  on every single-product build. */
       companions?: Omit<BuildProduct, "items">[];
@@ -1045,6 +1082,11 @@ export function CreateHistoryProvider({
         conceptPrompt: input.prompt,
         title: input.title,
         summary: input.summary,
+        ...(input.description?.trim() ? { description: input.description } : null),
+        ...(input.projectChoiceId ? { projectChoiceId: input.projectChoiceId } : null),
+        ...(input.projectChoiceName?.trim()
+          ? { projectChoiceName: input.projectChoiceName }
+          : null),
         parts: input.parts,
         conceptNumber: input.conceptNumber,
         status: busy ? "queued" : "running",

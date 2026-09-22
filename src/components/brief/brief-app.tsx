@@ -44,7 +44,11 @@ import {
   useManualProjects,
   type ManualProject,
 } from "@/lib/manual/projects";
-import { useCreateHistory, type BuildJob } from "@/lib/create/history";
+import {
+  productsOf,
+  useCreateHistory,
+  type BuildJob,
+} from "@/lib/create/history";
 import {
   BRIEF_DESC_MAX,
   DEFAULT_STATE,
@@ -174,12 +178,37 @@ function clearDraft(scope: string) {
 // value instead — "new" with the name empty — cannot tell the default apart
 // from a maker who picked "+ Create new project" and then cleared the name
 // again, and silently reverted their choice on the next reload.
-function seedFromBuild(s: BriefState, job: BuildJob, stored: boolean): BriefState {
-  const oneLine = (job.summary || job.conceptPrompt).trim();
+function seedFromBuild(
+  s: BriefState,
+  job: BuildJob,
+  stored: boolean,
+  projects: ManualProject[],
+): BriefState {
+  // The description the model wrote, not the parts line. `summary` is
+  // "ATmega328P · GPS Receiver · IMU · ESC · LiPo Battery", which answered
+  // "one line · what does it do?" with an inventory.
+  const oneLine = (job.description || job.summary || job.conceptPrompt).trim();
+
+  // The project was already chosen, at the setup question, before a single
+  // concept was drawn: an existing one by id, or a name for the new one every
+  // multi-product build gets. Opening this step with an empty chooser asked
+  // the maker the same question a second time and threw the first answer
+  // away. An id whose project is gone from this browser falls back to making
+  // a new one under the same name rather than pointing at nothing.
+  const chosenExists =
+    !!job.projectChoiceId && projects.some((p) => p.id === job.projectChoiceId);
+  const decided = chosenExists
+    ? job.projectChoiceId!
+    : job.projectChoiceName?.trim()
+      ? "new"
+      : "";
+
   return {
     ...s,
-    projectChoice: stored ? s.projectChoice : "",
-    newProjectName: s.newProjectName.trim() ? s.newProjectName : job.title,
+    projectChoice: stored ? s.projectChoice : decided,
+    newProjectName: s.newProjectName.trim()
+      ? s.newProjectName
+      : job.projectChoiceName?.trim() || job.title,
     productName: s.productName.trim() ? s.productName : job.title,
     productDescription: s.productDescription.trim()
       ? s.productDescription
@@ -485,6 +514,22 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   // The project this brief belongs to. On a build that is whichever project
   // Step 1 attached it to — nothing until then, which is the whole reason
   // build mode exists.
+  // Every product this build made, named and described by the model. The
+  // first is the headline one the Step 1 fields edit; the rest are shown
+  // beside them and saved onto the project with it — §4.4.8 puts a whole
+  // system in one project, and `productName` alone could record only the
+  // first of them.
+  const buildProducts = React.useMemo(
+    () =>
+      job
+        ? productsOf(job).map((x) => ({
+            name: (x.title || x.name).trim(),
+            description: (x.description || x.summary || "").trim(),
+          }))
+        : [],
+    [job],
+  );
+
   const scopeProjectId = buildId ? (job?.projectId ?? null) : activeProjectId;
   // …and the record itself. NOT `activeProject`: a build's brief keeps running
   // in this shell while the editor is pointed somewhere else entirely, so
@@ -549,7 +594,8 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       : loaded;
     // Unattached, this brief is the build's: fill in what the build already
     // knows rather than asking for it again.
-    if (!scopeProjectId && job) normalized = seedFromBuild(normalized, job, stored);
+    if (!scopeProjectId && job)
+      normalized = seedFromBuild(normalized, job, stored, projects);
     let nextStep = loadedStep;
     const regen = readRegenRequest();
     if (regen) {
@@ -750,6 +796,20 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       if (seedDraft(targetId, next, afterIdea, targetProductName)) {
         updateProject(targetId, {
           productName: next.productName,
+          // The whole system, not just its headline. The maker's own edits to
+          // the first product win over what the model called it; the rest are
+          // as the concepts named them.
+          ...(buildProducts.length
+            ? {
+                products: [
+                  {
+                    name: next.productName,
+                    description: next.productDescription,
+                  },
+                  ...buildProducts.slice(1),
+                ],
+              }
+            : null),
           // Only a project made from this build carries it as its origin:
           // stamping an existing project would claim it was this build's all
           // along, and its product count would drop by one.
@@ -974,6 +1034,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                 productCount={productCount}
                 productName={state.productName}
                 productDescription={state.productDescription}
+                otherProducts={buildProducts.slice(1)}
                 intent={state.intent}
                 busy={continuing}
                 onChange={handleStep1Change}
