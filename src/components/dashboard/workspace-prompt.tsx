@@ -221,19 +221,30 @@ export function WorkspacePrompt() {
 
 // ────────────────────────────────── parts ───────────────────────────────
 
-// The soft violet wash behind the hero. One blurred ellipse painted with
-// the brand's own AI gradient at low opacity, so it follows the theme
-// instead of carrying its own colour; decorative, never in the way.
+// The soft violet wash behind the hero, breathing. Two blurred lobes of the
+// brand's own AI gradient — so it follows the theme rather than carrying its
+// own colour — drifting across each other on long, mismatched cycles, which
+// reads as light moving rather than a shape sliding. The opacity lives in
+// the keyframes, and both start at rest, so the global reduced-motion rule
+// (which pins an animation to its first frame) leaves exactly the still wash
+// that was here before. Decorative, never in the way: it is the light behind
+// a headline, and nothing below it moves.
 function HeroGlow() {
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute inset-x-0 top-0 flex justify-center overflow-hidden"
     >
-      <div
-        className="h-[420px] w-[1100px] max-w-[140%] -translate-y-[38%] rounded-full opacity-25 blur-[120px]"
-        style={{ backgroundImage: "var(--gradient-ai)" }}
-      />
+      <div className="relative h-[420px] w-[1100px] max-w-[140%] -translate-y-[38%]">
+        <div
+          className="ix-hero-glow-a absolute inset-0 rounded-full blur-[120px]"
+          style={{ backgroundImage: "var(--gradient-ai)" }}
+        />
+        <div
+          className="ix-hero-glow-b absolute inset-x-[12%] inset-y-[8%] rounded-full blur-[140px]"
+          style={{ backgroundImage: "var(--gradient-brand)" }}
+        />
+      </div>
     </div>
   );
 }
