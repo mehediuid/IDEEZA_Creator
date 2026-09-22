@@ -230,7 +230,12 @@ function HeroGlow() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
+      // Tall enough that the clip falls where the glow has already reached
+      // the page's own colour. `overflow-hidden` is here for the travelling
+      // light, which crosses ±42vw and would otherwise widen the page — but
+      // it was cutting the wash at 420px while a 120px blur was still 33
+      // levels above the background, leaving a hard rule across the hero.
+      className="pointer-events-none absolute inset-x-0 top-0 h-[900px] overflow-hidden"
     >
       <div className="flex justify-center">
         <div
