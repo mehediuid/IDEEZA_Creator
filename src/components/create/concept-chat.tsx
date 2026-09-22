@@ -954,9 +954,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       </aside>
 
       {/* The canvas. The questions land here first, then the concepts —
-          side by side, because a system build draws several at once. */}
+          side by side, because a system build draws several at once. It takes
+          the whole width it is given: the 880 px measure that used to cap it
+          was a prose measure on a surface that carries no prose, so a wide
+          screen spent everything past it on empty page while the product tabs,
+          the deliverable tabs and the concept grid — all of which grow into
+          width — sat squeezed against the rail. */}
       <main className="flex-1 overflow-y-auto bg-bg-page">
-        <div className="mx-auto w-full max-w-[880px] px-[32px] py-[32px]">
+        <div className="w-full px-[32px] py-[32px]">
           <ChatThread
             chat={chat}
             regeneratingFrom={regeneratingFrom}
