@@ -273,6 +273,10 @@ function seedDraft(
       projectChoice: projectId,
       productName: s.productName,
       productDescription: s.productDescription,
+      // The other products travel with it. They were left out, so a step back
+      // after the hand-off re-hydrated on a draft that had never heard of
+      // them and the maker's edits to their names went with it.
+      otherProducts: s.otherProducts,
       intent: s.intent,
       mediaType: s.mediaType,
     };
@@ -789,6 +793,20 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       next = { ...next, projectId: targetId };
     }
 
+    // What the project should record. The COUNT comes from the job, which is
+    // the only thing that knows how many products this build really made;
+    // the maker's edits are laid over it where they exist. Reading the list
+    // straight off the draft meant that a press after the draft had been
+    // re-seeded wrote a one-product project over a three-product one.
+    const productList = buildProducts.length
+      ? [
+          { name: next.productName, description: next.productDescription },
+          ...buildProducts
+            .slice(1)
+            .map((p, i) => next.otherProducts[i] ?? p),
+        ]
+      : null;
+
     // Where the brief opens on the other side: the step this intent runs after
     // the idea, so a seeded hand-off lands exactly where staying put would.
     const afterIdea =
@@ -800,24 +818,20 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // build's key onto the project's — so the rest of the brief runs on the
     // project, in this same shell, and /project/<slug>/brief opens on exactly
     // where this left off.
-    if (buildId) {
+    // The attachment happens ONCE. `buildId` outlives it — it is in the URL —
+    // so this branch used to swallow every later press: step back to the idea,
+    // press Continue again, and it re-ran the hand-off into a project the
+    // build was already in. `seedDraft` then refused, correctly, because that
+    // project's draft now holds work, and the step was never written. The
+    // button did nothing at all, twice over: no navigation, no advance.
+    if (buildId && job?.projectId !== targetId) {
       if (seedDraft(targetId, next, afterIdea, targetProductName)) {
         updateProject(targetId, {
           productName: next.productName,
           // The whole system, not just its headline. The maker's own edits to
           // the first product win over what the model called it; the rest are
           // as the concepts named them.
-          ...(buildProducts.length
-            ? {
-                products: [
-                  {
-                    name: next.productName,
-                    description: next.productDescription,
-                  },
-                  ...next.otherProducts,
-                ],
-              }
-            : null),
+          ...(productList ? { products: productList } : null),
           // Only a project made from this build carries it as its origin:
           // stamping an existing project would claim it was this build's all
           // along, and its product count would drop by one.
@@ -869,7 +883,12 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       return;
     }
 
-    updateProject(targetId, { productName: next.productName });
+    // The ordinary advance — and, for a build already attached, every press
+    // after the first. An edit made on the way back belongs to the project.
+    updateProject(targetId, {
+      productName: next.productName,
+      ...(productList ? { products: productList } : null),
+    });
     continuingRef.current = false;
     setContinuing(false);
     setState(next);
