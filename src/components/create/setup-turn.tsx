@@ -25,10 +25,15 @@ import {
   Loading03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { SelectMenu } from "@/components/ideeza";
 import type { Companion } from "@/lib/create/companions";
 import type { SetupAnswer } from "@/lib/create/history";
 
 export type SetupProject = { id: string; name: string };
+
+/** The chooser's own value for "not one of these" — no project can carry it,
+ *  since every id is generated with a prefix. */
+const NEW_PROJECT = "__new__";
 
 export function SetupTurn({
   prompt,
@@ -175,28 +180,38 @@ export function SetupTurn({
           />
         ) : (
           <>
-            {projects.map((pr) => (
-              <Row
-                key={pr.id}
-                radio
-                checked={projectId === pr.id}
-                title={pr.name}
-                why="Add this product to that project."
-                onToggle={() => {
-                  setProjectId(pr.id);
+            {/* A dropdown, not a row per project. The rows were fine for the
+                three products above — a list you read once and tick — but a
+                maker with fifty projects got fifty radio rows in the middle
+                of a chat, and the question they were answering scrolled off
+                the top. Same control the Brief's own project chooser uses, so
+                picking a project reads the same in both places. */}
+            <SelectMenu
+              placeholder="Choose a project"
+              value={
+                projectId ? projectId : projectName !== "" ? NEW_PROJECT : null
+              }
+              onChange={(v) => {
+                if (v === NEW_PROJECT) {
+                  setProjectId("");
+                  setProjectName((n) => n || " ");
+                } else {
+                  setProjectId(v);
                   setProjectName("");
-                }}
-              />
-            ))}
-            <Row
-              radio
-              checked={projectId === "" && projectName !== ""}
-              title="Start a new project"
-              why="Give it a name and this product becomes its first."
-              onToggle={() => {
-                setProjectId("");
-                setProjectName((n) => n || " ");
+                }
               }}
+              options={[
+                {
+                  value: NEW_PROJECT,
+                  label: "+ Start a new project",
+                  sub: "This product becomes its first.",
+                },
+                ...projects.map((pr) => ({
+                  value: pr.id,
+                  label: pr.name,
+                  section: "EXISTING PROJECTS",
+                })),
+              ]}
             />
             {projectId === "" && projectName !== "" && (
               <NameField
