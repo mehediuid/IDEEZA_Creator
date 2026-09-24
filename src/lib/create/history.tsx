@@ -63,6 +63,9 @@ export type SetupAnswer = {
   projectName: string;
   /** companionId of every additional product the maker ticked. */
   picked: string[];
+  /** Products still in the project that the maker left out of the next
+   *  build — ticked off on the canvas, their concepts kept. */
+  leftOut?: string[];
 };
 
 export type ChatTurn =
@@ -656,6 +659,11 @@ type Ctx = {
   ) => void;
   addSetupPick: (chatId: string, turnId: string, companionId: string) => void;
   addSetupProduct: (chatId: string, turnId: string, companion: Companion) => void;
+  /** Takes a product out of the project. Its concepts stay in the chat, so
+   *  putting it back (`addSetupPick`) draws nothing and costs nothing. */
+  dropSetupPick: (chatId: string, turnId: string, companionId: string) => void;
+  /** In or out of the next build, for a product that stays in the project. */
+  setSetupLeftOut: (chatId: string, turnId: string, companionId: string, out: boolean) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -1019,6 +1027,46 @@ export function CreateHistoryProvider({
       );
     },
     [],
+  );
+
+  const patchSetupAnswer = React.useCallback(
+    (chatId: string, turnId: string, patch: (a: SetupAnswer) => SetupAnswer) => {
+      setChats((arr) =>
+        arr.map((c) =>
+          c.id !== chatId
+            ? c
+            : {
+                ...c,
+                updatedAt: Date.now(),
+                turns: c.turns.map((t) =>
+                  t.id === turnId && t.role === "setup" && t.answer
+                    ? { ...t, answer: patch(t.answer) }
+                    : t,
+                ),
+              },
+        ),
+      );
+    },
+    [],
+  );
+
+  const dropSetupPick = React.useCallback(
+    (chatId: string, turnId: string, companionId: string) =>
+      patchSetupAnswer(chatId, turnId, (a) => ({
+        ...a,
+        picked: a.picked.filter((id) => id !== companionId),
+        leftOut: (a.leftOut ?? []).filter((id) => id !== companionId),
+      })),
+    [patchSetupAnswer],
+  );
+
+  const setSetupLeftOut = React.useCallback(
+    (chatId: string, turnId: string, companionId: string, out: boolean) =>
+      patchSetupAnswer(chatId, turnId, (a) => {
+        const rest = (a.leftOut ?? []).filter((id) => id !== companionId);
+        return { ...a, leftOut: out ? [...rest, companionId] : rest };
+      }),
+    [patchSetupAnswer],
   );
 
   // The job token for a render in flight. Written once, as soon as the
@@ -1542,6 +1590,8 @@ export function CreateHistoryProvider({
     answerSetupTurn,
     addSetupPick,
     addSetupProduct,
+    dropSetupPick,
+    setSetupLeftOut,
     getChat,
     startBuild,
     updateBuildItem,

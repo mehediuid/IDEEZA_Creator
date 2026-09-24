@@ -24,12 +24,14 @@ import {
   CheckmarkBadge01Icon,
   Coins01Icon,
   Copy01Icon,
+  Delete02Icon,
   MagicWand01Icon,
   Refresh01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { Icon } from "@/components/dashboard/icon";
+import { Checkbox } from "@/components/ideeza/checkbox";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { useMinuteClock } from "./build-status";
@@ -52,6 +54,8 @@ export function ImageTurn({
   regenerating = false,
   onRegenerate,
   onRefine,
+  buildChoice,
+  onRemove,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
   conceptLabel: string;
@@ -65,6 +69,12 @@ export function ImageTurn({
   regenerating?: boolean;
   onRegenerate: () => void;
   onRefine: () => void;
+  /** Whether this product goes into the next build. `locked` for the
+   *  concept the project started from, which is always built (Part 4
+   *  §4.4.4); the tick is shown, and says why it cannot be cleared. */
+  buildChoice?: { included: boolean; locked?: boolean; onToggle?: () => void };
+  /** Takes the product out of the project. Absent for the primary. */
+  onRemove?: () => void;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
   // The rendered balance, not canAfford(): that reads a ref the provider
@@ -76,24 +86,49 @@ export function ImageTurn({
   const { hydrated: creditsHydrated, balance } = useCredits();
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
+  const what = productName ?? `concept ${conceptLabel}`;
+  const tick = buildChoice ? <BuildTick what={what} choice={buildChoice} /> : null;
+  const remove = onRemove ? <RemoveButton what={what} onRemove={onRemove} /> : null;
+  const leftOut = !!buildChoice && !buildChoice.included;
+
+  // A drawing still under way, or one that failed, has no header of its
+  // own; the product's name and its two choices sit on a line above it, so
+  // a failed remote can be left out or removed rather than holding up the
+  // whole build.
+  const withChoices = (tile: React.ReactNode) =>
+    tick || remove ? (
+      <div className="flex w-full max-w-[640px] flex-col gap-[8px]">
+        <div className="flex items-center gap-[8px]">
+          {tick}
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
+            {productName ?? `Concept ${conceptLabel}`}
+          </span>
+          {remove}
+        </div>
+        {tile}
+      </div>
+    ) : (
+      tile
+    );
+
   if (turn.status === "pending") {
-    return (
+    return withChoices(
       <PendingImageTurn
         conceptLabel={conceptLabel}
         parentConceptLabel={parentConceptLabel}
         productName={productName}
         kind={turn.kind}
         since={turn.ts}
-      />
+      />,
     );
   }
   if (turn.status === "failed") {
-    return (
+    return withChoices(
       <FailedImageTurn
         reason={turn.failReason}
         onRetry={onRegenerate}
         disabled={shortForRender}
-      />
+      />,
     );
   }
 
@@ -108,6 +143,8 @@ export function ImageTurn({
         conceptLabel={conceptLabel}
         productName={productName}
         ts={turn.ts}
+        lead={tick}
+        trail={remove}
       />
 
       {/* The picture is the picture. It used to be a hidden Refine button,
@@ -119,7 +156,10 @@ export function ImageTurn({
           src={turn.imageUrl}
           alt={`${name}: ${turn.prompt}`}
           onError={() => setImgOk(false)}
-          className="aspect-[16/10] w-full rounded-xl object-cover"
+          className={[
+            "aspect-[16/10] w-full rounded-xl object-cover transition-opacity duration-fast",
+            leftOut ? "opacity-50" : "",
+          ].join(" ")}
         />
       ) : turn.imageUrl ? (
         <div className="flex aspect-[16/10] w-full flex-col items-center justify-center gap-[8px] rounded-xl bg-bg-surface-raised px-[16px] text-center">
@@ -183,9 +223,61 @@ export function ImageTurn({
         <span className="text-sm text-text-tertiary">
           {CONCEPT_COST} credit each
         </span>
-        {inBuild && <BuiltChip />}
+        {inBuild && !leftOut && <BuiltChip />}
+        {leftOut && (
+          <span className="ml-auto text-sm font-medium text-text-tertiary">
+            Left out
+          </span>
+        )}
       </div>
     </article>
+  );
+}
+
+/** "Include in build" for one product — a real checkbox, named for the
+ *  product, so a screen reader hears which one it is ticking. */
+function BuildTick({
+  what,
+  choice,
+}: {
+  what: string;
+  choice: { included: boolean; locked?: boolean; onToggle?: () => void };
+}) {
+  const reason = choice.locked
+    ? `${what} is always built — it is the concept this project started from`
+    : undefined;
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={choice.included}
+      aria-disabled={choice.locked || undefined}
+      aria-label={reason ?? `Include ${what} in the build`}
+      title={reason ?? "Include in the build"}
+      onClick={choice.locked ? undefined : choice.onToggle}
+      className={[
+        "inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+        choice.locked ? "cursor-not-allowed" : "hover:bg-bg-subtle",
+      ].join(" ")}
+    >
+      <Checkbox checked={choice.included} decorative disabled={choice.locked} />
+    </button>
+  );
+}
+
+/** Takes the product out of the project — undone from the canvas's own
+ *  Removed list, free, since its concept is kept. */
+function RemoveButton({ what, onRemove }: { what: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      aria-label={`Remove ${what} from this project`}
+      title="Remove from this project"
+      className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
+    >
+      <Icon icon={Delete02Icon} size={16} />
+    </button>
   );
 }
 
@@ -243,17 +335,24 @@ function ConceptHeader({
   conceptLabel,
   productName,
   ts,
+  lead,
+  trail,
 }: {
   conceptLabel: string;
   productName?: string;
   ts?: number;
+  /** The build tick, before the name. */
+  lead?: React.ReactNode;
+  /** The remove control, after the time. */
+  trail?: React.ReactNode;
 }) {
   // Re-read on the minute clock, so "just now" does not stay "just now".
   const now = useMinuteClock();
   const time = ts ? formatRelative(ts, now) : "";
   return (
-    <header className="flex items-baseline justify-between gap-[12px]">
+    <header className="flex items-center justify-between gap-[12px]">
       <div className="flex min-w-0 items-baseline gap-[8px]">
+        {lead && <span className="self-center">{lead}</span>}
         {productName && (
           <h3 className="truncate text-md font-semibold text-text-primary">
             {productName}
@@ -263,8 +362,11 @@ function ConceptHeader({
           Concept {conceptLabel}
         </span>
       </div>
-      {time && (
-        <span className="shrink-0 text-sm text-text-tertiary">{time}</span>
+      {(time || trail) && (
+        <span className="flex shrink-0 items-center gap-[4px]">
+          {time && <span className="text-sm text-text-tertiary">{time}</span>}
+          {trail}
+        </span>
       )}
     </header>
   );

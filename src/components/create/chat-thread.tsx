@@ -13,8 +13,9 @@
 // of concept 1) beside the product's name.
 
 import * as React from "react";
-import { Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { TextInput } from "@/components/ideeza/text-input";
 import {
   productsOf,
   type BuildJob,
@@ -63,6 +64,10 @@ export function ChatThread({
   onBuild,
   onRefineTurn,
   onAddProduct,
+  onAddNamedProduct,
+  onRemoveProduct,
+  onRestoreProduct,
+  onToggleInBuild,
   job,
   focusedProduct,
   onFocusProduct,
@@ -85,6 +90,14 @@ export function ChatThread({
   onRefineTurn: (turnId: string) => void;
   /** Take up a product the maker passed over at the question. */
   onAddProduct: (companionId: string) => void;
+  /** A product nobody offered, named by the maker — drawn as its own
+   *  concept (one credit) and added to the project. */
+  onAddNamedProduct: (name: string) => void;
+  /** Out of the project; its concepts stay, so Restore is free. */
+  onRemoveProduct: (companionId: string) => void;
+  onRestoreProduct: (companionId: string) => void;
+  /** In or out of the next build, for a product that stays in the project. */
+  onToggleInBuild: (companionId: string) => void;
   /** The build this chat started, once it has one. The canvas leads with the
    *  build's own surface then — the deliverables arriving one by one —
    *  rather than sending the maker to a page of its own. */
@@ -118,6 +131,15 @@ export function ChatThread({
   // stack another card here, so a two-product build with a few refines
   // became a column nobody could see the shape of. The history is not
   // lost — the rail beside this records every render as it happened.
+  const setup = React.useMemo(
+    () => chat.turns.find((t) => t.role === "setup"),
+    [chat.turns],
+  );
+  const answer = setup?.role === "setup" ? setup.answer : undefined;
+
+  // A product taken out of the project keeps its turns (the rail is the
+  // history), so the canvas reads membership from the answer, not from
+  // which products happen to have been drawn.
   const products = React.useMemo(() => {
     const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
     for (const t of chat.turns) {
@@ -127,14 +149,17 @@ export function ChatThread({
     // Primary first; the companions keep the order they were offered in.
     const primary = latest.get("primary");
     const rest = [...latest.entries()]
-      .filter(([k]) => k !== "primary")
+      .filter(([k]) => k !== "primary" && (!answer || answer.picked.includes(k)))
       .map(([, t]) => t);
     return primary ? [primary, ...rest] : rest;
-  }, [chat.turns]);
+  }, [chat.turns, answer]);
 
-  const setup = React.useMemo(
-    () => chat.turns.find((t) => t.role === "setup"),
-    [chat.turns],
+  // What the next build takes: the primary always (Part 4 §4.4.4), and
+  // every other product the maker has not ticked off.
+  const leftOut = React.useMemo(() => new Set(answer?.leftOut ?? []), [answer]);
+  const selected = React.useMemo(
+    () => products.filter((t) => !t.companionOf || !leftOut.has(t.companionOf)),
+    [products, leftOut],
   );
 
   // Every card is titled with the product it is a drawing of — the name the
@@ -147,15 +172,25 @@ export function ChatThread({
 
   // Offered, and not being built: no concept has been drawn for it and the
   // answer did not include it.
+  const drawn = React.useMemo(
+    () =>
+      new Set(
+        chat.turns
+          .filter((t) => t.role === "assistant" && t.companionOf)
+          .map((t) => (t.role === "assistant" ? t.companionOf! : "")),
+      ),
+    [chat.turns],
+  );
   const available = React.useMemo(() => {
     if (setup?.role !== "setup" || setup.status !== "answered") return [];
-    const drawn = new Set(
-      chat.turns
-        .filter((t) => t.role === "assistant" && t.companionOf)
-        .map((t) => (t.role === "assistant" ? t.companionOf! : "")),
-    );
     return setup.companions.filter((x) => !drawn.has(x.id));
-  }, [setup, chat.turns]);
+  }, [setup, drawn]);
+  // Drawn once, then taken out: their concepts are still here to put back.
+  const removed = React.useMemo(() => {
+    if (setup?.role !== "setup" || !setup.answer) return [];
+    const picked = setup.answer.picked;
+    return setup.companions.filter((x) => drawn.has(x.id) && !picked.includes(x.id));
+  }, [setup, drawn]);
 
   // Which drawings the current build was made from. A concept changed after
   // the build — refined, regenerated, or a product added — is not in it, and
@@ -171,14 +206,20 @@ export function ChatThread({
   );
   const inBuild = (t: Extract<ChatTurn, { role: "assistant" }>) =>
     !!t.imageUrl && builtImages.has(t.imageUrl);
+  // Changed means the next build would differ from the one on screen: a
+  // chosen product drawn again or added, or one the build holds that has
+  // since been left out or removed.
   const changedSinceBuild =
-    !!job && products.some((t) => t.status !== "ready" || !inBuild(t));
+    !!job &&
+    (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
+      builtImages.size !== selected.filter(inBuild).length);
 
   const buildable = products.find(
     (t) => t.status === "ready" && !t.companionOf,
   );
   const allReady =
-    products.length > 0 && products.every((t) => t.status === "ready");
+    selected.length > 0 && selected.every((t) => t.status === "ready");
+  const failedChoice = selected.find((t) => t.status === "failed");
   const offerBuild = !!buildable && (!job || changedSinceBuild);
 
   // The credit gate is explained ONCE, beside the one build action — every
@@ -186,8 +227,9 @@ export function ChatThread({
   // canAfford(): the provider refreshes that ref in its own effect, which
   // runs after ours, so it reads a render behind here.
   const { hydrated: creditsHydrated, balance } = useCredits();
-  const cost = buildCost(products.length);
+  const cost = buildCost(selected.length);
   const shortForBuild = creditsHydrated && balance < cost;
+  const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
   const conceptGrid = (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-[20px]">
@@ -206,6 +248,26 @@ export function ChatThread({
           regenerating={regeneratingFrom?.has(turn.id) ?? false}
           onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
           onRefine={() => onRefineTurn(turn.id)}
+          // A project of one has nothing to choose between, and a chat from
+          // before the setup question has no answer to record the choice in.
+          buildChoice={
+            answer && products.length > 1
+              ? turn.companionOf
+                ? {
+                    included: !leftOut.has(turn.companionOf),
+                    onToggle: () => onToggleInBuild(turn.companionOf!),
+                  }
+                : { included: true, locked: true }
+              : undefined
+          }
+          onRemove={
+            answer && turn.companionOf
+              ? () => {
+                  if (focusedProduct === turn.companionOf) onFocusProduct?.("primary");
+                  onRemoveProduct(turn.companionOf!);
+                }
+              : undefined
+          }
         />
       ))}
     </div>
@@ -279,49 +341,31 @@ export function ChatThread({
 
           {conceptGrid}
 
-          {/* Everything the classifier found that is not being built. The
-              answer at the question was "not now", which is not "never" —
-              and the offer is already paid for in thinking, so making them
-              start again to get it back would lose work they had done. */}
-          {available.length > 0 && (
-            <section className="flex w-full flex-col gap-[8px] border-t border-solid border-border pt-[20px]">
-              <h3 className="text-sm font-semibold text-text-primary">
-                Add another product to this project
-              </h3>
-              <ul role="list" className="flex flex-col gap-[2px]">
-                {available.map((a) => (
-                  <li
-                    key={a.id}
-                    data-testid="available-product"
-                    className="flex items-start gap-[12px] rounded-xl px-[12px] py-[10px] transition-colors duration-fast hover:bg-bg-subtle"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-md font-medium text-text-primary">
-                        {a.name}
-                      </span>
-                      <span className="mt-[1px] block text-sm leading-relaxed text-text-tertiary">
-                        {a.why}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onAddProduct(a.id)}
-                      className="mt-[2px] inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
-                    >
-                      Add · {CONCEPT_COST} credit
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {/* Figma-less, the maker's own ask: what is missing is added here,
+              beside what it joins — a name typed and drawn, a product the
+              classifier offered and was passed over, or one taken out and
+              wanted back. The composer still reads "add a charger" too;
+              this is the place to do it without phrasing a sentence. */}
+          {answer && (
+            <AddProductSection
+              existing={products.map((t) => productNameOf(t) ?? "")}
+              available={available}
+              removed={removed}
+              shortForRender={shortForRender}
+              onAddOffered={onAddProduct}
+              onRestore={onRestoreProduct}
+              onAddNamed={onAddNamedProduct}
+            />
           )}
 
           {offerBuild && buildable && (
             <BuildAction
-              products={products.length}
+              products={selected.length}
+              total={products.length}
               cost={cost}
               again={!!job}
               allReady={allReady}
+              failedName={failedChoice ? productNameOf(failedChoice) ?? "One product" : undefined}
               preparing={preparingTurnId === buildable.id}
               onBuild={() => onBuild(buildable.id)}
             />
@@ -341,17 +385,25 @@ export function ChatThread({
  *  a product with nothing drawn has nothing to build from. */
 function BuildAction({
   products,
+  total,
   cost,
   again,
   allReady,
+  failedName,
   preparing,
   onBuild,
 }: {
+  /** The products this build takes. */
   products: number;
+  /** Every product in the project, ticked or not. */
+  total: number;
   cost: number;
   /** A build exists and a concept has changed since — this books the next. */
   again: boolean;
   allReady: boolean;
+  /** A chosen product whose concept failed — it holds the build until it is
+   *  drawn again, left out or removed. */
+  failedName?: string;
   preparing: boolean;
   onBuild: () => void;
 }) {
@@ -362,9 +414,11 @@ function BuildAction({
   const blocked = short || !allReady;
   const reason = short
     ? `Not enough credits — this build costs ${cost}, you have ${balance}`
-    : !allReady
-      ? "One of the concepts is still drawing"
-      : undefined;
+    : failedName
+      ? `${failedName}'s concept didn't come through — try it again, or leave it out of this build`
+      : !allReady
+        ? "One of the concepts is still drawing"
+        : undefined;
   const label = again
     ? "Build again"
     : products === 1
@@ -374,8 +428,12 @@ function BuildAction({
     <div className="flex w-full flex-wrap items-center gap-[12px] border-t border-solid border-border pt-[20px]">
       <p className="text-sm text-text-secondary">
         {allReady
-          ? `${products} product${products === 1 ? "" : "s"} · ${cost} credits`
-          : "Waiting for every concept to land"}
+          ? `${products < total ? `${products} of ${total}` : products} product${
+              (products < total ? total : products) === 1 ? "" : "s"
+            } · ${cost} credits`
+          : failedName
+            ? "A chosen concept didn't come through"
+            : "Waiting for every concept to land"}
         {short ? (
           <span className="text-text-error"> · you have {balance}</span>
         ) : null}
@@ -411,5 +469,160 @@ function BuildAction({
         <p className="w-full text-right text-sm text-text-tertiary">{reason}</p>
       )}
     </div>
+  );
+}
+
+/** The canvas's one place to grow or restore the project (the spot beside
+ *  the build it joins). A typed name that is already here says so; one that
+ *  was offered, or removed, takes that product rather than drawing a twin. */
+function AddProductSection({
+  existing,
+  available,
+  removed,
+  shortForRender,
+  onAddOffered,
+  onRestore,
+  onAddNamed,
+}: {
+  existing: string[];
+  available: { id: string; name: string; why: string }[];
+  removed: { id: string; name: string; why: string }[];
+  shortForRender: boolean;
+  onAddOffered: (id: string) => void;
+  onRestore: (id: string) => void;
+  onAddNamed: (name: string) => void;
+}) {
+  const [name, setName] = React.useState("");
+  const [note, setNote] = React.useState("");
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const trimmed = name.trim().replace(/\s+/g, " ").slice(0, 48);
+  const offered = trimmed ? available.find((a) => same(a.name, trimmed)) : undefined;
+  const wasRemoved = trimmed ? removed.find((r) => same(r.name, trimmed)) : undefined;
+  const costs = !wasRemoved;
+  const blocked = !trimmed || (costs && shortForRender);
+
+  const submit = () => {
+    if (!trimmed) return;
+    const twin = existing.find((n) => same(n, trimmed));
+    if (twin) {
+      setNote(`${twin} is already in this project.`);
+      return;
+    }
+    if (wasRemoved) onRestore(wasRemoved.id);
+    else if (shortForRender) return;
+    else if (offered) onAddOffered(offered.id);
+    else onAddNamed(trimmed);
+    setName("");
+    setNote("");
+  };
+
+  const rowButton =
+    "mt-[2px] inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-text-disabled";
+
+  return (
+    <section
+      aria-labelledby="add-product-heading"
+      className="flex w-full flex-col gap-[12px] border-t border-solid border-border pt-[20px]"
+    >
+      <div>
+        <h3 id="add-product-heading" className="text-sm font-semibold text-text-primary">
+          Add a product
+        </h3>
+        <p className="mt-[2px] text-sm text-text-tertiary">
+          Name what this project is missing. It is drawn as its own concept ({CONCEPT_COST} credit) and joins the next build.
+        </p>
+      </div>
+      <form
+        className="flex w-full max-w-[560px] items-start gap-[8px]"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <div className="min-w-0 flex-1">
+          <label htmlFor="add-product-name" className="sr-only">
+            Product name
+          </label>
+          <TextInput
+            id="add-product-name"
+            value={name}
+            onValueChange={(v) => {
+              setName(v);
+              setNote("");
+            }}
+            placeholder="e.g. Charging dock"
+            maxLength={48}
+            aria-describedby="add-product-note"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={blocked}
+          title={costs && shortForRender ? `Not enough credits — a concept render costs ${CONCEPT_COST}` : undefined}
+          className="inline-flex h-[36px] shrink-0 items-center gap-[6px] rounded-lg bg-bg-brand px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-text-disabled"
+        >
+          <Icon icon={Add01Icon} size={15} />
+          {wasRemoved ? "Restore" : `Add · ${CONCEPT_COST} credit`}
+        </button>
+      </form>
+      <p id="add-product-note" role="status" className="text-sm text-text-tertiary empty:hidden">
+        {note ||
+          (wasRemoved
+            ? `${wasRemoved.name} was removed — its concept is kept, so putting it back is free.`
+            : costs && shortForRender && trimmed
+              ? `Not enough credits — a concept render costs ${CONCEPT_COST}.`
+              : "")}
+      </p>
+
+      {available.length > 0 && (
+        <div className="flex flex-col gap-[2px]">
+          <p className="text-xs font-medium text-text-tertiary">Suggested for this project</p>
+          <ul role="list" className="flex flex-col gap-[2px]">
+            {available.map((a) => (
+              <li
+                key={a.id}
+                data-testid="available-product"
+                className="flex items-start gap-[12px] rounded-xl px-[12px] py-[10px] transition-colors duration-fast hover:bg-bg-subtle"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-md font-medium text-text-primary">{a.name}</span>
+                  <span className="mt-[1px] block text-sm leading-relaxed text-text-tertiary">{a.why}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onAddOffered(a.id)}
+                  disabled={shortForRender}
+                  title={shortForRender ? `Not enough credits — a concept render costs ${CONCEPT_COST}` : undefined}
+                  className={rowButton}
+                >
+                  Add · {CONCEPT_COST} credit
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {removed.length > 0 && (
+        <div className="flex flex-col gap-[2px]">
+          <p className="text-xs font-medium text-text-tertiary">Removed from this project</p>
+          <ul role="list" className="flex flex-col gap-[2px]">
+            {removed.map((r) => (
+              <li
+                key={r.id}
+                data-testid="removed-product"
+                className="flex items-center gap-[12px] rounded-xl px-[12px] py-[10px] transition-colors duration-fast hover:bg-bg-subtle"
+              >
+                <span className="min-w-0 flex-1 truncate text-md font-medium text-text-secondary">{r.name}</span>
+                <span className="text-sm text-text-tertiary">Concept kept · free</span>
+                <button type="button" onClick={() => onRestore(r.id)} className={rowButton}>
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }

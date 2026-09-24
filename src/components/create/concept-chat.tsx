@@ -100,6 +100,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     answerSetupTurn,
     addSetupPick,
     addSetupProduct,
+    dropSetupPick,
+    setSetupLeftOut,
     startBuild,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
@@ -410,6 +412,68 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       });
     },
     [chat, addSetupPick, appendAssistantTurn],
+  );
+
+  // The canvas's own Add a product: a name nobody offered, drawn the way a
+  // product asked for in the composer is (same id, same prompt, same place
+  // in the answer), so the gate and the build treat it like any other.
+  const handleAddNamedProduct = React.useCallback(
+    (name: string) => {
+      if (!chat || !canAfford(CONCEPT_COST)) return;
+      const setup = chat.turns.find(
+        (t) => t.role === "setup" && t.status === "answered" && t.answer,
+      );
+      if (!setup || setup.role !== "setup") return;
+      const id = slugFor(name);
+      const already = setup.companions.find((c) => c.id === id);
+      addSetupProduct(chat.id, setup.id, {
+        id,
+        name: already?.name ?? name,
+        why: already?.why ?? `You added ${name.toLowerCase()}.`,
+      });
+      setFocusedProduct(id);
+      appendAssistantTurn(chat.id, {
+        prompt: `${name} for ${asPhrase(setup.prompt)}`,
+        kind: "fresh",
+        companionOf: id,
+      });
+    },
+    [chat, canAfford, addSetupProduct, appendAssistantTurn],
+  );
+
+  // Out of the project, back in, in or out of the next build — each a change
+  // to the answer alone. Nothing is drawn and nothing is charged: a removed
+  // product keeps its concepts (Part 4's "re-selecting does not require
+  // regeneration"), so restoring it costs nothing.
+  const answeredSetupId = React.useMemo(() => {
+    const t = chat?.turns.find((x) => x.role === "setup" && x.status === "answered" && x.answer);
+    return t?.id ?? null;
+  }, [chat]);
+  const leftOutNow = React.useMemo(() => {
+    const t = chat?.turns.find((x) => x.id === answeredSetupId);
+    return t?.role === "setup" ? t.answer?.leftOut ?? [] : [];
+  }, [chat, answeredSetupId]);
+  const handleRemoveProduct = React.useCallback(
+    (companionId: string) => {
+      if (!chat || !answeredSetupId) return;
+      dropSetupPick(chat.id, answeredSetupId, companionId);
+    },
+    [chat, answeredSetupId, dropSetupPick],
+  );
+  const handleRestoreProduct = React.useCallback(
+    (companionId: string) => {
+      if (!chat || !answeredSetupId) return;
+      addSetupPick(chat.id, answeredSetupId, companionId);
+      setFocusedProduct(companionId);
+    },
+    [chat, answeredSetupId, addSetupPick],
+  );
+  const handleToggleInBuild = React.useCallback(
+    (companionId: string) => {
+      if (!chat || !answeredSetupId) return;
+      setSetupLeftOut(chat.id, answeredSetupId, companionId, !leftOutNow.includes(companionId));
+    },
+    [chat, answeredSetupId, leftOutNow, setSetupLeftOut],
   );
 
   // Auto-run any pending assistant turns. This handles:
@@ -787,10 +851,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       const setup = chat.turns.find(
         (x) => x.role === "setup" && x.status === "answered" && x.answer,
       );
+      // Ticked off on the canvas means not in this build: the product stays
+      // in the project, its concept kept, and the price leaves it out.
       const decided =
         setup && setup.role === "setup" && setup.answer
-          ? setup.companions.filter((c) =>
-              setup.answer!.picked.includes(c.id),
+          ? setup.companions.filter(
+              (c) =>
+                setup.answer!.picked.includes(c.id) &&
+                !(setup.answer!.leftOut ?? []).includes(c.id),
             )
           : [];
       setCompanionPlan(decided);
@@ -1039,6 +1107,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             onBuild={handleUseTurn}
             onRefineTurn={handleOpenEditor}
             onAddProduct={handleAddProduct}
+            onAddNamedProduct={handleAddNamedProduct}
+            onRemoveProduct={handleRemoveProduct}
+            onRestoreProduct={handleRestoreProduct}
+            onToggleInBuild={handleToggleInBuild}
             job={activeBuild}
             focusedProduct={focusedProduct}
             onFocusProduct={setFocusedProduct}
