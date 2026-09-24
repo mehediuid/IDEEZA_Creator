@@ -1160,24 +1160,9 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     hydrated && step !== "success" ? (
       <p
         role="status"
-        style={{
-          margin: 0,
-          fontSize: 12,
-          color: "var(--color-text-tertiary)",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-        }}
+        className="m-0 inline-flex items-center gap-[6px] text-sm text-text-tertiary"
       >
-        <span
-          aria-hidden
-          style={{
-            width: 6,
-            height: 6,
-            background: "var(--color-bg-success)",
-            borderRadius: "50%",
-          }}
-        />
+        <span aria-hidden className="h-[6px] w-[6px] rounded-full bg-bg-success" />
         Saved as you go
       </p>
     ) : null;
@@ -1218,14 +1203,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       <div
         data-brief-shell="build"
         // Tighter at phone width, where 32 px a side was a fifth of the screen.
-        className="px-[16px] pb-[48px] pt-[24px] md:px-[32px] md:pb-[64px] md:pt-[40px]"
-        style={{
-          minHeight: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "var(--spacing-6)",
-        }}
+        className="flex min-h-full flex-col items-center gap-6 px-[16px] pb-[48px] pt-[24px] md:px-[32px] md:pb-[64px] md:pt-[40px]"
       >
         {step !== "success" && (
           <BriefStepLine steps={seq} current={step} intent={state.intent} />
@@ -1254,26 +1232,9 @@ export function BriefApp({ buildId }: { buildId?: string }) {
 
       <div
         data-brief-shell="project"
-        style={{
-          position: "absolute",
-          top: 62,
-          bottom: 0,
-          left: 74,
-          right: 0,
-          background: "var(--color-bg-page)",
-          overflowY: "auto",
-        }}
+        className="absolute bottom-0 left-[74px] right-0 top-[62px] overflow-y-auto bg-bg-page"
       >
-        <div
-          style={{
-            minHeight: "100%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "var(--spacing-6)",
-            padding: "64px 32px",
-          }}
-        >
+        <div className="flex min-h-full flex-col items-center gap-6 px-[32px] py-[64px]">
           {body}
           {savedNote}
         </div>
@@ -1296,37 +1257,13 @@ export function BriefCard({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 600,
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--spacing-8)",
-      }}
-    >
+    <div className="flex w-full max-w-[600px] flex-col gap-8">
       {onBack ? (
         <button
           type="button"
-          className="ix-brief-back"
+          // A 32 px target — the bare text was 21 px tall.
+          className="ix-brief-back -ml-[4px] inline-flex min-h-[32px] items-center gap-4 self-start px-[4px] text-md font-medium text-text-secondary transition-colors duration-fast"
           onClick={onBack}
-          style={{
-            alignSelf: "flex-start",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "var(--spacing-4)",
-            // A 32 px target — the bare text was 21 px tall.
-            minHeight: 32,
-            padding: "0 4px",
-            marginLeft: -4,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 500,
-            color: "var(--color-text-secondary)",
-            transition: "color .14s",
-          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M19 12H5 M11 6l-6 6 6 6" />
@@ -1334,15 +1271,7 @@ export function BriefCard({
           Back
         </button>
       ) : null}
-      <div
-        style={{
-          background: "var(--color-bg-surface)",
-          border: "var(--border-width-1) solid var(--color-border-subtle)",
-          borderRadius: "var(--radius-2xl)",
-          boxShadow: "var(--elevation-1)",
-          padding: "var(--spacing-12)",
-        }}
-      >
+      <div className="rounded-2xl border border-solid border-subtle bg-bg-surface p-12 shadow-1">
         {children}
       </div>
     </div>
@@ -1377,18 +1306,7 @@ function HandoffNotice({
     <div
       role="status"
       data-handoff-notice
-      style={{
-        width: "100%",
-        maxWidth: 600,
-        display: "flex",
-        gap: 10,
-        padding: "12px 14px",
-        background: "var(--color-bg-info-subtle)",
-        border: "var(--border-width-1) solid var(--color-border-blue)",
-        borderRadius: "var(--radius-lg)",
-        fontSize: 13,
-        color: "var(--color-text-primary)",
-      }}
+      className="flex w-full max-w-[600px] gap-[10px] rounded-lg border border-solid border-[var(--color-border-blue)] bg-bg-info-subtle px-[14px] py-[12px] text-sm text-text-primary"
     >
       <svg
         width="17"
@@ -1399,7 +1317,7 @@ function HandoffNotice({
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
+        className="mt-[1px] shrink-0"
         aria-hidden
       >
         <circle cx="12" cy="12" r="9" />
@@ -1438,12 +1356,7 @@ function Crossfade({
   return (
     <div
       key={keyName}
-      style={{
-        width: "100%",
-        display: "flex",
-        justifyContent: "center",
-        animation: "ix-brief-in .2s ease-out",
-      }}
+      className="flex w-full animate-[ix-brief-in_.2s_ease-out] justify-center"
     >
       {children}
     </div>

@@ -9,7 +9,6 @@
 import { DsIcon } from "@/lib/pcb/icons";
 import { buildRail } from "@/lib/pcb/data";
 import { useStepNav, RAIL_KEY_TO_STEP } from "@/components/manual/use-step-nav";
-import { C } from "@/lib/pcb/colors";
 import {
   BRIEF_FORM_LABEL,
   STEP_ORDER,
@@ -81,32 +80,13 @@ export function BriefRail({
 
   return (
     <div
-      style={{
-        position: "absolute",
-        top: topOffset,
-        bottom: 0,
-        left: 0,
-        width: 74,
-        background: "var(--color-bg-surface)",
-        borderRight: "var(--border-width-1) solid var(--color-border-subtle)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        paddingTop: "var(--spacing-8)",
-        overflowY: "auto",
-        zIndex: 16,
-      }}
+      style={{ top: topOffset }}
+      className="absolute bottom-0 left-0 z-[16] flex w-[74px] flex-col items-center overflow-y-auto border-r border-solid border-border-subtle bg-bg-surface pt-[16px]"
     >
       <nav
         aria-label="Brief steps"
         data-brief-rail
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "var(--spacing-2)",
-          width: "100%",
-        }}
+        className="flex w-full flex-col items-center gap-[4px]"
       >
         {steps.map((id, i) => {
           const active = i === activeIndex;
@@ -128,41 +108,20 @@ export function BriefRail({
               disabled={!canGo && !active}
               aria-disabled={canGo ? undefined : true}
               onClick={canGo ? () => onGo?.(id) : undefined}
-              className="ix-brief-step"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "var(--spacing-2)",
-                padding: "var(--spacing-4) var(--spacing-2)",
-                width: "100%",
-                background: "none",
-                border: "none",
-                cursor: canGo ? "pointer" : "default",
-              }}
+              className={[
+                "ix-brief-step flex w-full flex-col items-center gap-[4px] border-none bg-transparent px-[4px] py-[8px]",
+                canGo ? "cursor-pointer" : "cursor-default",
+              ].join(" ")}
             >
               <span
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "var(--radius-full)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "var(--font-size-xs)",
-                  fontWeight: 700,
-                  background: active
-                    ? C.primary
+                className={[
+                  "flex h-[34px] w-[34px] items-center justify-center rounded-full text-xs font-bold transition-colors duration-fast",
+                  active
+                    ? "bg-bg-brand text-text-on-brand"
                     : done
-                      ? "var(--color-bg-success-subtle)"
-                      : "var(--color-bg-subtle)",
-                  color: active
-                    ? "var(--color-text-on-brand)"
-                    : done
-                      ? "var(--color-text-success)"
-                      : "var(--color-text-tertiary)",
-                  transition: "background .14s, color .14s",
-                }}
+                      ? "bg-bg-success-subtle text-text-success"
+                      : "bg-bg-subtle text-text-tertiary",
+                ].join(" ")}
               >
                 {done ? (
                   <svg
@@ -183,14 +142,10 @@ export function BriefRail({
                 )}
               </span>
               <span
-                style={{
-                  fontSize: "var(--font-size-2xs)",
-                  fontWeight: 600,
-                  textAlign: "center",
-                  lineHeight: 1.15,
-                  color: active ? C.primary : done ? C.text : C.body,
-                  maxWidth: 64,
-                }}
+                className={[
+                  "max-w-[64px] text-center text-2xs font-semibold leading-[1.15]",
+                  active ? "text-text-brand" : done ? "text-text-primary" : "text-text-secondary",
+                ].join(" ")}
               >
                 {labelFor(id, intent)}
               </span>
@@ -199,67 +154,28 @@ export function BriefRail({
         })}
       </nav>
 
-      <div
-        style={{
-          width: 42,
-          height: "var(--border-width-1)",
-          background: "var(--color-border-subtle)",
-          margin: "var(--spacing-6) 0",
-          flexShrink: 0,
-        }}
-      />
+      <div className="my-[12px] h-px w-[42px] shrink-0 bg-border-subtle" />
 
-      <nav
-        aria-label="Editor modules"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-        }}
-      >
+      <nav aria-label="Editor modules" className="flex w-full flex-col items-center">
         {items.map((r) => (
           <div
             key={r.key}
-            className="ix-nav"
+            className="ix-nav flex w-full flex-col items-center gap-[4px] py-[8px]"
             onClick={() => {
               const step = RAIL_KEY_TO_STEP[r.key];
               if (step && r.key !== "brief" && activeProject) goStep(step);
             }}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "var(--spacing-2)",
-              padding: "var(--spacing-4) var(--spacing-0)",
-              width: "100%",
-              cursor: r.cursor,
-              opacity: r.opacity,
-            }}
+            style={{ cursor: r.cursor, opacity: r.opacity }}
           >
             <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: "var(--radius-xl)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: r.bg,
-                color: r.fg,
-              }}
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-xl"
+              style={{ background: r.bg, color: r.fg }}
             >
               <DsIcon name={r.icon} size={20} />
             </div>
             <span
-              style={{
-                fontSize: "var(--font-size-2xs)",
-                fontWeight: 600,
-                textAlign: "center",
-                lineHeight: 1.15,
-                color: r.fg,
-                maxWidth: 64,
-              }}
+              className="max-w-[64px] text-center text-2xs font-semibold leading-[1.15]"
+              style={{ color: r.fg }}
             >
               {r.label}
             </span>

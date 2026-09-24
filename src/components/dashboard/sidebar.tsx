@@ -139,9 +139,11 @@ export function DashboardSidebar({
       <aside
         aria-label="Primary navigation"
         data-collapsed={collapsed}
+        // Collapses at once rather than animating its width: a width
+        // animation re-lays the whole page out on every frame, and a panel
+        // toggle is a state change that needs no choreography.
         className={[
           "hidden h-full shrink-0 flex-col border-r border-border bg-bg-page md:flex",
-          "transition-[width] duration-normal ease-decelerate motion-reduce:transition-none",
           collapsed ? "w-[72px]" : "w-[280px]",
         ].join(" ")}
       >

@@ -14,7 +14,6 @@
 
 import * as React from "react";
 import { Checkbox, SelectMenu, type SelectOption } from "@/components/ideeza";
-import { C } from "@/lib/pcb/colors";
 import { BriefCard } from "./brief-app";
 // The model itself, not `brief-app`'s re-export of it: these are read at module
 // scope (the option lists below), which only worked while some other import
@@ -286,22 +285,18 @@ export function Step3Mint({
         ? "Save as Private"
         : `Pay ${MINT_FEE} IDZ and go live`;
 
+  // Shared by the two hint lines under the CTA — the unmet-requirement reason
+  // and the "you don't have to wait" note both read as a small centred aside.
+  const hintClass = "text-center text-sm leading-relaxed text-text-secondary";
+
   return (
     <BriefCard onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="flex flex-col gap-[20px]">
         <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: C.text,
-              margin: 0,
-              letterSpacing: -0.2,
-            }}
-          >
+          <h1 className="m-0 text-2xl font-bold tracking-[-0.2px] text-text-primary">
             {heading}
           </h1>
-          <p style={{ fontSize: 13, color: C.body, marginTop: 6 }}>
+          <p className="mt-[6px] text-sm text-text-secondary">
             {SUB_BY_INTENT[intent]}{" "}
             {intent === "sell" &&
               willRenderVideo &&
@@ -329,16 +324,7 @@ export function Step3Mint({
             no price, so a cost card there would be the one place money is
             mentioned, with nothing on the form to check it against. */}
         {intent === "sell" && (
-          <div
-            style={{
-              background: "var(--color-bg-surface-raised)",
-              borderRadius: "var(--radius-lg)",
-              padding: 16,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
+          <div className="flex flex-col gap-[8px] rounded-lg bg-bg-surface-raised p-[16px]">
             <CostRow label="Mint fee" value={`${MINT_FEE} IDZ`} />
             {isAmount(listingAmount) && (
               <CostRow
@@ -354,33 +340,19 @@ export function Step3Mint({
               value={
                 <>
                   {gas.fee} {gas.native}{" "}
-                  <span style={{ color: "var(--color-text-tertiary)" }}>
-                    {gas.note}
-                  </span>
+                  <span className="text-text-tertiary">{gas.note}</span>
                 </>
               }
             />
             {/* `--color-border-subtle` *is* this card's own ground in light
                 theme (both gray-100), so the rule has to step off it. */}
-            <div
-              style={{
-                height: 1,
-                background: "var(--color-border-strong)",
-                margin: "4px 0",
-              }}
-            />
+            <div className="my-[4px] h-[1px] bg-[var(--color-border-strong)]" />
             <CostRow
               label="Total to pay now"
               value={formatTotal(MINT_FEE, gas)}
               bold
             />
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--color-text-tertiary)",
-                lineHeight: 1.5,
-              }}
-            >
+            <div className="text-xs leading-relaxed text-text-tertiary">
               Estimate at fixed reference rates — live network pricing
               isn&rsquo;t wired yet. IDZ is IDEEZA&rsquo;s token, paid from
               your wallet; it is separate from the credits a build uses.
@@ -392,7 +364,7 @@ export function Step3Mint({
 
         {/* A disabled button takes no pointer events, so the reason has to live
             on a wrapper the cursor can still reach. */}
-        <span title={missing ?? undefined} style={{ display: "flex" }}>
+        <span title={missing ?? undefined} className="flex">
           <button
             onClick={isLastStep ? onMint : onNext}
             disabled={!canPay}
@@ -400,27 +372,12 @@ export function Step3Mint({
             aria-describedby={missing ? reasonId : undefined}
             // The app's primary button — the same shape and weight as every
             // other one, not a glowing pill of its own.
-            style={{
-              width: "100%",
-              height: 44,
-              padding: "0 24px",
-              background: canPay
-                ? "var(--color-bg-brand)"
-                : "var(--color-bg-subtle)",
-              color: canPay
-                ? "var(--color-text-on-brand)"
-                : "var(--color-text-disabled)",
-              border: "none",
-              borderRadius: "var(--radius-lg)",
-              fontSize: "var(--font-size-md)",
-              fontWeight: 600,
-              cursor: canPay ? "pointer" : "not-allowed",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              transition: "background .14s",
-            }}
+            className={[
+              "inline-flex h-[44px] w-full items-center justify-center gap-[8px] rounded-lg border-0 px-[24px] text-md font-semibold transition-colors duration-fast",
+              canPay
+                ? "cursor-pointer bg-bg-brand text-text-on-brand"
+                : "cursor-not-allowed bg-bg-subtle text-text-disabled",
+            ].join(" ")}
           >
             {minting ? (
               <>
@@ -438,26 +395,11 @@ export function Step3Mint({
         </span>
 
         {missing ? (
-          <div
-            id={reasonId}
-            style={{
-              fontSize: 12,
-              color: C.body,
-              textAlign: "center",
-              lineHeight: 1.5,
-            }}
-          >
+          <div id={reasonId} className={hintClass}>
             {missing}
           </div>
         ) : willRenderVideo && !minting ? (
-          <div
-            style={{
-              fontSize: 12,
-              color: C.body,
-              textAlign: "center",
-              lineHeight: 1.5,
-            }}
-          >
+          <div className={hintClass}>
             {videoDone ? (
               <>Video is ready. Minting now publishes your listing immediately.</>
             ) : (
@@ -506,40 +448,18 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
     <div
       role="status"
       aria-live="polite"
-      style={{
-        padding: "12px 14px",
-        background: videoDone
-          ? "var(--color-bg-success-subtle)"
-          : "var(--color-bg-brand-subtle)",
-        border: `var(--border-width-1) solid ${
-          videoDone
-            ? "var(--color-border-success)"
-            : "var(--color-border-brand)"
-        }`,
-        borderRadius: "var(--radius-lg)",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        fontSize: 13,
-        lineHeight: 1.5,
-        color: videoDone
-          ? "var(--color-text-success)"
-          : "var(--color-text-brand)",
-      }}
+      className={[
+        "flex items-center gap-[10px] rounded-lg border border-solid px-[14px] py-[12px] text-md leading-relaxed",
+        videoDone
+          ? "border-[var(--color-border-success)] bg-bg-success-subtle text-text-success"
+          : "border-border-brand bg-bg-brand-subtle text-text-brand",
+      ].join(" ")}
     >
       <span
-        style={{
-          width: 22,
-          height: 22,
-          borderRadius: 11,
-          background: videoDone
-            ? "var(--color-bg-success-subtle)"
-            : "var(--color-bg-surface)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flex: "0 0 22px",
-        }}
+        className={[
+          "inline-flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full",
+          videoDone ? "bg-bg-success-subtle" : "bg-bg-surface",
+        ].join(" ")}
       >
         {videoDone ? (
           <svg
@@ -555,18 +475,10 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
             <path d="M5 13l4 4 10-10" />
           </svg>
         ) : (
-          <span
-            className="ix-s3i-pulse"
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              background: "var(--color-bg-brand)",
-            }}
-          />
+          <span className="ix-s3i-pulse h-[8px] w-[8px] rounded-full bg-bg-brand" />
         )}
       </span>
-      <span style={{ flex: 1 }}>
+      <span className="flex-1">
         {videoDone ? (
           <>
             <strong>Video is ready.</strong> Finish the mint setup and pay to
@@ -609,21 +521,10 @@ function ProductCard({
   onOpen: () => void;
 }) {
   const noMedia = state.mediaType === "skip";
-  const thumbStyle: React.CSSProperties = {
-    position: "relative",
-    width: 72,
-    height: 54,
-    flex: "0 0 72px",
-    padding: 0,
-    borderRadius: "var(--radius-md)",
-    overflow: "hidden",
-    background: noMedia
-      ? "var(--color-bg-brand-subtle)"
-      : "var(--gradient-brand)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  };
+  const thumbClass = [
+    "relative flex h-[54px] w-[72px] flex-none items-center justify-center overflow-hidden rounded-md p-0",
+    noMedia ? "bg-bg-brand-subtle" : "bg-[image:var(--gradient-brand)]",
+  ].join(" ");
 
   // The product itself where there is a picture of it — the violet gradient
   // stood in for a product that has a concept image already.
@@ -634,13 +535,7 @@ function ProductCard({
         <img
           src={imageUrl}
           alt=""
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
+          className="absolute inset-0 h-full w-full object-cover"
         />
       ) : null}
       {state.arClip ? (
@@ -649,13 +544,7 @@ function ProductCard({
           muted
           playsInline
           preload="metadata"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
+          className="absolute inset-0 h-full w-full object-cover"
         />
       ) : null}
       {noMedia ? (
@@ -673,18 +562,7 @@ function ProductCard({
           <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </svg>
       ) : watchable ? (
-        <span
-          style={{
-            position: "relative",
-            width: 22,
-            height: 22,
-            borderRadius: "50%",
-            background: "var(--color-bg-surface)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        <span className="relative inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-bg-surface">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-text-brand)" aria-hidden>
             <polygon points="7,4 21,12 7,20" />
           </svg>
@@ -694,64 +572,30 @@ function ProductCard({
   );
 
   return (
-    <div
-      style={{
-        background: "var(--color-bg-surface)",
-        border: "var(--border-width-1) solid var(--color-border-subtle)",
-        borderRadius: "var(--radius-lg)",
-        padding: 14,
-        display: "flex",
-        gap: 14,
-        alignItems: "center",
-      }}
-    >
+    <div className="flex items-center gap-[14px] rounded-lg border border-solid border-border-subtle bg-bg-surface p-[14px]">
       {watchable && !noMedia ? (
         <button
           type="button"
           onClick={onOpen}
           aria-label="Play the product video"
-          style={{ ...thumbStyle, border: "none", cursor: "pointer" }}
+          className={`${thumbClass} cursor-pointer border-0`}
+         
         >
           {inner}
         </button>
       ) : (
-        <div style={thumbStyle}>{inner}</div>
+        <div className={thumbClass}>
+          {inner}
+        </div>
       )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13,
-            color: "var(--color-text-tertiary)",
-            fontWeight: 500,
-            marginBottom: 2,
-          }}
-        >
+      <div className="min-w-0 flex-1">
+        <div className="mb-[2px] text-sm font-medium text-text-tertiary">
           {projectName || "No project"}
         </div>
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: C.text,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <div className="truncate text-lg font-bold text-text-primary">
           {state.productName || "Untitled"}
         </div>
-        <div
-          style={{
-            fontSize: 13,
-            color: C.body,
-            marginTop: 4,
-            lineHeight: 1.4,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
+        <div className="mt-[4px] line-clamp-2 text-sm leading-relaxed text-text-secondary">
           {state.productDescription || "—"}
         </div>
       </div>
@@ -805,7 +649,7 @@ function SellFields({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-[16px]">
       <SelectMenu
         label="Blockchain Mint"
         placeholder={BLOCKCHAIN_PLACEHOLDER}
@@ -839,13 +683,7 @@ function SellFields({
           {/* The token select carries its own label, like the Buy-now row's:
               a `SelectMenu` with none is named by its value, so it announced
               as "ETH" with nothing saying what ETH is for. */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "160px 1fr",
-              gap: 12,
-            }}
-          >
+          <div className="grid grid-cols-[160px_1fr] gap-[12px]">
             <SelectMenu
               label="Token"
               placeholder="Select token"
@@ -856,12 +694,11 @@ function SellFields({
             <Field label="Minimum bidding price" controlId={minBidId}>
               <input
                 id={minBidId}
-                className="ix-brief-field"
+                className={`ix-brief-field ${FIELD_BASE} h-[44px] px-[14px]`}
                 value={state.minBid}
                 onChange={(e) => onChange({ minBid: decimal(e.target.value) })}
                 placeholder="0.00"
                 inputMode="decimal"
-                style={inputStyle}
               />
             </Field>
           </div>
@@ -869,23 +706,22 @@ function SellFields({
           <Field label="Auction Buy Now Price" controlId={buyNowId}>
             <input
               id={buyNowId}
-              className="ix-brief-field"
+              className={`ix-brief-field ${FIELD_BASE} h-[44px] px-[14px]`}
               value={state.auctionBuyNow}
               onChange={(e) =>
                 onChange({ auctionBuyNow: decimal(e.target.value) })
               }
               placeholder="0.5 for example"
               inputMode="decimal"
-              style={inputStyle}
             />
           </Field>
 
           <Field label="Expired Date" controlId={expiryId}>
-            <div style={{ position: "relative" }}>
+            <div className="relative">
               <input
                 id={expiryId}
                 ref={expiryRef}
-                className="ix-brief-field ix-s3-date"
+                className={`ix-brief-field ix-s3-date ${FIELD_BASE} h-[44px] pl-[14px] pr-[40px]`}
                 type="datetime-local"
                 value={state.expiresAt}
                 // An auction that expired before it opened isn't a listing —
@@ -893,28 +729,12 @@ function SellFields({
                 // a date typed in by hand.
                 min={earliestExpiry}
                 onChange={(e) => onChange({ expiresAt: e.target.value })}
-                style={{ ...inputStyle, paddingRight: 40 }}
               />
               <button
                 type="button"
                 onClick={openExpiryPicker}
                 aria-label="Open the date picker"
-                style={{
-                  position: "absolute",
-                  right: 6,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  width: 30,
-                  height: 30,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "transparent",
-                  border: "none",
-                  borderRadius: "var(--radius-md)",
-                  color: "var(--color-text-tertiary)",
-                  cursor: "pointer",
-                }}
+                className="absolute right-[6px] top-1/2 inline-flex h-[30px] w-[30px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-text-tertiary"
               >
                 <svg
                   width="16"
@@ -935,9 +755,7 @@ function SellFields({
           </Field>
         </>
       ) : (
-        <div
-          style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}
-        >
+        <div className="grid grid-cols-[160px_1fr] gap-[12px]">
           <SelectMenu
             label="Token"
             placeholder="Select token"
@@ -948,12 +766,11 @@ function SellFields({
           <Field label="Price" controlId={priceId}>
             <input
               id={priceId}
-              className="ix-brief-field"
+              className={`ix-brief-field ${FIELD_BASE} h-[44px] px-[14px]`}
               value={state.price}
               onChange={(e) => onChange({ price: decimal(e.target.value) })}
               placeholder="0.00"
               inputMode="decimal"
-              style={inputStyle}
             />
           </Field>
         </div>
@@ -966,16 +783,15 @@ function SellFields({
       >
         <input
           id={royaltyId}
-          className="ix-brief-field"
+          className={`ix-brief-field ${FIELD_BASE} h-[44px] px-[14px]`}
           value={state.royalties}
           onChange={(e) => onChange({ royalties: percent(e.target.value) })}
           inputMode="decimal"
           placeholder="Suggested: 2%, 2.5%, 5% Maximum is 10%"
-          style={inputStyle}
         />
       </Field>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-[10px]">
         <Check
           label="I understand a network gas fee is added at mint"
           checked={state.understandGas}
@@ -1004,7 +820,7 @@ function GiveFields({
   const { collections, reread } = useCollections(state.network);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-[16px]">
       <SelectMenu
         label="Blockchain Mint"
         placeholder={BLOCKCHAIN_PLACEHOLDER}
@@ -1036,7 +852,7 @@ function GiveFields({
         options={LICENSE_OPTIONS}
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-[10px]">
         <OwnerAndShare state={state} onChange={onChange} />
       </div>
 
@@ -1061,7 +877,7 @@ function SaveFields({
   const { collections, reread } = useCollections(state.network);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-[16px]">
       <SelectMenu
         label="Blockchain Mint"
         placeholder={BLOCKCHAIN_PLACEHOLDER}
@@ -1085,7 +901,7 @@ function SaveFields({
         }}
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-[10px]">
         <OwnerAndShare state={state} onChange={onChange} />
       </div>
 
@@ -1136,63 +952,27 @@ function StoryPanel({
 }) {
   const storyId = React.useId();
   return (
-    <div
-      style={{
-        background: "var(--color-bg-subtle)",
-        borderRadius: "var(--radius-xl)",
-        padding: 14,
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-      }}
-    >
-      <label
-        htmlFor={storyId}
-        style={{ fontSize: 13, fontWeight: 600, color: C.text }}
-      >
+    <div className="flex flex-col gap-[8px] rounded-xl bg-bg-subtle p-[14px]">
+      <label htmlFor={storyId} className="text-md font-semibold text-text-primary">
         Write your story
       </label>
       <textarea
         id={storyId}
-        className="ix-brief-field"
+        className={`ix-brief-field ${FIELD_BASE} h-[76px] resize-y px-[14px] py-[10px] leading-relaxed`}
         value={state.story}
         maxLength={MAX_STORY}
         onChange={(e) => onChange({ story: e.target.value.slice(0, MAX_STORY) })}
         placeholder="Why did you build this? What should others do with it?"
         rows={3}
-        style={{
-          ...inputStyle,
-          height: 76,
-          resize: "vertical",
-          paddingTop: 10,
-          paddingBottom: 10,
-          lineHeight: 1.5,
-        }}
       />
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          fontSize: 12,
-          color: "var(--color-input-helper)",
-        }}
-      >
+      <div className="flex justify-between gap-[12px] text-sm text-[var(--color-input-helper)]">
         <span>Shown with your post in Innovations.</span>
-        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+        <span className="tabular-nums">
           {state.story.length}/{MAX_STORY}
         </span>
       </div>
       {note ? (
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--color-text-brand)",
-            lineHeight: 1.5,
-          }}
-        >
-          {note}
-        </div>
+        <div className="text-sm leading-relaxed text-text-brand">{note}</div>
       ) : null}
     </div>
   );
@@ -1257,7 +1037,7 @@ function CollectionField({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="flex flex-col gap-[8px]">
       <SelectMenu
         label="Choose collection"
         placeholder="Select collection"
@@ -1273,10 +1053,10 @@ function CollectionField({
         options={options}
       />
       {naming && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="flex items-center gap-[8px]">
           <input
             id={newNameId}
-            className="ix-brief-field"
+            className={`ix-brief-field ${FIELD_BASE} h-[38px] px-[14px]`}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
@@ -1291,44 +1071,24 @@ function CollectionField({
             placeholder="Collection name"
             aria-label="New collection name"
             autoFocus
-            style={{ ...inputStyle, height: 38 }}
           />
           <button
             type="button"
             onClick={create}
             disabled={!newName.trim()}
-            style={{
-              height: 38,
-              padding: "0 16px",
-              flex: "0 0 auto",
-              background: newName.trim() ? C.primary : "var(--color-bg-subtle)",
-              color: newName.trim()
-                ? "var(--color-text-on-brand)"
-                : "var(--color-text-disabled)",
-              border: "none",
-              borderRadius: "var(--radius-lg)",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: newName.trim() ? "pointer" : "not-allowed",
-            }}
+            className={[
+              "h-[38px] flex-none rounded-lg border-0 px-[16px] text-sm font-semibold",
+              newName.trim()
+                ? "cursor-pointer bg-bg-brand text-text-on-brand"
+                : "cursor-not-allowed bg-bg-subtle text-text-disabled",
+            ].join(" ")}
           >
             Add
           </button>
           <button
             type="button"
             onClick={cancel}
-            style={{
-              height: 38,
-              padding: "0 12px",
-              flex: "0 0 auto",
-              background: "transparent",
-              border: "none",
-              borderRadius: "var(--radius-lg)",
-              color: C.body,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            className="h-[38px] flex-none cursor-pointer rounded-lg border-0 bg-transparent px-[12px] text-sm font-semibold text-text-secondary"
           >
             Cancel
           </button>
@@ -1356,33 +1116,16 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--spacing-3)",
-      }}
-    >
+    <div className="flex flex-col gap-[var(--spacing-3)]">
       <label
         htmlFor={controlId}
-        style={{
-          width: "fit-content",
-          fontSize: "var(--font-size-md)",
-          color: "var(--color-input-label)",
-        }}
+        className="w-fit text-md text-[var(--color-input-label)]"
       >
         {label}
       </label>
       {children}
       {hint ? (
-        <span
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-input-helper)",
-          }}
-        >
-          {hint}
-        </span>
+        <span className="text-sm text-[var(--color-input-helper)]">{hint}</span>
       ) : null}
     </div>
   );
@@ -1405,30 +1148,13 @@ function Check({
 }) {
   return (
     <label
-      className="ix-s3-check"
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        cursor: "pointer",
-        fontSize: 13,
-        color: C.text,
-        fontWeight: 500,
-      }}
+      className="ix-s3-check relative inline-flex cursor-pointer items-center gap-[10px] text-md font-medium text-text-primary"
     >
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{
-          position: "absolute",
-          width: 1,
-          height: 1,
-          margin: 0,
-          padding: 0,
-          opacity: 0,
-        }}
+        className="absolute m-0 h-[1px] w-[1px] p-0 opacity-0"
       />
       <Checkbox checked={checked} decorative />
       {label}
@@ -1439,16 +1165,7 @@ function Check({
 /** What the money actually does — said before the button, not after it. */
 function WalletCallout() {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 10,
-        padding: "12px 14px",
-        background: "var(--color-bg-info-subtle)",
-        border: "var(--border-width-1) solid var(--color-border-blue)",
-        borderRadius: "var(--radius-lg)",
-      }}
-    >
+    <div className="flex gap-[10px] rounded-lg border border-solid border-[var(--color-border-blue)] bg-bg-info-subtle px-[14px] py-[12px]">
       <svg
         width="17"
         height="17"
@@ -1458,30 +1175,17 @@ function WalletCallout() {
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
+        className="mt-[1px] shrink-0"
         aria-hidden
       >
         <circle cx="12" cy="12" r="9" />
         <path d="M12 11v5 M12 7.6v.4" />
       </svg>
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-          }}
-        >
+      <div className="min-w-0">
+        <div className="text-md font-semibold text-text-primary">
           Nothing is charged until you approve in your wallet
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--color-text-secondary)",
-            marginTop: 2,
-            lineHeight: 1.5,
-          }}
-        >
+        <div className="mt-[2px] text-sm leading-relaxed text-text-secondary">
           Gas is an estimate at current network rates. Minting records that you
           made this first — it does not stop someone copying the design.
         </div>
@@ -1501,16 +1205,15 @@ function CostRow({
 }) {
   return (
     <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        fontSize: bold ? 14 : 13,
-        color: bold ? C.text : C.body,
-        fontWeight: bold ? 700 : 500,
-      }}
+      className={[
+        "flex justify-between",
+        bold
+          ? "text-md font-bold text-text-primary"
+          : "text-sm font-medium text-text-secondary",
+      ].join(" ")}
     >
       <span>{label}</span>
-      <span style={{ fontVariantNumeric: "tabular-nums" }}>{value}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   );
 }
@@ -1537,31 +1240,20 @@ function WalletIcon() {
 
 function Spinner() {
   return (
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        border: "2px solid color-mix(in srgb, currentColor 35%, transparent)",
-        borderTopColor: "currentColor",
-        animation: "ix-mint-spin .8s linear infinite",
-        display: "inline-block",
-      }}
-    >
+    <span className="inline-block h-[14px] w-[14px] animate-[ix-mint-spin_.8s_linear_infinite] rounded-full border-2 border-solid border-l-[color-mix(in_srgb,currentColor_35%,transparent)] border-r-[color-mix(in_srgb,currentColor_35%,transparent)] border-b-[color-mix(in_srgb,currentColor_35%,transparent)] border-t-current">
       <style>{`@keyframes ix-mint-spin{to{transform:rotate(360deg)}}`}</style>
     </span>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  height: 44,
-  width: "100%",
-  padding: "0 14px",
-  background: "var(--color-input-bg)",
-  border: "var(--border-width-1) solid var(--color-border-default)",
-  borderRadius: "var(--radius-lg)",
-  fontSize: 14,
-  color: "var(--color-text-primary)",
-  outline: "none",
-  fontFamily: "inherit",
-};
+/**
+ * The shared shape every text field in this form draws — background, border,
+ * radius, text colour. Height and padding are left out here and added per
+ * call site: two utility classes that both set the same CSS property (say,
+ * two different heights) race for the winning rule in the compiled
+ * stylesheet, not for the order they're written in a `className` string, so
+ * the properties an instance overrides (height, padding) never live in this
+ * shared base.
+ */
+const FIELD_BASE =
+  "w-full border border-solid border-border bg-[var(--color-input-bg)] rounded-lg text-md text-text-primary outline-none";

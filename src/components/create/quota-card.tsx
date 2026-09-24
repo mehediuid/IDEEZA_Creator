@@ -71,10 +71,10 @@ export function QuotaCard() {
         >
           <div
             className={[
-              "h-full transition-[width] duration-normal ease-decelerate",
-              exhausted ? "bg-bg-error" : "bg-violet-500",
+              "h-full w-full origin-left transition-transform duration-normal ease-decelerate",
+              exhausted ? "bg-bg-error" : "bg-bg-brand",
             ].join(" ")}
-            style={{ width: `${fillPct}%` }}
+            style={{ transform: `scaleX(${fillPct / 100})` }}
           />
         </div>
       </div>

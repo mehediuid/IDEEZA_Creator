@@ -12,7 +12,6 @@
 // continue to mint as usual.
 
 import * as React from "react";
-import { C } from "@/lib/pcb/colors";
 import {
   useVideoJobs,
   progressOf,
@@ -122,71 +121,24 @@ export function RegenerateFlow({
   return (
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "color-mix(in srgb, var(--color-bg-overlay) 62%, transparent)",
-        backdropFilter: "blur(4px)",
-        zIndex: "var(--z-modal)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      }}
+      className="fixed inset-0 z-modal flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] p-[24px] backdrop-blur-sm"
     >
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="regen-flow-title"
-        style={{
-          width: "100%",
-          maxWidth: 600,
-          maxHeight: "min(86vh, 760px)",
-          background: "var(--color-bg-surface)",
-          borderRadius: "var(--radius-xl)",
-          padding: 0,
-          boxShadow: "var(--elevation-5)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
+        className="flex w-full max-w-[600px] max-h-[min(86vh,760px)] flex-col overflow-hidden rounded-xl bg-bg-surface shadow-5"
       >
         {/* Header */}
-        <div
-          style={{
-            padding: "20px 24px 12px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 12,
-            borderBottom:
-              "var(--border-width-1) solid var(--color-border-subtle)",
-          }}
-        >
+        <div className="flex items-start justify-between gap-[12px] border-b border-solid border-subtle px-[24px] pb-[12px] pt-[20px]">
           <div>
-            <h2
-              id="regen-flow-title"
-              style={{
-                margin: 0,
-                fontSize: 20,
-                fontWeight: 700,
-                color: C.text,
-                letterSpacing: -0.3,
-              }}
-            >
+            <h2 id="regen-flow-title" className="m-0 text-2xl font-bold tracking-tight text-text-primary">
               {inRenderPhase
                 ? "Render in flight"
                 : "Regenerate video"}
             </h2>
-            <div
-              style={{
-                fontSize: 13,
-                color: C.body,
-                marginTop: 4,
-                lineHeight: 1.4,
-              }}
-            >
+            <div className="mt-[4px] text-sm leading-relaxed text-text-secondary">
               {inRenderPhase ? (
                 <>
                   Your listing&rsquo;s video updates automatically when this
@@ -194,7 +146,7 @@ export function RegenerateFlow({
                 </>
               ) : (
                 <>
-                  For: <strong style={{ color: C.text }}>{baseJob.title}</strong>{" "}
+                  For: <strong className="text-text-primary">{baseJob.title}</strong>{" "}
                   · Edit the prompt, regenerate the storyboard, then start the
                   new render.
                 </>
@@ -204,33 +156,14 @@ export function RegenerateFlow({
           <button
             onClick={onClose}
             aria-label="Close"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: C.body,
-              fontSize: 20,
-              cursor: "pointer",
-              padding: 4,
-              lineHeight: 1,
-              flex: "0 0 28px",
-            }}
+            className="flex-[0_0_28px] p-[4px] text-2xl leading-none text-text-secondary"
           >
             ×
           </button>
         </div>
 
         {/* Body — scrollable */}
-        <div
-          style={{
-            padding: "18px 24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            overflowY: "auto",
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
+        <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-[24px] py-[18px]">
           {!inRenderPhase && (
             <>
               <FieldGroup label="What should the video show?">
@@ -247,7 +180,7 @@ export function RegenerateFlow({
                   }}
                   rows={3}
                   placeholder="Aerial cinematic of a Discord bot ping notification floating over a cityscape at dusk."
-                  style={textareaStyle}
+                  className={TEXTAREA_CLASS}
                 />
               </FieldGroup>
 
@@ -270,22 +203,19 @@ export function RegenerateFlow({
                       ? "Auto: ambient + soft synth (override if you want)"
                       : "Describe the soundscape, mood, instruments"
                   }
-                  style={{
-                    ...textareaStyle,
-                    opacity: audioAuto ? 0.7 : 1,
-                  }}
+                  className={`${TEXTAREA_CLASS} ${audioAuto ? "opacity-70" : "opacity-100"}`}
                 />
               </FieldGroup>
 
               <FieldGroup
                 label="Quality"
                 right={
-                  <span style={{ fontSize: 11, color: C.body }}>
+                  <span className="text-xs text-text-secondary">
                     Full video is 10s
                   </span>
                 }
               >
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="flex gap-[8px]">
                   <Pill
                     selected={quality === "low"}
                     onClick={() => setQuality("low")}
@@ -304,7 +234,7 @@ export function RegenerateFlow({
               <button
                 onClick={generateStoryboard}
                 disabled={!canGenerateStoryboard}
-                style={primaryButton(canGenerateStoryboard)}
+                className={primaryButtonClass(canGenerateStoryboard)}
               >
                 {generatingStoryboard ? (
                   <>
@@ -329,80 +259,29 @@ export function RegenerateFlow({
               </button>
 
               {storyboardGenerated && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "baseline",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: C.text,
-                      }}
-                    >
+                <div className="flex flex-col gap-[8px]">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-sm font-bold text-text-primary">
                       Storyboard
                     </div>
-                    <div style={{ fontSize: 11, color: C.body }}>
+                    <div className="text-xs text-text-secondary">
                       3 scenes · 10s total
                     </div>
                   </div>
                   {scenes.map((s) => (
                     <div
                       key={s.id}
-                      style={{
-                        padding: "10px 14px",
-                        background: "var(--color-bg-page)",
-                        border:
-                          "var(--border-width-1) solid var(--color-border-subtle)",
-                        borderRadius: "var(--radius-md)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                      }}
+                      className="flex flex-col gap-[4px] rounded-md border border-solid border-subtle bg-bg-page px-[14px] py-[10px]"
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: C.text,
-                          }}
-                        >
+                      <div className="flex items-center gap-[10px]">
+                        <span className="text-sm font-bold text-text-primary">
                           {s.label}
                         </span>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: C.primary,
-                            fontWeight: 600,
-                          }}
-                        >
+                        <span className="text-xs font-semibold text-text-brand">
                           {s.timeRange}
                         </span>
                       </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: C.body,
-                          lineHeight: 1.4,
-                        }}
-                      >
+                      <div className="text-xs leading-relaxed text-text-secondary">
                         {s.visual}
                       </div>
                     </div>
@@ -423,17 +302,7 @@ export function RegenerateFlow({
           )}
 
           {inRenderPhase && (
-            <div
-              style={{
-                padding: "10px 12px",
-                background: "var(--color-bg-page)",
-                border: "var(--border-width-1) solid var(--color-border-subtle)",
-                borderRadius: "var(--radius-md)",
-                fontSize: 12,
-                color: C.body,
-                lineHeight: 1.5,
-              }}
-            >
+            <div className="rounded-md border border-solid border-subtle bg-bg-page px-[12px] py-[10px] text-sm leading-relaxed text-text-secondary">
               You can close this — we&rsquo;ll track progress in the top-right
               indicator. Your listing&rsquo;s video updates the moment this
               finishes.
@@ -442,25 +311,16 @@ export function RegenerateFlow({
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: "14px 24px 18px",
-            borderTop:
-              "var(--border-width-1) solid var(--color-border-subtle)",
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-          }}
-        >
+        <div className="flex justify-end gap-[8px] border-t border-solid border-subtle px-[24px] pb-[18px] pt-[14px]">
           {!inRenderPhase && (
             <>
-              <button onClick={onClose} style={ghostButton}>
+              <button onClick={onClose} className={GHOST_BUTTON_CLASS}>
                 Cancel
               </button>
               <button
                 onClick={startRender}
                 disabled={!canStartRender}
-                style={ctaButton(canStartRender)}
+                className={ctaButtonClass(canStartRender)}
               >
                 <svg
                   width="14"
@@ -475,7 +335,7 @@ export function RegenerateFlow({
             </>
           )}
           {inRenderPhase && (
-            <button onClick={onClose} style={ctaButton(true)}>
+            <button onClick={onClose} className={ctaButtonClass(true)}>
               Close
               <svg
                 width="14"
@@ -504,30 +364,17 @@ function ProgressBlock({ job }: { job: VideoJob }) {
   const isDone = job.stage === "done";
   return (
     <div
-      style={{
-        padding: 18,
-        background: "var(--color-bg-surface)",
-        border: `var(--border-width-1-5) solid ${
-          isDone ? "var(--color-border-success)" : "var(--color-border-brand)"
-        }`,
-        borderRadius: "var(--radius-lg)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
+      className={[
+        "flex flex-col gap-[12px] rounded-lg border-1-5 border-solid bg-bg-surface p-[18px]",
+        isDone ? "border-[var(--color-border-success)]" : "border-border-brand",
+      ].join(" ")}
       role="status"
       aria-live="polite"
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+      <div className="flex items-center justify-between">
+        <div className="inline-flex items-center gap-[10px]">
           {isDone ? (
-            <span style={iconBadge("var(--color-bg-success-subtle)", "var(--color-text-success)")}>
+            <span className={iconBadgeClass("success")}>
               <svg
                 width="14"
                 height="14"
@@ -542,23 +389,15 @@ function ProgressBlock({ job }: { job: VideoJob }) {
               </svg>
             </span>
           ) : (
-            <span style={iconBadge("var(--color-bg-brand-subtle)", "var(--color-text-brand)")}>
-              <span
-                className="ix-rgf-pulse"
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: "var(--color-bg-brand)",
-                }}
-              />
+            <span className={iconBadgeClass("brand")}>
+              <span className="ix-rgf-pulse h-[8px] w-[8px] rounded-full bg-bg-brand" />
             </span>
           )}
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+            <div className="text-md font-bold text-text-primary">
               {isDone ? "Video ready" : "Video rendering"}
             </div>
-            <div style={{ fontSize: 11, color: C.body, marginTop: 1 }}>
+            <div className="mt-[1px] text-xs text-text-secondary">
               {isDone
                 ? "Listing video will update"
                 : `Stage ${stageNum}/5 · ${STAGE_LABELS[job.stage]}`}
@@ -566,38 +405,20 @@ function ProgressBlock({ job }: { job: VideoJob }) {
           </div>
         </div>
         {!isDone && (
-          <span
-            style={{
-              fontSize: 12,
-              color: C.body,
-              fontWeight: 600,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
+          <span className="text-sm font-semibold tabular-nums text-text-secondary">
             {etaLabel(etaSec)} left
           </span>
         )}
       </div>
 
       {!isDone && (
-        <div
-          style={{
-            height: 6,
-            background: "var(--color-bg-surface-raised)",
-            borderRadius: 3,
-            overflow: "hidden",
-          }}
-        >
+        <div className="h-[6px] overflow-hidden rounded-[3px] bg-bg-surface-raised">
           <div
+            className="h-full w-full origin-left bg-bg-brand transition-transform duration-slower ease-linear"
             style={{
               // Scaled, not resized: a transform moves on the compositor, where an
               // animated width re-lays the row out every half second.
-              width: "100%",
-              height: "100%",
-              background: "var(--color-bg-brand)",
               transform: `scaleX(${total / 100})`,
-              transformOrigin: "left",
-              transition: "transform .5s linear",
             }}
           />
         </div>
@@ -623,13 +444,7 @@ function NotifyOptIns({
   const [emailOpen, setEmailOpen] = React.useState(!!job.emailReminder);
   const [email, setEmail] = React.useState(job.emailReminder ?? "");
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
+    <div className="flex flex-col gap-[6px]">
       <Opt
         label="Email me when ready"
         checked={emailOpen}
@@ -652,20 +467,7 @@ function NotifyOptIns({
             type="email"
             inputMode="email"
             autoComplete="email"
-            style={{
-              flex: 1,
-              height: 30,
-              padding: "0 10px",
-              background: "var(--color-bg-page)",
-              border:
-                "var(--border-width-1) solid var(--color-border-subtle)",
-              borderRadius: 8,
-              fontSize: 12,
-              color: "var(--color-text-primary)",
-              outline: "none",
-              fontFamily: "inherit",
-              minWidth: 0,
-            }}
+            className="h-[30px] min-w-0 flex-1 rounded-lg border border-solid border-subtle bg-bg-page px-[10px] text-sm text-text-primary outline-none"
           />
         )}
       </Opt>
@@ -690,21 +492,9 @@ function FieldGroup({
   children: React.ReactNode;
 }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--color-text-secondary)",
-          }}
-        >
+    <label className="flex flex-col gap-[6px]">
+      <span className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-text-secondary">
           {label}
         </span>
         {right}
@@ -726,23 +516,12 @@ function Pill({
   return (
     <button
       onClick={onClick}
-      style={{
-        padding: "8px 16px",
-        background: selected
-          ? "var(--color-bg-brand-subtle)"
-          : "var(--color-bg-page)",
-        border: `var(--border-width-1) solid ${
-          selected
-            ? "var(--color-border-brand)"
-            : "var(--color-border-subtle)"
-        }`,
-        borderRadius: 999,
-        color: selected ? C.primary : C.body,
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: "pointer",
-        transition: "background .14s, border-color .14s",
-      }}
+      className={[
+        "cursor-pointer rounded-full border border-solid px-[16px] py-[8px] text-sm font-semibold transition-colors duration-fast",
+        selected
+          ? "border-border-brand bg-bg-brand-subtle text-text-brand"
+          : "border-subtle bg-bg-page text-text-secondary",
+      ].join(" ")}
     >
       {children}
     </button>
@@ -766,48 +545,21 @@ function Toggle({
       role="switch"
       aria-checked={on}
       onClick={() => onChange(!on)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        minHeight: 32,
-        padding: 0,
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        fontSize: 12,
-        color: "var(--color-text-secondary)",
-        fontWeight: 500,
-      }}
+      className="inline-flex min-h-[32px] items-center gap-[8px] text-sm font-medium text-text-secondary"
     >
       {label}
       <span
         aria-hidden
-        style={{
-          width: 40,
-          height: 24,
-          borderRadius: 12,
-          background: on
-            ? "var(--color-bg-brand)"
-            : "var(--color-border-strong)",
-          position: "relative",
-          transition: "background .14s",
-          flex: "0 0 40px",
-        }}
+        className={[
+          "relative h-[24px] w-[40px] shrink-0 rounded-full transition-colors duration-fast",
+          on ? "bg-bg-brand" : "bg-border-strong",
+        ].join(" ")}
       >
         <span
-          style={{
-            position: "absolute",
-            top: 2,
-            left: on ? 18 : 2,
-            width: 20,
-            height: 20,
-            background: "var(--color-bg-surface)",
-            borderRadius: "50%",
-            boxShadow: "var(--elevation-1)",
-            transition: "left .14s",
-          }}
+          className={[
+            "absolute top-[2px] h-[20px] w-[20px] rounded-full bg-bg-surface shadow-1 transition-[left] duration-fast",
+            on ? "left-[18px]" : "left-[2px]",
+          ].join(" ")}
         />
       </span>
     </button>
@@ -826,41 +578,17 @@ function Opt({
   children?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <label
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 12,
-          color: "var(--color-text-secondary)",
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
-      >
+    <div className="flex items-center gap-[8px]">
+      <label className="inline-flex cursor-pointer items-center gap-[8px] text-sm font-medium text-text-secondary">
         <span
           onClick={(e) => {
             e.preventDefault();
             onChange(!checked);
           }}
-          style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
-            border: `1.5px solid ${
-              checked
-                ? "var(--color-bg-brand)"
-                : "var(--color-border-default)"
-            }`,
-            background: checked
-              ? "var(--color-bg-brand)"
-              : "var(--color-bg-surface)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flex: "0 0 16px",
-            transition: "background .14s, border-color .14s",
-          }}
+          className={[
+            "inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-[4px] border-1-5 border-solid transition-colors duration-fast",
+            checked ? "border-bg-brand bg-bg-brand" : "border-border bg-bg-surface",
+          ].join(" ")}
         >
           {checked && (
             <svg
@@ -886,94 +614,41 @@ function Opt({
 
 function Spinner() {
   return (
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        border: "2px solid color-mix(in srgb, currentColor 35%, transparent)",
-        borderTopColor: "currentColor",
-        animation: "ix-rgf-spin .8s linear infinite",
-        display: "inline-block",
-      }}
-    >
+    <span className="inline-block h-[14px] w-[14px] animate-[ix-rgf-spin_.8s_linear_infinite] rounded-full border-2 border-solid border-x-[color-mix(in_srgb,currentColor_35%,transparent)] border-b-[color-mix(in_srgb,currentColor_35%,transparent)] border-t-[currentColor]">
       <style>{`@keyframes ix-rgf-spin{to{transform:rotate(360deg)}}`}</style>
     </span>
   );
 }
 
-function iconBadge(bg: string, fg: string): React.CSSProperties {
-  return {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    background: bg,
-    color: fg,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flex: "0 0 24px",
-  };
+function iconBadgeClass(tone: "success" | "brand"): string {
+  return [
+    "inline-flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full",
+    tone === "success"
+      ? "bg-bg-success-subtle text-text-success"
+      : "bg-bg-brand-subtle text-text-brand",
+  ].join(" ");
 }
 
-function primaryButton(enabled: boolean): React.CSSProperties {
-  return {
-    padding: "12px 22px",
-    background: enabled
-      ? "var(--color-bg-brand)"
-      : "var(--color-bg-surface-raised)",
-    color: enabled
-      ? "var(--color-text-on-brand)"
-      : "var(--color-text-tertiary)",
-    border: "none",
-    borderRadius: "var(--radius-3xl)",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: enabled ? "pointer" : "default",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  };
+function primaryButtonClass(enabled: boolean): string {
+  return [
+    "inline-flex items-center justify-center gap-[8px] rounded-3xl px-[22px] py-[12px] text-md font-bold",
+    enabled
+      ? "cursor-pointer bg-bg-brand text-text-on-brand"
+      : "cursor-default bg-bg-surface-raised text-text-tertiary",
+  ].join(" ");
 }
 
-function ctaButton(enabled: boolean): React.CSSProperties {
-  return {
-    padding: "12px 22px",
-    background: enabled ? C.primary : "var(--color-bg-surface-raised)",
-    color: enabled
-      ? "var(--color-text-on-brand)"
-      : "var(--color-text-tertiary)",
-    border: "none",
-    borderRadius: "var(--radius-3xl)",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: enabled ? "pointer" : "default",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-  };
+function ctaButtonClass(enabled: boolean): string {
+  return [
+    "inline-flex items-center gap-[8px] rounded-3xl px-[22px] py-[12px] text-md font-bold",
+    enabled
+      ? "cursor-pointer bg-bg-brand text-text-on-brand"
+      : "cursor-default bg-bg-surface-raised text-text-tertiary",
+  ].join(" ");
 }
 
-const ghostButton: React.CSSProperties = {
-  padding: "12px 22px",
-  background: "transparent",
-  border: "var(--border-width-1) solid var(--color-border-default)",
-  borderRadius: "var(--radius-3xl)",
-  color: C.text,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-};
+const GHOST_BUTTON_CLASS =
+  "cursor-pointer rounded-3xl border border-solid border-border px-[22px] py-[12px] text-sm font-semibold text-text-primary";
 
-const textareaStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  background: "var(--color-bg-page)",
-  border: "var(--border-width-1) solid var(--color-border-subtle)",
-  borderRadius: "var(--radius-lg)",
-  fontSize: 14,
-  color: "var(--color-text-primary)",
-  resize: "vertical",
-  outline: "none",
-  fontFamily: "inherit",
-};
+const TEXTAREA_CLASS =
+  "resize-y rounded-lg border border-solid border-subtle bg-bg-page px-[14px] py-[12px] text-md text-text-primary outline-none";

@@ -13,7 +13,6 @@
 // preview clip.
 
 import * as React from "react";
-import { C } from "@/lib/pcb/colors";
 import { BriefCard } from "./brief-app";
 import type { BriefState, Intent, MediaType, Scene } from "./brief-app";
 import { ArRecordPanel } from "./ar-record-panel";
@@ -46,6 +45,9 @@ const BUSY_CTA: Record<Intent, string> = {
   give: "Minting…",
   save: "Saving…",
 };
+
+const TEXTAREA_CLASS =
+  "ix-brief-field w-full resize-y rounded-lg border border-solid border-border bg-[var(--color-input-bg)] px-[14px] py-[12px] text-md leading-relaxed text-text-primary outline-none";
 
 export function Step2Video({
   state,
@@ -177,20 +179,12 @@ export function Step2Video({
 
   return (
     <BriefCard onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="flex flex-col gap-[20px]">
         <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: C.text,
-              margin: 0,
-              letterSpacing: -0.2,
-            }}
-          >
+          <h1 className="text-2xl font-bold tracking-tight text-text-primary">
             Pick your preview
           </h1>
-          <p style={{ fontSize: 13, color: C.body, marginTop: 6 }}>
+          <p className="mt-[6px] text-sm leading-relaxed text-text-secondary">
             {videoRecommended
               ? state.intent === "sell"
                 ? "Generate a storyboard for your listing — your 10s video starts rendering when you continue."
@@ -199,13 +193,7 @@ export function Step2Video({
           </p>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 10,
-          }}
-        >
+        <div className="grid grid-cols-3 gap-[10px]">
           <TypeCard
             id="ar"
             label="AR"
@@ -285,17 +273,7 @@ export function Step2Video({
                   <button
                     type="button"
                     onClick={onPromptHelp}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      padding: "0 4px",
-                      minHeight: 32,
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: "var(--color-text-brand)",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
+                    className="px-[4px] min-h-[32px] text-sm font-medium text-text-brand"
                   >
                     Help me write it
                   </button>
@@ -304,19 +282,18 @@ export function Step2Video({
             >
               <textarea
                 id="s2-video-prompt"
-                className="ix-brief-field"
+                className={TEXTAREA_CLASS}
                 value={state.videoPrompt}
                 onChange={(e) => onChange({ videoPrompt: e.target.value })}
                 placeholder="Describe the shot — the product, the setting, how the camera moves"
                 rows={3}
-                style={textareaStyle}
               />
             </FieldGroup>
 
             <FieldGroup label="Audio prompt" htmlFor="s2-audio-prompt">
               <textarea
                 id="s2-audio-prompt"
-                className="ix-brief-field"
+                className={TEXTAREA_CLASS}
                 value={state.audioPrompt}
                 onChange={(e) => onChange({ audioPrompt: e.target.value })}
                 placeholder={
@@ -325,7 +302,6 @@ export function Step2Video({
                     : "Describe soundscape - ambient noise, music mood, speech tone..."
                 }
                 rows={2}
-                style={textareaStyle}
               />
               <ToggleRow
                 label="Auto Generate Audio"
@@ -339,7 +315,7 @@ export function Step2Video({
               label="Quality"
               labelId="s2-quality-label"
               right={
-                <span style={{ fontSize: 12, color: C.body }}>
+                <span className="text-sm text-text-secondary">
                   Full video is 10s
                 </span>
               }
@@ -347,14 +323,7 @@ export function Step2Video({
               <div
                 role="group"
                 aria-labelledby="s2-quality-label"
-                style={{
-                  display: "inline-flex",
-                  alignSelf: "flex-start",
-                  gap: 2,
-                  padding: 3,
-                  background: "var(--color-bg-subtle)",
-                  borderRadius: "var(--radius-lg)",
-                }}
+                className="inline-flex self-start gap-[2px] rounded-lg bg-bg-subtle p-[3px]"
               >
                 <QualityTab
                   selected={state.quality === "low"}
@@ -373,13 +342,13 @@ export function Step2Video({
 
             <span
               title={hasPrompt ? undefined : "Type a prompt first"}
-              style={{ display: "block" }}
+              className="block"
             >
               <button
                 onClick={onGenerateStoryboard}
                 disabled={!canGenerateStoryboard}
                 title={hasPrompt ? undefined : "Type a prompt first"}
-                style={outlineButtonStyle(canGenerateStoryboard)}
+                className={outlineButtonStyle(canGenerateStoryboard)}
               >
                 {generatingStoryboard ? (
                   <>
@@ -406,21 +375,12 @@ export function Step2Video({
             </span>
 
             {state.storyboardGenerated && !generatingStoryboard && (
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 10 }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    justifyContent: "space-between",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+              <div className="flex flex-col gap-[10px]">
+                <div className="flex items-baseline justify-between gap-[12px]">
+                  <div className="text-md font-semibold text-text-primary">
                     Storyboard
                   </div>
-                  <div style={{ fontSize: 12, color: C.body }}>
+                  <div className="text-sm text-text-secondary">
                     3 scenes · used as the listing preview
                   </div>
                 </div>
@@ -436,17 +396,7 @@ export function Step2Video({
                   />
                 ))}
                 {!renderStarted && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      padding: "12px 14px",
-                      background: "var(--color-bg-info-subtle)",
-                      border:
-                        "var(--border-width-1) solid var(--color-border-blue)",
-                      borderRadius: "var(--radius-lg)",
-                    }}
-                  >
+                  <div className="flex gap-[10px] rounded-lg border border-solid border-[var(--color-border-blue)] bg-bg-info-subtle px-[14px] py-[12px]">
                     <svg
                       width="17"
                       height="17"
@@ -456,29 +406,17 @@ export function Step2Video({
                       strokeWidth="1.8"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      style={{ flexShrink: 0, marginTop: 1 }}
+                      className="mt-[1px] shrink-0"
                       aria-hidden
                     >
                       <circle cx="12" cy="12" r="9" />
                       <path d="M12 11v5 M12 7.6v.4" />
                     </svg>
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "var(--color-text-primary)",
-                        }}
-                      >
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-text-primary">
                         Click Continue to start rendering your 10s video
                       </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "var(--color-text-secondary)",
-                          marginTop: 2,
-                        }}
-                      >
+                      <div className="mt-[2px] text-sm text-text-secondary">
                         You will see progress right here. The render keeps
                         running if you leave.
                       </div>
@@ -499,7 +437,7 @@ export function Step2Video({
             {/* True from the moment there is a storyboard: the next click starts
                 a render that never needs this tab to stay open. */}
             {state.storyboardGenerated && !generatingStoryboard && !renderDone && (
-              <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
+              <div className="text-sm leading-relaxed text-text-secondary">
                 {isLastStep
                   ? "You can stay here and wait, or go ahead now — the render keeps running either way."
                   : "You can stay here and wait, or continue to the mint setup in parallel — the render keeps running either way."}
@@ -516,24 +454,15 @@ export function Step2Video({
         )}
 
         {effectiveMediaType === "skip" && (
-          <div style={{ fontSize: 13, color: C.body }}>
+          <div className="text-sm text-text-secondary">
             You can add media later from the project dashboard. Continue to set
             up the mint.
           </div>
         )}
 
-        <div
-          style={{
-            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-            paddingTop: 18,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 16,
-          }}
-        >
+        <div className="flex items-center justify-between gap-[16px] border-t border-solid border-border-subtle pt-[18px]">
           {effectiveMediaType === "ai" ? (
-            <span style={{ fontSize: 12, color: C.body }}>
+            <span className="text-sm text-text-secondary">
               {!state.storyboardGenerated &&
                 (hasPrompt
                   ? "Generate the storyboard to continue."
@@ -551,13 +480,13 @@ export function Step2Video({
               {renderDone && "Video ready."}
             </span>
           ) : effectiveMediaType === null ? (
-            <span style={{ fontSize: 12, color: C.body }}>
+            <span className="text-sm text-text-secondary">
               Skip isn't available for this listing — choose AR or generate an
               AI storyboard to continue.
             </span>
           ) : effectiveMediaType === "ar" ? (
             /* The wait is the state of this step, so it is said here too. */
-            <span style={{ fontSize: 12, color: C.body }}>
+            <span className="text-sm text-text-secondary">
               {state.arClip
                 ? "Clip received from your phone."
                 : "Waiting for the clip from your phone."}
@@ -568,10 +497,7 @@ export function Step2Video({
           {!renderStarted ? (
             /* A disabled button takes no pointer events, so the reason has to
                live on a wrapper the cursor can still reach. */
-            <span
-              title={continueBlockedReason}
-              style={{ display: "inline-flex" }}
-            >
+            <span title={continueBlockedReason} className="inline-flex">
               <button
                 onClick={() => {
                   // AI flow w/ storyboard → kick off render and stay here.
@@ -586,7 +512,7 @@ export function Step2Video({
                   (!canStartRender && !canContinueWithoutRender) || minting
                 }
                 title={continueBlockedReason}
-                style={primaryFooterButton(
+                className={primaryFooterButton(
                   (canStartRender || canContinueWithoutRender) && !minting,
                 )}
               >
@@ -602,7 +528,7 @@ export function Step2Video({
             <button
               onClick={onContinue}
               disabled={minting}
-              style={primaryFooterButton(!minting)}
+              className={primaryFooterButton(!minting)}
             >
               <ForwardLabel
                 busy={minting}
@@ -668,48 +594,24 @@ function ChevronRight() {
 
 // The storyboard button is secondary work on this step — the page's one filled
 // button is Continue — so it reads as a full-width outline.
-function outlineButtonStyle(enabled: boolean): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "12px 20px",
-    background: enabled ? "var(--color-bg-surface)" : "var(--color-bg-subtle)",
-    color: enabled
-      ? "var(--color-text-primary)"
-      : "var(--color-text-disabled)",
-    border: `var(--border-width-1) solid ${
-      enabled ? "var(--color-border-default)" : "var(--color-border-subtle)"
-    }`,
-    borderRadius: "var(--radius-lg)",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    fontFamily: "inherit",
-    transition: "background .14s, border-color .14s",
-  };
+function outlineButtonStyle(enabled: boolean): string {
+  return [
+    "w-full px-[20px] py-[12px] rounded-lg text-md font-semibold inline-flex items-center justify-center gap-[8px]",
+    "border border-solid transition-colors duration-fast",
+    enabled
+      ? "bg-bg-surface text-text-primary border-border"
+      : "cursor-not-allowed bg-bg-subtle text-text-disabled border-border-subtle",
+  ].join(" ");
 }
 
-function primaryFooterButton(enabled: boolean): React.CSSProperties {
-  return {
-    padding: "11px 22px",
-    background: enabled ? C.primary : "var(--color-bg-subtle)",
-    color: enabled
-      ? "var(--color-text-on-brand)"
-      : "var(--color-text-disabled)",
-    border: "none",
-    borderRadius: "var(--radius-lg)",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    fontFamily: "inherit",
-    transition: "background .14s",
-  };
+function primaryFooterButton(enabled: boolean): string {
+  return [
+    "px-[22px] py-[11px] rounded-lg text-md font-semibold inline-flex items-center gap-[8px]",
+    "transition-colors duration-fast",
+    enabled
+      ? "bg-bg-brand text-text-on-brand"
+      : "cursor-not-allowed bg-bg-subtle text-text-disabled",
+  ].join(" ");
 }
 
 // RenderCard — inline render-progress card shown on Step 2 once the user
@@ -737,33 +639,15 @@ function RenderCard({
     <div
       role="status"
       aria-live="polite"
-      style={{
-        padding: 18,
-        background: "var(--color-bg-surface)",
-        border: `var(--border-width-1-5) solid ${
-          isDone ? "var(--color-border-success)" : "var(--color-border-brand)"
-        }`,
-        borderRadius: "var(--radius-lg)",
-        boxShadow: isDone
-          ? "var(--elevation-2)"
-          : "var(--elevation-2)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-      }}
+      className={[
+        "flex flex-col gap-[14px] rounded-lg border-1-5 border-solid bg-bg-surface p-[18px] shadow-2",
+        isDone ? "border-[var(--color-border-success)]" : "border-border-brand",
+      ].join(" ")}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div
-          style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
-        >
+      <div className="flex items-center justify-between">
+        <div className="inline-flex items-center gap-[10px]">
           {isDone ? (
-            <span style={badge("var(--color-bg-success-subtle)", "var(--color-text-success)")}>
+            <span className={badge("bg-bg-success-subtle", "text-text-success")}>
               <svg
                 width="14"
                 height="14"
@@ -778,23 +662,17 @@ function RenderCard({
               </svg>
             </span>
           ) : (
-            <span style={badge("var(--color-bg-brand-subtle)", "var(--color-text-brand)")}>
+            <span className={badge("bg-bg-brand-subtle", "text-text-brand")}>
               <span
-                className="ix-s2rc-pulse"
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: "var(--color-bg-brand)",
-                }}
+                className="ix-s2rc-pulse h-[8px] w-[8px] rounded-full bg-bg-brand"
               />
             </span>
           )}
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+            <div className="text-md font-bold text-text-primary">
               {isDone ? "Video ready" : "Video rendering"}
             </div>
-            <div style={{ fontSize: 12, color: C.body, marginTop: 1 }}>
+            <div className="mt-[1px] text-sm text-text-secondary">
               {isDone
                 ? "Project will go live once you mint"
                 : `Stage ${stageNum}/5 · ${STAGE_LABELS[job.stage]}`}
@@ -802,58 +680,32 @@ function RenderCard({
           </div>
         </div>
         {!isDone && (
-          <span
-            style={{
-              fontSize: 12,
-              color: C.body,
-              fontWeight: 600,
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
+          <span className="text-sm font-semibold tabular-nums text-text-secondary">
             {etaLabel(etaSec)} left
           </span>
         )}
       </div>
 
       {!isDone && (
-        <div
-          style={{
-            height: 6,
-            background: "var(--color-bg-surface-raised)",
-            borderRadius: 3,
-            overflow: "hidden",
-          }}
-        >
+        <div className="h-[6px] overflow-hidden rounded-[3px] bg-bg-surface-raised">
           <div
-            style={{
-              // Scaled, not resized: a transform moves on the compositor, where an
-              // animated width re-lays the row out every half second.
-              width: "100%",
-              height: "100%",
-              background: "var(--color-bg-brand)",
-              transform: `scaleX(${total / 100})`,
-              transformOrigin: "left",
-              transition: "transform .5s linear",
-            }}
+            // Scaled, not resized: a transform moves on the compositor, where an
+            // animated width re-lays the row out every half second.
+            className="h-full w-full origin-left bg-bg-brand transition-transform duration-slower ease-linear"
+            style={{ transform: `scaleX(${total / 100})` }}
           />
         </div>
       )}
 
       {!isDone && (
-        <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
+        <div className="text-sm leading-relaxed text-text-secondary">
           You can leave — the render keeps running, and the clip is here when
           it finishes.
         </div>
       )}
 
       {!isDone && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-          }}
-        >
+        <div className="flex flex-col gap-[6px]">
           <Opt
             label="Email me when ready"
             checked={emailOpen}
@@ -876,20 +728,7 @@ function RenderCard({
                 type="email"
                 inputMode="email"
                 autoComplete="email"
-                style={{
-                  flex: 1,
-                  height: 30,
-                  padding: "0 10px",
-                  background: "var(--color-bg-page)",
-                  border:
-                    "var(--border-width-1) solid var(--color-border-subtle)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: "var(--color-text-primary)",
-                  outline: "none",
-                  fontFamily: "inherit",
-                  minWidth: 0,
-                }}
+                className="h-[30px] min-w-0 flex-1 rounded-lg border border-solid border-border-subtle bg-bg-page px-[10px] text-sm text-text-primary outline-none"
               />
             )}
           </Opt>
@@ -909,18 +748,8 @@ function RenderCard({
   );
 }
 
-function badge(bg: string, fg: string): React.CSSProperties {
-  return {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    background: bg,
-    color: fg,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flex: "0 0 24px",
-  };
+function badge(bgClass: string, fgClass: string): string {
+  return `${bgClass} ${fgClass} inline-flex h-[24px] w-[24px] shrink-0 grow-0 items-center justify-center rounded-full`;
 }
 
 function Opt({
@@ -935,41 +764,20 @@ function Opt({
   children?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <label
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 12,
-          color: "var(--color-text-secondary)",
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
-      >
+    <div className="flex items-center gap-[8px]">
+      <label className="inline-flex cursor-pointer items-center gap-[8px] text-sm font-medium text-text-secondary">
         <span
           onClick={(e) => {
             e.preventDefault();
             onChange(!checked);
           }}
-          style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
-            border: `1.5px solid ${
-              checked
-                ? "var(--color-bg-brand)"
-                : "var(--color-border-default)"
-            }`,
-            background: checked
-              ? "var(--color-bg-brand)"
-              : "var(--color-bg-surface)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flex: "0 0 16px",
-            transition: "background .14s, border-color .14s",
-          }}
+          className={[
+            "inline-flex h-[16px] w-[16px] shrink-0 grow-0 items-center justify-center rounded-sm",
+            "border-1-5 border-solid transition-colors duration-fast",
+            checked
+              ? "border-border-brand bg-bg-brand"
+              : "border-border bg-bg-surface",
+          ].join(" ")}
         >
           {checked && (
             <svg
@@ -997,35 +805,28 @@ type CardStatus = "available" | "recommended" | "locked" | "soon";
 
 // The status is the card's own header band — what this way of getting a
 // preview costs you is the first thing to read, before the name.
-const STATUS_BAND: Record<
-  CardStatus,
-  { label: string; background: string; color: string }
-> = {
+const STATUS_BAND: Record<CardStatus, { label: string; className: string }> = {
   available: {
     label: "Available",
-    background: "var(--color-bg-success-subtle)",
-    color: "var(--color-text-success)",
+    className: "bg-bg-success-subtle text-text-success",
   },
   // A recommendation is information, not the page's action: the brand's
   // quiet tint, not the gradient slab (white on the gradient's light end also
   // failed contrast in dark).
   recommended: {
     label: "Recommended",
-    background: "var(--color-bg-brand-subtle)",
-    color: "var(--color-text-brand)",
+    className: "bg-bg-brand-subtle text-text-brand",
   },
   locked: {
     label: "Locked",
-    background: "var(--color-bg-subtle)",
-    color: "var(--color-text-secondary)",
+    className: "bg-bg-subtle text-text-secondary",
   },
   // The phone app that records the clip is not released. The card stays —
   // picking it explains that and offers the way to AI — but it no longer
   // wears a green "Available" over a dead end.
   soon: {
     label: "App coming soon",
-    background: "var(--color-bg-warning-subtle)",
-    color: "var(--color-text-warning)",
+    className: "bg-bg-warning-subtle text-text-warning",
   },
 };
 
@@ -1058,59 +859,33 @@ function TypeCard({
       aria-disabled={locked || undefined}
       aria-pressed={selected}
       title={locked ? lockReason : undefined}
-      style={{
-        padding: 0,
-        overflow: "hidden",
-        textAlign: "left",
-        background: "var(--color-bg-surface)",
-        border: `var(--border-width-1) solid ${
-          selected ? "var(--color-border-brand)" : "var(--color-border-default)"
-        }`,
-        boxShadow: selected ? "0 0 0 3px var(--color-bg-brand-subtle)" : "none",
-        borderRadius: "var(--radius-xl)",
-        cursor: locked ? "not-allowed" : "pointer",
-        display: "flex",
-        flexDirection: "column",
-        opacity: locked ? 0.6 : 1,
-        transition: "border-color .14s, box-shadow .14s",
-      }}
+      className={[
+        "flex flex-col overflow-hidden rounded-xl text-left",
+        "border border-solid bg-bg-surface transition-[border-color,box-shadow] duration-fast",
+        selected ? "border-border-brand" : "border-border",
+        selected ? "shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]" : "",
+        locked ? "cursor-not-allowed opacity-60" : "",
+      ].join(" ")}
     >
-      <span
-        style={{
-          display: "block",
-          padding: "5px 10px",
-          background: band.background,
-          color: band.color,
-          fontSize: 11,
-          fontWeight: 600,
-        }}
-      >
+      <span className={`block px-[10px] py-[5px] text-xs font-semibold ${band.className}`}>
         {band.label}
       </span>
-      <span
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          padding: "10px 12px 12px",
-        }}
-      >
+      <span className="flex flex-col gap-[4px] px-[12px] pb-[12px] pt-[10px]">
         <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            color: selected ? "var(--color-text-brand)" : C.text,
-          }}
+          className={`inline-flex items-center gap-[8px] ${
+            selected ? "text-text-brand" : "text-text-primary"
+          }`}
         >
           {icon}
-          <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
+          <span className="text-md font-semibold">{label}</span>
         </span>
-        <span style={{ fontSize: 12, color: C.body }}>{sub}</span>
+        <span className="text-sm text-text-secondary">{sub}</span>
       </span>
     </button>
   );
 }
+
+const FIELD_LABEL_CLASS = "text-md font-semibold text-text-primary";
 
 function FieldGroup({
   label,
@@ -1125,27 +900,15 @@ function FieldGroup({
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const labelStyle: React.CSSProperties = {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "var(--color-text-primary)",
-  };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
+    <div className="flex flex-col gap-[8px]">
+      <div className="flex items-center justify-between gap-[12px]">
         {htmlFor ? (
-          <label htmlFor={htmlFor} style={labelStyle}>
+          <label htmlFor={htmlFor} className={FIELD_LABEL_CLASS}>
             {label}
           </label>
         ) : (
-          <span id={labelId} style={labelStyle}>
+          <span id={labelId} className={FIELD_LABEL_CLASS}>
             {label}
           </span>
         )}
@@ -1169,55 +932,24 @@ function SceneRow({
 }) {
   return (
     <div
-      style={{
-        background: "var(--color-bg-subtle)",
-        border: `var(--border-width-1) solid ${
-          editing ? "var(--color-border-brand)" : "transparent"
-        }`,
-        borderRadius: "var(--radius-lg)",
-        overflow: "hidden",
-        transition: "border-color .14s",
-      }}
+      className={[
+        "overflow-hidden rounded-lg border border-solid bg-bg-subtle transition-colors duration-fast",
+        editing ? "border-border-brand" : "border-transparent",
+      ].join(" ")}
     >
       <div
         onClick={onToggleEdit}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 16px",
-          cursor: "pointer",
-        }}
+        className="flex cursor-pointer items-center justify-between px-[16px] py-[12px]"
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+        <div className="flex items-center gap-[12px]">
+          <span className="text-sm font-semibold text-text-primary">
             {scene.label}
           </span>
-          <span
-            style={{
-              fontSize: 12,
-              color: "var(--color-text-brand)",
-              fontWeight: 600,
-            }}
-          >
+          <span className="text-sm font-semibold text-text-brand">
             {scene.timeRange}
           </span>
         </div>
-        <span
-          style={{
-            fontSize: 12,
-            color: C.body,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
+        <span className="inline-flex items-center gap-[4px] text-sm text-text-secondary">
           {editing ? "Done" : "Edit"}
           <svg
             width="12"
@@ -1226,37 +958,21 @@ function SceneRow({
             fill="none"
             stroke="currentColor"
             strokeWidth="2.4"
-            style={{
-              transform: editing ? "rotate(180deg)" : undefined,
-              transition: "transform .14s",
-            }}
+            className={`transition-transform duration-fast ${editing ? "rotate-180" : ""}`}
           >
             <path d="M6 9l6 6 6-6" />
           </svg>
         </span>
       </div>
       {editing && (
-        <div
-          style={{
-            padding: "0 16px 16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
+        <div className="flex flex-col gap-[10px] px-[16px] pb-[16px]">
           <SceneField
             label="Visual description"
             value={scene.visual}
             onChange={(v) => onChange({ visual: v })}
             rows={2}
           />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-            }}
-          >
+          <div className="grid grid-cols-2 gap-[10px]">
             <SceneField
               label="Background audio"
               value={scene.bgAudio}
@@ -1297,8 +1013,8 @@ function SceneField({
   rows: number;
 }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span style={{ fontSize: 11, fontWeight: 600, color: C.body }}>
+    <label className="flex flex-col gap-[4px]">
+      <span className="text-xs font-semibold text-text-secondary">
         {label}
       </span>
       <textarea
@@ -1306,17 +1022,7 @@ function SceneField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        style={{
-          padding: "8px 10px",
-          background: "var(--color-bg-surface)",
-          border: "var(--border-width-1) solid var(--color-border-subtle)",
-          borderRadius: "var(--radius-md)",
-          fontSize: 13,
-          color: "var(--color-text-primary)",
-          resize: "none",
-          outline: "none",
-          fontFamily: "inherit",
-        }}
+        className="resize-none rounded-md border border-solid border-border-subtle bg-bg-surface px-[10px] py-[8px] text-sm text-text-primary outline-none"
       />
     </label>
   );
@@ -1335,22 +1041,12 @@ function QualityTab({
     <button
       onClick={onClick}
       aria-pressed={selected}
-      style={{
-        padding: "8px 16px",
-        background: selected ? "var(--color-bg-surface)" : "transparent",
-        border: `var(--border-width-1) solid ${
-          selected ? "var(--color-border-subtle)" : "transparent"
-        }`,
-        boxShadow: selected ? "var(--elevation-1)" : "none",
-        borderRadius: "var(--radius-md)",
-        color: selected ? "var(--color-text-primary)" : C.body,
-        fontSize: 13,
-        fontWeight: selected ? 600 : 500,
-        fontFamily: "inherit",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        transition: "background .14s, color .14s",
-      }}
+      className={[
+        "whitespace-nowrap rounded-md border border-solid px-[16px] py-[8px] text-sm transition-colors duration-fast",
+        selected
+          ? "border-border-subtle bg-bg-surface font-semibold text-text-primary shadow-1"
+          : "border-transparent bg-transparent font-medium text-text-secondary",
+      ].join(" ")}
     >
       {children}
     </button>
@@ -1373,22 +1069,8 @@ function ToggleRow({
 }) {
   const labelId = React.useId();
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-end",
-        gap: 4,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
+    <div className="flex flex-col items-end gap-[4px]">
+      <div className="flex items-center justify-end gap-[8px]">
         <button
           type="button"
           role="switch"
@@ -1397,55 +1079,22 @@ function ToggleRow({
           onClick={() => onChange(!on)}
           // A 24 px target, and an off track that shows against the card —
           // the raised-surface grey it used was all but invisible on white.
-          style={{
-            width: 40,
-            height: 24,
-            padding: 0,
-            borderRadius: 12,
-            border: "none",
-            background: on
-              ? "var(--color-bg-brand)"
-              : "var(--color-border-strong)",
-            position: "relative",
-            cursor: "pointer",
-            transition: "background .14s",
-            flex: "0 0 40px",
-          }}
+          className={`relative h-[24px] w-[40px] shrink-0 grow-0 rounded-full transition-colors duration-fast ${
+            on ? "bg-bg-brand" : "bg-[var(--color-border-strong)]"
+          }`}
         >
           <span
-            style={{
-              position: "absolute",
-              top: 2,
-              left: on ? 18 : 2,
-              width: 20,
-              height: 20,
-              background: "var(--color-bg-surface)",
-              borderRadius: "50%",
-              boxShadow: "var(--elevation-1)",
-              transition: "left .14s",
-            }}
+            className={`absolute top-[2px] h-[20px] w-[20px] rounded-full bg-bg-surface shadow-1 transition-[left] duration-fast ${
+              on ? "left-[18px]" : "left-[2px]"
+            }`}
           />
         </button>
-        <span
-          id={labelId}
-          style={{
-            fontSize: 13,
-            color: "var(--color-text-secondary)",
-            fontWeight: 500,
-          }}
-        >
+        <span id={labelId} className="text-sm font-medium text-text-secondary">
           {label}
         </span>
       </div>
       {hint && (
-        <span
-          style={{
-            fontSize: 12,
-            color: C.body,
-            maxWidth: 320,
-            textAlign: "right",
-          }}
-        >
+        <span className="max-w-[320px] text-right text-sm text-text-secondary">
           {hint}
         </span>
       )}
@@ -1455,31 +1104,8 @@ function ToggleRow({
 
 function Spinner() {
   return (
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        border: "2px solid var(--color-border-default)",
-        borderTopColor: "currentColor",
-        animation: "ix-brief-spin .8s linear infinite",
-        display: "inline-block",
-      }}
-    >
+    <span className="inline-block h-[14px] w-[14px] animate-[ix-brief-spin_0.8s_linear_infinite] rounded-full border-2 border-solid border-border border-t-current">
       <style>{`@keyframes ix-brief-spin{to{transform:rotate(360deg)}}`}</style>
     </span>
   );
 }
-
-const textareaStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  background: "var(--color-input-bg)",
-  border: "var(--border-width-1) solid var(--color-border-default)",
-  borderRadius: "var(--radius-lg)",
-  fontSize: 14,
-  color: "var(--color-text-primary)",
-  lineHeight: 1.5,
-  resize: "vertical",
-  outline: "none",
-  fontFamily: "inherit",
-};

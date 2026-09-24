@@ -11,7 +11,6 @@
 // open yet, so nothing claims buyers can see it).
 
 import * as React from "react";
-import { C } from "@/lib/pcb/colors";
 import { type BriefState, type Intent } from "./brief-app";
 import {
   useVideoJobs,
@@ -106,32 +105,12 @@ export function Step4Success({
     : pendingSubline(intent, state.shareToNewsfeed);
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: 560,
-        display: "flex",
-        flexDirection: "column",
-        gap: 24,
-        alignItems: "center",
-        textAlign: "center",
-      }}
-    >
+    <div className="flex w-full max-w-[560px] flex-col items-center gap-[24px] text-center">
       <div
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          background: isLive
-            ? "var(--color-bg-success-subtle)"
-            : "var(--color-bg-brand-subtle)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: isLive
-            ? "var(--elevation-2)"
-            : "var(--elevation-2)",
-        }}
+        className={[
+          "flex h-[64px] w-[64px] items-center justify-center rounded-full shadow-2",
+          isLive ? "bg-bg-success-subtle" : "bg-bg-brand-subtle",
+        ].join(" ")}
       >
         <svg
           width="32"
@@ -152,25 +131,10 @@ export function Step4Success({
       </div>
 
       <div>
-        <h1
-          style={{
-            fontSize: 32,
-            fontWeight: 700,
-            color: C.text,
-            margin: 0,
-            letterSpacing: -0.5,
-          }}
-        >
+        <h1 className="m-0 text-5xl font-bold tracking-tight text-text-primary">
           {heading}
         </h1>
-        <p
-          style={{
-            fontSize: 14,
-            color: C.body,
-            marginTop: 6,
-            maxWidth: 460,
-          }}
-        >
+        <p className="mt-[6px] max-w-[460px] text-md text-text-secondary">
           {subline}
         </p>
       </div>
@@ -181,65 +145,24 @@ export function Step4Success({
       )}
 
       {state.scenes.length > 0 && (
-        <div
-          style={{
-            width: "100%",
-            background: "var(--color-bg-surface)",
-            border:
-              "var(--border-width-1) solid var(--color-border-subtle)",
-            borderRadius: "var(--radius-lg)",
-            padding: 18,
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-            textAlign: "left",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
+        <div className="flex w-full flex-col gap-[14px] rounded-lg border border-solid border-border-subtle bg-bg-surface p-[18px] text-left">
+          <div className="flex items-center justify-between">
             <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "var(--color-text-tertiary)",
-                  marginBottom: 2,
-                }}
-              >
+              <div className="mb-[2px] text-sm font-medium text-text-tertiary">
                 {projectName || "Listing"}
               </div>
-              <div
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: C.text,
-                }}
-              >
+              <div className="text-lg font-bold text-text-primary">
                 {state.productName || "Untitled"}
               </div>
             </div>
             {willRenderVideo && (
               <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 10px",
-                  background: isLive
-                    ? "var(--color-bg-success-subtle)"
-                    : "var(--color-bg-brand-subtle)",
-                  color: isLive
-                    ? "var(--color-text-success)"
-                    : "var(--color-text-brand)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 999,
-                }}
+                className={[
+                  "inline-flex items-center gap-[6px] rounded-full px-[10px] py-[4px] text-sm font-semibold",
+                  isLive
+                    ? "bg-bg-success-subtle text-text-success"
+                    : "bg-bg-brand-subtle text-text-brand",
+                ].join(" ")}
               >
                 {isLive ? (
                   <>
@@ -260,13 +183,7 @@ export function Step4Success({
                 ) : (
                   <>
                     <span
-                      className="ix-s4-pulse"
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 3,
-                        background: "var(--color-bg-brand)",
-                      }}
+                      className="ix-s4-pulse h-[6px] w-[6px] rounded-full bg-bg-brand"
                     />
                     Pending video
                   </>
@@ -277,34 +194,14 @@ export function Step4Success({
 
           {/* Storyboard scenes — internal-only preview while we wait, full
               video replaces it once live. */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 8,
-            }}
-          >
+          <div className="grid grid-cols-3 gap-[8px]">
             {state.scenes.map((scene, i) => (
               <SceneCard key={scene.id} scene={scene} index={i} />
             ))}
           </div>
 
           {willRenderVideo && !isLive && (
-            <div
-              style={{
-                padding: "10px 12px",
-                background: "var(--color-bg-page)",
-                border:
-                  "var(--border-width-1) solid var(--color-border-subtle)",
-                borderRadius: "var(--radius-md)",
-                fontSize: 12,
-                color: C.body,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                lineHeight: 1.5,
-              }}
-            >
+            <div className="flex items-center gap-[8px] rounded-md border border-solid border-border-subtle bg-bg-page px-[12px] py-[10px] text-sm leading-relaxed text-text-secondary">
               <svg
                 width="14"
                 height="14"
@@ -314,7 +211,7 @@ export function Step4Success({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ flex: "0 0 14px" }}
+                className="shrink-0"
               >
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 8v4 M12 16h.01" />
@@ -334,31 +231,10 @@ export function Step4Success({
         </div>
       )}
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          width: "100%",
-          alignItems: "stretch",
-        }}
-      >
+      <div className="flex w-full flex-col items-stretch gap-[10px]">
         <button
           onClick={() => onBrowse("/projects")}
-          style={{
-            padding: "14px 24px",
-            background: "var(--color-bg-brand)",
-            color: "var(--color-text-on-brand)",
-            border: "none",
-            borderRadius: "var(--radius-3xl)",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
+          className="inline-flex items-center justify-center gap-[8px] rounded-3xl border-none bg-bg-brand px-[24px] py-[14px] text-md font-bold text-text-on-brand"
         >
           <svg
             width="16"
@@ -375,14 +251,11 @@ export function Step4Success({
           Go to My Projects
         </button>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <a onClick={() => onBrowse("/")} style={linkButton}>
+        <div className="flex items-center justify-center">
+          <a
+            onClick={() => onBrowse("/")}
+            className="cursor-pointer rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline"
+          >
             Back to home
           </a>
         </div>
@@ -403,65 +276,21 @@ function PendingCard({
 }) {
   const { total, etaSec } = progressOf(job);
   return (
-    <div
-      style={{
-        width: "100%",
-        padding: 16,
-        background: "var(--color-bg-brand-subtle)",
-        border: "var(--border-width-1) solid var(--color-border-brand)",
-        borderRadius: "var(--radius-lg)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        textAlign: "left",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: "var(--color-text-brand)",
-          }}
-        >
+    <div className="flex w-full flex-col gap-[10px] rounded-lg border border-solid border-border-brand bg-bg-brand-subtle p-[16px] text-left">
+      <div className="flex items-center justify-between">
+        <div className="text-md font-bold text-text-brand">
           Video is rendering · {STAGE_LABELS[job.stage]}
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "var(--color-text-brand)",
-            fontVariantNumeric: "tabular-nums",
-            fontWeight: 600,
-          }}
-        >
+        <div className="tabular-nums text-sm font-semibold text-text-brand">
           {etaLabel(etaSec)} left
         </div>
       </div>
-      <div
-        style={{
-          height: 6,
-          background: "var(--color-bg-surface)",
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
+      <div className="h-[6px] overflow-hidden rounded-full bg-bg-surface">
         <div
-          style={{
-            // Scaled, not resized: a transform moves on the compositor, where an
-            // animated width re-lays the row out every half second.
-            width: "100%",
-            height: "100%",
-            background: "var(--color-bg-brand)",
-            transform: `scaleX(${total / 100})`,
-            transformOrigin: "left",
-            transition: "transform .5s linear",
-          }}
+          // Scaled, not resized: a transform moves on the compositor, where an
+          // animated width re-lays the row out every half second.
+          className="h-full w-full origin-left bg-bg-brand transition-transform duration-slower ease-linear"
+          style={{ transform: `scaleX(${total / 100})` }}
         />
       </div>
     </div>
@@ -475,67 +304,27 @@ function SceneCard({
   scene: BriefState["scenes"][number];
   index: number;
 }) {
-  const gradients = [
-    "linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)",
-    "linear-gradient(135deg, #4c1d95 0%, #831843 100%)",
-    "linear-gradient(135deg, #831843 0%, #fb923c 100%)",
-  ];
+  // Only the brand gradient tokens exist (CLAUDE.md §7 — an agent never mints
+  // a design token), so the three-tone poster art becomes an alternation of
+  // the two rather than a third invented ramp.
+  const gradientClass =
+    index % 2 === 0 ? "bg-[image:var(--gradient-brand)]" : "bg-[image:var(--gradient-ai)]";
   return (
     <div
-      style={{
-        aspectRatio: "9 / 16",
-        background: gradients[index % gradients.length],
-        borderRadius: "var(--radius-md)",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "0 4px 12px -4px rgba(0,0,0,.2)",
-      }}
+      className={[
+        "relative aspect-[9/16] overflow-hidden rounded-md shadow-3",
+        gradientClass,
+      ].join(" ")}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: 6,
-          left: 6,
-          fontSize: 11,
-          fontWeight: 600,
-          padding: "2px 6px",
-          background: "color-mix(in srgb, var(--color-bg-overlay) 70%, transparent)",
-          color: "var(--color-white)",
-          borderRadius: 4,
-        }}
-      >
+      {/* A dark scrim behind the caption instead of a text-shadow — the
+          caption is white regardless of theme, since it sits on imagery. */}
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(to_top,color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent),transparent)]" />
+      <div className="absolute left-[6px] top-[6px] rounded-sm bg-[color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent)] px-[6px] py-[2px] text-xs font-semibold text-[var(--color-white)]">
         {scene.timeRange}
       </div>
-      <div
-        style={{
-          position: "absolute",
-          left: 6,
-          right: 6,
-          bottom: 6,
-          fontSize: 11,
-          color: "rgba(255,255,255,0.92)",
-          fontWeight: 500,
-          textShadow: "0 1px 2px rgba(0,0,0,0.5)",
-          lineHeight: 1.3,
-          display: "-webkit-box",
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}
-      >
+      <div className="absolute bottom-[6px] left-[6px] right-[6px] line-clamp-3 text-xs font-medium leading-[1.3] text-[var(--color-white)]">
         {scene.visual}
       </div>
     </div>
   );
 }
-
-const linkButton: React.CSSProperties = {
-  padding: "6px 12px",
-  fontSize: 12,
-  fontWeight: 700,
-  color: "var(--color-text-brand)",
-  textDecoration: "none",
-  cursor: "pointer",
-  background: "var(--color-bg-brand-subtle)",
-  borderRadius: 999,
-};

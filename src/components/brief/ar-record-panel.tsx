@@ -63,39 +63,10 @@ export function ArRecordPanel({
   );
 
   return (
-    <div
-      style={{
-        background: "var(--color-bg-surface)",
-        border: "var(--border-width-1) solid var(--color-border-default)",
-        borderRadius: "var(--radius-xl)",
-        padding: 18,
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", gap: 12, minWidth: 0 }}>
-          <span
-            style={{
-              width: 36,
-              height: 36,
-              flex: "0 0 36px",
-              borderRadius: "var(--radius-lg)",
-              background: "var(--color-bg-subtle)",
-              color: "var(--color-text-secondary)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+    <div className="flex flex-col gap-[16px] rounded-xl border border-solid border-border bg-bg-surface p-[18px]">
+      <div className="flex items-start justify-between gap-[12px]">
+        <div className="flex min-w-0 gap-[12px]">
+          <span className="inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg bg-bg-subtle text-text-secondary">
             <svg
               width="19"
               height="19"
@@ -112,80 +83,24 @@ export function ArRecordPanel({
               <path d="M9 6h6" />
             </svg>
           </span>
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 700,
-                color: "var(--color-text-primary)",
-              }}
-            >
+          <div className="min-w-0">
+            <div className="text-lg font-bold text-text-primary">
               Record on your phone
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "var(--color-text-secondary)",
-                marginTop: 2,
-              }}
-            >
+            <div className="mt-[2px] text-sm text-text-secondary">
               Scan the code with your phone camera to open the IDEEZA app.
             </div>
           </div>
         </div>
-        <span
-          style={{
-            flex: "0 0 auto",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "4px 10px",
-            background: "var(--color-bg-warning-subtle)",
-            color: "var(--color-text-warning)",
-            borderRadius: "var(--radius-full)",
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          <span
-            className="ix-ar-dot"
-            style={{
-              width: 7,
-              height: 7,
-              flex: "0 0 7px",
-              borderRadius: "var(--radius-full)",
-              background: "var(--color-bg-warning)",
-            }}
-          />
+        <span className="inline-flex shrink-0 items-center gap-[6px] rounded-full bg-bg-warning-subtle px-[10px] py-[4px] text-sm font-semibold text-text-warning">
+          <span className="ix-ar-dot h-[7px] w-[7px] shrink-0 rounded-full bg-bg-warning" />
           Waiting for phone
         </span>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "flex-start",
-          gap: 20,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 8,
-            flex: "0 0 auto",
-          }}
-        >
-          <div
-            style={{
-              padding: 12,
-              background: "var(--color-bg-subtle)",
-              borderRadius: "var(--radius-lg)",
-              display: "inline-flex",
-            }}
-          >
+      <div className="flex flex-wrap items-start gap-[20px]">
+        <div className="flex shrink-0 flex-col items-center gap-[8px]">
+          <div className="inline-flex rounded-lg bg-bg-subtle p-[12px]">
             {qr ? (
               /* A code is a physical thing before it is a picture: dark modules
                  on a light field is what a camera can lock onto, so the plate
@@ -208,98 +123,40 @@ export function ArRecordPanel({
                   y={0}
                   width={qr.size}
                   height={qr.size}
-                  style={{ fill: "var(--color-white)" }}
+                  className="fill-[var(--color-white)]"
                 />
-                <path d={qr.path} style={{ fill: "var(--color-gray-900)" }} />
+                <path d={qr.path} className="fill-[var(--color-gray-900)]" />
               </svg>
             ) : (
-              <span
-                style={{
-                  width: QR_PX,
-                  height: QR_PX,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  fontSize: 12,
-                  color: "var(--color-text-tertiary)",
-                  padding: 16,
-                }}
-              >
+              <span className="inline-flex h-[200px] w-[200px] items-center justify-center p-[16px] text-center text-sm text-text-tertiary">
                 Preparing the scan code…
               </span>
             )}
           </div>
-          <p
-            style={{
-              maxWidth: QR_PX + 24,
-              margin: 0,
-              fontSize: 12,
-              lineHeight: 1.5,
-              color: "var(--color-text-tertiary)",
-            }}
-          >
+          <p className="m-0 max-w-[224px] text-sm leading-relaxed text-text-tertiary">
             The IDEEZA phone app isn&apos;t released yet — this page will pick
             the clip up automatically once it is.
           </p>
         </div>
 
-        <div style={{ flex: "1 1 240px", minWidth: 200 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-text-primary)",
-              marginBottom: 10,
-            }}
-          >
+        <div className="min-w-[200px] flex-[1_1_240px]">
+          <div className="mb-[10px] text-sm font-semibold text-text-primary">
             How it works
           </div>
-          <ol
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
+          <ol className="m-0 flex list-none flex-col gap-[10px] p-0">
             {STEPS.map((s, i) => (
-              <li key={s.title} style={{ display: "flex", gap: 10 }}>
+              <li key={s.title} className="flex gap-[10px]">
                 <span
-                  style={{
-                    flex: "0 0 14px",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "var(--color-text-brand)",
-                    fontVariantNumeric: "tabular-nums",
-                    lineHeight: 1.5,
-                  }}
+                  className="flex-[0_0_14px] tabular-nums text-sm font-bold leading-relaxed text-text-brand"
                   aria-hidden
                 >
                   {i + 1}
                 </span>
-                <span style={{ minWidth: 0 }}>
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "var(--color-text-primary)",
-                    }}
-                  >
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-text-primary">
                     {s.title}
                   </span>
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      lineHeight: 1.5,
-                      color: "var(--color-text-secondary)",
-                      marginTop: 1,
-                    }}
-                  >
+                  <span className="mt-[1px] block text-sm leading-relaxed text-text-secondary">
                     {s.sub}
                   </span>
                 </span>
@@ -309,32 +166,14 @@ export function ArRecordPanel({
         </div>
       </div>
 
-      <div
-        style={{
-          borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-          paddingTop: 12,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+      <div className="flex items-center justify-between gap-[12px] border-t border-solid border-border-subtle pt-[12px]">
+        <span className="text-sm text-text-secondary">
           No phone nearby?
         </span>
         <button
           type="button"
           onClick={onSwitchToAi}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--color-text-brand)",
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          className="border-none bg-transparent p-0 font-sans text-sm font-semibold text-text-brand"
         >
           Switch to AI instead
         </button>

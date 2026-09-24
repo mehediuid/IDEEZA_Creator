@@ -17,7 +17,6 @@
 // the card it opens from has no confirm of its own.
 
 import * as React from "react";
-import { C } from "@/lib/pcb/colors";
 import { RegenerateConfirm } from "./regenerate-confirm";
 
 export type ReviewVariant = "approve" | "preview";
@@ -68,18 +67,8 @@ export function ReviewModal({
     <>
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        // The flow's one backdrop — the same wash and blur as the gate's.
-        background: "color-mix(in srgb, var(--color-bg-overlay) 62%, transparent)",
-        backdropFilter: "blur(4px)",
-        zIndex: "var(--z-modal)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      }}
+      // The flow's one backdrop — the same wash and blur as the gate's.
+      className="fixed inset-0 z-modal flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] p-[24px] backdrop-blur-sm"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -87,20 +76,10 @@ export function ReviewModal({
         aria-modal="true"
         aria-labelledby="review-title"
         data-review-variant={variant}
-        style={{
-          width: "100%",
-          maxWidth: 640,
-          background: "var(--color-bg-surface)",
-          borderRadius: "var(--radius-xl)",
-          padding: 24,
-          boxShadow: "var(--elevation-5)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-        }}
+        className="flex w-full max-w-[640px] flex-col gap-[18px] rounded-xl bg-bg-surface p-[24px] shadow-5"
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-          <h2 id="review-title" style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text }}>
+        <div className="flex items-center justify-between gap-[12px]">
+          <h2 id="review-title" className="m-0 text-2xl font-bold text-text-primary">
             {isPreview ? "Auto-Generated Preview" : "Review your video"}
           </h2>
           {isPreview ? (
@@ -109,7 +88,7 @@ export function ReviewModal({
             <button
               onClick={onClose}
               aria-label="Close review"
-              style={{ background: "transparent", border: "none", color: C.body, fontSize: 18, cursor: "pointer", padding: 4, lineHeight: 1 }}
+              className="border-none bg-transparent p-[4px] text-xl leading-none text-text-secondary"
             >
               ×
             </button>
@@ -118,38 +97,21 @@ export function ReviewModal({
 
         <div
           onClick={() => setPlaying((p) => !p)}
-          style={{
-            position: "relative",
-            aspectRatio: "16 / 9",
-            background: "linear-gradient(135deg, #1e1b4b 0%, #4c1d95 38%, #831843 76%, #fb923c 100%)",
-            borderRadius: "var(--radius-lg)",
-            overflow: "hidden",
-            cursor: "pointer",
-            boxShadow: "var(--elevation-2)",
-          }}
+          className="relative aspect-video cursor-pointer overflow-hidden rounded-lg bg-[image:var(--gradient-ai)] shadow-2"
         >
           <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "radial-gradient(circle at 30% 40%, rgba(255,255,255,.18), transparent 50%), radial-gradient(circle at 70% 70%, rgba(255,255,255,.10), transparent 60%)",
-              animation: "ix-rm-pulse 3.5s ease-in-out infinite",
-            }}
+            className="absolute inset-0 animate-[ix-rm-pulse_3.5s_ease-in-out_infinite] bg-[radial-gradient(circle_at_30%_40%,color-mix(in_srgb,var(--color-white)_18%,transparent),transparent_50%),radial-gradient(circle_at_70%_70%,color-mix(in_srgb,var(--color-white)_10%,transparent),transparent_60%)]"
           />
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {/* A dark scrim behind the caption, not a text-shadow — the caption
+              is white regardless of theme (it sits on imagery, not on the
+              page), so it needs its own ground to stay legible. */}
+          <div className="absolute inset-x-0 bottom-0 h-[56px] bg-[linear-gradient(to_top,color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent),transparent)]" />
+          <div className="absolute inset-0 flex items-center justify-center">
             <div
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                background: "var(--color-bg-surface)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
-                transition: "transform .15s",
-                transform: playing ? "scale(.92)" : "scale(1)",
-              }}
+              className={[
+                "flex h-[80px] w-[80px] items-center justify-center rounded-full bg-bg-surface shadow-5 transition-transform",
+                playing ? "scale-[0.92]" : "scale-100",
+              ].join(" ")}
             >
               {playing ? (
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="var(--color-text-brand)">
@@ -163,63 +125,22 @@ export function ReviewModal({
               )}
             </div>
           </div>
-          <div
-            style={{
-              position: "absolute",
-              left: 14,
-              bottom: 12,
-              right: 14,
-              color: "var(--color-bg-surface)",
-              fontSize: 12,
-              fontWeight: 600,
-              textShadow: "0 1px 2px rgba(0,0,0,0.5)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
+          <div className="absolute bottom-[12px] left-[14px] right-[14px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[var(--color-white)]">
             {prompt.slice(0, 110) || "AI-generated demo"}
           </div>
-          <div
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 14,
-              fontSize: 11,
-              fontWeight: 700,
-              padding: "3px 8px",
-              background: "rgba(0,0,0,.55)",
-              color: "white",
-              borderRadius: 999,
-              letterSpacing: 0.4,
-            }}
-          >
+          <div className="absolute right-[14px] top-[12px] rounded-full bg-[color-mix(in_srgb,var(--color-bg-overlay)_55%,transparent)] px-[8px] py-[3px] text-xs font-bold tracking-caps text-[var(--color-white)]">
             {quality === "low" ? "480p" : "720p"} · 10s
           </div>
         </div>
 
-        <div style={{ fontSize: 13, color: C.body, lineHeight: 1.5 }}>
+        <div className="text-md leading-relaxed text-text-secondary">
           Watch the full clip before approving. Once you mint, this is the version that ships with the listing.
         </div>
 
         {!isPreview && (
           <button
             onClick={() => { onApprove(); onClose(); }}
-            style={{
-              padding: "14px 24px",
-              background: "var(--color-bg-brand)",
-              color: "var(--color-text-on-brand)",
-              border: "none",
-              borderRadius: "var(--radius-3xl)",
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              boxShadow: "var(--elevation-2)",
-            }}
+            className="inline-flex items-center justify-center gap-[8px] rounded-3xl border-none bg-bg-brand px-[24px] py-[14px] text-lg font-bold text-text-on-brand shadow-2"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 13l4 4 10-10" />
@@ -228,17 +149,8 @@ export function ReviewModal({
           </button>
         )}
 
-        <div
-          style={{
-            paddingTop: 14,
-            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <div style={{ fontSize: 12, color: C.body }}>
+        <div className="flex items-center justify-between gap-[12px] border-t border-solid border-border-subtle pt-[14px]">
+          <div className="text-sm text-text-secondary">
             {isPreview ? "Made from your 3D model" : "Not happy with the result?"}
           </div>
           <button
@@ -246,19 +158,7 @@ export function ReviewModal({
               if (isPreview) setConfirmRegen(true);
               else onRegenerate();
             }}
-            style={{
-              padding: "10px 18px",
-              background: "transparent",
-              border: "var(--border-width-1) solid var(--color-border-default)",
-              borderRadius: 999,
-              color: C.text,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-            }}
+            className="inline-flex items-center gap-[6px] rounded-full border border-solid border-border bg-transparent px-[18px] py-[10px] text-sm font-semibold text-text-primary"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 0 1 15-6.7L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-15 6.7L3 16 M3 21v-5h5" />
@@ -289,19 +189,12 @@ function ReadyBadge({ ready }: { ready: boolean }) {
   return (
     <span
       data-review-badge={ready ? "ready" : "rendering"}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "4px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 600,
-        background: ready
-          ? "var(--color-bg-success-subtle)"
-          : "var(--color-bg-warning-subtle)",
-        color: ready ? "var(--color-text-success)" : "var(--color-text-warning)",
-      }}
+      className={[
+        "inline-flex items-center gap-[6px] rounded-full px-[10px] py-[4px] text-sm font-semibold",
+        ready
+          ? "bg-bg-success-subtle text-text-success"
+          : "bg-bg-warning-subtle text-text-warning",
+      ].join(" ")}
     >
       {ready ? "Ready" : "Rendering"}
     </span>

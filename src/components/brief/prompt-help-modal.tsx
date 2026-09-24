@@ -15,7 +15,6 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { C } from "@/lib/pcb/colors";
 import { videoScenePrompt } from "@/lib/brief/video-prompt";
 
 export function PromptHelpModal(props: {
@@ -134,18 +133,7 @@ function PromptHelpDialog({
   return createPortal(
     <div
       onClick={onClose}
-      className="z-modal"
-      style={{
-        position: "fixed",
-        inset: 0,
-        // The flow's one backdrop — the same wash and blur as the gate's.
-        background: "color-mix(in srgb, var(--color-bg-overlay) 62%, transparent)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      }}
+      className="fixed inset-0 z-modal flex items-center justify-center bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] p-[24px] backdrop-blur-sm"
     >
       <div
         role="dialog"
@@ -153,61 +141,21 @@ function PromptHelpDialog({
         aria-labelledby="prompt-help-title"
         data-testid="prompt-help-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 560,
-          maxHeight: "calc(100dvh - 48px)",
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--color-bg-surface)",
-          border: "var(--border-width-1) solid var(--color-border-default)",
-          borderRadius: "var(--radius-2xl)",
-          boxShadow: "var(--elevation-6)",
-          overflow: "hidden",
-        }}
+        className="flex w-full max-w-[560px] max-h-[calc(100dvh-48px)] flex-col overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface shadow-6"
       >
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 12,
-            padding: "22px 24px 18px",
-            borderBottom:
-              "var(--border-width-1) solid var(--color-border-subtle)",
-          }}
-        >
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 13,
-                fontWeight: 500,
-                color: "var(--color-text-tertiary)",
-              }}
-            >
+        <div className="flex items-start gap-[12px] border-b border-solid border-subtle px-[24px] pb-[18px] pt-[22px]">
+          <div className="min-w-0 flex-1">
+            <p className="m-0 text-sm font-medium text-text-tertiary">
               Prompt help
             </p>
             <h2
               id="prompt-help-title"
-              style={{
-                margin: "6px 0 0",
-                fontSize: 20,
-                fontWeight: 700,
-                letterSpacing: -0.2,
-                color: C.text,
-              }}
+              className="mt-[6px] text-2xl font-bold tracking-tight text-text-primary"
             >
               Turn your idea into a video prompt
             </h2>
-            <p
-              style={{
-                margin: "6px 0 0",
-                fontSize: 13,
-                lineHeight: 1.5,
-                color: C.body,
-              }}
-            >
+            <p className="mt-[6px] text-sm leading-relaxed text-text-secondary">
               Describe the product in your own words. We rewrite it into a
               scene the model can render.
             </p>
@@ -216,19 +164,7 @@ function PromptHelpDialog({
             type="button"
             onClick={onClose}
             aria-label="Close prompt help"
-            style={{
-              flexShrink: 0,
-              width: 32,
-              height: 32,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "transparent",
-              border: "none",
-              borderRadius: "var(--radius-md)",
-              color: C.body,
-              cursor: "pointer",
-            }}
+            className="inline-flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-md text-text-secondary"
           >
             <svg
               width="18"
@@ -245,34 +181,24 @@ function PromptHelpDialog({
         </div>
 
         {/* Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "18px 24px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-1 flex-col gap-[18px] overflow-y-auto px-[24px] pb-[20px] pt-[18px]">
+          <div className="flex flex-col gap-[8px]">
             <label
               htmlFor="prompt-help-idea"
-              style={{ fontSize: 14, fontWeight: 600, color: C.text }}
+              className="text-md font-semibold text-text-primary"
             >
               Write your idea
             </label>
             <textarea
               id="prompt-help-idea"
               ref={ideaRef}
-              className="ix-brief-field"
+              className={`ix-brief-field ${FIELD_CLASS}`}
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
               placeholder="make a gesture and voice controlled electric fan for me"
               rows={3}
-              style={fieldStyle}
             />
-            <p style={{ margin: 0, fontSize: 12, color: C.gray }}>
+            <p className="m-0 text-sm text-text-tertiary">
               One or two lines is enough.
             </p>
           </div>
@@ -285,7 +211,7 @@ function PromptHelpDialog({
             title={
               trimmedIdea ? undefined : "Write your idea first"
             }
-            style={outlineButton(canGenerate)}
+            className={outlineButtonClass(canGenerate)}
           >
             {pending ? (
               <>
@@ -301,32 +227,16 @@ function PromptHelpDialog({
           </button>
 
           {hasResult && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
+            <div className="flex flex-col gap-[8px]">
+              <div className="flex items-center justify-between gap-[8px]">
                 <label
                   htmlFor="prompt-help-refined"
-                  style={{ fontSize: 14, fontWeight: 600, color: C.text }}
+                  className="text-md font-semibold text-text-primary"
                 >
                   Refined prompt
                 </label>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <span
-                    aria-live="polite"
-                    style={{ fontSize: 12, color: C.gray }}
-                  >
+                <span className="inline-flex items-center gap-[6px]">
+                  <span aria-live="polite" className="text-sm text-text-tertiary">
                     {copied ? "Copied" : ""}
                   </span>
                   <button
@@ -334,18 +244,7 @@ function PromptHelpDialog({
                     onClick={copy}
                     aria-label="Copy the refined prompt"
                     title="Copy the refined prompt"
-                    style={{
-                      width: 28,
-                      height: 28,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "transparent",
-                      border: "none",
-                      borderRadius: "var(--radius-md)",
-                      color: C.body,
-                      cursor: "pointer",
-                    }}
+                    className="inline-flex h-[28px] w-[28px] items-center justify-center rounded-md text-text-secondary"
                   >
                     <svg
                       width="16"
@@ -366,31 +265,16 @@ function PromptHelpDialog({
               <textarea
                 id="prompt-help-refined"
                 ref={refinedRef}
-                className="ix-brief-field"
+                className={`ix-brief-field ${FIELD_CLASS}`}
                 value={refined}
                 onChange={(e) => setRefined(e.target.value)}
                 rows={5}
-                style={fieldStyle}
               />
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  padding: "12px 14px",
-                  background: "var(--color-bg-info-subtle)",
-                  border: "var(--border-width-1) solid var(--color-border-blue)",
-                  borderRadius: "var(--radius-lg)",
-                }}
-              >
+              <div className="flex gap-[10px] rounded-lg border border-solid border-[var(--color-border-blue)] bg-bg-info-subtle px-[14px] py-[12px]">
                 <span
                   aria-hidden
-                  style={{
-                    flexShrink: 0,
-                    color: "var(--color-icon-info)",
-                    lineHeight: 0,
-                    marginTop: 1,
-                  }}
+                  className="mt-[1px] shrink-0 leading-none text-[var(--color-icon-info)]"
                 >
                   <svg
                     width="16"
@@ -406,25 +290,11 @@ function PromptHelpDialog({
                     <path d="M12 11v5M12 7.8v.2" />
                   </svg>
                 </span>
-                <div style={{ minWidth: 0 }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: C.text,
-                    }}
-                  >
+                <div className="min-w-0">
+                  <p className="m-0 text-sm font-semibold text-text-primary">
                     You can edit this before rendering
                   </p>
-                  <p
-                    style={{
-                      margin: "2px 0 0",
-                      fontSize: 12,
-                      lineHeight: 1.5,
-                      color: C.body,
-                    }}
-                  >
+                  <p className="mt-[2px] text-sm leading-relaxed text-text-secondary">
                     Copy it into the video prompt field, or tweak the wording
                     first.
                   </p>
@@ -435,22 +305,13 @@ function PromptHelpDialog({
         </div>
 
         {/* Actions */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            gap: 12,
-            padding: "14px 24px",
-            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-          }}
-        >
+        <div className="flex items-center justify-end gap-[12px] border-t border-solid border-subtle px-[24px] py-[14px]">
           <button
             type="button"
             onClick={generate}
             disabled={!hasResult || pending}
             aria-disabled={!hasResult || pending}
-            style={secondaryButton(hasResult && !pending)}
+            className={secondaryButtonClass(hasResult && !pending)}
           >
             Regenerate
           </button>
@@ -465,7 +326,7 @@ function PromptHelpDialog({
             }}
             disabled={!hasResult}
             aria-disabled={!hasResult}
-            style={primaryButton(hasResult)}
+            className={primaryButtonClass(hasResult)}
           >
             Use this prompt
           </button>
@@ -482,72 +343,34 @@ function PromptHelpDialog({
 
 // ───────────────────── parts ─────────────────────
 
-const fieldStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  background: "var(--color-input-bg)",
-  border: "var(--border-width-1) solid var(--color-border-default)",
-  borderRadius: "var(--radius-lg)",
-  fontSize: 14,
-  color: "var(--color-text-primary)",
-  lineHeight: 1.5,
-  resize: "vertical",
-  outline: "none",
-  fontFamily: "inherit",
-  width: "100%",
-};
+const FIELD_CLASS =
+  "w-full resize-y rounded-lg border border-solid border-border bg-[var(--color-input-bg)] px-[14px] py-[12px] text-md leading-relaxed text-text-primary outline-none";
 
-function outlineButton(enabled: boolean): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "12px 20px",
-    background: enabled ? "var(--color-bg-surface)" : "var(--color-bg-subtle)",
-    color: enabled ? "var(--color-text-primary)" : "var(--color-text-disabled)",
-    border: `var(--border-width-1) solid ${
-      enabled ? "var(--color-border-default)" : "var(--color-border-subtle)"
-    }`,
-    borderRadius: "var(--radius-lg)",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    fontFamily: "inherit",
-    transition: "background .14s, border-color .14s",
-  };
+function outlineButtonClass(enabled: boolean): string {
+  return [
+    "inline-flex w-full items-center justify-center gap-[8px] rounded-lg border border-solid px-[20px] py-[12px] text-md font-semibold transition-colors duration-fast",
+    enabled
+      ? "cursor-pointer border-border bg-bg-surface text-text-primary"
+      : "cursor-not-allowed border-subtle bg-bg-subtle text-text-disabled",
+  ].join(" ");
 }
 
-function secondaryButton(enabled: boolean): React.CSSProperties {
-  return {
-    padding: "11px 20px",
-    background: enabled ? "var(--color-bg-surface)" : "var(--color-bg-subtle)",
-    color: enabled ? "var(--color-text-primary)" : "var(--color-text-disabled)",
-    border: `var(--border-width-1) solid ${
-      enabled ? "var(--color-border-default)" : "var(--color-border-subtle)"
-    }`,
-    borderRadius: "var(--radius-lg)",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    fontFamily: "inherit",
-    transition: "background .14s, border-color .14s",
-  };
+function secondaryButtonClass(enabled: boolean): string {
+  return [
+    "rounded-lg border border-solid px-[20px] py-[11px] text-md font-semibold transition-colors duration-fast",
+    enabled
+      ? "cursor-pointer border-border bg-bg-surface text-text-primary"
+      : "cursor-not-allowed border-subtle bg-bg-subtle text-text-disabled",
+  ].join(" ");
 }
 
-function primaryButton(enabled: boolean): React.CSSProperties {
-  return {
-    padding: "11px 22px",
-    background: enabled ? C.primary : "var(--color-bg-subtle)",
-    color: enabled ? "var(--color-text-on-brand)" : "var(--color-text-disabled)",
-    border: "none",
-    borderRadius: "var(--radius-lg)",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: enabled ? "pointer" : "not-allowed",
-    fontFamily: "inherit",
-    transition: "background .14s",
-  };
+function primaryButtonClass(enabled: boolean): string {
+  return [
+    "rounded-lg px-[22px] py-[11px] text-md font-bold transition-colors duration-fast",
+    enabled
+      ? "cursor-pointer bg-bg-brand text-text-on-brand"
+      : "cursor-not-allowed bg-bg-subtle text-text-disabled",
+  ].join(" ");
 }
 
 function SparkleIcon() {
@@ -560,16 +383,6 @@ function SparkleIcon() {
 
 function Spinner() {
   return (
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        border: "2px solid var(--color-border-default)",
-        borderTopColor: "currentColor",
-        animation: "ix-ph-spin .8s linear infinite",
-        display: "inline-block",
-      }}
-    />
+    <span className="inline-block h-[14px] w-[14px] animate-[ix-ph-spin_.8s_linear_infinite] rounded-full border-2 border-solid border-x-border border-b-border border-t-[currentColor]" />
   );
 }

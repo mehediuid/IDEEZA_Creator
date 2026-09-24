@@ -7,7 +7,6 @@
 import * as React from "react";
 import { SelectMenu, type SelectOption } from "@/components/ideeza";
 import type { ManualProject } from "@/lib/manual/projects";
-import { C } from "@/lib/pcb/colors";
 import { BRIEF_DESC_MAX as MAX_DESC } from "@/lib/brief/types";
 import { BriefCard, type Intent } from "./brief-app";
 
@@ -56,6 +55,15 @@ const INTENTS: {
     ),
   },
 ];
+
+// Shared look for every text field in this step: the visible chrome lives here
+// as classes, and `.ix-brief-field` (defined in brief-app.tsx) carries the
+// focus ring + placeholder colour that can't be expressed as a static class.
+// Height and vertical padding are deliberately left off — they differ between
+// a single-line input and a multi-line textarea, and are added at each call
+// site so no two classes in one list ever fight over the same property.
+const FIELD_CLASS =
+  "ix-brief-field w-full rounded-lg border border-solid border-border bg-[var(--color-input-bg)] px-[12px] text-md text-text-primary outline-none [font-family:inherit]";
 
 export type Step1Patch = {
   projectChoice?: string;
@@ -165,19 +173,19 @@ export function Step1Idea({
 
   return (
     <BriefCard onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="flex flex-col gap-[20px]">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: 0, letterSpacing: -0.2 }}>
-            {fromBuild ? "Add a brief" : "What\u2019s your idea?"}
+          <h1 className="m-0 text-2xl font-bold tracking-tight text-text-primary">
+            {fromBuild ? "Add a brief" : "What’s your idea?"}
           </h1>
-          <p style={{ fontSize: 13, color: C.body, marginTop: 6 }}>
+          <p className="mt-[6px] text-sm text-text-secondary">
             {fromBuild
               ? "Check the names and one-liners the build wrote, then choose how it goes out."
               : "A name and one line. Quick — you can edit everything later."}
           </p>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="flex flex-col gap-[16px]">
           {readBack ? (
             <DecidedProject
               name={isNew ? newProjectName.trim() : (chosen?.name ?? "")}
@@ -229,36 +237,26 @@ export function Step1Idea({
 
           <FieldLabel label="Product name">
             <input
-              className="ix-brief-field"
               value={productName}
               onChange={(e) => onChange({ productName: e.target.value })}
               placeholder="Smart plant waterer"
               autoFocus
-              style={inputStyle}
+              className={`${FIELD_CLASS} h-[42px] py-0`}
             />
           </FieldLabel>
 
           <FieldLabel label="One line · what does it do?">
             <>
               <textarea
-                className="ix-brief-field"
                 value={productDescription}
                 onChange={(e) =>
                   onChange({ productDescription: e.target.value.slice(0, MAX_DESC) })
                 }
                 placeholder="Waters a houseplant when its soil runs dry."
                 rows={3}
-                style={{
-                  ...inputStyle,
-                  height: 76,
-                  resize: "vertical",
-                  paddingTop: 12,
-                  paddingBottom: 12,
-                  lineHeight: 1.5,
-                  fontFamily: "inherit",
-                }}
+                className={`${FIELD_CLASS} h-[76px] resize-y py-[12px] leading-relaxed`}
               />
-              <span style={{ fontSize: 12, color: C.body, fontVariantNumeric: "tabular-nums" }}>
+              <span className="tabular-nums text-sm text-text-secondary">
                 {productDescription.length}/{MAX_DESC}
               </span>
             </>
@@ -281,22 +279,17 @@ export function Step1Idea({
           ) : null}
         </div>
 
-        <div
-          style={{
-            borderTop: "var(--border-width-1) solid var(--color-border-subtle)",
-            paddingTop: 18,
-          }}
-        >
+        <div className="border-t border-solid border-border-subtle pt-[18px]">
           <div
             id={intentLabelId}
-            style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 12 }}
+            className="mb-[12px] text-md font-semibold text-text-primary"
           >
             How do you want to share it?
           </div>
           <div
             role="group"
             aria-labelledby={intentLabelId}
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}
+            className="grid grid-cols-3 gap-[12px]"
           >
             {INTENTS.map((i) => {
               const sel = intent === i.id;
@@ -305,47 +298,22 @@ export function Step1Idea({
                   key={i.id}
                   onClick={() => onChange({ intent: i.id })}
                   aria-pressed={sel}
-                  style={{
-                    padding: "14px 12px",
-                    background: sel ? "var(--color-bg-brand-subtle)" : "var(--color-bg-surface)",
-                    border: `var(--border-width-1) solid ${sel ? "var(--color-border-brand)" : "var(--color-border-default)"}`,
-                    borderRadius: "var(--radius-xl)",
-                    cursor: "pointer",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    gap: 8,
-                    textAlign: "left",
-                    transition: "background .14s, border-color .14s",
-                  }}
+                  className={[
+                    "flex cursor-pointer flex-col items-start gap-[8px] rounded-xl border border-solid px-[12px] py-[14px] text-left transition-colors duration-fast",
+                    sel ? "border-border-brand bg-bg-brand-subtle" : "border-border bg-bg-surface",
+                  ].join(" ")}
                 >
                   <span
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "var(--radius-lg)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: sel ? "var(--color-bg-brand)" : "var(--color-bg-subtle)",
-                      color: sel ? "var(--color-text-on-brand)" : "var(--color-text-secondary)",
-                    }}
+                    className={[
+                      "inline-flex h-[32px] w-[32px] items-center justify-center rounded-lg",
+                      sel ? "bg-bg-brand text-text-on-brand" : "bg-bg-subtle text-text-secondary",
+                    ].join(" ")}
                   >
                     {i.icon}
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{i.label}</span>
-                  <span style={{ fontSize: 12, color: C.body }}>{i.sub}</span>
-                  <span
-                    style={{
-                      padding: "2px 7px",
-                      borderRadius: "var(--radius-sm)",
-                      background: "var(--color-bg-info-subtle)",
-                      color: "var(--color-text-blue)",
-                      fontSize: 11,
-                      fontWeight: 500,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <span className="text-md font-semibold text-text-primary">{i.label}</span>
+                  <span className="text-sm text-text-secondary">{i.sub}</span>
+                  <span className="whitespace-nowrap rounded-sm bg-bg-info-subtle px-[7px] py-[2px] text-xs font-medium text-[var(--color-text-blue)]">
                     {i.requirement}
                   </span>
                 </button>
@@ -354,41 +322,26 @@ export function Step1Idea({
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
+        <div className="flex items-center justify-end gap-[12px]">
           {/* The reason Continue is off is text on the page, not a tooltip —
               so a screen reader reaches it through aria-describedby. */}
           {missing ? (
-            <span id={reasonId} style={{ fontSize: 12, color: C.body, textAlign: "right" }}>
+            <span id={reasonId} className="text-right text-sm text-text-secondary">
               {missing}
             </span>
           ) : null}
-          <span title={missing ?? undefined} style={{ display: "inline-flex" }}>
+          <span title={missing ?? undefined} className="inline-flex">
             <button
               onClick={onContinue}
               disabled={!canContinue}
               title={missing ?? undefined}
               aria-describedby={missing ? reasonId : undefined}
-              style={{
-                padding: "11px 22px",
-                background: canContinue ? C.primary : "var(--color-bg-subtle)",
-                color: canContinue ? "var(--color-text-on-brand)" : "var(--color-text-disabled)",
-                border: "none",
-                borderRadius: "var(--radius-lg)",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: canContinue ? "pointer" : "not-allowed",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                transition: "background .14s",
-              }}
+              className={[
+                "inline-flex items-center gap-[8px] rounded-lg border-none px-[22px] py-[11px] text-md font-semibold transition-colors duration-fast",
+                canContinue
+                  ? "cursor-pointer bg-bg-brand text-text-on-brand"
+                  : "cursor-not-allowed bg-bg-subtle text-text-disabled",
+              ].join(" ")}
             >
               Continue
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -414,53 +367,27 @@ function NewProjectPanel({
   onChange: (patch: Step1Patch) => void;
 }) {
   return (
-    <div
-      style={{
-        background: "var(--color-bg-subtle)",
-        borderRadius: "var(--radius-xl)",
-        padding: 16,
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          color: "var(--color-text-brand)",
-        }}
-      >
+    <div className="flex flex-col gap-[12px] rounded-xl bg-bg-subtle p-[16px]">
+      <div className="text-xs font-semibold tracking-caps text-text-brand">
         NEW PROJECT DETAILS
       </div>
 
       <FieldLabel label="Project name" hint="Products live inside a project. You can rename it later.">
         <input
-          className="ix-brief-field"
           value={name}
           onChange={(e) => onChange({ newProjectName: e.target.value })}
           placeholder="Garden sensors"
-          style={inputStyle}
+          className={`${FIELD_CLASS} h-[42px] py-0`}
         />
       </FieldLabel>
 
       <FieldLabel label="Project description" hint="Optional.">
         <textarea
-          className="ix-brief-field"
           value={description}
           onChange={(e) => onChange({ newProjectDescription: e.target.value })}
           placeholder="Write description"
           rows={3}
-          style={{
-            ...inputStyle,
-            height: 72,
-            resize: "vertical",
-            paddingTop: 12,
-            paddingBottom: 12,
-            lineHeight: 1.5,
-            fontFamily: "inherit",
-          }}
+          className={`${FIELD_CLASS} h-[72px] resize-y py-[12px] leading-relaxed`}
         />
       </FieldLabel>
     </div>
@@ -469,16 +396,7 @@ function NewProjectPanel({
 
 function Callout({ title, body }: { title: string; body: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 10,
-        padding: "12px 14px",
-        background: "var(--color-bg-info-subtle)",
-        border: "var(--border-width-1) solid var(--color-border-blue)",
-        borderRadius: "var(--radius-lg)",
-      }}
-    >
+    <div className="flex gap-[10px] rounded-lg border border-solid border-[var(--color-border-blue)] bg-bg-info-subtle px-[14px] py-[12px]">
       <svg
         width="17"
         height="17"
@@ -488,32 +406,19 @@ function Callout({ title, body }: { title: string; body: string }) {
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ flexShrink: 0, marginTop: 1 }}
+        className="mt-[1px] shrink-0"
         aria-hidden
       >
         <circle cx="12" cy="12" r="9" />
         <path d="M12 11v5 M12 7.6v.4" />
       </svg>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)" }}>{title}</div>
-        <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 2 }}>{body}</div>
+      <div className="min-w-0">
+        <div className="text-md font-semibold text-text-primary">{title}</div>
+        <div className="mt-[2px] text-sm text-text-secondary">{body}</div>
       </div>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  height: 42,
-  width: "100%",
-  padding: "0 12px",
-  background: "var(--color-input-bg)",
-  border: "var(--border-width-1) solid var(--color-border-default)",
-  borderRadius: "var(--radius-lg)",
-  fontSize: 14,
-  color: "var(--color-text-primary)",
-  outline: "none",
-  fontFamily: "inherit",
-};
 
 function FieldLabel({
   label,
@@ -525,10 +430,10 @@ function FieldLabel({
   children: React.ReactNode;
 }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-input-label)" }}>{label}</span>
+    <label className="flex flex-col gap-[6px]">
+      <span className="text-md font-medium text-[var(--color-input-label)]">{label}</span>
       {children}
-      {hint ? <span style={{ fontSize: 12, color: "var(--color-input-helper)" }}>{hint}</span> : null}
+      {hint ? <span className="text-sm text-[var(--color-input-helper)]">{hint}</span> : null}
     </label>
   );
 }
@@ -548,34 +453,14 @@ function OtherProducts({
   const [editing, setEditing] = React.useState<number | null>(null);
   return (
     <div>
-      <p
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--color-text-primary)",
-          margin: "0 0 8px",
-        }}
-      >
+      <p className="mx-0 mt-0 mb-[8px] text-md font-semibold text-text-primary">
         Also in this project
       </p>
-      <ul
-        style={{
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 1,
-          border: "var(--border-width-1) solid var(--color-border)",
-          borderRadius: "var(--radius-lg)",
-          overflow: "hidden",
-          background: "var(--color-border)",
-        }}
-      >
+      <ul className="m-0 flex list-none flex-col gap-[1px] overflow-hidden rounded-lg border border-solid border-border bg-border p-0">
         {products.map((x, i) => (
           <li
             key={`${i}-${x.name}`}
-            style={{ padding: "10px 14px", background: "var(--color-bg-surface)" }}
+            className="bg-bg-surface px-[14px] py-[10px]"
           >
             {editing === i ? (
               <ProductEditor
@@ -587,23 +472,13 @@ function OtherProducts({
                 }}
               />
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ minWidth: 0, flex: 1 }}>
-                  <span
-                    style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.text }}
-                  >
+              <div className="flex items-center gap-[12px]">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-md font-semibold text-text-primary">
                     {x.name}
                   </span>
                   {x.description ? (
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: 2,
-                        fontSize: 12,
-                        lineHeight: 1.5,
-                        color: C.body,
-                      }}
-                    >
+                    <span className="mt-[2px] block text-sm leading-relaxed text-text-secondary">
                       {x.description}
                     </span>
                   ) : null}
@@ -612,18 +487,7 @@ function OtherProducts({
                   type="button"
                   onClick={() => setEditing(i)}
                   aria-label={`Edit ${x.name}`}
-                  style={{
-                    flexShrink: 0,
-                    height: 30,
-                    padding: "0 12px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--color-text-brand)",
-                    background: "transparent",
-                    border: "var(--border-width-1) solid var(--color-border)",
-                    borderRadius: "var(--radius-md)",
-                    cursor: "pointer",
-                  }}
+                  className="h-[30px] shrink-0 cursor-pointer rounded-md border border-solid border-border bg-transparent px-[12px] text-md font-semibold text-text-brand"
                 >
                   Edit
                 </button>
@@ -632,7 +496,7 @@ function OtherProducts({
           </li>
         ))}
       </ul>
-      <p style={{ fontSize: 12, color: C.body, marginTop: 8 }}>
+      <p className="mt-[8px] text-sm text-text-secondary">
         Saved with the project.
       </p>
     </div>
@@ -654,67 +518,42 @@ function ProductEditor({
   const [description, setDescription] = React.useState(value.description);
   const clean = name.trim();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="flex flex-col gap-[10px]">
       <input
-        className="ix-brief-field"
         value={name}
         autoFocus
         onChange={(e) => setName(e.target.value)}
         placeholder="Product name"
         aria-label="Product name"
-        style={inputStyle}
+        className={`${FIELD_CLASS} h-[42px] py-0`}
       />
       <textarea
-        className="ix-brief-field"
         value={description}
         onChange={(e) => setDescription(e.target.value.slice(0, MAX_DESC))}
-        placeholder="One line \u00b7 what does it do?"
+        placeholder="One line · what does it do?"
         aria-label="One line description"
         rows={2}
-        style={{
-          ...inputStyle,
-          height: 60,
-          resize: "vertical",
-          paddingTop: 10,
-          paddingBottom: 10,
-          lineHeight: 1.5,
-          fontFamily: "inherit",
-        }}
+        className={`${FIELD_CLASS} h-[60px] resize-y py-[10px] leading-relaxed`}
       />
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="flex items-center gap-[8px]">
         <button
           type="button"
           disabled={!clean}
           title={clean ? undefined : "A product needs a name."}
           onClick={() => onSave({ name: clean, description: description.trim() })}
-          style={{
-            height: 30,
-            padding: "0 14px",
-            fontSize: 13,
-            fontWeight: 600,
-            color: clean ? "var(--color-text-on-brand)" : "var(--color-text-disabled)",
-            background: clean ? "var(--color-bg-brand)" : "var(--color-bg-subtle)",
-            border: "none",
-            borderRadius: "var(--radius-md)",
-            cursor: clean ? "pointer" : "not-allowed",
-          }}
+          className={[
+            "h-[30px] rounded-md border-none px-[14px] text-md font-semibold",
+            clean
+              ? "cursor-pointer bg-bg-brand text-text-on-brand"
+              : "cursor-not-allowed bg-bg-subtle text-text-disabled",
+          ].join(" ")}
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          style={{
-            height: 30,
-            padding: "0 12px",
-            fontSize: 13,
-            fontWeight: 600,
-            color: C.body,
-            background: "transparent",
-            border: "var(--border-width-1) solid var(--color-border)",
-            borderRadius: "var(--radius-md)",
-            cursor: "pointer",
-          }}
+          className="h-[30px] cursor-pointer rounded-md border border-solid border-border bg-transparent px-[12px] text-md font-semibold text-text-secondary"
         >
           Cancel
         </button>
@@ -744,61 +583,22 @@ function DecidedProject({
 }) {
   return (
     <div>
-      <p
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--color-text-primary)",
-          margin: "0 0 8px",
-        }}
-      >
+      <p className="mx-0 mt-0 mb-[8px] text-md font-semibold text-text-primary">
         Project
       </p>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 14px",
-          border: "var(--border-width-1) solid var(--color-border)",
-          borderRadius: "var(--radius-lg)",
-          background: "var(--color-bg-surface)",
-        }}
-      >
-        <span style={{ minWidth: 0, flex: 1 }}>
-          <span
-            style={{
-              display: "block",
-              fontSize: 14,
-              fontWeight: 600,
-              color: C.text,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
+      <div className="flex items-center gap-[12px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] py-[12px]">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-md font-semibold text-text-primary">
             {name}
           </span>
-          <span style={{ display: "block", marginTop: 2, fontSize: 12, color: C.body }}>
+          <span className="mt-[2px] block text-sm text-text-secondary">
             {detail}
           </span>
         </span>
         <button
           type="button"
           onClick={onChange}
-          className="ix-brief-change"
-          style={{
-            flexShrink: 0,
-            height: 32,
-            padding: "0 12px",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--color-text-brand)",
-            background: "transparent",
-            border: "var(--border-width-1) solid var(--color-border)",
-            borderRadius: "var(--radius-md)",
-            cursor: "pointer",
-          }}
+          className="ix-brief-change h-[32px] shrink-0 cursor-pointer rounded-md border border-solid border-border bg-transparent px-[12px] text-md font-semibold text-text-brand"
         >
           {actionLabel}
         </button>

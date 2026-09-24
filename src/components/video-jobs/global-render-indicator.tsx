@@ -115,12 +115,7 @@ export function GlobalRenderIndicator() {
       {renderSlot &&
         createPortal(
           <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 8,
-            }}
+            className="flex flex-col items-end gap-[8px]"
             role="status"
             aria-live="polite"
             aria-label="Video render status"
