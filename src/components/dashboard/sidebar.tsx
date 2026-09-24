@@ -753,7 +753,9 @@ function NotificationBell({
         {count > 0 && (
           <span
             aria-hidden
-            className="absolute right-[2px] top-[2px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-bg-error px-[4px] text-2xs font-bold leading-none text-text-inverse"
+            // Filled with the error ink, not the error fill: white on
+            // red-500 is 3.76:1 at 10 px, on red-600 it is 4.83:1.
+            className="absolute right-[2px] top-[2px] inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[var(--color-text-error)] px-[4px] text-2xs font-bold leading-none text-text-inverse"
           >
             {count > 99 ? "99+" : count}
           </span>

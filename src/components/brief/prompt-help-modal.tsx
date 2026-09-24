@@ -144,7 +144,7 @@ function PromptHelpDialog({
         className="flex w-full max-w-[560px] max-h-[calc(100dvh-48px)] flex-col overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface shadow-6"
       >
         {/* Header */}
-        <div className="flex items-start gap-[12px] border-b border-solid border-subtle px-[24px] pb-[18px] pt-[22px]">
+        <div className="flex items-start gap-[12px] border-b border-solid border-border-subtle px-[24px] pb-[18px] pt-[22px]">
           <div className="min-w-0 flex-1">
             <p className="m-0 text-sm font-medium text-text-tertiary">
               Prompt help
@@ -305,7 +305,7 @@ function PromptHelpDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-[12px] border-t border-solid border-subtle px-[24px] py-[14px]">
+        <div className="flex items-center justify-end gap-[12px] border-t border-solid border-border-subtle px-[24px] py-[14px]">
           <button
             type="button"
             onClick={generate}
@@ -351,7 +351,7 @@ function outlineButtonClass(enabled: boolean): string {
     "inline-flex w-full items-center justify-center gap-[8px] rounded-lg border border-solid px-[20px] py-[12px] text-md font-semibold transition-colors duration-fast",
     enabled
       ? "cursor-pointer border-border bg-bg-surface text-text-primary"
-      : "cursor-not-allowed border-subtle bg-bg-subtle text-text-disabled",
+      : "cursor-not-allowed border-border-subtle bg-bg-subtle text-text-disabled",
   ].join(" ");
 }
 
@@ -360,7 +360,7 @@ function secondaryButtonClass(enabled: boolean): string {
     "rounded-lg border border-solid px-[20px] py-[11px] text-md font-semibold transition-colors duration-fast",
     enabled
       ? "cursor-pointer border-border bg-bg-surface text-text-primary"
-      : "cursor-not-allowed border-subtle bg-bg-subtle text-text-disabled",
+      : "cursor-not-allowed border-border-subtle bg-bg-subtle text-text-disabled",
   ].join(" ");
 }
 

@@ -283,7 +283,9 @@ export function Step3Mint({
       ? "Give to the community"
       : intent === "save"
         ? "Save as Private"
-        : `Pay ${MINT_FEE} IDZ and go live`;
+        // "and mint", not "and go live": the marketplace is not open, and
+        // the success screen says the listing goes on sale when it does.
+        : `Pay ${MINT_FEE} IDZ and mint`;
 
   // Shared by the two hint lines under the CTA — the unmet-requirement reason
   // and the "you don't have to wait" note both read as a small centred aside.
@@ -439,8 +441,8 @@ export function Step3Mint({
   );
 }
 
-// RenderInfo — slim info banner on Step 3 reminding the user that the project
-// goes live when the in-flight render finishes. The actual render progress +
+// RenderInfo — slim info banner on Step 3 reminding the user that the video
+// joins the listing when the in-flight render finishes. The actual render progress +
 // notification opt-ins live on Step 2 (inline) and in the bottom-right toast,
 // so we don't duplicate them here. This banner is just signal.
 function RenderInfo({ videoDone }: { videoDone: boolean }) {
@@ -482,13 +484,13 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
         {videoDone ? (
           <>
             <strong>Video is ready.</strong> Finish the mint setup and pay to
-            go live.
+            mint.
           </>
         ) : (
           <>
-            Your video is still rendering. Set up the mint here — your
-            project will go live when the video is final. Progress lives in
-            the top-right indicator.
+            Your video is still rendering. You can set up the mint now — the
+            video joins the listing when it is final. Its progress shows in
+            the bottom-right corner.
           </>
         )}
       </span>

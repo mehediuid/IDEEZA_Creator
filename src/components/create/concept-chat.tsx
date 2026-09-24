@@ -12,6 +12,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  conceptBriefOf,
   deriveTitle,
   statusOf,
   useCreateHistory,
@@ -729,18 +730,21 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           } => x.turn !== null,
         );
       return Promise.all(
-        ready.map(({ companion, turn }) =>
-          summarizeConcept(turn.id, turn.prompt).then((concept) => ({
+        ready.map(({ companion, turn }) => {
+          const brief = conceptBriefOf(chat.turns, turn.id);
+          return summarizeConcept(turn.id, brief).then((concept) => ({
             id: companion.id,
             name: companion.name,
             conceptImageUrl: turn.imageUrl ?? "",
-            conceptPrompt: turn.prompt,
-            title: concept.title || companion.name,
+            conceptPrompt: brief,
+            // The name the canvas and the rail already call it, as the
+            // primary keeps the name its question gave it.
+            title: companion.name || concept.title,
             summary: concept.summary,
             description: concept.description,
             parts: concept.parts,
-          })),
-        ),
+          }));
+        }),
       );
     },
     [chat],
@@ -837,7 +841,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       if (!t || t.role !== "assistant" || !t.imageUrl) return;
       // A companion's own concept does not branch again: §4.4.7 is flat,
       // so a remote has no companions of its own.
-      const source = { turnId: t.id, imageUrl: t.imageUrl, prompt: t.prompt };
+      const source = {
+        turnId: t.id,
+        imageUrl: t.imageUrl,
+        prompt: conceptBriefOf(chat.turns, t.id),
+      };
       if (t.companionOf) {
         goToGate(source);
         return;
@@ -870,7 +878,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // Busy until the gate is open: the concept is read back first, so the
       // gate opens on the real title and parts rather than a stand-in.
       setPreparingTurnId(t.id);
-      void summarizeConcept(t.id, t.prompt)
+      void summarizeConcept(t.id, source.prompt)
         .catch(() => null)
         .then(() => goToGate(source))
         .finally(() => setPreparingTurnId(null));
@@ -925,6 +933,26 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     ],
   );
 
+  // The products the gate is about to charge for, by the names the canvas
+  // gives them. Empty when there is no answered question to name them from,
+  // and the gate then falls back to the concept's own title.
+  const gateNames = React.useMemo(() => {
+    if (!chat || !confirmFor) return [];
+    const source = chat.turns.find((t) => t.id === confirmFor.turnId);
+    if (source?.role === "assistant" && source.companionOf) return [];
+    const setup = chat.turns.find(
+      (t) => t.role === "setup" && t.status === "answered",
+    );
+    const primary =
+      setup && setup.role === "setup" ? setup.productName?.trim() : undefined;
+    if (!primary) return [];
+    return [
+      primary,
+      ...companionPlan
+        .filter((c) => pickedCompanions.has(c.id))
+        .map((c) => c.name),
+    ];
+  }, [chat, confirmFor, companionPlan, pickedCompanions]);
 
   const handleConfirmBuild = React.useCallback(
     async (concept: ConceptSummary) => {
@@ -1127,6 +1155,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         turnId={confirmFor?.turnId ?? ""}
         conceptPrompt={confirmFor?.prompt ?? ""}
         products={pickedCompanions.size + 1}
+        productNames={gateNames}
         submitting={submittingBuild}
         onCancel={() => setConfirmFor(null)}
         onConfirm={handleConfirmBuild}

@@ -1271,7 +1271,7 @@ export function BriefCard({
           Back
         </button>
       ) : null}
-      <div className="rounded-2xl border border-solid border-subtle bg-bg-surface p-12 shadow-1">
+      <div className="rounded-2xl border border-solid border-border-subtle bg-bg-surface p-12 shadow-1">
         {children}
       </div>
     </div>

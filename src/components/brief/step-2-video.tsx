@@ -193,7 +193,7 @@ export function Step2Video({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-[10px]">
+        <div className="grid grid-cols-1 gap-[10px] sm:grid-cols-3">
           <TypeCard
             id="ar"
             label="AR"
@@ -674,7 +674,7 @@ function RenderCard({
             </div>
             <div className="mt-[1px] text-sm text-text-secondary">
               {isDone
-                ? "Project will go live once you mint"
+                ? "It ships with the listing when you mint"
                 : `Stage ${stageNum}/5 · ${STAGE_LABELS[job.stage]}`}
             </div>
           </div>
@@ -1084,8 +1084,8 @@ function ToggleRow({
           }`}
         >
           <span
-            className={`absolute top-[2px] h-[20px] w-[20px] rounded-full bg-bg-surface shadow-1 transition-[left] duration-fast ${
-              on ? "left-[18px]" : "left-[2px]"
+            className={`absolute left-[2px] top-[2px] h-[20px] w-[20px] rounded-full bg-bg-surface shadow-1 transition-transform duration-fast ${
+              on ? "translate-x-[16px]" : "translate-x-0"
             }`}
           />
         </button>

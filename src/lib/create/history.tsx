@@ -129,6 +129,41 @@ export type ChatTurn =
       ts: number;
     };
 
+/**
+ * The whole brief a concept was drawn from. A refine's own `prompt` is only
+ * the change typed for it, so reading a refine alone asked the summarizer
+ * what "make it matte black" is — it answered with a matte-black something
+ * else, and that product's parts became the build. Walks the refine chain
+ * back to the concept it started from and names every change after it,
+ * oldest first. A chain whose root is gone starts from the chat's own idea.
+ */
+export function conceptBriefOf(turns: ChatTurn[], turnId: string): string {
+  const byId = new Map(turns.map((t) => [t.id, t]));
+  const changes: string[] = [];
+  const seen = new Set<string>();
+  let root = "";
+  let companion: string | undefined;
+  let cur = byId.get(turnId);
+  while (cur && cur.role === "assistant" && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    companion = cur.companionOf;
+    if (cur.kind !== "refine") {
+      root = cur.prompt.trim();
+      break;
+    }
+    changes.unshift(cur.prompt.trim());
+    cur = cur.parentTurnId ? byId.get(cur.parentTurnId) : undefined;
+  }
+  if (!root && !companion) {
+    const setup = turns.find((t) => t.role === "setup");
+    root = setup ? setup.prompt.trim() : "";
+  }
+  const kept = changes.filter(Boolean);
+  if (!root) return kept.join("; ");
+  if (!kept.length) return root;
+  return `${root.replace(/[.\s]+$/, "")}. Changes: ${kept.join("; ")}`;
+}
+
 export type ChatSession = {
   id: string;
   title: string;

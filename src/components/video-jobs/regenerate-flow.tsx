@@ -131,7 +131,7 @@ export function RegenerateFlow({
         className="flex w-full max-w-[600px] max-h-[min(86vh,760px)] flex-col overflow-hidden rounded-xl bg-bg-surface shadow-5"
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-[12px] border-b border-solid border-subtle px-[24px] pb-[12px] pt-[20px]">
+        <div className="flex items-start justify-between gap-[12px] border-b border-solid border-border-subtle px-[24px] pb-[12px] pt-[20px]">
           <div>
             <h2 id="regen-flow-title" className="m-0 text-2xl font-bold tracking-tight text-text-primary">
               {inRenderPhase
@@ -271,7 +271,7 @@ export function RegenerateFlow({
                   {scenes.map((s) => (
                     <div
                       key={s.id}
-                      className="flex flex-col gap-[4px] rounded-md border border-solid border-subtle bg-bg-page px-[14px] py-[10px]"
+                      className="flex flex-col gap-[4px] rounded-md border border-solid border-border-subtle bg-bg-page px-[14px] py-[10px]"
                     >
                       <div className="flex items-center gap-[10px]">
                         <span className="text-sm font-bold text-text-primary">
@@ -302,16 +302,16 @@ export function RegenerateFlow({
           )}
 
           {inRenderPhase && (
-            <div className="rounded-md border border-solid border-subtle bg-bg-page px-[12px] py-[10px] text-sm leading-relaxed text-text-secondary">
-              You can close this — we&rsquo;ll track progress in the top-right
-              indicator. Your listing&rsquo;s video updates the moment this
+            <div className="rounded-md border border-solid border-border-subtle bg-bg-page px-[12px] py-[10px] text-sm leading-relaxed text-text-secondary">
+              You can close this — its progress shows in the bottom-right
+              corner. Your listing&rsquo;s video updates the moment this
               finishes.
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-[8px] border-t border-solid border-subtle px-[24px] pb-[18px] pt-[14px]">
+        <div className="flex justify-end gap-[8px] border-t border-solid border-border-subtle px-[24px] pb-[18px] pt-[14px]">
           {!inRenderPhase && (
             <>
               <button onClick={onClose} className={GHOST_BUTTON_CLASS}>
@@ -467,7 +467,7 @@ function NotifyOptIns({
             type="email"
             inputMode="email"
             autoComplete="email"
-            className="h-[30px] min-w-0 flex-1 rounded-lg border border-solid border-subtle bg-bg-page px-[10px] text-sm text-text-primary outline-none"
+            className="h-[30px] min-w-0 flex-1 rounded-lg border border-solid border-border-subtle bg-bg-page px-[10px] text-sm text-text-primary outline-none"
           />
         )}
       </Opt>
@@ -520,7 +520,7 @@ function Pill({
         "cursor-pointer rounded-full border border-solid px-[16px] py-[8px] text-sm font-semibold transition-colors duration-fast",
         selected
           ? "border-border-brand bg-bg-brand-subtle text-text-brand"
-          : "border-subtle bg-bg-page text-text-secondary",
+          : "border-border-subtle bg-bg-page text-text-secondary",
       ].join(" ")}
     >
       {children}
@@ -557,8 +557,8 @@ function Toggle({
       >
         <span
           className={[
-            "absolute top-[2px] h-[20px] w-[20px] rounded-full bg-bg-surface shadow-1 transition-[left] duration-fast",
-            on ? "left-[18px]" : "left-[2px]",
+            "absolute left-[2px] top-[2px] h-[20px] w-[20px] rounded-full bg-bg-surface shadow-1 transition-transform duration-fast",
+            on ? "translate-x-[16px]" : "translate-x-0",
           ].join(" ")}
         />
       </span>
@@ -651,4 +651,4 @@ const GHOST_BUTTON_CLASS =
   "cursor-pointer rounded-3xl border border-solid border-border px-[22px] py-[12px] text-sm font-semibold text-text-primary";
 
 const TEXTAREA_CLASS =
-  "resize-y rounded-lg border border-solid border-subtle bg-bg-page px-[14px] py-[12px] text-md text-text-primary outline-none";
+  "resize-y rounded-lg border border-solid border-border-subtle bg-bg-page px-[14px] py-[12px] text-md text-text-primary outline-none";

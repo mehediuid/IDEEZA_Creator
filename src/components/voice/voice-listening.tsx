@@ -75,10 +75,12 @@ export function VoiceListening({
             <span
               key={i}
               data-bar={heard ? "heard" : "waiting"}
-              style={{ height: `${height}px` }}
+              // Full height, scaled to the level: a transform stays on the
+              // compositor where 78 animated heights re-laid the row out.
+              style={{ transform: `scaleY(${height / (BAR_MIN + BAR_SPAN)})` }}
               className={cn(
-                "w-[3px] shrink-0 rounded-[2px] bg-bg-brand",
-                "transition-[height] duration-normal ease-decelerate motion-reduce:transition-none",
+                "h-[36px] w-[3px] shrink-0 rounded-[2px] bg-bg-brand",
+                "transition-transform duration-normal ease-decelerate motion-reduce:transition-none",
                 !heard && "opacity-20",
               )}
             />

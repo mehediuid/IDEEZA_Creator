@@ -241,7 +241,9 @@ export function parseConcept(
   if (parts.length < 2) return null;
   const title = String(obj.title ?? "").trim();
   return {
-    title: title ? title.slice(0, 40) : deriveTitle(prompt),
+    // A long model title is shortened the way a prompt is — at the end of the
+    // name, before "with …" — rather than cut mid-word ("…Automatic Brighteni").
+    title: title ? (title.length > 40 ? deriveTitle(title) : title) : deriveTitle(prompt),
     description: (() => {
       const d = String(obj.description ?? "").trim();
       return d ? d.slice(0, 160) : describeFallback(prompt);

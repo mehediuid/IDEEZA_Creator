@@ -27,30 +27,18 @@ export const metadata: Metadata = {
 function ToastLayer() {
   return (
     <>
+      {/* At phone width it docks at the foot instead: top-centre it covered
+          the menu button and the Canvas/Chat tabs, so nothing could be
+          reached until the toast was dismissed. There it shares the foot
+          with a render toast, so it stands on top of one when one is up. */}
       <div
         id="ideeza-toast-layer"
-        style={{
-          position: "fixed",
-          top: 16,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: "var(--z-toast)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 8,
-          pointerEvents: "none",
-        }}
+        className="pointer-events-none fixed bottom-[16px] left-1/2 z-toast flex -translate-x-1/2 flex-col items-center gap-[8px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] md:bottom-auto md:top-[16px]"
       >
         <div
           id="ideeza-toast-layer-attention"
           data-slot="attention"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 8,
-          }}
+          className="flex flex-col items-center gap-[8px]"
         />
       </div>
       <div

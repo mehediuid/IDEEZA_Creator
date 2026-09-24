@@ -100,6 +100,7 @@ export function ConfirmBuildDialog({
   turnId,
   conceptPrompt,
   products,
+  productNames = [],
   onCancel,
   onConfirm,
   submitting,
@@ -111,6 +112,9 @@ export function ConfirmBuildDialog({
   /** How many products the build covers. The price is per product, and the
    *  canvas behind this dialog says the same number. */
   products: number;
+  /** What the canvas calls each product being paid for. "and 1 more" asked
+   *  the maker to pay for a product the dialog would not name. */
+  productNames?: string[];
   onCancel: () => void;
   onConfirm: (concept: ConceptSummary) => void;
   submitting: boolean;
@@ -201,8 +205,10 @@ export function ConfirmBuildDialog({
             {products > 1 ? `Build ${products} products?` : "Build this product?"}
           </h2>
           <p className="text-sm leading-relaxed text-text-secondary">
-            {concept.title}
-            {products > 1 ? ` and ${products - 1} more` : ""}. The build runs in
+            {productNames.length === products
+              ? new Intl.ListFormat("en", { type: "conjunction" }).format(productNames)
+              : `${concept.title}${products > 1 ? ` and ${products - 1} more` : ""}`}
+            . The build runs in
             the background — you can leave, and we&apos;ll tell you when each
             piece is ready.
           </p>

@@ -289,7 +289,9 @@ export function Step1Idea({
           <div
             role="group"
             aria-labelledby={intentLabelId}
-            className="grid grid-cols-3 gap-[12px]"
+            // Stacked at phone width: three columns there cut the
+            // requirement chips off mid-word ("Wallet + identity c…").
+            className="grid grid-cols-1 gap-[12px] sm:grid-cols-3"
           >
             {INTENTS.map((i) => {
               const sel = intent === i.id;
@@ -396,7 +398,8 @@ function NewProjectPanel({
 
 function Callout({ title, body }: { title: string; body: string }) {
   return (
-    <div className="flex gap-[10px] rounded-lg border border-solid border-[var(--color-border-blue)] bg-bg-info-subtle px-[14px] py-[12px]">
+    // A tint, not a bordered box: it already sits inside the Brief's card.
+    <div className="flex gap-[10px] rounded-lg bg-bg-info-subtle px-[14px] py-[12px]">
       <svg
         width="17"
         height="17"
@@ -456,11 +459,12 @@ function OtherProducts({
       <p className="mx-0 mt-0 mb-[8px] text-md font-semibold text-text-primary">
         Also in this project
       </p>
-      <ul className="m-0 flex list-none flex-col gap-[1px] overflow-hidden rounded-lg border border-solid border-border bg-border p-0">
+      {/* A list divided by hairlines, not a bordered card inside the card. */}
+      <ul className="m-0 flex list-none flex-col divide-y divide-solid divide-border-subtle border-y border-solid border-border-subtle p-0">
         {products.map((x, i) => (
           <li
             key={`${i}-${x.name}`}
-            className="bg-bg-surface px-[14px] py-[10px]"
+            className="py-[10px]"
           >
             {editing === i ? (
               <ProductEditor

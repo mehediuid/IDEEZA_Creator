@@ -61,7 +61,11 @@ export function PromptBar({
     const el = taRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    // A hidden pane (the Chat tab at phone width) measures 0, and writing
+    // that collapsed the box to its padding; leave it at its rows instead.
+    el.style.height = el.scrollHeight
+      ? `${Math.min(el.scrollHeight, 160)}px`
+      : "";
   }, [value, listening]);
 
   const send = () => {

@@ -140,8 +140,8 @@ export function BuildAttentionBanner() {
           : tone === "warning"
             ? "border-[var(--color-border-warning)]"
             : "border-border-brand",
-        "transition-all duration-normal ease-out motion-reduce:transition-none",
-        entered ? "translate-y-0 opacity-100" : "-translate-y-[8px] opacity-0",
+        "transition-[transform,opacity] duration-normal ease-out motion-reduce:transition-none",
+        entered ? "translate-y-0 opacity-100" : "translate-y-[8px] opacity-0 md:-translate-y-[8px]",
       ].join(" ")}
     >
       <span
