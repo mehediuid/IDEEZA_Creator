@@ -233,7 +233,10 @@ export function Select({
         onClick={() => (open ? close() : openAt(selectedIndex < 0 ? 0 : selectedIndex))}
         onKeyDown={onKeyDown}
         className={cn(
-          "flex w-full items-center justify-between gap-[var(--spacing-5)] border border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[color:var(--color-text-primary)] outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed disabled:opacity-50",
+          // `button { border: 0 }` in the reset drops the border style, so a
+          // bordered button has to name it — without `border-solid` the width
+          // and colour below drew nothing.
+          "flex w-full items-center justify-between gap-[var(--spacing-5)] border-1 border-solid border-[var(--color-border-default)] bg-[var(--color-bg-surface)] text-[color:var(--color-text-primary)] outline-none transition-colors hover:border-[var(--color-border-strong)] focus-visible:border-[var(--color-border-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed disabled:opacity-50",
           SIZES[size],
           className,
         )}
