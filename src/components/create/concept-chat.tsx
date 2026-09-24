@@ -104,6 +104,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     dropSetupPick,
     setSetupLeftOut,
     startBuild,
+    setTurnConcept,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
   // Every concept render costs credits — the first draft, a refine and a
@@ -173,6 +174,29 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     }
     return latest;
   }, [builds, chat]);
+
+  // The spec on each card is worked out from its concept's parts, so each
+  // product's latest drawing is read as soon as it lands rather than when
+  // Build is pressed. summarizeConcept runs them one at a time, and the
+  // reading is kept on the turn, so a reload never asks again.
+  const reading = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    if (!chat) return;
+    const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
+    for (const t of chat.turns) {
+      if (t.role === "assistant") latest.set(t.companionOf ?? "primary", t);
+    }
+    for (const t of latest.values()) {
+      if (t.status !== "ready" || t.concept || reading.current.has(t.id)) continue;
+      reading.current.add(t.id);
+      const chatId = chat.id;
+      const turnId = t.id;
+      void summarizeConcept(turnId, conceptBriefOf(chat.turns, turnId)).then((concept) => {
+        setTurnConcept(chatId, turnId, concept);
+        reading.current.delete(turnId);
+      });
+    }
+  }, [chat, setTurnConcept]);
 
   // The build's 3D enclosure is generated where the build is reviewed, which
   // is here.
@@ -732,7 +756,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       return Promise.all(
         ready.map(({ companion, turn }) => {
           const brief = conceptBriefOf(chat.turns, turn.id);
-          return summarizeConcept(turn.id, brief).then((concept) => ({
+          return summarizeConcept(turn.id, brief, turn.concept).then((concept) => ({
             id: companion.id,
             name: companion.name,
             conceptImageUrl: turn.imageUrl ?? "",
@@ -878,7 +902,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // Busy until the gate is open: the concept is read back first, so the
       // gate opens on the real title and parts rather than a stand-in.
       setPreparingTurnId(t.id);
-      void summarizeConcept(t.id, source.prompt)
+      void summarizeConcept(t.id, source.prompt, t.concept)
         .catch(() => null)
         .then(() => goToGate(source))
         .finally(() => setPreparingTurnId(null));

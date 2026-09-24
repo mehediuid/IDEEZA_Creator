@@ -37,6 +37,7 @@ import {
   fallbackConcept,
   type ConceptSummary,
 } from "@/lib/create/concept";
+import { parseHints } from "@/lib/spec/hints";
 
 // The estimate in words — a build here takes about a minute.
 const TIME_CHIP =
@@ -53,15 +54,24 @@ const summaryCache = new Map<string, ConceptSummary>();
 // instead of firing a second /api/concept/summarize call.
 const pendingSummaries = new Map<string, Promise<ConceptSummary>>();
 
+// Pollinations queues one request per IP and answers a second with a 429
+// that sends it to the fallback — so the background reader, the Build path
+// and the gate all go through this one line, each request starting when the
+// one ahead of it has answered.
+let queue: Promise<unknown> = Promise.resolve();
+
 export function summarizeConcept(
   turnId: string,
   prompt: string,
+  /** The reading already kept on the turn — used as is, no request. */
+  known?: ConceptSummary,
 ): Promise<ConceptSummary> {
+  if (known) summaryCache.set(turnId, known);
   const cached = summaryCache.get(turnId);
   if (cached) return Promise.resolve(cached);
   const pending = pendingSummaries.get(turnId);
   if (pending) return pending;
-  const request = (async (): Promise<ConceptSummary> => {
+  const request = queue.then(async (): Promise<ConceptSummary> => {
     try {
       const res = await fetch("/api/concept/summarize", {
         method: "POST",
@@ -69,7 +79,7 @@ export function summarizeConcept(
         body: JSON.stringify({ prompt }),
       });
       if (!res.ok) throw new Error("summarize failed");
-      const data = (await res.json()) as Partial<ConceptSummary>;
+      const data = (await res.json()) as Partial<ConceptSummary> & { hints?: unknown };
       if (!data.title || !Array.isArray(data.parts) || !data.parts.length) {
         throw new Error("empty concept");
       }
@@ -78,13 +88,18 @@ export function summarizeConcept(
         summary: data.summary ?? "",
         description: data.description ?? describeFallback(prompt),
         parts: data.parts,
+        ...(() => {
+          const hints = parseHints(data.hints);
+          return hints ? { hints } : null;
+        })(),
       };
     } catch {
       // The same deterministic concept the route falls back to, so a
       // build started offline still carries a real parts list.
       return fallbackConcept(prompt);
     }
-  })();
+  });
+  queue = request.catch(() => null);
   pendingSummaries.set(turnId, request);
   // The cache used to be written by the dialog's own effect, so a path that
   // never opens the dialog — a dismissed gate — asked the model the same
