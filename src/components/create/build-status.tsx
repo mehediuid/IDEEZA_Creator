@@ -588,8 +588,8 @@ function BuildItemRow({
             className="mt-[8px] h-[6px] w-full overflow-hidden rounded-full bg-bg-subtle"
           >
             <div
-              className="h-full rounded-full bg-bg-brand transition-[width] duration-normal ease-decelerate"
-              style={{ width: `${item.progress}%` }}
+              className="h-full w-full origin-left bg-bg-brand transition-transform duration-normal ease-decelerate"
+              style={{ transform: `scaleX(${item.progress / 100})` }}
             />
           </div>
         )}

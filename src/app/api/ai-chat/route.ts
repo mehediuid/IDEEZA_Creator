@@ -15,8 +15,6 @@
 
 import { NextResponse } from "next/server";
 
-export const runtime = "edge";
-
 // Which product tab each chat context lives in.
 const MODULE_OF: Record<string, "pcb" | "code" | "3d" | "preview"> = {
   pcb: "pcb", blockly: "code", code: "code", "3d": "3d", preview: "preview",
@@ -102,21 +100,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ say: "", module: mod, actions: [] });
   }
 
+  // The anonymous model reasons before it answers. On the plain endpoint that
+  // took 11–20 s and often ran past the old 20 s cut-off; asked for low effort
+  // on the OpenAI-shaped endpoint it answers in a few seconds. The route runs
+  // on Node, not edge, so the 45 s bound is ours rather than the platform's.
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  const timer = setTimeout(() => ctrl.abort(), 45_000);
   try {
-    const res = await fetch("https://text.pollinations.ai/", {
+    const res = await fetch("https://text.pollinations.ai/openai", {
       method: "POST",
       signal: ctrl.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai",
+        model: "openai-fast",
+        reasoning_effort: "low",
+        response_format: { type: "json_object" },
         messages: [{ role: "system", content: systemFor(context) }, ...history],
       }),
     });
     clearTimeout(timer);
     if (!res.ok) return NextResponse.json({ say: "", module: mod, actions: [] });
-    const text = (await res.text()).trim();
+    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
+    const content = envelope.choices?.[0]?.message?.content;
+    const text = typeof content === "string" ? content.trim() : "";
     if (!text || text.length > 8000) return NextResponse.json({ say: "", module: mod, actions: [] });
     return NextResponse.json(parseEnvelope(text, mod));
   } catch {

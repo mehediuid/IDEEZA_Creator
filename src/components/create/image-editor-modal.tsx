@@ -20,7 +20,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
-  AiMagicIcon,
+  ArrowUp02Icon,
   Cancel01Icon,
   Mic01Icon,
 } from "@hugeicons/core-free-icons";
@@ -253,8 +253,9 @@ export function ImageEditorModal({
               >
                 <Icon icon={Mic01Icon} />
               </button>
-              {/* The same send the prompt bar carries, so the two composers
-                  read as one control. Off until there is a change described. */}
+              {/* The same arrow send the prompt bar carries, so the two
+                  composers read as one control. Off until there is a change
+                  described. */}
               <button
                 type="button"
                 onClick={submit}
@@ -270,7 +271,7 @@ export function ImageEditorModal({
                     : "inline-flex h-[40px] w-[40px] shrink-0 cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
                 }
               >
-                <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
+                <Icon icon={ArrowUp02Icon} size={18} strokeWidth={1.8} />
               </button>
             </div>
           )}

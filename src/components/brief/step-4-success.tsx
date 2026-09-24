@@ -453,11 +453,14 @@ function PendingCard({
       >
         <div
           style={{
-            width: `${total}%`,
+            // Scaled, not resized: a transform moves on the compositor, where an
+            // animated width re-lays the row out every half second.
+            width: "100%",
             height: "100%",
-            background:
-              "var(--color-bg-brand)",
-            transition: "width .5s linear",
+            background: "var(--color-bg-brand)",
+            transform: `scaleX(${total / 100})`,
+            transformOrigin: "left",
+            transition: "transform .5s linear",
           }}
         />
       </div>

@@ -21,8 +21,6 @@ import {
   type CompanionPlan,
 } from "@/lib/create/companions";
 
-export const runtime = "edge";
-
 const SYSTEM =
   "You decide whether an electronics product is one object or part of a multi-product system. " +
   "Reply with STRICT JSON and nothing else — no markdown, no code fence, no preamble — " +
@@ -44,15 +42,21 @@ function unfence(text: string): string {
 }
 
 async function classifyWithAI(prompt: string): Promise<CompanionPlan | null> {
+  // The anonymous model reasons before it answers. On the plain endpoint that
+  // often ran past the old 20 s cut-off and the rule answered instead; asked
+  // for low effort on the OpenAI-shaped endpoint it answers in a few seconds.
+  // Node, not edge, so the 45 s bound is ours rather than the platform's.
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  const timer = setTimeout(() => ctrl.abort(), 45_000);
   try {
-    const res = await fetch("https://text.pollinations.ai/", {
+    const res = await fetch("https://text.pollinations.ai/openai", {
       method: "POST",
       signal: ctrl.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai",
+        model: "openai-fast",
+        reasoning_effort: "low",
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM },
           { role: "user", content: prompt },
@@ -61,7 +65,9 @@ async function classifyWithAI(prompt: string): Promise<CompanionPlan | null> {
     });
     clearTimeout(timer);
     if (!res.ok) return null;
-    const text = unfence((await res.text()).trim());
+    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
+    const content = envelope.choices?.[0]?.message?.content;
+    const text = unfence(typeof content === "string" ? content : "");
     if (!text || text.length > 4000) return null;
     let raw: unknown;
     try {

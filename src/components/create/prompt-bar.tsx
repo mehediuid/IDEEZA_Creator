@@ -1,20 +1,18 @@
 "use client";
 
-// PromptBar — the chat composer, pinned under the thread. Same controls
-// as the home hero prompt card (`+` attach · mic dictation · Enhance ·
-// ai-magic send) so the chat reads as a continuation of the home flow;
-// the send stays icon-only here because the thread already says what a
-// submission does.
+// PromptBar — the chat composer, pinned under the thread. The home card's
+// controls (mic dictation · Enhance · send) so the chat reads as a
+// continuation of the home flow; the send is icon-only here — the arrow every
+// chat composer uses — because the thread already says what a submission does.
 //
 // It is never disabled while a generation is in flight — a user may
 // describe the next change while the current concept renders.
 
 import * as React from "react";
 import {
-  AiMagicIcon,
+  ArrowUp02Icon,
   MagicWand01Icon,
   Mic01Icon,
-  PlusSignIcon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
@@ -172,12 +170,9 @@ export function PromptBar({
         />
 
         <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
+          {/* No attach button until an image can go with the message — it
+              was permanently disabled, a control that offered only a reason. */}
           <div className="flex items-center gap-[4px]">
-            <ToolbarIconButton
-              ariaLabel="Attach a reference image — not sent to the generator yet"
-              icon={PlusSignIcon}
-              disabled
-            />
             <ToolbarIconButton
               ariaLabel={
                 voice.supported
@@ -330,7 +325,7 @@ function SendButton({
         title={why}
         className="inline-flex h-[40px] w-[40px] cursor-not-allowed items-center justify-center rounded-lg bg-[var(--color-button-disabled-bg)] text-[color:var(--color-button-disabled-text)]"
       >
-        <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
+        <Icon icon={ArrowUp02Icon} size={18} strokeWidth={1.8} />
       </button>
     );
   }
@@ -342,7 +337,7 @@ function SendButton({
       title="Send (Enter)"
       className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg bg-button-primary-bg text-button-primary-text outline-none transition-colors duration-fast hover:bg-button-primary-bg-hover focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      <Icon icon={AiMagicIcon} size={18} strokeWidth={1.8} />
+      <Icon icon={ArrowUp02Icon} size={18} strokeWidth={1.8} />
     </button>
   );
 }

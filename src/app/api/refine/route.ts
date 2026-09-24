@@ -15,8 +15,6 @@ import { NextResponse } from "next/server";
 import { refinePromptTemplate } from "@/lib/dashboard/refine";
 import { videoScenePrompt } from "@/lib/brief/video-prompt";
 
-export const runtime = "edge";
-
 type RefineMode = "brief" | "video" | "change";
 const MODES: RefineMode[] = ["brief", "video", "change"];
 
@@ -44,15 +42,20 @@ function tidyChange(prompt: string): string {
 }
 
 async function refineWithAI(prompt: string, mode: RefineMode): Promise<string> {
+  // The anonymous model reasons before it answers. On the plain endpoint that
+  // ran past the old 20 s cut-off most of the time and the template answered
+  // instead; asked for low effort on the OpenAI-shaped endpoint it answers in
+  // a few seconds. Node, not edge, so the 45 s bound is ours.
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20_000);
+  const timer = setTimeout(() => ctrl.abort(), 45_000);
   try {
-    const res = await fetch("https://text.pollinations.ai/", {
+    const res = await fetch("https://text.pollinations.ai/openai", {
       method: "POST",
       signal: ctrl.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai",
+        model: "openai-fast",
+        reasoning_effort: "low",
         messages: [
           { role: "system", content: SYSTEM[mode] },
           { role: "user", content: prompt },
@@ -61,7 +64,9 @@ async function refineWithAI(prompt: string, mode: RefineMode): Promise<string> {
     });
     clearTimeout(timer);
     if (!res.ok) return "";
-    const text = (await res.text()).trim();
+    const envelope = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
+    const content = envelope.choices?.[0]?.message?.content;
+    const text = typeof content === "string" ? content.trim() : "";
     // Reject error JSON / runaway output; we want a short plain-text answer.
     if (!text || text.startsWith("{") || text.startsWith("[") || text.length > 900) {
       return "";

@@ -21,7 +21,6 @@ import {
   PackageIcon,
   MagicWand01Icon,
   Mic01Icon,
-  PlusSignIcon,
   Refresh01Icon,
   SparklesIcon,
   ViewIcon,
@@ -403,8 +402,10 @@ const PromptCard = React.forwardRef<
     wasListening.current = listening;
   }, [listening, returnToComposer]);
 
+  // Enter sends and Shift+Enter breaks the line, the way the chat's composer
+  // and the Refine box already worked — this box alone wanted ⌘/Ctrl+Enter.
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onSubmit();
     }
@@ -455,12 +456,10 @@ const PromptCard = React.forwardRef<
         />
 
         <div className="flex items-center justify-between gap-[8px] px-[12px] pb-[12px] pt-[4px]">
+          {/* No attach button: it was permanently disabled — the picked file
+              was never sent to the generator — so it offered nothing but a
+              reason. It comes back when an image can go with the prompt. */}
           <div className="flex items-center gap-[4px]">
-            <ToolbarIconButton
-              ariaLabel="Attach a reference image — not sent to the generator yet"
-              icon={PlusSignIcon}
-              disabled
-            />
             <ToolbarIconButton
               ariaLabel={
                 voice.supported
@@ -750,7 +749,8 @@ function ExampleTile({ item }: { item: Project }) {
       aria-label={`Open project ${item.title} by ${item.creator.name}`}
       className="group block overflow-hidden rounded-xl border border-border bg-bg-surface outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
     >
-      {/* Image header — carries the Minted badge, top-right. */}
+      {/* Image header — carries the Minted badge, top-right. The card's own
+          border answers a hover; the picture zooming as well was decoration. */}
       <div className="relative aspect-[16/10] overflow-hidden bg-bg-surface-raised">
         {item.image && imgOk ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -760,7 +760,7 @@ function ExampleTile({ item }: { item: Project }) {
             loading="lazy"
             decoding="async"
             onError={() => setImgOk(false)}
-            className="h-full w-full object-cover transition-transform duration-normal ease-standard group-hover:scale-[1.02]"
+            className="h-full w-full object-cover"
           />
         ) : (
           <div
