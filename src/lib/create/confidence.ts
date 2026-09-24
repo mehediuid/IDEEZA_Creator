@@ -9,19 +9,20 @@
 //   `Draft`    a check failed, **or a check could not be run**
 //
 // That second trigger is the honest one today, and it is why every build
-// currently lands on `Draft`. A build produces a parts list, a net graph
-// and board *dimensions* — `PcbMeta` — but no copper: no tracks, no pads,
-// no clearances. `runDrc` in lib/pcb/drc.ts checks real geometry, so it
-// has nothing to consume, and a design-rule check that never ran cannot
-// report a pass. The issue list says exactly that rather than implying a
-// failure the user could fix.
+// currently lands on `Draft`. A build produces a parts list, a net graph and a
+// spec — sizes, a board outline, a pack — but no copper: no tracks, no pads,
+// no clearances. `runDrc` in lib/pcb/drc.ts checks real geometry, so it has
+// nothing to consume, and a design-rule check that never ran cannot report a
+// pass. The issue list says exactly that rather than implying a failure the
+// user could fix.
 //
-// What *is* really checked is §4.4.10's cross-product compatibility, which
-// needs no geometry: two products' parts lists are enough to tell whether
-// they can talk to each other and whether their connectors match. A
-// compatibility failure appears in the issue list of **both** affected
-// products, as the spec requires.
+// What *is* really checked is the assembly pass (§4.3.5) — the power budget
+// and the fit inside the enclosure, both computed from the spec — and
+// §4.4.10's cross-product compatibility, which two parts lists are enough for.
 
+import { batteryOf } from "../spec/batteries";
+import { deriveSpec } from "../spec/derive";
+import { mm3 } from "../spec/units";
 import type { BuildJob, BuildProduct } from "./history";
 import type { ConceptPart } from "./concept";
 
@@ -47,6 +48,9 @@ export type ProductConfidence = {
   productName: string;
   tier: Tier;
   issues: Issue[];
+  /** Checks that ran and passed — said, so a Draft that only waits on DRC
+   *  does not read as if nothing were checked. */
+  passed: string[];
 };
 
 export type BuildConfidence = {
@@ -122,14 +126,35 @@ const NOT_RUN: Issue[] = [
   {
     group: "design-rule",
     notRun: true,
-    text: "Design rule checks have not run — this build produces a parts list and board dimensions, not a copper layout, so trace widths, clearances and via sizes cannot be measured yet.",
-  },
-  {
-    group: "assembly",
-    notRun: true,
-    text: "Assembly checks have not run — the parts list carries no current draw or body dimensions, so the power budget and the fit inside an enclosure cannot be computed yet.",
+    text: "Design rule checks have not run — this build produces a parts list and a board outline, not a copper layout, so trace widths, clearances and via sizes cannot be measured yet.",
   },
 ];
+
+/** §4.3.5 Assembly — from the booked spec, or from the parts for a build
+ *  older than the spec. */
+export function assemblyChecks(p: BuildProduct): { issues: Issue[]; passed: string[] } {
+  const s = p.spec ?? deriveSpec(p.parts);
+  const supply = s.battery === "none" ? "USB" : batteryOf(s.battery).label;
+  const issues: Issue[] = [];
+  const passed: string[] = [];
+  if (s.drawMa > s.budgetMa) {
+    issues.push({
+      group: "assembly",
+      text: `${p.name} draws about ${s.drawMa} mA, but ${supply} gives ${s.budgetMa} mA — it will brown out under load.`,
+    });
+  } else {
+    passed.push(`Power budget — ${p.name} draws about ${s.drawMa} mA of the ${s.budgetMa} mA ${supply} gives.`);
+  }
+  if (!s.fits) {
+    issues.push({
+      group: "assembly",
+      text: `${p.name} doesn't fit the ${mm3(s.size)} you set — its parts need at least ${mm3(s.minSize)}.`,
+    });
+  } else {
+    passed.push(`Enclosure fit — ${p.name}'s parts fit in ${mm3(s.size)}.`);
+  }
+  return { issues, passed };
+}
 
 /** §4.4.10 — the cross-product pass. Returns the issues for the pair,
  *  which the caller files against **both** products. */
@@ -175,12 +200,16 @@ export function checkBuild(
   job: BuildJob,
   products: BuildProduct[],
 ): BuildConfidence {
-  const byProduct: ProductConfidence[] = products.map((p) => ({
-    productId: p.id,
-    productName: p.name,
-    tier: "draft" as Tier,
-    issues: [...NOT_RUN],
-  }));
+  const byProduct: ProductConfidence[] = products.map((p) => {
+    const assembly = assemblyChecks(p);
+    return {
+      productId: p.id,
+      productName: p.name,
+      tier: "draft" as Tier,
+      issues: [...NOT_RUN, ...assembly.issues],
+      passed: assembly.passed,
+    };
+  });
 
   // §4.4.10 — every pair, and a failure lands on both sides of it.
   for (let i = 0; i < products.length; i += 1) {
@@ -194,9 +223,9 @@ export function checkBuild(
 
   for (const entry of byProduct) {
     // A product is `Checked` only when nothing is outstanding. Today the
-    // NOT_RUN pair guarantees that never happens; the rule is written the
-    // way it will behave once the checks exist, rather than hardcoding
-    // the current answer.
+    // NOT_RUN design-rule entry guarantees that never happens; the rule is
+    // written the way it will behave once the checks exist, rather than
+    // hardcoding the current answer.
     entry.tier = entry.issues.length === 0 ? "checked" : "draft";
   }
 
@@ -225,6 +254,11 @@ export const TIER_MEANING: Record<Tier, string> = {
  *  the rows beneath it said never ran. */
 export const DRAFT_UNCHECKED_MEANING =
   "Not checked yet — the design rule checks can't run on this build, so nothing has been verified. Nothing was found wrong either; review it before you manufacture.";
+
+/** `Draft` when the assembly checks ran and passed and only the design rule
+ *  checks are outstanding — true of most builds now. */
+export const DRAFT_PARTLY_CHECKED_MEANING =
+  "Power and fit were checked and passed. The design rule checks can't run on this build yet, so the board itself isn't verified — review it before you manufacture.";
 
 /** §4.3.4 — the sentence that has to be on screen wherever `Draft` is,
  *  because the spec calls this copy the single most likely source of a

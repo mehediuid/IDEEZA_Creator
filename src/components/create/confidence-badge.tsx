@@ -25,6 +25,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import {
   DRAFT_CREDIT_NOTE,
+  DRAFT_PARTLY_CHECKED_MEANING,
   DRAFT_UNCHECKED_MEANING,
   TIER_LABEL,
   TIER_MEANING,
@@ -35,7 +36,7 @@ import {
 
 const GROUP_LABEL: Record<IssueGroup, string> = {
   "design-rule": "Design rule issues",
-  assembly: "Assembly issues",
+  assembly: "Assembly checks",
   compatibility: "Works-with issues",
 };
 
@@ -58,6 +59,7 @@ export function ConfidenceBadge({
   const total = confidence.issues.length;
   const found = confidence.issues.filter((i) => !i.notRun).length;
   const unchecked = draft && found === 0;
+  const passed = confidence.passed;
 
   const badge = (
     <span
@@ -88,7 +90,8 @@ export function ConfidenceBadge({
   const groups = GROUP_ORDER.map((group) => ({
     group,
     issues: confidence.issues.filter((i) => i.group === group),
-  })).filter((g) => g.issues.length > 0);
+    passes: group === "assembly" ? passed : [],
+  })).filter((g) => g.issues.length > 0 || g.passes.length > 0);
 
   return (
     <div className="flex flex-col gap-[8px]">
@@ -97,15 +100,17 @@ export function ConfidenceBadge({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={`${id}-issues`}
-        className="inline-flex w-fit items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex w-fit flex-wrap items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         {badge}
-        <span className="text-sm text-text-secondary">
-          {unchecked
-            ? `${total} check${total === 1 ? "" : "s"} not run yet`
-            : found === total
-              ? `${found} to review`
-              : `${found} to review · ${total - found} not run`}
+        <span className="whitespace-nowrap text-sm text-text-secondary">
+          {[
+            passed.length ? `${passed.length} passed` : null,
+            found ? `${found} to review` : null,
+            total - found ? `${total - found} not run` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </span>
         <svg
           width={12}
@@ -131,9 +136,13 @@ export function ConfidenceBadge({
           className="flex flex-col gap-[12px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]"
         >
           <p className="text-sm text-text-secondary">
-            {unchecked ? DRAFT_UNCHECKED_MEANING : TIER_MEANING.draft}
+            {unchecked
+              ? passed.length
+                ? DRAFT_PARTLY_CHECKED_MEANING
+                : DRAFT_UNCHECKED_MEANING
+              : TIER_MEANING.draft}
           </p>
-          {groups.map(({ group, issues }) => (
+          {groups.map(({ group, issues, passes }) => (
             <section key={group} className="flex flex-col gap-[6px]">
               <h4 className="text-sm font-semibold text-text-primary">
                 {GROUP_LABEL[group]}
@@ -141,6 +150,9 @@ export function ConfidenceBadge({
               <ul role="list" className="flex flex-col gap-[6px]">
                 {issues.map((issue) => (
                   <IssueRow key={issue.text} issue={issue} />
+                ))}
+                {passes.map((text) => (
+                  <PassRow key={text} text={text} />
                 ))}
               </ul>
             </section>
@@ -173,6 +185,17 @@ function IssueRow({ issue }: { issue: Issue }) {
         {issue.notRun ? "Not run" : "Found"}
       </span>
       <span className="min-w-0">{issue.text}</span>
+    </li>
+  );
+}
+
+function PassRow({ text }: { text: string }) {
+  return (
+    <li className="flex items-start gap-[8px] text-sm leading-relaxed text-text-secondary">
+      <span className="mt-[1px] inline-flex h-[20px] shrink-0 items-center rounded-full bg-bg-success-subtle px-[8px] text-xs font-semibold text-text-success">
+        Passed
+      </span>
+      <span className="min-w-0">{text}</span>
     </li>
   );
 }
