@@ -405,10 +405,6 @@ function PowerField({
       {onChange ? (
         <Select
           size="sm"
-          // The reset's `button { border: 0 }` outranks the trigger's own
-          // `border`, so without a style it drew no edge — on the card's
-          // surface the battery read as a line of text, not a field.
-          className="border-solid"
           aria-label="Battery"
           value={spec.battery}
           options={BATTERIES.map((b) => ({ label: b.label, value: b.key }))}
