@@ -4,6 +4,9 @@
 // handler importing from it would get a client reference, not the
 // function.
 
+import { parseHints } from "../spec/hints";
+import type { AiHints } from "../spec/types";
+
 export type ConceptPartCategory =
   | "Microcontroller"
   | "Sensor"
@@ -41,6 +44,10 @@ export type ConceptSummary = {
    *  needs something to put under its name. */
   description: string;
   parts: ConceptPart[];
+  /** What the model suggested for the spec sheet — battery, material, where
+   *  it is used. Checked on arrival; absent when the model gave nothing
+   *  usable, and then the spec's rules decide. */
+  hints?: AiHints;
 };
 
 /** What to say about a product when no model did. It repeats the maker's own
@@ -218,6 +225,7 @@ export function parseConcept(
     title?: unknown;
     description?: unknown;
     parts?: unknown;
+    spec?: unknown;
   };
   if (!Array.isArray(obj.parts)) return null;
   const parts: ConceptPart[] = [];
@@ -250,5 +258,9 @@ export function parseConcept(
     })(),
     summary: summaryFromParts(parts.slice(0, 6)),
     parts: parts.slice(0, 6),
+    ...(() => {
+      const hints = parseHints(obj.spec);
+      return hints ? { hints } : null;
+    })(),
   };
 }

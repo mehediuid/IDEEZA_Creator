@@ -9,7 +9,7 @@
 // parts list.
 //
 // Request:  { prompt: string }
-// Response: { title: string; summary: string; parts: ConceptPart[] }
+// Response: { title: string; summary: string; parts: ConceptPart[]; hints? }
 
 import { NextResponse } from "next/server";
 import {
@@ -23,14 +23,19 @@ import {
 const SYSTEM =
   "You turn a rough electronics project idea into a parts-level concept. " +
   "Reply with STRICT JSON and nothing else — no markdown, no code fence, no preamble — " +
-  'in the shape {"title": string, "description": string, "summary": string, "parts": [{"name": string, "role": string, "category": string}]}. ' +
+  'in the shape {"title": string, "description": string, "summary": string, "parts": [{"name": string, "role": string, "category": string}], ' +
+  '"spec": {"battery": string, "material": string, "useCase": [string], "runtimeGoalH": number}}. ' +
   "Give 4 to 6 parts: a microcontroller, the sensors and actuators the idea needs, power, and the connector. " +
   "title is at most 40 characters and names the product, not the sentence. " +
   "description is ONE sentence, at most 140 characters, saying what the product is and does — " +
   "no marketing, no adjectives it cannot support. " +
   'summary is the part names joined by " · ". ' +
   "role is a short phrase saying what that part does in this project. " +
-  `category is exactly one of: ${CONCEPT_CATEGORIES.join(", ")}.`;
+  `category is exactly one of: ${CONCEPT_CATEGORIES.join(", ")}. ` +
+  "spec.battery is exactly one of: none (USB powered), li-1s-400, li-1s-1000, li-1s-2000 (an 18650 cell), li-2s-1500, aa-2, aa-4 — the pack this product would really use. " +
+  "spec.material is exactly one of: PLA, PETG, ASA, TPU — the enclosure plastic for where it is used. " +
+  "spec.useCase lists whichever apply of: handheld, outdoor, waterproof, wearable, desk. " +
+  "spec.runtimeGoalH is how many hours it should run on one charge; leave it out when it is USB powered.";
 
 // Strips a ```json fence if the model wrapped its answer in one.
 function unfence(text: string): string {
@@ -104,5 +109,8 @@ export async function POST(req: Request) {
     // card under the title can't disagree with the list beside it.
     summary: summaryFromParts(concept.parts),
     parts: concept.parts,
+    // The spec sheet's hints, already checked by parseConcept; absent when
+    // the model gave none we recognise or the fallback answered.
+    ...(concept.hints ? { hints: concept.hints } : null),
   });
 }
