@@ -24,6 +24,9 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { deriveSpec, specKey } from "@/lib/spec/derive";
+import { cleanEdits } from "@/lib/spec/hints";
+import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
@@ -54,6 +57,9 @@ export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
   return out;
 }
 
+/** The key a product's spec edits and open state are filed under. */
+const idOf = (t: Extract<ChatTurn, { role: "assistant" }>) => t.companionOf ?? "primary";
+
 export function ChatThread({
   chat,
   regeneratingFrom,
@@ -72,6 +78,10 @@ export function ChatThread({
   job,
   focusedProduct,
   onFocusProduct,
+  openSpecs,
+  onSpecOpenChange,
+  onFocusSpec,
+  onSpecChange,
 }: {
   projects: SetupProject[];
   onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
@@ -107,6 +117,13 @@ export function ChatThread({
    *  composer so all three name the same thing. */
   focusedProduct?: string;
   onFocusProduct?: (productId: string) => void;
+  /** Cards whose spec is open, shared with the build path that opens one. */
+  openSpecs?: ReadonlySet<string>;
+  onSpecOpenChange?: (productId: string, open: boolean) => void;
+  /** Opens a card's spec and focuses its size — the Build line's way to a
+   *  size that can't be built. */
+  onFocusSpec?: (productId: string) => void;
+  onSpecChange?: (productId: string, edits: SpecEdits) => void;
 }) {
   // One label per concept, so a card, its breadcrumb and the editor all
   // name the same thing.
@@ -163,6 +180,29 @@ export function ChatThread({
     [products, leftOut],
   );
 
+  // Each ready card's spec, worked out from its concept's parts, the model's
+  // hints and the maker's edits. Null while the concept is still being read.
+  const specs = React.useMemo(() => {
+    const out = new Map<string, ResolvedSpec | null>();
+    for (const t of products) {
+      const read = t.status === "ready" && t.concept && Array.isArray(t.concept.parts);
+      out.set(
+        t.id,
+        read
+          ? deriveSpec(t.concept!.parts, t.concept!.hints, cleanEdits(answer?.specs?.[idOf(t)]))
+          : null,
+      );
+    }
+    return out;
+  }, [products, answer]);
+
+  // A chosen product whose size its parts can't fit, and that the maker has
+  // not agreed to build as Draft, holds the build (spec S3).
+  const specBlock = selected.find((t) => {
+    const s = specs.get(t.id);
+    return s && !s.fits && !s.draftAtSize;
+  });
+
   // Every card is titled with the product it is a drawing of — the name the
   // question gave it, which is the name the rail and the composer use too.
   const productNameOf = (t: Extract<ChatTurn, { role: "assistant" }>) => {
@@ -210,10 +250,20 @@ export function ChatThread({
   // Changed means the next build would differ from the one on screen: a
   // chosen product drawn again or added, or one the build holds that has
   // since been left out or removed.
-  const changedSinceBuild =
+  // A spec edited after the build is a change too: the booked snapshot is
+  // what the deliverables say, so a different size or pack needs a new build.
+  const specChanged =
+    !!job &&
+    selected.some((t) => {
+      const now = specs.get(t.id);
+      const booked = productsOf(job).find((p) => p.id === idOf(t))?.spec;
+      return !!now && !!booked && inBuild(t) && specKey(now) !== specKey(booked);
+    });
+  const conceptChanged =
     !!job &&
     (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
       builtImages.size !== selected.filter(inBuild).length);
+  const changedSinceBuild = conceptChanged || specChanged;
 
   const buildable = products.find(
     (t) => t.status === "ready" && !t.companionOf,
@@ -259,6 +309,22 @@ export function ChatThread({
                     onToggle: () => onToggleInBuild(turn.companionOf!),
                   }
                 : { included: true, locked: true }
+              : undefined
+          }
+          spec={
+            turn.status === "ready"
+              ? {
+                  productId: idOf(turn),
+                  spec: specs.get(turn.id) ?? null,
+                  parts: turn.concept?.parts ?? [],
+                  edits: cleanEdits(answer?.specs?.[idOf(turn)]),
+                  open: openSpecs?.has(idOf(turn)) ?? false,
+                  onOpenChange: (open) => onSpecOpenChange?.(idOf(turn), open),
+                  onChange:
+                    answer && onSpecChange
+                      ? (edits) => onSpecChange(idOf(turn), edits)
+                      : undefined,
+                }
               : undefined
           }
           onRemove={
@@ -321,9 +387,11 @@ export function ChatThread({
                 Concepts
               </h2>
               <p className="text-sm text-text-tertiary">
-                {changedSinceBuild
+                {conceptChanged
                   ? "Changed since this build — build again to carry the change into the deliverables."
-                  : "The drawings this build was made from. Refine one to change the next build."}
+                  : specChanged
+                    ? "Spec changed since this build — building again makes a new version."
+                    : "The drawings this build was made from. Refine one to change the next build."}
               </p>
             </header>
           ) : (
@@ -368,7 +436,10 @@ export function ChatThread({
               allReady={allReady}
               failedName={failedChoice ? productNameOf(failedChoice) ?? "One product" : undefined}
               preparing={preparingTurnId === buildable.id}
-              onBuild={() => onBuild(buildable.id)}
+              specBlock={specBlock ? productNameOf(specBlock) ?? "One product" : undefined}
+              onBuild={() =>
+                specBlock ? onFocusSpec?.(idOf(specBlock)) : onBuild(buildable.id)
+              }
             />
           )}
           {offerBuild && allReady && shortForBuild && (
@@ -392,6 +463,7 @@ function BuildAction({
   allReady,
   failedName,
   preparing,
+  specBlock,
   onBuild,
 }: {
   /** The products this build takes. */
@@ -406,6 +478,9 @@ function BuildAction({
    *  drawn again, left out or removed. */
   failedName?: string;
   preparing: boolean;
+  /** A chosen product whose size its parts can't fit. The button stays live
+   *  and takes the maker to that card's size instead of the gate. */
+  specBlock?: string;
   onBuild: () => void;
 }) {
   const { hydrated, balance } = useCredits();
@@ -419,7 +494,9 @@ function BuildAction({
       ? `${failedName}'s concept didn't come through — try it again, or leave it out of this build`
       : !allReady
         ? "One of the concepts is still drawing"
-        : undefined;
+        : specBlock
+          ? `${specBlock} doesn't fit the size you set — fix it, or build it as Draft`
+          : undefined;
   const label = again
     ? "Build again"
     : products === 1
@@ -462,7 +539,7 @@ function BuildAction({
             <Icon icon={Refresh01Icon} size={16} />
           </span>
         )}
-        {preparing ? "Preparing the build…" : label}
+        {preparing ? "Preparing the build…" : specBlock ? `Fix ${specBlock}'s size` : label}
       </button>
       {/* The reason a disabled button is off, where the keyboard and a touch
           screen can reach it — a title on a disabled button reaches neither. */}

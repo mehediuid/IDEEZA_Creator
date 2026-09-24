@@ -23,6 +23,7 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
+import type { SpecEdits } from "@/lib/spec/types";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -40,6 +41,7 @@ import {
 } from "@/lib/create/companions";
 
 import { ImageEditorModal } from "./image-editor-modal";
+import { specSizeInputId } from "./spec-panel";
 
 const POLL_MS = 2_500;
 /** Longer than the generator’s own budget, so the server is what gives up
@@ -105,6 +107,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     setSetupLeftOut,
     startBuild,
     setTurnConcept,
+    setSpecEdits,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
   // Every concept render costs credits — the first draft, a refine and a
@@ -161,6 +164,36 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // classify round-trips, so that one card's button can say so.
   const [preparingTurnId, setPreparingTurnId] = React.useState<string | null>(
     null,
+  );
+  // Which cards have their spec open. Held here, not in the card, because the
+  // build path opens a card itself when that product's size can't be built.
+  const [openSpecs, setOpenSpecs] = React.useState<ReadonlySet<string>>(() => new Set());
+  const setSpecOpen = React.useCallback((productId: string, open: boolean) => {
+    setOpenSpecs((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(productId);
+      else next.delete(productId);
+      return next;
+    });
+  }, []);
+  // Opens the card's spec and puts the keyboard on its size — where the
+  // conflict the Build line names can be fixed.
+  const focusSpec = React.useCallback(
+    (productId: string) => {
+      setSpecOpen(productId, true);
+      setFocusedProduct(productId);
+      setPane("work");
+      requestAnimationFrame(() => document.getElementById(specSizeInputId(productId))?.focus());
+    },
+    [setSpecOpen],
+  );
+  const handleSpecChange = React.useCallback(
+    (productId: string, edits: SpecEdits) => {
+      if (!chat) return;
+      const setup = chat.turns.find((t) => t.role === "setup" && t.answer);
+      if (setup) setSpecEdits(chat.id, setup.id, productId, edits);
+    },
+    [chat, setSpecEdits],
   );
   // The build this chat started, if it has one. Derived rather than held
   // in state, so a reload lands back on the build instead of an empty
@@ -1166,6 +1199,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             job={activeBuild}
             focusedProduct={focusedProduct}
             onFocusProduct={setFocusedProduct}
+            openSpecs={openSpecs}
+            onSpecOpenChange={setSpecOpen}
+            onFocusSpec={focusSpec}
+            onSpecChange={handleSpecChange}
           />
         </div>
       </main>
