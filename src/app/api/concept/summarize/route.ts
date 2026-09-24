@@ -41,10 +41,11 @@ function unfence(text: string): string {
 async function summarizeWithAI(
   prompt: string,
 ): Promise<ConceptSummary | null> {
-  // The anonymous model reasons before it answers. On the plain endpoint that
-  // ran past the old 20 s cut-off nearly every time, so every build started on
-  // the fallback parts; asked for low effort on the OpenAI-shaped endpoint it
-  // answers in a few seconds. Node, not edge, so the 45 s bound is ours.
+  // The anonymous model reasons before it answers, and under load that takes
+  // 15–40 s on either endpoint — past the old 20 s cut-off, so every build
+  // started on the fallback parts. The OpenAI-shaped endpoint keeps the
+  // reasoning out of `content`. Node, not edge: Vercel ends an edge function
+  // that has not started answering in 25 s, before this 45 s bound.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45_000);
   try {

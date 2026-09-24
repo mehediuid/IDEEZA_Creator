@@ -100,10 +100,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ say: "", module: mod, actions: [] });
   }
 
-  // The anonymous model reasons before it answers. On the plain endpoint that
-  // took 11–20 s and often ran past the old 20 s cut-off; asked for low effort
-  // on the OpenAI-shaped endpoint it answers in a few seconds. The route runs
-  // on Node, not edge, so the 45 s bound is ours rather than the platform's.
+  // The anonymous model reasons before it answers, and under load that takes
+  // 15–40 s on either endpoint — past the old 20 s cut-off, so a third of
+  // these replies were the client's fallback. The OpenAI-shaped endpoint keeps
+  // the reasoning out of `content`. Node, not edge: Vercel ends an edge
+  // function that has not started answering in 25 s, before this 45 s bound.
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45_000);
   try {
