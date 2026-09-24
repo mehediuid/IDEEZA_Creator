@@ -13,7 +13,7 @@
 // of concept 1) beside the product's name.
 
 import * as React from "react";
-import { Add01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { TextInput } from "@/components/ideeza/text-input";
 import {
@@ -24,7 +24,12 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
+import {
+  ImageTurn,
+  InsufficientCreditsBanner,
+  OUTLINE_BUTTON,
+  OUTLINE_BUTTON_OFF,
+} from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
 import { ReviewOutputs } from "./review-outputs";
 
@@ -472,9 +477,12 @@ function BuildAction({
   );
 }
 
-/** The canvas's one place to grow or restore the project (the spot beside
- *  the build it joins). A typed name that is already here says so; one that
- *  was offered, or removed, takes that product rather than drawing a twin. */
+/** Grows or restores the project, right under the products it adds to —
+ *  one quiet row, in the cards' own button family, so the build below stays
+ *  the only filled button on the canvas. "Add a product" opens a name field
+ *  in place; the classifier's passed-over offers and the products taken out
+ *  sit beside it as chips. A typed name already here says so; one that was
+ *  offered, or removed, takes that product instead of drawing a twin. */
 function AddProductSection({
   existing,
   available,
@@ -492,15 +500,30 @@ function AddProductSection({
   onRestore: (id: string) => void;
   onAddNamed: (name: string) => void;
 }) {
+  const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
   const [note, setNote] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const openerRef = React.useRef<HTMLButtonElement>(null);
+  const wasOpen = React.useRef(false);
+  React.useEffect(() => {
+    if (open) inputRef.current?.focus();
+    else if (wasOpen.current) openerRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
+
   const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
   const trimmed = name.trim().replace(/\s+/g, " ").slice(0, 48);
   const offered = trimmed ? available.find((a) => same(a.name, trimmed)) : undefined;
   const wasRemoved = trimmed ? removed.find((r) => same(r.name, trimmed)) : undefined;
   const costs = !wasRemoved;
-  const blocked = !trimmed || (costs && shortForRender);
+  const noCredits = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
 
+  const close = () => {
+    setOpen(false);
+    setName("");
+    setNote("");
+  };
   const submit = () => {
     if (!trimmed) return;
     const twin = existing.find((n) => same(n, trimmed));
@@ -512,115 +535,135 @@ function AddProductSection({
     else if (shortForRender) return;
     else if (offered) onAddOffered(offered.id);
     else onAddNamed(trimmed);
-    setName("");
-    setNote("");
+    close();
   };
 
-  const rowButton =
-    "mt-[2px] inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-text-disabled";
+  const chip =
+    "inline-flex h-[32px] items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[10px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-text-disabled disabled:hover:border-border";
+
+  const suggested = available.length > 0 && (
+    <div className="flex flex-wrap items-center gap-[8px]">
+      <span className="text-sm text-text-tertiary">Suggested · {CONCEPT_COST} credit each</span>
+      {available.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          data-testid="available-product"
+          onClick={() => onAddOffered(a.id)}
+          disabled={shortForRender}
+          aria-label={`Add ${a.name} — ${CONCEPT_COST} credit. ${a.why}`}
+          title={shortForRender ? noCredits : a.why}
+          className={chip}
+        >
+          <Icon icon={Add01Icon} size={14} />
+          {a.name}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <section
-      aria-labelledby="add-product-heading"
-      className="flex w-full flex-col gap-[12px] border-t border-solid border-border pt-[20px]"
-    >
-      <div>
-        <h3 id="add-product-heading" className="text-sm font-semibold text-text-primary">
-          Add a product
-        </h3>
-        <p className="mt-[2px] text-sm text-text-tertiary">
-          Name what this project is missing. It is drawn as its own concept ({CONCEPT_COST} credit) and joins the next build.
-        </p>
-      </div>
-      <form
-        className="flex w-full max-w-[560px] items-start gap-[8px]"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <div className="min-w-0 flex-1">
-          <label htmlFor="add-product-name" className="sr-only">
-            Product name
-          </label>
-          <TextInput
-            id="add-product-name"
-            value={name}
-            onValueChange={(v) => {
-              setName(v);
-              setNote("");
-            }}
-            placeholder="e.g. Charging dock"
-            maxLength={48}
-            aria-describedby="add-product-note"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={blocked}
-          title={costs && shortForRender ? `Not enough credits — a concept render costs ${CONCEPT_COST}` : undefined}
-          className="inline-flex h-[36px] shrink-0 items-center gap-[6px] rounded-lg bg-bg-brand px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:bg-bg-subtle disabled:text-text-disabled"
+    <section aria-label="Add a product" className="flex w-full flex-col gap-[12px]">
+      {open ? (
+        <form
+          className="flex w-full max-w-[640px] flex-col gap-[6px]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
         >
-          <Icon icon={Add01Icon} size={15} />
-          {wasRemoved ? "Restore" : `Add · ${CONCEPT_COST} credit`}
-        </button>
-      </form>
-      <p id="add-product-note" role="status" className="text-sm text-text-tertiary empty:hidden">
-        {note ||
-          (wasRemoved
-            ? `${wasRemoved.name} was removed — its concept is kept, so putting it back is free.`
-            : costs && shortForRender && trimmed
-              ? `Not enough credits — a concept render costs ${CONCEPT_COST}.`
-              : "")}
-      </p>
-
-      {available.length > 0 && (
-        <div className="flex flex-col gap-[2px]">
-          <p className="text-xs font-medium text-text-tertiary">Suggested for this project</p>
-          <ul role="list" className="flex flex-col gap-[2px]">
-            {available.map((a) => (
-              <li
-                key={a.id}
-                data-testid="available-product"
-                className="flex items-start gap-[12px] rounded-xl px-[12px] py-[10px] transition-colors duration-fast hover:bg-bg-subtle"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-md font-medium text-text-primary">{a.name}</span>
-                  <span className="mt-[1px] block text-sm leading-relaxed text-text-tertiary">{a.why}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onAddOffered(a.id)}
-                  disabled={shortForRender}
-                  title={shortForRender ? `Not enough credits — a concept render costs ${CONCEPT_COST}` : undefined}
-                  className={rowButton}
-                >
+          <div className="flex items-center gap-[8px]">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="add-product-name" className="sr-only">
+                Product name
+              </label>
+              <TextInput
+                id="add-product-name"
+                ref={inputRef}
+                value={name}
+                onValueChange={(v) => {
+                  setName(v);
+                  setNote("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    close();
+                  }
+                }}
+                placeholder="Name a product — e.g. Charging dock"
+                maxLength={48}
+                aria-describedby="add-product-note"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!trimmed || (costs && shortForRender)}
+              title={costs && shortForRender ? noCredits : undefined}
+              className={!trimmed || (costs && shortForRender) ? OUTLINE_BUTTON_OFF : OUTLINE_BUTTON}
+            >
+              {wasRemoved ? (
+                <>
+                  <Icon icon={Undo02Icon} size={15} />
+                  Restore · free
+                </>
+              ) : (
+                <>
+                  <Icon icon={Add01Icon} size={15} />
                   Add · {CONCEPT_COST} credit
-                </button>
-              </li>
-            ))}
-          </ul>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={close}
+              className="inline-flex h-[36px] items-center rounded-lg px-[10px] text-sm font-medium text-text-tertiary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              Cancel
+            </button>
+          </div>
+          <p id="add-product-note" role="status" className="px-[2px] text-sm text-text-tertiary">
+            {note ||
+              (wasRemoved
+                ? `${wasRemoved.name} was removed — its concept is kept, so putting it back is free.`
+                : costs && shortForRender
+                  ? `${noCredits}.`
+                  : "Drawn as its own concept, then it joins the next build.")}
+          </p>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-[20px] gap-y-[10px]">
+          <button
+            ref={openerRef}
+            type="button"
+            onClick={() => setOpen(true)}
+            className={OUTLINE_BUTTON}
+          >
+            <Icon icon={Add01Icon} size={16} />
+            Add a product
+          </button>
+          {suggested}
         </div>
       )}
+      {open && suggested}
 
       {removed.length > 0 && (
-        <div className="flex flex-col gap-[2px]">
-          <p className="text-xs font-medium text-text-tertiary">Removed from this project</p>
-          <ul role="list" className="flex flex-col gap-[2px]">
-            {removed.map((r) => (
-              <li
-                key={r.id}
-                data-testid="removed-product"
-                className="flex items-center gap-[12px] rounded-xl px-[12px] py-[10px] transition-colors duration-fast hover:bg-bg-subtle"
-              >
-                <span className="min-w-0 flex-1 truncate text-md font-medium text-text-secondary">{r.name}</span>
-                <span className="text-sm text-text-tertiary">Concept kept · free</span>
-                <button type="button" onClick={() => onRestore(r.id)} className={rowButton}>
-                  Restore
-                </button>
-              </li>
-            ))}
-          </ul>
+        <div className="flex flex-wrap items-center gap-[8px]">
+          <span className="text-sm text-text-tertiary">Removed · restore free</span>
+          {removed.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              data-testid="removed-product"
+              onClick={() => onRestore(r.id)}
+              aria-label={`Restore ${r.name} — free, its concept is kept`}
+              title="Put it back — its concept is kept, nothing is drawn or charged"
+              className={chip}
+            >
+              <Icon icon={Undo02Icon} size={14} />
+              {r.name}
+            </button>
+          ))}
         </div>
       )}
     </section>

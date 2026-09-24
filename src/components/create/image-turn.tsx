@@ -25,6 +25,7 @@ import {
   Coins01Icon,
   Copy01Icon,
   Delete02Icon,
+  LockIcon,
   MagicWand01Icon,
   Refresh01Icon,
   Tick02Icon,
@@ -40,9 +41,9 @@ import { elapsedLabel, useSecondClock } from "./use-clock";
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
 
-const OUTLINE_BUTTON =
+export const OUTLINE_BUTTON =
   "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
-const OUTLINE_BUTTON_OFF =
+export const OUTLINE_BUTTON_OFF =
   "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none";
 
 export function ImageTurn({
@@ -87,48 +88,50 @@ export function ImageTurn({
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
   const what = productName ?? `concept ${conceptLabel}`;
-  const tick = buildChoice ? <BuildTick what={what} choice={buildChoice} /> : null;
-  const remove = onRemove ? <RemoveButton what={what} onRemove={onRemove} /> : null;
   const leftOut = !!buildChoice && !buildChoice.included;
-
-  // A drawing still under way, or one that failed, has no header of its
-  // own; the product's name and its two choices sit on a line above it, so
-  // a failed remote can be left out or removed rather than holding up the
-  // whole build.
-  const withChoices = (tile: React.ReactNode) =>
-    tick || remove ? (
-      <div className="flex w-full max-w-[640px] flex-col gap-[8px]">
-        <div className="flex items-center gap-[8px]">
-          {tick}
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
-            {productName ?? `Concept ${conceptLabel}`}
-          </span>
-          {remove}
-        </div>
-        {tile}
+  // The card's own choices, on the right of its title: in or out of the
+  // next build, and out of the project. The name keeps the rest of the line.
+  const choices =
+    buildChoice || onRemove ? (
+      <div className="flex shrink-0 items-center gap-[4px]">
+        {buildChoice && <BuildToggle what={what} choice={buildChoice} />}
+        {onRemove && <RemoveButton what={what} onRemove={onRemove} />}
       </div>
-    ) : (
-      tile
-    );
+    ) : null;
+
+  // A drawing still under way, or one that failed, carries the same title
+  // line as a finished card — inside its own tile, in the same place — so a
+  // failed remote can be left out or removed rather than holding up the
+  // whole build, and the grid reads as one set of cards.
+  const titleLine = choices ? (
+    <div className="flex min-h-[32px] items-center gap-[12px]">
+      <span className="min-w-0 flex-1 truncate text-md font-semibold text-text-primary">
+        {productName ?? `Concept ${conceptLabel}`}
+      </span>
+      {choices}
+    </div>
+  ) : null;
 
   if (turn.status === "pending") {
-    return withChoices(
+    return (
       <PendingImageTurn
         conceptLabel={conceptLabel}
         parentConceptLabel={parentConceptLabel}
         productName={productName}
         kind={turn.kind}
         since={turn.ts}
-      />,
+        header={titleLine}
+      />
     );
   }
   if (turn.status === "failed") {
-    return withChoices(
+    return (
       <FailedImageTurn
         reason={turn.failReason}
         onRetry={onRegenerate}
         disabled={shortForRender}
-      />,
+        header={titleLine}
+      />
     );
   }
 
@@ -143,8 +146,7 @@ export function ImageTurn({
         conceptLabel={conceptLabel}
         productName={productName}
         ts={turn.ts}
-        lead={tick}
-        trail={remove}
+        choices={choices}
       />
 
       {/* The picture is the picture. It used to be a hidden Refine button,
@@ -157,8 +159,8 @@ export function ImageTurn({
           alt={`${name}: ${turn.prompt}`}
           onError={() => setImgOk(false)}
           className={[
-            "aspect-[16/10] w-full rounded-xl object-cover transition-opacity duration-fast",
-            leftOut ? "opacity-50" : "",
+            "aspect-[16/10] w-full rounded-xl object-cover transition-[opacity,filter] duration-normal ease-decelerate",
+            leftOut ? "opacity-40 grayscale" : "",
           ].join(" ")}
         />
       ) : turn.imageUrl ? (
@@ -224,43 +226,53 @@ export function ImageTurn({
           {CONCEPT_COST} credit each
         </span>
         {inBuild && !leftOut && <BuiltChip />}
-        {leftOut && (
-          <span className="ml-auto text-sm font-medium text-text-tertiary">
-            Left out
-          </span>
-        )}
       </div>
     </article>
   );
 }
 
-/** "Include in build" for one product — a real checkbox, named for the
- *  product, so a screen reader hears which one it is ticking. */
-function BuildTick({
+/** In or out of the next build — a labelled toggle, not a bare box, so the
+ *  card says what the tick is for. On, the tick is filled; off, the label
+ *  goes quiet with the drawing. The primary shows a status in its place:
+ *  it is always built (Part 4 §4.4.4), so there is nothing to toggle. */
+function BuildToggle({
   what,
   choice,
 }: {
   what: string;
   choice: { included: boolean; locked?: boolean; onToggle?: () => void };
 }) {
-  const reason = choice.locked
-    ? `${what} is always built — it is the concept this project started from`
-    : undefined;
+  if (choice.locked) {
+    return (
+      <span
+        title="The concept this project started from is always built"
+        className="inline-flex h-[32px] items-center gap-[6px] px-[8px] text-sm font-medium text-text-tertiary"
+      >
+        <Icon icon={LockIcon} size={14} />
+        Always built
+        <span className="sr-only"> — {what} is the concept this project started from</span>
+      </span>
+    );
+  }
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={choice.included}
-      aria-disabled={choice.locked || undefined}
-      aria-label={reason ?? `Include ${what} in the build`}
-      title={reason ?? "Include in the build"}
-      onClick={choice.locked ? undefined : choice.onToggle}
+      aria-label={`Include ${what} in the next build`}
+      onClick={choice.onToggle}
       className={[
-        "inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
-        choice.locked ? "cursor-not-allowed" : "hover:bg-bg-subtle",
+        "inline-flex h-[32px] items-center gap-[8px] rounded-lg border border-solid px-[10px] text-sm font-medium outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+        // The tick carries the selection colour; the chip around it stays
+        // neutral, so four products in a build are four ticks, not four
+        // violet slabs competing with the build button.
+        choice.included
+          ? "border-border bg-bg-surface text-text-primary hover:border-border-strong"
+          : "border-border bg-bg-surface text-text-tertiary hover:border-border-strong hover:text-text-primary",
       ].join(" ")}
     >
-      <Checkbox checked={choice.included} decorative disabled={choice.locked} />
+      <Checkbox checked={choice.included} decorative size="sm" />
+      In build
     </button>
   );
 }
@@ -274,7 +286,7 @@ function RemoveButton({ what, onRemove }: { what: string; onRemove: () => void }
       onClick={onRemove}
       aria-label={`Remove ${what} from this project`}
       title="Remove from this project"
-      className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
+      className="inline-flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-error-subtle hover:text-text-error focus-visible:ring-2 focus-visible:ring-border-focus"
     >
       <Icon icon={Delete02Icon} size={16} />
     </button>
@@ -329,45 +341,39 @@ export function InsufficientCreditsBanner({ cost }: { cost: number }) {
   );
 }
 
-// The product is the title; the lineage number is metadata beside it. The
-// number used to be the only name a card had, in a violet caps chip.
+// The product is the title, with the whole line to itself but for the
+// card's own choices on the right; the lineage number and the time are one
+// quiet line of metadata under it. They used to share the title's line, and
+// with a tick and a remove beside them "Remote Controller" became
+// "Remote Controll…" — the one word on the card that must not be cut.
 function ConceptHeader({
   conceptLabel,
   productName,
   ts,
-  lead,
-  trail,
+  choices,
 }: {
   conceptLabel: string;
   productName?: string;
   ts?: number;
-  /** The build tick, before the name. */
-  lead?: React.ReactNode;
-  /** The remove control, after the time. */
-  trail?: React.ReactNode;
+  /** In build · Remove, on the right of the title. */
+  choices?: React.ReactNode;
 }) {
   // Re-read on the minute clock, so "just now" does not stay "just now".
   const now = useMinuteClock();
   const time = ts ? formatRelative(ts, now) : "";
   return (
-    <header className="flex items-center justify-between gap-[12px]">
-      <div className="flex min-w-0 items-baseline gap-[8px]">
-        {lead && <span className="self-center">{lead}</span>}
-        {productName && (
-          <h3 className="truncate text-md font-semibold text-text-primary">
-            {productName}
-          </h3>
-        )}
-        <span className="shrink-0 text-sm text-text-tertiary">
-          Concept {conceptLabel}
-        </span>
+    <header className="flex items-start justify-between gap-[12px]">
+      <div className="flex min-w-0 flex-col gap-[2px]">
+        <h3 className="truncate text-md font-semibold text-text-primary">
+          {productName ?? `Concept ${conceptLabel}`}
+        </h3>
+        <p className="truncate text-sm text-text-tertiary">
+          {productName ? `Concept ${conceptLabel}` : null}
+          {productName && time ? " · " : null}
+          {time}
+        </p>
       </div>
-      {(time || trail) && (
-        <span className="flex shrink-0 items-center gap-[4px]">
-          {time && <span className="text-sm text-text-tertiary">{time}</span>}
-          {trail}
-        </span>
-      )}
+      {choices}
     </header>
   );
 }
@@ -441,12 +447,15 @@ function PendingImageTurn({
   conceptLabel,
   productName,
   since,
+  header,
 }: {
   conceptLabel: string;
   parentConceptLabel?: string;
   productName?: string;
   kind: "fresh" | "refine";
   since: number;
+  /** The card's title line, pinned to the top of the tile. */
+  header?: React.ReactNode;
 }) {
   // The real elapsed time, and what a render usually takes — not a
   // percentage the generator never reported.
@@ -469,6 +478,7 @@ function PendingImageTurn({
           backgroundSize: "8px 8px",
         }}
       />
+      {header && <div className="absolute inset-x-0 top-0 p-[16px]">{header}</div>}
       <span
         data-testid="turn-progress"
         className="relative inline-flex items-center gap-[8px] rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
@@ -513,17 +523,17 @@ function FailedImageTurn({
   reason,
   onRetry,
   disabled,
+  header,
 }: {
   reason?: ConceptFailReason;
   onRetry: () => void;
   /** A retry is a fresh render, so it costs one like any other. */
   disabled?: boolean;
+  /** The card's title line, as on a finished card. */
+  header?: React.ReactNode;
 }) {
-  return (
-    <div
-      role="alert"
-      className="flex w-full max-w-[640px] gap-[12px] rounded-2xl border border-border bg-bg-surface p-[20px]"
-    >
+  const body = (
+    <div role="alert" className="flex gap-[12px]">
       <span className="mt-[2px] inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-bg-error-subtle text-[var(--color-icon-error)]">
         <Icon icon={Alert02Icon} size={16} />
       </span>
@@ -549,6 +559,12 @@ function FailedImageTurn({
           Try again
         </button>
       </div>
+    </div>
+  );
+  return (
+    <div className="flex w-full max-w-[640px] flex-col gap-[16px] rounded-2xl border border-border bg-bg-surface p-[16px]">
+      {header}
+      <div className={header ? "px-[4px] pb-[4px]" : "p-[4px]"}>{body}</div>
     </div>
   );
 }
