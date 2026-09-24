@@ -34,6 +34,7 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { bomFor } from "@/lib/create/build-artifacts";
+import { NetworkSection } from "@/components/network/network-section";
 import {
   FLOW_STEPS,
   STEP_LABELS,
@@ -166,6 +167,8 @@ export function ProjectDetails({ id }: { id: string }) {
               />
             )}
           </section>
+
+          <NetworkSection project={project} build={build} />
 
           {/* Editor progress */}
           <section aria-labelledby="progress-heading" className="mt-[32px]">

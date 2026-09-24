@@ -176,6 +176,43 @@ export function planMap(intent: Intent, products: NetProduct[]) {
   return { nodes, links, masterId: pickMaster(products.map((p) => p.id), links) };
 }
 
+/** Re-seats the boxes around the links a map really has. The column layout
+ *  assumes the broker is the hub; an AI answer often routes products
+ *  through one of their own (a gateway), and arrows between boxes stacked
+ *  in one column run over the boxes. So the product most linked to other
+ *  products moves to the middle column, the broker and the app step right,
+ *  and every arrow is re-sided to face its new ends. */
+export function arrangeFor(
+  intent: Intent,
+  products: NetProduct[],
+  links: MapLink[],
+): { nodes: MapNode[]; links: MapLink[] } {
+  const ids = new Set(products.map((p) => p.id));
+  const peers = (id: string) =>
+    links.filter((l) => (l.from === id && ids.has(l.to)) || (l.to === id && ids.has(l.from))).length;
+  const hub = [...products].sort((a, b) => peers(b.id) - peers(a.id))[0];
+  let nodes = layoutNodes(intent, products);
+  if (hub && peers(hub.id) >= 2) {
+    const others = products.filter((p) => p.id !== hub.id);
+    const mid = ((Math.max(others.length, 1) - 1) * ROW) / 2;
+    nodes = [
+      ...others.map((p, i) => ({ id: p.id, kind: "product" as const, x: 0, y: i * ROW })),
+      { id: hub.id, kind: "product", x: COL, y: mid },
+      ...(needsBroker(intent) ? [{ id: "broker", kind: "broker" as const, x: COL * 2, y: mid }] : []),
+      ...(needsApp(intent) ? [{ id: "app", kind: "app" as const, x: COL * 3, y: mid }] : []),
+    ];
+  }
+  const box = (id: string) => nodes.find((n) => n.id === id);
+  return {
+    nodes,
+    links: links.map((l) => {
+      const a = box(l.from);
+      const b = box(l.to);
+      return a && b ? { ...l, ...facingSides(boxOf(a), boxOf(b)) } : l;
+    }),
+  };
+}
+
 /** Keeps a map in step with Setup: a product taken out loses its box and
  *  every arrow that touched it, a product added gets a box below the others,
  *  and the broker and app come and go with the goal. */

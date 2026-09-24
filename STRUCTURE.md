@@ -31,6 +31,7 @@ ideeza-creator-panel/
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/[id]/           "/projects" — My projects + details
+   │  │   │   └─ network/             "/projects/<id>/network" — the Connection Map
    │  │   ├─ history/                 "/history"  — past generations
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
@@ -50,6 +51,11 @@ ideeza-creator-panel/
    │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
    │  ├─ projects/           my-projects, project-details
+   │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
+   │  │                      map-editor (the connection canvas), link-panel, product-form,
+   │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,
+   │  │                      all-parameters), network-section (project page),
+   │  │                      network-action (review card), connection-map-page, summary, ui
    │  ├─ manual/             manual project creation + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
    │  ├─ video-jobs/         background render/video jobs + indicator
@@ -75,6 +81,9 @@ ideeza-creator-panel/
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)
+   │  ├─ network/            types, catalog (the Figma tables), derive (roles, auto-fill,
+   │  │                      diff, master change, blockers), planner (rule map, layout,
+   │  │                      AI-answer validation), geometry, products, store
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),

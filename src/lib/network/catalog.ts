@@ -19,11 +19,6 @@ import type {
   Topology,
 } from "./types";
 
-/** How a protocol's key is tinted in the dropdown — a semantic text token,
- *  never a raw colour. The key itself carries the meaning; the tint only
- *  groups families. */
-export type KeyTone = "brand" | "ai" | "success" | "warning" | "error" | "muted";
-
 export type ProtocolInfo = {
   key: ProtocolKey;
   name: string;
@@ -32,7 +27,6 @@ export type ProtocolInfo = {
   frequencyNote: string;
   cloudBlock: string;
   useCase: string;
-  tone: KeyTone;
   /** Figma: "hide for I2C, SPI, CAN and RS-232 — no repeater concept there". */
   repeater: boolean;
   /** How it reads on a product's chip ("ESP32-S3 · Wi-Fi"); null for
@@ -42,18 +36,18 @@ export type ProtocolInfo = {
 
 // Figma 44533:123345 — Protocols.
 export const PROTOCOLS: ProtocolInfo[] = [
-  { key: "WF", name: "Wi-Fi (direct)", frequencies: ["2.4", "5"], frequencyNote: "2.4 GHz or 5 GHz", cloudBlock: "Optional", useCase: "Local control, no cloud round-trip", tone: "brand", repeater: true, radioLabel: "Wi-Fi" },
-  { key: "WM", name: "Wi-Fi + MQTT", frequencies: ["2.4", "5"], frequencyNote: "2.4 GHz or 5 GHz", cloudBlock: "Required", useCase: "APK-controlled products via MQTT", tone: "brand", repeater: true, radioLabel: null },
-  { key: "BL", name: "BLE", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Optional (via GW)", useCase: "Battery sensors, mobile-direct pairing", tone: "ai", repeater: true, radioLabel: "BLE" },
-  { key: "EN", name: "ESP-NOW", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Blank (offline)", useCase: "ESP32 mesh, 1 ms latency, no router", tone: "success", repeater: true, radioLabel: null },
-  { key: "ZB", name: "Zigbee / Thread", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Via coordinator", useCase: "Large mesh, low power, self-healing", tone: "warning", repeater: true, radioLabel: "Zigbee" },
-  { key: "LR", name: "LoRa / LoRaWAN", frequencies: ["868", "915", "433"], frequencyNote: "Sub-GHz 868 / 915 MHz", cloudBlock: "Via GW", useCase: "2–15 km outdoor fleet", tone: "warning", repeater: true, radioLabel: "LoRa" },
-  { key: "MT", name: "Matter / Thread", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Optional", useCase: "Smart home, cloudless, IP-based", tone: "success", repeater: true, radioLabel: "Matter" },
-  { key: "CN", name: "CAN Bus", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Industrial, automotive, 40 m bus", tone: "error", repeater: false, radioLabel: "CAN" },
-  { key: "R5", name: "RS-485", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Building automation, 1.2 km, 32 nodes", tone: "warning", repeater: true, radioLabel: "RS-485" },
-  { key: "R2", name: "RS-232", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Point-to-point legacy serial, under 15 m", tone: "warning", repeater: false, radioLabel: "RS-232" },
-  { key: "I2", name: "I2C", frequencies: ["na"], frequencyNote: "N/A (on-board)", cloudBlock: "N/A", useCase: "Chip-to-chip, same PCB, multi-drop", tone: "muted", repeater: false, radioLabel: null },
-  { key: "SP", name: "SPI", frequencies: ["na"], frequencyNote: "N/A (on-board)", cloudBlock: "N/A", useCase: "Chip-to-chip, same PCB, high speed", tone: "muted", repeater: false, radioLabel: null },
+  { key: "WF", name: "Wi-Fi (direct)", frequencies: ["2.4", "5"], frequencyNote: "2.4 GHz or 5 GHz", cloudBlock: "Optional", useCase: "Local control, no cloud round-trip", repeater: true, radioLabel: "Wi-Fi" },
+  { key: "WM", name: "Wi-Fi + MQTT", frequencies: ["2.4", "5"], frequencyNote: "2.4 GHz or 5 GHz", cloudBlock: "Required", useCase: "APK-controlled products via MQTT", repeater: true, radioLabel: null },
+  { key: "BL", name: "BLE", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Optional (via GW)", useCase: "Battery sensors, mobile-direct pairing", repeater: true, radioLabel: "BLE" },
+  { key: "EN", name: "ESP-NOW", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Blank (offline)", useCase: "ESP32 mesh, 1 ms latency, no router", repeater: true, radioLabel: null },
+  { key: "ZB", name: "Zigbee / Thread", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Via coordinator", useCase: "Large mesh, low power, self-healing", repeater: true, radioLabel: "Zigbee" },
+  { key: "LR", name: "LoRa / LoRaWAN", frequencies: ["868", "915", "433"], frequencyNote: "Sub-GHz 868 / 915 MHz", cloudBlock: "Via GW", useCase: "2–15 km outdoor fleet", repeater: true, radioLabel: "LoRa" },
+  { key: "MT", name: "Matter / Thread", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Optional", useCase: "Smart home, cloudless, IP-based", repeater: true, radioLabel: "Matter" },
+  { key: "CN", name: "CAN Bus", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Industrial, automotive, 40 m bus", repeater: false, radioLabel: "CAN" },
+  { key: "R5", name: "RS-485", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Building automation, 1.2 km, 32 nodes", repeater: true, radioLabel: "RS-485" },
+  { key: "R2", name: "RS-232", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Point-to-point legacy serial, under 15 m", repeater: false, radioLabel: "RS-232" },
+  { key: "I2", name: "I2C", frequencies: ["na"], frequencyNote: "N/A (on-board)", cloudBlock: "N/A", useCase: "Chip-to-chip, same PCB, multi-drop", repeater: false, radioLabel: null },
+  { key: "SP", name: "SPI", frequencies: ["na"], frequencyNote: "N/A (on-board)", cloudBlock: "N/A", useCase: "Chip-to-chip, same PCB, high speed", repeater: false, radioLabel: null },
 ];
 
 export const PROTOCOL_KEYS = PROTOCOLS.map((p) => p.key);

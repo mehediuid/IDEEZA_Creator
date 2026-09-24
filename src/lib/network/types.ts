@@ -168,4 +168,6 @@ export type NetProduct = {
   acts: boolean;
   /** What its actuator does, for a command arrow's label ("on / off"). */
   actLabel: string;
+  /** The parts themselves, for the AI's prompt. */
+  parts: { name: string; category: string }[];
 };

@@ -132,6 +132,7 @@ export function productFromParts(input: {
     senses: parts.some((p) => p.category === "Sensor"),
     acts: parts.some((p) => p.category === "Actuator" || p.category === "Display & I/O"),
     actLabel: detectActLabel(parts),
+    parts: parts.map((x) => ({ name: x.name, category: x.category })),
   };
 }
 
@@ -262,10 +263,6 @@ export const TOPOLOGY_OF_MIDDLE: Record<Middle, Topology> = {
 export function cloudTypeOfMiddle(middle: Middle, networkCloud: CloudType): CloudType {
   if (middle === "direct") return "none";
   return networkCloud === "none" ? "mqtt" : networkCloud;
-}
-
-export function carriesSensor(c: Carries): boolean {
-  return c === "sensor" || c === "data+commands";
 }
 
 /** The arrow's words when nobody wrote them: the sender's sensor, or what
@@ -505,9 +502,12 @@ export function masterChange(
 
 // ───────────────────────── what stops Create ─────────────────────────
 
+/** Figma: Sensor is "required when Q3 says sensor data" — the answer
+ *  "Sensor data" itself. A bulb's two-way "Data + commands" link reports its
+ *  own state, which is not a sensor reading. */
 export function sendsSensorData(productId: string, links: MapLink[], isProduct: (id: string) => boolean): boolean {
   return links.some(
-    (l) => touches(l, productId) && carriesSensor(l.carries) && dataSender(l, isProduct) === productId,
+    (l) => touches(l, productId) && l.carries === "sensor" && dataSender(l, isProduct) === productId,
   );
 }
 

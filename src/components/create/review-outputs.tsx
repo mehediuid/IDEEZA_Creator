@@ -20,7 +20,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight02Icon,
   CheckmarkCircle02Icon,
-  ConnectIcon,
   FloppyDiskIcon,
   HelpCircleIcon,
   MobileProgramming01Icon,
@@ -43,6 +42,7 @@ import { stepHref, useManualProjects } from "@/lib/manual/projects";
 import type { ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge } from "./confidence-badge";
+import { NetworkAction } from "@/components/network/network-action";
 import {
   FirmwarePreview,
   PartsPreview,
@@ -251,11 +251,12 @@ function ReviewPanel({
         </div>
 
         {/* What this project could become next. A tier below the footer's
-            Save Project, so quiet; neither has an engine behind it yet, so
-            each says so on the control itself, where a pointer, a keyboard
-            and a touch screen all reach it. */}
+            Save Project, so quiet. Add Network is live once the build is a
+            project; Create Mobile App has no engine behind it yet and says
+            so on the control, where a pointer, a keyboard and a touch
+            screen all reach it. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <HeaderAction icon={ConnectIcon} label="Add Network" />
+          <NetworkAction project={saved} build={job} />
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>
