@@ -58,7 +58,7 @@ function PromptHelpDialog({
   const runRef = React.useRef(0);
 
   // Focus starts in the idea box and goes back to whatever opened the modal
-  // — the "Need to prompt help?" link — when it closes.
+  // — the "Help me write it" link — when it closes.
   React.useEffect(() => {
     const opener =
       document.activeElement instanceof HTMLElement

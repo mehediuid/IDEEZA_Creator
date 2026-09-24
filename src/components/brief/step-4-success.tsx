@@ -7,7 +7,8 @@
 // the render is still in flight, this screen shows "Mint complete · pending"
 // with progress; once the render flips to done (potentially while the user is
 // here OR on another page via the global indicator), the screen morphs into
-// "Listing is live".
+// its finished heading ("Listing is minted" for a sale: the marketplace is not
+// open yet, so nothing claims buyers can see it).
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
@@ -19,7 +20,7 @@ import {
 } from "@/components/video-jobs/video-jobs-provider";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
-  sell: "Listing is live",
+  sell: "Listing is minted",
   give: "Drop is live",
   save: "Saved",
 };
@@ -36,8 +37,8 @@ function liveSubline(intent: Intent, hasClip: boolean, share: boolean): string {
   const base =
     intent === "sell"
       ? hasClip
-        ? "Your video is final and your listing is on the marketplace. Buyers can see it now."
-        : "Your listing is on the marketplace. Buyers can see it now."
+        ? "Your video is final and your listing is minted. It goes on sale when the marketplace opens."
+        : "Your listing is minted. It goes on sale when the marketplace opens."
       : intent === "give"
         ? hasClip
           ? "Your video is final and the drop is open. Your community can claim it."
@@ -50,7 +51,7 @@ function liveSubline(intent: Intent, hasClip: boolean, share: boolean): string {
 function pendingSubline(intent: Intent, share: boolean): string {
   const base =
     intent === "sell"
-      ? "We’ll publish your listing the moment the video finishes — no extra action needed."
+      ? "Your listing is minted. It goes on sale, with the video, when the marketplace opens."
       : intent === "give"
         ? "We’ll open the drop the moment the video finishes — no extra action needed."
         : "Stored in your library. Pick it up any time.";
@@ -70,7 +71,7 @@ function pendingSubline(intent: Intent, share: boolean): string {
  */
 function pendingCardLine(intent: Intent, share: boolean, quality: string): string {
   const clip = `your ${quality} 10s video`;
-  if (intent === "sell") return `Your listing goes live as soon as ${clip} finishes.`;
+  if (intent === "sell") return `Your listing is minted — its video lands as soon as ${clip} finishes.`;
   if (intent === "give") return `The drop opens as soon as ${clip} finishes.`;
   return share
     ? `Your Innovations post goes up as soon as ${clip} finishes.`

@@ -26,13 +26,10 @@ import {
   FlashIcon,
   InformationCircleIcon,
   Refresh01Icon,
-  ShieldKeyIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
-import { Checkbox } from "@/components/ideeza";
-import { writeGateDismissed } from "@/lib/create/gate-preference";
-import { BUILD_COST, useCredits } from "@/lib/create/credits";
+import { buildCost, useCredits } from "@/lib/create/credits";
 import { BUILD_ESTIMATE_MIN } from "@/lib/create/history";
 import {
   describeFallback,
@@ -118,9 +115,6 @@ export function ConfirmBuildDialog({
   submitting: boolean;
 }) {
   const { hydrated: creditsHydrated, balance } = useCredits();
-  // Unticked on every open: the stored preference already hides the whole
-  // dialog, so a user seeing this is a user who has not dismissed it.
-  const [dismiss, setDismiss] = React.useState(false);
   const [resolved, setResolved] = React.useState<{
     turnId: string;
     concept: ConceptSummary;
@@ -159,7 +153,7 @@ export function ConfirmBuildDialog({
 
   if (!open) return null;
 
-  const cost = BUILD_COST * Math.max(1, products);
+  const cost = buildCost(products);
   // The rendered balance rather than canAfford(): the credits provider
   // refreshes that ref in its own effect, which runs after ours, so it
   // reads a render behind here (chat-thread.tsx reads it the same way).
@@ -198,9 +192,7 @@ export function ConfirmBuildDialog({
             id="confirm-build-title"
             className="text-lg font-semibold text-text-primary"
           >
-            {products > 1
-              ? `Engineer ${products} products?`
-              : "Engineer this product?"}
+            {products > 1 ? `Build ${products} products?` : "Build this product?"}
           </h2>
           <p className="text-sm leading-relaxed text-text-secondary">
             {concept.title}
@@ -226,24 +218,20 @@ export function ConfirmBuildDialog({
         </div>
 
         <div className="flex flex-wrap gap-[8px]">
+          {/* The balance on both sides of the spend, so the maker sees what
+              they have and what they will have — not only the price. */}
           <Chip icon={Coins01Icon}>
             {cost} credits
-            {shortOnCredits ? ` · you have ${balance}` : ""}
+            {creditsHydrated
+              ? shortOnCredits
+                ? ` · you have ${balance}`
+                : ` · ${balance} → ${balance - cost} after`
+              : ""}
           </Chip>
           <Chip icon={InformationCircleIcon}>{TIME_CHIP}</Chip>
-          <Chip icon={ShieldKeyIcon}>No wallet or KYC yet</Chip>
         </div>
 
         <div className="flex items-center gap-[12px] border-t border-solid border-border pt-[16px]">
-          <label className="flex cursor-pointer select-none items-center gap-[8px] text-sm text-text-tertiary">
-            <Checkbox
-              checked={dismiss}
-              onChange={() => setDismiss((v) => !v)}
-              size="sm"
-              aria-label="Don't show this again"
-            />
-            Don&apos;t show this again
-          </label>
           <button
             type="button"
             onClick={onCancel}
@@ -270,10 +258,7 @@ export function ConfirmBuildDialog({
                   ? "Booking the build…"
                   : undefined
             }
-            onClick={() => {
-              if (dismiss) writeGateDismissed(true);
-              onConfirm(concept);
-            }}
+            onClick={() => onConfirm(concept)}
             className={
               shortOnCredits
                 ? "inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
@@ -288,7 +273,7 @@ export function ConfirmBuildDialog({
             >
               <Icon icon={submitting ? Refresh01Icon : FlashIcon} size={16} />
             </span>
-            {submitting ? "Starting the build…" : "Generate"}
+            {submitting ? "Starting…" : "Build"}
           </button>
         </div>
       </div>

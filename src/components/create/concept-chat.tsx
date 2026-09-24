@@ -1,26 +1,19 @@
 "use client";
 
-// ConceptChat — Phase 1 orchestrator. Owns the per-page UI state:
-//   • prompt bar submissions    → /api/concept/generate + new turn
-//   • per-image Regenerate       → /api/concept/generate + new turn
-//                                  using the source prompt (never
-//                                  overwrites the older turn)
-//   • per-image "Use this"       → opens ConfirmBuildDialog with that
-//                                  specific image+prompt
-//   • ConfirmBuildDialog confirm → /api/build/start + record job in
-//                                  the Project create history + route
-//                                  to /build/[jobId] — unless the job
-//                                  queues behind another build, in which
-//                                  case we stay in the chat and show a
-//                                  queued notice instead
+// ConceptChat — the create flow's orchestrator. Owns the per-page UI state:
+//   • the setup question          → the renders it asks for, one per product
+//   • composer submissions        → a refine of the product in focus, or a new
+//                                   product when the maker asks for one
+//   • per-card Refine / Regenerate → a new turn (never overwrites the older one)
+//   • the canvas's one build action → the gate, then a booked build
+//   • the build                   → stays here: it leads the canvas and its
+//                                   pipeline and whole-build states join the rail
 
 import * as React from "react";
 import Link from "next/link";
-import { Cancel01Icon, Clock01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import {
   deriveTitle,
-  queuedAhead,
+  statusOf,
   useCreateHistory,
   type BuildJob,
   type BuildProduct,
@@ -34,6 +27,8 @@ import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import { ChatRail } from "./chat-rail";
 import { BuildRail } from "./build-rail";
+import { BuildStatus } from "./build-status";
+import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
 import { PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
@@ -42,7 +37,6 @@ import {
   parseProductRequest,
   type Companion,
 } from "@/lib/create/companions";
-import { readGateDismissed } from "@/lib/create/gate-preference";
 
 import { ImageEditorModal } from "./image-editor-modal";
 
@@ -90,7 +84,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     hydrated,
     builds,
     getChat,
-    getBuild,
     appendUserTurn,
     appendAssistantTurn,
     resolveAssistantTurn,
@@ -128,10 +121,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     prompt: string;
   } | null>(null);
   const [submittingBuild, setSubmittingBuild] = React.useState(false);
-  // Set when a confirmed build went into the queue behind another one —
-  // the notice above the prompt bar is the only place that says so at
-  // the moment it happens (the concept's own row carries it afterwards).
-  const [queuedNotice, setQueuedNotice] = React.useState<string | null>(null);
   // Full-screen image editor: editorTurnId is the concept currently shown in
   // the lightbox (null = closed). Submitting an edit closes the editor; the
   // refine then continues in the thread (pending → ready), where the user can
@@ -151,11 +140,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const [preparingTurnId, setPreparingTurnId] = React.useState<string | null>(
     null,
   );
-  // The notice names one specific build — once it leaves the queue
-  // (started, finished, or failed), there's nothing left for it to
-  // point at. Derived from live build state each render (via `builds`,
-  // read fresh by `getBuild`) rather than mirrored into its own effect,
-  // so it can't go stale on screen or trigger a cascading re-render.
   // The build this chat started, if it has one. Derived rather than held
   // in state, so a reload lands back on the build instead of an empty
   // canvas — the job record already knows which chat it came from.
@@ -169,8 +153,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     return latest;
   }, [builds, chat]);
 
-  const queuedNoticeJob = queuedNotice ? getBuild(queuedNotice) : null;
-  const showQueuedNotice = queuedNoticeJob?.status === "queued";
+  // The build's 3D enclosure is generated where the build is reviewed, which
+  // is here.
+  useBuildModel(activeBuild);
 
   // Which concept each Regenerate came from: child turn id → source turn
   // id. The source card's Regenerate reads pressed while its child is
@@ -522,6 +507,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     return last ?? fallback;
   }, [chat, focusedProduct]);
 
+  // The setup question is still open. Typing then used to skip it: the text
+  // started a paid render of its own beside the unanswered question.
+  const setupPending = React.useMemo(
+    () =>
+      !!chat?.turns.some((t) => t.role === "setup" && t.status !== "answered"),
+    [chat],
+  );
+
   /** What the composer will refine, by name, for the line under it. */
   const focusedName = React.useMemo(() => {
     const setup = chat?.turns.find((t) => t.role === "setup");
@@ -552,7 +545,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   const handleUserSubmit = React.useCallback(
     (text: string) => {
-      if (!chat || !canAfford(CONCEPT_COST)) return;
+      if (!chat || !canAfford(CONCEPT_COST) || setupPending) return;
       appendUserTurn(chat.id, text);
 
       // Two different things get typed into this box, and treating them the
@@ -605,6 +598,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [
       chat,
       canAfford,
+      setupPending,
       latestReadyTurn,
       appendUserTurn,
       appendAssistantTurn,
@@ -731,13 +725,21 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         );
         const decidedProject =
           answered && answered.role === "setup" ? answered.answer : undefined;
-        const job = startBuild({
+        // One name for the product from the question onwards: the name the
+        // setup question gave it is what the rail, the cards and the composer
+        // already call it, so the build carries that rather than a second
+        // reading of the same concept.
+        const namedAt =
+          answered && answered.role === "setup"
+            ? answered.productName?.trim()
+            : undefined;
+        startBuild({
           chatId: chat.id,
           turnId: source.turnId,
           imageUrl: source.imageUrl,
           prompt: source.prompt,
           conceptNumber: labels.get(source.turnId) ?? "1",
-          title: concept.title || deriveTitle(source.prompt),
+          title: namedAt || concept.title || deriveTitle(source.prompt),
           summary: concept.summary,
           description: concept.description,
           projectChoiceId: decidedProject?.projectId,
@@ -745,21 +747,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           parts: concept.parts,
           companions,
         });
-        // A queued build isn't building yet, so we stay in the chat and
-        // say so beside the concept that started it — the build page
-        // would only show a waiting room. Any earlier notice is for a
-        // build this new confirm has nothing to do with, so it's
-        // replaced (or cleared, if this one didn't queue) rather than
-        // left pointing at a stale job.
         // The build does NOT leave the chat. It used to push /build/<id>,
         // a separate full-screen page with a Back link, which threw away
         // the conversation, the rail and the composer at the exact moment
         // the work got interesting. The job is derived from this chat, so
-        // it simply takes over the canvas: the pipeline joins the rail and
-        // each piece appears as it lands, with the composer still there.
-        // A queued job is the same surface — every row reads Waiting —
-        // plus a line saying what it is waiting for.
-        setQueuedNotice(job.status === "queued" ? job.id : null);
+        // it simply takes over the canvas, and a queued job says what it is
+        // waiting for in the rail, where its Cancel is.
       } finally {
         setSubmittingBuild(false);
         setConfirmFor(null);
@@ -768,40 +761,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [chat, labels, startBuild],
   );
 
-  // The step after the companion screen, and the whole of it on the
-  // ordinary single-product path: the gate, or the build straight away
-  // when the gate has been dismissed (§4.5).
-  // Awaitable, because on the dismissed path this IS the build: the caller
-  // has to keep its control busy until the job exists, not until this
-  // returns. The dialog path resolves immediately — opening it is the whole
-  // of the work.
+  // The last step before money moves is always the gate. It used to offer
+  // "Don't show this again", which removed the only confirmation of a spend
+  // for good — nothing anywhere could bring it back.
   const goToGate = React.useCallback(
-    async (
-      source: { turnId: string; imageUrl: string; prompt: string },
-      // The products this build covers, settled at the question. Passed in
-      // rather than read from state: the caller decides them in the same
-      // tick it calls here, and state has not re-rendered yet.
-      decided: Companion[] = [],
-    ) => {
-      if (readGateDismissed()) {
-        setSubmittingBuild(true);
-        try {
-          const [concept, companions] = await Promise.all([
-            summarizeConcept(source.turnId, source.prompt),
-            // It used to pass none at all, so dismissing the gate once
-            // turned every later multi-product project into a
-            // single-product build — quietly, at the price of all of them.
-            companionProductsFor(decided),
-          ]);
-          await startBuildFor(source, concept, companions);
-        } finally {
-          setSubmittingBuild(false);
-        }
-        return;
-      }
+    (source: { turnId: string; imageUrl: string; prompt: string }) => {
       setConfirmFor(source);
     },
-    [companionProductsFor, startBuildFor],
+    [],
   );
 
   // Part 4 §4.4.2 — accepting a concept branches here: the flow asks
@@ -842,16 +809,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // before paying is a real decision — just not the same one.
       setPickedCompanions(new Set(decided.map((c) => c.id)));
 
-      // Busy until the gate is open, or — when the gate has been dismissed
-      // — until the build really exists. It used to clear the moment the
-      // concept came back and then start the rest of the work, so the
-      // button returned to its idle brand fill while a second round-trip
-      // and the build POST were still running; pressing it again in that
-      // window booked a second job for the same concept.
+      // Busy until the gate is open: the concept is read back first, so the
+      // gate opens on the real title and parts rather than a stand-in.
       setPreparingTurnId(t.id);
       void summarizeConcept(t.id, t.prompt)
         .catch(() => null)
-        .then(() => goToGate(source, decided))
+        .then(() => goToGate(source))
         .finally(() => setPreparingTurnId(null));
     },
     [chat, goToGate],
@@ -970,40 +933,39 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                 activeProductId={focusedProduct}
                 onPickProduct={setFocusedProduct}
               />
+              {/* The whole-build states — queued with its Cancel, waiting on
+                  credits, a partial or system failure with its retry, the
+                  overrun stop — which used to exist only on a page the chat
+                  no longer sends anyone to. */}
+              {statusOf(activeBuild) !== "ready" && (
+                <div className="px-[14px] pb-[16px]">
+                  <BuildStatus job={activeBuild} statesOnly inChat />
+                </div>
+              )}
             </div>
           )}
         </div>
         <div className="border-t border-solid border-border">
           <div className="w-full px-[14px] py-[14px]">
-          {showQueuedNotice && (
-            <div
-              role="status"
-              data-testid="queued-notice"
-              className="mb-[12px] flex items-center gap-[10px] rounded-xl border border-solid border-border bg-bg-subtle px-[14px] py-[10px] text-sm text-text-secondary"
-            >
-              <Icon icon={Clock01Icon} size={16} />
-              <span className="flex-1">
-                {queuedNoticeText(queuedNoticeJob, builds)}
-              </span>
-              <button
-                type="button"
-                onClick={() => setQueuedNotice(null)}
-                aria-label="Dismiss"
-                className="inline-flex h-[24px] w-[24px] items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={Cancel01Icon} size={14} />
-              </button>
-            </div>
-          )}
-          {/* Never disabled while a concept renders — describing the next
-              change shouldn't wait on the current one. */}
-          <PromptBar onSubmit={handleUserSubmit} canRender={canRender} />
+          <PromptBar
+            onSubmit={handleUserSubmit}
+            canRender={canRender}
+            blockedReason={setupPending ? "Answer the question first" : undefined}
+            enhanceMode={latestReadyTurn ? "change" : "brief"}
+            placeholder={
+              focusedName && latestReadyTurn
+                ? `Describe a change to ${focusedName}…`
+                : undefined
+            }
+          />
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
-            {canRender
-              ? focusedName
-                ? `What you type refines ${focusedName} — or ask for another product, like “add a charger”.`
-                : `Start by describing the concept. Each render costs ${CONCEPT_COST} credit${CONCEPT_COST === 1 ? "" : "s"} — refine and regenerate as often as you like.`
-              : "You are out of credits — top them up to render another concept."}
+            {!canRender
+              ? "You are out of credits — top them up to draw another concept."
+              : setupPending
+                ? "Answer the question on the canvas first — nothing is drawn or charged until you do."
+                : focusedName && latestReadyTurn
+                  ? `Refines ${focusedName} · ${CONCEPT_COST} credit. Name another product to add it.`
+                  : `Each drawing costs ${CONCEPT_COST} credit.`}
           </p>
           </div>
         </div>
@@ -1025,7 +987,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             projects={setupProjects}
             onAnswerSetup={handleAnswerSetup}
             onRegenerateAt={handleRegenerate}
-            onUseTurn={handleUseTurn}
+            onBuild={handleUseTurn}
             onRefineTurn={handleOpenEditor}
             onAddProduct={handleAddProduct}
             job={activeBuild}
@@ -1061,18 +1023,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 }
 
-// What the notice under the prompt bar says about a build that didn't
-// start. A build parked on credits isn't waiting its turn — it is
-// waiting on the user — so it reads the way the concept card's own
-// status line reads; everything else names the real queue depth
-// instead of assuming one build is ahead.
-function queuedNoticeText(job: BuildJob, builds: BuildJob[]): string {
-  if (job.blocked === "credits") return "Paused — top up credits to start";
-  const ahead = queuedAhead(job, builds);
-  if (ahead === 0) return "Queued — starts when the current build finishes";
-  return `Queued — ${ahead} build${ahead === 1 ? "" : "s"} ahead of you`;
-}
-
 function LoadingShell() {
   return (
     <div className="flex h-full items-center justify-center text-md text-text-tertiary">
@@ -1096,7 +1046,7 @@ function NotFoundShell() {
       </p>
       <Link
         href="/"
-        className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-violet-600 px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         Back to Home
       </Link>

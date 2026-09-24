@@ -1,26 +1,28 @@
 "use client";
 
-// ChatThread — renders every turn in the concept conversation. User
-// prompts are right-aligned text bubbles; assistant turns are
-// left-aligned ImageTurn cards.
+// ChatThread — the chat's canvas. The setup question while it is still a
+// question; then one card per product (its current concept) and the one build
+// action for all of them; once a build exists, the build leads and the
+// concepts stay beneath it, so a change made after the build is visible and
+// can be built again.
 //
-// Spec §4a / §10: regenerations APPEND new turns and never overwrite
-// older ones. The thread is the in-session history; the user scrolls
-// back to compare or reuse any prior result.
+// Spec §4a / §10: regenerations APPEND new turns and never overwrite older
+// ones — the rail keeps that history; the canvas shows the current state.
 //
-// Spec §4c: each image turn is labelled "Concept N" so users can locate
-// a specific version. Refinements are numbered off their parent
-// ("Concept 1.1"), so the dotted label alone carries the evolution
-// chain while scrolling.
+// Spec §4c: each concept carries a lineage number ("1.1" is the first refine
+// of concept 1) beside the product's name.
 
 import * as React from "react";
-import type {
-  BuildJob,
-  ChatSession,
-  ChatTurn,
-  SetupAnswer,
+import { Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import {
+  productsOf,
+  type BuildJob,
+  type ChatSession,
+  type ChatTurn,
+  type SetupAnswer,
 } from "@/lib/create/history";
-import { BUILD_COST, useCredits } from "@/lib/create/credits";
+import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
 import { ReviewOutputs } from "./review-outputs";
@@ -57,7 +59,7 @@ export function ChatThread({
   projects,
   onAnswerSetup,
   onRegenerateAt,
-  onUseTurn,
+  onBuild,
   onRefineTurn,
   onAddProduct,
   job,
@@ -70,15 +72,16 @@ export function ChatThread({
   // Turns whose Regenerate is still rendering its fresh take — the
   // orchestrator owns the child→source link, the card only reads it.
   regeneratingFrom?: ReadonlySet<string>;
-  /** The turn whose "Use this concept" is waiting on the two model calls
-   *  that have to answer before the gate can open. */
+  /** The turn whose build is waiting on the model calls that have to answer
+   *  before the gate can open. */
   preparingTurnId?: string | null;
   onRegenerateAt: (sourcePrompt: string, sourceTurnId: string) => void;
-  onUseTurn: (turnId: string) => void;
+  /** Build what is on the canvas, starting from the primary's concept. */
+  onBuild: (turnId: string) => void;
   onRefineTurn: (turnId: string) => void;
   /** Take up a product the maker passed over at the question. */
   onAddProduct: (companionId: string) => void;
-  /** The build this chat started, once it has one. The canvas becomes the
+  /** The build this chat started, once it has one. The canvas leads with the
    *  build's own surface then — the deliverables arriving one by one —
    *  rather than sending the maker to a page of its own. */
   job?: BuildJob | null;
@@ -90,27 +93,6 @@ export function ChatThread({
   // One label per concept, so a card, its breadcrumb and the editor all
   // name the same thing.
   const labels = React.useMemo(() => conceptLabels(chat.turns), [chat.turns]);
-
-  // The credit gate is explained ONCE, under the newest concept the user
-  // could still have built — every greyed "Use this concept" above it
-  // has the same reason, and repeating the notice per card would say it
-  // down the whole conversation. It sits inside the thread (not below
-  // it) so the auto-scroll to the newest turn carries it into view.
-  // The rendered balance, not canAfford(): the provider refreshes that
-  // ref in its own effect, which runs after ours, so it reads a render
-  // behind here (build-simulator.tsx reads it the same way).
-  const { hydrated: creditsHydrated, balance } = useCredits();
-  const bannerAfterId = React.useMemo(() => {
-    if (!creditsHydrated || balance >= BUILD_COST) return null;
-    let id: string | null = null;
-    for (const t of chat.turns) {
-      if (t.role !== "assistant" || t.status !== "ready" || t.usedForBuild) {
-        continue;
-      }
-      id = t.id;
-    }
-    return id;
-  }, [chat.turns, creditsHydrated, balance]);
 
   // Auto-scroll to the newest turn so the latest result is in view.
   const endRef = React.useRef<HTMLDivElement>(null);
@@ -144,9 +126,14 @@ export function ChatThread({
   const projectName =
     setup?.role === "setup" ? (setup.answer?.projectName ?? "") : "";
 
-  // One build, one action. A card per product each carrying "Use this
-  // concept" asked for the same build once per product — and answering it
-  // twice was the same answer both times.
+  // Every card is titled with the product it is a drawing of — the name the
+  // question gave it, which is the name the rail and the composer use too.
+  const productNameOf = (t: Extract<ChatTurn, { role: "assistant" }>) => {
+    if (setup?.role !== "setup") return undefined;
+    if (!t.companionOf) return setup.productName?.trim() || undefined;
+    return setup.companions.find((c) => c.id === t.companionOf)?.name;
+  };
+
   // Offered, and not being built: no concept has been drawn for it and the
   // answer did not include it.
   const available = React.useMemo(() => {
@@ -159,19 +146,62 @@ export function ChatThread({
     return setup.companions.filter((x) => !drawn.has(x.id));
   }, [setup, chat.turns]);
 
+  // Which drawings the current build was made from. A concept changed after
+  // the build — refined, regenerated, or a product added — is not in it, and
+  // the canvas says so: that change used to be charged and then hidden
+  // behind the review card, because the canvas showed nothing else once a
+  // build existed.
+  const builtImages = React.useMemo(
+    () =>
+      new Set(
+        job ? productsOf(job).map((p) => p.conceptImageUrl).filter(Boolean) : [],
+      ),
+    [job],
+  );
+  const inBuild = (t: Extract<ChatTurn, { role: "assistant" }>) =>
+    !!t.imageUrl && builtImages.has(t.imageUrl);
+  const changedSinceBuild =
+    !!job && products.some((t) => t.status !== "ready" || !inBuild(t));
+
   const buildable = products.find(
     (t) => t.status === "ready" && !t.companionOf,
   );
   const allReady =
     products.length > 0 && products.every((t) => t.status === "ready");
+  const offerBuild = !!buildable && (!job || changedSinceBuild);
+
+  // The credit gate is explained ONCE, beside the one build action — every
+  // reason it is off is the same reason. The rendered balance, not
+  // canAfford(): the provider refreshes that ref in its own effect, which
+  // runs after ours, so it reads a render behind here.
+  const { hydrated: creditsHydrated, balance } = useCredits();
+  const cost = buildCost(products.length);
+  const shortForBuild = creditsHydrated && balance < cost;
+
+  const conceptGrid = (
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-[20px]">
+      {products.map((turn) => (
+        <ImageTurn
+          key={turn.id}
+          turn={turn}
+          conceptLabel={labels.get(turn.id) ?? "1"}
+          parentConceptLabel={
+            turn.kind === "refine" && turn.parentTurnId
+              ? labels.get(turn.parentTurnId)
+              : undefined
+          }
+          productName={productNameOf(turn)}
+          inBuild={!!job && inBuild(turn)}
+          regenerating={regeneratingFrom?.has(turn.id) ?? false}
+          onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
+          onRefine={() => onRefineTurn(turn.id)}
+        />
+      ))}
+    </div>
+  );
 
   return (
-    <div
-      role="log"
-      aria-label="Concepts"
-      aria-live="polite"
-      className="flex flex-col items-start gap-[28px]"
-    >
+    <div aria-label="Concepts" className="flex flex-col items-start gap-[28px]">
       {/* The questions, while they are still questions. Once they are
           answered the rail carries the decision, and a read-back of it at the
           top of the canvas says the same thing twice in the same eyeful. */}
@@ -188,11 +218,8 @@ export function ChatThread({
         />
       )}
 
-      {/* Once the build is running the canvas is the build: its products as
-          tabs, each deliverable as a tab under them, filling in as they
-          land. The concepts that got here are in the rail, in the order
-          they happened — the canvas shows the current state of the work,
-          which is now the output rather than the drawings of it. */}
+      {/* Once a build exists it leads the canvas: its products as tabs, each
+          deliverable as a tab under them, filling in as they land. */}
       {job && (
         <div className="w-full">
           <ReviewOutputs
@@ -204,41 +231,34 @@ export function ChatThread({
         </div>
       )}
 
-      {!job && products.length > 0 && (
+      {products.length > 0 && (
         <>
-          {projectName && (
+          {job ? (
             <header className="flex flex-col gap-[2px]">
               <h2 className="text-lg font-semibold text-text-primary">
-                {projectName}
+                Concepts
               </h2>
               <p className="text-sm text-text-tertiary">
-                {products.length} product{products.length === 1 ? "" : "s"} in
-                this project
+                {changedSinceBuild
+                  ? "Changed since this build — build again to carry the change into the deliverables."
+                  : "The drawings this build was made from. Refine one to change the next build."}
               </p>
             </header>
+          ) : (
+            projectName && (
+              <header className="flex flex-col gap-[2px]">
+                <h2 className="text-lg font-semibold text-text-primary">
+                  {projectName}
+                </h2>
+                <p className="text-sm text-text-tertiary">
+                  {products.length} product{products.length === 1 ? "" : "s"} in
+                  this project
+                </p>
+              </header>
+            )
           )}
 
-          <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-[20px]">
-            {products.map((turn) => (
-              <div key={turn.id} aria-label={`Concept ${labels.get(turn.id) ?? "1"}`}>
-                <ImageTurn
-                  turn={turn}
-                  conceptLabel={labels.get(turn.id) ?? "1"}
-                  parentConceptLabel={
-                    turn.kind === "refine" && turn.parentTurnId
-                      ? labels.get(turn.parentTurnId)
-                      : undefined
-                  }
-                  regenerating={regeneratingFrom?.has(turn.id) ?? false}
-                  onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
-                  preparing={preparingTurnId === turn.id}
-                  onUseThis={() => onUseTurn(turn.id)}
-                  onRefine={() => onRefineTurn(turn.id)}
-                  showUse={false}
-                />
-              </div>
-            ))}
-          </div>
+          {conceptGrid}
 
           {/* Everything the classifier found that is not being built. The
               answer at the question was "not now", which is not "never" —
@@ -269,7 +289,7 @@ export function ChatThread({
                       onClick={() => onAddProduct(a.id)}
                       className="mt-[2px] inline-flex h-[32px] shrink-0 items-center gap-[6px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
                     >
-                      Add · 1 credit
+                      Add · {CONCEPT_COST} credit
                     </button>
                   </li>
                 ))}
@@ -277,15 +297,19 @@ export function ChatThread({
             </section>
           )}
 
-          {buildable && (
+          {offerBuild && buildable && (
             <BuildAction
               products={products.length}
+              cost={cost}
+              again={!!job}
               allReady={allReady}
               preparing={preparingTurnId === buildable.id}
-              onBuild={() => onUseTurn(buildable.id)}
+              onBuild={() => onBuild(buildable.id)}
             />
           )}
-          {bannerAfterId && <InsufficientCreditsBanner />}
+          {offerBuild && allReady && shortForBuild && (
+            <InsufficientCreditsBanner cost={cost} />
+          )}
         </>
       )}
       <div ref={endRef} />
@@ -298,49 +322,72 @@ export function ChatThread({
  *  a product with nothing drawn has nothing to build from. */
 function BuildAction({
   products,
+  cost,
+  again,
   allReady,
   preparing,
   onBuild,
 }: {
   products: number;
+  cost: number;
+  /** A build exists and a concept has changed since — this books the next. */
+  again: boolean;
   allReady: boolean;
   preparing: boolean;
   onBuild: () => void;
 }) {
   const { hydrated, balance } = useCredits();
-  const cost = BUILD_COST * products;
   const short = hydrated && balance < cost;
   const blocked = short || !allReady || preparing;
+  const reason = short
+    ? `Not enough credits — this build costs ${cost}, you have ${balance}`
+    : !allReady
+      ? "One of the concepts is still drawing"
+      : undefined;
+  const label = again
+    ? "Build again"
+    : products === 1
+      ? "Build this product"
+      : `Build ${products} products`;
   return (
-    <div className="flex w-full items-center gap-[12px] border-t border-solid border-border pt-[20px]">
-      <p className="text-sm text-text-tertiary">
+    <div className="flex w-full flex-wrap items-center gap-[12px] border-t border-solid border-border pt-[20px]">
+      <p className="text-sm text-text-secondary">
         {allReady
-          ? `Engineering ${products} product${products === 1 ? "" : "s"} · ${cost} credits`
+          ? `${products} product${products === 1 ? "" : "s"} · ${cost} credits`
           : "Waiting for every concept to land"}
-        {short ? ` · you have ${balance}` : ""}
+        {short ? (
+          <span className="text-text-error"> · you have {balance}</span>
+        ) : null}
       </p>
+      {/* Busy looks like the gate's own busy: the brand fill, dimmed, turning
+          — not a grey that reads as disabled while the work is under way. */}
       <button
         type="button"
         data-testid="build-action"
         onClick={onBuild}
         disabled={blocked}
         aria-busy={preparing}
-        title={
-          short
-            ? "Not enough credits"
-            : !allReady
-              ? "One of the concepts is still rendering"
-              : undefined
-        }
+        title={reason}
         className={
-          blocked
-            ? "ml-auto inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
-            : "ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+          preparing
+            ? "ml-auto inline-flex h-[40px] cursor-wait items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand opacity-80"
+            : blocked
+              ? "ml-auto inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
+              : "ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
         }
       >
-        {preparing ? "Preparing…" : "Generate the full product"}
+        {preparing && (
+          <span aria-hidden className="inline-flex motion-safe:animate-spin">
+            <Icon icon={Refresh01Icon} size={16} />
+          </span>
+        )}
+        {preparing ? "Preparing the build…" : label}
       </button>
+      {/* The reason a disabled button is off, where the keyboard and a touch
+          screen can reach it — a title on a disabled button reaches neither. */}
+      {reason && !preparing && (
+        <p className="w-full text-right text-sm text-text-tertiary">{reason}</p>
+      )}
     </div>
   );
 }
-

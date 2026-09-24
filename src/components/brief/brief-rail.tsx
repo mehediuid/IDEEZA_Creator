@@ -17,7 +17,7 @@ import {
   type Intent,
 } from "@/lib/brief/types";
 
-function labelFor(id: BriefStepId, intent: Intent | null): string {
+export function labelFor(id: BriefStepId, intent: Intent | null): string {
   switch (id) {
     case "idea":
       return "Idea";
@@ -278,5 +278,63 @@ export function BriefRail({
         }
       `}</style>
     </div>
+  );
+}
+
+/**
+ * The same steps as one line, for the build's Brief — which runs in the
+ * dashboard shell with no rail beside it, so nothing on screen said how many
+ * steps there were or which one this is. Read-only: Back on the card is the
+ * way back, as it always was there.
+ */
+export function BriefStepLine({
+  steps,
+  current,
+  intent,
+}: {
+  steps: BriefStepId[];
+  current: BriefStepId;
+  intent: Intent | null;
+}) {
+  const at = steps.indexOf(current);
+  const here = at >= 0 ? at : nearestIndex(steps, STEP_ORDER.indexOf(current));
+  // Until the intent is chosen the sequence is only the idea: every intent
+  // runs four steps, but in an order the choice decides, so the line says how
+  // many there are and leaves their order to the choice.
+  const undecided = steps.length === 1;
+  return (
+    <nav aria-label="Brief steps" className="w-full max-w-[600px]">
+      <ol className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px] text-sm">
+        <li className="text-text-tertiary">
+          Step {here + 1} of {undecided ? STEP_ORDER.length : steps.length}
+        </li>
+        {steps.map((id, i) => (
+          <li
+            key={id}
+            aria-current={i === here ? "step" : undefined}
+            className={
+              i === here
+                ? "font-semibold text-text-primary"
+                : i < here
+                  ? "text-text-secondary"
+                  : "text-text-tertiary"
+            }
+          >
+            <span aria-hidden className="mr-[8px] text-text-tertiary">
+              ·
+            </span>
+            {labelFor(id, intent)}
+          </li>
+        ))}
+        {undecided && (
+          <li className="text-text-tertiary">
+            <span aria-hidden className="mr-[8px]">
+              ·
+            </span>
+            then the steps for how you share it
+          </li>
+        )}
+      </ol>
+    </nav>
   );
 }

@@ -77,6 +77,7 @@ export function Step1Idea({
   productDescription,
   otherProducts,
   projectDecided,
+  fromBuild,
   intent,
   busy,
   onChange,
@@ -101,6 +102,9 @@ export function Step1Idea({
    *  again. False on a hand-made project and on an older build that carries
    *  no such answer, where the chooser IS the question. */
   projectDecided?: boolean;
+  /** Opened from a finished AI build: the idea has been built already, so the
+   *  step is not asking for one — it checks what the brief will say. */
+  fromBuild?: boolean;
   intent: Intent | null;
   /** Continue has been answered and the hand-off is in flight. */
   busy?: boolean;
@@ -164,10 +168,12 @@ export function Step1Idea({
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: 0, letterSpacing: -0.2 }}>
-            What&rsquo;s your idea?
+            {fromBuild ? "Add a brief" : "What\u2019s your idea?"}
           </h1>
           <p style={{ fontSize: 13, color: C.body, marginTop: 6 }}>
-            A name and one line. Quick — you can edit everything later.
+            {fromBuild
+              ? "Check the names and one-liners the build wrote, then choose how it goes out."
+              : "A name and one line. Quick — you can edit everything later."}
           </p>
         </div>
 

@@ -20,9 +20,20 @@
 
 import * as React from "react";
 
+/** What building ONE product costs. A build covers every product in the
+ *  project, each with its own five deliverables, so the price is per product —
+ *  see `buildCost`. */
 export const BUILD_COST = 4;
 /** What one concept render costs — first draft, refine or regenerate. */
 export const CONCEPT_COST = 1;
+
+/** What a build of `products` products costs. The gate and the canvas quote
+ *  this and the worker charges it: they used to quote BUILD_COST × products
+ *  while the worker charged a flat BUILD_COST, so a two-product build said
+ *  8 credits and took 4. */
+export function buildCost(products: number): number {
+  return BUILD_COST * Math.max(1, Math.trunc(products));
+}
 
 /** Part 4 §4.4.6 — what a companion selection will cost, recomputed live
  *  as the selection changes.
@@ -207,21 +218,24 @@ export function topUpState(state: CreditsState, n: number): CreditsState {
   });
 }
 
-// One-line description of a ledger entry for display (CreditsCard).
-export function describeEntry(entry: CreditEntry): string {
+// One-line description of a ledger entry for display (CreditsCard). `subject`
+// names what was charged — the build's title — because the id alone
+// ("build_t4p17pf3_…") tells the reader nothing.
+export function describeEntry(entry: CreditEntry, subject?: string): string {
   const sign = entry.delta >= 0 ? "+" : "−"; // U+2212 minus sign
   const amount = Math.abs(entry.delta);
+  const about = subject ? ` · ${subject}` : "";
   switch (entry.reason) {
     case "seed":
       return `${sign}${amount} Starting balance`;
     case "topup":
       return `${sign}${amount} Top up`;
     case "build":
-      return `${sign}${amount} Build${entry.buildId ? ` · ${entry.buildId}` : ""}`;
+      return `${sign}${amount} Build${about}`;
     case "concept":
       return `${sign}${amount} Concept render`;
     case "refund":
-      return `${sign}${amount} Refund${entry.buildId ? ` · ${entry.buildId}` : ""}`;
+      return `${sign}${amount} Refund${about}`;
   }
 }
 

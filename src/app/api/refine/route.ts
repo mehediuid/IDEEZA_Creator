@@ -1,12 +1,14 @@
 // POST /api/refine
 //
 // Rewrites the user's raw text — using a FREE LLM (Pollinations text API, no
-// API key) — into whichever of two things the caller asked for: a project
-// brief ("brief", the default) or a 10-second product-video scene ("video",
-// the Prompt Help modal). Falls back to a deterministic template per mode if
-// the model is unreachable, so the button always returns something.
+// API key) — into whichever thing the caller asked for: a project brief
+// ("brief", the default), a 10-second product-video scene ("video", the Prompt
+// Help modal), or one precise instruction for a change to a concept already
+// on screen ("change", the chat composer). Falls back to a deterministic
+// answer per mode if the model is unreachable, so the button always returns
+// something.
 //
-// Request:  { prompt: string, mode?: "brief" | "video" }
+// Request:  { prompt: string, mode?: "brief" | "video" | "change" }
 // Response: { refined: string }
 
 import { NextResponse } from "next/server";
@@ -15,7 +17,8 @@ import { videoScenePrompt } from "@/lib/brief/video-prompt";
 
 export const runtime = "edge";
 
-type RefineMode = "brief" | "video";
+type RefineMode = "brief" | "video" | "change";
+const MODES: RefineMode[] = ["brief", "video", "change"];
 
 const SYSTEM: Record<RefineMode, string> = {
   brief:
@@ -25,7 +28,20 @@ const SYSTEM: Record<RefineMode, string> = {
   video:
     "Rewrite the user's product idea as a single vivid 10-second product-video scene for a text-to-video model: " +
     "subject, setting, camera move, lighting, mood. One paragraph, ≤ 60 words, no lists.",
+  change:
+    "The user is asking for a change to a product concept image that already exists. " +
+    "Rewrite their request as ONE short, specific instruction that describes only the change — material, colour, shape, size, a feature added or removed. " +
+    "Do not describe the whole product, do not name a microcontroller or parts, and never invent a different product. " +
+    "At most 25 words. Output ONLY the instruction — no preamble, no quotes, no lists.",
 };
+
+// The change-mode fallback: the maker's own words, tidied — a capital and a
+// full stop. Nothing is added, because anything added would be a guess.
+function tidyChange(prompt: string): string {
+  const t = prompt.trim().replace(/\s+/g, " ");
+  const capped = t.charAt(0).toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(capped) ? capped : `${capped}.`;
+}
 
 async function refineWithAI(prompt: string, mode: RefineMode): Promise<string> {
   const ctrl = new AbortController();
@@ -77,18 +93,26 @@ export async function POST(req: Request) {
     typeof body === "object" && body !== null && "prompt" in body
       ? String((body as { prompt?: unknown }).prompt ?? "")
       : "";
-  const mode: RefineMode =
-    typeof body === "object" &&
-    body !== null &&
-    (body as { mode?: unknown }).mode === "video"
-      ? "video"
-      : "brief";
+  const asked =
+    typeof body === "object" && body !== null
+      ? (body as { mode?: unknown }).mode
+      : undefined;
+  const mode: RefineMode = MODES.includes(asked as RefineMode)
+    ? (asked as RefineMode)
+    : "brief";
   if (prompt.trim().length < 6) {
     return NextResponse.json({ refined: "" });
   }
-  const ai = await refineWithAI(prompt.trim(), mode);
+  const answer = await refineWithAI(prompt.trim(), mode);
+  // A change that comes back as a paragraph has been turned into a product
+  // description, which is the failure this mode exists to prevent.
+  const ai = mode === "change" && answer.length > 220 ? "" : answer;
   const refined =
     ai ||
-    (mode === "video" ? videoScenePrompt(prompt) : refinePromptTemplate(prompt));
+    (mode === "video"
+      ? videoScenePrompt(prompt)
+      : mode === "change"
+        ? tidyChange(prompt)
+        : refinePromptTemplate(prompt));
   return NextResponse.json({ refined });
 }

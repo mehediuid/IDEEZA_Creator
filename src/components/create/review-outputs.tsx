@@ -1,24 +1,19 @@
 "use client";
 
-// ReviewOutputs — the last view of a build (Ai-Flow frames 15 / DL-02 /
-// DL-03 / Wiring / Parts). One pill tab per deliverable the build really
-// produced, the artifact itself on the left, what ships with it on the
-// right, and the two things a finished build can become:
+// ReviewOutputs — a build's own surface, live from the moment it starts (Ai-Flow
+// frames 15 / DL-02 / DL-03 / Wiring / Parts). One tab per deliverable the
+// build really produced, the artifact itself on the left, what it covers on
+// the right, and the two things a finished build can become:
 //
-//   • Save Project  — opens this build's Brief (/build/<id>/brief), which
-//                     is where the build is given a project: Step 1's
-//                     chooser attaches it to an existing one or starts a
-//                     new one, then the outcome (sell / give / private)
-//                     runs from there.
-//   • Advance Edit  — skip the brief: make (or reuse) the project now and
-//                     open it straight in the PCB editor.
+//   • Save Project  — one click. The build becomes the project the maker chose
+//                     at the setup question (`projectFromBuild`), with every
+//                     product and its description, and the card then offers
+//                     the Brief (sell · give · keep private) and the editor.
+//   • Advance Edit  — the same project, opened straight in the PCB editor.
 //
-// One project per build. Save Project makes nothing on its own — the
-// attachment is the maker's answer, not a side effect of pressing a
-// button — and Advance Edit goes through `projectFromBuild`, so pressing
-// it twice reuses the project rather than making a second one. Once the
-// build carries a project the footer says so and offers the ways on
-// instead of repeating the two first-time actions.
+// One project per build: `projectFromBuild` hands the same one back on every
+// later press. A piece that failed is retried from its own panel, here, rather
+// than from a page of its own.
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -101,7 +96,8 @@ function ReviewPanel({
 }) {
   const router = useRouter();
   const query = useSearchParams();
-  const { setBuildProject } = useCreateHistory();
+  const { setBuildProject, retryBuildItem, setBuildModelFailed } =
+    useCreateHistory();
   const { projects, projectFromBuild, selectProject } = useManualProjects();
 
   // An artifact an older build never produced has nothing to review, so
@@ -145,8 +141,14 @@ function ReviewPanel({
   const wanted = picked ?? ITEM_KINDS.find((k) => k === linked) ?? null;
   // Falls back to the first real deliverable when the link (or a job
   // whose items changed underneath) names one this build doesn't have.
+  // With nothing asked for, open on something there is to look at: a finished
+  // piece, and the 3D tab only once its mesh has landed. Opening on a spinner
+  // was the first thing a finished build showed.
+  const viewable = (i: (typeof deliverables)[number]) =>
+    i.status === "ready" && (i.kind !== "3d" || !!job.modelGlbUrl);
   const shown =
     deliverables.find((i) => i.kind === wanted)?.kind ??
+    deliverables.find(viewable)?.kind ??
     deliverables[0]?.kind ??
     null;
 
@@ -185,10 +187,28 @@ function ReviewPanel({
     router.push(stepHref(project, "pcb"));
   }, [job, projectFromBuild, setBuildProject, selectProject, router]);
 
+  // Saving is the save — it used to open the Brief and ask "What's your idea?"
+  // and "sell, give or keep private?" before anything was saved at all. Which
+  // project it lands in was answered at the setup question.
+  const saveProject = React.useCallback(() => {
+    const project = projectFromBuild(job);
+    if (project.id !== job.projectId) setBuildProject(job.id, project.id);
+  }, [job, projectFromBuild, setBuildProject]);
+
   const openBrief = React.useCallback(() => {
     setLeaving("brief");
     router.push(`/build/${job.id}/brief`);
   }, [job.id, router]);
+
+  // Every product's pieces, for the footer's count.
+  const pieceCount = React.useMemo(
+    () =>
+      products.reduce(
+        (n, x) => n + x.items.filter((i) => i.status !== "skipped").length,
+        0,
+      ),
+    [products],
+  );
 
   return (
     <section
@@ -302,7 +322,7 @@ function ReviewPanel({
                     "inline-flex h-[36px] items-center rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast",
                     "focus-visible:ring-2 focus-visible:ring-border-focus",
                     isActive
-                      ? "bg-bg-brand text-text-on-brand"
+                      ? "bg-bg-brand-subtle text-text-brand"
                       : "text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
                   ].join(" ")}
                 >
@@ -329,19 +349,40 @@ function ReviewPanel({
                 <div className="flex h-[280px] flex-col items-center justify-center gap-[8px] rounded-xl border border-solid border-border bg-bg-subtle text-center">
                   <p className="text-md font-medium text-text-secondary">
                     {shownItem.status === "failed"
-                      ? "This piece couldn't be generated"
+                      ? job.failure === "system"
+                        ? "This piece didn't run"
+                        : "This piece couldn't be generated"
                       : shownItem.status === "building"
                         ? `Generating · ${Math.round(shownItem.progress)}%`
                         : "Waiting to start"}
                   </p>
                   <p className="max-w-[40ch] text-sm text-text-tertiary">
                     {shownItem.status === "failed"
-                      ? "The other pieces are unaffected — retry it from the build."
+                      ? job.failure === "system"
+                        ? "The whole build stopped on our side — try it again from the panel beside the chat."
+                        : "The other pieces are unaffected. Retrying costs no extra credits."
                       : "It appears here the moment it lands."}
                   </p>
+                  {shownItem.status === "failed" && job.failure !== "system" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        retryBuildItem(job.id, shownItem.kind, product.id)
+                      }
+                      className="mt-[4px] inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+                    >
+                      <Icon icon={Refresh01Icon} size={16} />
+                      Retry {ITEM_LABELS[shownItem.kind]}
+                    </button>
+                  )}
                 </div>
               ) : (
-                <DeliverablePanel kind={shown} product={product} job={job} />
+                <DeliverablePanel
+                  kind={shown}
+                  product={product}
+                  job={job}
+                  onRetryModel={() => setBuildModelFailed(job.id, false)}
+                />
               )}
             </div>
             <aside className="flex flex-col gap-8 rounded-xl border border-solid border-border bg-bg-surface p-8">
@@ -375,8 +416,8 @@ function ReviewPanel({
                     size={16}
                     className="shrink-0 text-text-success"
                   />
-                  Saved to {saved.name}. Pick the brief back up, or open the
-                  project to keep editing.
+                  Saved to {saved.name}. Add a brief to sell, give or keep it
+                  private — or open the project to keep editing.
                 </p>
                 <div className="flex items-center gap-6">
                   <LeaveButton
@@ -384,12 +425,9 @@ function ReviewPanel({
                     busy={leaving === "brief"}
                     blocked={leaving !== null}
                     onClick={openBrief}
-                    /* Carrying on, not saving again — the floppy belongs to
-                       "Save Project", which is the button this one replaces
-                       once the build has a project. */
                     icon={ArrowRight02Icon}
                   >
-                    Continue Brief
+                    Add Brief
                   </LeaveButton>
                   <LeaveButton
                     tone="quiet"
@@ -405,20 +443,23 @@ function ReviewPanel({
             ) : (
               <>
                 <p className="text-sm text-text-secondary">
-                  {deliverables.length === ITEM_KINDS.length
-                    ? "All five pieces are ready. Choose what happens to this build next."
-                    : "Every piece this build made is ready. Choose what happens to this build next."}
+                  {pieceCount === ITEM_KINDS.length
+                    ? "All five pieces are ready."
+                    : `All ${pieceCount} pieces are ready.`}{" "}
+                  {job.projectChoiceName?.trim() || job.projectChoiceId
+                    ? "Save it to the project you chose, or open it in the editor."
+                    : "Save it as a project, or open it in the editor."}
                 </p>
                 <div className="flex items-center gap-6">
-                  <LeaveButton
-                    tone="primary"
-                    busy={leaving === "brief"}
-                    blocked={leaving !== null}
-                    onClick={openBrief}
-                    icon={FloppyDiskIcon}
+                  <button
+                    type="button"
+                    onClick={saveProject}
+                    disabled={leaving !== null}
+                    className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:opacity-60"
                   >
+                    <Icon icon={FloppyDiskIcon} size={18} />
                     Save Project
-                  </LeaveButton>
+                  </button>
                   <LeaveButton
                     tone="quiet"
                     busy={leaving === "editor"}
@@ -443,6 +484,7 @@ function DeliverablePanel({
   kind,
   product,
   job,
+  onRetryModel,
 }: {
   kind: BuildItemKind;
   /** The product being reviewed — the primary, or one of its companions
@@ -452,6 +494,7 @@ function DeliverablePanel({
   /** Still the job, for the one thing that is the job's and not a
    *  product's: the generated 3D model. */
   job: BuildJob;
+  onRetryModel: () => void;
 }) {
   if (kind === "pcb") return <PcbPreview job={product} />;
   if (kind === "code") return <FirmwarePreview job={product} />;
@@ -461,6 +504,8 @@ function DeliverablePanel({
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-solid border-border bg-bg-surface-raised">
       {job.modelGlbUrl ? (
         <ModelViewer url={job.modelGlbUrl} />
+      ) : job.modelFailed ? (
+        <ModelFailed onRetry={onRetryModel} />
       ) : (
         <GeneratingModel />
       )}
@@ -480,6 +525,30 @@ function GeneratingModel() {
       </svg>
       <p className="text-sm font-medium text-text-secondary">Generating 3D model…</p>
       <style>{`.ix-modelspin{animation:ix-modelspin-kf 1s linear infinite}@keyframes ix-modelspin-kf{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ix-modelspin{animation:none}}`}</style>
+    </div>
+  );
+}
+
+// The mesh could not be made — the provider refused, failed or never
+// answered. Said plainly, with the one thing that can change it.
+function ModelFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-[8px] px-[24px] text-center">
+      <p className="text-md font-medium text-text-secondary">
+        Couldn&apos;t make the 3D model
+      </p>
+      <p className="max-w-[40ch] text-sm text-text-tertiary">
+        The model service didn&apos;t return a mesh for this concept. The other
+        pieces are unaffected, and trying again costs nothing.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-[4px] inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <Icon icon={Refresh01Icon} size={16} />
+        Try again
+      </button>
     </div>
   );
 }

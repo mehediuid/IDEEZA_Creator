@@ -49,20 +49,35 @@ import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { Icon, type IconValue } from "./icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 
-const NAV: Array<{
-  label: string;
-  href: string;
-  icon: IconValue;
-}> = [
+// `href: null` is a section with no page behind it yet. It stays in the list,
+// so the shape of the product is visible, but it says it is not open rather
+// than linking to a 404.
+type NavItem = { label: string; href: string | null; icon: IconValue };
+
+const NAV: NavItem[] = [
   { label: "Home", href: "/", icon: Home01Icon },
   { label: "History", href: "/history", icon: HistoryIcon },
   { label: "My projects", href: "/projects", icon: Folder01Icon },
   { label: "Parts & agile module", href: "/parts", icon: CpuIcon },
-  { label: "Explore marketplace", href: "/marketplace", icon: ShoppingBag01Icon },
+  { label: "Explore marketplace", href: null, icon: ShoppingBag01Icon },
   { label: "Innovations", href: "/innovations", icon: News01Icon },
-  { label: "Messages", href: "/messages", icon: Mail01Icon },
-  { label: "Blog", href: "/blog", icon: BookOpen01Icon },
+  { label: "Messages", href: null, icon: Mail01Icon },
+  { label: "Blog", href: null, icon: BookOpen01Icon },
 ];
+
+/** The builds that need the maker — minus the one whose chat is open, which
+ *  is already in front of them. The bell used to say "1 needs attention"
+ *  about the very build on screen. */
+function useAttentionElsewhere(): BuildAttention[] {
+  const pathname = usePathname();
+  const { attentionBuilds } = useCreateHistory();
+  return React.useMemo(() => {
+    const open = pathname.startsWith("/chat/") ? pathname.split("/")[2] : null;
+    return open
+      ? attentionBuilds.filter((a) => a.job.chatId !== open)
+      : attentionBuilds;
+  }, [attentionBuilds, pathname]);
+}
 
 const USER = {
   name: "You",
@@ -129,7 +144,7 @@ export function DashboardSidebar({
       >
         <ul role="list" className="flex flex-col gap-[2px]">
           {NAV.map((item) => (
-            <NavRow key={item.href} item={item} collapsed={collapsed} />
+            <NavRow key={item.label} item={item} collapsed={collapsed} />
           ))}
         </ul>
       </nav>
@@ -249,19 +264,45 @@ function NavRow({
   item,
   collapsed,
 }: {
-  item: { label: string; href: string; icon: IconValue };
+  item: NavItem;
   collapsed: boolean;
 }) {
   const pathname = usePathname();
-  const { attentionBuilds } = useCreateHistory();
-  const isActive =
-    item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+  const attentionBuilds = useAttentionElsewhere();
+  if (!item.href) {
+    const why = `${item.label} isn't open yet`;
+    return (
+      <li>
+        <span
+          role="link"
+          aria-disabled="true"
+          aria-label={why}
+          title={why}
+          className={[
+            "flex h-[32px] cursor-not-allowed items-center rounded-md text-md font-regular text-text-disabled",
+            collapsed ? "justify-center px-0" : "gap-[12px] px-[10px]",
+          ].join(" ")}
+        >
+          <span aria-hidden className="shrink-0">
+            <Icon icon={item.icon} />
+          </span>
+          {!collapsed && (
+            <>
+              <span className="flex-1 truncate">{item.label}</span>
+              <span className="shrink-0 text-xs text-text-tertiary">Soon</span>
+            </>
+          )}
+        </span>
+      </li>
+    );
+  }
+  const href = item.href;
+  const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
   // History row gets a red dot whenever any build needs attention. Per
   // spec §7b, the dot stays on until the user resolves the issue (not
   // just because they dismissed the banner) — that's why we read the
   // raw attentionBuilds count, not topAttention.
-  const showAttention =
-    item.href === "/history" && attentionBuilds.length > 0;
+  const showAttention = href === "/history" && attentionBuilds.length > 0;
   const attentionLabel = showAttention
     ? `, ${attentionBuilds.length} build${attentionBuilds.length === 1 ? "" : "s"} need${attentionBuilds.length === 1 ? "s" : ""} attention`
     : "";
@@ -269,7 +310,7 @@ function NavRow({
   return (
     <li>
       <Link
-        href={item.href}
+        href={href}
         aria-current={isActive ? "page" : undefined}
         aria-label={collapsed ? fullLabel : showAttention ? fullLabel : undefined}
         title={collapsed ? item.label : undefined}
@@ -310,41 +351,43 @@ function Footer({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+// There is no paid plan to move to yet, so this is not a button that does
+// nothing: it names the plan and says it is not on sale, the convention every
+// other not-yet control here follows.
 function UpgradeButton({ collapsed }: { collapsed: boolean }) {
-  const label = "Upgrade to Builder — unlock more features";
+  const why = "The Builder plan isn't on sale yet";
   if (collapsed) {
     return (
-      <button
-        type="button"
-        aria-label={label}
-        title={label}
-        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg border border-transparent bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:border-border-brand focus-visible:ring-2 focus-visible:ring-border-focus"
+      <span
+        role="img"
+        aria-label={why}
+        title={why}
+        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-subtle text-text-tertiary"
       >
         <Icon icon={CrownIcon} />
-      </button>
+      </span>
     );
   }
   return (
-    <button
-      type="button"
-      aria-label={label}
-      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg border border-transparent bg-bg-brand-subtle px-[12px] py-[12px] text-left outline-none transition-colors duration-fast hover:border-border-brand focus-visible:ring-2 focus-visible:ring-border-focus"
+    <div
+      aria-label={why}
+      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-subtle px-[12px] py-[12px]"
     >
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-md font-semibold text-text-brand">
-          Upgrade to Builder
+        <span className="block truncate text-md font-semibold text-text-secondary">
+          Builder plan
         </span>
-        <span className="block truncate text-xs font-regular text-text-secondary">
-          Unlock more features
+        <span className="block truncate text-xs font-regular text-text-tertiary">
+          Not on sale yet — you are on Free
         </span>
       </span>
       <span
         aria-hidden
-        className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-lg bg-bg-surface text-text-brand"
+        className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-lg bg-bg-surface text-text-tertiary"
       >
         <Icon icon={FlashIcon} />
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -550,7 +593,8 @@ function NotificationBell({
   onToggle: () => void;
   onClose: () => void;
 }) {
-  const { attentionBuilds } = useCreateHistory();
+  const attentionBuilds = useAttentionElsewhere();
+  const { getChat } = useCreateHistory();
   const count = attentionBuilds.length;
 
   const label =
@@ -601,7 +645,9 @@ function NotificationBell({
                     href={
                       att.reason === "credits"
                         ? "/history#credits"
-                        : `/build/${att.job.id}`
+                        : getChat(att.job.chatId)
+                          ? `/chat/${att.job.chatId}`
+                          : `/build/${att.job.id}`
                     }
                     role="menuitem"
                     onClick={onClose}

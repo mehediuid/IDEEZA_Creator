@@ -31,7 +31,7 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import {
-  BUILD_COST,
+  buildCost,
   openCharges,
   useCredits,
   type CreditEntry,
@@ -70,6 +70,11 @@ function oldestQueued(builds: BuildJob[]): BuildJob | null {
   return next;
 }
 
+// What this build costs: one product's price for every product it covers.
+function costOf(job: BuildJob): number {
+  return buildCost(productsOf(job).length);
+}
+
 // Whether the ledger has ever put this build's credits back. Read with
 // openCharges() it separates the two ways a build can have no open
 // charge: the money came back, or it never left.
@@ -102,7 +107,12 @@ export function BuildSimulator() {
   // The rendered balance, not useCredits().canAfford(): that reads a ref
   // the provider refreshes in its OWN effect, and a provider's effects
   // run after its children's — so from here the ref is a render behind.
-  const affordable = balance >= BUILD_COST;
+  // Asked per build, because the price is per product: a balance that
+  // covers a one-product build does not cover a three-product one.
+  const affordable = React.useCallback(
+    (job: BuildJob) => balance >= costOf(job),
+    [balance],
+  );
 
   // The tick reads the latest builds without restarting the interval.
   const buildsRef = React.useRef(builds);
@@ -127,13 +137,13 @@ export function BuildSimulator() {
       }
       // Its turn came up but the balance can't cover it — back to the
       // queue, flagged, rather than building unpaid.
-      if (!affordable) {
+      if (!affordable(b)) {
         blockForCredits(b.id);
         continue;
       }
       // Idempotent per open charge, so a re-run before the ledger has
       // re-rendered can't charge twice.
-      charge(b.id);
+      charge(b.id, costOf(b));
     }
   }, [
     ready,
@@ -206,7 +216,7 @@ export function BuildSimulator() {
       // A build that has already paid (a partial build queued for a
       // single retry) owes nothing more, so an empty balance must not
       // park it — retrying a piece costs no extra credits.
-      if (affordable || next.creditsCharged) promoteQueued();
+      if (affordable(next) || next.creditsCharged) promoteQueued();
       // Already parked for the same reason — don't re-issue the action
       // every tick, which is what kept re-rendering the provider and
       // rewriting localStorage while a credits-blocked build just sat

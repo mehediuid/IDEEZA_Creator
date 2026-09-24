@@ -1,87 +1,68 @@
 "use client";
 
-// ImageTurn — assistant turn in the concept chat. Either:
+// ImageTurn — one product's current concept on the chat canvas. Either:
 //   • Pending  — a bare rendering tile: dotted texture + a centred
-//                "Rendering concept N · P%" pill, no card chrome
-//   • Ready    — header (chip + time), image, the prompt on one line
-//                with a copy button, then the action row
+//                "Drawing <product> · P%" pill, no card chrome
+//   • Ready    — the product's name with its concept number beside it, the
+//                image, the prompt on one line with a copy button, then
+//                Refine · Regenerate and what each costs
 //   • Failed   — error card with a retry control
 //
-// Spec §4b: regenerate is a FRESH from-scratch take; refinement comes
-// from typing a change into the persistent prompt bar (handled by the
-// orchestrator). Use this works on ANY image in the thread, not just
-// the latest.
+// Spec §4b: regenerate is a FRESH from-scratch take; refinement is a change
+// described in the editor or the composer.
 //
-// Spec §4c: each card shows a "Concept N" label so users can locate
-// versions while scrolling. Lineage is carried by that dotted label
-// ("1.2" is the second refine of concept 1) — no breadcrumb row.
+// Spec §4c: the concept number carries lineage ("1.2" is the second refine
+// of concept 1), so it stays on the card — as metadata beside the product's
+// name, which is what the card is actually of.
 //
-// Styling: Refine and Regenerate are outlined, "Use this concept" is
-// the one primary violet CTA on the card.
-//
-// Two states replace that action row. When the balance can't cover a
-// build the price line names the shortfall and the CTA is off (the
-// thread carries one InsufficientCreditsBanner saying why). Once the
-// concept has been sent to build the row becomes the build's own
-// status line — see SentToBuildRow.
+// The build is one action for the whole canvas (see chat-thread.tsx), so no
+// card carries a build button of its own.
 
 import * as React from "react";
-import Link from "next/link";
 import {
   Alert02Icon,
-  ArrowRight01Icon,
   CheckmarkBadge01Icon,
   Coins01Icon,
   Copy01Icon,
-  InformationCircleIcon,
   MagicWand01Icon,
   Refresh01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
+import Link from "next/link";
 import { Icon } from "@/components/dashboard/icon";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import {
-  minutesLeft,
-  statusOf,
-  useCreateHistory,
-  type BuildJob,
-  type ChatTurn,
-  type ConceptFailReason,
-} from "@/lib/create/history";
+import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { useMinuteClock } from "./build-status";
 
-const COST_HINT = `Generating the full product uses ${BUILD_COST} credits. Every concept render — a first draft, a refine or a regenerate — uses ${CONCEPT_COST}.`;
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
 
 const OUTLINE_BUTTON =
   "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
+const OUTLINE_BUTTON_OFF =
+  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none";
 
 export function ImageTurn({
   turn,
   conceptLabel,
   parentConceptLabel,
+  productName,
+  inBuild = false,
   regenerating = false,
-  preparing = false,
   onRegenerate,
-  onUseThis,
-  showUse = true,
   onRefine,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
   conceptLabel: string;
   parentConceptLabel?: string;
+  /** What this card is a drawing OF. Without it a charger read as
+   *  "Concept 2" — an alternative take on the phone rather than a second
+   *  product. The lineage number stays, as metadata under the name. */
+  productName?: string;
+  /** This exact drawing is what the current build was made from. */
+  inBuild?: boolean;
   regenerating?: boolean;
-  /** Pressing Use this concept reads the concept back and asks whether it
-   *  is part of a multi-product system — two model round-trips before the
-   *  gate can open. The button says so rather than looking ignored. */
-  preparing?: boolean;
   onRegenerate: () => void;
-  onUseThis: () => void;
-  /** Whether this card carries the build action. False on a canvas showing
-   *  several products of ONE build: the action belongs to the build, and a
-   *  copy on every product asks for the same thing twice. */
-  showUse?: boolean;
   onRefine: () => void;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
@@ -92,17 +73,14 @@ export function ImageTurn({
   // Before the ledger has read storage its balance is 0, so the gate
   // waits for `hydrated` rather than greying every card on load.
   const { hydrated: creditsHydrated, balance } = useCredits();
-  const shortOnCredits = creditsHydrated && balance < BUILD_COST;
-  // A render is far cheaper than a build, so the two gates are separate:
-  // a balance of 2 still refines, it just cannot start a build yet.
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
-  const costHintId = React.useId();
 
   if (turn.status === "pending") {
     return (
       <PendingImageTurn
         conceptLabel={conceptLabel}
         parentConceptLabel={parentConceptLabel}
+        productName={productName}
         kind={turn.kind}
         progress={turn.progress}
       />
@@ -119,68 +97,39 @@ export function ImageTurn({
   }
 
   // status === "ready"
+  const name = productName ? `${productName}, concept ${conceptLabel}` : `Concept ${conceptLabel}`;
   return (
     <article
-      aria-label={`Concept ${conceptLabel}`}
+      aria-label={name}
       className="flex w-full max-w-[640px] flex-col gap-[12px] rounded-2xl border border-border bg-bg-surface p-[16px]"
     >
-      <ConceptHeader conceptLabel={conceptLabel} ts={turn.ts} />
+      <ConceptHeader
+        conceptLabel={conceptLabel}
+        productName={productName}
+        ts={turn.ts}
+      />
 
+      {/* The picture is the picture. It used to be a hidden Refine button,
+          which nobody expects of an image — a click on one means "show me
+          it bigger" — and it made two Refine controls on one card. */}
       {turn.imageUrl && imgOk ? (
-        <button
-          type="button"
-          onClick={onRefine}
-          disabled={shortForRender}
-          aria-label={
-            shortForRender
-              ? `Concept ${conceptLabel} — ${NO_RENDER.toLowerCase()}`
-              : `Refine Concept ${conceptLabel} — open the image editor`
-          }
-          title={shortForRender ? NO_RENDER : undefined}
-          className="block w-full overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={turn.imageUrl}
-            alt={`Concept ${conceptLabel} ${turn.kind === "refine" ? "refining Concept " + parentConceptLabel : "from"}: ${turn.prompt}`}
-            onError={() => setImgOk(false)}
-            className="aspect-[16/10] w-full object-cover"
-          />
-        </button>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={turn.imageUrl}
+          alt={`${name}: ${turn.prompt}`}
+          onError={() => setImgOk(false)}
+          className="aspect-[16/10] w-full rounded-xl object-cover"
+        />
       ) : turn.imageUrl ? (
         <div className="flex aspect-[16/10] w-full flex-col items-center justify-center gap-[8px] rounded-xl bg-bg-surface-raised px-[16px] text-center">
           <p className="text-sm text-text-tertiary">
             Couldn&apos;t load this image.
           </p>
-          <button
-            type="button"
-            onClick={onRegenerate}
-            disabled={shortForRender}
-            title={shortForRender ? NO_RENDER : undefined}
-            className={
-              shortForRender
-                ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none"
-                : OUTLINE_BUTTON
-            }
-          >
-            <Icon icon={Refresh01Icon} />
-            Regenerate
-          </button>
         </div>
       ) : null}
 
       <div className="flex items-center gap-[8px]">
-        {/* Truncated while the card is still a choice — the row has to
-            leave space for three controls. Once the concept is building
-            the row is a status line, so the prompt it was sent with is
-            shown whole. */}
-        <p
-          className={
-            turn.usedForBuild
-              ? "min-w-0 flex-1 text-sm text-text-tertiary"
-              : "min-w-0 flex-1 truncate text-sm text-text-tertiary"
-          }
-        >
+        <p className="min-w-0 flex-1 truncate text-sm text-text-tertiary">
           <span className="font-semibold text-text-secondary">Prompt: </span>
           {turn.prompt}
         </p>
@@ -190,121 +139,50 @@ export function ImageTurn({
       <div aria-hidden className="h-px w-full bg-border" />
 
       <div className="flex flex-wrap items-center gap-[8px]">
-        {turn.usedForBuild ? (
-          <SentToBuildRow buildId={turn.usedForBuild} />
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={onRefine}
-              disabled={shortForRender}
-              aria-label={`Refine Concept ${conceptLabel} in the editor`}
-              title={
-                shortForRender
-                  ? NO_RENDER
-                  : "Open the editor — describe edits to this image"
-              }
-              className={shortForRender ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none" : OUTLINE_BUTTON}
-            >
-              <Icon icon={MagicWand01Icon} />
-              Refine
-            </button>
-            <button
-              type="button"
-              onClick={regenerating ? () => {} : onRegenerate}
-              disabled={shortForRender}
-              aria-disabled={regenerating || shortForRender}
-              aria-pressed={regenerating}
-              aria-label={`Regenerate a fresh take of Concept ${conceptLabel}`}
-              title={
-                shortForRender
-                  ? NO_RENDER
-                  : regenerating
-                    ? "A fresh take is rendering below"
-                    : "Fresh take — ignores the current image"
-              }
-              className={
-                shortForRender
-                  ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none"
-                  : regenerating
-                    ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border-strong bg-bg-subtle px-[12px] text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                    : OUTLINE_BUTTON
-              }
-            >
-              <Icon icon={Refresh01Icon} />
-              Regenerate
-            </button>
-            {/* When the balance can't cover a build the price line says
-                what the balance IS — the gap is the reason the CTA is
-                off, and naming it here saves a trip to the ledger. */}
-            {showUse && (
-              <>
-              <span
-                data-testid="cost-label"
-                className={
-                  shortOnCredits
-                    ? "inline-flex items-center gap-[4px] text-sm text-text-error"
-                    : "inline-flex items-center gap-[4px] text-sm text-text-tertiary"
-                }
-              >
-                Cost: {BUILD_COST} credits
-                {shortOnCredits ? ` · you have ${balance}` : ""}
-                <button
-                  type="button"
-                  aria-label={COST_HINT}
-                  title={COST_HINT}
-                  aria-describedby={costHintId}
-                  className="inline-flex h-[20px] w-[20px] items-center justify-center rounded-full outline-none transition-colors duration-fast hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
-                >
-                  <Icon icon={InformationCircleIcon} size={14} />
-                </button>
-                <span id={costHintId} className="sr-only">
-                  {COST_HINT}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={onUseThis}
-                disabled={shortOnCredits || preparing}
-                aria-disabled={shortOnCredits || preparing}
-                aria-busy={preparing}
-                aria-label={`Use Concept ${conceptLabel} and start the full build`}
-                title={
-                  shortOnCredits
-                    ? "Not enough credits"
-                    : preparing
-                      ? "Reading the concept back…"
-                      : undefined
-                }
-                className={
-                  shortOnCredits
-                    ? "ml-auto inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[14px] text-sm font-semibold text-text-disabled"
-                    : preparing
-                      ? "ml-auto inline-flex h-[36px] cursor-wait items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand opacity-80"
-                      : "ml-auto inline-flex h-[36px] items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-                }
-              >
-                {preparing ? (
-                  <>
-                    <span
-                      aria-hidden
-                      className="inline-flex motion-safe:animate-spin"
-                    >
-                      <Icon icon={Refresh01Icon} size={14} />
-                    </span>
-                    Preparing…
-                  </>
-                ) : (
-                  <>
-                    Use this concept
-                    {!shortOnCredits && <Icon icon={ArrowRight01Icon} />}
-                  </>
-                )}
-              </button>
-                </>
-            )}
-          </>
-        )}
+        <button
+          type="button"
+          onClick={onRefine}
+          disabled={shortForRender}
+          aria-label={`Refine ${name} — ${CONCEPT_COST} credit`}
+          title={
+            shortForRender
+              ? NO_RENDER
+              : "Describe a change to this image"
+          }
+          className={shortForRender ? OUTLINE_BUTTON_OFF : OUTLINE_BUTTON}
+        >
+          <Icon icon={MagicWand01Icon} />
+          Refine
+        </button>
+        <button
+          type="button"
+          onClick={regenerating ? () => {} : onRegenerate}
+          disabled={shortForRender}
+          aria-disabled={regenerating || shortForRender}
+          aria-pressed={regenerating}
+          aria-label={`Regenerate a fresh take of ${name} — ${CONCEPT_COST} credit`}
+          title={
+            shortForRender
+              ? NO_RENDER
+              : regenerating
+                ? "A fresh take is rendering"
+                : "Fresh take — ignores the current image"
+          }
+          className={
+            shortForRender
+              ? OUTLINE_BUTTON_OFF
+              : regenerating
+                ? "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border-strong bg-bg-subtle px-[12px] text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                : OUTLINE_BUTTON
+          }
+        >
+          <Icon icon={Refresh01Icon} />
+          Regenerate
+        </button>
+        <span className="text-sm text-text-tertiary">
+          {CONCEPT_COST} credit each
+        </span>
+        {inBuild && <BuiltChip />}
       </div>
     </article>
   );
@@ -312,74 +190,16 @@ export function ImageTurn({
 
 // ───────────────────── parts ─────────────────────
 
-function SentChip() {
+// This drawing is the one the build on this canvas was made from. The build
+// itself is right there, so the chip names the fact rather than linking away
+// to a page of its own.
+function BuiltChip() {
   return (
-    <span className="inline-flex h-[36px] items-center gap-[6px] rounded-lg bg-bg-success-subtle px-[12px] text-2xs font-bold uppercase tracking-wider text-text-success">
+    <span className="ml-auto inline-flex h-[28px] items-center gap-[6px] rounded-lg bg-bg-success-subtle px-[10px] text-sm font-medium text-text-success">
       <Icon icon={CheckmarkBadge01Icon} size={14} />
-      Sent to build
+      In this build
     </span>
   );
-}
-
-// The action row of a concept that has been sent to build: the chip says
-// it left the chat, the line beside it says where the build has got to,
-// and the link is the way back to it. The status is read from the job
-// itself (never stored on the turn), so it is whatever the build really
-// is right now — the simulator writes progress into the store every
-// tick, which is what moves the "minutes left" figure here.
-function SentToBuildRow({ buildId }: { buildId: string }) {
-  const { getBuild } = useCreateHistory();
-  // The same minute clock the build page reads — the countdown is in
-  // whole minutes, so it is re-read on a slow tick rather than at
-  // render, where Date.now() has no business.
-  const now = useMinuteClock();
-  const job = getBuild(buildId);
-
-  // A chat kept from an earlier session can name a build this browser no
-  // longer holds. The turn is still sent — there is just nothing to open.
-  if (!job) return <SentChip />;
-
-  return (
-    <>
-      <SentChip />
-      <span
-        data-testid="build-status-line"
-        className="min-w-0 text-sm text-text-tertiary"
-      >
-        {buildStatusLine(job, now)}
-      </span>
-      <Link
-        href={`/build/${job.id}`}
-        aria-label="View this build"
-        className={`ml-auto ${OUTLINE_BUTTON}`}
-      >
-        View build
-        <Icon icon={ArrowRight01Icon} />
-      </Link>
-    </>
-  );
-}
-
-// One sentence per build state: what it is doing, then what that means
-// for the user.
-// The stored `status` only speaks for the two states the items can't
-// express (queued, and a system failure) — everything else is derived
-// from the artifacts themselves, so the line reads statusOf(job).
-function buildStatusLine(job: BuildJob, now: number): string {
-  switch (statusOf(job)) {
-    case "queued":
-      return job.blocked === "credits"
-        ? "Paused · top up credits to start"
-        : "Queued · starts when the current build finishes";
-    case "running":
-      return `Building now · about ${minutesLeft(job, now)} minutes left`;
-    case "ready":
-      return "Build ready · review your deliverables";
-    case "partial":
-      return "Needs a retry · open the build";
-    case "failed":
-      return "Build failed · open the build";
-  }
 }
 
 // Shown once per thread while the balance can't cover a build — every
@@ -387,7 +207,7 @@ function buildStatusLine(job: BuildJob, now: number): string {
 // thread places it under the newest concept that could still be built
 // (see chat-thread.tsx); per card it would repeat the same sentence
 // down the whole conversation.
-export function InsufficientCreditsBanner() {
+export function InsufficientCreditsBanner({ cost }: { cost: number }) {
   return (
     <aside
       role="note"
@@ -402,8 +222,8 @@ export function InsufficientCreditsBanner() {
           Not enough credits to build this
         </p>
         <p className="text-sm text-text-secondary">
-          Generating the full product costs {BUILD_COST} credits, and each
-          concept render costs {CONCEPT_COST}.
+          Building it costs {cost} credits — {BUILD_COST} per product — and
+          each concept render costs {CONCEPT_COST}.
         </p>
         <Link
           href="/history#credits"
@@ -416,23 +236,34 @@ export function InsufficientCreditsBanner() {
   );
 }
 
+// The product is the title; the lineage number is metadata beside it. The
+// number used to be the only name a card had, in a violet caps chip.
 function ConceptHeader({
   conceptLabel,
+  productName,
   ts,
 }: {
   conceptLabel: string;
+  productName?: string;
   ts?: number;
 }) {
-  const time = ts ? formatRelative(ts) : "";
+  // Re-read on the minute clock, so "just now" does not stay "just now".
+  const now = useMinuteClock();
+  const time = ts ? formatRelative(ts, now) : "";
   return (
-    <header className="flex items-center justify-between gap-[12px]">
-      <span className="inline-flex h-[22px] items-center rounded-full bg-bg-brand-subtle px-[8px] text-2xs font-bold uppercase tracking-wider text-text-brand">
-        Concept {conceptLabel}
-      </span>
-      {time && (
-        <span className="shrink-0 text-2xs font-medium text-text-tertiary">
-          {time}
+    <header className="flex items-baseline justify-between gap-[12px]">
+      <div className="flex min-w-0 items-baseline gap-[8px]">
+        {productName && (
+          <h3 className="truncate text-md font-semibold text-text-primary">
+            {productName}
+          </h3>
+        )}
+        <span className="shrink-0 text-sm text-text-tertiary">
+          Concept {conceptLabel}
         </span>
+      </div>
+      {time && (
+        <span className="shrink-0 text-sm text-text-tertiary">{time}</span>
       )}
     </header>
   );
@@ -493,7 +324,7 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
             ? "Copied"
             : "Copy prompt"
       }
-      className="inline-flex h-[28px] shrink-0 items-center gap-[4px] rounded-lg px-[6px] text-2xs font-medium text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
+      className="inline-flex h-[28px] shrink-0 items-center gap-[4px] rounded-lg px-[6px] text-sm font-medium text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus"
     >
       <Icon icon={copied ? Tick02Icon : Copy01Icon} size={15} />
       {copied && "Copied"}
@@ -505,25 +336,24 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
 // thread doesn't jump when the render lands.
 function PendingImageTurn({
   conceptLabel,
-  parentConceptLabel,
-  kind,
+  productName,
   progress,
 }: {
   conceptLabel: string;
   parentConceptLabel?: string;
+  productName?: string;
   kind: "fresh" | "refine";
   progress?: number;
 }) {
   const pct = typeof progress === "number" ? Math.round(progress) : 0;
+  // One verb for a render everywhere — the rail says "Drawing" too.
+  const what = productName ?? `concept ${conceptLabel}`;
   return (
+    // Not a live region: the percentage moves every 700 ms, and announcing
+    // each step is noise. The rail beside the canvas reports when it lands.
     <div
-      role="status"
-      aria-live="polite"
-      aria-label={
-        kind === "refine"
-          ? `Refining Concept ${parentConceptLabel} into Concept ${conceptLabel}`
-          : `Drafting Concept ${conceptLabel}`
-      }
+      role="img"
+      aria-label={`Drawing ${what}`}
       className="relative flex aspect-[64/53] w-full max-w-[640px] items-center justify-center overflow-hidden rounded-2xl border border-solid border-[var(--color-glass-fill-brand)] bg-bg-brand-subtle"
     >
       <span
@@ -539,7 +369,7 @@ function PendingImageTurn({
         data-testid="turn-progress"
         className="relative inline-flex items-center rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
       >
-        Rendering concept {conceptLabel} · {pct}%
+        Drawing {what} · {pct}%
       </span>
     </div>
   );
@@ -611,8 +441,8 @@ function FailedImageTurn({
   );
 }
 
-function formatRelative(ts: number): string {
-  const delta = Math.max(0, Date.now() - ts);
+function formatRelative(ts: number, now: number): string {
+  const delta = Math.max(0, now - ts);
   const sec = Math.floor(delta / 1000);
   if (sec < 45) return "just now";
   const min = Math.floor(sec / 60);

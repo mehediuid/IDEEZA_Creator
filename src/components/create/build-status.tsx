@@ -34,10 +34,11 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, type BannerTone } from "@/components/ideeza";
-import { BUILD_COST } from "@/lib/create/credits";
+import { buildCost } from "@/lib/create/credits";
 import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
+  allItems,
   elapsedMinutes,
   isOverrunning,
   productsOf,
@@ -126,6 +127,8 @@ export function stateRowFor(
 ): StateRow {
   const status = statusOf(job);
   const elapsed = elapsedMinutes(job, now);
+  // What this build was charged: one product's price per product.
+  const cost = buildCost(productsOf(job).length);
 
   // Its turn came up and the balance couldn't cover it. Still queued,
   // but for a reason the user can act on.
@@ -173,9 +176,9 @@ export function stateRowFor(
     // states — the refund is a separate step from the failure, so the
     // banner can't announce one that hasn't happened.
     const credits = job.creditsRefunded
-      ? `All ${BUILD_COST} credits have been refunded automatically — your balance is unchanged.`
+      ? `All ${cost} credits have been refunded automatically — your balance is unchanged.`
       : job.creditsCharged
-        ? `The ${BUILD_COST} credits this build was charged are being put back now.`
+        ? `The ${cost} credits this build was charged are being put back now.`
         : "Nothing was charged for this build.";
     // A piece that finished before the failure is still a piece that
     // finished — the rows say so, so the clock line can't say nothing
@@ -216,7 +219,9 @@ export function stateRowFor(
         title: `The ${failedList} step${failed.length === 1 ? "" : "s"} failed`,
         body: `${safe}Retrying the ${failedList} will not cost additional credits.`,
       },
-      meta: `${done.length} of ${job.items.length} pieces finished · retry costs no extra credits`,
+      meta: `${done.length} of ${
+        allItems(job).filter((i) => i.status !== "skipped").length
+      } pieces finished · retry costs no extra credits`,
       footer: `The finished pieces are saved. Only the ${failedList} ${
         failed.length === 1 ? "needs" : "need"
       } another attempt.`,
@@ -229,7 +234,7 @@ export function stateRowFor(
       badge: { text: "Ready", tone: "success" },
       sectionLabel: "Build results",
       meta: `Finished in ${minutes(elapsed)}`,
-      footer: "All five pieces are ready. Choose what happens to this build next.",
+      footer: "Every piece is ready. Choose what happens to this build next.",
       footerLink: HOME_LINK,
     };
   }
@@ -292,8 +297,13 @@ export function useMinuteClock(): number {
 export function BuildStatus({
   job,
   statesOnly = false,
+  inChat = false,
 }: {
   job: BuildJob;
+  /** Rendered in the build's own chat: the ways back to that chat (and to
+   *  home, a page away from the work) are dropped, since the maker is
+   *  already where they would lead. */
+  inChat?: boolean;
   /** Drop the concept strip and the artifact rows, keeping the states that
    *  belong to the whole build — the banner, the queue notice, the cancel,
    *  the overrun stop and the retries. Set where the rail already lists
@@ -332,7 +342,7 @@ export function BuildStatus({
             </p>
             <p className="mt-[2px] text-sm text-text-secondary">
               It has run past twice its estimate. You can stop it and get your{" "}
-              {BUILD_COST} credits back.
+              {buildCost(products.length)} credits back.
             </p>
           </div>
           <button
@@ -414,7 +424,7 @@ export function BuildStatus({
             type="button"
             onClick={() => {
               cancelBuild(job.id);
-              router.push(`/chat/${job.chatId}`);
+              if (!inChat) router.push(`/chat/${job.chatId}`);
             }}
             className="inline-flex h-[40px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
           >
@@ -433,28 +443,32 @@ export function BuildStatus({
           <button
             type="button"
             onClick={() => retryBuild(job.id)}
-            className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-violet-600 px-[16px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             <Icon icon={Refresh01Icon} />
             Try this build again
           </button>
-          <Link
-            href={`/chat/${job.chatId}`}
-            className="inline-flex h-[40px] items-center rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            Back to chat
-          </Link>
+          {!inChat && (
+            <Link
+              href={`/chat/${job.chatId}`}
+              className="inline-flex h-[40px] items-center rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              Back to chat
+            </Link>
+          )}
         </div>
       )}
 
       <div className="text-center">
         <p className="text-sm text-text-tertiary">{row.footer}</p>
-        <Link
-          href={row.footerLink.href}
-          className="mt-[4px] inline-block text-sm font-semibold text-text-link no-underline outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          {row.footerLink.label}
-        </Link>
+        {!(inChat && row.footerLink.href === HOME_LINK.href) && (
+          <Link
+            href={row.footerLink.href}
+            className="mt-[4px] inline-block text-sm font-semibold text-text-link no-underline outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            {row.footerLink.label}
+          </Link>
+        )}
       </div>
     </section>
   );

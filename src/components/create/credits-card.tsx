@@ -6,10 +6,23 @@
 // balance, nothing more.
 
 import * as React from "react";
-import { describeEntry, useCredits, TOP_UP_CREDITS } from "@/lib/create/credits";
+import {
+  BUILD_COST,
+  CONCEPT_COST,
+  describeEntry,
+  useCredits,
+  TOP_UP_CREDITS,
+} from "@/lib/create/credits";
+import { useCreateHistory } from "@/lib/create/history";
 
 export function CreditsCard() {
   const { hydrated, balance, ledger, topUp } = useCredits();
+  // A build's ledger line names the build, not its id.
+  const { builds } = useCreateHistory();
+  const titles = React.useMemo(
+    () => new Map(builds.map((b) => [b.id, b.title])),
+    [builds],
+  );
 
   if (!hydrated) {
     return <Shell aria-hidden />;
@@ -28,8 +41,9 @@ export function CreditsCard() {
           {balance}
         </p>
         <p className="mt-[4px] text-sm text-text-secondary">
-          Each full-product build uses 4 credits. Exploring and refining
-          concepts stays free.
+          A full-product build uses {BUILD_COST} credits per product. Every
+          concept render — a first draft, a refine or a regenerate — uses{" "}
+          {CONCEPT_COST}.
         </p>
 
         {recent.length > 0 && (
@@ -39,7 +53,10 @@ export function CreditsCard() {
                 key={entry.id}
                 className="text-sm tabular-nums text-text-tertiary"
               >
-                {describeEntry(entry)}
+                {describeEntry(
+                  entry,
+                  entry.buildId ? titles.get(entry.buildId) : undefined,
+                )}
               </li>
             ))}
           </ul>

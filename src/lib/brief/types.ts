@@ -139,7 +139,6 @@ export type BriefState = {
   videoPrompt: string;
   audioPrompt: string;
   audioAutoGenerate: boolean;
-  autoGenerateVideo: boolean;
   quality: Quality;
   scenes: Scene[];
   storyboardGenerated: boolean;
@@ -189,7 +188,6 @@ export const DEFAULT_STATE: BriefState = {
   videoPrompt: "",
   audioPrompt: "",
   audioAutoGenerate: true,
-  autoGenerateVideo: false,
   quality: "low",
   scenes: [],
   storyboardGenerated: false,
@@ -344,7 +342,6 @@ export function normalizeBrief(parsed: unknown): BriefState {
     videoPrompt: str(s.videoPrompt, DEFAULT_STATE.videoPrompt),
     audioPrompt: str(s.audioPrompt, DEFAULT_STATE.audioPrompt),
     audioAutoGenerate: bool(s.audioAutoGenerate, DEFAULT_STATE.audioAutoGenerate),
-    autoGenerateVideo: bool(s.autoGenerateVideo, DEFAULT_STATE.autoGenerateVideo),
     quality: oneOf(s.quality, QUALITIES, DEFAULT_STATE.quality),
     scenes: normalizeScenes(s.scenes),
     storyboardGenerated: bool(

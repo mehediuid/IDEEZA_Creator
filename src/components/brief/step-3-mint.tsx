@@ -377,7 +377,8 @@ export function Step3Mint({
               }}
             >
               Estimate at fixed reference rates — live network pricing
-              isn&rsquo;t wired yet.
+              isn&rsquo;t wired yet. IDZ is IDEEZA&rsquo;s token, paid from
+              your wallet; it is separate from the credits a build uses.
             </div>
           </div>
         )}

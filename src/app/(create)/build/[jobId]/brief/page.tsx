@@ -9,8 +9,9 @@
 // point (the module and step rails belong to a project, and there isn't
 // one to rail through yet).
 //
-// A build nobody can review has no brief to write: an unknown id, or one
-// still building, goes back to /build/<id>, which says which it is.
+// A build nobody can review has no brief to write: one still building goes
+// back to its chat (or to /build/<id> when the chat is gone, which also says
+// when an id is unknown).
 
 import * as React from "react";
 import dynamic from "next/dynamic";
@@ -31,14 +32,17 @@ export default function BuildBriefPage({
 }) {
   const { jobId } = React.use(params);
   const router = useRouter();
-  const { hydrated, getBuild } = useCreateHistory();
+  const { hydrated, getBuild, getChat } = useCreateHistory();
   const job = getBuild(jobId);
   const ready = job ? rollupBuild(job).status === "ready" : false;
+  // Not ready yet: back to where the build is — its chat when this browser
+  // holds it.
+  const home = job && getChat(job.chatId) ? `/chat/${job.chatId}` : `/build/${jobId}`;
 
   React.useEffect(() => {
     if (!hydrated || ready) return;
-    router.replace(`/build/${jobId}`);
-  }, [hydrated, ready, jobId, router]);
+    router.replace(home);
+  }, [hydrated, ready, home, router]);
 
   if (!hydrated) return <Blank label="Loading brief…" />;
   if (!ready) return <Blank label="Opening the build…" />;

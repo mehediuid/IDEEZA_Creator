@@ -1,102 +1,54 @@
 "use client";
 
-// BuildShell — the client orchestrator for /build/[jobId]. Pulls the
-// job from the create history store and:
-//   • While items are still building or failed → shows <BuildStatus />
-//   • Once every item is ready                 → shows <ReviewOutputs />
-//
-// The page is one centred card under a plain "← Back" link (Ai-Flow
-// frames 11–14): back means where you came from, which for a build
-// opened straight from its concept is the source chat.
+// BuildShell — /build/[jobId]. A build lives in its chat now, so this page
+// sends anyone whose browser still holds that chat straight there (keeping a
+// deep link's ?tab=). It stays a page of its own only for a build whose chat
+// is gone: the rail lists the pipeline and the whole-build states, and the
+// canvas is the same review surface the chat shows.
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import {
-  rollupBuild,
-  useCreateHistory,
-  type BuildJob,
-} from "@/lib/create/history";
+import { rollupBuild, useCreateHistory } from "@/lib/create/history";
 import { BuildRail } from "./build-rail";
 import { BuildConceptCard, BuildStatus } from "./build-status";
 import { ReviewOutputs } from "./review-outputs";
-
-// Tracks jobs whose 3D generation is in flight this session, so navigating
-// away and back doesn't kick off a duplicate generation.
-const modelStarted = new Set<string>();
-
-// Generate the build's 3D enclosure from its concept image, once, and store the
-// resulting .glb on the job. Runs for the whole life of the build view (both
-// the building and review phases) so a slow provider (Meshy) keeps going even
-// after the simulated items report "ready".
-function useBuildModel(job: BuildJob | null) {
-  const { setBuildModel } = useCreateHistory();
-  const jobId = job?.id;
-  const conceptImageUrl = job?.conceptImageUrl;
-  const hasModel = Boolean(job?.modelGlbUrl);
-
-  React.useEffect(() => {
-    if (!jobId || !conceptImageUrl || hasModel) return;
-    if (modelStarted.has(jobId)) return;
-    modelStarted.add(jobId);
-
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/three/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: conceptImageUrl }),
-        });
-        if (!res.ok) throw new Error("create failed");
-        const { provider, taskId } = (await res.json()) as {
-          provider: string;
-          taskId: string;
-        };
-        const poll = async () => {
-          if (!alive) return;
-          try {
-            const r = (await fetch(
-              `/api/three/generate?provider=${provider}&taskId=${encodeURIComponent(taskId)}`,
-            ).then((x) => x.json())) as { status: string; glbUrl?: string };
-            if (!alive) return;
-            if (r.status === "ready" && r.glbUrl) {
-              setBuildModel(jobId, r.glbUrl);
-              return;
-            }
-            if (r.status === "failed") {
-              modelStarted.delete(jobId); // allow a later retry
-              return;
-            }
-            setTimeout(poll, 2500);
-          } catch {
-            if (alive) setTimeout(poll, 3500);
-          }
-        };
-        setTimeout(poll, 1500);
-      } catch {
-        modelStarted.delete(jobId);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [jobId, conceptImageUrl, hasModel, setBuildModel]);
-}
+import { useBuildModel } from "./use-build-model";
 
 export function BuildShell({ jobId }: { jobId: string }) {
-  const { hydrated, getBuild } = useCreateHistory();
+  // The redirect reads `?tab=`, which needs a boundary so the route can still
+  // be pre-rendered.
+  return (
+    <React.Suspense fallback={<LoadingShell />}>
+      <BuildShellInner jobId={jobId} />
+    </React.Suspense>
+  );
+}
+
+function BuildShellInner({ jobId }: { jobId: string }) {
+  const { hydrated, getBuild, getChat } = useCreateHistory();
+  const router = useRouter();
+  const query = useSearchParams();
   const job = getBuild(jobId);
-  useBuildModel(job);
+  // A build lives in its chat — the conversation, the rail and the composer
+  // stay with it there. This page only remains for a build whose chat this
+  // browser no longer holds; anything else goes home to the chat, keeping a
+  // deep link's tab.
+  const chatId = job && getChat(job.chatId) ? job.chatId : null;
+  React.useEffect(() => {
+    if (!chatId) return;
+    const tab = query.get("tab");
+    router.replace(`/chat/${chatId}${tab ? `?tab=${encodeURIComponent(tab)}` : ""}`);
+  }, [chatId, query, router]);
+  useBuildModel(chatId ? null : job);
   // Shared between the rail and the canvas, so picking a product in one
   // moves the other. Declared before the early returns — a hook after one
   // is a hook that runs in a different order on the next render.
   const [productId, setProductId] = React.useState("primary");
 
-  if (!hydrated) return <LoadingShell />;
+  if (!hydrated || chatId) return <LoadingShell />;
   if (!job) return <NotFoundShell />;
 
   const rollup = rollupBuild(job);
@@ -113,7 +65,7 @@ export function BuildShell({ jobId }: { jobId: string }) {
           until the last piece finished. */}
       <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-solid border-border bg-bg-surface">
         <div className="px-[12px] pt-[16px]">
-          <BackLink job={job} />
+          <BackLink />
         </div>
         <BuildRail
           job={job}
@@ -146,13 +98,11 @@ export function BuildShell({ jobId }: { jobId: string }) {
   );
 }
 
-// Back is where the user came from. A build opened from its concept has
-// that chat one step back; a build opened cold (a link, a reload) has
-// nothing to go back to, so it falls back to the chat the build belongs
-// to rather than dropping the user on an unrelated page.
-function BackLink({ job }: { job: BuildJob }) {
+// Back is where the user came from. This page only shows for a build whose
+// chat is gone from this browser, so a cold open falls back to History, where
+// the build is listed, rather than to a chat that no longer exists.
+function BackLink() {
   const router = useRouter();
-  const chatHref = `/chat/${job.chatId}`;
   return (
     <button
       type="button"
@@ -161,7 +111,7 @@ function BackLink({ job }: { job: BuildJob }) {
           router.back();
           return;
         }
-        router.push(chatHref);
+        router.push("/history");
       }}
       className="inline-flex h-[32px] items-center gap-[8px] rounded-lg px-[8px] text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
     >

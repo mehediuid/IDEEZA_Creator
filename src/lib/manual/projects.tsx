@@ -270,11 +270,15 @@ export function ManualProjectsProvider({
     [],
   );
 
-  // The build's own words become the project: its title is the project
-  // name and the product being built, its concept prompt the
-  // description. Nothing is invented here — the review surface passes
-  // the job it is showing. Making the record is all this does: the
-  // caller decides whether the editor should switch to it.
+  // The project a finished build becomes — the one the maker already chose.
+  // The setup question asked it before anything was drawn: an existing
+  // project for a single product, or a name for the new one every system
+  // gets. Save honours that answer instead of inventing a project from the
+  // build's title, and it records every product the build made with the
+  // sentence the model wrote for it, which is what the Brief and My projects
+  // read. One project per build: a build that already has one gets it back.
+  // Making the record is all this does — the caller decides whether the
+  // editor should switch to it.
   const projectFromBuild = React.useCallback(
     (job: BuildJob) => {
       const existing = job.projectId
@@ -286,11 +290,53 @@ export function ManualProjectsProvider({
       // two projects. This is what keeps one build to one project.
       const already = builtFrom.current.get(job.id);
       if (already) return already;
+
+      const built: ManualProduct[] = [
+        {
+          name: job.title,
+          description: (job.description || job.summary || "").trim(),
+        },
+        ...(job.companions ?? []).map((c) => ({
+          name: (c.name || c.title).trim(),
+          description: (c.description || c.summary || "").trim(),
+        })),
+      ];
+
+      const chosen = job.projectChoiceId
+        ? projects.find((p) => p.id === job.projectChoiceId)
+        : undefined;
+      if (chosen) {
+        // Joining a project that already exists: its headline stays its own,
+        // and this build's products are added to what it already holds.
+        const held: ManualProduct[] =
+          chosen.products ??
+          (chosen.productName.trim()
+            ? [{ name: chosen.productName, description: chosen.description }]
+            : []);
+        const names = new Set(held.map((x) => x.name.trim().toLowerCase()));
+        const products = [
+          ...held,
+          ...built.filter((x) => !names.has(x.name.trim().toLowerCase())),
+        ];
+        const patch = {
+          products,
+          ...(chosen.productName.trim() ? null : { productName: job.title }),
+        };
+        updateProject(chosen.id, patch);
+        const project = { ...chosen, ...patch };
+        builtFrom.current.set(job.id, project);
+        return project;
+      }
+
       const created = createProject({
-        name: job.title,
-        description: job.conceptPrompt,
+        name: job.projectChoiceName?.trim() || job.title,
+        description: (job.description || job.conceptPrompt).trim(),
       });
-      const patch = { productName: job.title, buildId: job.id };
+      const patch = {
+        productName: job.title,
+        buildId: job.id,
+        products: built,
+      };
       updateProject(created.id, patch);
       const project = { ...created, ...patch };
       builtFrom.current.set(job.id, project);

@@ -242,6 +242,9 @@ export type BuildJob = {
   // review panel. Generated from conceptImageUrl via /api/three/generate;
   // undefined until it lands (the review panel shows a generating state).
   modelGlbUrl?: string;
+  /** The generation failed or never answered. The 3D panel says so and
+   *  offers a retry, instead of a spinner that turns forever. */
+  modelFailed?: boolean;
 };
 
 // What "needs attention" means for a build (spec §7b):
@@ -563,6 +566,7 @@ function normalizeJob(raw: BuildJob): BuildJob {
     estimateMin: stored.estimateMin ?? BUILD_ESTIMATE_MIN,
     creditsCharged: stored.creditsCharged ?? false,
     creditsRefunded: stored.creditsRefunded ?? false,
+    modelFailed: stored.modelFailed === true ? true : undefined,
     // Only a queued build can be waiting on credits.
     blocked:
       status === "queued" && stored.blocked === "credits"
@@ -728,6 +732,7 @@ type Ctx = {
   // Advance Edit create one project per build and reuse it after that.
   setBuildProject: (buildId: string, projectId: string) => void;
   setBuildModel: (buildId: string, glbUrl: string) => void;
+  setBuildModelFailed: (buildId: string, failed: boolean) => void;
   getBuild: (buildId: string) => BuildJob | null;
   buildsForChat: (chatId: string) => BuildJob[];
 
@@ -1503,10 +1508,25 @@ export function CreateHistoryProvider({
   const setBuildModel = React.useCallback((buildId: string, glbUrl: string) => {
     setBuilds((arr) =>
       arr.map((b) =>
-        b.id === buildId ? { ...b, modelGlbUrl: glbUrl, updatedAt: Date.now() } : b,
+        b.id === buildId
+          ? { ...b, modelGlbUrl: glbUrl, modelFailed: undefined, updatedAt: Date.now() }
+          : b,
       ),
     );
   }, []);
+
+  const setBuildModelFailed = React.useCallback(
+    (buildId: string, failed: boolean) => {
+      setBuilds((arr) =>
+        arr.map((b) =>
+          b.id === buildId
+            ? { ...b, modelFailed: failed || undefined, updatedAt: Date.now() }
+            : b,
+        ),
+      );
+    },
+    [],
+  );
 
   const dismissAttention = React.useCallback((buildId: string) => {
     setBuilds((arr) =>
@@ -1577,6 +1597,7 @@ export function CreateHistoryProvider({
     promoteQueued,
     setBuildProject,
     setBuildModel,
+    setBuildModelFailed,
     getBuild,
     buildsForChat,
     attentionBuilds,

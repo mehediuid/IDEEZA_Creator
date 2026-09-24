@@ -24,8 +24,10 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 
 export function PromptBar({
   onSubmit,
-  placeholder = "Describe your electronics project...",
+  placeholder = "Describe your electronics project…",
   canRender = true,
+  blockedReason,
+  enhanceMode = "brief",
 }: {
   onSubmit: (text: string) => void;
   placeholder?: string;
@@ -33,6 +35,13 @@ export function PromptBar({
    *  shut with that as its reason rather than letting a submit start a
    *  turn the ledger will immediately fail. */
   canRender?: boolean;
+  /** Something else has to be answered before a submission means anything —
+   *  the send is shut and says what. */
+  blockedReason?: string;
+  /** What Enhance rewrites the draft into. A change to a concept on screen
+   *  is not a project idea: rewritten as one it came back as a different
+   *  product ("make it matte black" → a whole new sensor spec). */
+  enhanceMode?: "brief" | "change";
 }) {
   const [value, setValue] = React.useState("");
   const [refining, setRefining] = React.useState(false);
@@ -59,14 +68,14 @@ export function PromptBar({
 
   const send = () => {
     const trimmed = value.trim();
-    if (!trimmed || refining) return;
+    if (!trimmed || refining || blockedReason || !canRender) return;
     onSubmit(trimmed);
     setValue("");
   };
 
-  // Enhance — rewrites the current draft into a concrete brief via
-  // /api/refine (the same endpoint the home prompt card uses), then drops
-  // it back in the box.
+  // Enhance — rewrites the current draft via /api/refine, then drops it back
+  // in the box: into a concrete brief for a new idea (the home card's mode),
+  // or into one precise instruction for a change to the concept on screen.
   const enhance = async () => {
     const trimmed = value.trim();
     if (!trimmed || refining) return;
@@ -75,7 +84,7 @@ export function PromptBar({
       const res = await fetch("/api/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed }),
+        body: JSON.stringify({ prompt: trimmed, mode: enhanceMode }),
       });
       const data = (await res.json()) as { refined?: string };
       if (data.refined && data.refined.trim()) {
@@ -186,12 +195,14 @@ export function PromptBar({
               onClick={enhance}
               refining={refining}
               disabled={!hasText || refining}
+              mode={enhanceMode}
             />
             <SendButton
               onClick={send}
               hasText={hasText}
               refining={refining}
               canRender={canRender}
+              blockedReason={blockedReason}
             />
           </div>
         </div>
@@ -249,10 +260,12 @@ function EnhanceButton({
   onClick,
   refining,
   disabled,
+  mode,
 }: {
   onClick: () => void;
   refining: boolean;
   disabled: boolean;
+  mode: "brief" | "change";
 }) {
   return (
     <button
@@ -260,7 +273,11 @@ function EnhanceButton({
       onClick={onClick}
       disabled={disabled}
       aria-label="Enhance the prompt with AI"
-      title="Rewrite your draft into a clearer, concrete brief"
+      title={
+        mode === "change"
+          ? "Rewrite your change as one clear instruction"
+          : "Rewrite your draft into a clearer, concrete brief"
+      }
       className={[
         "inline-flex h-[40px] items-center gap-[8px] rounded-lg px-[16px] text-md font-medium outline-none transition-colors duration-fast",
         "focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-50",
@@ -288,18 +305,22 @@ function SendButton({
   hasText,
   refining,
   canRender,
+  blockedReason,
 }: {
   onClick: () => void;
   hasText: boolean;
   refining: boolean;
   canRender: boolean;
+  blockedReason?: string;
 }) {
-  if (!hasText || refining || !canRender) {
+  if (!hasText || refining || !canRender || blockedReason) {
     const why = !canRender
       ? "Not enough credits to render a concept"
-      : refining
-        ? "Enhancing your draft…"
-        : "Describe your project first";
+      : blockedReason
+        ? blockedReason
+        : refining
+          ? "Enhancing your draft…"
+          : "Type something first";
     return (
       <button
         type="button"

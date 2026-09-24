@@ -31,7 +31,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
-import { BriefRail } from "./brief-rail";
+import { BriefRail, BriefStepLine } from "./brief-rail";
 import { Step1Idea, type Step1Patch } from "./step-1-idea";
 import { Step2Video } from "./step-2-video";
 import { PromptHelpModal } from "./prompt-help-modal";
@@ -521,7 +521,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     setStatus,
     updateProject,
   } = useManualProjects();
-  const { builds, getBuild, setBuildProject } = useCreateHistory();
+  const { builds, getBuild, getChat, setBuildProject } = useCreateHistory();
   const job = buildId ? getBuild(buildId) : null;
   // The project this brief belongs to. On a build that is whichever project
   // Step 1 attached it to — nothing until then, which is the whole reason
@@ -569,7 +569,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   const hydrated = scope !== null && hydratedScope === scope;
   const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
-  // Step 2's "Need to prompt help?" — a view, not an answer, so it stays out
+  // Step 2's "Help me write it" — a view, not an answer, so it stays out
   // of the saved draft.
   const [promptHelpOpen, setPromptHelpOpen] = React.useState(false);
   // Step 1's hand-off is in flight: Continue has created/attached and the page
@@ -608,6 +608,23 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // knows rather than asking for it again.
     if (!scopeProjectId && job)
       normalized = seedFromBuild(normalized, job, stored, projects);
+    // A project that already records its products — a build saved in one
+    // click does — opens its first brief on them, so Step 1 shows every
+    // product with its description rather than the headline alone.
+    if (scopeProjectId && !stored) {
+      const own = projects.find((p) => p.id === scopeProjectId);
+      if (own?.products?.length) {
+        normalized = {
+          ...normalized,
+          productDescription:
+            normalized.productDescription ||
+            own.products[0].description.slice(0, BRIEF_DESC_MAX),
+          otherProducts: normalized.otherProducts.length
+            ? normalized.otherProducts
+            : own.products.slice(1),
+        };
+      }
+    }
     let nextStep = loadedStep;
     const regen = readRegenRequest();
     if (regen) {
@@ -795,14 +812,21 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // the maker's edits are laid over it where they exist. Reading the list
     // straight off the draft meant that a press after the draft had been
     // re-seeded wrote a one-product project over a three-product one.
-    const productList = buildProducts.length
-      ? [
-          { name: next.productName, description: next.productDescription },
-          ...buildProducts
-            .slice(1)
-            .map((p, i) => next.otherProducts[i] ?? p),
-        ]
-      : null;
+    // A project that already records its products is the list: its brief
+    // opened on them, so the maker's edits are laid over the project's own
+    // list rather than over this build's alone, which would drop whatever
+    // the project held before the build joined it.
+    const head = { name: next.productName, description: next.productDescription };
+    const productList = scopeProject?.products?.length
+      ? [head, ...next.otherProducts]
+      : buildProducts.length
+        ? [
+            head,
+            ...buildProducts
+              .slice(1)
+              .map((p, i) => next.otherProducts[i] ?? p),
+          ]
+        : null;
 
     // Where the brief opens on the other side: the step this intent runs after
     // the idea, so a seeded hand-off lands exactly where staying put would.
@@ -864,7 +888,11 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // gate reads the slug and remounts the Brief per project. So attaching the
     // build elsewhere is a navigation, with the draft seeded first so the
     // remount opens on the next step carrying what was just typed.
-    if (targetId !== activeProjectId) {
+    // A build's brief on the project the build was saved into carries on in
+    // place — this shell is where it runs, whichever project the editor has
+    // open.
+    const inPlace = !!buildId && job?.projectId === targetId;
+    if (targetId !== activeProjectId && !inPlace) {
       // Unless that project already has a brief of its own — then its draft
       // wins, we only open it, and Step 1 there explains what happened.
       if (seedDraft(targetId, next, afterIdea, targetProductName)) {
@@ -1063,13 +1091,20 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                   !scopeProjectId &&
                   !!(job?.projectChoiceId || job?.projectChoiceName?.trim())
                 }
+                fromBuild={!!buildId}
                 intent={state.intent}
                 busy={continuing}
                 onChange={handleStep1Change}
                 // Back is where this brief was opened from: the build's
                 // review, or My projects.
                 onBack={() =>
-                  router.push(buildId ? `/build/${buildId}` : "/projects")
+                  router.push(
+                    job && getChat(job.chatId)
+                      ? `/chat/${job.chatId}`
+                      : buildId
+                        ? `/build/${buildId}`
+                        : "/projects",
+                  )
                 }
                 onContinue={continueFromIdea}
               />
@@ -1119,10 +1154,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         open={promptHelpOpen && step === "preview"}
         productName={state.productName}
         productDescription={state.productDescription}
-        onUse={(prompt) =>
-          // Hand-authored now — the auto toggle must not overwrite it.
-          patch({ videoPrompt: prompt, autoGenerateVideo: false })
-        }
+        onUse={(prompt) => patch({ videoPrompt: prompt })}
         onClose={() => setPromptHelpOpen(false)}
       />
 
@@ -1183,6 +1215,9 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           padding: "40px 32px 64px",
         }}
       >
+        {step !== "success" && (
+          <BriefStepLine steps={seq} current={step} intent={state.intent} />
+        )}
         {body}
         {chrome}
       </div>

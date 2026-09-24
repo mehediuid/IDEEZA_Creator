@@ -17,6 +17,7 @@ import { C } from "@/lib/pcb/colors";
 import { BriefCard } from "./brief-app";
 import type { BriefState, Intent, MediaType, Scene } from "./brief-app";
 import { ArRecordPanel } from "./ar-record-panel";
+import { videoScenePrompt } from "@/lib/brief/video-prompt";
 import {
   useVideoJobs,
   progressOf,
@@ -25,10 +26,6 @@ import {
   type VideoJob,
 } from "@/components/video-jobs/video-jobs-provider";
 
-/** What "Auto Generate Video" writes into the prompt field. */
-function autoVideoPrompt(productName: string, productDescription: string): string {
-  return `Cinematic product reveal of ${productName}: ${productDescription}. Slow orbit, soft studio light, 10 seconds.`;
-}
 
 const LOCK_LISTING = "A listing needs a preview clip";
 const LOCK_POST = "An Innovations post needs a preview clip";
@@ -125,10 +122,37 @@ export function Step2Video({
       ? "The clip hasn't arrived yet"
       : undefined;
 
-  const filledPrompt = autoVideoPrompt(
-    state.productName || "your product",
-    state.productDescription || "what it does",
-  );
+  // Picking AI starts the prompt from what the brief already knows, as an
+  // editable draft. There used to be three ways to fill this one field — type
+  // it, an "Auto Generate Video" toggle, and Prompt Help — and the toggle and
+  // Prompt Help's fallback wrote the same sentence. Now there is the draft and
+  // one helper.
+  const draftPrompt = () =>
+    videoScenePrompt(
+      [state.productName, state.productDescription]
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .join(": ") || "your product",
+    );
+  const pickAi = () =>
+    onChange(
+      state.videoPrompt.trim()
+        ? { mediaType: "ai" }
+        : { mediaType: "ai", videoPrompt: draftPrompt() },
+    );
+  // AI is the default, so most briefs arrive here with it already picked and
+  // the field empty — the draft is written once, on arrival.
+  const seeded = React.useRef(false);
+  React.useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    if (effectiveMediaType === "ai" && !state.videoPrompt.trim()) {
+      onChange({ videoPrompt: draftPrompt() });
+    }
+    // Once, on arrival: re-running on every edit would write the draft back
+    // over a field the maker has just cleared.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const intent = (state.intent || "sell") as Intent;
   // Forward from here is either "start the render and stay" or "carry on" —
@@ -182,7 +206,7 @@ export function Step2Video({
             id="ar"
             label="AR"
             sub="Record from your phone"
-            status="available"
+            status="soon"
             selected={effectiveMediaType === "ar"}
             onClick={() => onChange({ mediaType: "ar" })}
             icon={
@@ -208,7 +232,7 @@ export function Step2Video({
             sub="Generate from a prompt"
             status="recommended"
             selected={effectiveMediaType === "ai"}
-            onClick={() => onChange({ mediaType: "ai" })}
+            onClick={pickAi}
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M10.5 3l1.7 4.8L17 9.5l-4.8 1.7L10.5 16l-1.7-4.8L4 9.5l4.8-1.7z" />
@@ -268,7 +292,7 @@ export function Step2Video({
                       fontFamily: "inherit",
                     }}
                   >
-                    Need to prompt help?
+                    Help me write it
                   </button>
                 ) : null
               }
@@ -277,27 +301,10 @@ export function Step2Video({
                 id="s2-video-prompt"
                 className="ix-brief-field"
                 value={state.videoPrompt}
-                onChange={(e) =>
-                  onChange({
-                    videoPrompt: e.target.value,
-                    // Once you write it yourself it is no longer auto-written.
-                    autoGenerateVideo: false,
-                  })
-                }
-                placeholder="Write here your description for your new product video"
+                onChange={(e) => onChange({ videoPrompt: e.target.value })}
+                placeholder="Describe the shot — the product, the setting, how the camera moves"
                 rows={3}
                 style={textareaStyle}
-              />
-              <ToggleRow
-                label="Auto Generate Video"
-                on={state.autoGenerateVideo}
-                onChange={(v) =>
-                  onChange(
-                    v
-                      ? { autoGenerateVideo: true, videoPrompt: filledPrompt }
-                      : { autoGenerateVideo: false },
-                  )
-                }
               />
             </FieldGroup>
 
@@ -319,7 +326,7 @@ export function Step2Video({
                 label="Auto Generate Audio"
                 on={state.audioAutoGenerate}
                 onChange={(v) => onChange({ audioAutoGenerate: v })}
-                hint="Suggests a soundscape only — unlike the video toggle, it doesn't write into the field above."
+                hint="Picks the soundscape for you; the field above stays yours."
               />
             </FieldGroup>
 
@@ -385,7 +392,9 @@ export function Step2Video({
                     >
                       <path d="M12 3.2l1.9 5.4 5.4 1.9-5.4 1.9-1.9 5.4-1.9-5.4L4.7 10.5l5.4-1.9z" />
                     </svg>
-                    Regenerate storyboard
+                    {state.storyboardGenerated
+                      ? "Regenerate storyboard"
+                      : "Generate storyboard"}
                   </>
                 )}
               </button>
@@ -521,7 +530,9 @@ export function Step2Video({
           {effectiveMediaType === "ai" ? (
             <span style={{ fontSize: 12, color: C.body }}>
               {!state.storyboardGenerated &&
-                "Type a prompt and generate the storyboard."}
+                (hasPrompt
+                  ? "Generate the storyboard to continue."
+                  : "Describe the shot, then generate the storyboard.")}
               {state.storyboardGenerated &&
                 !renderStarted &&
                 "Storyboard ready · Continue to start render."}
@@ -973,7 +984,7 @@ function Opt({
   );
 }
 
-type CardStatus = "available" | "recommended" | "locked";
+type CardStatus = "available" | "recommended" | "locked" | "soon";
 
 // The status is the card's own header band — what this way of getting a
 // preview costs you is the first thing to read, before the name.
@@ -986,15 +997,26 @@ const STATUS_BAND: Record<
     background: "var(--color-bg-success-subtle)",
     color: "var(--color-text-success)",
   },
+  // A recommendation is information, not the page's action: the brand's
+  // quiet tint, not the gradient slab (white on the gradient's light end also
+  // failed contrast in dark).
   recommended: {
     label: "Recommended",
-    background: "var(--gradient-brand)",
-    color: "var(--color-text-on-brand)",
+    background: "var(--color-bg-brand-subtle)",
+    color: "var(--color-text-brand)",
   },
   locked: {
     label: "Locked",
     background: "var(--color-bg-subtle)",
     color: "var(--color-text-secondary)",
+  },
+  // The phone app that records the clip is not released. The card stays —
+  // picking it explains that and offers the way to AI — but it no longer
+  // wears a green "Available" over a dead end.
+  soon: {
+    label: "App coming soon",
+    background: "var(--color-bg-warning-subtle)",
+    color: "var(--color-text-warning)",
   },
 };
 
