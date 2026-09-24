@@ -11,12 +11,14 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Activity01Icon,
   AiMagicIcon,
   ArrowRight01Icon,
-  CheckListIcon,
-  DeliveryBox01Icon,
+  CodeIcon,
+  CpuIcon,
+  CubeIcon,
+  ElectricWireIcon,
   FavouriteIcon,
+  PackageIcon,
   MagicWand01Icon,
   Mic01Icon,
   PlusSignIcon,
@@ -25,7 +27,12 @@ import {
   ViewIcon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-import { useCreateHistory } from "@/lib/create/history";
+import {
+  ITEM_KINDS,
+  ITEM_LABELS,
+  useCreateHistory,
+  type BuildItemKind,
+} from "@/lib/create/history";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
@@ -643,22 +650,26 @@ function Chips({
   );
 }
 
+// What a build really delivers — the same five pieces, in the same order and
+// with the same names, as the build's own tabs. This used to promise
+// "Schematic · Parts list · Build steps", which is not what arrives.
+const DELIVERABLE_ICON: Record<BuildItemKind, IconValue> = {
+  "3d": CubeIcon,
+  pcb: CpuIcon,
+  code: CodeIcon,
+  wiring: ElectricWireIcon,
+  parts: PackageIcon,
+};
+
 function WhatYouGet() {
-  const items: Array<{ icon: IconValue; label: string }> = [
-    { icon: Activity01Icon, label: "Schematic" },
-    { icon: DeliveryBox01Icon, label: "Parts list" },
-    { icon: CheckListIcon, label: "Build steps" },
-  ];
   return (
     <div
-      aria-label="Each AI generation produces a schematic, a parts list, and build steps"
+      aria-label={`Each build delivers: ${ITEM_KINDS.map((k) => ITEM_LABELS[k]).join(", ")}`}
       className="flex flex-wrap items-center justify-center gap-[6px]"
     >
-      <span className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-        You&apos;ll get
-      </span>
-      {items.map((it, i) => (
-        <React.Fragment key={it.label}>
+      <span className="text-sm text-text-tertiary">You&apos;ll get</span>
+      {ITEM_KINDS.map((kind, i) => (
+        <React.Fragment key={kind}>
           {i > 0 && (
             <span aria-hidden className="text-text-tertiary">
               ·
@@ -666,9 +677,9 @@ function WhatYouGet() {
           )}
           <span className="inline-flex items-center gap-[6px] text-sm font-regular text-text-secondary">
             <span aria-hidden className="text-text-tertiary">
-              <Icon icon={it.icon} size={14} />
+              <Icon icon={DELIVERABLE_ICON[kind]} size={14} />
             </span>
-            <span className="text-text-primary">{it.label}</span>
+            <span className="text-text-primary">{ITEM_LABELS[kind]}</span>
           </span>
         </React.Fragment>
       ))}

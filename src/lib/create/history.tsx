@@ -226,7 +226,7 @@ export type BuildJob = {
   // but the balance couldn't cover it, so it went back in the queue
   // rather than running unpaid.
   blocked?: "credits";
-  // Set by Save Project / Advance Edit once the build becomes a real
+  // Set by Save Project / Open in editor once the build becomes a real
   // ManualProject.
   projectId?: string;
   items: BuildItem[];
@@ -281,7 +281,7 @@ export const ITEM_SUBTITLES: Record<BuildItemKind, string> = {
   pcb: "Schematic, layout and BOM",
   code: "Starter firmware for the parts used",
   wiring: "Harness and pin-to-pin connections",
-  parts: "Bill of materials with suppliers",
+  parts: "Bill of materials, grouped by function",
 };
 
 // How long a full build is expected to take, in minutes.
@@ -671,6 +671,9 @@ type Ctx = {
     chatId: string,
     turnId: string,
     answer: SetupAnswer,
+    /** The project's name, which the chat then goes by — in History and
+     *  everywhere else — instead of the maker's opening sentence. */
+    title?: string,
   ) => void;
   addSetupPick: (chatId: string, turnId: string, companionId: string) => void;
   addSetupProduct: (chatId: string, turnId: string, companion: Companion) => void;
@@ -729,7 +732,7 @@ type Ctx = {
   // the simulator on each tick.
   promoteQueued: () => void;
   // Records the ManualProject this build became, so Save Project /
-  // Advance Edit create one project per build and reuse it after that.
+  // Open in editor create one project per build and reuse it after that.
   setBuildProject: (buildId: string, projectId: string) => void;
   setBuildModel: (buildId: string, glbUrl: string) => void;
   setBuildModelFailed: (buildId: string, failed: boolean) => void;
@@ -950,13 +953,14 @@ export function CreateHistoryProvider({
   // The maker has answered. The card stops asking and starts reading the
   // decision back; the orchestrator watches for this and starts the renders.
   const answerSetupTurn = React.useCallback(
-    (chatId: string, turnId: string, answer: SetupAnswer) => {
+    (chatId: string, turnId: string, answer: SetupAnswer, title?: string) => {
       setChats((arr) =>
         arr.map((c) =>
           c.id !== chatId
             ? c
             : {
                 ...c,
+                ...(title?.trim() ? { title: title.trim() } : null),
                 updatedAt: Date.now(),
                 turns: c.turns.map((t) =>
                   t.id === turnId && t.role === "setup"
@@ -1659,7 +1663,7 @@ function computeRollup(items: BuildItem[]): BuildRollup {
 //   • ready, not yet reviewed — must be opened and taken somewhere
 //   • partial / failed        — at least one item failed; retry needed
 //
-// "Reviewed" is the `projectId` that Save Project / Advance Edit set
+// "Reviewed" is the `projectId` that Save Project / Open in editor set
 // when the build becomes a real project. Without it a saved build keeps
 // asking to be reviewed forever — the work is done and the bell is
 // still lit.

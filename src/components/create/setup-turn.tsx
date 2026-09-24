@@ -165,7 +165,7 @@ export function SetupTurn({
       )}
       <Question
         chip="Project"
-        ask={multi ? "What should the project be called?" : "Where does this go?"}
+        ask={multi ? "What should the project be called?" : "Which project is this for?"}
         note={
           multi
             ? `${extra.length + 1} products belong together, so they go in one new project.`

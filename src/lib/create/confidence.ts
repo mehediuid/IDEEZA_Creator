@@ -215,8 +215,16 @@ export const TIER_LABEL: Record<Tier, string> = {
 
 export const TIER_MEANING: Record<Tier, string> = {
   checked: "Automated design rule checks passed",
-  draft: "Design rule issues found — review required before manufacturing",
+  // Not "design rule issues": what is found today is a works-with mismatch
+  // between two products, and the sentence has to be true of every group.
+  draft: "Issues found — review them before you manufacture",
 };
+
+/** What `Draft` means when nothing was found because nothing could run — the
+ *  case on every build today. "Issues found" there was a claim about checks
+ *  the rows beneath it said never ran. */
+export const DRAFT_UNCHECKED_MEANING =
+  "Not checked yet — the design rule checks can't run on this build, so nothing has been verified. Nothing was found wrong either; review it before you manufacture.";
 
 /** §4.3.4 — the sentence that has to be on screen wherever `Draft` is,
  *  because the spec calls this copy the single most likely source of a

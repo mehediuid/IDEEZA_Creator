@@ -3,9 +3,8 @@
 // GlobalRenderIndicator — a stack of dark toasts fixed top-centre, visible on
 // every page once at least one video job wants attention (rendering, or done
 // but not yet reviewed, or failed). One line per job, newest on top:
-//   rendering → "Video rendering · ~Nm remaining. Project goes live when
-//                done." + CANCEL + ×
-//   ready     → "Video ready · <title>. Tap to review." + REVIEW (opens
+//   rendering → "Video rendering · <title> · about Nm left" + Cancel + ×
+//   ready     → "Video ready · <title>" + Review (opens
 //                ReviewModal) + ×
 //   failed    → "Video render failed · <title>." + RETRY + ×
 //
@@ -220,7 +219,7 @@ function ToastLine({
     icon = <CheckGlyph />;
     message = (
       <>
-        Video ready · {title}. Tap to review.
+        Video ready · {title}
       </>
     );
     action = (
@@ -258,8 +257,7 @@ function ToastLine({
     icon = <InfoGlyph />;
     message = (
       <>
-        Video rendering · ~{fmtMin(etaSec)} remaining. Project goes live when
-        done.
+        Video rendering · {title} · about {fmtMin(etaSec)} left
       </>
     );
     action = (

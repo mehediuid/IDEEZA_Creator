@@ -25,6 +25,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import {
   DRAFT_CREDIT_NOTE,
+  DRAFT_UNCHECKED_MEANING,
   TIER_LABEL,
   TIER_MEANING,
   type Issue,
@@ -50,18 +51,30 @@ export function ConfidenceBadge({
   const [open, setOpen] = React.useState(defaultOpen);
   const draft = confidence.tier === "draft";
   const id = React.useId().replace(/:/g, "");
+  // A check that ran and found something is a warning; a check that could not
+  // run is a fact about the build, not a fault in it. Every build today is the
+  // second kind, and painting it amber made the moment a build finished read
+  // as a problem.
+  const total = confidence.issues.length;
+  const found = confidence.issues.filter((i) => !i.notRun).length;
+  const unchecked = draft && found === 0;
 
   const badge = (
     <span
       data-testid="confidence-badge"
       className={[
         "inline-flex h-[24px] items-center gap-[6px] rounded-full px-[10px] text-sm font-semibold",
-        draft
-          ? "bg-bg-warning-subtle text-[color:var(--color-text-warning)]"
-          : "bg-bg-success-subtle text-text-success",
+        !draft
+          ? "bg-bg-success-subtle text-text-success"
+          : unchecked
+            ? "bg-bg-subtle text-text-secondary"
+            : "bg-bg-warning-subtle text-[color:var(--color-text-warning)]",
       ].join(" ")}
     >
-      <Icon icon={draft ? Alert02Icon : CheckmarkCircle02Icon} size={13} />
+      <Icon
+        icon={draft ? (unchecked ? InformationCircleIcon : Alert02Icon) : CheckmarkCircle02Icon}
+        size={13}
+      />
       {TIER_LABEL[confidence.tier]}
     </span>
   );
@@ -88,7 +101,11 @@ export function ConfidenceBadge({
       >
         {badge}
         <span className="text-sm text-text-secondary">
-          {confidence.issues.length} to review
+          {unchecked
+            ? `${total} check${total === 1 ? "" : "s"} not run yet`
+            : found === total
+              ? `${found} to review`
+              : `${found} to review · ${total - found} not run`}
         </span>
         <svg
           width={12}
@@ -114,11 +131,11 @@ export function ConfidenceBadge({
           className="flex flex-col gap-[12px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]"
         >
           <p className="text-sm text-text-secondary">
-            {TIER_MEANING.draft}
+            {unchecked ? DRAFT_UNCHECKED_MEANING : TIER_MEANING.draft}
           </p>
           {groups.map(({ group, issues }) => (
             <section key={group} className="flex flex-col gap-[6px]">
-              <h4 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
+              <h4 className="text-sm font-semibold text-text-primary">
                 {GROUP_LABEL[group]}
               </h4>
               <ul role="list" className="flex flex-col gap-[6px]">
@@ -147,13 +164,13 @@ function IssueRow({ issue }: { issue: Issue }) {
           things, and the row says which before it says what. */}
       <span
         className={[
-          "mt-[2px] inline-flex h-[16px] shrink-0 items-center rounded-full px-[6px] text-2xs font-semibold uppercase tracking-caps",
+          "mt-[1px] inline-flex h-[20px] shrink-0 items-center rounded-full px-[8px] text-xs font-semibold",
           issue.notRun
             ? "bg-bg-surface-raised text-text-tertiary"
             : "bg-bg-warning-subtle text-[color:var(--color-text-warning)]",
         ].join(" ")}
       >
-        {issue.notRun ? "not run" : "found"}
+        {issue.notRun ? "Not run" : "Found"}
       </span>
       <span className="min-w-0">{issue.text}</span>
     </li>

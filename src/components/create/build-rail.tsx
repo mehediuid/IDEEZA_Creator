@@ -31,47 +31,69 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 
+// What the build is doing, in one word — the rail used to say "Building"
+// beside "every piece is ready".
+const STATE_WORD: Record<ReturnType<typeof statusOf>, string> = {
+  queued: "Queued",
+  running: "Building",
+  ready: "Build ready",
+  partial: "Needs a retry",
+  failed: "Build stopped",
+};
+
 export function BuildRail({
   job,
+  title,
   /** Which product the canvas is showing, so the rail can mark it. */
   activeProductId,
   onPickProduct,
 }: {
   job: BuildJob;
+  /** What the build is called — the project, the same name the review card
+   *  carries. Falls back to the project named at the question, then to the
+   *  primary product. */
+  title?: string;
   activeProductId?: string;
   onPickProduct?: (productId: string) => void;
 }) {
   const products = React.useMemo(() => productsOf(job), [job]);
   const roll = rollupBuild(job);
   const state = statusOf(job);
+  const name = title?.trim() || job.projectChoiceName?.trim() || job.title;
 
   return (
     <div className="flex flex-col gap-[20px] px-[18px] py-[20px]">
       <div className="flex flex-col gap-[4px]">
-        <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
-          Building
+        <span className="text-sm font-semibold text-text-tertiary">
+          {STATE_WORD[state]}
         </span>
-        <p className="text-md font-semibold text-text-primary">{job.title}</p>
+        <p className="text-md font-semibold text-text-primary">{name}</p>
         <p className="text-sm text-text-tertiary">
           {products.length} product{products.length === 1 ? "" : "s"} ·{" "}
           {state === "ready"
             ? "every piece is ready"
-            : `${Math.round(roll.progress)}% done`}
+            : state === "queued"
+              ? "waiting to start"
+              : `${Math.round(roll.progress)}% done`}
         </p>
       </div>
 
       {products.map((product) => (
         <section key={product.id} className="flex flex-col gap-[6px]">
+          {/* A product's name, and — where the canvas can show it — the way to
+              show it. Selection reads as the selected row everywhere else in
+              the app reads: the quiet fill, not violet caps text. */}
           {products.length > 1 && (
             <button
               type="button"
               onClick={() => onPickProduct?.(product.id)}
               disabled={!onPickProduct}
+              aria-pressed={product.id === activeProductId}
               className={[
-                "w-full rounded-lg px-[6px] py-[4px] text-left font-display text-xs font-semibold uppercase tracking-caps outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+                "w-full rounded-lg px-[6px] py-[5px] text-left text-sm font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
                 product.id === activeProductId
-                  ? "text-text-brand"
-                  : "text-text-tertiary",
+                  ? "bg-bg-subtle text-text-primary"
+                  : "text-text-secondary",
                 onPickProduct ? "hover:bg-bg-subtle" : "cursor-default",
               ].join(" ")}
             >

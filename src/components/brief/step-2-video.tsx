@@ -108,6 +108,9 @@ export function Step2Video({
     ? jobs.find((j) => j.id === state.videoJobId) || null
     : null;
   const renderStarted = !!job;
+  // Finished: nothing is "in flight" any more, and the notes stop saying the
+  // render keeps running.
+  const renderDone = job?.stage === "done";
 
   const canStartRender =
     effectiveMediaType === "ai" && state.storyboardGenerated;
@@ -493,7 +496,7 @@ export function Step2Video({
 
             {/* True from the moment there is a storyboard: the next click starts
                 a render that never needs this tab to stay open. */}
-            {state.storyboardGenerated && !generatingStoryboard && (
+            {state.storyboardGenerated && !generatingStoryboard && !renderDone && (
               <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
                 {isLastStep
                   ? "You can stay here and wait, or go ahead now — the render keeps running either way."
@@ -540,8 +543,10 @@ export function Step2Video({
                   running, so on the last step this would be the same fact
                   twice — and the commit needs the width to read in one line. */}
               {renderStarted &&
+                !renderDone &&
                 !isLastStep &&
                 "Render in flight · you can leave any time."}
+              {renderDone && "Video ready."}
             </span>
           ) : effectiveMediaType === null ? (
             <span style={{ fontSize: 12, color: C.body }}>
@@ -832,8 +837,8 @@ function RenderCard({
 
       {!isDone && (
         <div style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>
-          You can leave — the render keeps running and the project goes live
-          once it is done.
+          You can leave — the render keeps running, and the clip is here when
+          it finishes.
         </div>
       )}
 

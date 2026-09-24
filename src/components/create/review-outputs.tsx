@@ -9,7 +9,7 @@
 //                     at the setup question (`projectFromBuild`), with every
 //                     product and its description, and the card then offers
 //                     the Brief (sell · give · keep private) and the editor.
-//   • Advance Edit  — the same project, opened straight in the PCB editor.
+//   • Open in editor  — the same project, opened straight in the PCB editor.
 //
 // One project per build: `projectFromBuild` hands the same one back on every
 // later press. A piece that failed is retried from its own panel, here, rather
@@ -155,7 +155,7 @@ function ReviewPanel({
   const shownItem = deliverables.find((i) => i.kind === shown) ?? null;
 
   // The project this build already belongs to — the Brief's Step 1 (or
-  // Advance Edit) is what put it there. A stored id whose project is gone
+  // Open in editor) is what put it there. A stored id whose project is gone
   // reads as unsaved, so the footer can't point at a project that isn't
   // in this browser any more.
   const saved = React.useMemo(
@@ -166,9 +166,13 @@ function ReviewPanel({
   // What the card is about. The project the maker named, which is what the
   // rail beside it already calls this work; then the project it was saved
   // into; then the primary product, for a build that has neither.
-  const heading = projectName?.trim() || saved?.name || job.title;
+  const heading =
+    projectName?.trim() ||
+    saved?.name ||
+    job.projectChoiceName?.trim() ||
+    job.title;
 
-  // Advance Edit's project: created on the first press and handed back on
+  // Open in editor's project: created on the first press and handed back on
   // every one after it. Selecting it is explicit — the editor pages work
   // on the active project, so landing there means switching to it, but
   // nothing else on this surface moves it under the user.
@@ -249,7 +253,7 @@ function ReviewPanel({
         {/* What this project could become next, beside the project it is
             about. They are a tier below the footer's Save Project — that is
             the decision this card exists to take — so they wear the quiet
-            outline the card already uses for Advance Edit, one size down.
+            outline the card already uses for Open in editor, one size down.
             Neither has an engine behind it yet, so each is greyed and says
             so rather than accepting a press and doing nothing. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
@@ -467,7 +471,7 @@ function ReviewPanel({
                     onClick={openInEditor}
                     icon={PencilEdit02Icon}
                   >
-                    Advance Edit
+                    Open in editor
                   </LeaveButton>
                 </div>
               </>

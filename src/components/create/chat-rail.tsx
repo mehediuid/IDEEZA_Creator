@@ -56,7 +56,15 @@ export function ChatRail({
   }, [chat.turns.length]);
 
   return (
-    <div className="flex flex-col gap-[18px] px-[18px] py-[20px]">
+    // The rail is the account screen readers hear: a line is announced when it
+    // appears or its words change, and the moving percentage is kept out of
+    // it (the canvas tile is not a live region either).
+    <div
+      role="log"
+      aria-label="What is happening"
+      aria-live="polite"
+      className="flex flex-col gap-[18px] px-[18px] py-[20px]"
+    >
       {chat.turns.map((turn) => (
         <RailLine
           key={turn.id}
@@ -121,8 +129,8 @@ function RailLine({
           <>
             <Status tone="done">Read your idea</Status>
             <Status tone="done">
-              Building {turn.answer.picked.length + 1} product
-              {turn.answer.picked.length ? "s" : ""}
+              {turn.answer.picked.length + 1} product
+              {turn.answer.picked.length ? "s" : ""} in this project
             </Status>
             {turn.answer.projectName && (
               <Status tone="done">
@@ -144,10 +152,13 @@ function RailLine({
         <Sub>
           Drawing
           {/* Rounded: the ticker carries a fraction and a rail line is not
-              the place to print 28.667519999999996%. */}
-          {typeof turn.progress === "number"
-            ? ` · ${Math.round(turn.progress)}%`
-            : "…"}
+              the place to print 28.667519999999996%. Hidden from the live
+              region, which would otherwise read every step of it. */}
+          <span aria-hidden>
+            {typeof turn.progress === "number"
+              ? ` · ${Math.round(turn.progress)}%`
+              : "…"}
+          </span>
         </Sub>
       </Status>
     );
@@ -175,11 +186,10 @@ function Sub({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Who said it — a plain label, not another caps eyebrow in a column of them.
 function Who({ children }: { children: React.ReactNode }) {
   return (
-    <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
-      {children}
-    </span>
+    <span className="text-sm font-semibold text-text-tertiary">{children}</span>
   );
 }
 

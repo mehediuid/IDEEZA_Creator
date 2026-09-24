@@ -232,7 +232,7 @@ export function Step1Idea({
               className="ix-brief-field"
               value={productName}
               onChange={(e) => onChange({ productName: e.target.value })}
-              placeholder="Discord Bot"
+              placeholder="Smart plant waterer"
               autoFocus
               style={inputStyle}
             />
@@ -246,7 +246,7 @@ export function Step1Idea({
                 onChange={(e) =>
                   onChange({ productDescription: e.target.value.slice(0, MAX_DESC) })
                 }
-                placeholder="A discord bot that pings on every command."
+                placeholder="Waters a houseplant when its soil runs dry."
                 rows={3}
                 style={{
                   ...inputStyle,
@@ -440,7 +440,7 @@ function NewProjectPanel({
           className="ix-brief-field"
           value={name}
           onChange={(e) => onChange({ newProjectName: e.target.value })}
-          placeholder="Modern Battle Tank"
+          placeholder="Garden sensors"
           style={inputStyle}
         />
       </FieldLabel>

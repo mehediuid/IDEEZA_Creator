@@ -47,6 +47,13 @@ const POLL_CEILING_MS = 180_000;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** The maker's sentence as the tail of another one: a companion is drawn as
+ *  "Charger for a handheld soil meter…", not "…for A handheld soil meter". */
+function asPhrase(prompt: string): string {
+  const t = prompt.trim();
+  return /^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+}
+
 /** Ask the route whether the render has landed, until it has. The route is
  *  the one holding the deadline; this loop only stops waiting if it somehow
  *  never answers. */
@@ -290,7 +297,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         (t) => t.id === turnId && t.role === "setup",
       );
       if (!setup || setup.role !== "setup") return;
-      answerSetupTurn(chat.id, turnId, answer);
+      // The chat goes by the project's name from here on — one name for the
+      // work in History, the rail and the review card alike.
+      answerSetupTurn(
+        chat.id,
+        turnId,
+        answer,
+        answer.projectName.trim() ||
+          projects.find((p) => p.id === answer.projectId)?.name,
+      );
 
       // Only the turns are created here. Starting them is the auto-run
       // effect’s job, and it has the guard that stops a turn being rendered
@@ -303,13 +318,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // The companion inherits the parent’s words, so the products read
         // as one family rather than three unrelated objects.
         appendAssistantTurn(chat.id, {
-          prompt: `${companion.name} for ${setup.prompt}`,
+          prompt: `${companion.name} for ${asPhrase(setup.prompt)}`,
           kind: "fresh",
           companionOf: companion.id,
         });
       }
     },
-    [chat, answerSetupTurn, appendAssistantTurn],
+    [chat, projects, answerSetupTurn, appendAssistantTurn],
   );
 
   // A setup turn arrives with nothing in it. Two readings fill it, both from
@@ -378,7 +393,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       addSetupPick(chat.id, setup.id, companionId);
       setFocusedProduct(companionId);
       appendAssistantTurn(chat.id, {
-        prompt: `${companion.name} for ${setup.prompt}`,
+        prompt: `${companion.name} for ${asPhrase(setup.prompt)}`,
         kind: "fresh",
         companionOf: companionId,
       });
@@ -507,6 +522,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     return last ?? fallback;
   }, [chat, focusedProduct]);
 
+  // The project this chat's work belongs to, by name: typed at the question
+  // for a new one, or the existing project picked there.
+  const projectName = React.useMemo(() => {
+    const setup = chat?.turns.find((t) => t.role === "setup");
+    if (setup?.role !== "setup" || !setup.answer) return "";
+    return (
+      setup.answer.projectName.trim() ||
+      projects.find((p) => p.id === setup.answer!.projectId)?.name ||
+      ""
+    );
+  }, [chat, projects]);
+
   // The setup question is still open. Typing then used to skip it: the text
   // started a paid render of its own beside the unanswered question.
   const setupPending = React.useMemo(
@@ -572,7 +599,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         });
         setFocusedProduct(id);
         appendAssistantTurn(chat.id, {
-          prompt: `${asked.name} for ${setup.prompt}`,
+          prompt: `${asked.name} for ${asPhrase(setup.prompt)}`,
           kind: "fresh",
           companionOf: id,
         });
@@ -930,6 +957,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             <div className="border-t border-solid border-border">
               <BuildRail
                 job={activeBuild}
+                title={projectName}
                 activeProductId={focusedProduct}
                 onPickProduct={setFocusedProduct}
               />
@@ -986,6 +1014,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             preparingTurnId={preparingTurnId}
             projects={setupProjects}
             onAnswerSetup={handleAnswerSetup}
+            projectName={projectName}
             onRegenerateAt={handleRegenerate}
             onBuild={handleUseTurn}
             onRefineTurn={handleOpenEditor}

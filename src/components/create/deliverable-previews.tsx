@@ -307,7 +307,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
       </svg>
       <figcaption>
         <MetaLine
-          text={`${meta.layers}-layer · ${meta.widthMm} x ${meta.heightMm} mm · ${meta.partCount} parts · Gerber + KiCad`}
+          text={`${meta.layers}-layer · ${meta.widthMm} × ${meta.heightMm} mm · ${meta.partCount} parts`}
         />
       </figcaption>
     </figure>

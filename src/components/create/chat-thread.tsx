@@ -58,6 +58,7 @@ export function ChatThread({
   preparingTurnId,
   projects,
   onAnswerSetup,
+  projectName = "",
   onRegenerateAt,
   onBuild,
   onRefineTurn,
@@ -69,6 +70,9 @@ export function ChatThread({
   projects: SetupProject[];
   onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
   chat: ChatSession;
+  /** The project's name — typed at the question, or the existing project
+   *  picked there. The rail and the review card use the same one. */
+  projectName?: string;
   // Turns whose Regenerate is still rendering its fresh take — the
   // orchestrator owns the child→source link, the card only reads it.
   regeneratingFrom?: ReadonlySet<string>;
@@ -123,8 +127,6 @@ export function ChatThread({
     () => chat.turns.find((t) => t.role === "setup"),
     [chat.turns],
   );
-  const projectName =
-    setup?.role === "setup" ? (setup.answer?.projectName ?? "") : "";
 
   // Every card is titled with the product it is a drawing of — the name the
   // question gave it, which is the name the rail and the composer use too.
