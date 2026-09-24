@@ -20,6 +20,7 @@ import {
   ArrowDown01Icon,
   BookOpen01Icon,
   Bug01Icon,
+  Cancel01Icon,
   Compass01Icon,
   ComputerIcon,
   CpuIcon,
@@ -31,6 +32,7 @@ import {
   HelpCircleIcon,
   Logout01Icon,
   Mail01Icon,
+  Menu01Icon,
   Moon01Icon,
   MortarboardIcon,
   News01Icon,
@@ -48,6 +50,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { Icon, type IconValue } from "./icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
+import { useDialogFocus } from "@/components/create/use-dialog-focus";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -116,23 +119,71 @@ export function DashboardSidebar({
   onOpenSearch: () => void;
 }) {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
+  // The page the drawer was opened on. A drawer is for getting somewhere, so
+  // arriving closes it: once the path changes it no longer matches.
+  const pathname = usePathname();
+  const [openOn, setOpenOn] = React.useState<string | null>(null);
+  const drawerOpen = openOn === pathname;
+  const setDrawerOpen = (open: boolean) => setOpenOn(open ? pathname : null);
 
   return (
-    <aside
-      aria-label="Primary navigation"
-      data-collapsed={collapsed}
-      className={[
-        "flex h-full shrink-0 flex-col border-r border-border bg-bg-page",
-        "transition-[width] duration-normal ease-decelerate motion-reduce:transition-none",
-        collapsed ? "w-[72px]" : "w-[280px]",
-      ].join(" ")}
-    >
-      <Brand collapsed={collapsed} onToggle={toggleCollapsed} />
+    <>
+      {/* Below `md` the 280 px sidebar is a drawer behind a bar. At phone
+          width it stayed open beside every page and left the page 120 px —
+          the home headline broke a word a line, and the chat's canvas was off
+          the screen entirely. */}
+      <MobileBar
+        onOpenMenu={() => setDrawerOpen(true)}
+        onOpenSearch={onOpenSearch}
+      />
+      <aside
+        aria-label="Primary navigation"
+        data-collapsed={collapsed}
+        className={[
+          "hidden h-full shrink-0 flex-col border-r border-border bg-bg-page md:flex",
+          "transition-[width] duration-normal ease-decelerate motion-reduce:transition-none",
+          collapsed ? "w-[72px]" : "w-[280px]",
+        ].join(" ")}
+      >
+        <SidebarBody
+          collapsed={collapsed}
+          onToggle={toggleCollapsed}
+          onOpenSearch={onOpenSearch}
+        />
+      </aside>
+      {drawerOpen && (
+        <SidebarDrawer
+          onClose={() => setDrawerOpen(false)}
+          onOpenSearch={() => {
+            setDrawerOpen(false);
+            onOpenSearch();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function SidebarBody({
+  collapsed,
+  onToggle,
+  onOpenSearch,
+  onClose,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  onOpenSearch: () => void;
+  /** Present in the drawer: the brand row closes it instead of collapsing. */
+  onClose?: () => void;
+}) {
+  return (
+    <>
+      <Brand collapsed={collapsed} onToggle={onToggle} onClose={onClose} />
 
       <div className={collapsed ? "px-[12px] pt-[12px]" : "px-[16px] pt-[16px]"}>
         {collapsed && (
           <div className="mb-[8px]">
-            <ExpandButton onClick={toggleCollapsed} />
+            <ExpandButton onClick={onToggle} />
           </div>
         )}
         <SearchRow onOpen={onOpenSearch} collapsed={collapsed} />
@@ -150,7 +201,88 @@ export function DashboardSidebar({
       </nav>
 
       <Footer collapsed={collapsed} />
-    </aside>
+    </>
+  );
+}
+
+/** The phone's own chrome: the menu, the mark, and search — the three things
+ *  the sidebar is for, at 56 px instead of 280. */
+function MobileBar({
+  onOpenMenu,
+  onOpenSearch,
+}: {
+  onOpenMenu: () => void;
+  onOpenSearch: () => void;
+}) {
+  return (
+    <div className="flex h-[56px] shrink-0 items-center gap-[8px] border-b border-border bg-bg-page px-[12px] md:hidden">
+      <button
+        type="button"
+        onClick={onOpenMenu}
+        aria-label="Open the menu"
+        aria-haspopup="dialog"
+        className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <Icon icon={Menu01Icon} />
+      </button>
+      <Link
+        href="/"
+        aria-label="IDEEZA — go to dashboard"
+        className="flex min-w-0 flex-1 items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <IdeezaLogo height={24} decorative className="shrink-0" />
+      </Link>
+      <button
+        type="button"
+        onClick={onOpenSearch}
+        aria-label="Search commands, pages, and settings"
+        className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <Icon icon={Search01Icon} />
+      </button>
+    </div>
+  );
+}
+
+/** The sidebar as a drawer over the page, for phone widths: the same body,
+ *  a backdrop that closes it, Escape, and focus held inside while it is open
+ *  and handed back to the menu button when it closes. */
+function SidebarDrawer({
+  onClose,
+  onOpenSearch,
+}: {
+  onClose: () => void;
+  onOpenSearch: () => void;
+}) {
+  const panelRef = React.useRef<HTMLElement>(null);
+  useDialogFocus(true, panelRef);
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-overlay md:hidden">
+      <div
+        aria-hidden
+        onClick={onClose}
+        className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)]"
+      />
+      <aside
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Primary navigation"
+        className="relative flex h-full w-[280px] max-w-[85vw] flex-col border-r border-border bg-bg-page shadow-3"
+      >
+        <SidebarBody
+          collapsed={false}
+          onToggle={onClose}
+          onOpenSearch={onOpenSearch}
+          onClose={onClose}
+        />
+      </aside>
+    </div>
   );
 }
 
@@ -159,9 +291,11 @@ export function DashboardSidebar({
 function Brand({
   collapsed,
   onToggle,
+  onClose,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  onClose?: () => void;
 }) {
   // Collapsed: the icon mark sits where the full logo was (still links Home).
   // A separate, clearly-visible ExpandButton below it does the expanding, so
@@ -191,13 +325,13 @@ function Brand({
       </Link>
       <button
         type="button"
-        onClick={onToggle}
-        aria-label="Collapse sidebar"
-        aria-expanded
-        title="Collapse sidebar"
+        onClick={onClose ?? onToggle}
+        aria-label={onClose ? "Close the menu" : "Collapse sidebar"}
+        aria-expanded={onClose ? undefined : true}
+        title={onClose ? "Close the menu" : "Collapse sidebar"}
         className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <Icon icon={SidebarLeft01Icon} />
+        <Icon icon={onClose ? Cancel01Icon : SidebarLeft01Icon} />
       </button>
     </div>
   );

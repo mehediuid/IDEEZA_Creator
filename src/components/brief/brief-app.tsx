@@ -1217,13 +1217,14 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     return (
       <div
         data-brief-shell="build"
+        // Tighter at phone width, where 32 px a side was a fifth of the screen.
+        className="px-[16px] pb-[48px] pt-[24px] md:px-[32px] md:pb-[64px] md:pt-[40px]"
         style={{
           minHeight: "100%",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: "var(--spacing-6)",
-          padding: "40px 32px 64px",
         }}
       >
         {step !== "success" && (

@@ -142,6 +142,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // refine then continues in the thread (pending → ready), where the user can
   // watch it land and reopen Refine to iterate.
   const [focusedProduct, setFocusedProduct] = React.useState("primary");
+  // Which pane a phone shows; both show from `md`.
+  const [pane, setPane] = React.useState<"work" | "chat">("work");
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
   // Part 4 §4.4 — the companion products offered for the concept the gate
   // is open on, and which of them are ticked. The concepts themselves live
@@ -907,7 +909,39 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       : undefined;
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col md:flex-row">
+      {/* At phone width the two panes are two tabs — side by side they needed
+          1000 px and the canvas was simply off the screen. The canvas leads,
+          because the question and the work are there; the chat tab carries
+          the account and the composer. */}
+      <div
+        role="tablist"
+        aria-label="Chat panes"
+        className="flex shrink-0 gap-[4px] border-b border-solid border-border bg-bg-surface px-[12px] py-[8px] md:hidden"
+      >
+        {(
+          [
+            ["work", "Canvas"],
+            ["chat", "Chat"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={pane === id}
+            onClick={() => setPane(id)}
+            className={[
+              "inline-flex h-[36px] flex-1 items-center justify-center rounded-lg text-md font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+              pane === id
+                ? "bg-bg-subtle text-text-primary"
+                : "text-text-secondary hover:bg-bg-subtle",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {/* Two panes, the shape the work actually has: the rail on the left is
           the running account — what was asked, what was decided, what is
           happening right now — and the canvas beside it is where the work
@@ -915,7 +949,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           better part of a minute and a multi-product build runs several at
           once, so the account of it needs its own column rather than
           competing with the output for the same one. */}
-      <aside className="flex w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface">
+      <aside
+        className={[
+          "min-h-0 flex-1 flex-col border-solid border-border bg-bg-surface md:w-[360px] md:flex-none md:shrink-0 md:border-r",
+          pane === "chat" ? "flex" : "hidden md:flex",
+        ].join(" ")}
+      >
         <div className="flex-1 overflow-y-auto">
           <ChatRail chat={chat} labels={labels} />
           {/* The whole pipeline, stated the moment the build starts — every
@@ -944,7 +983,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         <div className="border-t border-solid border-border">
           <div className="w-full px-[14px] py-[14px]">
           <PromptBar
-            onSubmit={handleUserSubmit}
+            onSubmit={(text) => {
+              handleUserSubmit(text);
+              // On a phone the answer appears on the other tab.
+              setPane("work");
+            }}
             canRender={canRender}
             blockedReason={setupPending ? "Answer the question first" : undefined}
             enhanceMode={latestReadyTurn ? "change" : "brief"}
@@ -974,8 +1017,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           screen spent everything past it on empty page while the product tabs,
           the deliverable tabs and the concept grid — all of which grow into
           width — sat squeezed against the rail. */}
-      <main className="flex-1 overflow-y-auto bg-bg-page">
-        <div className="w-full px-[32px] py-[32px]">
+      <main
+        className={[
+          "min-h-0 flex-1 overflow-y-auto bg-bg-page",
+          pane === "work" ? "block" : "hidden md:block",
+        ].join(" ")}
+      >
+        <div className="w-full px-[16px] py-[20px] md:px-[32px] md:py-[32px]">
           {/* The page's one h1, for the heading outline a screen reader walks:
               the chat had none, so it opened on an h3. The rail and the
               review card already say the name on screen. */}
@@ -1032,7 +1080,7 @@ function LoadingShell() {
   return (
     <div role="status" aria-label="Loading the chat" className="flex h-full">
       <span className="sr-only">Loading the chat</span>
-      <div className="flex w-[360px] shrink-0 flex-col gap-[14px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse">
+      <div className="hidden w-[360px] shrink-0 flex-col gap-[14px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse md:flex">
         <div className="h-[12px] w-[40px] rounded bg-bg-subtle" />
         <div className="h-[14px] w-[260px] rounded bg-bg-subtle" />
         <div className="h-[14px] w-[200px] rounded bg-bg-subtle" />
@@ -1041,7 +1089,7 @@ function LoadingShell() {
         <div className="h-[14px] w-[220px] rounded bg-bg-subtle" />
         <div className="mt-auto h-[96px] w-full rounded-2xl bg-bg-subtle" />
       </div>
-      <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(320px,1fr))] content-start gap-[20px] bg-bg-page px-[32px] py-[32px] motion-safe:animate-pulse">
+      <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] content-start gap-[20px] bg-bg-page px-[16px] py-[20px] motion-safe:animate-pulse md:px-[32px] md:py-[32px]">
         <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />
         <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />
       </div>

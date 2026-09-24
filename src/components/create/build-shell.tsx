@@ -55,7 +55,7 @@ function BuildShellInner({ jobId }: { jobId: string }) {
   const ready = rollup.status === "ready";
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col md:flex-row">
       {/* Same two panes as the concept surface, for the same reason: the
           pipeline is a small fixed list that never changes, and the work it
           produces is what deserves the screen. The rail states the whole
@@ -63,7 +63,7 @@ function BuildShellInner({ jobId }: { jobId: string }) {
           not begun — and the canvas fills in beside it as each one lands. The
           page used to be the pipeline, full width, with nothing to look at
           until the last piece finished. */}
-      <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-r border-solid border-border bg-bg-surface">
+      <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-b border-solid border-border bg-bg-surface md:w-[320px] md:border-b-0 md:border-r">
         <div className="px-[12px] pt-[16px]">
           <BackLink />
         </div>
@@ -82,8 +82,8 @@ function BuildShellInner({ jobId }: { jobId: string }) {
         )}
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-bg-page">
-        <div className="mx-auto w-full max-w-[920px] px-[24px] py-[24px]">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-bg-page">
+        <div className="mx-auto w-full max-w-[920px] px-[16px] py-[20px] md:px-[24px] md:py-[24px]">
           <div className="flex flex-col gap-[16px]">
             <BuildConceptCard job={job} />
             <ReviewOutputs
@@ -127,7 +127,7 @@ function LoadingShell() {
   return (
     <div role="status" aria-label="Loading the build" className="flex h-full">
       <span className="sr-only">Loading the build</span>
-      <div className="flex w-[320px] shrink-0 flex-col gap-[12px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse">
+      <div className="hidden w-[320px] shrink-0 flex-col gap-[12px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse md:flex">
         <div className="h-[12px] w-[60px] rounded bg-bg-subtle" />
         <div className="h-[16px] w-[180px] rounded bg-bg-subtle" />
         {Array.from({ length: 5 }, (_, i) => (
