@@ -38,11 +38,11 @@ import {
   type ConceptSummary,
 } from "@/lib/create/concept";
 
-// A window rather than a second number: the estimate is an estimate.
-const ESTIMATE_WINDOW = 2;
-const TIME_CHIP = `About ${BUILD_ESTIMATE_MIN - ESTIMATE_WINDOW}–${
-  BUILD_ESTIMATE_MIN + ESTIMATE_WINDOW
-} minutes`;
+// The estimate in words — a build here takes about a minute.
+const TIME_CHIP =
+  BUILD_ESTIMATE_MIN <= 1
+    ? "About a minute"
+    : `About ${BUILD_ESTIMATE_MIN} minutes`;
 
 // One summarize call per concept: reopening the dialog on the same turn
 // shows what it read the first time instead of asking again.

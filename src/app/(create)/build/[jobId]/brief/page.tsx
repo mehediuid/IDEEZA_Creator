@@ -49,14 +49,18 @@ export default function BuildBriefPage({
   return <BriefApp buildId={jobId} />;
 }
 
+// The Brief's own shape while it loads — the step line and the card — not a
+// line of centred text.
 function Blank({ label }: { label: string }) {
   return (
     <div
       role="status"
-      aria-live="polite"
-      className="flex h-full w-full items-center justify-center bg-bg-page text-md text-text-tertiary"
+      aria-label={label}
+      className="flex min-h-full w-full flex-col items-center gap-[24px] bg-bg-page px-[32px] pb-[64px] pt-[40px] motion-safe:animate-pulse"
     >
-      {label}
+      <span className="sr-only">{label}</span>
+      <div className="h-[14px] w-full max-w-[600px] rounded bg-bg-subtle" />
+      <div className="h-[420px] w-full max-w-[600px] rounded-2xl bg-bg-subtle" />
     </div>
   );
 }

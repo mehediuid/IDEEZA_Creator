@@ -114,11 +114,6 @@ export type ChatTurn =
       // the page: reloading mid-render must pick the same job back up rather
       // than start — and charge for — a second one.
       renderJob?: string;
-      // How far the render has visibly got, 0–100. Ticked by the chat
-      // orchestrator while the turn is pending and set to 100 the moment
-      // the image lands, so the card shows real motion instead of an
-      // endless shimmer. Absent on turns that predate it.
-      progress?: number;
       imageUrl?: string;
       // Whether this image has been promoted to a build (informational —
       // does NOT lock the chat, since spec §1 says one chat can produce
@@ -285,8 +280,11 @@ export const ITEM_SUBTITLES: Record<BuildItemKind, string> = {
   parts: "Bill of materials, grouped by function",
 };
 
-// How long a full build is expected to take, in minutes.
-export const BUILD_ESTIMATE_MIN = 10;
+// How long a full build is expected to take, in minutes — what it really
+// takes here, about a minute. It said ten ("About 8–12 minutes") for a build
+// that finished in one, which made every later estimate hard to believe. The
+// overrun stop (§4.6) reads twice this.
+export const BUILD_ESTIMATE_MIN = 1;
 
 // ─────────────────────────── storage ───────────────────────────────
 
@@ -463,26 +461,6 @@ export function elapsedMinutes(job: BuildJob, now: number = Date.now()): number 
 export function isOverrunning(job: BuildJob, now: number = Date.now()): boolean {
   if (statusOf(job) !== "running") return false;
   return elapsedMinutes(job, now) > job.estimateMin * 2;
-}
-
-// The estimate scaled by what's left to do. Never says "0 minutes left"
-// while work remains — the smallest honest answer is 1 — and never
-// counts down for work that has stopped: a system failure, or a partial
-// build sitting on a failed artifact with nothing still in flight.
-export function minutesLeft(job: BuildJob, now: number = Date.now()): number {
-  if (statusOf(job) === "failed") return 0;
-  const working = liveItems(allItems(job)).some(
-    (i) => i.status === "building" || i.status === "pending",
-  );
-  if (!working) return 0;
-  // The job has already been closed out (ready / partial) — anything
-  // still marked building is stale, so there's nothing to wait for.
-  if (job.endedAt !== undefined && job.endedAt <= now) return 0;
-  // Across every product, so a two-product build does not read as
-  // half-finished the moment the primary lands.
-  const remaining = (100 - progressOf(allItems(job))) / 100;
-  if (remaining <= 0) return 0;
-  return Math.max(1, Math.round(job.estimateMin * remaining));
 }
 
 // ─────────────────────────── migration ─────────────────────────────
@@ -678,7 +656,6 @@ type Ctx = {
   ) => void;
   addSetupPick: (chatId: string, turnId: string, companionId: string) => void;
   addSetupProduct: (chatId: string, turnId: string, companion: Companion) => void;
-  setTurnProgress: (chatId: string, turnId: string, progress: number) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -890,7 +867,7 @@ export function CreateHistoryProvider({
             updatedAt: Date.now(),
             turns: c.turns.map((t) =>
               t.id === turnId && t.role === "assistant"
-                ? { ...t, status: "ready" as const, progress: 100, imageUrl }
+                ? { ...t, status: "ready" as const, imageUrl }
                 : t,
             ),
           };
@@ -1057,29 +1034,6 @@ export function CreateHistoryProvider({
             turns: c.turns.map((t) =>
               t.id === turnId && t.role === "assistant"
                 ? { ...t, renderJob: job }
-                : t,
-            ),
-          };
-        }),
-      );
-    },
-    [],
-  );
-
-  // Render progress while a turn is pending. Plain state — the number
-  // moves several times a second and carries no decision, so it doesn't
-  // belong in any history of its own.
-  const setTurnProgress = React.useCallback(
-    (chatId: string, turnId: string, progress: number) => {
-      const next = Math.max(0, Math.min(100, progress));
-      setChats((arr) =>
-        arr.map((c) => {
-          if (c.id !== chatId) return c;
-          return {
-            ...c,
-            turns: c.turns.map((t) =>
-              t.id === turnId && t.role === "assistant" && t.progress !== next
-                ? { ...t, progress: next }
                 : t,
             ),
           };
@@ -1588,7 +1542,6 @@ export function CreateHistoryProvider({
     answerSetupTurn,
     addSetupPick,
     addSetupProduct,
-    setTurnProgress,
     getChat,
     startBuild,
     updateBuildItem,

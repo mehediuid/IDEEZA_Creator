@@ -4,7 +4,7 @@
 // on every page once at least one video job wants attention (rendering, or done
 // but not yet reviewed, or failed). One card per job, newest on top, in the
 // attention toast's own shape:
-//   rendering → "Video rendering · about Nm left" / <title> + Cancel + ×
+//   rendering → "Video rendering · under a minute left" / <title> + Cancel + ×
 //   ready     → "Video ready" / <title> + Review (opens ReviewModal) + ×
 //   failed    → "Video render failed" / <title> + Try again + ×
 //
@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import {
   useVideoJobs,
   progressOf,
+  etaLabel,
   type VideoJob,
 } from "./video-jobs-provider";
 import { ReviewModal } from "@/components/brief/review-modal";
@@ -33,11 +34,6 @@ import { useManualProjects, stepHref } from "@/lib/manual/projects";
 const REGEN_REQUEST_KEY = "ideeza:brief:regenerate";
 const REGEN_EVENT = "ideeza:brief-regenerate";
 
-function fmtMin(seconds: number): string {
-  if (seconds <= 0) return "<1m";
-  const min = Math.ceil(seconds / 60);
-  return `${min}m`;
-}
 
 export function GlobalRenderIndicator() {
   const { jobs, hydrated, acknowledge, dismiss } = useVideoJobs();
@@ -215,7 +211,7 @@ function ToastLine({
     ? "Video ready"
     : isFailed
       ? "Video render failed"
-      : `Video rendering · about ${fmtMin(etaSec)} left`;
+      : `Video rendering · ${etaLabel(etaSec)} left`;
   const action = isDone
     ? { label: "Review", run: onReview }
     : isFailed

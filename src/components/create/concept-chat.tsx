@@ -100,7 +100,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     answerSetupTurn,
     addSetupPick,
     addSetupProduct,
-    setTurnProgress,
     startBuild,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
@@ -450,54 +449,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, chat?.id, chat?.turns]);
-
-  // Render progress. The generator gives no milestones, so the card
-  // shows the honest shape of a wait: fast at first, slowing as it goes,
-  // and parked at 90 until the image really lands (resolve writes 100).
-  // A timer per pending turn, so several renders in flight each move.
-  const progressTimers = React.useRef<
-    Map<string, ReturnType<typeof setInterval>>
-  >(new Map());
-  React.useEffect(() => {
-    const timers = progressTimers.current;
-    // The sweep comes first: a chat that has gone (cleared storage, a
-    // route change) leaves no pending turns, and returning before this
-    // would leave its intervals ticking against a turn nothing renders.
-    const pending = new Set(
-      (chat?.turns ?? [])
-        .filter((t) => t.role === "assistant" && t.status === "pending")
-        .map((t) => t.id),
-    );
-    for (const [id, handle] of timers) {
-      if (pending.has(id)) continue;
-      clearInterval(handle);
-      timers.delete(id);
-    }
-    if (!chat) return;
-    for (const turn of chat.turns) {
-      if (turn.role !== "assistant" || turn.status !== "pending") continue;
-      if (timers.has(turn.id)) continue;
-      const cid = chat.id;
-      const tid = turn.id;
-      let p = turn.progress ?? 0;
-      timers.set(
-        tid,
-        setInterval(() => {
-          p = Math.min(90, p + Math.max(1, (90 - p) * 0.12));
-          setTurnProgress(cid, tid, p);
-        }, 700),
-      );
-    }
-  }, [chat, setTurnProgress]);
-  React.useEffect(() => {
-    const timers = progressTimers.current;
-    return () => {
-      for (const handle of timers.values()) clearInterval(handle);
-      timers.clear();
-    };
-  }, []);
-
-
 
   // One lineage label per concept — the same map the thread renders from,
   // so every surface names a concept identically.
@@ -1070,10 +1021,26 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 }
 
+// The page's own shape while the chat is read from storage — the rail, the
+// composer and two cards — so nothing jumps when it lands. It was a line of
+// centred text.
 function LoadingShell() {
   return (
-    <div className="flex h-full items-center justify-center text-md text-text-tertiary">
-      Loading chat…
+    <div role="status" aria-label="Loading the chat" className="flex h-full">
+      <span className="sr-only">Loading the chat</span>
+      <div className="flex w-[360px] shrink-0 flex-col gap-[14px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse">
+        <div className="h-[12px] w-[40px] rounded bg-bg-subtle" />
+        <div className="h-[14px] w-[260px] rounded bg-bg-subtle" />
+        <div className="h-[14px] w-[200px] rounded bg-bg-subtle" />
+        <div className="mt-[10px] h-[12px] w-[60px] rounded bg-bg-subtle" />
+        <div className="h-[14px] w-[180px] rounded bg-bg-subtle" />
+        <div className="h-[14px] w-[220px] rounded bg-bg-subtle" />
+        <div className="mt-auto h-[96px] w-full rounded-2xl bg-bg-subtle" />
+      </div>
+      <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(320px,1fr))] content-start gap-[20px] bg-bg-page px-[32px] py-[32px] motion-safe:animate-pulse">
+        <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />
+        <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />
+      </div>
     </div>
   );
 }

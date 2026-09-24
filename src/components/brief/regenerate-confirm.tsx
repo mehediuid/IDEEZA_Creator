@@ -43,7 +43,7 @@ export function RegenerateConfirm({
           background: "var(--color-bg-surface)",
           borderRadius: "var(--radius-xl)",
           padding: 24,
-          boxShadow: "0 30px 80px -20px rgba(0,0,0,.6)",
+          boxShadow: "var(--elevation-5)",
           display: "flex",
           flexDirection: "column",
           gap: 16,
@@ -55,8 +55,8 @@ export function RegenerateConfirm({
               width: 36,
               height: 36,
               borderRadius: 18,
-              background: "var(--color-orange-100, var(--color-bg-brand-subtle))",
-              color: "var(--color-orange-600, var(--color-violet-600))",
+              background: "var(--color-bg-warning-subtle)",
+              color: "var(--color-text-warning)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -105,7 +105,7 @@ export function RegenerateConfirm({
             onClick={onConfirm}
             style={{
               padding: "10px 20px",
-              background: "var(--color-violet-600)",
+              background: "var(--color-bg-brand)",
               color: "var(--color-text-on-brand)",
               border: "none",
               borderRadius: 999,

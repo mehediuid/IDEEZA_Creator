@@ -98,8 +98,17 @@ export function progressOf(
     stageBudget,
     ((now - job.stageStartedAt) / 1000) * DEMO_SPEED,
   );
-  const etaSec = Math.max(0, TOTAL_RENDER_SECONDS - elapsedSec);
+  // Wall-clock seconds, which is what a reader waits in. The budgets are in
+  // the full-length flow's seconds, so the remainder has to come back down
+  // through the demo speed — without it a 30-second render said "18 min left".
+  const etaSec = Math.max(0, (TOTAL_RENDER_SECONDS - elapsedSec) / DEMO_SPEED);
   return { total, stageElapsedSec, stageBudget, etaSec };
+}
+
+/** "under a minute", "about 3 min" — the time left, in words. */
+export function etaLabel(etaSec: number): string {
+  if (etaSec < 60) return "under a minute";
+  return `about ${Math.ceil(etaSec / 60)} min`;
 }
 
 type Ctx = {

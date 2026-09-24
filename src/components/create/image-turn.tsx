@@ -33,6 +33,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { useMinuteClock } from "./build-status";
+import { elapsedLabel, useSecondClock } from "./use-clock";
 
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
@@ -82,7 +83,7 @@ export function ImageTurn({
         parentConceptLabel={parentConceptLabel}
         productName={productName}
         kind={turn.kind}
-        progress={turn.progress}
+        since={turn.ts}
       />
     );
   }
@@ -337,39 +338,46 @@ function CopyPromptButton({ prompt }: { prompt: string }) {
 function PendingImageTurn({
   conceptLabel,
   productName,
-  progress,
+  since,
 }: {
   conceptLabel: string;
   parentConceptLabel?: string;
   productName?: string;
   kind: "fresh" | "refine";
-  progress?: number;
+  since: number;
 }) {
-  const pct = typeof progress === "number" ? Math.round(progress) : 0;
-  // One verb for a render everywhere — the rail says "Drawing" too.
+  // The real elapsed time, and what a render usually takes — not a
+  // percentage the generator never reported.
+  const now = useSecondClock(true);
   const what = productName ?? `concept ${conceptLabel}`;
   return (
-    // Not a live region: the percentage moves every 700 ms, and announcing
-    // each step is noise. The rail beside the canvas reports when it lands.
+    // Not a live region: the clock moves every second, and announcing each
+    // tick is noise. The rail beside the canvas reports when it lands.
     <div
       role="img"
       aria-label={`Drawing ${what}`}
-      className="relative flex aspect-[64/53] w-full max-w-[640px] items-center justify-center overflow-hidden rounded-2xl border border-solid border-[var(--color-glass-fill-brand)] bg-bg-brand-subtle"
+      className="relative flex aspect-[64/53] w-full max-w-[640px] flex-col items-center justify-center gap-[10px] overflow-hidden rounded-2xl border border-solid border-border bg-bg-subtle"
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-40"
+        className="pointer-events-none absolute inset-0 opacity-60"
         style={{
           backgroundImage:
-            "radial-gradient(var(--color-glass-fill-brand) 1px, transparent 1px)",
+            "radial-gradient(var(--color-border) 1px, transparent 1px)",
           backgroundSize: "8px 8px",
         }}
       />
       <span
         data-testid="turn-progress"
-        className="relative inline-flex items-center rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
+        className="relative inline-flex items-center gap-[8px] rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
       >
-        Drawing {what} · {pct}%
+        <span aria-hidden className="inline-flex motion-safe:animate-spin text-text-tertiary">
+          <Icon icon={Refresh01Icon} size={14} />
+        </span>
+        Drawing {what} · {elapsedLabel(since, now)}
+      </span>
+      <span className="relative text-sm text-text-tertiary">
+        Usually 30–60 seconds
       </span>
     </div>
   );

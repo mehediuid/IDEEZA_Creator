@@ -524,7 +524,7 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
         >
           <span
             aria-hidden
-            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-violet-600 text-md font-bold text-text-on-brand"
+            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-bg-brand text-md font-bold text-text-on-brand"
           >
             {USER.initials}
           </span>

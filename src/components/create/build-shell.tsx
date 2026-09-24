@@ -121,10 +121,22 @@ function BackLink() {
   );
 }
 
+// The page's own shape while the build is read — the rail and the review
+// card — not a line of centred text.
 function LoadingShell() {
   return (
-    <div className="flex h-full items-center justify-center text-md text-text-tertiary">
-      Loading build…
+    <div role="status" aria-label="Loading the build" className="flex h-full">
+      <span className="sr-only">Loading the build</span>
+      <div className="flex w-[320px] shrink-0 flex-col gap-[12px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse">
+        <div className="h-[12px] w-[60px] rounded bg-bg-subtle" />
+        <div className="h-[16px] w-[180px] rounded bg-bg-subtle" />
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="h-[14px] w-full rounded bg-bg-subtle" />
+        ))}
+      </div>
+      <div className="flex-1 bg-bg-page px-[24px] py-[24px] motion-safe:animate-pulse">
+        <div className="mx-auto h-[480px] w-full max-w-[920px] rounded-2xl bg-bg-subtle" />
+      </div>
     </div>
   );
 }
@@ -142,7 +154,7 @@ function NotFoundShell() {
       </p>
       <Link
         href="/"
-        className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-violet-600 px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         Back to Home
       </Link>

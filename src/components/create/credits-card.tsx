@@ -70,7 +70,7 @@ export function CreditsCard() {
         >
           Top up
         </button>
-        <p className="max-w-[220px] text-right text-2xs text-text-tertiary">
+        <p className="max-w-[220px] text-right text-sm text-text-tertiary">
           No payments are wired yet — this adds to your local balance.
         </p>
       </div>

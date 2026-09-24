@@ -93,7 +93,7 @@ export function ReviewModal({
           background: "var(--color-bg-surface)",
           borderRadius: "var(--radius-xl)",
           padding: 24,
-          boxShadow: "0 30px 80px -20px rgba(0,0,0,.6)",
+          boxShadow: "var(--elevation-5)",
           display: "flex",
           flexDirection: "column",
           gap: 18,
@@ -125,7 +125,7 @@ export function ReviewModal({
             borderRadius: "var(--radius-lg)",
             overflow: "hidden",
             cursor: "pointer",
-            boxShadow: "0 8px 32px -8px rgba(124, 45, 185, .4)",
+            boxShadow: "var(--elevation-2)",
           }}
         >
           <div
@@ -142,7 +142,7 @@ export function ReviewModal({
                 width: 80,
                 height: 80,
                 borderRadius: "50%",
-                background: "rgba(255,255,255,0.95)",
+                background: "var(--color-bg-surface)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -152,12 +152,12 @@ export function ReviewModal({
               }}
             >
               {playing ? (
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="var(--color-violet-600)">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="var(--color-text-brand)">
                   <rect x="6" y="5" width="4" height="14" rx="1" />
                   <rect x="14" y="5" width="4" height="14" rx="1" />
                 </svg>
               ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--color-violet-600)">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--color-text-brand)">
                   <polygon points="7,4 21,12 7,20" />
                 </svg>
               )}
@@ -169,7 +169,7 @@ export function ReviewModal({
               left: 14,
               bottom: 12,
               right: 14,
-              color: "rgba(255,255,255,0.95)",
+              color: "var(--color-bg-surface)",
               fontSize: 12,
               fontWeight: 600,
               textShadow: "0 1px 2px rgba(0,0,0,0.5)",
@@ -207,7 +207,7 @@ export function ReviewModal({
             onClick={() => { onApprove(); onClose(); }}
             style={{
               padding: "14px 24px",
-              background: "var(--color-violet-600)",
+              background: "var(--color-bg-brand)",
               color: "var(--color-text-on-brand)",
               border: "none",
               borderRadius: "var(--radius-3xl)",
@@ -218,7 +218,7 @@ export function ReviewModal({
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
-              boxShadow: "0 6px 24px -6px rgba(124, 45, 185, .4)",
+              boxShadow: "var(--elevation-2)",
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">

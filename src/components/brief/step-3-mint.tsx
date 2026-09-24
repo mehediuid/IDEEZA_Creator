@@ -499,7 +499,7 @@ export function Step3Mint({
 
 // RenderInfo — slim info banner on Step 3 reminding the user that the project
 // goes live when the in-flight render finishes. The actual render progress +
-// notification opt-ins live on Step 2 (inline) and in the top-right indicator,
+// notification opt-ins live on Step 2 (inline) and in the bottom-right toast,
 // so we don't duplicate them here. This banner is just signal.
 function RenderInfo({ videoDone }: { videoDone: boolean }) {
   return (
@@ -509,11 +509,11 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
       style={{
         padding: "12px 14px",
         background: videoDone
-          ? "var(--color-green-50, var(--color-bg-surface))"
+          ? "var(--color-bg-success-subtle)"
           : "var(--color-bg-brand-subtle)",
         border: `var(--border-width-1) solid ${
           videoDone
-            ? "var(--color-green-500)"
+            ? "var(--color-border-success)"
             : "var(--color-border-brand)"
         }`,
         borderRadius: "var(--radius-lg)",
@@ -523,8 +523,8 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
         fontSize: 13,
         lineHeight: 1.5,
         color: videoDone
-          ? "var(--color-green-700)"
-          : "var(--color-violet-700, var(--color-violet-600))",
+          ? "var(--color-text-success)"
+          : "var(--color-text-brand)",
       }}
     >
       <span
@@ -533,8 +533,8 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
           height: 22,
           borderRadius: 11,
           background: videoDone
-            ? "var(--color-green-100)"
-            : "rgba(255,255,255,.55)",
+            ? "var(--color-bg-success-subtle)"
+            : "var(--color-bg-surface)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -561,7 +561,7 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
               width: 8,
               height: 8,
               borderRadius: 4,
-              background: "var(--color-violet-600)",
+              background: "var(--color-bg-brand)",
             }}
           />
         )}
@@ -664,7 +664,7 @@ function ProductCard({
           height="24"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="var(--color-violet-600)"
+          stroke="var(--color-text-brand)"
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -679,13 +679,13 @@ function ProductCard({
             width: 22,
             height: 22,
             borderRadius: "50%",
-            background: "rgba(255,255,255,.94)",
+            background: "var(--color-bg-surface)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-violet-600)" aria-hidden>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--color-text-brand)" aria-hidden>
             <polygon points="7,4 21,12 7,20" />
           </svg>
         </span>
@@ -1542,7 +1542,7 @@ function Spinner() {
         width: 14,
         height: 14,
         borderRadius: "50%",
-        border: "2px solid rgba(255,255,255,0.45)",
+        border: "2px solid color-mix(in srgb, currentColor 35%, transparent)",
         borderTopColor: "currentColor",
         animation: "ix-mint-spin .8s linear infinite",
         display: "inline-block",

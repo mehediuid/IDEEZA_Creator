@@ -743,8 +743,8 @@ export function PartsPreview({ job }: { job: ArtifactSource }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-bg-surface">
       <header className="flex flex-wrap items-center justify-between gap-6 border-b border-border px-12 py-8">
-        <h3 className="text-2xs font-bold tracking-wider text-text-secondary">
-          PARTS IN THIS BUILD
+        <h3 className="text-sm font-semibold text-text-primary">
+          Parts in this build
         </h3>
         <p className="font-mono text-sm text-text-secondary">
           {bom.unique} unique parts · {bom.units} units
@@ -754,16 +754,16 @@ export function PartsPreview({ job }: { job: ArtifactSource }) {
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-bg-subtle">
-              <th scope="col" className="px-12 py-6 text-2xs font-semibold tracking-wider text-text-secondary">
+              <th scope="col" className="px-12 py-6 text-xs font-semibold text-text-secondary">
                 CATEGORY
               </th>
-              <th scope="col" className="px-12 py-6 text-2xs font-semibold tracking-wider text-text-secondary">
+              <th scope="col" className="px-12 py-6 text-xs font-semibold text-text-secondary">
                 COMPONENT NAME
               </th>
-              <th scope="col" className="px-12 py-6 text-2xs font-semibold tracking-wider text-text-secondary">
+              <th scope="col" className="px-12 py-6 text-xs font-semibold text-text-secondary">
                 REF
               </th>
-              <th scope="col" className="px-12 py-6 text-2xs font-semibold tracking-wider text-text-secondary">
+              <th scope="col" className="px-12 py-6 text-xs font-semibold text-text-secondary">
                 QTY
               </th>
             </tr>

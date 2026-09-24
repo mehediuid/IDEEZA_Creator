@@ -98,9 +98,18 @@ export function ChatThread({
   // name the same thing.
   const labels = React.useMemo(() => conceptLabels(chat.turns), [chat.turns]);
 
-  // Auto-scroll to the newest turn so the latest result is in view.
+  // Scroll to the newest turn when one ARRIVES, so a new drawing is in view.
+  // Not on opening the chat: that scrolled to the foot of the canvas and cut
+  // off the tops of the first cards, on a page the maker had just come back
+  // to read from the top.
   const endRef = React.useRef<HTMLDivElement>(null);
+  const seenTurns = React.useRef(chat.turns.length);
   React.useEffect(() => {
+    if (chat.turns.length <= seenTurns.current) {
+      seenTurns.current = chat.turns.length;
+      return;
+    }
+    seenTurns.current = chat.turns.length;
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chat.turns.length]);
 

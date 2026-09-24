@@ -16,6 +16,7 @@ import { type BriefState, type Intent } from "./brief-app";
 import {
   useVideoJobs,
   progressOf,
+  etaLabel,
   STAGE_LABELS,
 } from "@/components/video-jobs/video-jobs-provider";
 
@@ -122,14 +123,14 @@ export function Step4Success({
           height: 64,
           borderRadius: 32,
           background: isLive
-            ? "var(--color-green-100)"
+            ? "var(--color-bg-success-subtle)"
             : "var(--color-bg-brand-subtle)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           boxShadow: isLive
-            ? "0 8px 24px -6px rgba(34, 197, 94, .3)"
-            : "0 8px 24px -6px rgba(124, 45, 185, .25)",
+            ? "var(--elevation-2)"
+            : "var(--elevation-2)",
         }}
       >
         <svg
@@ -139,8 +140,8 @@ export function Step4Success({
           fill="none"
           stroke={
             isLive
-              ? "var(--color-green-700)"
-              : "var(--color-violet-600)"
+              ? "var(--color-text-success)"
+              : "var(--color-text-brand)"
           }
           strokeWidth="2.6"
           strokeLinecap="round"
@@ -230,11 +231,11 @@ export function Step4Success({
                   gap: 6,
                   padding: "4px 10px",
                   background: isLive
-                    ? "var(--color-green-100)"
+                    ? "var(--color-bg-success-subtle)"
                     : "var(--color-bg-brand-subtle)",
                   color: isLive
-                    ? "var(--color-green-700)"
-                    : "var(--color-violet-600)",
+                    ? "var(--color-text-success)"
+                    : "var(--color-text-brand)",
                   fontSize: 12,
                   fontWeight: 600,
                   borderRadius: 999,
@@ -264,7 +265,7 @@ export function Step4Success({
                         width: 6,
                         height: 6,
                         borderRadius: 3,
-                        background: "var(--color-violet-600)",
+                        background: "var(--color-bg-brand)",
                       }}
                     />
                     Pending video
@@ -346,7 +347,7 @@ export function Step4Success({
           onClick={() => onBrowse("/projects")}
           style={{
             padding: "14px 24px",
-            background: "var(--color-violet-600)",
+            background: "var(--color-bg-brand)",
             color: "var(--color-text-on-brand)",
             border: "none",
             borderRadius: "var(--radius-3xl)",
@@ -401,7 +402,6 @@ function PendingCard({
   job: NonNullable<ReturnType<typeof useVideoJobs>["jobs"][number]>;
 }) {
   const { total, etaSec } = progressOf(job);
-  const etaMin = Math.max(1, Math.ceil(etaSec / 60));
   return (
     <div
       style={{
@@ -427,7 +427,7 @@ function PendingCard({
           style={{
             fontSize: 13,
             fontWeight: 700,
-            color: "var(--color-violet-700, var(--color-violet-600))",
+            color: "var(--color-text-brand)",
           }}
         >
           Video is rendering · {STAGE_LABELS[job.stage]}
@@ -435,18 +435,18 @@ function PendingCard({
         <div
           style={{
             fontSize: 12,
-            color: "var(--color-violet-700, var(--color-violet-600))",
+            color: "var(--color-text-brand)",
             fontVariantNumeric: "tabular-nums",
             fontWeight: 600,
           }}
         >
-          ~{etaMin} min left
+          {etaLabel(etaSec)} left
         </div>
       </div>
       <div
         style={{
           height: 6,
-          background: "rgba(255,255,255,.55)",
+          background: "var(--color-bg-surface)",
           borderRadius: 3,
           overflow: "hidden",
         }}
@@ -456,7 +456,7 @@ function PendingCard({
             width: `${total}%`,
             height: "100%",
             background:
-              "linear-gradient(90deg, var(--color-violet-500), var(--color-violet-600))",
+              "var(--color-bg-brand)",
             transition: "width .5s linear",
           }}
         />
@@ -509,7 +509,7 @@ function SceneCard({
           left: 6,
           right: 6,
           bottom: 6,
-          fontSize: 10,
+          fontSize: 11,
           color: "rgba(255,255,255,0.92)",
           fontWeight: 500,
           textShadow: "0 1px 2px rgba(0,0,0,0.5)",
@@ -530,7 +530,7 @@ const linkButton: React.CSSProperties = {
   padding: "6px 12px",
   fontSize: 12,
   fontWeight: 700,
-  color: "var(--color-violet-600)",
+  color: "var(--color-text-brand)",
   textDecoration: "none",
   cursor: "pointer",
   background: "var(--color-bg-brand-subtle)",

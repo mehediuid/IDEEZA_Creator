@@ -16,6 +16,7 @@ import { C } from "@/lib/pcb/colors";
 import {
   useVideoJobs,
   progressOf,
+  etaLabel,
   STAGE_LABELS,
   STAGE_ORDER,
   type VideoJob,
@@ -124,9 +125,9 @@ export function RegenerateFlow({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(2px)",
-        zIndex: 100,
+        background: "color-mix(in srgb, var(--color-bg-overlay) 62%, transparent)",
+        backdropFilter: "blur(4px)",
+        zIndex: "var(--z-modal)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -145,7 +146,7 @@ export function RegenerateFlow({
           background: "var(--color-bg-surface)",
           borderRadius: "var(--radius-xl)",
           padding: 0,
-          boxShadow: "0 30px 80px -20px rgba(0,0,0,.6)",
+          boxShadow: "var(--elevation-5)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -501,14 +502,13 @@ function ProgressBlock({ job }: { job: VideoJob }) {
   const stageIdx = STAGE_ORDER.indexOf(job.stage);
   const stageNum = stageIdx >= 0 ? stageIdx + 1 : 0;
   const isDone = job.stage === "done";
-  const etaMin = Math.max(1, Math.ceil(etaSec / 60));
   return (
     <div
       style={{
         padding: 18,
         background: "var(--color-bg-surface)",
         border: `var(--border-width-1-5) solid ${
-          isDone ? "var(--color-green-500)" : "var(--color-border-brand)"
+          isDone ? "var(--color-border-success)" : "var(--color-border-brand)"
         }`,
         borderRadius: "var(--radius-lg)",
         display: "flex",
@@ -527,7 +527,7 @@ function ProgressBlock({ job }: { job: VideoJob }) {
       >
         <div style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
           {isDone ? (
-            <span style={iconBadge("var(--color-green-100)", "var(--color-green-700)")}>
+            <span style={iconBadge("var(--color-bg-success-subtle)", "var(--color-text-success)")}>
               <svg
                 width="14"
                 height="14"
@@ -542,14 +542,14 @@ function ProgressBlock({ job }: { job: VideoJob }) {
               </svg>
             </span>
           ) : (
-            <span style={iconBadge("var(--color-bg-brand-subtle)", "var(--color-violet-600)")}>
+            <span style={iconBadge("var(--color-bg-brand-subtle)", "var(--color-text-brand)")}>
               <span
                 className="ix-rgf-pulse"
                 style={{
                   width: 8,
                   height: 8,
                   borderRadius: 4,
-                  background: "var(--color-violet-600)",
+                  background: "var(--color-bg-brand)",
                 }}
               />
             </span>
@@ -574,7 +574,7 @@ function ProgressBlock({ job }: { job: VideoJob }) {
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            ~{etaMin} min left
+            {etaLabel(etaSec)} left
           </span>
         )}
       </div>
@@ -593,7 +593,7 @@ function ProgressBlock({ job }: { job: VideoJob }) {
               width: `${total}%`,
               height: "100%",
               background:
-                "linear-gradient(90deg, var(--color-violet-500), var(--color-violet-600))",
+                "var(--color-bg-brand)",
               transition: "width .5s linear",
             }}
           />
@@ -777,7 +777,7 @@ function Toggle({
           height: 16,
           borderRadius: 8,
           background: on
-            ? "var(--color-violet-600)"
+            ? "var(--color-bg-brand)"
             : "var(--color-bg-surface-raised)",
           position: "relative",
           cursor: "pointer",
@@ -794,7 +794,7 @@ function Toggle({
             height: 12,
             background: "var(--color-bg-surface)",
             borderRadius: "50%",
-            boxShadow: "0 1px 2px rgba(0,0,0,.2)",
+            boxShadow: "var(--elevation-1)",
             transition: "left .14s",
           }}
         />
@@ -838,11 +838,11 @@ function Opt({
             borderRadius: 4,
             border: `1.5px solid ${
               checked
-                ? "var(--color-violet-600)"
+                ? "var(--color-bg-brand)"
                 : "var(--color-border-default)"
             }`,
             background: checked
-              ? "var(--color-violet-600)"
+              ? "var(--color-bg-brand)"
               : "var(--color-bg-surface)",
             display: "inline-flex",
             alignItems: "center",
@@ -857,7 +857,7 @@ function Opt({
               height="10"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="white"
+              stroke="var(--color-text-on-brand)"
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -880,7 +880,7 @@ function Spinner() {
         width: 14,
         height: 14,
         borderRadius: "50%",
-        border: "2px solid rgba(255,255,255,0.45)",
+        border: "2px solid color-mix(in srgb, currentColor 35%, transparent)",
         borderTopColor: "currentColor",
         animation: "ix-rgf-spin .8s linear infinite",
         display: "inline-block",
@@ -909,7 +909,7 @@ function primaryButton(enabled: boolean): React.CSSProperties {
   return {
     padding: "12px 22px",
     background: enabled
-      ? "var(--color-violet-600)"
+      ? "var(--color-bg-brand)"
       : "var(--color-bg-surface-raised)",
     color: enabled
       ? "var(--color-text-on-brand)"

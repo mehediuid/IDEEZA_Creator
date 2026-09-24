@@ -20,6 +20,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import type { ChatSession, ChatTurn } from "@/lib/create/history";
+import { elapsedLabel, useSecondClock } from "./use-clock";
 
 export function ChatRail({
   chat,
@@ -151,14 +152,9 @@ function RailLine({
         {what}
         <Sub>
           Drawing
-          {/* Rounded: the ticker carries a fraction and a rail line is not
-              the place to print 28.667519999999996%. Hidden from the live
-              region, which would otherwise read every step of it. */}
-          <span aria-hidden>
-            {typeof turn.progress === "number"
-              ? ` · ${Math.round(turn.progress)}%`
-              : "…"}
-          </span>
+          {/* How long it really has been running — hidden from the live
+              region, which would otherwise read every second of it. */}
+          <Elapsed since={turn.ts} />
         </Sub>
       </Status>
     );
@@ -177,6 +173,11 @@ function RailLine({
       <Sub>Concept ready</Sub>
     </Status>
   );
+}
+
+function Elapsed({ since }: { since: number }) {
+  const now = useSecondClock(true);
+  return <span aria-hidden>{` · ${elapsedLabel(since, now)}`}</span>;
 }
 
 /** The second line of a status: the detail under the thing it is about. */

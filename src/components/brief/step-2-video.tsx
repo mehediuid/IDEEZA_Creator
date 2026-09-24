@@ -21,6 +21,7 @@ import { videoScenePrompt } from "@/lib/brief/video-prompt";
 import {
   useVideoJobs,
   progressOf,
+  etaLabel,
   STAGE_LABELS,
   STAGE_ORDER,
   type VideoJob,
@@ -727,7 +728,6 @@ function RenderCard({
   const stageIdx = STAGE_ORDER.indexOf(job.stage);
   const stageNum = stageIdx >= 0 ? stageIdx + 1 : 0;
   const isDone = job.stage === "done";
-  const etaMin = Math.max(1, Math.ceil(etaSec / 60));
 
   const [emailOpen, setEmailOpen] = React.useState(!!job.emailReminder);
   const [email, setEmail] = React.useState(job.emailReminder ?? "");
@@ -740,12 +740,12 @@ function RenderCard({
         padding: 18,
         background: "var(--color-bg-surface)",
         border: `var(--border-width-1-5) solid ${
-          isDone ? "var(--color-green-500)" : "var(--color-border-brand)"
+          isDone ? "var(--color-border-success)" : "var(--color-border-brand)"
         }`,
         borderRadius: "var(--radius-lg)",
         boxShadow: isDone
-          ? "0 6px 20px -6px rgba(34, 197, 94, .22)"
-          : "0 6px 20px -6px rgba(124, 45, 185, .22)",
+          ? "var(--elevation-2)"
+          : "var(--elevation-2)",
         display: "flex",
         flexDirection: "column",
         gap: 14,
@@ -762,7 +762,7 @@ function RenderCard({
           style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
         >
           {isDone ? (
-            <span style={badge("var(--color-green-100)", "var(--color-green-700)")}>
+            <span style={badge("var(--color-bg-success-subtle)", "var(--color-text-success)")}>
               <svg
                 width="14"
                 height="14"
@@ -777,14 +777,14 @@ function RenderCard({
               </svg>
             </span>
           ) : (
-            <span style={badge("var(--color-bg-brand-subtle)", "var(--color-violet-600)")}>
+            <span style={badge("var(--color-bg-brand-subtle)", "var(--color-text-brand)")}>
               <span
                 className="ix-s2rc-pulse"
                 style={{
                   width: 8,
                   height: 8,
                   borderRadius: 4,
-                  background: "var(--color-violet-600)",
+                  background: "var(--color-bg-brand)",
                 }}
               />
             </span>
@@ -793,7 +793,7 @@ function RenderCard({
             <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
               {isDone ? "Video ready" : "Video rendering"}
             </div>
-            <div style={{ fontSize: 11, color: C.body, marginTop: 1 }}>
+            <div style={{ fontSize: 12, color: C.body, marginTop: 1 }}>
               {isDone
                 ? "Project will go live once you mint"
                 : `Stage ${stageNum}/5 · ${STAGE_LABELS[job.stage]}`}
@@ -809,7 +809,7 @@ function RenderCard({
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            ~{etaMin} min left
+            {etaLabel(etaSec)} left
           </span>
         )}
       </div>
@@ -828,7 +828,7 @@ function RenderCard({
               width: `${total}%`,
               height: "100%",
               background:
-                "linear-gradient(90deg, var(--color-violet-500), var(--color-violet-600))",
+                "var(--color-bg-brand)",
               transition: "width .5s linear",
             }}
           />
@@ -954,11 +954,11 @@ function Opt({
             borderRadius: 4,
             border: `1.5px solid ${
               checked
-                ? "var(--color-violet-600)"
+                ? "var(--color-bg-brand)"
                 : "var(--color-border-default)"
             }`,
             background: checked
-              ? "var(--color-violet-600)"
+              ? "var(--color-bg-brand)"
               : "var(--color-bg-surface)",
             display: "inline-flex",
             alignItems: "center",
@@ -973,7 +973,7 @@ function Opt({
               height="10"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="white"
+              stroke="var(--color-text-on-brand)"
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -1398,7 +1398,7 @@ function ToggleRow({
             borderRadius: 10,
             border: "none",
             background: on
-              ? "var(--color-violet-600)"
+              ? "var(--color-bg-brand)"
               : "var(--color-bg-surface-raised)",
             position: "relative",
             cursor: "pointer",
@@ -1434,7 +1434,7 @@ function ToggleRow({
       {hint && (
         <span
           style={{
-            fontSize: 11,
+            fontSize: 12,
             color: C.body,
             maxWidth: 320,
             textAlign: "right",

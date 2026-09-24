@@ -703,7 +703,7 @@ function Examples({ items }: { items: Project[] }) {
           </h2>
           <Link
             href="/innovations"
-            className="inline-flex h-[36px] items-center gap-[6px] rounded-lg px-[12px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:text-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="inline-flex h-[36px] items-center gap-[6px] rounded-lg px-[12px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             Browse all
             <Icon icon={ArrowRight01Icon} />
@@ -764,7 +764,7 @@ function ExampleTile({ item }: { item: Project }) {
         <p className="truncate text-md font-semibold text-text-primary">
           {item.title}
         </p>
-        <div className="mt-[6px] flex items-center gap-[10px] text-2xs font-medium tabular-nums text-text-tertiary">
+        <div className="mt-[6px] flex items-center gap-[10px] text-xs font-medium tabular-nums text-text-tertiary">
           <span className="min-w-0 flex-1 truncate font-regular">
             {item.creator.name}
           </span>

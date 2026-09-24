@@ -1198,6 +1198,8 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        /* The browser's default placeholder grey measured 2.5:1 on white. */
+        .ix-brief-field::placeholder { color: var(--color-input-placeholder); opacity: 1; }
         .ix-brief-field:focus {
           border-color: var(--color-border-brand);
           box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);

@@ -515,16 +515,22 @@ function DeliverablePanel({
 
 // Shown in the 3D tab while the enclosure mesh is still being generated from
 // the concept image. The build can flip to "ready" before a slow provider
-// finishes the mesh, so this keeps the panel honest until the model lands.
+// finishes the mesh, so this keeps the panel honest until the model lands —
+// the panel's own space, pulsing quietly, with the state in words.
 function GeneratingModel() {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 text-text-tertiary">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="ix-modelspin">
-        <circle cx="12" cy="12" r="9" stroke="var(--color-border)" strokeWidth="2.5" />
-        <path d="M21 12a9 9 0 0 0-9-9" stroke="var(--color-text-brand)" strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
-      <p className="text-sm font-medium text-text-secondary">Generating 3D model…</p>
-      <style>{`.ix-modelspin{animation:ix-modelspin-kf 1s linear infinite}@keyframes ix-modelspin-kf{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ix-modelspin{animation:none}}`}</style>
+    <div
+      role="status"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-[8px]"
+    >
+      {/* The ground pulses, not the words on it. */}
+      <span aria-hidden className="absolute inset-0 bg-bg-subtle motion-safe:animate-pulse" />
+      <p className="relative text-sm font-medium text-text-secondary">
+        Generating the 3D model…
+      </p>
+      <p className="relative text-sm text-text-tertiary">
+        The other pieces are ready to look at meanwhile.
+      </p>
     </div>
   );
 }

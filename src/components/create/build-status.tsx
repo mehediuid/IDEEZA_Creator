@@ -242,7 +242,9 @@ export function stateRowFor(
   return {
     badge: { text: `Building · ${rollupBuild(job).progress}%`, tone: "brand" },
     sectionLabel: "Build progress",
-    meta: `About 8–12 minutes · ${minutes(elapsed)} elapsed`,
+    meta: `Usually about a minute · ${
+      elapsed === 0 ? "just started" : `${minutes(elapsed)} elapsed`
+    }`,
     footer:
       "You can leave — the build keeps running and we'll notify you when each piece is ready.",
     footerLink: HOME_LINK,
@@ -509,7 +511,7 @@ function ConceptHeader({ job, row }: { job: BuildJob; row: StateRow }) {
       </div>
       <span
         className={[
-          "inline-flex h-[26px] shrink-0 items-center rounded-full px-[10px] text-2xs font-bold",
+          "inline-flex h-[26px] shrink-0 items-center rounded-full px-[10px] text-xs font-semibold",
           BADGE_TONE[row.badge.tone],
         ].join(" ")}
       >
@@ -586,7 +588,7 @@ function BuildItemRow({
             className="mt-[8px] h-[6px] w-full overflow-hidden rounded-full bg-bg-subtle"
           >
             <div
-              className="h-full rounded-full bg-violet-600 transition-[width] duration-normal ease-decelerate"
+              className="h-full rounded-full bg-bg-brand transition-[width] duration-normal ease-decelerate"
               style={{ width: `${item.progress}%` }}
             />
           </div>

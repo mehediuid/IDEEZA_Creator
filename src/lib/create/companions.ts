@@ -239,8 +239,17 @@ const ASK_VERB =
 
 /** The article is what separates a thing from a property. Without one, only
  *  an explicitly additive opener ("add", "include", "also") may pass, so
- *  "make it black" can never be read as a product called "black". */
+ *  "make it black" can never be read as a product called "black". `ARTICLE`
+ *  is what the name is stripped of; `NEW_THING` is the subset that introduces
+ *  something new. "The" points at what is already there — "make the case
+ *  matte black" is a change to the case, and it used to come back as a
+ *  product called "Case Matte Black". */
 const ARTICLE = "(?:a|an|another|one more|the)";
+const NEW_THING = "(?:a|an|another|one more)";
+
+/** A colour or a finish is a change to how the product looks, not a product:
+ *  "make a matte black one" asks for a restyle. */
+const LOOKS = /\b(?:matte|glossy|gloss|metallic|chrome|transparent|translucent|black|white|red|blue|green|yellow|orange|purple|pink|grey|gray|silver|gold)\b/i;
 
 /** Words that name a property of the picture or a degree of one, never a
  *  product. "Add more detail" and "add a drop shadow" are changes to what is
@@ -275,7 +284,7 @@ export function parseProductRequest(text: string): { name: string } | null {
   // "make charger" is ambiguous and "make black" is not a product, so a
   // bare noun needs an opener that can only mean addition.
   const hadArticle = new RegExp(
-    `(?:${ASK_VERB}|and|also|plus)\\s+${ARTICLE}\\s`,
+    `(?:${ASK_VERB}|and|also|plus)\\s+${NEW_THING}\\s`,
     "i",
   ).test(line);
   if (!hadArticle && !ADDITIVE_OPENER.test(line)) return null;
@@ -288,6 +297,7 @@ export function parseProductRequest(text: string): { name: string } | null {
   const raw = m[1].trim().replace(/\s+(?:also|too|as well)$/i, "").trim();
   if (raw.length < 3) return null;
   if (NOT_A_PRODUCT.test(raw)) return null;
+  if (LOOKS.test(raw)) return null;
   // A whole sentence is a brief, not a product name.
   if (raw.split(" ").length > 5) return null;
 
