@@ -89,6 +89,12 @@ const COPY: Record<
     reason: "storage",
     status: 500,
   },
+  filtered: {
+    error:
+      "The image service's safety filter blocked the render by mistake — there is no picture to show.",
+    reason: "filtered",
+    status: 502,
+  },
 };
 
 function failed(err: unknown) {

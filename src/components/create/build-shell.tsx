@@ -132,9 +132,7 @@ function LoadingShell() {
 function NotFoundShell() {
   return (
     <div className="mx-auto flex h-full max-w-[480px] flex-col items-center justify-center gap-[16px] px-[24px] text-center">
-      <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-        Project build
-      </p>
+      <p className="text-sm font-medium text-text-tertiary">Project build</p>
       <h1 className="text-2xl font-bold text-text-primary">
         We couldn&apos;t find this build
       </h1>

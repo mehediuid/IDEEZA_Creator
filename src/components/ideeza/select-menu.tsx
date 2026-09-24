@@ -34,6 +34,10 @@ export interface SelectMenuProps<V extends string = string> {
   disabled?: boolean;
   id?: string;
   className?: string;
+  /** The control's name when no visible `label` is given — the question
+   *  above it can be what a sighted reader sees, but the combobox itself
+   *  still has to be named. */
+  ariaLabel?: string;
 }
 
 /** Viewport margin, trigger↔panel gap and the panel's own height cap. */
@@ -89,6 +93,7 @@ export function SelectMenu<V extends string = string>({
   disabled,
   id,
   className,
+  ariaLabel,
 }: SelectMenuProps<V>): React.JSX.Element {
   const uid = React.useId();
   const triggerId = id ?? `${uid}-trigger`;
@@ -410,6 +415,7 @@ export function SelectMenu<V extends string = string>({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-labelledby={label ? `${labelId} ${triggerId}` : undefined}
+        aria-label={label ? undefined : ariaLabel}
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
         onClick={() => (open ? close(true) : openMenu())}
@@ -451,6 +457,7 @@ export function SelectMenu<V extends string = string>({
               tabIndex={-1}
               data-select-menu-panel
               aria-labelledby={label ? labelId : undefined}
+              aria-label={label ? undefined : ariaLabel}
               aria-activedescendant={active >= 0 ? optId(active) : undefined}
               onKeyDown={onPanelKey}
               onMouseLeave={() => setTip(-1)}

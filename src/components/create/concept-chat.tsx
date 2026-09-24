@@ -118,7 +118,17 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // list is only ever offered for the single case.
   const { projects } = useManualProjects();
   const setupProjects = React.useMemo(
-    () => projects.map((p) => ({ id: p.id, name: p.name })),
+    () =>
+      projects.map((p) => {
+        const n = p.products?.length || 1;
+        return {
+          id: p.id,
+          name: p.name,
+          detail: `${n} product${n === 1 ? "" : "s"} · updated ${new Date(
+            p.updatedAt,
+          ).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+        };
+      }),
     [projects],
   );
 
@@ -937,6 +947,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     editorTurn && editorTurn.role === "assistant"
       ? (editorTurn.imageUrl ?? null)
       : null;
+  const editorSetup = chat.turns.find((t) => t.role === "setup");
+  const editorProduct =
+    editorTurn?.role === "assistant" && editorSetup?.role === "setup"
+      ? editorTurn.companionOf
+        ? editorSetup.companions.find((c) => c.id === editorTurn.companionOf)?.name
+        : editorSetup.productName?.trim()
+      : undefined;
 
   return (
     <div className="flex h-full">
@@ -1045,6 +1062,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         image={editorImage}
         conceptLabel={editorConceptLabel}
         nextRefineIndex={editorNextRefineIndex}
+        productName={editorProduct}
         onClose={() => setEditorTurnId(null)}
         onSubmitEdit={handleSubmitEdit}
       />
@@ -1063,9 +1081,7 @@ function LoadingShell() {
 function NotFoundShell() {
   return (
     <div className="mx-auto flex h-full max-w-[480px] flex-col items-center justify-center gap-[16px] px-[24px] text-center">
-      <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-        Concept chat
-      </p>
+      <p className="text-sm font-medium text-text-tertiary">Concept chat</p>
       <h1 className="text-2xl font-bold text-text-primary">
         We couldn&apos;t find this chat
       </h1>

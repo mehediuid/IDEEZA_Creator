@@ -224,9 +224,13 @@ function ReviewPanel({
           describes the surface the maker is already looking at — the tabs,
           the panels and the footer all say that — while the one thing the
           card could not tell you was which project this is. */}
-      <header className="flex flex-wrap items-start justify-between gap-6 px-10 pb-6 pt-8">
-        <div className="min-w-0">
-          <p className="text-2xs font-bold uppercase tracking-wider text-text-brand">
+      {/* The state and the subject in one line of hierarchy: a small state
+          word, then the project. The actions stay beside the heading at any
+          width the card is given — the issue list used to widen the left
+          column and push them onto a row of their own. */}
+      <header className="flex flex-col gap-6 px-10 pb-6 pt-8 md:flex-row md:items-start">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-text-tertiary">
             {building ? "Building" : "Build ready"}
           </p>
           <h2
@@ -235,27 +239,21 @@ function ReviewPanel({
           >
             {heading}
           </h2>
-        {/* §4.3 + §4.4.9 — the product's own tier, and on a multi-product
-            build the project's headline is the lowest of them, which this
-            badge already is because the switcher lands on that product's
-            own state. The list opens under it. */}
+          {/* §4.3 + §4.4.9 — the product's own tier, keyed by product so
+              switching products closes one product's open list rather than
+              carrying it onto another's issues. */}
           <div className="mt-4">
-          {/* Keyed by product: switching products is looking at a
-              different thing, so the list closes rather than carrying one
-              product's open state onto another's issues. */}
-          <ConfidenceBadge
-            key={productConfidence.productId}
-            confidence={productConfidence}
-          />
+            <ConfidenceBadge
+              key={productConfidence.productId}
+              confidence={productConfidence}
+            />
           </div>
         </div>
 
-        {/* What this project could become next, beside the project it is
-            about. They are a tier below the footer's Save Project — that is
-            the decision this card exists to take — so they wear the quiet
-            outline the card already uses for Open in editor, one size down.
-            Neither has an engine behind it yet, so each is greyed and says
-            so rather than accepting a press and doing nothing. */}
+        {/* What this project could become next. A tier below the footer's
+            Save Project, so quiet; neither has an engine behind it yet, so
+            each says so on the control itself, where a pointer, a keyboard
+            and a touch screen all reach it. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <HeaderAction icon={ConnectIcon} label="Add Network" />
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
@@ -277,7 +275,7 @@ function ReviewPanel({
               role="tablist"
               aria-label="Products in this build"
               data-testid="product-switcher"
-              className="mx-10 mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-solid border-border bg-bg-subtle p-2"
+              className="mx-10 mb-4 flex flex-wrap items-center gap-2 border-b border-solid border-border pb-4"
             >
               {products.map((x) => {
                 const on = x.id === product.id;
@@ -292,11 +290,11 @@ function ReviewPanel({
                       setPicked(null);
                     }}
                     className={[
-                      "inline-flex h-[32px] items-center rounded-lg px-5 text-sm font-semibold outline-none transition-colors duration-fast",
+                      "inline-flex h-[36px] items-center rounded-lg px-5 text-md font-semibold outline-none transition-colors duration-fast",
                       "focus-visible:ring-2 focus-visible:ring-border-focus",
                       on
-                        ? "bg-bg-surface text-text-primary shadow-1"
-                        : "text-text-secondary hover:text-text-primary",
+                        ? "bg-bg-subtle text-text-primary"
+                        : "text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
                     ].join(" ")}
                   >
                     {x.name}
@@ -389,21 +387,19 @@ function ReviewPanel({
                 />
               )}
             </div>
-            <aside className="flex flex-col gap-8 rounded-xl border border-solid border-border bg-bg-surface p-8">
+            {/* Beside the artifact, not a second card inside this one: a
+                hairline divides the two columns, and the list is a list — the
+                check-mark pills read as "verified" and wrapped inside
+                themselves. */}
+            <aside className="flex flex-col gap-8 md:border-l md:border-solid md:border-border md:pl-8">
               {shown === "parts" && <PartsSummary job={product} />}
               <section>
-                <h3 className="text-2xs font-bold tracking-wider text-text-secondary">
-                  WHAT THIS COVERS
+                <h3 className="text-sm font-semibold text-text-primary">
+                  What this covers
                 </h3>
-                <ul role="list" className="mt-4 flex flex-col items-start gap-3">
+                <ul role="list" className="mt-3 flex list-disc flex-col gap-2 pl-5 text-sm leading-relaxed text-text-secondary marker:text-text-tertiary">
                   {WHAT_SHIPS[shown].map((line) => (
-                    <li
-                      key={line}
-                      className="inline-flex items-center gap-3 rounded-full bg-bg-subtle px-4 py-2 text-sm text-text-secondary"
-                    >
-                      <Icon icon={CheckmarkCircle02Icon} size={14} className="shrink-0" />
-                      {line}
-                    </li>
+                    <li key={line}>{line}</li>
                   ))}
                 </ul>
               </section>
@@ -612,16 +608,20 @@ function LeaveButton({
  *  and doing nothing with it. */
 function HeaderAction({ icon, label }: { icon: IconValue; label: string }) {
   const reason = `${label} isn't built yet`;
+  // Focusable, so the reason is reachable from the keyboard — a disabled
+  // button takes no focus and its title reaches nobody but a mouse.
   return (
     <button
       type="button"
-      disabled
+      aria-disabled="true"
       title={reason}
       aria-label={`${label} — ${reason}`}
-      className="inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-semibold text-text-disabled"
+      onClick={(e) => e.preventDefault()}
+      className="inline-flex h-[36px] cursor-not-allowed items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-semibold text-text-disabled outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
     >
       <Icon icon={icon} size={16} />
       {label}
+      <span className="text-xs font-medium text-text-tertiary">Soon</span>
     </button>
   );
 }

@@ -34,9 +34,7 @@ export function CreditsCard() {
     <Shell>
       {/* Left: balance + what it's for + recent activity */}
       <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          Credits
-        </p>
+        <p className="text-sm font-medium text-text-tertiary">Credits</p>
         <p className="mt-[4px] text-xl font-semibold tabular-nums text-text-primary">
           {balance}
         </p>

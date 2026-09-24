@@ -41,7 +41,7 @@ export type ProviderId = "aihorde" | "pollinations";
  *  we failed to keep it. Saying "could not reach the image service" there
  *  would be a false statement, and it sends whoever debugs it at the wrong
  *  system. */
-export type FailReason = "busy" | "unpaid" | "unreachable" | "storage";
+export type FailReason = "busy" | "unpaid" | "unreachable" | "storage" | "filtered";
 
 export class RenderError extends Error {
   readonly reason: FailReason;
@@ -224,7 +224,15 @@ type HordeCheck = {
 };
 
 type HordeStatus = {
-  generations?: { img?: string; seed?: string; state?: string }[];
+  generations?: {
+    img?: string;
+    seed?: string;
+    state?: string;
+    /** The worker's safety filter replaced the picture with a "CENSORED"
+     *  card. It misfires on harmless prompts — a soil moisture meter came
+     *  back censored — and the card is not a concept. */
+    censored?: boolean;
+  }[];
 };
 
 async function hordeFetch(
@@ -368,6 +376,11 @@ async function hordePoll(job: RenderJob): Promise<RenderProgress> {
   }
   const gen = status.generations?.[0];
   if (!gen?.img) return { status: "pending" };
+  // Shown as a concept, the filter's placeholder was billed as one. It is a
+  // failed render, refunded like any other, and the card says what happened.
+  if (gen.censored) {
+    throw new RenderError("filtered", "the worker's filter replaced the image");
+  }
 
   // The img field is a presigned URL that dies in thirty minutes, so this
   // download is not an optimisation — it is the only chance to keep it.

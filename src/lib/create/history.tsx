@@ -44,7 +44,8 @@ export type ConceptFailReason =
   | "unreachable"
   | "storage"
   | "parent-lost"
-  | "credits";
+  | "credits"
+  | "filtered";
 
 /** What the flow asks before it spends anything.
  *

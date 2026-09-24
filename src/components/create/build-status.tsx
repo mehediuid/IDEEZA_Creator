@@ -389,7 +389,7 @@ export function BuildStatus({
               {/* No glyph: PackageIcon already means the Parts artifact
                   two rows below, and one glyph may not carry two
                   meanings. The label alone is what names a product. */}
-              <h3 className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
+              <h3 className="text-sm font-semibold text-text-primary">
                 {product.name}
               </h3>
               <ul role="list" className="flex flex-col gap-[10px]">
@@ -499,7 +499,7 @@ function ConceptHeader({ job, row }: { job: BuildJob; row: StateRow }) {
         className="h-[56px] w-[56px] shrink-0 rounded-lg object-cover"
       />
       <div className="min-w-0 flex-1">
-        <span className="inline-flex h-[20px] items-center rounded-md border border-solid border-border-brand bg-bg-brand-subtle px-[6px] text-2xs font-bold uppercase tracking-wider text-text-brand">
+        <span className="text-sm text-text-tertiary">
           Concept {job.conceptNumber} · {done ? "Ready" : "In build"}
         </span>
         <h2 className="mt-[4px] text-lg font-semibold text-text-primary">

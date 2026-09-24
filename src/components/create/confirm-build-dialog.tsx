@@ -30,6 +30,7 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost, useCredits } from "@/lib/create/credits";
+import { useDialogFocus } from "./use-dialog-focus";
 import { BUILD_ESTIMATE_MIN } from "@/lib/create/history";
 import {
   describeFallback,
@@ -115,6 +116,10 @@ export function ConfirmBuildDialog({
   submitting: boolean;
 }) {
   const { hydrated: creditsHydrated, balance } = useCredits();
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  // Focus in on open, held inside while open, back to the build button on
+  // close — focus used to stay on <body> with the page behind still tabbable.
+  useDialogFocus(open, panelRef);
   const [resolved, setResolved] = React.useState<{
     turnId: string;
     concept: ConceptSummary;
@@ -162,9 +167,6 @@ export function ConfirmBuildDialog({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-build-title"
       onClick={onCancel}
       className="fixed inset-0 z-modal flex items-center justify-center px-[16px] py-[24px]"
     >
@@ -174,6 +176,10 @@ export function ConfirmBuildDialog({
       />
 
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-build-title"
         data-testid="generate-modal"
         onClick={(e) => e.stopPropagation()}
         className="relative flex w-full max-w-[440px] flex-col gap-[16px] rounded-2xl border border-solid border-border bg-bg-surface p-[24px] shadow-3"

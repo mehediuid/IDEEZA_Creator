@@ -808,8 +808,8 @@ export function PartsSummary({ job }: { job: ArtifactSource }) {
   ];
   return (
     <section>
-      <h3 className="text-2xs font-bold tracking-wider text-text-secondary">
-        PARTS SUMMARY
+      <h3 className="text-sm font-semibold text-text-primary">
+        Parts summary
       </h3>
       <dl className="mt-8">
         {rows.map(([label, value]) => (

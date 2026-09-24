@@ -134,7 +134,7 @@ export function Step1Idea({
       ...projects.map((p) => ({
         value: p.id,
         label: `${p.name}${p.status === "draft" ? " · Draft" : ""}`,
-        section: "EXISTING PROJECTS",
+        section: "Existing projects",
       })),
     ],
     [projects],
@@ -550,11 +550,9 @@ function OtherProducts({
     <div>
       <p
         style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: C.body,
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
           margin: "0 0 8px",
         }}
       >
@@ -748,11 +746,9 @@ function DecidedProject({
     <div>
       <p
         style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: C.body,
+          fontSize: 13,
+          fontWeight: 600,
+          color: "var(--color-text-primary)",
           margin: "0 0 8px",
         }}
       >

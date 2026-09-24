@@ -204,11 +204,9 @@ export function Step4Success({
             <div>
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: C.primary,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.4,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "var(--color-text-tertiary)",
                   marginBottom: 2,
                 }}
               >
@@ -237,11 +235,9 @@ export function Step4Success({
                   color: isLive
                     ? "var(--color-green-700)"
                     : "var(--color-violet-600)",
-                  fontSize: 11,
-                  fontWeight: 700,
+                  fontSize: 12,
+                  fontWeight: 600,
                   borderRadius: 999,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.3,
                 }}
               >
                 {isLive ? (
@@ -497,14 +493,12 @@ function SceneCard({
           position: "absolute",
           top: 6,
           left: 6,
-          fontSize: 9,
-          fontWeight: 700,
+          fontSize: 11,
+          fontWeight: 600,
           padding: "2px 6px",
-          background: "rgba(0,0,0,.5)",
-          color: "white",
+          background: "color-mix(in srgb, var(--color-bg-overlay) 70%, transparent)",
+          color: "var(--color-white)",
           borderRadius: 4,
-          textTransform: "uppercase",
-          letterSpacing: 0.3,
         }}
       >
         {scene.timeRange}

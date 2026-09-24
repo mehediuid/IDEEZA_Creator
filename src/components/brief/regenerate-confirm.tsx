@@ -21,9 +21,11 @@ export function RegenerateConfirm({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(2px)",
-        zIndex: 110,
+        // The flow's one backdrop — the same wash and blur as the gate's.
+        background: "color-mix(in srgb, var(--color-bg-overlay) 62%, transparent)",
+        backdropFilter: "blur(4px)",
+        // Above the review modal it opens from.
+        zIndex: "var(--z-popover)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

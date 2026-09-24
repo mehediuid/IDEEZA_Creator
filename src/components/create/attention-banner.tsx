@@ -94,26 +94,28 @@ export function BuildAttentionBanner() {
       : "warning";
 
   const eyebrow = systemFailure
-    ? "BUILD FAILED"
+    ? "Build stopped"
     : reason === "retry"
-      ? "BUILD NEEDS A RETRY"
+      ? "Build needs a retry"
       : reason === "credits"
-        ? "BUILD PAUSED"
-        : "BUILD READY TO REVIEW";
+        ? "Build paused"
+        : "Build ready to review";
 
+  // The work is called by its project's name, as it is everywhere else.
+  const name = job.projectChoiceName?.trim() || job.title;
   const message = systemFailure
-    ? `${job.title} · the build stopped on our side${
+    ? `${name} · the build stopped on our side${
         job.creditsRefunded ? " — your credits were refunded" : ""
       }`
     : reason === "retry"
       ? (() => {
           const labels = failedLabels(job.items);
           const step = labels.length <= 1 ? "step" : "steps";
-          return `${job.title} · the ${joinLabels(labels)} ${step} failed`;
+          return `${name} · the ${joinLabels(labels)} ${step} failed`;
         })()
       : reason === "credits"
-        ? `${job.title} is paused — top up credits to start it`
-        : `${job.title} is ready`;
+        ? `${name} is paused — top up credits to start it`
+        : `${name} is ready`;
 
   const ctaLabel = reason === "credits" ? "Top up credits" : "Open build";
   // The build's home is the chat it was started from — that is where its
@@ -156,16 +158,14 @@ export function BuildAttentionBanner() {
         <Icon icon={Notification03Icon} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-          {eyebrow}
-        </p>
+        <p className="text-sm text-text-tertiary">{eyebrow}</p>
         <p className="mt-[2px] line-clamp-2 text-md font-semibold text-text-primary">
           {message}
         </p>
       </div>
       <Link
         href={ctaHref}
-        className="inline-flex h-[36px] shrink-0 items-center gap-[8px] rounded-lg bg-violet-600 px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex h-[36px] shrink-0 items-center gap-[8px] rounded-lg bg-bg-brand px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         {ctaLabel}
         <Icon icon={ArrowRight01Icon} />

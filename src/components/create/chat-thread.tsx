@@ -233,8 +233,16 @@ export function ChatThread({
         </div>
       )}
 
+      {/* One product is one 640 px card, so its section is that wide too —
+          the build action used to sit at the far edge of a 1000 px canvas,
+          a long way from the card it builds. Several products take the width. */}
       {products.length > 0 && (
-        <>
+        <div
+          className={[
+            "flex w-full flex-col items-start gap-[28px]",
+            products.length === 1 ? "max-w-[640px]" : "",
+          ].join(" ")}
+        >
           {job ? (
             <header className="flex flex-col gap-[2px]">
               <h2 className="text-lg font-semibold text-text-primary">
@@ -312,7 +320,7 @@ export function ChatThread({
           {offerBuild && allReady && shortForBuild && (
             <InsufficientCreditsBanner cost={cost} />
           )}
-        </>
+        </div>
       )}
       <div ref={endRef} />
     </div>
@@ -340,7 +348,9 @@ function BuildAction({
 }) {
   const { hydrated, balance } = useCredits();
   const short = hydrated && balance < cost;
-  const blocked = short || !allReady || preparing;
+  // Preparing is busy, not disabled: a disabled button drops focus to <body>,
+  // so the gate that opens next had nowhere to hand focus back to.
+  const blocked = short || !allReady;
   const reason = short
     ? `Not enough credits — this build costs ${cost}, you have ${balance}`
     : !allReady
@@ -366,8 +376,9 @@ function BuildAction({
       <button
         type="button"
         data-testid="build-action"
-        onClick={onBuild}
+        onClick={preparing ? undefined : onBuild}
         disabled={blocked}
+        aria-disabled={blocked || preparing}
         aria-busy={preparing}
         title={reason}
         className={

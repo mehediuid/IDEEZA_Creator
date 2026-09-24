@@ -392,6 +392,8 @@ const FAIL_COPY: Record<NonNullable<ConceptFailReason>, string> = {
     "The concept this was refining is no longer stored, so there was nothing to evolve. Nothing was charged — start a fresh concept instead.",
   credits:
     "Your credit balance ran out before this render started. Nothing was charged.",
+  filtered:
+    "The image service's safety filter blocked this render by mistake, so there is no picture. Nothing was charged — trying again usually works.",
 };
 
 const FAIL_FALLBACK =

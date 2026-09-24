@@ -247,14 +247,13 @@ export function ArRecordPanel({
         <div style={{ flex: "1 1 240px", minWidth: 200 }}>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: 600,
-              letterSpacing: 0.6,
-              color: "var(--color-text-secondary)",
+              color: "var(--color-text-primary)",
               marginBottom: 10,
             }}
           >
-            HOW IT WORKS
+            How it works
           </div>
           <ol
             style={{

@@ -210,10 +210,14 @@ export function Step3Mint({
   isLastStep,
   minting,
   projectName,
+  imageUrl,
 }: {
   state: BriefState;
   onChange: (patch: Partial<BriefState>) => void;
   onBack: () => void;
+  /** The product's own concept image, for the card that says what is being
+   *  minted — when the project came from a build. */
+  imageUrl?: string;
   /** Commit — mint and finish. Only ever the CTA when this form is last. */
   onMint: () => void;
   /** One step along the sequence — the preview, when Innovations added one. */
@@ -301,7 +305,7 @@ export function Step3Mint({
             {SUB_BY_INTENT[intent]}{" "}
             {intent === "sell" &&
               willRenderVideo &&
-              "Project goes live when the video is final."}
+              "The video joins the listing when it finishes."}
           </p>
         </div>
 
@@ -310,6 +314,7 @@ export function Step3Mint({
         <ProductCard
           state={state}
           projectName={projectName}
+          imageUrl={imageUrl}
           watchable={watchable}
           onOpen={() => setReviewOpen(true)}
         />
@@ -393,26 +398,28 @@ export function Step3Mint({
             disabled={!canPay}
             title={missing ?? undefined}
             aria-describedby={missing ? reasonId : undefined}
+            // The app's primary button — the same shape and weight as every
+            // other one, not a glowing pill of its own.
             style={{
               width: "100%",
-              padding: "16px 32px",
-              background: canPay ? C.primary : "var(--color-bg-subtle)",
+              height: 44,
+              padding: "0 24px",
+              background: canPay
+                ? "var(--color-bg-brand)"
+                : "var(--color-bg-subtle)",
               color: canPay
                 ? "var(--color-text-on-brand)"
                 : "var(--color-text-disabled)",
               border: "none",
-              borderRadius: "var(--radius-3xl)",
-              fontSize: 15,
-              fontWeight: 700,
+              borderRadius: "var(--radius-lg)",
+              fontSize: "var(--font-size-md)",
+              fontWeight: 600,
               cursor: canPay ? "pointer" : "not-allowed",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
-              boxShadow: canPay
-                ? "0 6px 24px -6px rgba(124, 45, 185, .4)"
-                : "none",
-              transition: "background .14s, box-shadow .2s",
+              transition: "background .14s",
             }}
           >
             {minting ? (
@@ -591,11 +598,13 @@ function RenderInfo({ videoDone }: { videoDone: boolean }) {
 function ProductCard({
   state,
   projectName,
+  imageUrl,
   watchable,
   onOpen,
 }: {
   state: BriefState;
   projectName: string;
+  imageUrl?: string;
   watchable: boolean;
   onOpen: () => void;
 }) {
@@ -616,8 +625,24 @@ function ProductCard({
     justifyContent: "center",
   };
 
+  // The product itself where there is a picture of it — the violet gradient
+  // stood in for a product that has a concept image already.
   const inner = (
     <>
+      {imageUrl && !state.arClip ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt=""
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      ) : null}
       {state.arClip ? (
         <video
           src={state.arClip.url}
@@ -695,11 +720,9 @@ function ProductCard({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 11,
-            color: C.primary,
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: 0.4,
+            fontSize: 13,
+            color: "var(--color-text-tertiary)",
+            fontWeight: 500,
             marginBottom: 2,
           }}
         >
@@ -836,7 +859,7 @@ function SellFields({
                 className="ix-brief-field"
                 value={state.minBid}
                 onChange={(e) => onChange({ minBid: decimal(e.target.value) })}
-                placeholder="32"
+                placeholder="0.00"
                 inputMode="decimal"
                 style={inputStyle}
               />
@@ -928,7 +951,7 @@ function SellFields({
               className="ix-brief-field"
               value={state.price}
               onChange={(e) => onChange({ price: decimal(e.target.value) })}
-              placeholder="32"
+              placeholder="0.00"
               inputMode="decimal"
               style={inputStyle}
             />

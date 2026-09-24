@@ -138,8 +138,9 @@ function PromptHelpDialog({
       style={{
         position: "fixed",
         inset: 0,
-        background: "color-mix(in srgb, var(--color-bg-page) 62%, transparent)",
-        backdropFilter: "blur(2px)",
+        // The flow's one backdrop — the same wash and blur as the gate's.
+        background: "color-mix(in srgb, var(--color-bg-overlay) 62%, transparent)",
+        backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -180,11 +181,9 @@ function PromptHelpDialog({
             <p
               style={{
                 margin: 0,
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: 1,
-                textTransform: "uppercase",
-                color: "var(--color-text-brand)",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--color-text-tertiary)",
               }}
             >
               Prompt help

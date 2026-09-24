@@ -37,7 +37,6 @@ import { Step2Video } from "./step-2-video";
 import { PromptHelpModal } from "./prompt-help-modal";
 import { Step3Mint } from "./step-3-mint";
 import { Step4Success } from "./step-4-success";
-import { C } from "@/lib/pcb/colors";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import {
   stepHref,
@@ -1135,6 +1134,12 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                 isLastStep={isLastStep}
                 minting={minting}
                 projectName={scopeProject?.name ?? ""}
+                imageUrl={
+                  (job ??
+                    (scopeProject?.buildId
+                      ? getBuild(scopeProject.buildId)
+                      : null))?.conceptImageUrl
+                }
               />
             )}
             {step === "success" && (
@@ -1148,6 +1153,35 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     </>
   );
 
+  // Under the card, at reading contrast. It used to be fixed in the
+  // bottom-right corner at 60% opacity (2.8:1), where the video render's
+  // toast now sits.
+  const savedNote =
+    hydrated && step !== "success" ? (
+      <p
+        role="status"
+        style={{
+          margin: 0,
+          fontSize: 12,
+          color: "var(--color-text-tertiary)",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 6,
+            height: 6,
+            background: "var(--color-bg-success)",
+            borderRadius: "50%",
+          }}
+        />
+        Saved as you go
+      </p>
+    ) : null;
+
   const chrome = (
     <>
       <PromptHelpModal
@@ -1158,31 +1192,6 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         onClose={() => setPromptHelpOpen(false)}
       />
 
-      {hydrated && step !== "success" && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 16,
-            right: 24,
-            fontSize: 11,
-            color: C.body,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            opacity: 0.6,
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              background: "var(--color-green-500)",
-              borderRadius: "50%",
-            }}
-          />
-          Auto-saved
-        </div>
-      )}
 
       <style>{`
         @keyframes ix-brief-in {
@@ -1219,6 +1228,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           <BriefStepLine steps={seq} current={step} intent={state.intent} />
         )}
         {body}
+        {savedNote}
         {chrome}
       </div>
     );
@@ -1262,6 +1272,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           }}
         >
           {body}
+          {savedNote}
         </div>
         {chrome}
       </div>

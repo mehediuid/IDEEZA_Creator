@@ -1,12 +1,12 @@
 "use client";
 
-// GlobalRenderIndicator — a stack of dark toasts fixed top-centre, visible on
-// every page once at least one video job wants attention (rendering, or done
-// but not yet reviewed, or failed). One line per job, newest on top:
-//   rendering → "Video rendering · <title> · about Nm left" + Cancel + ×
-//   ready     → "Video ready · <title>" + Review (opens
-//                ReviewModal) + ×
-//   failed    → "Video render failed · <title>." + RETRY + ×
+// GlobalRenderIndicator — a stack of toasts in the bottom-right corner, visible
+// on every page once at least one video job wants attention (rendering, or done
+// but not yet reviewed, or failed). One card per job, newest on top, in the
+// attention toast's own shape:
+//   rendering → "Video rendering · about Nm left" / <title> + Cancel + ×
+//   ready     → "Video ready" / <title> + Review (opens ReviewModal) + ×
+//   failed    → "Video render failed" / <title> + Try again + ×
 //
 // Email/browser notification opt-ins live in Step 2's own render card
 // (components/brief/step-2-video.tsx) — this indicator is a status line, not
@@ -122,9 +122,8 @@ export function GlobalRenderIndicator() {
             style={{
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
+              alignItems: "flex-end",
               gap: 8,
-              pointerEvents: "auto",
             }}
             role="status"
             aria-live="polite"
@@ -143,7 +142,7 @@ export function GlobalRenderIndicator() {
 
             <style>{`
               @keyframes ix-render-toast-in {
-                from { opacity: 0; transform: translateY(-6px); }
+                from { opacity: 0; transform: translateY(6px); }
                 to   { opacity: 1; transform: translateY(0); }
               }
               .ix-render-toast { animation: ix-render-toast-in .2s var(--motion-easing-decelerate); }
@@ -207,119 +206,66 @@ function ToastLine({
   const { etaSec } = progressOf(job);
   const title = job.title || "Untitled video";
 
-  let badgeBg: string;
-  let accent: string;
-  let icon: React.ReactNode;
-  let message: React.ReactNode;
-  let action: React.ReactNode;
-
-  if (isDone) {
-    badgeBg = "var(--color-green-500)";
-    accent = "var(--color-green-400)";
-    icon = <CheckGlyph />;
-    message = (
-      <>
-        Video ready · {title}
-      </>
-    );
-    action = (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onReview();
-        }}
-        style={actionButtonStyle(accent)}
-      >
-        REVIEW
-      </button>
-    );
-  } else if (isFailed) {
-    badgeBg = "var(--color-red-500)";
-    accent = "var(--color-red-400)";
-    icon = <AlertGlyph />;
-    message = <>Video render failed · {title}.</>;
-    action = (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRetry();
-        }}
-        style={actionButtonStyle(accent)}
-      >
-        RETRY
-      </button>
-    );
-  } else {
-    badgeBg = "var(--color-blue-500)";
-    accent = "var(--color-blue-400)";
-    icon = <InfoGlyph />;
-    message = (
-      <>
-        Video rendering · {title} · about {fmtMin(etaSec)} left
-      </>
-    );
-    action = (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onCancel();
-        }}
-        style={actionButtonStyle(accent)}
-      >
-        CANCEL
-      </button>
-    );
-  }
+  // The attention toast's shape, so the app has one: a surface card, a tinted
+  // tile carrying the state, the state in words, one action in the card's own
+  // button style. It used to be an inverted dark strip with uppercase coloured
+  // text links — a second toast language beside the first.
+  const tone = isDone ? "success" : isFailed ? "error" : "info";
+  const kicker = isDone
+    ? "Video ready"
+    : isFailed
+      ? "Video render failed"
+      : `Video rendering · about ${fmtMin(etaSec)} left`;
+  const action = isDone
+    ? { label: "Review", run: onReview }
+    : isFailed
+      ? { label: "Try again", run: onRetry }
+      : { label: "Cancel", run: onCancel };
 
   return (
     <div
-      className="ix-render-toast"
-      onClick={isDone ? onReview : undefined}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        width: "min(92vw, 420px)",
-        padding: "10px 10px 10px 14px",
-        background: "var(--color-bg-toast)",
-        color: "var(--color-text-on-toast)",
-        borderRadius: "var(--radius-lg)",
-        boxShadow: "var(--elevation-5)",
-        fontSize: "var(--font-size-sm)",
-        lineHeight: 1.35,
-        cursor: isDone ? "pointer" : "default",
-      }}
+      className={[
+        "ix-render-toast pointer-events-auto flex w-[400px] max-w-[calc(100vw-32px)] items-center gap-[12px] rounded-2xl border bg-bg-surface px-[14px] py-[10px] shadow-3",
+        tone === "error"
+          ? "border-[var(--color-border-error)]"
+          : tone === "success"
+            ? "border-[var(--color-border-success)]"
+            : "border-border",
+      ].join(" ")}
     >
       <span
-        style={{
-          flex: "0 0 20px",
-          width: 20,
-          height: 20,
-          borderRadius: 10,
-          background: badgeBg,
-          color: "var(--color-white)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
+        aria-hidden
+        className={[
+          "inline-flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-lg",
+          tone === "error"
+            ? "bg-bg-error-subtle text-text-error"
+            : tone === "success"
+              ? "bg-bg-success-subtle text-text-success"
+              : "bg-bg-subtle text-text-secondary",
+        ].join(" ")}
       >
-        {icon}
+        {isDone ? <CheckGlyph /> : isFailed ? <AlertGlyph /> : <InfoGlyph />}
       </span>
-      <span style={{ flex: 1, minWidth: 0 }}>{message}</span>
-      {action}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-text-tertiary">{kicker}</p>
+        <p className="truncate text-md font-semibold text-text-primary">{title}</p>
+      </div>
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDismiss();
-        }}
-        aria-label="Dismiss"
-        style={dismissButtonStyle}
+        onClick={action.run}
+        className="inline-flex h-[32px] shrink-0 items-center rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        ×
+        {action.label}
+      </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="inline-flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
       </button>
     </div>
   );
@@ -327,7 +273,7 @@ function ToastLine({
 
 function InfoGlyph() {
   return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       <circle cx="12" cy="7" r="2" />
       <rect x="10.4" y="11" width="3.2" height="9.5" rx="1.4" />
     </svg>
@@ -337,12 +283,12 @@ function InfoGlyph() {
 function CheckGlyph() {
   return (
     <svg
-      width="11"
-      height="11"
+      width="15"
+      height="15"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="3.2"
+      strokeWidth="3"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -353,38 +299,9 @@ function CheckGlyph() {
 
 function AlertGlyph() {
   return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       <rect x="10.4" y="3" width="3.2" height="12" rx="1.4" />
       <circle cx="12" cy="19" r="2" />
     </svg>
   );
 }
-
-function actionButtonStyle(accent: string): React.CSSProperties {
-  return {
-    flex: "0 0 auto",
-    padding: "4px 6px",
-    margin: 0,
-    background: "transparent",
-    border: "none",
-    borderRadius: "var(--radius-sm)",
-    color: accent,
-    fontSize: "var(--font-size-xs)",
-    fontWeight: 700,
-    letterSpacing: "0.02em",
-    whiteSpace: "nowrap",
-    cursor: "pointer",
-  };
-}
-
-const dismissButtonStyle: React.CSSProperties = {
-  flex: "0 0 auto",
-  padding: "2px 4px",
-  margin: 0,
-  background: "transparent",
-  border: "none",
-  color: "var(--color-gray-400)",
-  fontSize: 16,
-  lineHeight: 1,
-  cursor: "pointer",
-};

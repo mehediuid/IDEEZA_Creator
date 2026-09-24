@@ -29,7 +29,13 @@ import { SelectMenu } from "@/components/ideeza";
 import type { Companion } from "@/lib/create/companions";
 import type { SetupAnswer } from "@/lib/create/history";
 
-export type SetupProject = { id: string; name: string };
+export type SetupProject = {
+  id: string;
+  name: string;
+  /** What tells two projects of the same name apart: what they hold and when
+   *  they last changed. */
+  detail?: string;
+};
 
 /** The chooser's own value for "not one of these" — no project can carry it,
  *  since every id is generated with a prefix. */
@@ -174,6 +180,7 @@ export function SetupTurn({
       >
         {multi ? (
           <NameField
+            label="Project name"
             value={projectName}
             onChange={setProjectName}
             placeholder="e.g. Field survey drone"
@@ -188,6 +195,7 @@ export function SetupTurn({
                 picking a project reads the same in both places. */}
             <SelectMenu
               placeholder="Choose a project"
+              ariaLabel="Project"
               value={
                 projectId ? projectId : projectName !== "" ? NEW_PROJECT : null
               }
@@ -206,15 +214,20 @@ export function SetupTurn({
                   label: "+ Start a new project",
                   sub: "This product becomes its first.",
                 },
+                // Two projects can share a name, so each row says what it
+                // holds and when it last changed — four "Drone" rows with
+                // nothing else on them could not be told apart.
                 ...projects.map((pr) => ({
                   value: pr.id,
                   label: pr.name,
-                  section: "EXISTING PROJECTS",
+                  sub: pr.detail,
+                  section: "Existing projects",
                 })),
               ]}
             />
             {projectId === "" && projectName !== "" && (
               <NameField
+                label="New project name"
                 value={projectName.trim()}
                 onChange={setProjectName}
                 placeholder="e.g. Bench tools"
@@ -295,8 +308,8 @@ function Card({
     <div
       data-testid="setup-turn"
       className={[
-        "flex w-full max-w-[640px] flex-col border-t border-solid border-border",
-        muted ? "gap-[10px] pt-[20px]" : "gap-[22px] pt-[28px]",
+        "flex w-full max-w-[640px] flex-col",
+        muted ? "gap-[10px]" : "gap-[22px]",
       ].join(" ")}
     >
       {children}
@@ -320,9 +333,7 @@ function Question({
 }) {
   return (
     <section className="flex flex-col gap-[10px]">
-      <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
-        {chip}
-      </span>
+      <span className="text-sm font-medium text-text-tertiary">{chip}</span>
       <h3 className="text-lg font-semibold text-text-primary">{ask}</h3>
       <p className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
         {note}
@@ -346,9 +357,7 @@ function Decided({
 }) {
   return (
     <div className="flex items-baseline gap-[10px] text-sm">
-      <span className="font-display text-xs font-semibold uppercase tracking-caps text-text-tertiary">
-        {chip}
-      </span>
+      <span className="shrink-0 font-medium text-text-tertiary">{chip}</span>
       <span className="min-w-0 flex-1 truncate text-text-secondary">{text}</span>
       <button
         type="button"
@@ -421,8 +430,7 @@ function Row({
       onClick={onToggle}
       className={[
         "flex w-full items-start gap-[12px] rounded-xl px-[12px] py-[10px] text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-        checked ? "bg-bg-brand-subtle" : "hover:bg-bg-subtle",
-        disabled ? "cursor-default" : "",
+        disabled ? "cursor-default" : "hover:bg-bg-subtle",
       ].join(" ")}
     >
       <span
@@ -444,31 +452,44 @@ function Row({
             </svg>
           ))}
       </span>
-      <span className="flex min-w-0 flex-col gap-[2px]">
+      <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
         <span className="text-md font-medium text-text-primary">{title}</span>
         <span className="text-sm leading-relaxed text-text-tertiary">{why}</span>
       </span>
+      {disabled && (
+        <span className="shrink-0 text-sm text-text-tertiary">Always included</span>
+      )}
     </button>
   );
 }
 
+// A visible label, and as wide as the chooser above it — it was a 380 px box
+// with only a placeholder to say what it was for, under a 640 px dropdown.
 function NameField({
+  label,
   value,
   onChange,
   placeholder,
 }: {
+  label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
 }) {
+  const id = React.useId();
   return (
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      aria-label="Project name"
-      className="h-[40px] w-full max-w-[380px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-md text-text-primary outline-none placeholder:text-text-tertiary focus-visible:border-border-brand focus-visible:ring-2 focus-visible:ring-border-focus"
-    />
+    <div className="mt-[12px] flex flex-col gap-[6px]">
+      <label htmlFor={id} className="text-sm font-medium text-text-primary">
+        {label}
+      </label>
+      <input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-[40px] w-full rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-md text-text-primary outline-none placeholder:text-text-tertiary focus-visible:border-border-brand focus-visible:ring-2 focus-visible:ring-border-focus"
+      />
+    </div>
   );
 }
 

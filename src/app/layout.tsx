@@ -16,50 +16,59 @@ export const metadata: Metadata = {
   description: "Creator dashboard built on the IDEEZA design system",
 };
 
-// ToastLayer — the one shared top-centre toast stack. GlobalRenderIndicator
-// and BuildAttentionBanner live in different React subtrees (one hangs off
-// the root, the other off nested route-group layouts) but must never paint
-// on top of each other, so each portals its card into its own labelled slot
-// here instead of self-positioning with `fixed`. Slot order is fixed
-// (attention above render) regardless of which tree renders first.
+// ToastLayer — the two toast stacks. GlobalRenderIndicator and
+// BuildAttentionBanner live in different React subtrees (one hangs off the
+// root, the other off nested route-group layouts), so each portals its card
+// into its own labelled slot here instead of self-positioning with `fixed`.
+// The attention toast is top-centre: it asks for something and goes away. A
+// video render reports for minutes, and parked top-centre it sat over every
+// page's heading and Back link for the whole render, so it has the
+// bottom-right corner instead — where a background job's progress usually is.
 function ToastLayer() {
   return (
-    <div
-      id="ideeza-toast-layer"
-      style={{
-        position: "fixed",
-        top: 16,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: "var(--z-toast)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 8,
-        pointerEvents: "none",
-      }}
-    >
+    <>
       <div
-        id="ideeza-toast-layer-attention"
-        data-slot="attention"
+        id="ideeza-toast-layer"
         style={{
+          position: "fixed",
+          top: 16,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: "var(--z-toast)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: 8,
+          pointerEvents: "none",
         }}
-      />
+      >
+        <div
+          id="ideeza-toast-layer-attention"
+          data-slot="attention"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
+          }}
+        />
+      </div>
       <div
         id="ideeza-toast-layer-render"
         data-slot="render"
         style={{
+          position: "fixed",
+          bottom: 16,
+          right: 16,
+          zIndex: "var(--z-toast)",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
+          alignItems: "flex-end",
           gap: 8,
+          pointerEvents: "none",
         }}
       />
-    </div>
+    </>
   );
 }
 
