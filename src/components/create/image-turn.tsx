@@ -36,15 +36,12 @@ import { Checkbox } from "@/components/ideeza/checkbox";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { useMinuteClock } from "./build-status";
+import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
+import { SpecPanel, type SpecCard } from "./spec-panel";
 import { elapsedLabel, useSecondClock } from "./use-clock";
 
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
-
-export const OUTLINE_BUTTON =
-  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
-export const OUTLINE_BUTTON_OFF =
-  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none";
 
 export function ImageTurn({
   turn,
@@ -57,6 +54,7 @@ export function ImageTurn({
   onRefine,
   buildChoice,
   onRemove,
+  spec,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
   conceptLabel: string;
@@ -76,6 +74,9 @@ export function ImageTurn({
   buildChoice?: { included: boolean; locked?: boolean; onToggle?: () => void };
   /** Takes the product out of the project. Absent for the primary. */
   onRemove?: () => void;
+  /** The product's spec sheet — facts, and the editor behind "Spec". Ready
+   *  cards only: a drawing still under way has no parts to read yet. */
+  spec?: SpecCard;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
   // The rendered balance, not canAfford(): that reads a ref the provider
@@ -178,6 +179,8 @@ export function ImageTurn({
         </p>
         <CopyPromptButton prompt={turn.prompt} />
       </div>
+
+      {spec && <SpecPanel card={spec} what={what} />}
 
       <div aria-hidden className="h-px w-full bg-border" />
 

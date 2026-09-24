@@ -24,12 +24,8 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import {
-  ImageTurn,
-  InsufficientCreditsBanner,
-  OUTLINE_BUTTON,
-  OUTLINE_BUTTON_OFF,
-} from "./image-turn";
+import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
+import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
 import { ReviewOutputs } from "./review-outputs";
 
