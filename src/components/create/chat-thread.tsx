@@ -282,8 +282,10 @@ export function ChatThread({
   const shortForBuild = creditsHydrated && balance < cost;
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
+  // Top-aligned: an open spec makes one card tall, and stretched rows gave
+  // its neighbour a matching void under its buttons.
   const conceptGrid = (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-[20px]">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-[20px]">
       {products.map((turn) => (
         <ImageTurn
           key={turn.id}

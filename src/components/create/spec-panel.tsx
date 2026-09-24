@@ -35,6 +35,12 @@ import { OUTLINE_BUTTON } from "./buttons";
 
 export const specSizeInputId = (productId: string) => `spec-${productId}-size`;
 
+/** A fix, Auto and Undo each take away the button that was pressed, which
+ *  left the keyboard on the page's body. Focus goes to where the change
+ *  shows instead, once the new state has rendered. */
+const focusSoon = (id: string) =>
+  requestAnimationFrame(() => document.getElementById(id)?.focus());
+
 const DECIDED: Record<"you" | "ai" | "rule" | "calc", string> = {
   you: "you",
   ai: "AI",
@@ -69,7 +75,7 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
   const conflict = !spec.fits && !spec.draftAtSize;
   return (
     <section aria-label={`${what} spec`} className="flex flex-col gap-[8px]">
-      <div className="flex items-start gap-[8px]">
+      <div className="flex items-center gap-[8px]">
         <SpecFacts spec={spec} parts={card.parts} />
         <button
           type="button"
@@ -82,7 +88,7 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
           <span
             aria-hidden
             className={[
-              "inline-flex transition-transform duration-fast",
+              "inline-flex transition-transform duration-normal ease-decelerate motion-reduce:transition-none",
               open ? "rotate-180" : "",
             ].join(" ")}
           >
@@ -95,23 +101,32 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
         id={panelId}
         hidden={!open}
         // `hidden` alone loses to the `flex` utility, so the display class
-        // follows the same state.
+        // follows the same state. It sits on the card's own surface under a
+        // rule, not in a tinted box: a box in a card is a card in a card, and
+        // the tint took the error and Draft lines under 4.5:1 in light.
         className={[
-          "flex-col gap-[14px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]",
+          "flex-col gap-[14px] border-t border-solid border-border pt-[14px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:ease-decelerate motion-safe:[animation-duration:var(--motion-duration-normal)]",
           open ? "flex" : "hidden",
         ].join(" ")}
       >
-        {/* Keyed on the size, so a fix or Auto re-seeds the three fields
-            instead of an effect copying props into state. */}
-        <SizeField key={mm3(spec.size)} productId={productId} spec={spec} edits={card.edits} onChange={change} conflictId={conflict && change ? `${specSizeInputId(productId)}-conflict` : undefined} />
-        {conflict && change && <Fixes id={`${specSizeInputId(productId)}-conflict`} spec={spec} edits={card.edits} onChange={change} />}
+        <SizeField productId={productId} spec={spec} edits={card.edits} onChange={change} conflictId={conflict && change ? `${specSizeInputId(productId)}-conflict` : undefined} />
+        {conflict && change && <Fixes id={`${specSizeInputId(productId)}-conflict`} sizeId={specSizeInputId(productId)} spec={spec} edits={card.edits} onChange={change} />}
         {spec.draftAtSize && change && (
             <p className="flex flex-wrap items-center gap-[8px] text-sm text-[color:var(--color-text-warning)]">
               <Icon icon={Alert02Icon} size={14} />
-              Builds at this size as Draft — the fit check will list it.
+              {/* The keyboard lands on Undo when Draft is chosen, so Undo
+                  carries the sentence that says what was chosen. */}
+              <span id={`${specSizeInputId(productId)}-draft`}>
+                Builds at this size as Draft — the fit check will list it.
+              </span>
               <button
+                id={`${specSizeInputId(productId)}-undo`}
+                aria-describedby={`${specSizeInputId(productId)}-draft`}
                 type="button"
-                onClick={() => change({ ...card.edits, draftAtSize: false })}
+                onClick={() => {
+                  change({ ...card.edits, draftAtSize: false });
+                  focusSoon(specSizeInputId(productId));
+                }}
                 className="inline-flex min-h-[24px] items-center gap-[4px] rounded-sm px-[4px] font-semibold text-text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 <Icon icon={Undo02Icon} size={14} />
@@ -155,24 +170,39 @@ function SpecFacts({ spec, parts }: { spec: ResolvedSpec; parts: ConceptPart[] }
     ...(radio ? [{ key: "radio", text: radio, tone: "plain" as const }] : []),
     { key: "board", text: spec.board ? "2-layer" : "No board", tone: "plain" },
   ];
+  // A line of plain facts, not bordered chips: chips read as things to
+  // press, and the one thing here to press is Spec. Every fact carries its
+  // separator in front, and the list is pulled left under a clipping box, so
+  // whichever fact starts a line — the first, or one that wrapped — shows
+  // no dangling "·".
   return (
-    <ul role="list" className="flex min-w-0 flex-wrap gap-[4px]">
-      {facts.map((f) => (
-        <li
-          key={f.key}
-          className={[
-            "inline-flex h-[24px] items-center rounded-md border border-solid px-[8px] text-sm",
-            f.tone === "error"
-              ? "border-[var(--color-border-error)] text-text-error"
-              : f.tone === "warn"
-                ? "border-[var(--color-border-warning)] text-[color:var(--color-text-warning)]"
-                : "border-border text-text-secondary",
-          ].join(" ")}
-        >
-          {f.text}
-        </li>
-      ))}
-    </ul>
+    <div className="min-w-0 flex-1 overflow-hidden">
+      <ul
+        role="list"
+        className="-ml-[14px] flex flex-wrap items-center gap-y-[2px] text-sm tabular-nums"
+      >
+        {facts.map((f) => (
+          <li key={f.key} className="relative inline-flex items-center pl-[14px]">
+            <span aria-hidden className="absolute left-0 w-[14px] text-center text-text-tertiary">
+              ·
+            </span>
+            <span
+              className={[
+                "inline-flex items-center gap-[4px]",
+                f.tone === "error"
+                  ? "font-medium text-text-error"
+                  : f.tone === "warn"
+                    ? "font-medium text-[color:var(--color-text-warning)]"
+                    : "text-text-secondary",
+              ].join(" ")}
+            >
+              {f.tone !== "plain" && <Icon icon={Alert02Icon} size={14} />}
+              {f.text}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -215,16 +245,25 @@ function SizeField({
   onChange?: (edits: SpecEdits) => void;
   conflictId?: string;
 }) {
-  const [draft, setDraft] = React.useState({
-    l: String(spec.size.l),
-    w: String(spec.size.w),
-    h: String(spec.size.h),
-  });
+  const asDraft = (m: Mm3) => ({ l: String(m.l), w: String(m.w), h: String(m.h) });
+  const [draft, setDraft] = React.useState(() => asDraft(spec.size));
   const [error, setError] = React.useState<string | null>(null);
   const errorId = `${specSizeInputId(productId)}-error`;
 
-  // Committed on blur, as a whole box: three fields that each commit on
-  // their own would put a half-typed size through the fit check.
+  // A fix or Auto changes the size from outside: the three fields re-seed
+  // while rendering. Keying the field on the size did the same by remounting
+  // it, and that dropped the keyboard on the page's body after every commit.
+  const seeded = mm3(spec.size);
+  const [seededFrom, setSeededFrom] = React.useState(seeded);
+  if (seededFrom !== seeded) {
+    setSeededFrom(seeded);
+    setDraft(asDraft(spec.size));
+    setError(null);
+  }
+
+  // Committed as a whole box — on Enter, or when focus leaves the three
+  // fields: moving from Length to Width is not done yet, and committing
+  // there put a half-typed size through the fit check.
   const commit = () => {
     if (!onChange) return;
     const box = asMm3({ l: Number(draft.l), w: Number(draft.w), h: Number(draft.h) });
@@ -239,7 +278,12 @@ function SizeField({
 
   return (
     <Field label="Size" decided={DECIDED[spec.sizeSource]}>
-      <div className="grid grid-cols-3 gap-[6px]">
+      <div
+        className="grid grid-cols-3 gap-[6px]"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) commit();
+        }}
+      >
         {AXES.map((axis, i) => (
           <TextInput
             key={axis.key}
@@ -253,7 +297,6 @@ function SizeField({
             disabled={!onChange}
             value={draft[axis.key]}
             onValueChange={(v) => setDraft((d) => ({ ...d, [axis.key]: v }))}
-            onBlur={commit}
             onKeyDown={(e) => {
               if (e.key === "Enter") commit();
             }}
@@ -271,7 +314,10 @@ function SizeField({
           {spec.sizeSource === "you" && onChange && (
             <button
               type="button"
-              onClick={() => onChange({ ...edits, size: undefined, draftAtSize: false })}
+              onClick={() => {
+                onChange({ ...edits, size: undefined, draftAtSize: false });
+                focusSoon(specSizeInputId(productId));
+              }}
               className="inline-flex min-h-[24px] items-center rounded-sm px-[4px] font-semibold text-text-secondary underline-offset-2 outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
             >
               Auto
@@ -285,48 +331,60 @@ function SizeField({
 
 function Fixes({
   id,
+  sizeId,
   spec,
   edits,
   onChange,
 }: {
   id: string;
+  sizeId: string;
   spec: ResolvedSpec;
   edits: SpecEdits;
   onChange: (edits: SpecEdits) => void;
 }) {
   const smaller = spec.smallerBattery;
+  // Each fix clears the conflict, so its buttons go; the keyboard goes to the
+  // size the fix settled — or, for Draft, to its Undo.
+  const take = (next: SpecEdits, focusId: string) => {
+    onChange(next);
+    focusSoon(focusId);
+  };
   return (
-    <div className="flex flex-col gap-[6px]">
+    <div role="group" aria-labelledby={id} className="flex flex-col gap-[8px]">
       <p id={id} className="text-sm font-medium text-text-error">
         Doesn&apos;t fit — needs at least {mm3(spec.minSize)}.
       </p>
-      <button
-        type="button"
-        className={OUTLINE_BUTTON}
-        onClick={() => onChange({ ...edits, size: spec.minSize, draftAtSize: false })}
-      >
-        <Icon icon={Maximize01Icon} size={16} />
-        Use {mm3(spec.minSize)}
-      </button>
-      {smaller && (
+      {/* Sized to their words and wrapping as a row: three bars the width of
+          the card read as three more fields to fill in. */}
+      <div className="flex flex-wrap gap-[8px]">
         <button
           type="button"
           className={OUTLINE_BUTTON}
-          onClick={() => onChange({ ...edits, battery: smaller.key, draftAtSize: false })}
+          onClick={() => take({ ...edits, size: spec.minSize, draftAtSize: false }, sizeId)}
         >
-          <Icon icon={BatteryLowIcon} size={16} />
-          {batteryOf(smaller.key).label} — fits
-          {runtimeLabel(smaller.runtimeH) ? ` · ${runtimeLabel(smaller.runtimeH)}` : ""}
+          <Icon icon={Maximize01Icon} size={16} />
+          Use {mm3(spec.minSize)}
         </button>
-      )}
-      <button
-        type="button"
-        className={OUTLINE_BUTTON}
-        onClick={() => onChange({ ...edits, draftAtSize: true })}
-      >
-        <Icon icon={Alert02Icon} size={16} />
-        Build at this size as Draft
-      </button>
+        {smaller && (
+          <button
+            type="button"
+            className={OUTLINE_BUTTON}
+            onClick={() => take({ ...edits, battery: smaller.key, draftAtSize: false }, sizeId)}
+          >
+            <Icon icon={BatteryLowIcon} size={16} />
+            {batteryOf(smaller.key).label} — fits
+            {runtimeLabel(smaller.runtimeH) ? ` · ${runtimeLabel(smaller.runtimeH)}` : ""}
+          </button>
+        )}
+        <button
+          type="button"
+          className={OUTLINE_BUTTON}
+          onClick={() => take({ ...edits, draftAtSize: true }, `${sizeId}-undo`)}
+        >
+          <Icon icon={Alert02Icon} size={16} />
+          Build at this size as Draft
+        </button>
+      </div>
     </div>
   );
 }
@@ -347,6 +405,10 @@ function PowerField({
       {onChange ? (
         <Select
           size="sm"
+          // The reset's `button { border: 0 }` outranks the trigger's own
+          // `border`, so without a style it drew no edge — on the card's
+          // surface the battery read as a line of text, not a field.
+          className="border-solid"
           aria-label="Battery"
           value={spec.battery}
           options={BATTERIES.map((b) => ({ label: b.label, value: b.key }))}
@@ -376,15 +438,19 @@ function ReadOnly({ spec, parts }: { spec: ResolvedSpec; parts: ConceptPart[] })
   ];
   return (
     <div className="flex flex-col">
-      <dl className="flex flex-col">
+      {/* One grid, so every value starts on the same line: a wrapping row
+          per pair pushed a long value (the fab profile) into a ragged
+          right-aligned block and dropped a short one under its label. */}
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] text-sm">
         {rows.map(([label, value]) => (
-          <div
-            key={label}
-            className="flex flex-wrap justify-between gap-x-[12px] gap-y-[2px] border-t border-solid border-border py-[6px] text-sm"
-          >
-            <dt className="text-text-tertiary">{label}</dt>
-            <dd className="min-w-0 text-right text-text-primary">{value}</dd>
-          </div>
+          <React.Fragment key={label}>
+            <dt className="border-t border-solid border-border py-[6px] pr-[16px] text-text-tertiary">
+              {label}
+            </dt>
+            <dd className="min-w-0 border-t border-solid border-border py-[6px] text-text-primary">
+              {value}
+            </dd>
+          </React.Fragment>
         ))}
       </dl>
       {spec.estimated.length > 0 && (
