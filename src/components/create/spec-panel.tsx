@@ -94,7 +94,12 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
       <div
         id={panelId}
         hidden={!open}
-        className="flex flex-col gap-[14px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]"
+        // `hidden` alone loses to the `flex` utility, so the display class
+        // follows the same state.
+        className={[
+          "flex-col gap-[14px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]",
+          open ? "flex" : "hidden",
+        ].join(" ")}
       >
         {/* Keyed on the size, so a fix or Auto re-seeds the three fields
             instead of an effect copying props into state. */}
