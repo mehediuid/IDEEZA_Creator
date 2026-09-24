@@ -140,10 +140,30 @@ export function budgetOf(battery: BatteryKey): number {
 
 const hasUsb = (parts: ConceptPart[]) => parts.some((p) => /usb/i.test(p.name));
 
-/** Without a hint: USB power for a product that has a USB port, no pack and
+/** The pack a concept already names, read as one of ours — so a spare
+ *  battery, or a product that lists its own cell, keeps that cell. Null when
+ *  it names none, or names one too vaguely to place. */
+export function listedBattery(parts: ConceptPart[]): BatteryKey | null {
+  const pack = parts.find(isBatteryPart);
+  if (!pack) return null;
+  const n = pack.name.toLowerCase();
+  if (/\b2s\b|7\.4\s*v/.test(n)) return "li-2s-1500";
+  if (/18650/.test(n)) return "li-1s-2000";
+  if (/\baaa?\b/.test(n)) {
+    return /\b(?:4|four)\s*[x×]?\s*aa|aa\s*[x×]\s*4/.test(n) ? "aa-4" : "aa-2";
+  }
+  const mah = Number(n.match(/(\d{3,5})\s*mah/)?.[1]);
+  if (mah) return mah >= 1500 ? "li-1s-2000" : mah >= 700 ? "li-1s-1000" : "li-1s-400";
+  return null;
+}
+
+/** Without a hint: the pack the concept lists, when it names one we can place;
+ *  otherwise USB power for a product that has a USB port, no pack and
  *  nothing that moves; otherwise the smallest Li pack that can supply it and
  *  lasts the goal (an hour when nobody said). */
 export function ruleBattery(parts: ConceptPart[], goalH: number = RUNTIME_GOAL_H): BatteryKey {
+  const listed = listedBattery(parts);
+  if (listed) return listed;
   const list = placedParts(parts);
   const moving = parts.some((p) => MOVES.test(p.name));
   if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving) return "none";
