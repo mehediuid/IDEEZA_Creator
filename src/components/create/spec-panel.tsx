@@ -91,23 +91,23 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
         </button>
       </div>
 
-      {open && (
-        <div
-          id={panelId}
-          className="flex flex-col gap-[14px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]"
-        >
-          {/* Keyed on the size, so a fix or Auto re-seeds the three fields
-              instead of an effect copying props into state. */}
-          <SizeField key={mm3(spec.size)} productId={productId} spec={spec} edits={card.edits} onChange={change} />
-          {conflict && change && <Fixes spec={spec} edits={card.edits} onChange={change} />}
-          {spec.draftAtSize && change && (
+      <div
+        id={panelId}
+        hidden={!open}
+        className="flex flex-col gap-[14px] rounded-xl border border-solid border-border bg-bg-subtle p-[14px]"
+      >
+        {/* Keyed on the size, so a fix or Auto re-seeds the three fields
+            instead of an effect copying props into state. */}
+        <SizeField key={mm3(spec.size)} productId={productId} spec={spec} edits={card.edits} onChange={change} conflictId={conflict && change ? `${specSizeInputId(productId)}-conflict` : undefined} />
+        {conflict && change && <Fixes id={`${specSizeInputId(productId)}-conflict`} spec={spec} edits={card.edits} onChange={change} />}
+        {spec.draftAtSize && change && (
             <p className="flex flex-wrap items-center gap-[8px] text-sm text-[color:var(--color-text-warning)]">
               <Icon icon={Alert02Icon} size={14} />
               Builds at this size as Draft — the fit check will list it.
               <button
                 type="button"
                 onClick={() => change({ ...card.edits, draftAtSize: false })}
-                className="inline-flex items-center gap-[4px] rounded-sm font-semibold text-text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="inline-flex min-h-[24px] items-center gap-[4px] rounded-sm px-[4px] font-semibold text-text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
               >
                 <Icon icon={Undo02Icon} size={14} />
                 Undo
@@ -131,7 +131,6 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
           </Field>
           <ReadOnly spec={spec} parts={card.parts} />
         </div>
-      )}
     </section>
   );
 }
@@ -203,11 +202,13 @@ function SizeField({
   spec,
   edits,
   onChange,
+  conflictId,
 }: {
   productId: string;
   spec: ResolvedSpec;
   edits: SpecEdits;
   onChange?: (edits: SpecEdits) => void;
+  conflictId?: string;
 }) {
   const [draft, setDraft] = React.useState({
     l: String(spec.size.l),
@@ -241,8 +242,8 @@ function SizeField({
             size="sm"
             inputMode="numeric"
             aria-label={`${axis.label} in millimetres`}
-            aria-describedby={error ? errorId : undefined}
-            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : conflictId}
+            aria-invalid={error || conflictId ? true : undefined}
             invalid={!!error || (!spec.fits && !spec.draftAtSize)}
             disabled={!onChange}
             value={draft[axis.key]}
@@ -266,7 +267,7 @@ function SizeField({
             <button
               type="button"
               onClick={() => onChange({ ...edits, size: undefined, draftAtSize: false })}
-              className="rounded-sm font-semibold text-text-secondary underline-offset-2 outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="inline-flex min-h-[24px] items-center rounded-sm px-[4px] font-semibold text-text-secondary underline-offset-2 outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
             >
               Auto
             </button>
@@ -278,10 +279,12 @@ function SizeField({
 }
 
 function Fixes({
+  id,
   spec,
   edits,
   onChange,
 }: {
+  id: string;
   spec: ResolvedSpec;
   edits: SpecEdits;
   onChange: (edits: SpecEdits) => void;
@@ -289,7 +292,7 @@ function Fixes({
   const smaller = spec.smallerBattery;
   return (
     <div className="flex flex-col gap-[6px]">
-      <p className="text-sm font-medium text-text-error">
+      <p id={id} className="text-sm font-medium text-text-error">
         Doesn&apos;t fit — needs at least {mm3(spec.minSize)}.
       </p>
       <button
