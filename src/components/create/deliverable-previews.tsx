@@ -15,47 +15,75 @@ import {
   firmwareFor,
   netsFor,
   pcbMetaFor,
+  specOfSource,
   type ArtifactSource,
   type NetWire,
 } from "@/lib/create/build-artifacts";
 import type { ConceptPartCategory } from "@/lib/create/concept";
+import { batteryOf } from "@/lib/spec/batteries";
+import { FAB_PROFILE, mcuOf, powerLabel, radioOf } from "@/lib/spec/format";
+import { mm3 } from "@/lib/spec/units";
 
 // ─────────────────────── what each artifact covers ──────────────────
 //
-// This panel has no download or export control — the review step is a
-// preview, not a delivery mechanism. So every line here describes what
-// the artifact *covers* (what was designed, what it accounts for),
-// never a file format or a document you could take away, per CLAUDE.md
-// §6 ("no promises without delivery").
-
-export const WHAT_SHIPS: Record<BuildItemKind, string[]> = {
-  "3d": [
-    "3D enclosure model, sized to the board",
-    "Print settings: PETG, 0.2 mm layer",
-    "Mount points sized for the PCB",
-  ],
-  pcb: [
-    "Schematic, converted into a 2-layer board layout",
-    "Placement and copper routing between every part",
-    "Bill of materials for this board",
-  ],
-  code: [
-    "Arduino-style sketch, fully commented",
-    "Library list pinned to versions",
-    "Wiring map to the PCB pins",
-  ],
-  wiring: [
-    "Netlist + pin-to-pin table",
-    "Wire colors per net class",
-    "Harness lengths, 22 AWG",
-    "Connector pinouts: USB-C, JST-PH",
-    "Continuity test checklist",
-  ],
-  parts: [
-    "Every part — category, name, reference and quantity",
-    "Grouped by function, quantities per board",
-  ],
-};
+// What each artifact covers, for this product — the aside beside every tab.
+// Read from the spec the build was booked with, so the numbers here are the
+// numbers the maker saw on the card and at the gate. No download or export
+// control lives on this panel, so no line names a file you could take away
+// (CLAUDE.md §6, "no promises without delivery").
+export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[] {
+  const spec = specOfSource(product);
+  const asked =
+    !spec.fits && spec.draftAtSize
+      ? [`Asked ${mm3(spec.size)} · needs ${mm3(spec.minSize)}`]
+      : [];
+  const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
+  switch (kind) {
+    case "3d":
+      return [
+        ...asked,
+        `Enclosure · ${mm3(spec.size)}`,
+        `${spec.material} · ${spec.wallMm} mm wall · 0.2 mm layers`,
+        "Shape from the concept image, size from the spec",
+        "Mount points sized for the PCB",
+      ];
+    case "pcb":
+      return [
+        spec.board
+          ? `2-layer board · ${spec.board.w} × ${spec.board.h} mm · ${spec.board.parts} parts`
+          : "No board — none of this product's parts sits on one",
+        `Fab profile: ${FAB_PROFILE}`,
+        "Schematic, converted into a board layout",
+        "Bill of materials for this board",
+      ];
+    case "code": {
+      const radio = radioOf(product.parts);
+      return [
+        `Runs on ${mcuOf(product.parts) ?? "the microcontroller"}`,
+        radio ? `Talks over ${radio}` : "No radio named in the parts",
+        "Arduino-style sketch, fully commented",
+        "Library list pinned to versions",
+        "Wiring map to the PCB pins",
+      ];
+    }
+    case "wiring":
+      return [
+        `Power in: ${supply}`,
+        "Netlist + pin-to-pin table",
+        "Wire colors per net class",
+        "Harness lengths, 22 AWG",
+        "Connector pinouts: USB-C, JST-PH",
+        "Continuity test checklist",
+      ];
+    case "parts":
+      return [
+        spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`,
+        `Draws about ${spec.drawMa} mA · ${powerLabel(spec)}`,
+        "Every part — category, name, reference and quantity",
+        "Grouped by function, quantities per board",
+      ];
+  }
+}
 
 // ─────────────────────────── shared geometry ───────────────────────
 
@@ -307,7 +335,11 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
       </svg>
       <figcaption>
         <MetaLine
-          text={`${meta.layers}-layer · ${meta.widthMm} × ${meta.heightMm} mm · ${meta.partCount} parts`}
+          text={
+            meta.widthMm !== null && meta.heightMm !== null
+              ? `${meta.layers}-layer · ${meta.widthMm} × ${meta.heightMm} mm · ${meta.partCount} parts`
+              : "No board — none of this product's parts sits on one"
+          }
         />
       </figcaption>
     </figure>

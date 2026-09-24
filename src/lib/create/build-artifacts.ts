@@ -6,13 +6,22 @@
 // describe one build instead of three plausible-looking inventions.
 
 import type { ConceptPart, ConceptPartCategory } from "./concept";
+import { deriveSpec } from "../spec/derive";
+import type { ResolvedSpec } from "../spec/types";
 
 // The fields these builders read. BuildJob satisfies it; a fixture
 // doesn't have to carry the whole job to be summarised.
 export type ArtifactSource = {
   title: string;
   parts: ConceptPart[];
+  /** The spec the build was booked with; an older build has none and has its
+   *  spec worked out from its parts instead. */
+  spec?: ResolvedSpec;
 };
+
+export function specOfSource(job: ArtifactSource): ResolvedSpec {
+  return job.spec ?? deriveSpec(job.parts);
+}
 
 // Reference designator per category, the way a schematic names them:
 // ICs (MCU, regulators, radios) are U, sensors S, actuators and
@@ -239,17 +248,21 @@ export function firmwareFor(job: ArtifactSource): Firmware {
 
 export type PcbMeta = {
   layers: 2;
-  widthMm: number;
-  heightMm: number;
+  /** Null when none of the product's parts sits on a board. */
+  widthMm: number | null;
+  heightMm: number | null;
   partCount: number;
 };
 
+// The board's size is the spec's: the parts' own footprints plus room to
+// route (lib/spec/derive.ts). It used to be 32 + 4 mm per part, which gave
+// every five-part product the same board whatever the parts were.
 export function pcbMetaFor(job: ArtifactSource): PcbMeta {
-  const bom = bomFor(job);
+  const board = specOfSource(job).board;
   return {
     layers: 2,
-    widthMm: 32 + 4 * bom.unique,
-    heightMm: 24 + 2 * bom.unique,
-    partCount: bom.unique,
+    widthMm: board?.w ?? null,
+    heightMm: board?.h ?? null,
+    partCount: board?.parts ?? 0,
   };
 }

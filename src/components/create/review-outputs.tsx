@@ -39,16 +39,17 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
-import type { ArtifactSource } from "@/lib/create/build-artifacts";
+import { specOfSource, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge } from "./confidence-badge";
 import { NetworkAction } from "@/components/network/network-action";
+import { mm3 } from "@/lib/spec/units";
 import {
+  coversFor,
   FirmwarePreview,
   PartsPreview,
   PartsSummary,
   PcbPreview,
-  WHAT_SHIPS,
   WiringPreview,
 } from "./deliverable-previews";
 
@@ -424,7 +425,7 @@ function ReviewPanel({
                   What this covers
                 </h3>
                 <ul role="list" className="mt-3 flex list-disc flex-col gap-2 pl-5 text-sm leading-relaxed text-text-secondary marker:text-text-tertiary">
-                  {WHAT_SHIPS[shown].map((line) => (
+                  {coversFor(shown, product).map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
@@ -560,6 +561,12 @@ function DeliverablePanel({
       ) : (
         <GeneratingModel />
       )}
+      {/* The mesh is drawn from the concept image, so its proportions are the
+          concept's; the size it will be made at is the spec's, said here
+          rather than faked by stretching a model with no ruler beside it. */}
+      <p className="pointer-events-none absolute bottom-[10px] left-[12px] rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary">
+        {mm3(specOfSource(product).size)} · shape from concept, size from spec
+      </p>
     </div>
   );
 }
