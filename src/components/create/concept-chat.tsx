@@ -24,6 +24,9 @@ import {
 } from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
 import type { SpecEdits } from "@/lib/spec/types";
+import { deriveSpec, partsForBuild } from "@/lib/spec/derive";
+import { specLine } from "@/lib/spec/format";
+import { cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -142,6 +145,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     turnId: string;
     imageUrl: string;
     prompt: string;
+    /** One line per product — size · board · power — read before paying. */
+    lines: string[];
   } | null>(null);
   const [submittingBuild, setSubmittingBuild] = React.useState(false);
   // Full-screen image editor: editorTurnId is the concept currently shown in
@@ -194,6 +199,14 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       if (setup) setSpecEdits(chat.id, setup.id, productId, edits);
     },
     [chat, setSpecEdits],
+  );
+  // The maker's edits for one product, from the answered question.
+  const editsFor = React.useCallback(
+    (productId: string) => {
+      const setup = chat?.turns.find((t) => t.role === "setup" && t.answer);
+      return cleanEdits(setup?.role === "setup" ? setup.answer?.specs?.[productId] : undefined);
+    },
+    [chat],
   );
   // The build this chat started, if it has one. Derived rather than held
   // in state, so a reload lands back on the build instead of an empty
@@ -789,22 +802,26 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       return Promise.all(
         ready.map(({ companion, turn }) => {
           const brief = conceptBriefOf(chat.turns, turn.id);
-          return summarizeConcept(turn.id, brief, turn.concept).then((concept) => ({
-            id: companion.id,
-            name: companion.name,
-            conceptImageUrl: turn.imageUrl ?? "",
-            conceptPrompt: brief,
-            // The name the canvas and the rail already call it, as the
-            // primary keeps the name its question gave it.
-            title: companion.name || concept.title,
-            summary: concept.summary,
-            description: concept.description,
-            parts: concept.parts,
-          }));
+          return summarizeConcept(turn.id, brief, turn.concept).then((concept) => {
+            const spec = deriveSpec(concept.parts, concept.hints, editsFor(companion.id));
+            return {
+              id: companion.id,
+              name: companion.name,
+              conceptImageUrl: turn.imageUrl ?? "",
+              conceptPrompt: brief,
+              // The name the canvas and the rail already call it, as the
+              // primary keeps the name its question gave it.
+              title: companion.name || concept.title,
+              summary: concept.summary,
+              description: concept.description,
+              parts: partsForBuild(concept.parts, spec.battery),
+              spec,
+            };
+          });
         }),
       );
     },
-    [chat],
+    [chat, editsFor],
   );
 
   const startBuildFor = React.useCallback(
@@ -848,6 +865,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           answered && answered.role === "setup"
             ? answered.productName?.trim()
             : undefined;
+        const spec = deriveSpec(concept.parts, concept.hints, editsFor("primary"));
         startBuild({
           chatId: chat.id,
           turnId: source.turnId,
@@ -859,7 +877,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           description: concept.description,
           projectChoiceId: decidedProject?.projectId,
           projectChoiceName: decidedProject?.projectName,
-          parts: concept.parts,
+          parts: partsForBuild(concept.parts, spec.battery),
+          spec,
           companions,
         });
         // The build does NOT leave the chat. It used to push /build/<id>,
@@ -873,15 +892,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         setConfirmFor(null);
       }
     },
-    [chat, labels, startBuild],
+    [chat, labels, startBuild, editsFor],
   );
 
   // The last step before money moves is always the gate. It used to offer
   // "Don't show this again", which removed the only confirmation of a spend
   // for good — nothing anywhere could bring it back.
   const goToGate = React.useCallback(
-    (source: { turnId: string; imageUrl: string; prompt: string }) => {
-      setConfirmFor(source);
+    (
+      source: { turnId: string; imageUrl: string; prompt: string },
+      lines: string[],
+    ) => {
+      setConfirmFor({ ...source, lines });
     },
     [],
   );
@@ -904,7 +926,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         prompt: conceptBriefOf(chat.turns, t.id),
       };
       if (t.companionOf) {
-        goToGate(source);
+        const companionId = t.companionOf;
+        const setupTurn = chat.turns.find((x) => x.role === "setup");
+        const name =
+          setupTurn?.role === "setup"
+            ? setupTurn.companions.find((c) => c.id === companionId)?.name
+            : undefined;
+        void summarizeConcept(t.id, source.prompt, t.concept).then((concept) =>
+          goToGate(source, [
+            specLine(
+              name || concept.title,
+              deriveSpec(concept.parts, concept.hints, editsFor(companionId)),
+            ),
+          ]),
+        );
         return;
       }
       // What this build contains was settled before anything was drawn, in
@@ -932,15 +967,48 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // before paying is a real decision — just not the same one.
       setPickedCompanions(new Set(decided.map((c) => c.id)));
 
-      // Busy until the gate is open: the concept is read back first, so the
-      // gate opens on the real title and parts rather than a stand-in.
+      // Every chosen product is read before the gate opens — one at a time,
+      // through the same queue as the background reader — so the gate can
+      // say what each will be, and a size that can't be built is caught here
+      // even when the reading landed after the card last rendered.
+      const latestReady = (id: string) => {
+        for (let i = chat.turns.length - 1; i >= 0; i -= 1) {
+          const x = chat.turns[i];
+          if (x.role === "assistant" && x.companionOf === id && x.status === "ready") return x;
+        }
+        return null;
+      };
+      const primaryName =
+        setup && setup.role === "setup" ? setup.productName?.trim() : undefined;
+      const reads = [
+        { productId: "primary", name: primaryName, turn: t },
+        ...decided.flatMap((c) => {
+          const turn = latestReady(c.id);
+          return turn ? [{ productId: c.id, name: c.name as string | undefined, turn }] : [];
+        }),
+      ];
       setPreparingTurnId(t.id);
-      void summarizeConcept(t.id, source.prompt, t.concept)
-        .catch(() => null)
-        .then(() => goToGate(source))
-        .finally(() => setPreparingTurnId(null));
+      void (async () => {
+        const read: { productId: string; line: string; fits: boolean }[] = [];
+        for (const r of reads) {
+          const concept = await summarizeConcept(
+            r.turn.id,
+            conceptBriefOf(chat.turns, r.turn.id),
+            r.turn.concept,
+          );
+          const spec = deriveSpec(concept.parts, concept.hints, editsFor(r.productId));
+          read.push({
+            productId: r.productId,
+            line: specLine(r.name || concept.title, spec),
+            fits: spec.fits || spec.draftAtSize,
+          });
+        }
+        const blocked = read.find((r) => !r.fits);
+        if (blocked) focusSpec(blocked.productId);
+        else goToGate(source, read.map((r) => r.line));
+      })().finally(() => setPreparingTurnId(null));
     },
-    [chat, goToGate],
+    [chat, goToGate, editsFor, focusSpec],
   );
 
 
@@ -1217,6 +1285,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         conceptPrompt={confirmFor?.prompt ?? ""}
         products={pickedCompanions.size + 1}
         productNames={gateNames}
+        specLines={confirmFor?.lines ?? []}
         submitting={submittingBuild}
         onCancel={() => setConfirmFor(null)}
         onConfirm={handleConfirmBuild}

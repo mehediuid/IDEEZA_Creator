@@ -30,7 +30,10 @@ export function specLine(name: string, spec: ResolvedSpec): string {
 }
 
 export function radioOf(parts: ConceptPart[]): string | null {
-  return protocolOf(parts);
+  // The MCU's built-in radio is the fallback, not the answer, when the
+  // concept names a dedicated radio part — an ESP32's on-chip Wi-Fi would
+  // otherwise outrank an nRF24L01 the concept actually carries.
+  return protocolOf(parts.filter((p) => p.category === "Connectivity")) ?? protocolOf(parts);
 }
 
 export function ioOf(parts: ConceptPart[]): string[] {

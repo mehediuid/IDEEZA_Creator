@@ -116,6 +116,7 @@ export function ConfirmBuildDialog({
   conceptPrompt,
   products,
   productNames = [],
+  specLines,
   onCancel,
   onConfirm,
   submitting,
@@ -130,6 +131,9 @@ export function ConfirmBuildDialog({
   /** What the canvas calls each product being paid for. "and 1 more" asked
    *  the maker to pay for a product the dialog would not name. */
   productNames?: string[];
+  /** One line per product — size · board · power — so what each build will
+   *  be is on screen before the credits move. */
+  specLines: string[];
   onCancel: () => void;
   onConfirm: (concept: ConceptSummary) => void;
   submitting: boolean;
@@ -228,6 +232,16 @@ export function ConfirmBuildDialog({
             piece is ready.
           </p>
         </div>
+
+        {specLines.length > 0 && (
+          <ul role="list" aria-label="What each product will be" className="flex flex-col gap-[6px]">
+            {specLines.map((line) => (
+              <li key={line} className="text-sm leading-relaxed text-text-primary">
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {/* §4.5 — both of these are on screen before any money moves. They
             are what stops a Draft result becoming a refund dispute. */}
