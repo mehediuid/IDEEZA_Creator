@@ -44,7 +44,8 @@ ideeza-creator-panel/
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
-   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived)
+   │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
+   │  │                      spec-panel.tsx (the card's spec disclosure), buttons.ts
    │  ├─ package/            ★ New Package flow — shell + step rail, the two canvas
    │  │                      editors (symbol/footprint), 3D placement, finalize,
    │  │                      confirmation, and the chrome both editors share
@@ -88,6 +89,10 @@ ideeza-creator-panel/
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
+   │  ├─ spec/               The product spec sheet — part bodies, packs,
+   │  │                      size/board/power math, hint and snapshot checks, the
+   │  │                      words (types, units, batteries, bodies, derive, hints,
+   │  │                      format).
    │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
    │  │                      the wizard and the rail both read — + the stored-draft
    │  │                      migration), gas.ts, wallet.ts, video-prompt.ts, qr.ts

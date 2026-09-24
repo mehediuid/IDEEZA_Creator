@@ -165,7 +165,10 @@ system prompt gains a `spec` object:
   - No credits are spent.
 - **Closed card.** Under the two-line header: up to four facts — size ·
   runtime (or "USB powered") · radio · layers. A **Spec** disclosure
-  button. A **Size conflict** chip in the header when S3 applies.
+  button. When S3 applies, the size fact itself turns to the error tone
+  and reads *… · doesn't fit* (*… · Draft* once the maker chooses Draft)
+  — the header already carries the name, *In build* and remove, and a
+  fourth item there cut the name again.
 - **Open card.**
   - *Editable:* size (L, W, H number inputs, validated on blur, with
     *Minimum 96 × 52 × 30 · ±15% · Auto*); battery (select, with runtime

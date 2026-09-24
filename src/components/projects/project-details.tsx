@@ -29,11 +29,13 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
+  productsOf,
   useCreateHistory,
   type BuildItem,
   type BuildJob,
 } from "@/lib/create/history";
-import { bomFor } from "@/lib/create/build-artifacts";
+import { bomFor, specOfSource } from "@/lib/create/build-artifacts";
+import { specLine } from "@/lib/spec/format";
 import { NetworkSection } from "@/components/network/network-section";
 import {
   FLOW_STEPS,
@@ -127,6 +129,16 @@ export function ProjectDetails({ id }: { id: string }) {
               {productLabel(project)}
             </span>
           </p>
+
+          {build && (
+            <ul role="list" aria-label="What each product is" className="mt-[6px] flex flex-col gap-[2px]">
+              {productsOf(build).map((p) => (
+                <li key={p.id} className="text-sm text-text-secondary">
+                  {specLine(p.name, specOfSource(p))}
+                </li>
+              ))}
+            </ul>
+          )}
 
           {build?.conceptImageUrl && (
             <div className="mt-[18px] overflow-hidden rounded-[12px] border border-border bg-bg-surface-raised">
