@@ -470,7 +470,7 @@ function SupportAction({
       aria-disabled
       aria-label={`${label} — not available yet`}
       title={`${label} isn't available yet`}
-      className="cursor-not-allowed text-sm font-regular text-[color:var(--color-button-disabled-text)]"
+      className="inline-flex min-h-[24px] cursor-not-allowed items-center text-sm font-regular text-[color:var(--color-button-disabled-text)]"
     >
       {label}
     </button>

@@ -976,6 +976,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           width — sat squeezed against the rail. */}
       <main className="flex-1 overflow-y-auto bg-bg-page">
         <div className="w-full px-[32px] py-[32px]">
+          {/* The page's one h1, for the heading outline a screen reader walks:
+              the chat had none, so it opened on an h3. The rail and the
+              review card already say the name on screen. */}
+          <h1 className="sr-only">{chat.title}</h1>
           <ChatThread
             chat={chat}
             regeneratingFrom={regeneratingFrom}

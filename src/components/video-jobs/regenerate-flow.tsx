@@ -746,6 +746,8 @@ function Pill({
   );
 }
 
+// A real switch — it was a <span onClick>, which no keyboard could reach — at
+// a 24 px target, with an off track that shows against the card.
 function Toggle({
   on,
   onChange,
@@ -756,11 +758,21 @@ function Toggle({
   label: string;
 }) {
   return (
-    <span
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
       style={{
         display: "inline-flex",
         alignItems: "center",
         gap: 8,
+        minHeight: 32,
+        padding: 0,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        fontFamily: "inherit",
         fontSize: 12,
         color: "var(--color-text-secondary)",
         fontWeight: 500,
@@ -768,30 +780,26 @@ function Toggle({
     >
       {label}
       <span
-        onClick={(e) => {
-          e.preventDefault();
-          onChange(!on);
-        }}
+        aria-hidden
         style={{
-          width: 28,
-          height: 16,
-          borderRadius: 8,
+          width: 40,
+          height: 24,
+          borderRadius: 12,
           background: on
             ? "var(--color-bg-brand)"
-            : "var(--color-bg-surface-raised)",
+            : "var(--color-border-strong)",
           position: "relative",
-          cursor: "pointer",
           transition: "background .14s",
-          flex: "0 0 28px",
+          flex: "0 0 40px",
         }}
       >
         <span
           style={{
             position: "absolute",
             top: 2,
-            left: on ? 14 : 2,
-            width: 12,
-            height: 12,
+            left: on ? 18 : 2,
+            width: 20,
+            height: 20,
             background: "var(--color-bg-surface)",
             borderRadius: "50%",
             boxShadow: "var(--elevation-1)",
@@ -799,7 +807,7 @@ function Toggle({
           }}
         />
       </span>
-    </span>
+    </button>
   );
 }
 

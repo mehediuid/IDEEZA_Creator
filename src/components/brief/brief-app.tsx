@@ -1314,7 +1314,10 @@ export function BriefCard({
             display: "inline-flex",
             alignItems: "center",
             gap: "var(--spacing-4)",
-            padding: 0,
+            // A 32 px target — the bare text was 21 px tall.
+            minHeight: 32,
+            padding: "0 4px",
+            marginLeft: -4,
             background: "none",
             border: "none",
             cursor: "pointer",

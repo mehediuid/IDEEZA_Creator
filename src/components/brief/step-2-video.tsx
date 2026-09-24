@@ -288,7 +288,8 @@ export function Step2Video({
                     style={{
                       background: "none",
                       border: "none",
-                      padding: 0,
+                      padding: "0 4px",
+                      minHeight: 32,
                       fontSize: 13,
                       fontWeight: 500,
                       color: "var(--color-text-brand)",
@@ -1391,28 +1392,30 @@ function ToggleRow({
           aria-checked={on}
           aria-labelledby={labelId}
           onClick={() => onChange(!on)}
+          // A 24 px target, and an off track that shows against the card —
+          // the raised-surface grey it used was all but invisible on white.
           style={{
-            width: 34,
-            height: 20,
+            width: 40,
+            height: 24,
             padding: 0,
-            borderRadius: 10,
+            borderRadius: 12,
             border: "none",
             background: on
               ? "var(--color-bg-brand)"
-              : "var(--color-bg-surface-raised)",
+              : "var(--color-border-strong)",
             position: "relative",
             cursor: "pointer",
             transition: "background .14s",
-            flex: "0 0 34px",
+            flex: "0 0 40px",
           }}
         >
           <span
             style={{
               position: "absolute",
               top: 2,
-              left: on ? 16 : 2,
-              width: 16,
-              height: 16,
+              left: on ? 18 : 2,
+              width: 20,
+              height: 20,
               background: "var(--color-bg-surface)",
               borderRadius: "50%",
               boxShadow: "var(--elevation-1)",

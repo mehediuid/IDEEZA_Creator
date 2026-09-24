@@ -31,6 +31,14 @@ export default function CreateLayout({
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-bg-page font-sans text-text-primary">
+      {/* First in the document, so it is the first Tab stop — it sat after
+          the whole sidebar, sixteen stops in, where skipping was pointless. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-max focus:rounded-md focus:bg-bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-text-on-brand focus:outline-none"
+      >
+        Skip to main content
+      </a>
       <DashboardSidebar onOpenSearch={() => setSearchOpen(true)} />
       <main
         id="main-content"

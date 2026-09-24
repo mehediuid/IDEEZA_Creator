@@ -334,7 +334,7 @@ function Question({
   return (
     <section className="flex flex-col gap-[10px]">
       <span className="text-sm font-medium text-text-tertiary">{chip}</span>
-      <h3 className="text-lg font-semibold text-text-primary">{ask}</h3>
+      <h2 className="text-lg font-semibold text-text-primary">{ask}</h2>
       <p className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
         {note}
       </p>
@@ -383,14 +383,25 @@ function Footer({
   reason?: string;
   onGo: () => void;
 }) {
+  // Not ready: the reason takes the note's place, where a keyboard, a screen
+  // reader and a touch screen all find it — a title on a disabled button
+  // reached a mouse and nobody else. The button stays focusable for the same
+  // reason, and a press does nothing until it is ready.
+  const reasonId = React.useId();
+  const blocked = !ready && !!reason;
   return (
     <div className="flex items-center justify-end gap-[12px] pt-[2px]">
-      <span className="text-sm text-text-tertiary">{note}</span>
+      <span
+        id={blocked ? reasonId : undefined}
+        className="text-sm text-text-tertiary"
+      >
+        {blocked ? reason : note}
+      </span>
       <button
         type="button"
-        disabled={!ready}
-        onClick={onGo}
-        title={ready ? undefined : reason}
+        aria-disabled={!ready}
+        aria-describedby={blocked ? reasonId : undefined}
+        onClick={ready ? onGo : undefined}
         className={
           ready
             ? "inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"

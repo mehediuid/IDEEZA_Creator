@@ -265,10 +265,24 @@ function ModeToggle({
   mode: Mode;
   onChange: (m: Mode) => void;
 }) {
+  // A radio group is one Tab stop: the chosen option takes focus and the
+  // arrows move the choice. Both options used to be Tab stops of their own
+  // while the group announced itself as a radiogroup.
+  const onKey = (e: React.KeyboardEvent) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+    // Read now: React clears currentTarget once the handler returns.
+    const group = e.currentTarget as HTMLElement;
+    onChange(mode === "ai" ? "manual" : "ai");
+    requestAnimationFrame(() =>
+      group.querySelector<HTMLElement>('[aria-checked="true"]')?.focus(),
+    );
+  };
   return (
     <div
       role="radiogroup"
       aria-label="How you want to start the project"
+      onKeyDown={onKey}
       className="inline-flex h-[48px] items-center gap-[4px] rounded-full border border-border bg-bg-surface p-[4px]"
     >
       <ModeButton
@@ -299,6 +313,7 @@ function ModeButton({
       type="button"
       role="radio"
       aria-checked={active}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
       className={[
         "inline-flex h-[40px] items-center rounded-full px-[20px] text-md font-semibold outline-none transition-colors duration-fast",
@@ -422,7 +437,9 @@ const PromptCard = React.forwardRef<
 
   return (
     <div>
-      <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border">
+      {/* Focus shows: the brand border the chat composer already wears. It
+          was border → border, which changed nothing. */}
+      <div className="rounded-2xl border border-border bg-bg-surface focus-within:border-border-brand">
         <label htmlFor="ws-prompt" className="sr-only">
           Describe your electronics project
         </label>

@@ -275,6 +275,17 @@ function ReviewPanel({
               role="tablist"
               aria-label="Products in this build"
               data-testid="product-switcher"
+              onKeyDown={(e) =>
+                moveTab(
+                  e,
+                  products.map((x) => x.id),
+                  product.id,
+                  (id) => {
+                    setProductId(id);
+                    setPicked(null);
+                  },
+                )
+              }
               className="mx-10 mb-4 flex flex-wrap items-center gap-2 border-b border-solid border-border pb-4"
             >
               {products.map((x) => {
@@ -285,6 +296,9 @@ function ReviewPanel({
                     role="tab"
                     type="button"
                     aria-selected={on}
+                    aria-controls="review-tabpanel"
+                    tabIndex={on ? 0 : -1}
+                    data-tab={x.id}
                     onClick={() => {
                       setProductId(x.id);
                       setPicked(null);
@@ -307,6 +321,15 @@ function ReviewPanel({
           <div
             role="tablist"
             aria-label="Deliverables"
+            onKeyDown={(e) =>
+              shown &&
+              moveTab(
+                e,
+                deliverables.map((i) => i.kind),
+                shown,
+                (kind) => setPicked(kind as BuildItemKind),
+              )
+            }
             className="flex flex-wrap items-center gap-4 px-10 pb-6"
           >
             {deliverables.map((item) => {
@@ -319,6 +342,8 @@ function ReviewPanel({
                   type="button"
                   aria-selected={isActive}
                   aria-controls="review-tabpanel"
+                  tabIndex={isActive ? 0 : -1}
+                  data-tab={item.kind}
                   onClick={() => setPicked(item.kind)}
                   className={[
                     "inline-flex h-[36px] items-center rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast",
@@ -477,6 +502,31 @@ function ReviewPanel({
         </>
       )}
     </section>
+  );
+}
+
+/** The tab pattern a tablist announces: one Tab stop (the selected tab), the
+ *  arrows move the selection and focus with it, Home and End jump to the
+ *  ends. Every tab used to be its own Tab stop and the arrows did nothing. */
+function moveTab(
+  e: React.KeyboardEvent<HTMLElement>,
+  ids: string[],
+  current: string,
+  select: (id: string) => void,
+) {
+  const at = ids.indexOf(current);
+  let next = -1;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (at + 1) % ids.length;
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
+    next = (at - 1 + ids.length) % ids.length;
+  else if (e.key === "Home") next = 0;
+  else if (e.key === "End") next = ids.length - 1;
+  if (next < 0) return;
+  e.preventDefault();
+  const list = e.currentTarget;
+  select(ids[next]);
+  requestAnimationFrame(() =>
+    list.querySelector<HTMLElement>(`[data-tab="${ids[next]}"]`)?.focus(),
   );
 }
 
