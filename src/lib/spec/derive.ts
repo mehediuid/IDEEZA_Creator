@@ -211,6 +211,12 @@ export function ruleBattery(
     if (draw <= USB_BUDGET_MA) return "none";
     if (useCase.includes("desk")) return "adapter";
   }
+  // Nothing draws current and nothing sits on a board — a plate, a stand, a
+  // bracket, a case — so there is nothing here for a pack to supply. Without
+  // this, a passive mechanical concept fell through to the smallest Li pack
+  // below (li-1s-400) purely because 0 mA clears every pack's floor and
+  // every runtime goal at once.
+  if (draw === 0 && !boardFor(list)) return "none";
   // li-1s-100 is sized for a wearable or a named tiny/coin cell (see
   // listedBattery) — offered here to any low-draw product, it undercuts the
   // 400 mAh floor every other handheld or outdoor concept has always had.

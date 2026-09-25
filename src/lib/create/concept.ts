@@ -454,12 +454,92 @@ function fallbackHints(prompt: string): AiHints | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+// A companion's own prompt is "{companion.name} for {parent prompt}"
+// (concept-chat.tsx) — a plate ordered alongside an RC car arrives as
+// "Ground Standing Plate for rc car". Judging *that whole string* for what
+// electronics to add would read the parent's own words as the product's:
+// "car" alone trips the motor rule, and the plate would come back with a
+// gear motor it never asked for. So the mechanical check below judges only
+// the text before " for " — the product's own name — never the parent's.
+function productNamePart(prompt: string): string {
+  const idx = prompt.search(/\bfor\b/i);
+  const head = idx === -1 ? prompt : prompt.slice(0, idx);
+  return head.trim() || prompt.trim();
+}
+
+// A passive, mechanical companion — a plate, a stand, a bracket, a case —
+// has nothing to power and nothing to run firmware on, so it must never
+// inherit the ESP32/USB-C/LDO trio every other stand-in starts from. "dock"
+// is the one word here that cuts both ways: a plain dock is a mechanical
+// cradle, but a *charging* dock is the electronics that charge something
+// else, so "charging dock" is excluded from this list on purpose.
+const MECHANICAL_NAME = new RegExp(
+  String.raw`\b(?:plate|stand|base|mount|bracket|holder|case|cover|lid|shell|bag|pouch|strap|tray|rack|frame|skin)\b` +
+    String.raw`|(?<!\bcharging\s+)\bdock\b`,
+  "i",
+);
+
+/** True only when the product's own name (never the parent's, for a
+ *  companion prompt) both names a mechanical/passive product and matches
+ *  none of the electronic keyword table — a "Sensor Mount" still gets its
+ *  sensor; a "Ground Standing Plate" does not get a car's motor. */
+function mechanicalName(prompt: string): string | null {
+  const name = productNamePart(prompt);
+  if (!MECHANICAL_NAME.test(name)) return null;
+  if (fallbackPartsFromPrompt(name).length > 0) return null;
+  return name;
+}
+
+// Which hardware a mechanical stand-in's body needs, read off the same name
+// used to classify it — a stand or a plate sits on a surface and wants
+// feet, a mount or a bracket fastens with screws, a case or a lid closes
+// with magnets. A bag, pouch, strap or skin gets no added hardware: the
+// body line alone already says what it is.
+function mechanicalExtras(name: string): ConceptPart[] {
+  if (/\b(?:plate|stand|base)\b/i.test(name)) {
+    return [
+      { name: "Rubber feet", role: "Grips the surface the product sits on", category: "Connector & mech" },
+    ];
+  }
+  if (/\b(?:mount|bracket|holder|rack|frame)\b/i.test(name) || /(?<!\bcharging\s+)\bdock\b/i.test(name)) {
+    return [
+      { name: "M3 screws", role: "Fastens the product to what it mounts on", category: "Connector & mech" },
+    ];
+  }
+  if (/\b(?:case|cover|lid|shell|tray)\b/i.test(name)) {
+    return [{ name: "Magnets", role: "Holds the product closed", category: "Connector & mech" }];
+  }
+  return [];
+}
+
+/** The mechanical stand-in: a printed body plus whatever hardware its own
+ *  name calls for, all "Connector & mech" — no MCU, no power, no radio.
+ *  Hints carry only a use case (read off the product's own name too), never
+ *  a runtime goal or a battery hint, because nothing here draws current. */
+function mechanicalFallbackConcept(prompt: string, name: string): ConceptSummary {
+  const parts: ConceptPart[] = [
+    { name: `${name} body (printed)`, role: "The product's own printed structure", category: "Connector & mech" },
+    ...mechanicalExtras(name),
+  ];
+  const useCase = matchedUseCases(name.toLowerCase());
+  return {
+    title: deriveTitle(prompt),
+    summary: summaryFromParts(parts),
+    description: describeFallback(prompt),
+    parts,
+    ...(useCase.length ? { hints: { useCase } } : {}),
+    fallback: true,
+  };
+}
+
 // What we return when the model is unreachable or answers with
 // something we can't parse: a real, buildable concept built from what the
 // prompt actually asked for, rather than an empty shell or a generic box
 // with the same four parts every time. Every use of it stands in for a
 // model answer, so it is marked as one here rather than at each caller.
 export function fallbackConcept(prompt: string): ConceptSummary {
+  const mechanical = mechanicalName(prompt);
+  if (mechanical) return mechanicalFallbackConcept(prompt, mechanical);
   const matched = fallbackPartsFromPrompt(prompt);
   let parts: ConceptPart[];
   if (matched.length) {
