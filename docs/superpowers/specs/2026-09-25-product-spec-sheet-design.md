@@ -35,7 +35,13 @@ what will be built. Today:
   battery that fits, or build at this size as `Draft`.
 - **S4** The spec lives **on the concept card** (option A): a facts line
   under the header, a **Spec** disclosure that opens the editor inside the
-  card.
+  card. *Since then (2026-09-25, owner-approved):* the card keeps only the
+  facts and an **Edit spec ›** that opens the **spec sheet** (docked beside
+  the canvas from `lg`, a sheet over it below), and **every part the
+  product has can be changed there** — see *Editing parts* below. This
+  reverses the earlier "board, radio and parts are read-only, change them
+  with Refine" rule: one control, one home is now the sheet, and the card
+  and the rail only read what it set.
 - **S5** The build keeps a **snapshot** of each product's spec. Editing the
   canvas afterwards doesn't change a finished build.
 - **S6** Review keeps the §4.7 tabs. The aside's fixed "What this covers"
@@ -173,8 +179,10 @@ system prompt gains a `spec` object:
   - *Editable:* size (L, W, H number inputs, validated on blur, with
     *Minimum 96 × 52 × 30 · ±15% · Auto*); battery (select, with runtime
     and draw beneath); material (4-way segmented).
-  - *Read-only:* board, fab profile, radio, inputs/outputs. They come from
-    the part list and change through Refine — one control, one home.
+  - *Read-only:* board and fab profile, which are worked out from the
+    parts. The radio and the parts themselves are edited in the sheet
+    (*Editing parts*), not through Refine; the card shows what they came
+    to.
 - **Edits.**
   - Stored per product (primary or companion id) on the setup answer.
     They survive a new concept of the same product.
@@ -192,6 +200,65 @@ system prompt gains a `spec` object:
 - **Changed since build.** A spec edit after a build counts as a change,
   like a concept change does today: *Spec changed — building again makes a
   new version.*
+
+## Editing parts
+
+Owner-approved 2026-09-25 ("edit spec a gele joto type er edit kora jay
+product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
+(`catalog.ts`, `edits.ts`, the part fields of `SpecEdits`); the sheet is
+`src/components/create/spec-sheet.tsx` and `spec-sections.tsx`.
+
+- **Sections by what the product is** (`productKind` of the edited parts).
+  - *Electronic:* Size · Power (Battery / USB / Wall adapter, the pack, the
+    charge or power port, the runtime and draw line) · Brain (MCU) ·
+    Connects (only the radios the chosen MCU can have: its own, or one a
+    module brings — ESP-NOW only on an ESP) · Moves (motor kind and a −/+
+    count, its driver named, *Add a servo*) · Senses / Controls / Shows /
+    Sounds / Switches as chips with a ✕ · one grouped **Add a part** menu
+    (with a Moves group when nothing moves yet) · Case (plastic, wall,
+    Indoor / Splash-proof / Waterproof) · Mounting when it has one.
+  - *Mechanical:* Size · Case (plastic, wall) · Mounting (Rubber feet /
+    M3 screws / Magnets) · *Electronics — None: this product has no parts
+    to power* with **Add electronics**, which puts in an ESP32-C3 and a
+    USB-C port and switches to the electronic layout; **Remove
+    electronics** in Brain takes the chip, the port and anything added back
+    out.
+  - A section the product has nothing for is hidden; the add affordances
+    stay where they make sense (only a product with a chip gets Add a
+    part).
+- **Who set it.** Each section is tagged *From the concept* until the maker
+  changes it, then *You set* (Power keeps *Suggested by AI* / *Default*,
+  Size *Estimated*, a plate's typical size *Default*), and has a quiet
+  **Reset** that clears only that section's edits. Size keeps *Use
+  smallest* (*Use typical size* for a plate) as its reset.
+- **Knock-on.** A part edit moves numbers elsewhere — the size, the board,
+  the draw — so the footer says once what moved (*Now: Size 229 × 63 × 23
+  mm · board 77 × 57 mm · ~4.7 h per charge*), and the page's status line
+  reads it out with the edit.
+- **The build uses the edited parts.** The card's facts, the rail row, the
+  gate's line per product (it names the radio and the part the card
+  names), the booked snapshot's `choices`, and `partsForBuild` — so the
+  BOM, the wiring and the firmware — all read `applyEdits(concept.parts,
+  edits)`. A part edit after a build is a spec change (*Spec changed since
+  this build*). The concept image stays as the look; the footer says so:
+  *Changes save as you go · the build uses these parts · the image stays
+  as the look*. Edits are free; credits move only at Build.
+- **Power and its port.** A product powered over USB whose parts name no
+  socket gets a USB-C port (`withSupplyPort`) in its spec, its sheet and its
+  build. Plugged in, the port list has no *None*; switching to a wall
+  adapter puts in a barrel jack, to USB a USB-C port where there was none.
+- **A designator is not a name.** A part the model named only by its
+  reference designator (U1A, CP1A) reads as its kind — *Microcontroller
+  (U1A)* — in the sheet and the facts, and the card's "what it does" fact
+  passes over it; a picker shows *From the concept: U1A* above the
+  catalog's choices.
+- **A plate is its plate's size.** A mechanical concept starts at the size
+  typical for the thing its main part names (plate / base / tray 150 × 100
+  × 6, stand / holder / mount / bracket 80 × 60 × 100, case / bag / pouch /
+  cover 200 × 150 × 60, dock 120 × 80 × 40 mm; `bodies.ts` `mainBodyOf`).
+  Nothing inside it has to fit, so the only minimum is the printable shell;
+  a plate given electronics keeps its plate, grown to hold them. An
+  electronic product's "enclosure" part is never read as a body.
 
 ## Build and review
 
@@ -260,7 +327,6 @@ Changed:
 
 - Copper routing and a real DRC.
 - A fab partner's profile.
-- Changing radio or parts from the spec (that is Refine).
 - 3D meshes for companions.
 - Rescaling the mesh.
 
