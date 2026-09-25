@@ -21,7 +21,7 @@
 // §4.4.10's cross-product compatibility, which two parts lists are enough for.
 
 import { batteryOf } from "../spec/batteries";
-import { mm3 } from "../spec/units";
+import { currentLabel, mm3 } from "../spec/units";
 import type { BuildJob, BuildProduct } from "./history";
 import type { ConceptPart } from "./concept";
 
@@ -117,6 +117,20 @@ export function connectorOf(parts: ConceptPart[]): string | null {
   return firstMatch(parts, CONNECTORS, ["Connector & mech", "Power Management"]);
 }
 
+/** Every part that reads as one of the connectors above, by its own name —
+ *  for a listing (the Wiring aside, §4.7) rather than `connectorOf`'s single
+ *  canonical match. Recognition only, same table, same categories. */
+export function connectorPartsOf(parts: ConceptPart[]): string[] {
+  const categories: ConceptPart["category"][] = ["Connector & mech", "Power Management"];
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!categories.includes(part.category)) continue;
+    const hay = `${lower(part.name)} ${lower(part.role)}`;
+    if (Object.keys(CONNECTORS).some((key) => hay.includes(key))) out.push(part.name);
+  }
+  return out;
+}
+
 // ─────────────────────── the checks themselves ──────────────────────
 
 /** Every product carries these, because none of them can run yet. Stated
@@ -153,10 +167,12 @@ export function assemblyChecks(p: BuildProduct): { issues: Issue[]; passed: stri
   if (s.drawMa > s.budgetMa) {
     issues.push({
       group: "assembly",
-      text: `${p.name} draws about ${s.drawMa} mA, but ${supply} gives ${s.budgetMa} mA — it will brown out under load.`,
+      text: `${p.name} draws about ${currentLabel(s.drawMa)}, but ${supply} gives ${currentLabel(s.budgetMa)} — it will brown out under load.`,
     });
   } else {
-    passed.push(`Power budget — ${p.name} draws about ${s.drawMa} mA of the ${s.budgetMa} mA ${supply} gives.`);
+    passed.push(
+      `Power budget — ${p.name} draws about ${currentLabel(s.drawMa)} of the ${currentLabel(s.budgetMa)} ${supply} gives.`,
+    );
   }
   if (!s.fits) {
     issues.push({

@@ -410,6 +410,11 @@ function ReviewPanel({
                   kind={shown}
                   product={product}
                   job={job}
+                  // §4.4 — the mesh in the 3D tab is the job's, generated once
+                  // from the primary's concept image; a companion previews it
+                  // at its own size, not its own shape, and the caption says
+                  // so rather than claiming a shape that isn't its.
+                  isCompanion={product.id !== "primary"}
                   onRetryModel={() => setBuildModelFailed(job.id, false)}
                 />
               )}
@@ -536,6 +541,7 @@ function DeliverablePanel({
   kind,
   product,
   job,
+  isCompanion,
   onRetryModel,
 }: {
   kind: BuildItemKind;
@@ -546,6 +552,10 @@ function DeliverablePanel({
   /** Still the job, for the one thing that is the job's and not a
    *  product's: the generated 3D model. */
   job: BuildJob;
+  /** True for a companion: the 3D tab's mesh is generated once, from the
+   *  primary's concept image, so a companion's tab previews that same mesh
+   *  at its own size rather than a shape of its own. */
+  isCompanion: boolean;
   onRetryModel: () => void;
 }) {
   if (kind === "pcb") return <PcbPreview job={product} />;
@@ -566,12 +576,16 @@ function DeliverablePanel({
           rather than faked by stretching a model with no ruler beside it.
           A build with no booked snapshot never fixed that size at booking
           time (I4), so it reads as worked out from the parts, not as the
-          spec's own number. */}
+          spec's own number. A companion has no mesh of its own (the job
+          only ever generates one), so its caption says whose shape this
+          preview is showing instead of implying it drew the companion's. */}
       <p className="pointer-events-none absolute bottom-[10px] left-[12px] rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary">
         {mm3(specOfSource(product).size)} ·{" "}
-        {bookedSpec(product)
-          ? "shape from concept, size from spec"
-          : "shape from concept, size worked out from the parts"}
+        {isCompanion
+          ? `${bookedSpec(product) ? "size from spec" : "size worked out from the parts"} · this preview shows the primary's model`
+          : bookedSpec(product)
+            ? "shape from concept, size from spec"
+            : "shape from concept, size worked out from the parts"}
       </p>
     </div>
   );

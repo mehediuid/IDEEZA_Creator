@@ -21,8 +21,9 @@ import {
   type NetWire,
 } from "@/lib/create/build-artifacts";
 import type { ConceptPartCategory } from "@/lib/create/concept";
+import { connectorPartsOf } from "@/lib/create/confidence";
 import { batteryOf, isBatteryPart } from "@/lib/spec/batteries";
-import { FAB_PROFILE, mcuOf, powerLabel, radioOf } from "@/lib/spec/format";
+import { boardLabel, FAB_PROFILE, mcuOf, powerLabel, radioOf } from "@/lib/spec/format";
 import { mm3 } from "@/lib/spec/units";
 
 // ─────────────────────── what each artifact covers ──────────────────
@@ -59,15 +60,13 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
         booked
           ? "Shape from the concept image, size from the spec"
           : "Shape from the concept image, size worked out from the parts",
-        "Mount points sized for the PCB",
+        // Only a product with a board has anything for a mount point to sit
+        // on — a case-only product (a strap, a shell) gets no PCB to fit.
+        ...(spec.board ? ["Mount points sized for the PCB"] : []),
       ];
     case "pcb":
       return [
-        spec.board
-          ? withNote(
-              `2-layer board · ${spec.board.w} × ${spec.board.h} mm · ${spec.board.parts} parts`,
-            )
-          : "No board — none of this product's parts sits on one",
+        spec.board ? withNote(boardLabel(spec)) : boardLabel(spec),
         `Fab profile: ${FAB_PROFILE}`,
         "Schematic, converted into a board layout",
         "Bill of materials for this board",
@@ -82,15 +81,19 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
         "Wiring map to the PCB pins",
       ];
     }
-    case "wiring":
+    case "wiring": {
+      const connectors = connectorPartsOf(product.parts);
       return [
         ...(knowsBattery ? [`Power in: ${supply}`] : []),
         "Netlist + pin-to-pin table",
         "Wire colors per net class",
         "Harness lengths, 22 AWG",
-        "Connector pinouts: USB-C, JST-PH",
+        connectors.length
+          ? `Connector pinouts: ${connectors.join(", ")}`
+          : "No connectors named",
         "Continuity test checklist",
       ];
+    }
     case "parts":
       return [
         ...(knowsBattery
@@ -352,13 +355,9 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
         })}
       </svg>
       <figcaption>
-        <MetaLine
-          text={
-            meta.widthMm !== null && meta.heightMm !== null
-              ? `${meta.layers}-layer · ${meta.widthMm} × ${meta.heightMm} mm · ${meta.partCount} parts`
-              : "No board — none of this product's parts sits on one"
-          }
-        />
+        {/* boardLabel, not a repeat of this arithmetic — the caption used to
+            say "parts" even for a lone one. */}
+        <MetaLine text={boardLabel(specOfSource(job))} />
       </figcaption>
     </figure>
   );
