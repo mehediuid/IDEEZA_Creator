@@ -49,7 +49,10 @@ what will be built. Today:
   1424 px of window with the app sidebar expanded); short of that room it
   is a modal overlay (a bottom sheet on a phone), whose footer adds a
   quiet **Change by message** that hands the keyboard to the composer
-  without losing the selection.
+  without losing the selection. Done, Close and Esc shut it and clear the
+  selection. Docked, Esc closes it from anywhere on the page except a text
+  field, an open menu or another dialog, which keep Esc to themselves; over
+  the page it is the dialog's own Esc.
 - **S5** The build keeps a **snapshot** of each product's spec. Editing the
   canvas afterwards doesn't change a finished build.
 - **S6** Review keeps the §4.7 tabs. The aside's fixed "What this covers"
@@ -177,12 +180,18 @@ system prompt gains a `spec` object:
   - While it runs the card shows *Reading the spec…*. A failure uses the
     rule draft at once, tagged *rule*.
   - No credits are spent.
-- **Closed card.** Under the two-line header: up to four facts — size ·
-  runtime (or "USB powered") · radio · layers. A **Spec** disclosure
-  button. When S3 applies, the size fact itself turns to the error tone
-  and reads *… · doesn't fit* (*… · Draft* once the maker chooses Draft)
-  — the header already carries the name, *In build* and remove, and a
-  fourth item there cut the name again.
+- **Closed card.** Superseded, like *Open card* below. The card has no
+  **Spec** disclosure now. Under **What will be built** it shows up to four
+  facts chosen by what the product is (`facts.ts` `cardFactsOf`): Size ·
+  its power (*Battery ~5 h per charge*, *USB powered*) · *Pairs with X* /
+  *Can't pair with X* when it shares a radio with another product, else
+  *Radio …* when one is named · one part that says what it does (*Drives
+  TT gear motor*, *Charges 1S Li-Po over USB-C*). No layers. They take two
+  lines on most cards, three when a companion's name is long: a fact never
+  breaks inside, and one wider than the card ends in an ellipsis. When S3
+  applies, the size fact itself turns to the error tone and reads *… —
+  doesn't fit* (*… — Draft* once the maker builds at that size anyway).
+  The card's section is not a named region; only the sheet is *… spec*.
 - **Open card.** Superseded by the spec sheet (*Editing parts*, below): the
   card itself no longer opens an editor. It shows **What will be built** —
   Size first, then power, then *Pairs with*/*Can't pair with* or *Radio*
@@ -193,13 +202,15 @@ system prompt gains a `spec` object:
   - Stored per product (primary or companion id) on the setup answer.
     They survive a new concept of the same product.
   - Hints and math re-run for the new concept's parts.
-  - *Auto* clears the size edit.
+  - Size's **Reset** clears the size edit (it was *Auto*).
 - **Conflict (S3).**
-  - Under the size: *Doesn't fit — needs at least 62 × 44 × 24 mm.* Three
-    choices: *Use 62 × 44 × 24* · *Smaller battery (1S 400 mAh) — fits ·
-    ~3 h* (only when one fits) · *Build at this size as Draft*.
-  - Until one is taken, the Build line says *Fix Remote Controller's size
-    to build* and Build moves focus to that card's size field.
+  - Under the size, in the sheet: *Doesn't fit — needs at least 62 × 44 ×
+    24 mm.* Three choices: *Use 62 × 44 × 24* · *1S Li-Po 400 mAh — fits ·
+    ~3 h* (only when a smaller pack fits) · *Build at this size anyway*,
+    which marks the build Draft and offers an **Undo**.
+  - Until one is taken, the Build line says *Fix Remote Controller's size*,
+    and pressing it opens that product's sheet with the keyboard in its
+    Length field.
   - A product left out of the build doesn't block.
 - **Confirm dialog.** One line per product:
   `RC Car Controller — 118 × 64 × 38 mm · 2-layer 58 × 42 · ~45 min`.
@@ -244,8 +255,14 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
     out.
   - A section the product has nothing for is hidden; the add affordances
     stay where they make sense (only a product with a chip gets Add a
-    part). Every menu reads in plain words — *Chip that runs it*,
-    *Bluetooth LE* — with the part number as its sub.
+    part). **Add a part** leads with plain words, the part as its sub
+    (*Temperature & humidity* / DHT22). The chip, motor, servo and radio
+    menus lead with the part's own name — *ESP32-WROOM-32*, *TT gear
+    motor*, *SG90 servo*, *nRF24L01*, *LoRa SX1276* — under a plain field
+    label (*Chip that runs it*, *Radio*), with a plain sub saying what it
+    is for (*Direct link to a remote, about 100 m · adds a small module*),
+    as `qa-p-ux` proposed; the pack menu leads with the pack, its runtime
+    here and its size as the sub.
 - **Who set it.** Each section is tagged *Suggested* until the maker
   changes it, then *You set*, with a quiet **Reset** that clears only that
   section's edits (Size's Reset lives in its own header now, not as an
@@ -259,10 +276,18 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
   out with the edit.
 - **Pairing.** A radio edit, a pack swap or a charger's cell is checked
   against the project's other products: a section names the primary or
-  companion it must still match, in warn tone with a quiet **Open X** when
-  it no longer does. A spare pack or charger pairs with whichever product
-  its pack matches, else with the primary; two companions are never
-  checked against each other.
+  companion it works with (*Talks to X — both use nRF24L01.*, *Battery
+  Charger charges this pack.*), with a quiet **Open X** under every note.
+  One that no longer works reads in the **error** tone and names its way
+  out: *X uses LoRa SX1276 — these two won't talk. Pick LoRa SX1276 here,
+  or change X's radio.*; on the car, *Battery Charger charges 1S Li-Po —
+  it can't charge this 2S Li-Po 1500 mAh. Pick a 1S pack here to charge it
+  with Battery Charger.*; on the charger, *Change RC Car Controller's pack
+  to 1S — this charger charges one cell.* (from the cells the charger
+  names; a spare pack's note names the pack to pick the same way). What a
+  charger charges is read-only for now. A spare pack or charger pairs with
+  whichever product its pack matches, else with the primary; two
+  companions are never checked against each other.
 - **Stale edits.** A Refine or Regenerate that lands a new concept keeps
   the maker's part edits and rebases them onto it (a `removed` part the
   new concept no longer has is dropped). The sheet says so at its top:
@@ -331,8 +356,17 @@ New:
 - `src/lib/spec/`: `types.ts`, `bodies.ts`, `batteries.ts`, `derive.ts`
   (deriveSpec, board, minimum size, fit, power, smaller-battery fix),
   `hints.ts` (parse + rule defaults)
-- `src/components/create/spec-panel.tsx`: facts line, disclosure, editor,
-  conflict
+- `src/lib/spec/`: `catalog.ts` (the parts each menu offers and what each
+  is for), `edits.ts` (`applyEdits` and the sections' edits), `facts.ts`
+  (the card's facts, what a charger charges, readable names), `format.ts`,
+  `units.ts`
+- `src/components/create/spec-panel.tsx`: the card's *What will be built*
+  facts and its **Edit spec** button (the disclosure and the in-card editor
+  are gone)
+- `src/components/create/spec-sheet.tsx`: the sheet — docked column or
+  overlay, Size and its conflict fixes, the knock-on footer
+- `src/components/create/spec-sections.tsx`: the sections below Size, their
+  Resets and the pairing notes
 
 Changed:
 

@@ -610,3 +610,20 @@ There is no entrance choreography and no staggered list reveal.
   off the `md` breakpoint alone); short of that room it is the two tabs,
   *Canvas* and *Chat*, unchanged otherwise. This brings the split in line
   with how the spec sheet already decides whether it docks.
+- **A8 — the loading skeleton splits by the same measure.** §2.7's
+  `LoadingShell` measures its own box the way the page does
+  (`useRoomToSplit`) and shows the tab bar over the cards wherever the page
+  will land as tabs. Before anything is measured (the server's render) it
+  shows the tabs below 1024 px, where the app's sidebar, which paints open
+  until the stores are read, leaves no room for two panes.
+- **A9 — the review keeps its product when the selection clears.** §4's
+  step 1 still holds while a product is selected: the review's product tab
+  follows the row. Done, Close and Esc on the spec sheet clear the
+  selection, and the review then stays on the product it last showed rather
+  than going back to the primary. A row still opens that product's sheet
+  after a build.
+- **A10 — the held-send line goes when its reason does.** A send with
+  nothing selected keeps the draft and says *Pick a product above first —
+  or name a new one to add it* under the composer. Picking a product clears
+  that line at once, not on its 6 s clock, so the hint naming the product
+  shows.
