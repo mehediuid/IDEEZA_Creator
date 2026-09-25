@@ -111,6 +111,32 @@ const SENSES: [RegExp, string][] = [
   [/camera|ov\d{4}/i, "images"],
 ];
 
+// A schematic's reference designator — U1, U1A, CP1A, R12, SW2, LED3 — that
+// the model sometimes gives as a part's whole name. Only a designator's own
+// letters with one or two digits: a part number shares the shape (DHT22,
+// L298, TP4056) and is a name worth showing.
+const DESIGNATOR = /^(?:U|IC|R|RV|VR|C|CP|L|D|LED|Q|J|P|CN|K|F|FB|Y|X|T|TP|SW|S|BT|M)\d{1,2}[A-Z]?$/;
+
+const KIND_WORD: Record<ConceptPart["category"], string> = {
+  Microcontroller: "Microcontroller",
+  Sensor: "Sensor",
+  Actuator: "Actuator",
+  "Power Management": "Power part",
+  "Display & I/O": "Display or control",
+  Connectivity: "Radio module",
+  Passive: "Passive part",
+  "Connector & mech": "Connector",
+};
+
+/** A part's name for a person to read: its own, or — for a bare designator
+ *  — what kind of part it is, with the designator after ("Microcontroller
+ *  (U1A)"). The name itself is untouched: the BOM keeps its reference. */
+export function readableName(p: ConceptPart): string {
+  return isDesignator(p) ? `${KIND_WORD[p.category] ?? "Part"} (${p.name.trim()})` : p.name;
+}
+
+export const isDesignator = (p: ConceptPart) => DESIGNATOR.test(p.name.trim());
+
 /** A part's name as it reads mid-sentence: no bracketed aside, and a plain
  *  noun lower-cased ("Joystick" → "joystick"; "TT gear motor" and "OLED
  *  display" keep their capitals). */
@@ -152,14 +178,16 @@ function partFact(spec: ResolvedSpec, parts: ConceptPart[]): CardFact | null {
       tone: "plain",
     };
   }
-  const actuator = parts.find((p) => p.category === "Actuator" && !DRIVER.test(p.name));
+  // A part named only by its designator says nothing about what it does.
+  const named = parts.filter((p) => !isDesignator(p));
+  const actuator = named.find((p) => p.category === "Actuator" && !DRIVER.test(p.name));
   if (actuator) return { key: "part", label: "Drives", value: counted(actuator), tone: "plain" };
-  for (const p of parts) {
+  for (const p of named) {
     if (p.category !== "Display & I/O") continue;
     if (DISPLAY.test(p.name)) return { key: "part", label: "Shows", value: counted(p), tone: "plain" };
     if (CONTROL.test(p.name)) return { key: "part", label: "Controls", value: counted(p), tone: "plain" };
   }
-  const sensor = parts.find((p) => p.category === "Sensor");
+  const sensor = named.find((p) => p.category === "Sensor");
   if (sensor) {
     const what = SENSES.find(([re]) => re.test(sensor.name))?.[1] ?? short(sensor.name);
     return { key: "part", label: "Senses", value: what, tone: "plain" };

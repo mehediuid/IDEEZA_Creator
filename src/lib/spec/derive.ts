@@ -7,8 +7,9 @@
 
 import type { ConceptPart } from "../create/concept";
 import { BATTERIES, USB_BUDGET_MA, batteryOf, isBatteryPart } from "./batteries";
-import { bodyOf, mainBodyOf, qtyOf, type Body } from "./bodies";
-import { applyEdits } from "./edits";
+import { bodyOf, mainBodyOf, qtyOf, type Body, type MainBody } from "./bodies";
+import { CHARGE_PORTS, isChargePort } from "./catalog";
+import { applyEdits, asPart } from "./edits";
 import { asWallMm, cleanChoices } from "./hints";
 import {
   BATTERY_KEYS,
@@ -239,6 +240,17 @@ export function ruleBattery(
   // below (li-1s-400) purely because 0 mA clears every pack's floor and
   // every runtime goal at once.
   if (draw === 0 && !boardFor(list)) return "none";
+  return smallestPack(draw, goalH, useCase);
+}
+
+/** The smallest Li pack that supplies `draw` for the goal (an hour when
+ *  nobody said), else the biggest — the rule's own pick, and the pack the
+ *  sheet puts in when the maker switches a plugged-in product to Battery. */
+export function smallestPack(
+  draw: number,
+  goalH: number = RUNTIME_GOAL_H,
+  useCase: UseCase[] = [],
+): BatteryKey {
   // li-1s-100 is sized for a wearable or a named tiny/coin cell (see
   // listedBattery) — offered here to any low-draw product, it undercuts the
   // 400 mAh floor every other handheld or outdoor concept has always had.
@@ -267,6 +279,17 @@ export function productKind(parts: ConceptPart[]): "electronic" | "mechanical" {
   return hardware && drawOf(list) === 0 && !boardFor(list) ? "mechanical" : "electronic";
 }
 
+/** The body a plate, a stand or a case starts from — nothing inside it sets
+ *  a smallest size, so it takes the size typical for the thing it is. A
+ *  maker who adds electronics to one still has that plate, grown to hold
+ *  them, which is why the concept's own parts are asked as well as the
+ *  edited ones. An electronic product's "enclosure" part is never a body:
+ *  it is the box around the board, and the board decides it. */
+export function typicalBodyOf(concept: ConceptPart[], parts: ConceptPart[]): MainBody | null {
+  const mechanical = productKind(concept) === "mechanical" || productKind(parts) === "mechanical";
+  return mechanical ? mainBodyOf(parts) : null;
+}
+
 /** Everything below works on the edited parts (edits.ts) — a swapped radio,
  *  a motor count, an added sensor all move the size, the draw and the pack
  *  the same way a part the concept named would. */
@@ -276,33 +299,30 @@ export function deriveSpec(
   edits: SpecEdits = {},
 ): ResolvedSpec {
   const choices = cleanChoices(edits);
-  const parts = applyEdits(concept, choices);
+  const edited = applyEdits(concept, choices);
   const wallEdit = asWallMm(edits.wallMm);
   const wallMm = wallEdit ?? WALL_MM;
-  const list = placedParts(parts);
-  const board = boardFor(list);
-  const stack = stackOf(list);
-  const drawMa = drawOf(list);
   // The pack the parts themselves name outranks the AI's hint — the maker
   // already told the model what battery is in the thing. A hint whose pack
   // can't supply this concept's own draw is dropped rather than kept and
   // shown against an impossible budget — same "dropped, never repaired"
   // rule as a hint outside the allowed set, just checked against the parts
   // instead of a fixed list.
-  const listed = listedBattery(parts);
+  const listed = listedBattery(edited);
+  const needs = drawOf(placedParts(edited));
   const hinted =
-    hints.battery && batteryOf(hints.battery).maxMa >= drawMa ? hints.battery : undefined;
-  const battery = edits.battery ?? listed ?? hinted ?? ruleBattery(parts, hints.runtimeGoalH, hints.useCase);
+    hints.battery && batteryOf(hints.battery).maxMa >= needs ? hints.battery : undefined;
+  const battery =
+    edits.battery ?? listed ?? hinted ?? ruleBattery(edited, hints.runtimeGoalH, hints.useCase);
+  // Then the socket that supply comes in through, so the size holds it too.
+  const parts = withSupplyPort(edited, battery);
+  const list = placedParts(parts);
+  const board = boardFor(list);
+  const stack = stackOf(list);
+  const drawMa = drawOf(list);
   const minWith = (key: BatteryKey) => minSizeFor(board, stack, caseBodies(list, key), wallMm);
   const minSize = minWith(battery);
-  // A plate, a stand or a case has nothing inside it to set a smallest size,
-  // so it starts at the size typical for the thing it is — and a maker who
-  // adds electronics to one still has that plate, grown to hold them, which
-  // is why the concept's own parts are asked too, not only the edited ones.
-  // An electronic product's "enclosure" part is never a body: it is the box
-  // around the board, and the board decides it.
-  const mechanical = productKind(concept) === "mechanical" || productKind(parts) === "mechanical";
-  const typical = mechanical ? mainBodyOf(parts) : null;
+  const typical = typicalBodyOf(concept, parts);
   const size = edits.size ?? (typical ? growTo(typical.size, minSize) : minSize);
   const fits = fitsIn(size, minSize);
 
@@ -364,16 +384,27 @@ export function deriveSpec(
   };
 }
 
+/** A product powered over USB takes it through a USB socket. One whose
+ *  concept named none — the model's hint, or the maker's own pick, said USB —
+ *  gets a USB-C port, so the sheet, the size and the build all have the
+ *  socket the power comes in by. A product that draws nothing needs none. */
+export function withSupplyPort(parts: ConceptPart[], battery: BatteryKey): ConceptPart[] {
+  if (battery !== "none" || parts.some(isChargePort)) return parts;
+  if (drawOf(placedParts(parts)) === 0) return parts;
+  return [...parts, asPart(CHARGE_PORTS["usb-c"].part!)];
+}
+
 /** The parts a build is made from: the concept's with the maker's edits
  *  applied, and its pack swapped for the spec's — so the BOM, the wiring and
  *  the firmware carry the parts and the battery the maker chose, and a
- *  USB-powered product carries none. */
+ *  USB-powered product carries none, but a USB port to take the power. */
 export function partsForBuild(
   parts: ConceptPart[],
   battery: BatteryKey,
   edits: SpecEdits = {},
 ): ConceptPart[] {
-  const rest = applyEdits(parts, cleanChoices(edits)).filter((p) => !isBatteryPart(p));
+  const edited = applyEdits(parts, cleanChoices(edits));
+  const rest = withSupplyPort(edited, battery).filter((p) => !isBatteryPart(p));
   if (battery === "none") return rest;
   return [
     ...rest,

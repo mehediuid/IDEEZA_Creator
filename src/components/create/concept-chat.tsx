@@ -32,7 +32,7 @@ import { summaryFromParts, type ConceptSummary } from "@/lib/create/concept";
 import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { blocksBuild, deriveSpec, partsForBuild } from "@/lib/spec/derive";
 import { applyEdits } from "@/lib/spec/edits";
-import { specLine } from "@/lib/spec/format";
+import { cardFacts, specLine } from "@/lib/spec/format";
 import { asConceptSummary, cleanChoices, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
@@ -115,10 +115,23 @@ function landingOf(target: JumpTarget): { ring: string; focus: string } {
  *  tabs, and only one of them is on screen. */
 const sideBySide = () => window.matchMedia("(min-width: 768px)").matches;
 
-/** The gate's line for one product. A stand-in says so here too: the gate
- *  is the last thing read before credits move (review 2 I4). */
-function gateLine(name: string, spec: ResolvedSpec, concept: ConceptSummary): string {
-  return `${specLine(name, spec)}${concept.fallback ? " · stand-in parts" : ""}`;
+/** The gate's line for one product: its spec, then the radio and the one
+ *  part the card names — read off the parts as edited, so what is paid for
+ *  is what the sheet was set to. A stand-in says so here too: the gate is
+ *  the last thing read before credits move (review 2 I4). */
+function gateLine(
+  name: string,
+  spec: ResolvedSpec,
+  concept: ConceptSummary,
+  edits: SpecEdits,
+): string {
+  const parts = applyEdits(concept.parts, cleanChoices(edits));
+  const line = specLine(name, spec);
+  const what = cardFacts(spec, parts)
+    // A spare pack's pack is its power already — said once.
+    .filter((f) => (f.key === "radio" || f.key === "part") && !line.includes(f.value))
+    .map((f) => (f.label ? `${f.label} ${f.value}` : f.value));
+  return [line, ...what].join(" · ") + (concept.fallback ? " · stand-in parts" : "");
 }
 
 /** The parts line under a build's title, of the parts the maker edited —
@@ -1234,11 +1247,16 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         const companionId = t.companionOf;
         const name = productNameOf(names, t);
         void readForBuild(t, source.prompt).then((concept) => {
-          const spec = deriveSpec(concept.parts, concept.hints, editsNow.current(companionId));
+          const edits = editsNow.current(companionId);
+          const spec = deriveSpec(concept.parts, concept.hints, edits);
           // A size that can't be built goes to its card, as the primary's does.
           if (blocksBuild(spec)) focusSpec(companionId);
           else
-            goToGate(source, [gateLine(name || concept.title, spec, concept)], new Map([[t.id, concept]]));
+            goToGate(
+              source,
+              [gateLine(name || concept.title, spec, concept, edits)],
+              new Map([[t.id, concept]]),
+            );
         });
         return;
       }
@@ -1294,9 +1312,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // Worked out once every reading is in, from the edits as they are
         // then — the readings can take seconds, and the card stays editable.
         const read = reads.map((r, i) => {
-          const spec = deriveSpec(concepts[i].parts, concepts[i].hints, editsNow.current(r.productId));
+          const edits = editsNow.current(r.productId);
+          const spec = deriveSpec(concepts[i].parts, concepts[i].hints, edits);
           const name = productNameOf(names, r.turn) || concepts[i].title;
-          return { productId: r.productId, line: gateLine(name, spec, concepts[i]), spec };
+          return { productId: r.productId, line: gateLine(name, spec, concepts[i], edits), spec };
         });
         const blocked = read.find((r) => blocksBuild(r.spec));
         if (blocked) focusSpec(blocked.productId);

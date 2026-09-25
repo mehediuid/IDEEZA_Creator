@@ -32,9 +32,10 @@ import {
   isRadioPart,
   isServo,
   mcuRole,
+  partRole,
   type CatalogPart,
 } from "./catalog";
-import type { McuKey, PartChoices } from "./types";
+import { ADDABLE_KEYS, type AddableKey, type McuKey, type PartChoices, type SpecEdits } from "./types";
 
 /** A catalog part as the parts list carries it — "TT gear motor (x2)" for
  *  more than one, the count qtyOf reads back. */
@@ -105,4 +106,133 @@ export function applyEdits(parts: ConceptPart[], edits: PartChoices = {}): Conce
     if (edits.environment === "waterproof") tail.push(asPart(GASKET));
   }
   return [...out, ...tail, ...added];
+}
+
+// ───────────────────────── the sheet's sections ─────────────────────────
+//
+// Which edits each section of the spec sheet owns — so its tag can say "You
+// set" and its Reset takes out exactly those, and nothing another section
+// set.
+
+/** The sections whose parts show as chips, each a group of the catalog's
+ *  "+ Add a part" menu. */
+export const CHIP_ROLES = ["senses", "controls", "shows", "sounds", "switches"] as const;
+export type ChipRole = (typeof CHIP_ROLES)[number];
+
+export type PartSection = "power" | "brain" | "connects" | "moves" | "case" | "mounting" | ChipRole;
+
+const addedRole = (k: AddableKey) => ADDABLE[k].group.toLowerCase() as ChipRole;
+
+/** A removed name's role, by the concept part it named. */
+function removedRole(name: string, concept: ConceptPart[]) {
+  const p = concept.find((x) => x.name === name);
+  return p ? partRole(p) : null;
+}
+
+export function sectionEdited(edits: SpecEdits, section: PartSection, concept: ConceptPart[]): boolean {
+  switch (section) {
+    case "power":
+      return edits.battery !== undefined || edits.chargePort !== undefined;
+    case "brain":
+      return edits.mcu !== undefined;
+    case "connects":
+      return edits.radio !== undefined;
+    case "moves":
+      return !!edits.motors || !!edits.servos;
+    case "case":
+      return edits.material !== undefined || edits.wallMm !== undefined || edits.environment !== undefined;
+    case "mounting":
+      return edits.mounting !== undefined;
+    default:
+      return (
+        (edits.added ?? []).some((k) => addedRole(k) === section) ||
+        (edits.removed ?? []).some((n) => removedRole(n, concept) === section)
+      );
+  }
+}
+
+/** A list edit with nothing left in it is no edit — cleanChoices drops an
+ *  empty one, so the edits stay as the same key a fresh product has. */
+function withList<K extends "added" | "removed">(
+  edits: SpecEdits,
+  key: K,
+  list: NonNullable<SpecEdits[K]>,
+): SpecEdits {
+  const next = { ...edits };
+  if (list.length) next[key] = list;
+  else delete next[key];
+  return next;
+}
+
+/** The edits with one section's own taken out — back to the concept. */
+export function resetSection(edits: SpecEdits, section: PartSection, concept: ConceptPart[]): SpecEdits {
+  const next = { ...edits };
+  switch (section) {
+    case "power":
+      delete next.battery;
+      delete next.chargePort;
+      return next;
+    case "brain":
+      delete next.mcu;
+      return next;
+    case "connects":
+      delete next.radio;
+      return next;
+    case "moves":
+      delete next.motors;
+      delete next.servos;
+      return next;
+    case "case":
+      delete next.material;
+      delete next.wallMm;
+      delete next.environment;
+      return next;
+    case "mounting":
+      delete next.mounting;
+      return next;
+    default: {
+      const kept = withList(next, "added", (next.added ?? []).filter((k) => addedRole(k) !== section));
+      return withList(
+        kept,
+        "removed",
+        (kept.removed ?? []).filter((n) => removedRole(n, concept) !== section),
+      );
+    }
+  }
+}
+
+/** The ✕ on a chip. A part the maker added comes out of `added`; a
+ *  concept part goes into `removed` — both, for a concept part that an added
+ *  one of the same name stood in for, or it would come straight back. */
+export function removePart(edits: SpecEdits, part: ConceptPart, concept: ConceptPart[]): SpecEdits {
+  const added = edits.added ?? [];
+  const key = added.find((k) => ADDABLE[k].name === part.name);
+  let next = key ? withList(edits, "added", added.filter((k) => k !== key)) : edits;
+  if (concept.some((p) => p.name === part.name)) {
+    next = withList(next, "removed", [...new Set([...(next.removed ?? []), part.name])]);
+  }
+  return next;
+}
+
+/** What the "+ Add a part" menu offers: every catalog part not already in
+ *  the list by name, so none is put in twice. */
+export function addableFor(parts: ConceptPart[]): AddableKey[] {
+  const names = new Set(parts.map((p) => p.name.toLowerCase()));
+  return ADDABLE_KEYS.filter((k) => !names.has(ADDABLE[k].name.toLowerCase()));
+}
+
+/** A product with no parts to power, given some: the smallest chip the
+ *  catalog has that speaks a radio, and a USB-C port to power it by. */
+export function withElectronics(edits: SpecEdits): SpecEdits {
+  return { ...edits, mcu: "esp32-c3", chargePort: "usb-c" };
+}
+
+/** Everything withElectronics — and every section it opened — put in,
+ *  taken out again: the product is back to the thing its concept drew. */
+export function withoutElectronics(edits: SpecEdits): SpecEdits {
+  const next = { ...edits };
+  for (const k of ["mcu", "radio", "motors", "servos", "added", "chargePort", "battery"] as const) {
+    delete next[k];
+  }
+  return next;
 }

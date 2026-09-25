@@ -25,7 +25,7 @@ import {
   type ChatTurn,
   type SetupAnswer,
 } from "./history";
-import { blocksBuild, deriveSpec, specKey } from "../spec/derive";
+import { blocksBuild, deriveSpec, specKey, withSupplyPort } from "../spec/derive";
 import { applyEdits } from "../spec/edits";
 import { cleanEdits } from "../spec/hints";
 import { cardFacts, type SpecFactTone } from "../spec/format";
@@ -153,8 +153,10 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   for (const t of products) {
     const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
     const edits = cleanEdits(answer?.specs?.[productIdOf(t)]);
-    specs.set(t.id, concept ? deriveSpec(concept.parts, concept.hints, edits) : null);
-    if (concept) parts.set(t.id, applyEdits(concept.parts, edits));
+    const spec = concept ? deriveSpec(concept.parts, concept.hints, edits) : null;
+    specs.set(t.id, spec);
+    // With the socket its supply comes in by, as the spec and the build have.
+    if (concept && spec) parts.set(t.id, withSupplyPort(applyEdits(concept.parts, edits), spec.battery));
   }
 
   // A chosen product whose size its parts can't fit, and that the maker has
