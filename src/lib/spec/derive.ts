@@ -429,6 +429,7 @@ export function deriveSpec(
     minSize,
     fits,
     draftAtSize: !fits && edits.draftAtSize === true,
+    draftChosen: edits.draftAtSize === true,
     board: board ? { ...board, layers: 2 as const } : null,
     battery,
     batterySource: edits.battery ? "you" : listed ? "concept" : hinted ? "ai" : "rule",
@@ -548,7 +549,9 @@ export function specKey(s: ResolvedSpec): string {
     c.environment ?? null,
     c.mounting ?? null,
   ]);
-  return [size, battery, material, s.draftAtSize, wall, parts].join("|");
+  // The Draft choice, not whether it applies: the size fitting under a
+  // newer fit rule is no change the maker made.
+  return [size, battery, material, s.draftChosen, wall, parts].join("|");
 }
 
 /** A product whose size its parts can't fit, and that the maker hasn't

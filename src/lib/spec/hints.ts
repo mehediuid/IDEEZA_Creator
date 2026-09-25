@@ -217,6 +217,9 @@ export function asResolvedSpec(raw: unknown, booked: ConceptPart[] = []): Resolv
     minSize,
     fits: s.fits !== false,
     draftAtSize: s.draftAtSize === true,
+    // A snapshot from before `draftChosen` was booked as Draft only when
+    // the maker chose it, so its draftAtSize is the choice.
+    draftChosen: typeof s.draftChosen === "boolean" ? s.draftChosen : s.draftAtSize === true,
     board: boardRead,
     battery,
     batterySource: batteryDecidedBy(s.batterySource),

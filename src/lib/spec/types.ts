@@ -140,7 +140,14 @@ export type ResolvedSpec = {
   /** Nothing is routed yet, so this is the parts' own footprint — ±15%. */
   minSize: Mm3;
   fits: boolean;
+  /** Building as Draft at a size its parts don't fit: the maker's choice,
+   *  and a size that doesn't fit. */
   draftAtSize: boolean;
+  /** The maker chose Draft at this size (SpecEdits.draftAtSize) — kept
+   *  whether the size fits now or not. specKey keys the choice, not
+   *  `draftAtSize`: a change to the fit rules moves that, and an old Draft
+   *  build read "Changed" with nothing changed. */
+  draftChosen: boolean;
   /** Null when no part sits on a board — a case, a strap. */
   board: { w: number; h: number; parts: number; layers: 2 } | null;
   battery: BatteryKey;
