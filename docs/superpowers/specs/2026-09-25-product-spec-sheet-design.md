@@ -36,12 +36,20 @@ what will be built. Today:
 - **S4** The spec lives **on the concept card** (option A): a facts line
   under the header, a **Spec** disclosure that opens the editor inside the
   card. *Since then (2026-09-25, owner-approved):* the card keeps only the
-  facts and an **Edit spec ›** that opens the **spec sheet** (docked beside
-  the canvas from `lg`, a sheet over it below), and **every part the
-  product has can be changed there** — see *Editing parts* below. This
-  reverses the earlier "board, radio and parts are read-only, change them
-  with Refine" rule: one control, one home is now the sheet, and the card
-  and the rail only read what it set.
+  facts and an **Edit spec** button — the first of the card's action row,
+  before Refine and Regenerate, with the caption *Edit spec is free ·
+  Refine and Regenerate redraw the image, 1 credit each* — that opens the
+  **spec sheet**, and **every part the product has can be changed there**
+  — see *Editing parts* below. This reverses the earlier "board, radio and
+  parts are read-only, change them with Refine" rule: one control, one
+  home is now the sheet, and the card and the rail only read what it set.
+  *Since then again:* the sheet docks as a column beside the canvas only
+  when the chat page's own measured width still fits the rail, the sheet
+  and one card column beside it (the same test the two-pane split uses,
+  1424 px of window with the app sidebar expanded); short of that room it
+  is a modal overlay (a bottom sheet on a phone), whose footer adds a
+  quiet **Change by message** that hands the keyboard to the composer
+  without losing the selection.
 - **S5** The build keeps a **snapshot** of each product's spec. Editing the
   canvas afterwards doesn't change a finished build.
 - **S6** Review keeps the §4.7 tabs. The aside's fixed "What this covers"
@@ -175,14 +183,12 @@ system prompt gains a `spec` object:
   and reads *… · doesn't fit* (*… · Draft* once the maker chooses Draft)
   — the header already carries the name, *In build* and remove, and a
   fourth item there cut the name again.
-- **Open card.**
-  - *Editable:* size (L, W, H number inputs, validated on blur, with
-    *Minimum 96 × 52 × 30 · ±15% · Auto*); battery (select, with runtime
-    and draw beneath); material (4-way segmented).
-  - *Read-only:* board and fab profile, which are worked out from the
-    parts. The radio and the parts themselves are edited in the sheet
-    (*Editing parts*), not through Refine; the card shows what they came
-    to.
+- **Open card.** Superseded by the spec sheet (*Editing parts*, below): the
+  card itself no longer opens an editor. It shows **What will be built** —
+  Size first, then power, then *Pairs with*/*Can't pair with* or *Radio*
+  when one is named, then one part that says what it does — and the
+  **Edit spec** button that opens the sheet, where size, battery,
+  material and every part are edited.
 - **Edits.**
   - Stored per product (primary or companion id) on the setup answer.
     They survive a new concept of the same product.
@@ -208,15 +214,28 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
 (`catalog.ts`, `edits.ts`, the part fields of `SpecEdits`); the sheet is
 `src/components/create/spec-sheet.tsx` and `spec-sections.tsx`.
 
-- **Sections by what the product is** (`productKind` of the edited parts).
+- **Sections by what the product is** (`productKind` of the edited parts),
+  always in this order.
   - *Electronic:* Size · Power (Battery / USB / Wall adapter, the pack, the
-    charge or power port, the runtime and draw line) · Brain (MCU) ·
-    Connects (only the radios the chosen MCU can have: its own, or one a
-    module brings — ESP-NOW only on an ESP) · Moves (motor kind and a −/+
-    count, its driver named, *Add a servo*) · Senses / Controls / Shows /
-    Sounds / Switches as chips with a ✕ · one grouped **Add a part** menu
-    (with a Moves group when nothing moves yet) · Case (plastic, wall,
-    Indoor / Splash-proof / Waterproof) · Mounting when it has one.
+    charge or power port — plugged in, no *None* port — the runtime and
+    draw line) · Moves (motor kind and a −/+ count, its driver named,
+    *Add a servo*) · Senses / Controls / Shows / Sounds / Switches as chips
+    with a ✕ · one grouped **Add a part** menu (with a Moves group when
+    nothing moves yet) · **Wireless** (only the radios the chosen MCU can
+    have: its own, or one a module brings — ESP-NOW only on an ESP) · Case
+    (plastic, wall, Indoor / Splash-proof / Waterproof) · Mounting when it
+    has one · **Brain** (just the chip picker, *Chip that runs it*) ·
+    **Inside**, read-only — the circuit board, what's on it and what does
+    what, what's wired to it; no fab profile here, that stays on the build
+    review.
+  - A standalone **charger** swaps Power for **Charges** (the cell it
+    charges, the port it plugs into, a mismatch note when its pack no
+    longer matches); a **spare pack** swaps it for **Pack** (the pack
+    itself, what it plugs in with, the same mismatch note). Either with no
+    chip reads *No chip — add one to give it sensors, a screen or
+    wireless* with **Add a chip** (an ESP32-C3, no port change, so a
+    charger keeps its own); **Remove chip** takes the chip and its radio
+    back out, in place of Brain's Reset.
   - *Mechanical:* Size · Case (plastic, wall) · Mounting (Rubber feet /
     M3 screws / Magnets) · *Electronics — None: this product has no parts
     to power* with **Add electronics**, which puts in an ESP32-C3 and a
@@ -225,16 +244,29 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
     out.
   - A section the product has nothing for is hidden; the add affordances
     stay where they make sense (only a product with a chip gets Add a
-    part).
-- **Who set it.** Each section is tagged *From the concept* until the maker
-  changes it, then *You set* (Power keeps *Suggested by AI* / *Default*,
-  Size *Estimated*, a plate's typical size *Default*), and has a quiet
-  **Reset** that clears only that section's edits. Size keeps *Use
-  smallest* (*Use typical size* for a plate) as its reset.
-- **Knock-on.** A part edit moves numbers elsewhere — the size, the board,
-  the draw — so the footer says once what moved (*Now: Size 229 × 63 × 23
-  mm · board 77 × 57 mm · ~4.7 h per charge*), and the page's status line
-  reads it out with the edit.
+    part). Every menu reads in plain words — *Chip that runs it*,
+    *Bluetooth LE* — with the part number as its sub.
+- **Who set it.** Each section is tagged *Suggested* until the maker
+  changes it, then *You set*, with a quiet **Reset** that clears only that
+  section's edits (Size's Reset lives in its own header now, not as an
+  inline *Use smallest*). The tag no longer says whether *Suggested* came
+  from the concept, an AI hint or a rule — the maker only needs to know
+  whether they touched it.
+- **Knock-on.** A part edit moves numbers elsewhere, so the footer says
+  once what moved, from what to what (*Radio → Wi-Fi: size 224 × 60 × 25 →
+  150 × 52 × 32 mm · board 72 × 54 → 61 × 46 mm · runtime ~4.8 → ~5 h ·
+  won't talk to Remote Controller*), and the page's status line reads it
+  out with the edit.
+- **Pairing.** A radio edit, a pack swap or a charger's cell is checked
+  against the project's other products: a section names the primary or
+  companion it must still match, in warn tone with a quiet **Open X** when
+  it no longer does. A spare pack or charger pairs with whichever product
+  its pack matches, else with the primary; two companions are never
+  checked against each other.
+- **Stale edits.** A Refine or Regenerate that lands a new concept keeps
+  the maker's part edits and rebases them onto it (a `removed` part the
+  new concept no longer has is dropped). The sheet says so at its top:
+  *Your part changes from Concept N still apply · Reset parts*.
 - **The build uses the edited parts.** The card's facts, the rail row, the
   gate's line per product (it names the radio and the part the card
   names), the booked snapshot's `choices`, and `partsForBuild` — so the

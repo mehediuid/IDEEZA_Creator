@@ -7,7 +7,7 @@ jay + aro kivabe user friendly info dekhano jay. sob kichu sesh kore rakhbe"*
 ("ja korba koro"), so this spec is the design proposal below, adopted as is,
 with the controller's amendments at the end. It builds on the product spec
 sheet (`2026-09-25-product-spec-sheet-design.md`), which gives each product
-the size · power · radio facts the rail now shows.
+the facts the rail now shows (see A6/A7 for what has moved since).
 
 
 Skills used: `/impeccable` (product register, critique heuristics, detector: 0 findings on `chat-rail.tsx` and `build-rail.tsx`) and `/ui-ux-pro-max` (a11y, touch, feedback, navigation rules). Rules applied: `40-ui-ux.md` (read from tag `backup-before-strip`, since the worktree has no `docs/agent-rules/`), CLAUDE.md §5 entries 167, 186–196 and §7.
@@ -300,7 +300,7 @@ The primary shows no tag. Its "Always built" lives on its card.
 |---|---|---|
 | drawing | `Drawing Concept {label} · {elapsed}` (the `· {elapsed}` part is `aria-hidden`, on the second clock) | `text-text-secondary` |
 | failed (latest turn) | `Couldn't draw Concept {label} · nothing charged` | `text-text-error` |
-| conflict | `Doesn't fit its size · fix it on the card` | `text-text-error` |
+| conflict | `Doesn't fit its size · fix it in its spec` | `text-text-error` |
 | build: queued (in this build) | `Waiting to start · 0 of 5` | `text-text-tertiary` |
 | build: running | `{r} of 5 pieces ready`, then a 3 px track: `mt-[6px] h-[3px] w-full overflow-hidden rounded-full bg-bg-subtle` with a fill of `h-full w-full origin-left bg-text-tertiary transition-transform duration-normal ease-decelerate` and inline `transform: scaleX(p)` (data-valued inline style, as §7 allows) | `text-text-secondary` |
 | build: a piece failed | `{Piece} failed · retry it on the build` (`ITEM_LABELS[kind]`; several: `{k} pieces failed · retry them on the build`) | `text-text-error` |
@@ -311,9 +311,8 @@ The primary shows no tag. Its "Always built" lives on its card.
 
 `5` is the product's live item count (`items.filter(i => i.status !== "skipped").length`), never a literal.
 
-**Line 3** (spec, `id=factsId`, `text-sm tabular-nums truncate`, `title` = full): `specFacts(spec, parts)` joined with ` · `, taking size, power and radio (the board fact is dropped, since it rarely differs and would crowd 248 px). Colour:
-- Size fact error-toned when it doesn't fit.
-- Warning-toned when Draft.
+**Line 3** (spec, `id=factsId`, `text-sm tabular-nums truncate`, `title` = full): the card's own facts (`cardFactsOf`), minus Size — power, then *Pairs with*/*Can't pair with* a companion that shares its radio (else *Radio …* when one is named), then one part that says what it does — joined with ` · ` (the board fact is dropped, since it rarely differs and would crowd 248 px). Colour:
+- Warning-toned when Draft, or when a pairing has broken.
 - Otherwise `text-text-tertiary`.
 
 It is omitted while drawing, failed, or before a spec exists.
@@ -482,7 +481,7 @@ Also:
     - `Build stopped.`
   - Several transitions in one render are joined with a space.
 - **Clocks stay `aria-hidden`.** The elapsed seconds (row, activity) are never read.
-- **What a screen reader hears on a row:** *"Remote Controller, button, current, Concept 4 · ready, 60 × 46 × 48 mm · USB powered · nRF24"*. `aria-current="true"` is used rather than `aria-pressed`: pressing the current row again doesn't unselect it, and the row is also a jump, which `aria-current` describes truthfully. The `/build` page's `BuildRail` keeps its own `aria-pressed` and is not touched.
+- **What a screen reader hears on a row:** *"Remote Controller, button, current, Concept 4 · ready, USB powered · Pairs with RC Car Controller"* (no size — that stays on the card and in the spec sheet). `aria-current="true"` is used rather than `aria-pressed`: pressing the current row again doesn't unselect it, and the row is also a jump, which `aria-current` describes truthfully. The `/build` page's `BuildRail` keeps its own `aria-pressed` and is not touched.
 - **Stepper:** `<ol aria-label="Progress">` with `aria-current="step"` and sr-only `(done)`.
 - **Colour is never alone:** failed has a glyph and words; left out has a tag; selected has the fill plus `aria-current`.
 - **Contrast (existing tokens):**
@@ -599,3 +598,15 @@ There is no entrance choreography and no staggered list reveal.
 - **A3 — the spec's blocking rule.** `nextStep` rule 5, the row's *conflict* phase and the canvas's Build line all use one predicate, `blocksBuild(spec)` = `!spec.fits && !spec.draftAtSize`, exported from `src/lib/spec/derive.ts` (it is duplicated today in `spec-panel.tsx` and `chat-thread.tsx`; both switch to it).
 - **A4 — nothing new to buy or start from the rail.** Rule 4 of `40-ui-ux.md` is the acceptance test: after the redesign, every action control (In build, Remove, Refine, Regenerate, Try again, Spec edits, Build, Add, Restore, Save, Open in editor, Cancel/Stop/retry) exists exactly once on screen. `BuildStatus statesOnly` moves into the rail slot; it is not duplicated.
 - **A5 — nothing pushed**; commits on `feat/spec-sheet` only.
+- **A6 — the size jump reads *Open its spec*.** Every other next-step and
+  row jump still reads **Show on canvas**, but rule 5's jump and the row's
+  own size jump (both target the spec sheet, not a bare canvas control)
+  are labelled **Open its spec** instead, with the accessible name *Open
+  its spec — {Name}'s size*. The spec sheet (product spec sheet design
+  doc, S4) replaced the plain size field this jump used to reach.
+- **A7 — the two-pane split uses measured room, not `md`.** The rail and
+  the canvas sit side by side only when the chat page's own width still
+  leaves the canvas a card column (§8's "Phone" bullet used to key this
+  off the `md` breakpoint alone); short of that room it is the two tabs,
+  *Canvas* and *Chat*, unchanged otherwise. This brings the split in line
+  with how the spec sheet already decides whether it docks.

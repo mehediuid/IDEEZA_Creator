@@ -45,7 +45,9 @@ ideeza-creator-panel/
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
    │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
-   │  │                      spec-panel.tsx (the card's spec disclosure), buttons.ts
+   │  │                      spec-panel.tsx (the card's facts + Edit spec button),
+   │  │                      spec-sheet.tsx + spec-sections.tsx (the part editor,
+   │  │                      docked beside the canvas or an overlay), buttons.ts
    │  ├─ package/            ★ New Package flow — shell + step rail, the two canvas
    │  │                      editors (symbol/footprint), 3D placement, finalize,
    │  │                      confirmation, and the chrome both editors share
@@ -72,7 +74,7 @@ ideeza-creator-panel/
    │  ├─ voice/              voice-listening (what a composer becomes while the mic is
    │  │                      open — dot, live waveform, Cancel / Stop & review)
    │  ├─ ideeza/             In-house design-system primitives (button, select, toggle,
-   │  │                      text-input, slider, banner, select-menu…)
+   │  │                      text-input, number-input, slider, banner, select-menu…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
    │  └─ theme-provider.tsx · theme-toggle.tsx
@@ -91,8 +93,9 @@ ideeza-creator-panel/
    │  │                      plan.tsx (build-plan data)
    │  ├─ spec/               The product spec sheet — part bodies, packs,
    │  │                      size/board/power math, hint and snapshot checks, the
-   │  │                      words (types, units, batteries, bodies, derive, hints,
-   │  │                      format).
+   │  │                      menu copy and part/radio/MCU tables, edit helpers and
+   │  │                      what-it-does/pairing facts (types, units, batteries,
+   │  │                      bodies, derive, hints, catalog, edits, facts, format).
    │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
    │  │                      the wizard and the rail both read — + the stored-draft
    │  │                      migration), gas.ts, wallet.ts, video-prompt.ts, qr.ts
