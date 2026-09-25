@@ -154,7 +154,7 @@ async function meshyPoll(taskId: string): Promise<PollResult> {
 
 // ─────────────────────────── demo provider ─────────────────────────────
 
-const SAMPLE_GLB = "/models/sample.glb";
+export const SAMPLE_GLB = "/models/sample.glb";
 const DEMO_RENDER_MS = 6000; // feels like a short render, no external call
 
 function demoPoll(taskId: string): PollResult {

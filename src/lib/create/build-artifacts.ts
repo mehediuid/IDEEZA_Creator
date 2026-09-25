@@ -256,21 +256,27 @@ export function firmwareFor(job: ArtifactSource): Firmware {
 
 export type PcbMeta = {
   layers: 2;
-  /** Null when none of the product's parts sits on a board. */
-  widthMm: number | null;
-  heightMm: number | null;
-  partCount: number;
 };
 
-// The board's size is the spec's: the parts' own footprints plus room to
-// route (lib/spec/derive.ts). It used to be 32 + 4 mm per part, which gave
-// every five-part product the same board whatever the parts were.
-export function pcbMetaFor(job: ArtifactSource): PcbMeta {
-  const board = specOfSource(job).board;
-  return {
-    layers: 2,
-    widthMm: board?.w ?? null,
-    heightMm: board?.h ?? null,
-    partCount: board?.parts ?? 0,
-  };
+// widthMm/heightMm/partCount used to live here too — the board's size worked
+// out from the spec's own footprints (lib/spec/derive.ts). PcbPreview's
+// caption switched to boardLabel(specOfSource(job)) and stopped reading them,
+// so they were dropped rather than kept write-only (code audit #3).
+export function pcbMetaFor(): PcbMeta {
+  return { layers: 2 };
+}
+
+// ─────────────────────────── sample 3D model ───────────────────────────
+//
+// The bundled placeholder mesh lib/three/providers.ts's "demo" provider hands
+// back when no image-to-3D key is configured (its exported SAMPLE_GLB). Every
+// build lands on this exact URL in demo mode, so a preview or caption showing
+// it is not a shape generated for this concept, and the review says so
+// (e2e #3). The literal is duplicated rather than imported: providers.ts
+// pulls in image-store.ts's `next/headers`, which this file — read by every
+// client component that reviews a build — cannot carry into the browser.
+export const SAMPLE_MODEL_URL = "/models/sample.glb";
+
+export function isSampleModel(url: string | null | undefined): boolean {
+  return url === SAMPLE_MODEL_URL;
 }

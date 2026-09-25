@@ -24,7 +24,7 @@ import type { ConceptPartCategory } from "@/lib/create/concept";
 import { connectorPartsOf } from "@/lib/create/confidence";
 import { batteryOf, isBatteryPart } from "@/lib/spec/batteries";
 import { boardLabel, FAB_PROFILE, mcuOf, powerLabel, radioOf } from "@/lib/spec/format";
-import { mm3 } from "@/lib/spec/units";
+import { currentLabel, mm3 } from "@/lib/spec/units";
 
 // ─────────────────────── what each artifact covers ──────────────────
 //
@@ -33,7 +33,18 @@ import { mm3 } from "@/lib/spec/units";
 // numbers the maker saw on the card and at the gate. No download or export
 // control lives on this panel, so no line names a file you could take away
 // (CLAUDE.md §6, "no promises without delivery").
-export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[] {
+export function coversFor(
+  kind: BuildItemKind,
+  product: ArtifactSource,
+  // True when the 3D tab is showing the bundled placeholder mesh rather than
+  // a shape generated for this concept (e2e #3) — only the "3d" case reads
+  // this; every other kind ignores it.
+  sampleModel = false,
+  // True for a companion (§4.7): the job only ever generates one mesh, from
+  // the primary's concept image, so a companion's 3D tab previews that mesh
+  // rather than one drawn from its own — only the "3d" case reads this.
+  isCompanion = false,
+): string[] {
   const booked = bookedSpec(product);
   const spec = specOfSource(product);
   // A build with no booked snapshot never checked these numbers against a
@@ -57,9 +68,19 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
         ...asked,
         withNote(`Enclosure · ${mm3(spec.size)}`),
         `${spec.material} · ${spec.wallMm} mm wall · 0.2 mm layers`,
-        booked
-          ? "Shape from the concept image, size from the spec"
-          : "Shape from the concept image, size worked out from the parts",
+        // A sample mesh is never this concept's shape, whoever's product this
+        // is — checked first, ahead of the companion disclosure. A companion
+        // has no mesh of its own even for a real model, so its line says
+        // whose shape this is instead of claiming its own concept image; the
+        // booked/worked-out distinction stays on the size line above
+        // (withNote), not repeated here (qa-review #2).
+        sampleModel
+          ? "Sample 3D model — not generated from this concept (demo mode)"
+          : isCompanion
+            ? "Shape: the primary's model — this product has no mesh of its own"
+            : booked
+              ? "Shape from the concept image, size from the spec"
+              : "Shape from the concept image, size worked out from the parts",
         // Only a product with a board has anything for a mount point to sit
         // on — a case-only product (a strap, a shell) gets no PCB to fit.
         ...(spec.board ? ["Mount points sized for the PCB"] : []),
@@ -72,9 +93,14 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
         "Bill of materials for this board",
       ];
     case "code": {
+      const mcu = mcuOf(product.parts);
       const radio = radioOf(product.parts);
       return [
-        `Runs on ${mcuOf(product.parts) ?? "the microcontroller"}`,
+        // A battery-only or connector-only product (a charger, a spare pack)
+        // has no Microcontroller part at all, so nothing here runs firmware —
+        // said plainly rather than asserting one exists, the same way the
+        // next line already handles no radio being named (qa-review #1).
+        mcu ? `Runs on ${mcu}` : "No microcontroller — nothing runs firmware",
         radio ? `Talks over ${radio}` : "No radio named in the parts",
         "Arduino-style sketch, fully commented",
         "Library list pinned to versions",
@@ -99,7 +125,7 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
         ...(knowsBattery
           ? [spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`]
           : []),
-        `Draws about ${spec.drawMa} mA · ${powerLabel(spec)}`,
+        `Draws about ${currentLabel(spec.drawMa)} · ${powerLabel(spec)}`,
         "Every part — category, name, reference and quantity",
         "Grouped by function, quantities per board",
       ];
@@ -225,7 +251,7 @@ const PCB_GAP_Y = 34;
 
 export function PcbPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
-  const meta = pcbMetaFor(job);
+  const meta = pcbMetaFor();
   const nets = netsFor(job);
 
   const n = Math.max(bom.rows.length, 1);

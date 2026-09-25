@@ -60,6 +60,38 @@ function asPhrase(prompt: string): string {
   return /^[A-Z][a-z]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t;
 }
 
+// Turn ids the background reader has already retried once this browser
+// session (e2e #4) — kept in sessionStorage, not just the in-memory ref, so
+// reloading the same tab doesn't ask the model again; a fresh tab (a new
+// session) still gets its one retry. Every access is wrapped: a blocked or
+// full store (private browsing, quota) falls back to whatever the in-memory
+// ref already knows, so the worst case is one extra read per page load,
+// never a loop.
+const REREAD_SESSION_KEY = "ideeza:create:reread";
+
+function loadRereadTurnIds(): Set<string> {
+  try {
+    const raw = window.sessionStorage.getItem(REREAD_SESSION_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((id): id is string => typeof id === "string")
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveRereadTurnIds(ids: ReadonlySet<string>): void {
+  try {
+    window.sessionStorage.setItem(REREAD_SESSION_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Unavailable — the in-memory ref still stops a loop within this page
+    // load, just not across a reload.
+  }
+}
+
 /** Ask the route whether the render has landed, until it has. The route is
  *  the one holding the deadline; this loop only stops waiting if it somehow
  *  never answers. */
@@ -234,11 +266,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // reading is kept on the turn, so a reload never asks again.
   //
   // A stand-in is kept too, so the card has something honest to show, but
-  // it is not a reading: each page load asks once more — once, so a model
-  // that is down is not asked in a loop — and the card's Read again asks
+  // it is not a reading: each turn asks once more per browser session —
+  // once, so a model that is down is not asked in a loop, and not on every
+  // reload of the same chat either (e2e #4) — and the card's Read again asks
   // whenever the maker wants.
   const reading = React.useRef(new Set<string>());
+  // Hydrated from sessionStorage on first use below (retriedLoaded guards
+  // against re-reading the store on every render).
   const retried = React.useRef(new Set<string>());
+  const retriedLoaded = React.useRef(false);
   // The same set as state, for the card's "Reading again…".
   const [rereading, setRereading] = React.useState<ReadonlySet<string>>(() => new Set());
   const readConcept = React.useCallback(
@@ -261,6 +297,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
   React.useEffect(() => {
     if (!chat) return;
+    if (!retriedLoaded.current) {
+      retried.current = loadRereadTurnIds();
+      retriedLoaded.current = true;
+    }
     const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
     for (const t of chat.turns) {
       if (t.role === "assistant") latest.set(t.companionOf ?? "primary", t);
@@ -272,6 +312,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       if (kept && !kept.fallback) continue;
       if (kept && retried.current.has(t.id)) continue;
       retried.current.add(t.id);
+      saveRereadTurnIds(retried.current);
       readConcept(t.id);
     }
   }, [chat, readConcept]);

@@ -39,7 +39,12 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
-import { bookedSpec, specOfSource, type ArtifactSource } from "@/lib/create/build-artifacts";
+import {
+  bookedSpec,
+  isSampleModel,
+  specOfSource,
+  type ArtifactSource,
+} from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
 import { NetworkAction } from "@/components/network/network-action";
@@ -458,7 +463,12 @@ function ReviewPanel({
                   What this covers
                 </h3>
                 <ul role="list" className="mt-3 flex list-disc flex-col gap-2 pl-5 text-sm leading-relaxed text-text-secondary marker:text-text-tertiary">
-                  {coversFor(shown, product).map((line) => (
+                  {coversFor(
+                    shown,
+                    product,
+                    isSampleModel(job.modelGlbUrl),
+                    product.id !== "primary",
+                  ).map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
@@ -606,17 +616,39 @@ function DeliverablePanel({
           time (I4), so it reads as worked out from the parts, not as the
           spec's own number. A companion has no mesh of its own (the job
           only ever generates one), so its caption says whose shape this
-          preview is showing instead of implying it drew the companion's. */}
+          preview is showing instead of implying it drew the companion's.
+          A build in demo mode has no mesh of its own either — every job
+          lands on the same bundled sample.glb — so the caption says that
+          plainly instead of claiming a shape it never drew (e2e #3). */}
       <p className="pointer-events-none absolute bottom-[10px] left-[12px] rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary">
-        {mm3(specOfSource(product).size)} ·{" "}
-        {isCompanion
-          ? `${bookedSpec(product) ? "size from spec" : "size worked out from the parts"} · this preview shows the primary's model`
-          : bookedSpec(product)
-            ? "shape from concept, size from spec"
-            : "shape from concept, size worked out from the parts"}
+        {modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
       </p>
     </div>
   );
+}
+
+// The 3D tab's caption. A sample model's size note keeps the legacy
+// booked/worked-out-from-the-parts and companion wording (that part of the
+// number is still true), but its shape note replaces "shape from concept"
+// with the plain fact that the mesh is the demo placeholder, not this
+// concept's (e2e #3).
+function modelCaption(
+  product: ArtifactSource,
+  isCompanion: boolean,
+  isSample: boolean,
+): string {
+  const size = mm3(specOfSource(product).size);
+  const sizeNote = bookedSpec(product) ? "size from spec" : "size worked out from the parts";
+  if (isSample) {
+    const shapeNote =
+      "Sample model — the 3D service is in demo mode, so this is not your product's shape";
+    return isCompanion
+      ? `${shapeNote} · ${sizeNote}: ${size} · this preview shows the primary's model`
+      : `${shapeNote} · ${sizeNote}: ${size}`;
+  }
+  return isCompanion
+    ? `${size} · ${sizeNote} · this preview shows the primary's model`
+    : `${size} · shape from concept, ${sizeNote}`;
 }
 
 // Shown in the 3D tab while the enclosure mesh is still being generated from
