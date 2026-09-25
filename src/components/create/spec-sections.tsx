@@ -1231,7 +1231,8 @@ export function CaseSection({
               }
             />
           </Field>
-          <Note>Thicker walls make the outside bigger.</Note>
+          {/* A plate has no shell round its parts, so its wall moves nothing. */}
+          {spec.kind !== "mechanical" && <Note>Thicker walls make the outside bigger.</Note>}
           {sealing && (
             <>
               <Choice label="Where it's used">

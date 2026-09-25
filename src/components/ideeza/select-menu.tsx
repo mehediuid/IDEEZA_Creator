@@ -367,7 +367,9 @@ export function SelectMenu<V extends string = string>({
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate">{o.label}</span>
-          {o.sub ? <span className="block truncate text-[length:var(--font-size-xs)] text-[color:var(--color-text-tertiary)]">{o.sub}</span> : null}
+          {/* The sub wraps: it is the line that says what the option is for,
+              and cut at the panel's edge it lost the half that decides. */}
+          {o.sub ? <span className="block break-words text-[length:var(--font-size-xs)] text-[color:var(--color-text-tertiary)]">{o.sub}</span> : null}
         </span>
         {isSelected ? <Check /> : null}
         {o.info ? (

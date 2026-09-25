@@ -499,9 +499,12 @@ function radioLabel(parts: ConceptPart[]): string | null {
   return key ? RADIOS[key].label : radioOf(parts);
 }
 
-/** A product that has, or its concept had, a radio: one taken off is a
- *  pairing broken, not a product that never had one. */
-const speaks = (p: LinkPeer) => !!radioOf(p.parts) || !!radioOf(p.conceptParts);
+/** A product meant to talk over a radio: its concept named one — so one
+ *  taken off is a pairing broken, not a product that never had one — or the
+ *  maker picked one. A chip given to a charger has Wi-Fi on its die, and
+ *  that alone doesn't make the charger something the car should talk to. */
+const speaks = (p: LinkPeer) =>
+  !!radioOf(p.conceptParts) || (!!p.spec.choices?.radio && p.spec.choices.radio !== "none");
 
 function radioLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
   if (!speaks(me)) return [];
