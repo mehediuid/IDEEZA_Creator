@@ -6,8 +6,13 @@
 //                                   product when the maker asks for one
 //   • per-card Refine / Regenerate → a new turn (never overwrites the older one)
 //   • the canvas's one build action → the gate, then a booked build
-//   • the build                   → stays here: it leads the canvas and its
-//                                   pipeline and whole-build states join the rail
+//   • the build                   → stays here: it leads the canvas, its
+//                                   pieces join the rail's product rows and
+//                                   its whole-build states take the rail's
+//                                   next-step slot
+//   • the rail's jumps            → which product the composer changes, and
+//                                   taking the maker to the canvas control
+//                                   that does the next step
 
 import * as React from "react";
 import Link from "next/link";
@@ -18,6 +23,7 @@ import {
   useCreateHistory,
   type BuildJob,
   type BuildProduct,
+  type ChatSession,
   type ChatTurn,
   type ConceptFailReason,
   type SetupAnswer,
@@ -30,8 +36,17 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
-import { ChatRail } from "./chat-rail";
-import { BuildRail } from "./build-rail";
+import type { JumpTarget } from "@/lib/create/project-state";
+import {
+  ADD_PRODUCT_ID,
+  BUILD_ACTION_ID,
+  BUILD_REVIEW_ID,
+  CREDITS_NOTICE_ID,
+  SETUP_QUESTION_ID,
+  productCardId,
+  productRetryId,
+} from "./anchors";
+import { ProjectRail, RailAnnouncer, useRailModel } from "./chat-rail";
 import { BuildStatus } from "./build-status";
 import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
@@ -52,6 +67,41 @@ const POLL_MS = 2_500;
 const POLL_CEILING_MS = 180_000;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** What the rail reads before the chat has been read from storage. Its hook
+ *  has to run on every render, and the loading and not-found returns come
+ *  after it; neither of them shows the rail. */
+const NO_CHAT: ChatSession = { id: "", title: "", turns: [], createdAt: 0, updatedAt: 0 };
+
+/** How long a jump's ring stays on the place it landed (spec §4). */
+const ARRIVAL_MS = 1_200;
+
+/** Where a jump lands: the element scrolled to and ringed, and the one the
+ *  keyboard goes to — the control itself, inside its card, when the jump
+ *  names one. */
+function landingOf(target: JumpTarget): { ring: string; focus: string } {
+  switch (target.kind) {
+    case "setup":
+      return { ring: SETUP_QUESTION_ID, focus: SETUP_QUESTION_ID };
+    case "card":
+    case "spec":
+      return { ring: productCardId(target.productId), focus: productCardId(target.productId) };
+    case "retry":
+      return { ring: productCardId(target.productId), focus: productRetryId(target.productId) };
+    case "build":
+      return { ring: BUILD_ACTION_ID, focus: BUILD_ACTION_ID };
+    case "credits":
+      return { ring: CREDITS_NOTICE_ID, focus: CREDITS_NOTICE_ID };
+    case "review":
+      return { ring: BUILD_REVIEW_ID, focus: BUILD_REVIEW_ID };
+    case "add":
+      return { ring: ADD_PRODUCT_ID, focus: ADD_PRODUCT_ID };
+  }
+}
+
+/** Side by side from `md` (768 px); below it the rail and the canvas are two
+ *  tabs, and only one of them is on screen. */
+const sideBySide = () => window.matchMedia("(min-width: 768px)").matches;
 
 /** The maker's sentence as the tail of another one: a companion is drawn as
  *  "Charger for a handheld soil meter…", not "…for A handheld soil meter". */
@@ -705,6 +755,82 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     );
   }, [chat, projects]);
 
+  // The project a finished build was saved into, by the name it has now.
+  const savedName = React.useMemo(() => {
+    const id = activeBuild?.projectId;
+    return id ? projects.find((p) => p.id === id)?.name : undefined;
+  }, [activeBuild, projects]);
+
+  // Everything the rail and the page's announcer say, worked out once.
+  const rail = useRailModel(chat ?? NO_CHAT, activeBuild, labels, projectName, savedName);
+
+  // The ring a jump left on where it landed, and the timer that takes it off.
+  // Set on the element itself rather than through state: it lasts a second,
+  // and threading it through the canvas would re-render every card for it.
+  const arrived = React.useRef<{ el: HTMLElement; timer: number } | null>(null);
+  React.useEffect(
+    () => () => {
+      if (arrived.current) window.clearTimeout(arrived.current.timer);
+    },
+    [],
+  );
+
+  // Take the maker to a place on the canvas (spec §4): scrolled in, ringed
+  // for a moment, and — when `focus` — the keyboard on it. On a phone the
+  // canvas is the other tab, so it is shown first; without that there is
+  // nothing on screen to scroll to.
+  const jumpTo = React.useCallback(
+    (target: JumpTarget, { focus }: { focus: boolean }) => {
+      if (!sideBySide()) setPane("work");
+      // The size field is reached the way the Build line reaches it: the spec
+      // opens and the keyboard lands on the size.
+      if (target.kind === "spec") focusSpec(target.productId);
+      const land = landingOf(target);
+      // After the tab switch and the opened spec have rendered.
+      requestAnimationFrame(() => {
+        const ring = document.getElementById(land.ring);
+        if (!ring) return;
+        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        ring.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+        const prev = arrived.current;
+        if (prev) {
+          window.clearTimeout(prev.timer);
+          prev.el.removeAttribute("data-arrived");
+        }
+        ring.setAttribute("data-arrived", "true");
+        arrived.current = {
+          el: ring,
+          timer: window.setTimeout(() => {
+            ring.removeAttribute("data-arrived");
+            arrived.current = null;
+          }, ARRIVAL_MS),
+        };
+        if (!focus || target.kind === "spec") return;
+        const control = document.getElementById(land.focus);
+        control?.focus({ preventScroll: true });
+        // A Try again that can't be pressed (no credits) takes no focus; the
+        // card it sits in, whose words say why, does.
+        if (document.activeElement !== control) ring.focus({ preventScroll: true });
+      });
+    },
+    [focusSpec],
+  );
+
+  // A rail row: the composer, the row and the review's product tab all follow
+  // `focusedProduct`, and the canvas brings that product into view — its
+  // card, or with a build its tab in the review. Side by side the keyboard
+  // stays on the row, so the maker can go on choosing with the canvas in
+  // view; on a phone the rail has just been hidden, so it goes to the canvas.
+  const selectProduct = React.useCallback(
+    (productId: string) => {
+      setFocusedProduct(productId);
+      jumpTo(activeBuild ? { kind: "review" } : { kind: "card", productId }, {
+        focus: !sideBySide(),
+      });
+    },
+    [activeBuild, jumpTo],
+  );
+
   // The setup question is still open. Typing then used to skip it: the text
   // started a paid render of its own beside the unanswered question.
   const setupPending = React.useMemo(
@@ -1230,6 +1356,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   return (
     <div className="flex h-full flex-col md:flex-row">
+      {/* The one place a screen reader hears the flow change — outside both
+          panes, since on a phone the rail is hidden while the canvas shows,
+          and that is where the maker is when a render lands. */}
+      <RailAnnouncer model={rail} />
       {/* At phone width the two panes are two tabs — side by side they needed
           1000 px and the canvas was simply off the screen. The canvas leads,
           because the question and the work are there; the chat tab carries
@@ -1263,42 +1393,36 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         ))}
       </div>
       {/* Two panes, the shape the work actually has: the rail on the left is
-          the running account — what was asked, what was decided, what is
-          happening right now — and the canvas beside it is where the work
-          appears, questions first and then the concepts. A render takes the
-          better part of a minute and a multi-product build runs several at
-          once, so the account of it needs its own column rather than
-          competing with the output for the same one. */}
+          the project's status board — where it is, the one thing to do next,
+          each product's state, and the history folded under them — and the
+          canvas beside it is where the work appears, questions first and then
+          the concepts. A render takes the better part of a minute and a
+          multi-product build runs several at once, so the account of it needs
+          its own column rather than competing with the output for the same
+          one. */}
       <aside
+        aria-label="Project"
         className={[
           "min-h-0 flex-1 flex-col border-solid border-border bg-bg-surface md:w-[360px] md:flex-none md:shrink-0 md:border-r",
           pane === "chat" ? "flex" : "hidden md:flex",
         ].join(" ")}
       >
         <div className="flex-1 overflow-y-auto">
-          <ChatRail chat={chat} labels={labels} />
-          {/* The whole pipeline, stated the moment the build starts — every
-              piece of every product, including the ones that have not begun.
-              It belongs beside the work, not on a page of its own. */}
-          {activeBuild && (
-            <div className="border-t border-solid border-border">
-              <BuildRail
-                job={activeBuild}
-                title={projectName}
-                activeProductId={focusedProduct}
-                onPickProduct={setFocusedProduct}
-              />
-              {/* The whole-build states — queued with its Cancel, waiting on
-                  credits, a partial or system failure with its retry, the
-                  overrun stop — which used to exist only on a page the chat
-                  no longer sends anyone to. */}
-              {statusOf(activeBuild) !== "ready" && (
-                <div className="px-[14px] pb-[16px]">
-                  <BuildStatus job={activeBuild} statesOnly inChat />
-                </div>
-              )}
-            </div>
-          )}
+          <ProjectRail
+            model={rail}
+            focusedProduct={focusedProduct}
+            onSelectProduct={selectProduct}
+            onJump={(target) => jumpTo(target, { focus: true })}
+            // The whole-build states — queued with its Cancel, waiting on
+            // credits, a partial or system failure with its retry, the
+            // overrun stop — say what the build is doing, so while it isn't
+            // ready they are the next step. Each piece is on its product's row.
+            slot={
+              activeBuild && statusOf(activeBuild) !== "ready" ? (
+                <BuildStatus job={activeBuild} statesOnly inChat />
+              ) : undefined
+            }
+          />
         </div>
         <div className="border-t border-solid border-border">
           <div className="w-full px-[14px] py-[14px]">
@@ -1323,7 +1447,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               : setupPending
                 ? "Answer the question on the canvas first — nothing is drawn or charged until you do."
                 : focusedName && latestReadyTurn
-                  ? `Refines ${focusedName} · ${CONCEPT_COST} credit. Name another product to add it.`
+                  ? `Refines ${focusedName} · ${CONCEPT_COST} credit. Pick another product above, or name a new one to add it.`
                   : `Each drawing costs ${CONCEPT_COST} credit.`}
           </p>
           </div>
@@ -1405,21 +1529,36 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 }
 
-// The page's own shape while the chat is read from storage — the rail, the
-// composer and two cards — so nothing jumps when it lands. It was a line of
-// centred text.
+// The page's own shape while the chat is read from storage — the rail's
+// header, next step and product rows, the composer and two cards — so nothing
+// jumps when it lands. It was a line of centred text.
 function LoadingShell() {
   return (
     <div role="status" aria-label="Loading the chat" className="flex h-full">
       <span className="sr-only">Loading the chat</span>
-      <div className="hidden w-[360px] shrink-0 flex-col gap-[14px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse md:flex">
-        <div className="h-[12px] w-[40px] rounded bg-bg-subtle" />
-        <div className="h-[14px] w-[260px] rounded bg-bg-subtle" />
-        <div className="h-[14px] w-[200px] rounded bg-bg-subtle" />
-        <div className="mt-[10px] h-[12px] w-[60px] rounded bg-bg-subtle" />
-        <div className="h-[14px] w-[180px] rounded bg-bg-subtle" />
-        <div className="h-[14px] w-[220px] rounded bg-bg-subtle" />
-        <div className="mt-auto h-[96px] w-full rounded-2xl bg-bg-subtle" />
+      <div className="hidden w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface motion-safe:animate-pulse md:flex">
+        <div className="flex flex-col gap-[8px] border-b border-solid border-border px-[18px] pb-[14px] pt-[16px]">
+          <div className="h-[14px] w-[140px] rounded bg-bg-subtle" />
+          <div className="h-[12px] w-[220px] rounded bg-bg-subtle" />
+          <div className="h-[12px] w-[180px] rounded bg-bg-subtle" />
+        </div>
+        <div className="px-[10px] pt-[14px]">
+          <div className="h-[64px] w-full rounded-xl bg-bg-subtle" />
+        </div>
+        <div className="flex flex-col gap-[2px] px-[18px] pt-[18px]">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex h-[56px] items-center gap-[12px]">
+              <div className="h-[40px] w-[40px] shrink-0 rounded-lg bg-bg-subtle" />
+              <div className="flex flex-col gap-[6px]">
+                <div className="h-[12px] w-[140px] rounded bg-bg-subtle" />
+                <div className="h-[12px] w-[100px] rounded bg-bg-subtle" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-auto border-t border-solid border-border px-[14px] py-[14px]">
+          <div className="h-[96px] w-full rounded-2xl bg-bg-subtle" />
+        </div>
       </div>
       <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] content-start gap-[20px] bg-bg-page px-[16px] py-[20px] motion-safe:animate-pulse md:px-[32px] md:py-[32px]">
         <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />

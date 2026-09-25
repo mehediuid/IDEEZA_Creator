@@ -389,6 +389,8 @@ export type NextStep = {
   tone: NextStepTone;
   text: string;
   target?: JumpTarget;
+  /** The button's accessible name: its visible "Show on canvas" first, so
+   *  voice control reaches it by what it says (WCAG 2.5.3), then where it goes. */
   targetLabel?: string;
 };
 
@@ -420,7 +422,7 @@ export function nextStep(args: {
       tone: "attention",
       text: "Answer the question on the canvas. Nothing is drawn or charged until you do.",
       target: { kind: "setup" },
-      targetLabel: "Show the question on the canvas",
+      targetLabel: "Show on canvas — the question",
     };
   }
   // #3 — the slot shows BuildStatus instead; nothing to say here.
@@ -435,7 +437,7 @@ export function nextStep(args: {
       tone: "attention",
       text: `${failedRow.name} couldn't be drawn. Try again on its card · 1 credit.`,
       target: { kind: "retry", productId: failedRow.productId },
-      targetLabel: `Show ${failedRow.name}'s Try again on the canvas`,
+      targetLabel: `Show on canvas — ${failedRow.name}'s Try again`,
     };
   }
 
@@ -446,7 +448,7 @@ export function nextStep(args: {
       tone: "attention",
       text: `${conflictRow.name} doesn't fit the size you set. Fix the size, or build it as Draft.`,
       target: { kind: "spec", productId: conflictRow.productId },
-      targetLabel: `Show ${conflictRow.name}'s size on the canvas`,
+      targetLabel: `Show on canvas — ${conflictRow.name}'s size`,
     };
   }
 
@@ -477,14 +479,14 @@ export function nextStep(args: {
           tone: "attention",
           text: `Building again costs ${cost} credits. You have ${balance}.`,
           target: { kind: "credits" },
-          targetLabel: "Show the credits notice on the canvas",
+          targetLabel: "Show on canvas — the credits notice",
         };
       }
       return {
         tone: "neutral",
         text: `Changed since the build. Build again to carry it into the deliverables · ${cost} credits.`,
         target: { kind: "build" },
-        targetLabel: "Show the Build button on the canvas",
+        targetLabel: "Show on canvas — the Build button",
       };
     }
     // #9
@@ -494,14 +496,14 @@ export function nextStep(args: {
         tone: "neutral",
         text: `Saved to ${name}. Add a brief to sell, give or keep it.`,
         target: { kind: "review" },
-        targetLabel: "Show the build on the canvas",
+        targetLabel: "Show on canvas — the build",
       };
     }
     // #8
     const text = projectName
       ? `Build ready. Save it to ${projectName}, or open it in the editor.`
       : "Build ready. Save it as a project, or open it in the editor.";
-    return { tone: "neutral", text, target: { kind: "review" }, targetLabel: "Show the build on the canvas" };
+    return { tone: "neutral", text, target: { kind: "review" }, targetLabel: "Show on canvas — the build" };
   }
 
   // #10 / #10b
@@ -511,7 +513,7 @@ export function nextStep(args: {
         tone: "attention",
         text: `The build costs ${cost} credits. You have ${balance}. Top up to build.`,
         target: { kind: "credits" },
-        targetLabel: "Show the credits notice on the canvas",
+        targetLabel: "Show on canvas — the credits notice",
       };
     }
     const label = n === 1 ? "this product" : `${n} products`;
@@ -519,7 +521,7 @@ export function nextStep(args: {
       tone: "neutral",
       text: `Next: build ${label} · ${cost} credits. You have ${balance}.`,
       target: { kind: "build" },
-      targetLabel: "Show the Build button on the canvas",
+      targetLabel: "Show on canvas — the Build button",
     };
   }
 

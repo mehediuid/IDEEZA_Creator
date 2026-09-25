@@ -11,6 +11,10 @@
 //
 // Spec §4c: each concept carries a lineage number ("1.1" is the first refine
 // of concept 1) beside the product's name.
+//
+// The places the rail's jumps land carry the ids in anchors.ts. A wrapper
+// that is not a control is focusable from script only (tabIndex -1), and
+// every landing place draws the arrival ring the host sets for 1.2 s.
 
 import * as React from "react";
 import { Add01Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons";
@@ -30,6 +34,14 @@ import {
   productNameOf as sharedProductNameOf,
   projectState,
 } from "@/lib/create/project-state";
+import {
+  ADD_PRODUCT_ID,
+  ARRIVAL_RING,
+  BUILD_ACTION_ID,
+  BUILD_REVIEW_ID,
+  CREDITS_NOTICE_ID,
+  SETUP_QUESTION_ID,
+} from "./anchors";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
@@ -59,6 +71,15 @@ export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
   }
   return out;
 }
+
+/** A wrapper a jump lands on: clear of the canvas's top edge, no outline
+ *  when script focuses it (it is not a control), and the arrival ring, drawn
+ *  round the card inside it. */
+const LANDING = `scroll-mt-[16px] rounded-2xl outline-none transition-shadow duration-normal ease-decelerate motion-reduce:transition-none ${ARRIVAL_RING}`;
+/** The same, for a place with no edge of its own (the question, the add
+ *  row): the ring stands off it in the page's colour rather than touching
+ *  its words and buttons. */
+const LANDING_BARE = `${LANDING} data-[arrived=true]:ring-offset-8 data-[arrived=true]:ring-offset-bg-page`;
 
 export function ChatThread({
   chat,
@@ -213,6 +234,8 @@ export function ChatThread({
               : undefined
           }
           productName={productNameOf(turn)}
+          // With one card there is nothing to tell it from.
+          focused={products.length > 1 && productIdOf(turn) === focusedProduct}
           inBuild={!!job && inBuild(turn)}
           regenerating={regeneratingFrom?.has(turn.id) ?? false}
           onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
@@ -270,22 +293,24 @@ export function ChatThread({
           answered the rail carries the decision, and a read-back of it at the
           top of the canvas says the same thing twice in the same eyeful. */}
       {setup?.role === "setup" && setup.status !== "answered" && (
-        <SetupTurn
-          prompt={setup.prompt}
-          status={setup.status}
-          companions={setup.companions}
-          productName={setup.productName}
-          productSummary={setup.productSummary}
-          answer={setup.answer}
-          projects={projects}
-          onAnswer={(a) => onAnswerSetup(setup.id, a)}
-        />
+        <div id={SETUP_QUESTION_ID} tabIndex={-1} className={`w-full max-w-[640px] ${LANDING_BARE}`}>
+          <SetupTurn
+            prompt={setup.prompt}
+            status={setup.status}
+            companions={setup.companions}
+            productName={setup.productName}
+            productSummary={setup.productSummary}
+            answer={setup.answer}
+            projects={projects}
+            onAnswer={(a) => onAnswerSetup(setup.id, a)}
+          />
+        </div>
       )}
 
       {/* Once a build exists it leads the canvas: its products as tabs, each
           deliverable as a tab under them, filling in as they land. */}
       {job && (
-        <div className="w-full">
+        <div id={BUILD_REVIEW_ID} tabIndex={-1} className={`w-full ${LANDING}`}>
           <ReviewOutputs
             job={job}
             productId={focusedProduct}
@@ -367,7 +392,9 @@ export function ChatThread({
             />
           )}
           {offerBuild && allReady && shortForBuild && (
-            <InsufficientCreditsBanner cost={cost} />
+            <div id={CREDITS_NOTICE_ID} tabIndex={-1} className={`w-full max-w-[640px] ${LANDING}`}>
+              <InsufficientCreditsBanner cost={cost} />
+            </div>
           )}
         </div>
       )}
@@ -443,6 +470,7 @@ function BuildAction({
       {/* Busy looks like the gate's own busy: the brand fill, dimmed, turning
           — not a grey that reads as disabled while the work is under way. */}
       <button
+        id={BUILD_ACTION_ID}
         type="button"
         data-testid="build-action"
         onClick={preparing ? undefined : onBuild}
@@ -450,13 +478,14 @@ function BuildAction({
         aria-disabled={blocked || preparing}
         aria-busy={preparing}
         title={reason}
-        className={
+        className={[
+          "scroll-mt-[16px]",
           preparing
             ? "ml-auto inline-flex h-[40px] cursor-wait items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand opacity-80"
             : blocked
               ? "ml-auto inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
-              : "ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-        }
+              : `ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-[color,background-color,box-shadow] duration-fast motion-reduce:transition-none hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus ${ARRIVAL_RING}`,
+        ].join(" ")}
       >
         {preparing && (
           <span aria-hidden className="inline-flex motion-safe:animate-spin">
@@ -560,7 +589,12 @@ function AddProductSection({
   );
 
   return (
-    <section aria-label="Add a product" className="flex w-full flex-col gap-[12px]">
+    <section
+      id={ADD_PRODUCT_ID}
+      tabIndex={-1}
+      aria-label="Add a product"
+      className={`flex w-full flex-col gap-[12px] ${LANDING_BARE}`}
+    >
       {open ? (
         <form
           className="flex w-full max-w-[640px] flex-col gap-[6px]"

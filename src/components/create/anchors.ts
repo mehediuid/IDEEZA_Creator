@@ -22,3 +22,9 @@ export const BUILD_REVIEW_ID = "build-review";
 
 /** The Add-a-product section (suggested chips, removed chips, the name field). */
 export const ADD_PRODUCT_ID = "add-product";
+
+/** What a jump draws on the place it lands for 1.2 s (spec §4): the host
+ *  sets `data-arrived="true"` and takes it off again. The element's own
+ *  transition has to include box-shadow for the ring to fade. */
+export const ARRIVAL_RING =
+  "data-[arrived=true]:ring-2 data-[arrived=true]:ring-border-focus";

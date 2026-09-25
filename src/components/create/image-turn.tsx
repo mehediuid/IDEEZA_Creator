@@ -35,6 +35,8 @@ import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
+import { productIdOf } from "@/lib/create/project-state";
+import { ARRIVAL_RING, productCardId, productRetryId } from "./anchors";
 import { useMinuteClock } from "./build-status";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { SpecPanel, type SpecCard } from "./spec-panel";
@@ -42,6 +44,19 @@ import { elapsedLabel, relativeLabel, useSecondClock } from "./use-clock";
 
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
+
+/** Every card's root, whichever state it is in, is where the rail's jumps
+ *  land: an id to find it by, focusable from script only (it is not a
+ *  control, so no tab stop), clear of the canvas's top edge when scrolled
+ *  to, and the ring a jump draws. The edge turns brand while the composer
+ *  is aimed at this product. */
+function cardRoot(focused: boolean): string {
+  return [
+    "scroll-mt-[16px] outline-none transition-[border-color,box-shadow] duration-normal ease-decelerate motion-reduce:transition-none",
+    ARRIVAL_RING,
+    focused ? "border-border-brand" : "border-border",
+  ].join(" ");
+}
 
 export function ImageTurn({
   turn,
@@ -55,6 +70,7 @@ export function ImageTurn({
   buildChoice,
   onRemove,
   spec,
+  focused = false,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
   conceptLabel: string;
@@ -77,6 +93,9 @@ export function ImageTurn({
   /** The product's spec sheet — facts, and the editor behind "Spec". Ready
    *  cards only: a drawing still under way has no parts to read yet. */
   spec?: SpecCard;
+  /** The composer changes this product — said with the card's edge, and
+   *  only when there is more than one card to tell it from. */
+  focused?: boolean;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
   // The rendered balance, not canAfford(): that reads a ref the provider
@@ -90,6 +109,7 @@ export function ImageTurn({
 
   const what = productName ?? `concept ${conceptLabel}`;
   const leftOut = !!buildChoice && !buildChoice.included;
+  const productId = productIdOf(turn);
   // The card's own choices, on the right of its title: in or out of the
   // next build, and out of the project. The name keeps the rest of the line.
   const choices =
@@ -122,6 +142,8 @@ export function ImageTurn({
         kind={turn.kind}
         since={turn.ts}
         header={titleLine}
+        productId={productId}
+        focused={focused}
       />
     );
   }
@@ -132,6 +154,8 @@ export function ImageTurn({
         onRetry={onRegenerate}
         disabled={shortForRender}
         header={titleLine}
+        productId={productId}
+        focused={focused}
       />
     );
   }
@@ -140,8 +164,10 @@ export function ImageTurn({
   const name = productName ? `${productName}, concept ${conceptLabel}` : `Concept ${conceptLabel}`;
   return (
     <article
+      id={productCardId(productId)}
+      tabIndex={-1}
       aria-label={name}
-      className="flex w-full max-w-[640px] flex-col gap-[12px] rounded-2xl border border-border bg-bg-surface p-[16px]"
+      className={`flex w-full max-w-[640px] flex-col gap-[12px] rounded-2xl border bg-bg-surface p-[16px] ${cardRoot(focused)}`}
     >
       <ConceptHeader
         conceptLabel={conceptLabel}
@@ -451,6 +477,8 @@ function PendingImageTurn({
   productName,
   since,
   header,
+  productId,
+  focused,
 }: {
   conceptLabel: string;
   parentConceptLabel?: string;
@@ -459,6 +487,8 @@ function PendingImageTurn({
   since: number;
   /** The card's title line, pinned to the top of the tile. */
   header?: React.ReactNode;
+  productId: string;
+  focused: boolean;
 }) {
   // The real elapsed time, and what a render usually takes — not a
   // percentage the generator never reported.
@@ -466,11 +496,13 @@ function PendingImageTurn({
   const what = productName ?? `concept ${conceptLabel}`;
   return (
     // Not a live region: the clock moves every second, and announcing each
-    // tick is noise. The rail beside the canvas reports when it lands.
+    // tick is noise. The page's announcer says when it lands.
     <div
+      id={productCardId(productId)}
+      tabIndex={-1}
       role="img"
       aria-label={`Drawing ${what}`}
-      className="relative flex aspect-[64/53] w-full max-w-[640px] flex-col items-center justify-center gap-[10px] overflow-hidden rounded-2xl border border-solid border-border bg-bg-subtle"
+      className={`relative flex aspect-[64/53] w-full max-w-[640px] flex-col items-center justify-center gap-[10px] overflow-hidden rounded-2xl border border-solid bg-bg-subtle ${cardRoot(focused)}`}
     >
       <span
         aria-hidden
@@ -527,6 +559,8 @@ function FailedImageTurn({
   onRetry,
   disabled,
   header,
+  productId,
+  focused,
 }: {
   reason?: ConceptFailReason;
   onRetry: () => void;
@@ -534,6 +568,8 @@ function FailedImageTurn({
   disabled?: boolean;
   /** The card's title line, as on a finished card. */
   header?: React.ReactNode;
+  productId: string;
+  focused: boolean;
 }) {
   const body = (
     <div role="alert" className="flex gap-[12px]">
@@ -548,6 +584,7 @@ function FailedImageTurn({
           {reason ? FAIL_COPY[reason] : FAIL_FALLBACK}
         </p>
         <button
+          id={productRetryId(productId)}
           type="button"
           onClick={onRetry}
           disabled={disabled}
@@ -565,7 +602,11 @@ function FailedImageTurn({
     </div>
   );
   return (
-    <div className="flex w-full max-w-[640px] flex-col gap-[16px] rounded-2xl border border-border bg-bg-surface p-[16px]">
+    <div
+      id={productCardId(productId)}
+      tabIndex={-1}
+      className={`flex w-full max-w-[640px] flex-col gap-[16px] rounded-2xl border bg-bg-surface p-[16px] ${cardRoot(focused)}`}
+    >
       {header}
       <div className={header ? "px-[4px] pb-[4px]" : "p-[4px]"}>{body}</div>
     </div>

@@ -484,6 +484,13 @@ function ProductRow({
   const building = row.phase === "queued" || row.phase === "running";
   const facts = row.facts.length > 0 && !building ? row.facts : null;
   const tag = row.tag ?? null;
+  // Red on the selected row's brand fill falls just under 4.5:1 in light, so
+  // there an error reads in the primary ink and the glyph alone stays red:
+  // the words and the glyph carry it, never the colour by itself. A failed
+  // row's glyph is its thumbnail; a row with a picture takes one in its line.
+  const statusTone =
+    selected && status.tone === "error" ? "text-text-primary" : STATUS_TONE[status.tone];
+  const statusGlyph = status.tone === "error" && row.phase !== "failed";
   // The button is named by the product alone; what it is doing, whether the
   // next build takes it, and its spec are read after, in that order — the
   // tag too, or "Left out" would be colour and position only.
@@ -529,10 +536,20 @@ function ProductRow({
         </span>
         <span
           id={`${id}-status`}
-          className={`block text-sm ${STATUS_TONE[status.tone]}`}
+          className={`flex items-start gap-[4px] text-sm ${statusTone}`}
         >
-          {status.text}
-          {status.since !== undefined && <Elapsed since={status.since} />}
+          {statusGlyph && (
+            <span
+              aria-hidden
+              className="inline-flex h-[18px] shrink-0 items-center text-[var(--color-icon-error)]"
+            >
+              <Icon icon={Alert02Icon} size={14} />
+            </span>
+          )}
+          <span className="min-w-0">
+            {status.text}
+            {status.since !== undefined && <Elapsed since={status.since} />}
+          </span>
         </span>
         {status.bar !== undefined && (
           <span
@@ -554,7 +571,13 @@ function ProductRow({
             {facts.map((f, i) => (
               <React.Fragment key={f.key}>
                 {i > 0 && " · "}
-                <span className={FACT_TONE[f.tone]}>{f.text}</span>
+                <span
+                  className={
+                    selected && f.tone === "error" ? "text-text-primary" : FACT_TONE[f.tone]
+                  }
+                >
+                  {f.text}
+                </span>
               </React.Fragment>
             ))}
           </span>
@@ -894,225 +917,5 @@ function EntryGlyph({ tone }: { tone: ActivityEntry["tone"] }) {
         size={14}
       />
     </span>
-  );
-}
-
-// ─────────────────────── the transcript rail (legacy) ─────────────────────
-//
-// What `concept-chat.tsx` still mounts until the wiring switches it to
-// `ProjectRail`; it goes then.
-
-export function ChatRail({
-  chat,
-  labels,
-}: {
-  chat: ChatSession;
-  /** Concept numbering, shared with the canvas so both name a concept the
-   *  same way. */
-  labels: Map<string, string>;
-}) {
-  // Which product each concept belongs to, read off the setup answer, so a
-  // render line names the thing being drawn instead of a number.
-  const productOf = React.useMemo(() => {
-    const out = new Map<string, string>();
-    const setup = chat.turns.find((t) => t.role === "setup");
-    const named =
-      setup?.role === "setup"
-        ? new Map(setup.companions.map((c) => [c.id, c.name]))
-        : new Map<string, string>();
-    const primary =
-      setup?.role === "setup"
-        ? (setup.productName?.trim() || "Your product")
-        : "Your product";
-    for (const t of chat.turns) {
-      if (t.role !== "assistant") continue;
-      out.set(t.id, t.companionOf ? (named.get(t.companionOf) ?? "Companion") : primary);
-    }
-    return out;
-  }, [chat.turns]);
-
-  const endRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [chat.turns.length]);
-
-  return (
-    // The rail is the account screen readers hear: a line is announced when it
-    // appears or its words change, and the moving percentage is kept out of
-    // it (the canvas tile is not a live region either).
-    <div
-      role="log"
-      aria-label="What is happening"
-      aria-live="polite"
-      className="flex flex-col gap-[18px] px-[18px] py-[20px]"
-    >
-      {chat.turns.map((turn) => (
-        <RailLine
-          key={turn.id}
-          turn={turn}
-          labels={labels}
-          productOf={productOf}
-        />
-      ))}
-      <div ref={endRef} />
-    </div>
-  );
-}
-
-function RailLine({
-  turn,
-  labels,
-  productOf,
-}: {
-  turn: ChatTurn;
-  labels: Map<string, string>;
-  /** What each concept is a concept OF, so a render reads as
-   *  "Remote controller · 61%" rather than "Concept 2 · 61%". */
-  productOf: Map<string, string>;
-}) {
-  if (turn.role === "user") {
-    return (
-      <div className="flex flex-col gap-[4px]">
-        <Who>You</Who>
-        <p className="whitespace-pre-wrap text-md leading-relaxed text-text-primary">
-          {turn.text}
-        </p>
-      </div>
-    );
-  }
-
-  if (turn.role === "setup") {
-    const names = turn.companions.map((c) => c.name);
-    return (
-      <div className="flex flex-col gap-[8px]">
-        <Who>IDEEZA</Who>
-        {turn.status === "loading" && (
-          <>
-            <Status tone="working">Reading your idea</Status>
-            <Status tone="waiting">Working out what it needs</Status>
-          </>
-        )}
-        {turn.status === "asking" && (
-          <>
-            <Status tone="done">Read your idea</Status>
-            {names.length > 0 ? (
-              <Status tone="done">
-                This needs {names.length + 1} products
-                <Sub>{[turn.productName ?? "your product", ...names].join(" · ")}</Sub>
-              </Status>
-            ) : (
-              <Status tone="done">One product, nothing else needed</Status>
-            )}
-            <Status tone="working">Waiting on your answers →</Status>
-          </>
-        )}
-        {turn.status === "answered" && turn.answer && (
-          <>
-            <Status tone="done">Read your idea</Status>
-            <Status tone="done">
-              {turn.answer.picked.length + 1} product
-              {turn.answer.picked.length ? "s" : ""} in this project
-            </Status>
-            {turn.answer.projectName && (
-              <Status tone="done">
-                Project
-                <Sub>{turn.answer.projectName}</Sub>
-              </Status>
-            )}
-          </>
-        )}
-      </div>
-    );
-  }
-
-  const what = productOf.get(turn.id) ?? `Concept ${labels.get(turn.id) ?? "1"}`;
-  if (turn.status === "pending") {
-    return (
-      <Status tone="working" indent>
-        {what}
-        <Sub>
-          Drawing
-          {/* How long it really has been running — hidden from the live
-              region, which would otherwise read every second of it. */}
-          <Elapsed since={turn.ts} />
-        </Sub>
-      </Status>
-    );
-  }
-  if (turn.status === "failed") {
-    return (
-      <Status tone="bad" indent>
-        {what}
-        <Sub>Didn’t come through — nothing was charged</Sub>
-      </Status>
-    );
-  }
-  return (
-    <Status tone="done" indent>
-      {what}
-      <Sub>Concept ready</Sub>
-    </Status>
-  );
-}
-
-
-/** The second line of a status: the detail under the thing it is about. */
-function Sub({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="mt-[1px] block text-sm text-text-tertiary">{children}</span>
-  );
-}
-
-// Who said it — a plain label, not another caps eyebrow in a column of them.
-function Who({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-sm font-semibold text-text-tertiary">{children}</span>
-  );
-}
-
-/** One thing that happened, or is happening. The glyph carries the state so
- *  the words do not have to repeat it. */
-function Status({
-  tone,
-  children,
-  indent = false,
-}: {
-  tone: "working" | "waiting" | "done" | "bad";
-  children: React.ReactNode;
-  /** A render belongs under the project it is for, so it sits in from the
-   *  decisions above it rather than reading as another decision. */
-  indent?: boolean;
-}) {
-  return (
-    <p
-      className={[
-        "flex items-start gap-[8px] text-sm leading-relaxed",
-        indent ? "pl-[14px]" : "",
-        tone === "bad" ? "text-text-error" : "text-text-secondary",
-      ].join(" ")}
-    >
-      <span
-        aria-hidden
-        className={[
-          "mt-[2px] shrink-0",
-          tone === "working" ? "animate-spin text-text-tertiary" : "",
-          tone === "waiting" ? "text-text-disabled" : "",
-          tone === "done" ? "text-text-success" : "",
-          tone === "bad" ? "text-[var(--color-icon-error)]" : "",
-        ].join(" ")}
-      >
-        <Icon
-          icon={
-            tone === "working" || tone === "waiting"
-              ? Loading03Icon
-              : tone === "done"
-                ? CheckmarkCircle02Icon
-                : Alert02Icon
-          }
-          size={14}
-        />
-      </span>
-      <span className="min-w-0">{children}</span>
-    </p>
   );
 }

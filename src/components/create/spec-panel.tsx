@@ -22,7 +22,7 @@ import { TextInput } from "@/components/ideeza/text-input";
 import type { ConceptPart } from "@/lib/create/concept";
 import { BATTERIES, batteryOf } from "@/lib/spec/batteries";
 import { blocksBuild } from "@/lib/spec/derive";
-import { FAB_PROFILE, boardLabel, ioOf, powerLabel, radioOf } from "@/lib/spec/format";
+import { FAB_PROFILE, boardLabel, ioOf, radioOf, specFacts } from "@/lib/spec/format";
 import { MM_MAX, MM_MIN, asMm3 } from "@/lib/spec/hints";
 import {
   MATERIALS,
@@ -196,20 +196,8 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
 }
 
 function SpecFacts({ spec, parts }: { spec: ResolvedSpec; parts: ConceptPart[] }) {
-  const radio = radioOf(parts);
-  const sizeTone = spec.fits ? "plain" : spec.draftAtSize ? "warn" : "error";
-  const facts: { key: string; text: string; tone: "plain" | "warn" | "error" }[] = [
-    {
-      key: "size",
-      text: spec.fits
-        ? mm3(spec.size)
-        : `${mm3(spec.size)} · ${spec.draftAtSize ? "Draft" : "doesn't fit"}`,
-      tone: sizeTone,
-    },
-    { key: "power", text: powerLabel(spec), tone: "plain" },
-    ...(radio ? [{ key: "radio", text: radio, tone: "plain" as const }] : []),
-    { key: "board", text: spec.board ? "2-layer" : "No board", tone: "plain" },
-  ];
+  // The same facts the rail's rows show, from the one place that words them.
+  const facts = specFacts(spec, parts);
   // A line of plain facts, not bordered chips: chips read as things to
   // press, and the one thing here to press is Spec. Every fact carries its
   // separator in front, and the list is pulled left under a clipping box, so
