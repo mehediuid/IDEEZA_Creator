@@ -92,11 +92,18 @@ const PASSIVE: [RegExp, string][] = [
 ];
 
 // What holds, seals or houses a product is hardware (H), not a connector —
-// the screws, feet and magnets it sits on, a gasket, standoffs, its case.
+// the screws, feet and magnets it sits on, a gasket, standoffs, its case,
+// and a printed body of any kind: a plate, a stand, a tray. A card or a
+// fuse holder is a socket, and stays J.
 const HARDWARE =
-  /screw|bolt|\bnuts?\b|washer|standoff|spacer|feet|\bfoot\b|magnet|gasket|o-?ring|enclosure|housing|\bcase\b|\blid\b|bracket|sleeve|strap|hinge|\bclips?\b/;
+  /screw|bolt|\bnuts?\b|washer|standoff|spacer|feet|\bfoot\b|magnet|gasket|o-?ring|enclosure|housing|\bcase\b|\blid\b|bracket|sleeve|strap|hinge|\bclips?\b|\bbody\b|\bprinted\b|\bplate\b|\bstand\b|\bbase\b|\btray\b|(?<!card\s|fuse\s)\bholder\b/;
 const CONNECTOR = /connector|jack|socket|port|plug|header|terminal/;
 const SWITCH = /\bswitch(?:es)?\b|button/;
+
+// A wall adapter ships with the product and plugs into it: a power supply
+// (PS), not an IC on its board. A mains module soldered to the board (an
+// HLK-PM01) is one, and stays U.
+const ADAPTER = /\b(?:wall|power|dc|ac|mains|plug)[\s-]+adapter\b|\d\s*v\b[\w\s.]*\badapter\b/;
 
 const byName = (table: [RegExp, string][], name: string) =>
   table.find(([re]) => re.test(name))?.[1];
@@ -104,6 +111,9 @@ const byName = (table: [RegExp, string][], name: string) =>
 function refPrefixOf(part: ConceptPart): string {
   if (isBatteryPart(part)) return "BT";
   const n = part.name.toLowerCase();
+  if (ADAPTER.test(n) && (part.category === "Power Management" || part.category === "Connector & mech")) {
+    return "PS";
+  }
   switch (part.category) {
     // An MCU and a radio module are ICs or modules whatever their names
     // say, and a sensor is one too — a "piezo" sensor is no buzzer — unless
@@ -163,9 +173,10 @@ export function bomFor(job: ArtifactSource): Bom {
     };
   });
   const passives = rows.filter((r) => r.category === "Passive").length;
-  const connectors = rows.filter(
-    (r) => r.category === "Connector & mech",
-  ).length;
+  // Connectors and the mech hardware, by what each part is — its letter, J
+  // or H — not the category it was filed under: a USB port filed under power
+  // is a connector, and a switch filed with the connectors is not one.
+  const connectors = rows.filter((r) => /^[JH]\d/.test(r.ref)).length;
   return {
     rows,
     unique: rows.length,
@@ -302,14 +313,34 @@ export type Nets = {
 
 const GND_NODE: NetNode = { id: "GND", label: "Ground" };
 
+/** Wired to nothing: the hardware that holds or seals the product (H) —
+ *  its feet, screws, gasket, printed body — and the adapter it ships with
+ *  (PS), which plugs into its jack. */
+const offBoard = (ref: string) => /^(?:H|PS)\d/.test(ref);
+
 export function netsFor(job: ArtifactSource): Nets {
   const bom = bomFor(job);
-  const nodes: NetNode[] = bom.rows.map((r) => ({ id: r.ref, label: r.name }));
-  const at = (c: ConceptPartCategory) =>
-    bom.rows.filter((r) => r.category === c);
+  const placed = bom.rows
+    .map((row, i) => ({ row, part: job.parts[i] }))
+    .filter(({ row }) => !offBoard(row.ref));
+  const rows = placed.map(({ row }) => row);
+  const nodes: NetNode[] = rows.map((r) => ({ id: r.ref, label: r.name }));
+  const at = (c: ConceptPartCategory) => rows.filter((r) => r.category === c);
   const mcu = at("Microcontroller")[0];
-  const regulator = at("Power Management")[0];
-  const connector = at("Connector & mech")[0];
+  // A port filed under power is where the power comes in, not what drops it.
+  const regulator = at("Power Management").find((r) => !/^J\d/.test(r.ref));
+  // The power comes in by the product's charge port — a USB socket, a
+  // barrel jack — else by its first connector, else from its pack. The
+  // first "Connector & mech" row used to be taken, and that was as often a
+  // rubber foot or a printed plate, drawn feeding VBUS.
+  const connector =
+    placed.find(({ part }) => isChargePort(part))?.row ?? rows.find((r) => /^J\d/.test(r.ref));
+  const pack = rows.find((r) => /^BT\d/.test(r.ref));
+  const inlet = connector
+    ? { ref: connector.ref, label: "VBUS 5V" }
+    : pack
+      ? { ref: pack.ref, label: "VBAT" }
+      : null;
   const sensors = at("Sensor");
   const actuators = [...at("Actuator"), ...at("Display & I/O")];
 
@@ -319,15 +350,16 @@ export function netsFor(job: ArtifactSource): Nets {
   const signal = (from: string, to: string, label: string) =>
     wires.push({ from, to, label, cls: "signal" });
 
-  // Rail: USB-C brings VBUS in, the regulator drops it to 3V3, the MCU
-  // and sensors run off 3V3, LED strips and the like off VBUS.
-  if (connector && regulator) power(connector.ref, regulator.ref, "VBUS 5V");
+  // Rail: USB-C brings VBUS in (or the pack VBAT), the regulator drops it
+  // to 3V3, the MCU and sensors run off 3V3, LED strips and the like off
+  // the rail that comes in.
+  if (inlet && regulator && inlet.ref !== regulator.ref) power(inlet.ref, regulator.ref, inlet.label);
   if (regulator && mcu) power(regulator.ref, mcu.ref, "3V3");
   for (const s of sensors) {
     if (regulator) power(regulator.ref, s.ref, "3V3");
   }
   for (const a of actuators) {
-    if (connector) power(connector.ref, a.ref, "VBUS 5V");
+    if (inlet) power(inlet.ref, a.ref, inlet.label);
   }
 
   // Ground is the one net every part sits on.

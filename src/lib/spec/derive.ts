@@ -481,10 +481,23 @@ export function effectiveParts(
   return portFor(applyEdits(conceptParts, choices), battery, choices);
 }
 
+// A supply the parts already carry — an adapter of their own, a mains
+// module (an HLK-PM01) or an AC-DC brick — so a wall-powered product needs
+// no adapter beside it. A barrel jack is only where one plugs in, and a
+// mains relay or an AC current sensor is no supply: only a power part or a
+// connector is read.
+const OWN_SUPPLY =
+  /\b(?:wall|power|dc|ac|mains|plug)[\s-]+adapter\b|\d\s*v\b[\w\s.]*\badapter\b|\bmains\b|hlk-pm\d+|ac[\s-]?\/?[\s-]?dc|\d+\s*v\s*\/\s*\d+\s*v\s*supply/i;
+const carriesSupply = (p: ConceptPart) =>
+  (p.category === "Power Management" || p.category === "Connector & mech") && OWN_SUPPLY.test(p.name);
+
 /** The parts a build is made from: the concept's with the maker's edits
  *  applied, and its pack swapped for the spec's — so the BOM, the wiring and
  *  the firmware carry the parts and the battery the maker chose, and a
- *  USB-powered product carries none, but a USB port to take the power. */
+ *  USB-powered product carries none, but a USB port to take the power. A
+ *  wall-powered one ships with an adapter, unless its parts already carry
+ *  the supply: its own adapter is not listed twice, and a mains module
+ *  needs none. */
 export function partsForBuild(
   conceptParts: ConceptPart[],
   battery: BatteryKey,
@@ -492,6 +505,13 @@ export function partsForBuild(
 ): ConceptPart[] {
   const rest = effectiveParts(conceptParts, battery, edits).filter((p) => !isBatteryPart(p));
   if (battery === "none") return rest;
+  if (battery === "adapter") {
+    if (rest.some(carriesSupply)) return rest;
+    return [
+      ...rest,
+      { name: batteryOf(battery).label, role: "Ships with the product · powers it from the wall", category: "Power Management" },
+    ];
+  }
   return [
     ...rest,
     { name: batteryOf(battery).label, role: "Powers the product", category: "Power Management" },
