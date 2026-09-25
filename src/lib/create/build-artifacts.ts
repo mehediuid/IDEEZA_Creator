@@ -6,10 +6,22 @@
 // describe one build instead of three plausible-looking inventions.
 
 import type { ConceptPart, ConceptPartCategory } from "./concept";
+import { isBatteryPart } from "../spec/batteries";
 import { qtyOf } from "../spec/bodies";
-import { radioKeyOf } from "../spec/catalog";
-import { deriveSpec } from "../spec/derive";
-import type { ResolvedSpec } from "../spec/types";
+import {
+  isChargePort,
+  isDriveMotor,
+  isMcu,
+  isMotorDriver,
+  isMounting,
+  isRadioPart,
+  isServo,
+  radioKeyOf,
+} from "../spec/catalog";
+import { deriveSpec, partsForBuild } from "../spec/derive";
+import { readableName } from "../spec/facts";
+import { radioOf } from "../spec/format";
+import type { AiHints, ResolvedSpec } from "../spec/types";
 
 // The fields these builders read. BuildJob satisfies it; a fixture
 // doesn't have to carry the whole job to be summarised.
@@ -33,9 +45,14 @@ export function bookedSpec(job: ArtifactSource): ResolvedSpec | null {
   return job.spec ?? null;
 }
 
-// Reference designator per category, the way a schematic names them:
-// ICs (MCU, regulators, radios) are U, sensors S, actuators and
-// indicators D, displays DSP, connectors and mechanics J, passives R.
+// Reference designators, the way a schematic names them (IEEE 315): the
+// letters say what a part IS, so they're read off the part first and its
+// category after. Filed by category alone, a battery was U2 beside the MCU's
+// U1, and a motor, a buzzer and a relay were all D — a diode's letter.
+//
+// The category's letter, for a part nothing below recognises: ICs (MCU,
+// regulators, radios) are U, sensors S, displays and controls DSP,
+// connectors J, passives R, and an actuator keeps the D it always had.
 const REF_PREFIX: Record<ConceptPartCategory, string> = {
   Microcontroller: "U",
   "Power Management": "U",
@@ -46,6 +63,68 @@ const REF_PREFIX: Record<ConceptPartCategory, string> = {
   Passive: "R",
   "Connector & mech": "J",
 };
+
+// What a part's own name says it is, tried in order: a driver or controller
+// before the motor or LED it drives, a relay before the switch it is, and a
+// "switching regulator" is no switch.
+const BY_NAME: [RegExp, string][] = [
+  [/crystal|xtal|resonator|oscillator/, "Y"],
+  [/buzzer|piezo/, "BZ"],
+  [/speaker/, "LS"],
+  [/relay/, "K"],
+  [/fuse/, "F"],
+  [/mosfet|transistor|\bbjt\b/, "Q"],
+  [/driver|controller|\besc\b|h-?bridge|pca9685/, "U"],
+  [/diode|schottky|zener|\btvs\b/, "D"],
+  [/\bleds?\b|ws2812|sk6812|neopixel/, "D"],
+  [/\bswitch(?:es)?\b|button|\btact\b/, "SW"],
+  [/potentiometer|trimmer|\bpot\b/, "RV"],
+  [/motor|stepper|servo|brushless|bldc|pump|\bfan\b/, "M"],
+];
+
+// A passive by what it is, before the names above: an "LED resistor" is a
+// resistor.
+const PASSIVE: [RegExp, string][] = [
+  [/resistor/, "R"],
+  [/capacitor|\bcaps?\b|\d\s*[nuµp]f\b/, "C"],
+  [/ferrite|\bbead/, "FB"],
+  [/inductor|choke|\d\s*[uµm]h\b/, "L"],
+];
+
+// What holds, seals or houses a product is hardware (H), not a connector —
+// the screws, feet and magnets it sits on, a gasket, standoffs, its case.
+const HARDWARE =
+  /screw|bolt|\bnuts?\b|washer|standoff|spacer|feet|\bfoot\b|magnet|gasket|o-?ring|enclosure|housing|\bcase\b|\blid\b|bracket|sleeve|strap|hinge|\bclips?\b/;
+const CONNECTOR = /connector|jack|socket|port|plug|header|terminal/;
+const SWITCH = /\bswitch(?:es)?\b|button/;
+
+const byName = (table: [RegExp, string][], name: string) =>
+  table.find(([re]) => re.test(name))?.[1];
+
+function refPrefixOf(part: ConceptPart): string {
+  if (isBatteryPart(part)) return "BT";
+  const n = part.name.toLowerCase();
+  switch (part.category) {
+    // An MCU and a radio module are ICs or modules whatever their names
+    // say, and a sensor is one too — a "piezo" sensor is no buzzer — unless
+    // it is a button or a switch filed as one.
+    case "Microcontroller":
+    case "Connectivity":
+      return REF_PREFIX[part.category];
+    case "Sensor":
+      return SWITCH.test(n) ? "SW" : REF_PREFIX.Sensor;
+    case "Connector & mech":
+      if (SWITCH.test(n)) return "SW";
+      return HARDWARE.test(n) && !CONNECTOR.test(n) ? "H" : "J";
+    case "Passive":
+      return byName(PASSIVE, n) ?? byName(BY_NAME, n) ?? "R";
+    case "Power Management":
+      if (isChargePort(part)) return "J";
+      return byName(BY_NAME, n) ?? "U";
+    default:
+      return byName(BY_NAME, n) ?? REF_PREFIX[part.category] ?? "U";
+  }
+}
 
 export type BomRow = {
   category: ConceptPartCategory;
@@ -74,7 +153,7 @@ function qtyFor(part: ConceptPart, index: number): number {
 export function bomFor(job: ArtifactSource): Bom {
   const seen: Record<string, number> = {};
   const rows: BomRow[] = job.parts.map((part, i) => {
-    const prefix = REF_PREFIX[part.category] ?? "U";
+    const prefix = refPrefixOf(part);
     seen[prefix] = (seen[prefix] ?? 0) + 1;
     return {
       category: part.category,
@@ -95,6 +174,115 @@ export function bomFor(job: ArtifactSource): Bom {
     passives,
     connectors,
   };
+}
+
+// ───────────────────────── what the maker changed ─────────────────────────
+
+/** The parts a booked build carries that its concept didn't, by name. */
+export type PartChanges = {
+  removed: string[];
+  added: string[];
+  swapped: { from: string; to: string }[];
+};
+
+/** "TT gear motor (x2)" → "2 × TT gear motor"; a bare designator says what
+ *  kind of part it is (readableName). */
+function plainName(part: ConceptPart): string {
+  const name = readableName(part);
+  const n = qtyOf(part.name);
+  if (n === 1) return name;
+  const bare = name
+    .replace(/\s*\((?:[x×]\s*\d+|\d+\s*[x×])\)\s*$/i, "")
+    .replace(/^\s*\d+\s*[x×]\s+|\s*[x×]\s*\d+\s*$/i, "")
+    .trim();
+  return `${n} × ${bare}`;
+}
+
+// A removed part and an added one in the same place are one part swapped:
+// the chip, the pack, the port, the motors, their driver, the servos, what
+// holds the product where it sits.
+function slotOf(p: ConceptPart): string | null {
+  if (isMcu(p)) return "mcu";
+  if (isBatteryPart(p)) return "pack";
+  if (isChargePort(p)) return "port";
+  if (isMotorDriver(p)) return "driver";
+  if (isDriveMotor(p)) return "motor";
+  if (isServo(p)) return "servo";
+  if (isMounting(p)) return "mounting";
+  return null;
+}
+
+/** What a booked build changed from its concept's parts — what the maker
+ *  took out, put in and swapped on the sheet, read off the BOM that was
+ *  built. Null for a build older than spec booking (nothing to compare), and
+ *  for one with no part edit: the parts it carries differ from the
+ *  concept's only by the pack and port the rules picked, which are not the
+ *  maker's changes. The pack counts when the maker picked it.
+ *
+ *  `concept` is the concept the build was drawn from — its own parts, before
+ *  any edit, and its hints for the pack it would have had. */
+export function partChangesOf(
+  job: ArtifactSource,
+  concept: { parts: ConceptPart[]; hints?: AiHints },
+): PartChanges | null {
+  const spec = bookedSpec(job);
+  if (!spec) return null;
+  const pickedPack = spec.batterySource === "you";
+  if (!Object.keys(spec.choices ?? {}).length && !pickedPack) return null;
+
+  // The concept as it would have been built with no edit — the same pack
+  // unless the maker picked this one — so the difference is theirs.
+  const pack = pickedPack ? deriveSpec(concept.parts, concept.hints).battery : spec.battery;
+  const before = partsForBuild(concept.parts, pack);
+  const after = job.parts;
+
+  // A new radio is said as the radio, in the sheet's word for it, not as
+  // the module that came and went with it — and an ESP32 set to ESP-NOW
+  // changed no part's name at all.
+  const radioFrom = radioOf(before);
+  const radioTo = radioOf(after);
+  const radioMoved = radioFrom !== radioTo;
+  const listed = (p: ConceptPart) => !(radioMoved && isRadioPart(p));
+
+  const key = (p: ConceptPart) => p.name.trim().toLowerCase();
+  const left = before.filter(listed);
+  const added: ConceptPart[] = [];
+  for (const part of after.filter(listed)) {
+    const i = left.findIndex((p) => key(p) === key(part));
+    if (i >= 0) left.splice(i, 1);
+    else added.push(part);
+  }
+
+  const changes: PartChanges = { removed: [], added: [], swapped: [] };
+  for (const part of left) {
+    const slot = slotOf(part);
+    const j = slot ? added.findIndex((p) => slotOf(p) === slot) : -1;
+    if (j >= 0) {
+      changes.swapped.push({ from: plainName(part), to: plainName(added[j]) });
+      added.splice(j, 1);
+    } else {
+      changes.removed.push(plainName(part));
+    }
+  }
+  changes.added = added.map(plainName);
+  if (radioMoved) {
+    if (radioFrom && radioTo) changes.swapped.push({ from: radioFrom, to: radioTo });
+    else if (radioFrom) changes.removed.push(radioFrom);
+    else if (radioTo) changes.added.push(radioTo);
+  }
+  const any = changes.removed.length + changes.added.length + changes.swapped.length > 0;
+  return any ? changes : null;
+}
+
+/** "removed Piezo buzzer · added Status LED · swapped ESP32 → ESP32-C3". */
+export function partChangesText(c: PartChanges): string {
+  return [
+    c.removed.length ? `removed ${c.removed.join(", ")}` : "",
+    c.added.length ? `added ${c.added.join(", ")}` : "",
+    c.swapped.length ? `swapped ${c.swapped.map((s) => `${s.from} → ${s.to}`).join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export type NetNode = { id: string; label: string };
