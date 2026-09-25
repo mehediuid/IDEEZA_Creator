@@ -15,7 +15,6 @@ import {
   bookedSpec,
   firmwareFor,
   netsFor,
-  pcbMetaFor,
   specOfSource,
   type ArtifactSource,
   type NetWire,
@@ -94,13 +93,15 @@ export function coversFor(
       ];
     case "code": {
       const mcu = mcuOf(product.parts);
+      // A battery-only or connector-only product (a charger, a spare pack)
+      // has no Microcontroller part at all, so there is no sketch, no
+      // library list and no wiring map either — nothing here runs firmware,
+      // full stop, rather than saying so and then listing three files that
+      // don't exist (Minor 11).
+      if (!mcu) return ["No microcontroller — nothing runs firmware"];
       const radio = radioOf(product.parts);
       return [
-        // A battery-only or connector-only product (a charger, a spare pack)
-        // has no Microcontroller part at all, so nothing here runs firmware —
-        // said plainly rather than asserting one exists, the same way the
-        // next line already handles no radio being named (qa-review #1).
-        mcu ? `Runs on ${mcu}` : "No microcontroller — nothing runs firmware",
+        `Runs on ${mcu}`,
         radio ? `Talks over ${radio}` : "No radio named in the parts",
         "Arduino-style sketch, fully commented",
         "Library list pinned to versions",
@@ -125,7 +126,15 @@ export function coversFor(
         ...(knowsBattery
           ? [spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`]
           : []),
-        `Draws about ${currentLabel(spec.drawMa)} · ${powerLabel(spec)}`,
+        // powerLabel reads spec.battery for its runtime estimate — a real
+        // number only when the parts (or the booked spec) actually name a
+        // pack. A legacy build with no named battery gets one from the rule
+        // just to keep the arithmetic running, and printing its runtime here
+        // would claim a battery life for a battery nobody confirmed (Minor
+        // 10), the same thing knowsBattery already keeps off the line above.
+        knowsBattery
+          ? `Draws about ${currentLabel(spec.drawMa)} · ${powerLabel(spec)}`
+          : `Draws about ${currentLabel(spec.drawMa)}`,
         "Every part — category, name, reference and quantity",
         "Grouped by function, quantities per board",
       ];
@@ -251,7 +260,6 @@ const PCB_GAP_Y = 34;
 
 export function PcbPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
-  const meta = pcbMetaFor();
   const nets = netsFor(job);
 
   const n = Math.max(bom.rows.length, 1);
@@ -316,7 +324,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
         role="img"
-        aria-label={`Board layout: ${bom.rows.length} parts on a ${meta.layers}-layer board`}
+        aria-label={`Board layout: ${bom.rows.length} parts on a 2-layer board`}
         style={{ width: "100%", height: "auto" }}
       >
         <rect

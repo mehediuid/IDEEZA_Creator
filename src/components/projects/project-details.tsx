@@ -34,7 +34,7 @@ import {
   type BuildItem,
   type BuildJob,
 } from "@/lib/create/history";
-import { bomFor, specOfSource } from "@/lib/create/build-artifacts";
+import { bomFor, bookedSpec, specOfSource } from "@/lib/create/build-artifacts";
 import { specLine } from "@/lib/spec/format";
 import { NetworkSection } from "@/components/network/network-section";
 import {
@@ -135,6 +135,11 @@ export function ProjectDetails({ id }: { id: string }) {
               {productsOf(build).map((p) => (
                 <li key={p.id} className="text-sm text-text-secondary">
                   {specLine(p.name, specOfSource(p))}
+                  {/* A build that predates spec booking has this number
+                      worked out from its parts just now, not a decision
+                      the maker made at booking time (Minor 10) — said here
+                      the same way the build's own asides already say it. */}
+                  {!bookedSpec(p) ? " · worked out from the parts" : ""}
                 </li>
               ))}
             </ul>

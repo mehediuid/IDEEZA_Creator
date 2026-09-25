@@ -254,17 +254,13 @@ export function firmwareFor(job: ArtifactSource): Firmware {
   };
 }
 
-export type PcbMeta = {
-  layers: 2;
-};
-
 // widthMm/heightMm/partCount used to live here too — the board's size worked
 // out from the spec's own footprints (lib/spec/derive.ts). PcbPreview's
 // caption switched to boardLabel(specOfSource(job)) and stopped reading them,
-// so they were dropped rather than kept write-only (code audit #3).
-export function pcbMetaFor(): PcbMeta {
-  return { layers: 2 };
-}
+// so they were dropped rather than kept write-only (code audit #3). Every
+// board is drawn against the one fab profile (FAB_PROFILE, lib/spec/format.ts),
+// so the layer count PcbPreview's aria-label reads is the literal 2, not a
+// value worked out per build.
 
 // ─────────────────────────── sample 3D model ───────────────────────────
 //

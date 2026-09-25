@@ -122,7 +122,11 @@ export function ConfidenceBadge({
         type="button"
         onClick={() => setOpen(!isOpen)}
         aria-expanded={isOpen}
-        aria-controls={open === undefined ? issuesPanelId(confidence.productId) : undefined}
+        // Set whenever the panel is actually open, controlled or not (Minor
+        // 19) — in controlled mode the caller mounts `ConfidenceIssuesPanel`
+        // with this same id only while `open` is true, so pointing at it
+        // sooner would name an element that isn't in the DOM yet.
+        aria-controls={isOpen ? issuesPanelId(confidence.productId) : undefined}
         className="inline-flex w-fit flex-wrap items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         {badge}

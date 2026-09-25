@@ -620,7 +620,10 @@ function DeliverablePanel({
           A build in demo mode has no mesh of its own either — every job
           lands on the same bundled sample.glb — so the caption says that
           plainly instead of claiming a shape it never drew (e2e #3). */}
-      <p className="pointer-events-none absolute bottom-[10px] left-[12px] rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary">
+      <p
+        className="pointer-events-none absolute bottom-[10px] left-[12px] max-w-[calc(100%-24px)] truncate rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary"
+        title={modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
+      >
         {modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
       </p>
     </div>
@@ -631,21 +634,22 @@ function DeliverablePanel({
 // booked/worked-out-from-the-parts and companion wording (that part of the
 // number is still true), but its shape note replaces "shape from concept"
 // with the plain fact that the mesh is the demo placeholder, not this
-// concept's (e2e #3).
+// concept's (e2e #3). Kept short — this sits in a fixed pill over the model,
+// and every demo build shows it, so it must not wrap at 400 px (Minor 12).
 function modelCaption(
   product: ArtifactSource,
   isCompanion: boolean,
   isSample: boolean,
 ): string {
   const size = mm3(specOfSource(product).size);
-  const sizeNote = bookedSpec(product) ? "size from spec" : "size worked out from the parts";
+  const legacy = !bookedSpec(product);
   if (isSample) {
-    const shapeNote =
-      "Sample model — the 3D service is in demo mode, so this is not your product's shape";
+    const sizeNote = legacy ? "worked out from the parts" : "from spec";
     return isCompanion
-      ? `${shapeNote} · ${sizeNote}: ${size} · this preview shows the primary's model`
-      : `${shapeNote} · ${sizeNote}: ${size}`;
+      ? `Sample model (demo) · primary's shape · ${size} ${sizeNote}`
+      : `Sample model (demo) · ${size} ${sizeNote}`;
   }
+  const sizeNote = legacy ? "size worked out from the parts" : "size from spec";
   return isCompanion
     ? `${size} · ${sizeNote} · this preview shows the primary's model`
     : `${size} · shape from concept, ${sizeNote}`;
