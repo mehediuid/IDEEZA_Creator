@@ -1639,11 +1639,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       peers,
       onChange: answer && !locked ? (edits) => handleSpecChange(focusedProduct, edits) : undefined,
       locked,
+      // Booked but not made yet: the note says it is being built.
+      building: locked && !!activeBuild && !["ready", "partial"].includes(statusOf(activeBuild)),
       // The sheet follows the selection to the product it works with.
       onOpenProduct: (productId) => select(productId),
       fallback: !!concept?.fallback,
     };
-  }, [specSheet, focusedProduct, railState, labels, handleSpecChange, select]);
+  }, [specSheet, focusedProduct, railState, labels, handleSpecChange, select, activeBuild]);
   // select's other half (review M11): an open sheet whose product has nothing
   // to show — drawing again, failed, just added, being read — closes here,
   // whichever path moved the selection or the drawing, and stays closed.

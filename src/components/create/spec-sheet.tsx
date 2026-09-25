@@ -110,6 +110,9 @@ export type SheetProduct = {
    *  the sheet shows what was built, with no control, tag or Reset. It is
    *  changed in the editor the build review opens. */
   locked: boolean;
+  /** Locked to a build still queued or running — made from this spec, not
+   *  made yet. */
+  building?: boolean;
   /** Selects another product — the sheet follows to it. */
   onOpenProduct?: (productId: string) => void;
   /** The parts are the generic stand-in; the header says so. */
@@ -505,8 +508,12 @@ function SheetPanel({
               <Icon icon={LockIcon} size={14} />
             </span>
             <div className="flex min-w-0 flex-col items-start gap-[4px]">
-              <p>This is what was built. To change it, open the build in the editor.</p>
-              {onShowEditor && (
+              <p>
+                {product.building
+                  ? "This is what is being built. Once it is ready, change it in the editor."
+                  : "This is what was built. To change it, open the build in the editor."}
+              </p>
+              {onShowEditor && !product.building && (
                 <button
                   type="button"
                   // Named by what it says first (WCAG 2.5.3), then where it goes.
