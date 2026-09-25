@@ -210,13 +210,38 @@ const ON_DIE: [RegExp, RadioKey[]][] = [
   [/pico ?w\b/, ["wifi", "ble"]],
 ];
 
+// The radios a chip's own words state — "Arduino Nano 33 BLE", "Uno R4
+// WiFi", "STM32WB55 BLE" — for a chip the table above doesn't list. The
+// words the card's reading of an MCU (confidence.ts's PROTOCOLS) always
+// found, so a chip that names its radio is never read as having none.
+const STATED: [RegExp, RadioKey][] = [
+  [/esp-?now/, "esp-now"],
+  [/nrf24/, "nrf24"],
+  [/lora|sx12\d\d|rfm9\d/, "lora"],
+  [/zigbee|cc25\d\d/, "zigbee"],
+  [/\bble\b|bluetooth/, "ble"],
+  [/wi-?fi/, "wifi"],
+];
+
+const statedRadios = (text: string): RadioKey[] =>
+  STATED.filter(([re]) => re.test(text)).map(([, k]) => k);
+
+/** The radios on an MCU's die: the table's, or the ones a chip it doesn't
+ *  list states in its name — a radio it states is on the die. Read off the
+ *  name alone: the role is the sheet's to write (mcuRole), and writing it
+ *  must never take a radio off the chip. */
 export function builtInRadios(mcu: ConceptPart | undefined): RadioKey[] {
-  return mcu ? (kindOf(ON_DIE, lower(mcu)) ?? []) : [];
+  if (!mcu) return [];
+  const n = lower(mcu);
+  return kindOf(ON_DIE, n) ?? statedRadios(n);
 }
 
 // A radio module's protocol by its name. ESP-NOW and nRF24 go first: an
 // "ESP-NOW" or "nRF24 2.4G" part would otherwise read as Wi-Fi or cellular.
-const MODULES: [RegExp, RadioKey][] = [
+// An HC-05/06 is Bluetooth Classic, which no key here is — null, so the card
+// falls back to the protocol table's "Bluetooth" and never says BLE.
+const MODULES: [RegExp, RadioKey | null][] = [
+  [/hc-?0[56]/, null],
   [/esp-?now/, "esp-now"],
   [/nrf24/, "nrf24"],
   [/lora|sx12\d\d|rfm9\d/, "lora"],
@@ -255,15 +280,28 @@ const SAID: [RegExp, RadioKey][] = [
   [/wi-?fi/, "wifi"],
 ];
 
+/** The radio mcuRole wrote into the role — the maker's pick. */
+function pickedRadio(role: string): RadioKey | undefined {
+  if (role.endsWith(" · radio off")) return "none";
+  return RADIO_KEYS.find((k) => role.endsWith(` · ${RADIOS[k].label} built in`));
+}
+
 /** The radio the product uses off its MCU's die — null when it has a
- *  module of its own, or an MCU with no radio. */
+ *  module of its own, or an MCU with no radio. The maker's pick is read
+ *  first: a chip whose name lists two ("ESP32 (Wi-Fi + BLE)") would read as
+ *  the first of them otherwise. A radio a chip's role states counts as on
+ *  its die too, when its name states none. */
 export function builtInRadioOf(parts: ConceptPart[]): RadioKey | null {
   if (parts.some(isRadioPart)) return null;
   const mcu = parts.find(isMcu);
+  if (!mcu) return null;
   const onDie = builtInRadios(mcu);
-  if (!mcu || !onDie.length) return null;
+  const has = onDie.length ? onDie : statedRadios(mcu.role.toLowerCase());
+  const picked = pickedRadio(mcu.role);
+  if (picked && (picked === "none" || has.includes(picked))) return picked;
+  if (!has.length) return null;
   const said = kindOf(SAID, `${mcu.name} ${mcu.role}`.toLowerCase());
-  return said && (said === "none" || onDie.includes(said)) ? said : onDie[0];
+  return said && (said === "none" || has.includes(said)) ? said : has[0];
 }
 
 /** The sheet's Connects: a radio module first — a dedicated radio outranks

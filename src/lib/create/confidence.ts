@@ -96,6 +96,11 @@ const CONNECTORS: Record<string, string> = {
   pogo: "Pogo pins",
 };
 
+// A key found inside a word is another word: "compatible", "controllable"
+// and "enable" all end in "ble" — and an HC-05 whose name or role says so
+// read as Bluetooth LE. These keys match only as a word of their own.
+const WHOLE_WORD: Record<string, RegExp> = { ble: /\bble\b/ };
+
 function firstMatch(
   parts: ConceptPart[],
   table: Record<string, string>,
@@ -105,7 +110,7 @@ function firstMatch(
     if (!categories.includes(part.category)) continue;
     const hay = `${lower(part.name)} ${lower(part.role)}`;
     for (const key of Object.keys(table)) {
-      if (hay.includes(key)) return table[key];
+      if (WHOLE_WORD[key] ? WHOLE_WORD[key].test(hay) : hay.includes(key)) return table[key];
     }
   }
   return null;
