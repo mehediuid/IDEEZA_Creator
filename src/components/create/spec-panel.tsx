@@ -3,14 +3,16 @@
 // What a concept card says it will build (docs/superpowers/specs/2026-09-25-
 // product-spec-sheet-design.md): a line headed "What will be built", and
 // under it up to four facts chosen by what this product is (lib/spec/
-// facts.ts) — size first — in at most two lines. The way into the spec sheet
-// (spec-sheet.tsx) is the card's first action, Edit spec, before the two that
-// redraw the image: it is the free way to change a product, and it used to be
-// a quiet link at the end of this line while the paid ones were buttons. The
-// editor used to open inside the card, under a "Spec ⌄" that read as a
-// dropdown, and grew that one card in a row of three; the sheet sits over the
-// page instead, so no card changes height. A size the parts can't fit says
-// so here, on the size itself, before anything is paid.
+// facts.ts) — size first. Two lines on most cards, three when a companion's
+// name is long: a fact never breaks inside, and one wider than the card ends
+// in an ellipsis, so no fact takes more than a line. The way into the spec
+// sheet (spec-sheet.tsx) is the card's first action, Edit spec, before the
+// two that redraw the image: it is the free way to change a product, and it
+// used to be a quiet link at the end of this line while the paid ones were
+// buttons. The editor used to open inside the card, under a "Spec ⌄" that
+// read as a dropdown, and grew that one card in a row of three; the sheet
+// sits over the page instead, so no card changes height. A size the parts
+// can't fit says so here, on the size itself, before anything is paid.
 
 import * as React from "react";
 import { SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
@@ -63,11 +65,13 @@ export type SpecCard = {
   onReread?: () => void;
 };
 
-export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
+export function SpecPanel({ card }: { card: SpecCard }) {
   const { spec, productId } = card;
   const buttonId = specButtonId(productId);
+  // Not a named region: four cards made four landmarks named "… spec", one
+  // of them the docked sheet's own name. Its heading says what it holds.
   return (
-    <section aria-label={`${what} spec`} className="flex flex-col gap-[4px]">
+    <section className="flex flex-col gap-[4px]">
       {/* Generic parts shown as this product's would be a claim nobody
           checked — the facts under this line are the stand-in's. Flowing
           text, not a flex row: the sentence wraps on a card, and as a flex
@@ -168,14 +172,16 @@ function Facts({
   // in a card read as things to press, and four of them made every card a
   // panel. Each pair carries its separator in front and the list is pulled
   // left under a clipping box, so whichever pair starts a line — the first,
-  // or one that wrapped — shows no dangling "·". A pair never breaks inside.
+  // or one that wrapped — shows no dangling "·". A pair never breaks inside,
+  // and one wider than the card (a long companion's *Pairs with …*) takes a
+  // line of its own and ends in an ellipsis rather than being clipped.
   return (
     <div className="min-w-0 overflow-hidden">
       {/* A list, not a <dl>: "USB powered" and "No electronics" are facts
           with no term to hang them on. */}
       <ul role="list" className="-ml-[14px] flex flex-wrap text-sm leading-[20px] tabular-nums">
         {facts.map((f) => (
-          <li key={f.key} className="relative whitespace-nowrap pl-[14px]">
+          <li key={f.key} className="relative max-w-full truncate pl-[14px]">
             <span aria-hidden className="absolute left-0 w-[14px] text-center text-text-tertiary">
               ·
             </span>

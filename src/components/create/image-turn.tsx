@@ -214,7 +214,7 @@ export function ImageTurn({
         <CopyPromptButton prompt={turn.prompt} />
       </div>
 
-      {spec && <SpecPanel card={spec} what={what} />}
+      {spec && <SpecPanel card={spec} />}
 
       <div aria-hidden className="h-px w-full bg-border" />
 
