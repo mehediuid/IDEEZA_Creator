@@ -419,10 +419,18 @@ export function chargePortOf(parts: ConceptPart[]): ChargePortKey | null {
   return port ? (kindOf(PORT_KINDS, lower(port)) ?? null) : "none";
 }
 
+// A bare set of screws or bolts — "M3 screws (x4)", "M4 bolt", "4 x M3 x 10
+// screws" — is what fastens a product where it sits. A screw terminal, a lead
+// screw, a standoff kit or a screw-top lid is not: the name has to start
+// with the screws themselves, a count and an M2–M6 size aside.
+const BARE_SCREWS =
+  /^(?:\d{1,2}\s*[x×]\s+)?(?:m[2-6](?:\.5)?(?:\s*[x×]\s*\d+\s*(?:mm)?)?\s+)?(?:screws?|bolts?)\b(?![\s-]*(?:terminal|top|cap|driver))/;
+
 const MOUNTING_KINDS: [RegExp, MountingKey][] = [
   [/\bfeet\b|\bfoot\b|rubber (?:bumpers?|pads?)/, "rubber-feet"],
   [/\bmagnets?\b/, "magnets"],
   [/mounting screws?|screws?.*\bmount|wall mount/, "screws"],
+  [BARE_SCREWS, "screws"],
 ];
 
 /** What holds the product where it sits — not a magnetic connector, and not
