@@ -7,6 +7,7 @@
 
 import type { ConceptPart, ConceptPartCategory } from "./concept";
 import { qtyOf } from "../spec/bodies";
+import { radioKeyOf } from "../spec/catalog";
 import { deriveSpec } from "../spec/derive";
 import type { ResolvedSpec } from "../spec/types";
 
@@ -185,13 +186,46 @@ function symbolFor(name: string): string {
 }
 
 // The library each part family needs, so the sketch compiles against
-// the parts the BOM actually lists.
+// the parts the BOM actually lists. The radio is not a family: its library
+// comes from what the product talks over (`radioIncludes`).
 const INCLUDE_FOR: Partial<Record<ConceptPartCategory, string>> = {
   Sensor: "#include <Wire.h>",
   Actuator: "#include <Adafruit_NeoPixel.h>",
   "Display & I/O": "#include <U8g2lib.h>",
-  Connectivity: "#include <WiFi.h>",
 };
+
+// The libraries for the radio the product uses, read off the parts as built
+// (catalog.ts `radioKeyOf`): the radio the maker set on the MCU's die, or
+// the module that carries it. Any Connectivity part — or just an ESP32,
+// which has Wi-Fi on its die — used to bring in WiFi.h, so an ESP32 set to
+// LoRa or BLE compiled against the Wi-Fi stack it doesn't use. Zigbee and
+// cellular modules talk AT over a serial port, and a chip with its radio
+// off talks over nothing: no library for either.
+function radioIncludes(parts: ConceptPart[]): string[] {
+  const mcu = parts.find((p) => p.category === "Microcontroller");
+  const chip = (mcu?.name ?? "").toLowerCase();
+  // The ESP8266 core names its Wi-Fi and ESP-NOW headers after itself.
+  const esp8266 = /esp8266|esp-?12|esp-?01/.test(chip);
+  switch (radioKeyOf(parts)) {
+    case "wifi":
+      return [esp8266 ? "#include <ESP8266WiFi.h>" : "#include <WiFi.h>"];
+    case "esp-now":
+      return esp8266
+        ? ["#include <ESP8266WiFi.h>", "#include <espnow.h>"]
+        : ["#include <WiFi.h>", "#include <esp_now.h>"];
+    case "ble":
+      if (/esp32/.test(chip)) {
+        return ["#include <BLEDevice.h>", "#include <BLEServer.h>", "#include <BLEUtils.h>"];
+      }
+      return [/nrf52/.test(chip) ? "#include <bluefruit.h>" : "#include <ArduinoBLE.h>"];
+    case "lora":
+      return ["#include <SPI.h>", "#include <LoRa.h>"];
+    case "nrf24":
+      return ["#include <SPI.h>", "#include <RF24.h>"];
+    default:
+      return [];
+  }
+}
 
 // Parts the firmware addresses: regulators, passives and connectors
 // carry no pin, so they get no define. Neither does the microcontroller
@@ -209,8 +243,10 @@ export function firmwareFor(job: ArtifactSource): Firmware {
   const filename = `${base || "firmware"}.ino`;
 
   const includes = ["#include <Arduino.h>"];
-  for (const part of job.parts) {
-    const inc = INCLUDE_FOR[part.category];
+  for (const inc of [
+    ...job.parts.map((part) => INCLUDE_FOR[part.category]),
+    ...radioIncludes(job.parts),
+  ]) {
     if (inc && !includes.includes(inc)) includes.push(inc);
   }
 
