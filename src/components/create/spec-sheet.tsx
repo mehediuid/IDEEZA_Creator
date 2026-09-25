@@ -126,16 +126,46 @@ function fromTo(a: string, b: string): string {
   return ua && ua === unit(b) ? `${a.slice(0, -ua.length - 1)} → ${b}` : `${a} → ${b}`;
 }
 
+/** The pairings over a pack an edit made or broke, from this product's side
+ *  — "charges RC Car Controller now", "Spare Battery Pack won't swap in".
+ *  One it left as it was, or a new one that works, is nothing moved. */
+function powerMoves(
+  before: ProductLink[],
+  after: ProductLink[],
+  conceptParts: ConceptPart[],
+  peers: LinkPeer[],
+): string[] {
+  const was = new Map(before.filter((l) => l.about === "power").map((l) => [l.otherId, l.ok]));
+  const mine = standaloneOf(conceptParts);
+  return after.flatMap((l) => {
+    if (l.about !== "power") return [];
+    const had = was.get(l.otherId);
+    if (had === l.ok || (had === undefined && l.ok)) return [];
+    const other = peers.find((p) => p.id === l.otherId);
+    const theirs = other ? standaloneOf(other.conceptParts) : null;
+    const name = l.otherName;
+    if (mine === "charger") return [l.ok ? `charges ${name} now` : `can't charge ${name}`];
+    if (theirs === "charger") return [l.ok ? `${name} charges it now` : `${name} can't charge it`];
+    if (mine === "pack") return [l.ok ? `swaps into ${name} now` : `won't swap into ${name}`];
+    return [l.ok ? `${name} swaps in now` : `${name} won't swap in`];
+  });
+}
+
 /** "Radio → Wi-Fi: size 224 × 60 × 25 → 150 × 52 × 32 mm · board 72 × 54 →
  *  61 × 46 mm · runtime ~4.8 → ~5 h · won't talk to Remote Controller" —
  *  what an edit moved elsewhere in the spec, from what to what, and what
- *  caused it; and a product of the project it no longer works with. Null
- *  when nothing moved. The plastic is left out when the maker picked it:
- *  they can see it change. */
+ *  caused it; a product of the project it no longer talks to; and a pack
+ *  pairing it made or broke (powerMoves). Null when nothing moved. The
+ *  plastic is left out when the maker picked it: they can see it change. */
 function movedBy(
   before: ResolvedSpec,
   after: ResolvedSpec,
-  { cause, pickedPlastic, broken }: { cause?: string; pickedPlastic: boolean; broken: string[] },
+  {
+    cause,
+    pickedPlastic,
+    broken,
+    paired,
+  }: { cause?: string; pickedPlastic: boolean; broken: string[]; paired: string[] },
 ): string | null {
   const out: string[] = [];
   if (dims(before.size) !== dims(after.size)) {
@@ -155,6 +185,7 @@ function movedBy(
   }
   if (!pickedPlastic && before.material !== after.material) out.push(`case ${before.material} → ${after.material}`);
   for (const name of broken) out.push(`won't talk to ${name}`);
+  out.push(...paired);
   if (!out.length) return null;
   return cause ? `${cause}: ${out.join(" · ")}` : `Now: ${out.join(" · ")}`;
 }
@@ -367,7 +398,8 @@ function SheetPanel({
           p.id === productId ? { ...p, parts: effectiveParts(conceptParts, now.battery, clean), spec: now } : p,
         );
         const already = new Set(product.links.filter((l) => l.about === "radio" && !l.ok).map((l) => l.otherId));
-        const broken = linksFor(peers, productId)
+        const links = linksFor(peers, productId);
+        const broken = links
           .filter((l) => l.about === "radio" && !l.ok && !already.has(l.otherId))
           .map((l) => l.otherName);
         // A size typed or fixed is on screen in the fields; the line clears.
@@ -377,6 +409,7 @@ function SheetPanel({
               cause: after?.cause,
               pickedPlastic: next.material !== product.edits.material,
               broken,
+              paired: powerMoves(product.links, links, conceptParts, product.peers),
             });
         setMoved(text ? { productId, text } : null);
         const words = [after?.say, text].filter(Boolean).join(" ");

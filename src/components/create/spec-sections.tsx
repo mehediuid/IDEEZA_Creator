@@ -24,6 +24,8 @@ import { qtyOf } from "@/lib/spec/bodies";
 import {
   ADDABLE,
   ADD_GROUPS,
+  CELL_WORD,
+  CHARGERS,
   CHARGE_PORTS,
   ENVIRONMENTS,
   MCUS,
@@ -31,7 +33,9 @@ import {
   MOUNTINGS,
   RADIOS,
   SERVOS,
+  chargeCellsOf,
   chargePortOf,
+  chargerOf,
   driverWord,
   environmentOf,
   isChargePort,
@@ -62,6 +66,7 @@ import {
   resetSection,
   sectionEdited,
   withBrain,
+  withCharges,
   withElectronics,
   withSupply,
   withoutBrain,
@@ -80,6 +85,7 @@ import {
 import { MATERIAL_NOTE, needsNoPower } from "@/lib/spec/format";
 import { COUNT_MAX, WALL_MAX_MM, WALL_MIN_MM, WALL_STEP_MM, cleanEdits } from "@/lib/spec/hints";
 import {
+  CHARGE_CELL_KEYS,
   ENVIRONMENT_KEYS,
   MATERIALS,
   MCU_KEYS,
@@ -87,6 +93,7 @@ import {
   MOUNTING_KEYS,
   SERVO_KEYS,
   type BatteryKey,
+  type ChargeCellKey,
   type ChargePortKey,
   type EnvironmentKey,
   type McuKey,
@@ -431,12 +438,21 @@ const aPack = (short: string) => `${/^[AEIOU8]/i.test(short) ? "an" : "a"} ${sho
 const cellOf = (p: { parts: ConceptPart[]; conceptParts: ConceptPart[] }) =>
   (chargesOf(p.parts) ?? chargesOf(p.conceptParts))?.cell ?? null;
 
+/** The cells a pack is made of, as a charger can be set to fill them — null
+ *  for a pack no charger in the catalog fills. */
+const chargeCellsOfPack = (key: BatteryKey): ChargeCellKey | null =>
+  CHARGE_CELL_KEYS.find((k) => CELL_WORD[k] === packCellOf(key)) ?? null;
+
+/** "2S" — a charger's setting as the ways out name it. */
+const cellsWord = (k: ChargeCellKey) => k.toUpperCase();
+
 /** The way out of a power note that says what no longer works, named from
  *  the products the link joins — as the radio note names its own ("Pick Y
- *  here, or change X's radio"): a pack to pick here, or the other product's
- *  pack to change. Null for a note that is fine, or on a sheet that can't
- *  change anything. What a charger charges can't be picked, so the way out
- *  is always the pack's. */
+ *  here, or change X's radio"): what to pick here first, then what to change
+ *  on the other. A charger's cells are picked on the charger, so its sheet
+ *  offers the cells of the pack it is for, and the pack's sheet offers
+ *  both a pack of the charger's cells and the charger set to its own. Null
+ *  for a note that is fine, or on a sheet that can't change anything. */
 function powerWayOut(product: SheetProduct, link: ProductLink, editable: boolean): string | null {
   if (link.ok || link.about !== "power" || !editable) return null;
   const other = product.peers.find((p) => p.id === link.otherId);
@@ -446,33 +462,51 @@ function powerWayOut(product: SheetProduct, link: ProductLink, editable: boolean
   // The packs this product's menu offers, and can give its draw.
   const pickable = () => packOptions(product).filter((o) => !o.disabled).map((o) => o.value);
 
-  // This is the charger: the pack it is meant for has to change to its cells.
+  // This is the charger: set here to the cells of the pack it is meant for,
+  // or that pack changed to its own cells.
   if (mine === "charger") {
+    const to = chargeCellsOfPack(other.spec.battery);
+    const pick = to && chargerOf(product.conceptParts) ? `Pick ${cellsWord(to)} here` : null;
     const cell = cellOf(product);
     const words = cell && cellWords(cell);
-    if (!cell || !words) return null;
+    if (!cell || !words) return pick && `${pick} to charge ${other.name}.`;
     const packs = PACKS.filter((b) => packCellOf(b.key) === cell);
-    if (!packs.length) return `There is no ${words.short} pack to give ${other.name} yet — this charger charges ${words.count}.`;
-    if (!packs.some((b) => b.maxMa >= other.spec.drawMa)) {
-      return `No ${words.short} pack gives ${other.name} enough power — this charger charges ${words.count}.`;
+    if (!packs.length) {
+      return pick
+        ? `${pick} to charge ${other.name}.`
+        : `There is no ${words.short} pack to give ${other.name} yet — this charger charges ${words.count}.`;
     }
-    return theirs === "pack"
-      ? `Change ${other.name} to ${aPack(words.short)} — this charger charges ${words.count}.`
-      : `Change ${other.name}'s pack to ${words.short} — this charger charges ${words.count}.`;
+    if (!packs.some((b) => b.maxMa >= other.spec.drawMa)) {
+      return pick
+        ? `${pick} to charge ${other.name}.`
+        : `No ${words.short} pack gives ${other.name} enough power — this charger charges ${words.count}.`;
+    }
+    const change =
+      theirs === "pack" ? `${other.name} to ${aPack(words.short)}` : `${other.name}'s pack to ${words.short}`;
+    return pick ? `${pick}, or change ${change}.` : `Change ${change} — this charger charges ${words.count}.`;
   }
 
-  // The charger is the other one: a pack of its cells, picked here.
+  // The charger is the other one: a pack of its cells, picked here — or the
+  // charger set to this pack's cells.
   if (theirs === "charger") {
+    const to = chargeCellsOfPack(product.spec.battery);
+    const set = to && chargerOf(other.conceptParts) ? `change ${other.name} to ${cellsWord(to)}` : null;
     const cell = cellOf(other);
     const words = cell && cellWords(cell);
-    if (!cell || !words) return null;
+    if (!cell || !words) return set && `${set.charAt(0).toUpperCase()}${set.slice(1)} to charge this pack.`;
     const packs = PACKS.filter((b) => packCellOf(b.key) === cell);
-    if (!packs.length) return `There is no ${words.short} pack to pick here yet.`;
+    if (!packs.length) {
+      return `There is no ${words.short} pack to pick here yet${set ? ` — ${set} to charge this one` : ""}.`;
+    }
     const open = pickable();
     if (!packs.some((b) => open.includes(b.key))) {
-      return `No ${words.short} pack gives this enough power, so ${other.name} can't charge its pack.`;
+      return set
+        ? `No ${words.short} pack gives this enough power — ${set} to charge this one.`
+        : `No ${words.short} pack gives this enough power, so ${other.name} can't charge its pack.`;
     }
-    return `Pick ${aPack(words.short)} here to charge it with ${other.name}.`;
+    return set
+      ? `Pick ${aPack(words.short)} here, or ${set}.`
+      : `Pick ${aPack(words.short)} here to charge it with ${other.name}.`;
   }
 
   // A spare and the product it swaps into: one pack, the same on both.
@@ -653,9 +687,23 @@ const CELL_WORDS: Record<string, string> = {
   "AA cells": "AA cells",
 };
 
+/** What the cells menu offers: each of the catalog's cells, with the part
+ *  that fills them as its sub — the concept's own charger for the cells it
+ *  fills already, since picking those keeps it (withCharges). */
+function cellOptions(conceptParts: ConceptPart[]): SelectOption<ChargeCellKey>[] {
+  const own = chargerOf(conceptParts);
+  const ownCells = chargeCellsOf(conceptParts);
+  return CHARGE_CELL_KEYS.map((k) => {
+    const c = CHARGERS[k];
+    const keeps = own && k === ownCells && !own.name.toLowerCase().includes(c.label.toLowerCase());
+    return { value: k, label: c.plain, sub: keeps ? readableName(own) : c.label };
+  });
+}
+
 /** A charger's section, in place of a power source it isn't choosing: what
- *  it charges, what it plugs into, and whether that is the pack of the
- *  product it is for. No draw — it is the thing that gives the power. */
+ *  it charges — a pick that swaps its charging IC (CHARGERS) — what it
+ *  plugs into, and whether that is the pack of the product it is for. No
+ *  draw — it is the thing that gives the power. */
 export function ChargesSection({ product, edit, onOpen }: Props) {
   const { spec, edits, parts, conceptParts } = product;
   const id = "charges";
@@ -663,6 +711,7 @@ export function ChargesSection({ product, edit, onOpen }: Props) {
   const port = chargePortOf(parts);
   const portPart = parts.find(isChargePort);
   const portId = `${sectionId(id)}-port`;
+  const cellsId = `${sectionId(id)}-cells`;
   const cell = charges ? (CELL_WORDS[charges.cell] ?? charges.cell) : "Batteries";
   return (
     <Section
@@ -671,7 +720,26 @@ export function ChargesSection({ product, edit, onOpen }: Props) {
       tag={tagFor(sectionEdited(edits, "power", conceptParts))}
       reset={powerReset(product, edit, id, "Charges")}
     >
-      <ReadOnly>{cell}</ReadOnly>
+      {edit ? (
+        <Field id={cellsId} label="Pack it charges">
+          <SelectMenu<ChargeCellKey>
+            id={cellsId}
+            ariaLabel="Pack it charges"
+            // Cells the catalog has no charger for (3S, AA) are the concept's.
+            placeholder={fromConcept(chargerOf(parts), "Choose what it charges")}
+            value={chargeCellsOf(parts)}
+            options={cellOptions(conceptParts)}
+            onChange={(v) =>
+              edit(withCharges(edits, v, conceptParts), {
+                say: `Charges ${CHARGERS[v].plain}.`,
+                cause: `Charges → ${CELL_WORD[v]}`,
+              })
+            }
+          />
+        </Field>
+      ) : (
+        <ReadOnly>{cell}</ReadOnly>
+      )}
       {edit ? (
         <Field id={portId} label="Plugs into">
           <SelectMenu<ChargePortKey>
