@@ -4,9 +4,10 @@
 // (docs/superpowers/specs/2026-09-25-product-spec-sheet-design.md). Selecting
 // a product opens it — a rail row, the card's Edit spec, the Build line's
 // "Fix …'s size" — and it follows the selection until Done or Close, which
-// clear it. From `lg` it is a column docked beside the canvas, not a dialog;
-// below that, a side sheet over the page, and a bottom sheet on a phone. No
-// card grows for it. Everything the product is made of can be changed here,
+// clear it. Where the page has room for it beside the rail and a column of
+// cards it is a column docked beside the canvas, not a dialog; with less, a
+// side sheet over the page, and a bottom sheet on a phone. No card grows for
+// it. Everything the product is made of can be changed here,
 // and only what this product has is shown: an electronic product's power,
 // brain, radio, what moves, senses, controls and shows, and its case; a
 // plate's size, case and mounting, and a way to give it electronics
@@ -21,6 +22,7 @@ import { createPortal } from "react-dom";
 import {
   Alert02Icon,
   BatteryLowIcon,
+  BubbleChatEditIcon,
   Cancel01Icon,
   Maximize01Icon,
   Undo02Icon,
@@ -34,7 +36,7 @@ import { readableName } from "@/lib/spec/facts";
 import { MM_MAX, MM_MIN, asMm3, cleanEdits } from "@/lib/spec/hints";
 import type { AiHints, Mm3, ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { currentLabel, mm3, runtimeLabel } from "@/lib/spec/units";
-import { OUTLINE_BUTTON } from "./buttons";
+import { GHOST_BUTTON, OUTLINE_BUTTON } from "./buttons";
 import { SPEC_SHEET_ID, specButtonId, specSizeInputId } from "./spec-panel";
 import {
   AddPart,
@@ -110,34 +112,31 @@ function movedBy(before: ResolvedSpec, after: ResolvedSpec, pickedPlastic: boole
   return out.length ? `Now: ${out.join(" · ")}` : null;
 }
 
-/** Docked beside the canvas from `lg`; an overlay below it, where there is
- *  no room for a 420 px column next to the rail and the canvas. */
-const DOCKED = "(min-width: 1024px)";
-
-function useDocked(): boolean {
-  return React.useSyncExternalStore(
-    (onChange) => {
-      const query = window.matchMedia(DOCKED);
-      query.addEventListener("change", onChange);
-      return () => query.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(DOCKED).matches,
-    () => false,
-  );
-}
+/** The docked sheet's width — its `w-[420px]` — which the page makes room
+ *  for beside the canvas (concept-chat.tsx decides whether it has it). */
+export const SHEET_WIDTH = 420;
 
 export function SpecSheet({
   product,
   request,
+  docked,
   onClose,
+  onMessage,
 }: {
   /** The selected product's spec; null when the sheet is closed, or when the
    *  selected product has no spec to show yet. */
   product: SheetProduct | null;
   request: SheetRequest | null;
+  /** A column beside the canvas, where the page has room for one beside the
+   *  rail and a column of cards; an overlay otherwise. */
+  docked: boolean;
+  /** Done and Close clear the selection. */
   onClose: () => void;
+  /** Closes the overlay with the product still selected and the keyboard in
+   *  the composer, which then changes this product. Docked, the composer is
+   *  already on screen beside it, so it isn't offered. */
+  onMessage?: () => void;
 }) {
-  const docked = useDocked();
   // Closing an overlay unmounts nothing at once: the last product stays
   // drawn, inert, for the length of the exit, then goes. Kept as state from
   // the previous render rather than a ref, so it is read the way it is
@@ -169,6 +168,7 @@ export function SpecSheet({
       open={!!product}
       request={request}
       onClose={onClose}
+      onMessage={onMessage}
     />,
     document.body,
   );
@@ -180,6 +180,7 @@ function SheetPanel({
   open,
   request,
   onClose,
+  onMessage,
 }: {
   /** A column beside the canvas, not a dialog: nothing behind it is held. */
   docked: boolean;
@@ -188,6 +189,7 @@ function SheetPanel({
   open: boolean;
   request: SheetRequest | null;
   onClose: () => void;
+  onMessage?: () => void;
 }) {
   const { productId, onChange } = product;
   const panelRef = React.useRef<HTMLElement>(null);
@@ -248,10 +250,21 @@ function SheetPanel({
   // three fields commit when focus leaves them, so every way out blurs first
   // rather than counting on focus being handed back while they are still on
   // the page — with nowhere to hand it to, the typed size would go unsaved.
-  const close = () => {
+  const blurInside = () => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur();
+  };
+  const close = () => {
+    blurInside();
     onClose();
+  };
+  // Over the page the composer is behind the sheet (or on the other tab, on a
+  // phone), and Done clears the selection — so this is the way to change the
+  // product in words: out of the sheet, still selected.
+  const offersMessage = !docked && !!onMessage;
+  const message = () => {
+    blurInside();
+    onMessage?.();
   };
   // Every section edits through this: the change, then what it did in words
   // and where the keyboard goes once it has rendered.
@@ -338,8 +351,10 @@ function SheetPanel({
         </p>
       </div>
 
-      <footer className="flex shrink-0 items-center gap-[12px] border-t border-solid border-border px-[16px] pb-[max(12px,env(safe-area-inset-bottom))] pt-[12px] md:px-[24px]">
-        <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+      {/* The words and the actions share a row while both fit; with two
+          actions, over the page, the words take the row above them. */}
+      <footer className="flex shrink-0 flex-wrap items-center gap-x-[12px] gap-y-[10px] border-t border-solid border-border px-[16px] pb-[max(12px,env(safe-area-inset-bottom))] pt-[12px] md:px-[24px]">
+        <div className="flex min-w-0 flex-1 basis-[240px] flex-col gap-[2px]">
           {moved?.productId === productId && (
             <p className="text-sm tabular-nums text-text-secondary">{moved.text}</p>
           )}
@@ -349,9 +364,19 @@ function SheetPanel({
               : "This chat is from before specs were kept, so this one can't change."}
           </p>
         </div>
-        <button type="button" onClick={close} className={`${OUTLINE_BUTTON} shrink-0`}>
-          Done
-        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-[8px]">
+          {offersMessage && (
+            // Quiet beside Done: a way out that keeps the selection, not the
+            // sheet's main action — and never filled, Build is.
+            <button type="button" onClick={message} className={GHOST_BUTTON}>
+              <Icon icon={BubbleChatEditIcon} size={16} />
+              Change by message
+            </button>
+          )}
+          <button type="button" onClick={close} className={`${OUTLINE_BUTTON} shrink-0`}>
+            Done
+          </button>
+        </div>
       </footer>
     </>
   );

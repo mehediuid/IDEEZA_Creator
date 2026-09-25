@@ -40,6 +40,9 @@ export type SpecCard = {
   parts: ConceptPart[];
   /** The sheet is open on this product. */
   open: boolean;
+  /** The sheet opens as a column beside the canvas, not a dialog — Edit spec
+   *  has no popup to announce then. */
+  docked?: boolean;
   onOpen: () => void;
   /** False on a chat from before the setup question — it has nowhere to keep
    *  an edit, so the sheet shows the spec and cannot change it. */
@@ -100,7 +103,7 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
           <button
             id={buttonId}
             type="button"
-            aria-haspopup="dialog"
+            aria-haspopup={card.docked ? undefined : "dialog"}
             aria-expanded={card.open}
             aria-controls={card.open ? SPEC_SHEET_ID : undefined}
             onClick={card.onOpen}

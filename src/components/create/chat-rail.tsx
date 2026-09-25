@@ -224,14 +224,27 @@ export function ProjectRail({
  *  page root, outside both panes: on a phone the rail is hidden while the
  *  canvas tab shows, and a hidden live region says nothing — which is where
  *  the maker is while a render lands. */
-export function RailAnnouncer({ model }: { model: RailModel }) {
+export function RailAnnouncer({
+  model,
+  note,
+}: {
+  model: RailModel;
+  /** Something the page did that the rail's model doesn't see — a docked
+   *  spec sheet opening beside the canvas. Said once per `n`. */
+  note?: { text: string; n: number } | null;
+}) {
   const [seen, setSeen] = React.useState(model.snapshot);
+  const [seenNote, setSeenNote] = React.useState(note?.n ?? 0);
   const [said, setSaid] = React.useState("");
   // Compared during render rather than in an effect, so the sentence lands
   // in the same commit as the change it describes. Mounting says nothing.
-  if (seen !== model.snapshot) {
+  const fresh = note && note.n !== seenNote ? note : null;
+  if (seen !== model.snapshot || fresh) {
     setSeen(model.snapshot);
-    const line = announcementFor(seen, model.snapshot);
+    if (fresh) setSeenNote(fresh.n);
+    const line = [seen !== model.snapshot ? announcementFor(seen, model.snapshot) : null, fresh?.text]
+      .filter(Boolean)
+      .join(" ");
     if (line) setSaid(line);
   }
   return (

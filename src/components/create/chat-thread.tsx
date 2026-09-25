@@ -100,6 +100,7 @@ export function ChatThread({
   focusedProduct,
   onFocusProduct,
   specSheetFor,
+  specDocked = false,
   onOpenSpec,
   onFocusSpec,
   onSpecChange,
@@ -143,6 +144,8 @@ export function ChatThread({
   /** The product the spec sheet is showing — the selected one, while the
    *  sheet is open. The sheet itself sits beside the canvas (concept-chat). */
   specSheetFor?: string | null;
+  /** The sheet opens docked beside the canvas rather than over it. */
+  specDocked?: boolean;
   /** Selects this product and opens its spec sheet — the card's Edit spec. */
   onOpenSpec?: (productId: string) => void;
   /** Opens a product's spec sheet with the keyboard in its size — the Build
@@ -271,6 +274,7 @@ export function ChatThread({
                       ? () => onRereadConcept(turn.id)
                       : undefined,
                   open: specSheetFor === productIdOf(turn),
+                  docked: specDocked,
                   onOpen: () => onOpenSpec?.(productIdOf(turn)),
                   editable: !!answer && !!onSpecChange,
                 }
