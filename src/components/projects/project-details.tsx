@@ -45,6 +45,7 @@ import {
   specOfSource,
 } from "@/lib/create/build-artifacts";
 import { specLine } from "@/lib/spec/format";
+import { asConceptSummary } from "@/lib/spec/hints";
 import { NetworkSection } from "@/components/network/network-section";
 import {
   FLOW_STEPS,
@@ -530,9 +531,12 @@ function conceptOf(
   for (const t of chat?.turns ?? []) {
     if (t.role !== "assistant" || t.status !== "ready" || !t.concept) continue;
     if (primary ? t.companionOf : t.companionOf !== product.id) continue;
-    if (primary && t.usedForBuild === build.id) return t.concept;
+    // Read back the way every other reader takes a stored concept: one an
+    // older build of the app kept without its parts is no concept at all,
+    // and comparing its parts would throw.
+    if (primary && t.usedForBuild === build.id) return asConceptSummary(t.concept);
     // The latest drawing with this image, should a regenerate repeat one.
-    if (product.conceptImageUrl && t.imageUrl === product.conceptImageUrl) drawn = t.concept;
+    if (product.conceptImageUrl && t.imageUrl === product.conceptImageUrl) drawn = asConceptSummary(t.concept);
   }
   return drawn;
 }
