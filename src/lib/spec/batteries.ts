@@ -40,8 +40,15 @@ export function batteryOf(key: BatteryKey): BatteryInfo {
 // A pack the concept already lists is replaced by the spec's, so a battery is
 // never counted twice. Chargers, gauges and protection boards are not packs,
 // and a "cell" outside power and mechanics is a load cell, not a battery.
+// A bare "connector"/"level"/"indicator" used to disqualify the part outright
+// — but a real pack naming its own connector ("2S LiPo battery (XT60
+// connector)") or a hand-off pin block ("1S LiPo 1000mAh battery with JST
+// connector") is still a pack, and losing it dropped the maker's named
+// capacity/cell-count and left a duplicate generic body in the BOM. Only the
+// phrase "battery connector/level/indicator" — the word immediately after
+// "battery" — names an accessory instead of the cell.
 const PACK = /batter|li-?po|li-?ion|18650|\bcells?\b|\baaa?\b/i;
-const NOT_PACK = /charg|gauge|monitor|protect|\bbms\b|connector|level|indicator|solar|photo/i;
+const NOT_PACK = /charg|gauge|monitor|protect|\bbms\b|solar|photo|batter(?:y|ies)\s+(?:connector|level|indicator)/i;
 
 export function isBatteryPart(part: ConceptPart): boolean {
   if (part.category !== "Power Management" && part.category !== "Connector & mech") {

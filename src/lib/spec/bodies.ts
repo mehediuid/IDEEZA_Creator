@@ -26,10 +26,18 @@ const b = (l: number, w: number, h: number, at: Placement, mA: number): Body => 
 const QTY_AFTER_X = /(?:^|[(\s,])[x×]\s*(\d{1,2})\b/i;
 const QTY_BEFORE_X = /\b(\d{1,2})\s*[x×](?:[)\s,]|$)/i;
 
+// A resolution or a grid ("128 x 64", "16 x 2", "8x8") states a size, not a
+// count — a digit on both sides of the "x" (allowing only whitespace between)
+// means this is a dimension, so qtyOf reads nothing from it at all. Without
+// this, "0.96\" OLED 128 x 64" read as sixteen OLEDs and "M3 x 10 screws"
+// read as ten.
+const DIMENSION = /\d\s*[x×]\s*\d/;
+
 /** How many of this part its own name says there are — 1 when it says
  *  nothing, capped at 16 so a typo can't blow up the board or the draw. */
 export function qtyOf(name: string): number {
   const n = name.toLowerCase();
+  if (DIMENSION.test(n)) return 1;
   const m = n.match(QTY_AFTER_X) ?? n.match(QTY_BEFORE_X);
   const count = m ? Number(m[1]) : 1;
   return Number.isFinite(count) && count > 0 ? Math.min(count, 16) : 1;
@@ -54,13 +62,22 @@ function highPowerLedBody(name: string): Body | null {
   return null;
 }
 
-// An addressable matrix/panel names its own grid ("8x32") — the whole panel
-// is the part, not one pixel, so its footprint and draw scale with N × M
-// rather than falling to the bare-pixel rule below.
+// An addressable matrix names its own grid ("8x32") — the whole panel is the
+// part, not one pixel, so its footprint and draw scale with N × M rather
+// than falling to the bare-pixel rule below. A bare "panel" is not enough on
+// its own to mean this: an LCD, OLED, TFT, e-ink or touch panel states a
+// resolution too ("TFT LCD panel 320x240"), and none of those is an LED
+// grid — so an LED word is required, and any of those other panel kinds
+// rules it out even if "matrix" or a grid also appears in the name. The
+// solar/anemometer outside-rule (below, in RULES) also names its own
+// dimension ("Solar panel 110x60mm") and must win over this — excluding
+// "solar" here is what lets it.
 const MATRIX_GRID = /(\d{1,3})\s*[x×]\s*(\d{1,3})/;
-const MATRIX_NAME = /\bleds?\b|pixel|ws2812\w*|sk6812\w*|neopixel|matrix|panel/;
+const MATRIX_NAME = /\bleds?\b|pixel|ws2812\w*|sk6812\w*|neopixel|matrix/;
+const MATRIX_EXCLUDE = /solar|lcd|oled|tft|e-?ink|touch/;
 
 function ledMatrixBody(name: string): Body | null {
+  if (MATRIX_EXCLUDE.test(name)) return null;
   const grid = name.match(MATRIX_GRID);
   if (!grid || !MATRIX_NAME.test(name)) return null;
   const n = Number(grid[1]);

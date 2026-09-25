@@ -165,7 +165,9 @@ export function listedBattery(parts: ConceptPart[]): BatteryKey | null {
   if (/\baaa?\b/.test(n)) {
     return /\b(?:4|four)\s*[x×]?\s*aa|aa\s*[x×]\s*4/.test(n) ? "aa-4" : "aa-2";
   }
-  if (/\b9\s*v\b/.test(n)) return "9v";
+  // Not preceded by a digit or a decimal point — otherwise "3.9V" reads its
+  // trailing "9V" as the 9 V battery, when it is a LiPo cell's own voltage.
+  if (/(?<![\d.])9\s*v\b/.test(n)) return "9v";
   const mah = Number(n.match(/(\d{2,5})\s*mah/)?.[1]);
   if (mah) {
     if (mah <= 150) return "li-1s-100";
@@ -194,13 +196,27 @@ export function ruleBattery(
   // A cord to the wall is a fine answer for something that sits on a desk;
   // it is not an answer for something worn, carried or left outdoors.
   const carried = useCase.some((u) => u === "handheld" || u === "wearable" || u === "outdoor");
+  const draw = drawOf(list);
   // Checked before the USB rule: a barrel jack or a mains brick answers "how
   // is this powered" on its own, whether or not the concept also carries a
   // USB port for firmware.
   if (hasWallPower(parts) && !parts.some(isBatteryPart)) return "adapter";
-  if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving && !carried) return "none";
-  const draw = drawOf(list);
-  const packs = BATTERIES.filter((b) => b.key.startsWith("li-")).sort((a, b) => a.mAh - b.mAh);
+  if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving && !carried) {
+    // USB is only an answer within its own 500 mA budget — a "USB-powered"
+    // product that actually draws more than that (a high-power LED lamp, a
+    // touch-dimmer that pushes past 500 mA) is not fixed by naming a rule
+    // that can't supply it. A desk product still has a cord answer, the
+    // wall adapter; anything else falls to the pack search below instead of
+    // stopping here.
+    if (draw <= USB_BUDGET_MA) return "none";
+    if (useCase.includes("desk")) return "adapter";
+  }
+  // li-1s-100 is sized for a wearable or a named tiny/coin cell (see
+  // listedBattery) — offered here to any low-draw product, it undercuts the
+  // 400 mAh floor every other handheld or outdoor concept has always had.
+  const packs = BATTERIES.filter((b) => b.key.startsWith("li-"))
+    .filter((b) => b.key !== "li-1s-100" || useCase.includes("wearable"))
+    .sort((a, b) => a.mAh - b.mAh);
   const enough = packs.find(
     (b) => b.maxMa >= draw && (runtimeOf(b.key, draw) ?? Infinity) >= goalH,
   );
@@ -300,10 +316,16 @@ export function partsForBuild(parts: ConceptPart[], battery: BatteryKey): Concep
  *  when this differs from the snapshot it was booked with. A calculated size
  *  moves every time a part does, so it is compared only when the maker typed
  *  it themselves; otherwise the key just says "auto", and a part added or
- *  dropped shows up as a concept change, not a spec one. */
+ *  dropped shows up as a concept change, not a spec one. The battery and the
+ *  material follow the same rule: a "rule"/"concept"/"ai" pack or material
+ *  moves whenever the parts or the rule that picks it does — reordering the
+ *  battery rule, say — with nothing the maker chose, so only a "you"-sourced
+ *  pick is compared; anything else reads as "auto" too. */
 export function specKey(s: ResolvedSpec): string {
   const size = s.sizeSource === "you" ? `${s.size.l}x${s.size.w}x${s.size.h}` : "auto";
-  return [size, s.battery, s.material, s.draftAtSize].join("|");
+  const battery = s.batterySource === "you" ? s.battery : "auto";
+  const material = s.materialSource === "you" ? s.material : "auto";
+  return [size, battery, material, s.draftAtSize].join("|");
 }
 
 /** A product whose size its parts can't fit, and that the maker hasn't

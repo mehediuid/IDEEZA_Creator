@@ -176,6 +176,47 @@ type FallbackRule = {
   parts: (promptLower: string) => ConceptPart[];
 };
 
+// A handful of the keyword table's trigger words are ordinary English words
+// as often as they're a real signal — "ring" is as likely a ring light as a
+// wearable, "drive" as likely a USB drive as wheels, "arm" as likely a
+// forearm as a robot's. Firing on these alone over-fits the stand-in, so
+// each needs a companion word from its own kind of prompt before it counts;
+// the unambiguous words beside them (collar, motor, servo…) still fire
+// alone. Match position for these is the ambiguous word's own site, or the
+// companion's when the companion reads first — both land the rule at
+// roughly where the maker's own words for the idea are.
+const WEARABLE_CONTEXT = "wear\\w*|wrist\\w*|finger\\w*|smart";
+const WEARABLE_AMBIGUOUS = "band|ring|watch";
+const ROBOT_ARM_CONTEXT = "robot\\w*|claw|gripper|joint";
+const STORAGE_DRIVE = "usb|flash|hard|thumb|disk|ssd|external";
+
+// The wearable/battery rule below and matchedUseCases' "wearable" tag both
+// read this same signal — one function, so a prompt can't be a wearable
+// battery-wise but not use-case-wise or the other way round.
+const WEARABLE_SIGNAL = new RegExp(
+  `\\b(?:collar|wearable|portable)\\b` +
+    `|\\b(?:${WEARABLE_AMBIGUOUS})\\b(?=[\\s\\S]*\\b(?:${WEARABLE_CONTEXT})\\b)` +
+    `|\\b(?:${WEARABLE_CONTEXT})\\b(?=[\\s\\S]*\\b(?:${WEARABLE_AMBIGUOUS})\\b)`,
+  "i",
+);
+// Same idea, narrower: the use-case tag doesn't read "portable" or a runtime
+// word ("lasts", "battery", "a week") as "wearable" — those need a pack, not
+// necessarily a body to be worn on.
+const WEARABLE_USE_CASE = new RegExp(
+  `\\b(?:collar|wearable)\\b` +
+    `|\\b(?:${WEARABLE_AMBIGUOUS})\\b(?=[\\s\\S]*\\b(?:${WEARABLE_CONTEXT})\\b)` +
+    `|\\b(?:${WEARABLE_CONTEXT})\\b(?=[\\s\\S]*\\b(?:${WEARABLE_AMBIGUOUS})\\b)`,
+  "i",
+);
+const MOTOR_TRIGGER = new RegExp(
+  `\\b(?:motor|car|wheels?)\\b|(?<!\\b(?:${STORAGE_DRIVE})[\\s-])\\bdrive\\b`,
+  "i",
+);
+const ARM_TRIGGER = new RegExp(
+  `\\bservo\\b|\\barm\\b(?=[\\s\\S]*\\b(?:${ROBOT_ARM_CONTEXT})\\b)|\\b(?:${ROBOT_ARM_CONTEXT})\\b(?=[\\s\\S]*\\barm\\b)`,
+  "i",
+);
+
 const FALLBACK_RULES: FallbackRule[] = [
   {
     trigger: /\b(?:gps|tracker|location)\b/i,
@@ -186,12 +227,16 @@ const FALLBACK_RULES: FallbackRule[] = [
   {
     // "strip" picked out over the single-fixture default only when the
     // maker's own word is there — otherwise every "light" would read as a
-    // metre of LED strip instead of the bulb a lamp or fixture means.
+    // metre of LED strip instead of the bulb a lamp or fixture means. The
+    // single fixture is sized to a 1 W LED (I3): the stand-in's own USB
+    // power budget is 500 mA, and a full 3 W "high-power" emitter alone
+    // draws 811 mA of it — no plausible stand-in should already be over
+    // budget before the maker changes anything.
     trigger: /\b(?:lamp|light|leds?|glow\w*)\b/i,
     parts: (p) =>
       /\bstrip\b/i.test(p)
         ? [{ name: "LED strip", role: "Lights the surface the product illuminates", category: "Actuator" }]
-        : [{ name: "High-power LED", role: "Gives the product its light output", category: "Actuator" }],
+        : [{ name: "1W LED", role: "Gives the product its light output", category: "Actuator" }],
   },
   {
     trigger: /\b(?:dimm\w*|brightness)\b/i,
@@ -249,7 +294,10 @@ const FALLBACK_RULES: FallbackRule[] = [
     parts: () => [{ name: "PIR motion sensor", role: "Detects movement nearby", category: "Sensor" }],
   },
   {
-    trigger: /\b(?:motor|car|wheels?|drive)\b/i,
+    // Minor 16: "drive" alone also names a USB/flash/hard drive, which gets
+    // no motor at all — the trigger fires on "drive" only when it isn't
+    // sitting right after one of those storage words.
+    trigger: MOTOR_TRIGGER,
     parts: () => [
       { name: "TT gear motor", role: "Turns the wheels the product drives on", category: "Actuator" },
       {
@@ -264,10 +312,22 @@ const FALLBACK_RULES: FallbackRule[] = [
     parts: () => [
       { name: "Brushless motors (x4)", role: "Spins the propellers that lift the drone", category: "Actuator" },
       { name: "4-in-1 ESC", role: "Drives all four motors from one board", category: "Power Management" },
+      // I3: four brushless motors draw well past what any 1S pack — or a
+      // USB/adapter answer — can supply; naming the 2S pack directly here
+      // (read by listedBattery, same as a maker's own words) is what keeps
+      // the stand-in's own derived spec inside its battery's budget.
+      {
+        name: "2S LiPo battery",
+        role: "Supplies the current four motors draw at once",
+        category: "Power Management",
+      },
     ],
   },
   {
-    trigger: /\b(?:servo|arm)\b/i,
+    // Minor 16: "arm" alone also names a forearm ("worn on your arm"), which
+    // gets no servo — a robotic arm needs a companion word (robot/claw/
+    // gripper/joint) for the trigger to fire; "servo" on its own still does.
+    trigger: ARM_TRIGGER,
     parts: () => [{ name: "SG90 servo", role: "Moves the arm to the commanded angle", category: "Actuator" }],
   },
   {
@@ -285,8 +345,15 @@ const FALLBACK_RULES: FallbackRule[] = [
     // A product worn, carried, or stated to keep running untethered for a
     // stretch of time gets its own pack — unless the same prompt also names
     // a fixture that's plugged in (a desk lamp, a wall unit), in which case
-    // that wins and the product stays USB/adapter powered.
-    trigger: /\b(?:collar|wearable|band|ring|watch|portable|lasts?|batter(?:y|ies)|weeks?|days?|hours?|hrs?)\b/i,
+    // that wins and the product stays USB/adapter powered. Minor 16: "band",
+    // "ring" and "watch" only count as the wearable half of that with a
+    // wearable word (wear/wrist/finger/smart) somewhere in the same prompt —
+    // alone they as often mean a rubber band, a ring light or "watch the
+    // door" as a wrist-worn product.
+    trigger: new RegExp(
+      String.raw`\b(?:lasts?|batter(?:y|ies)|weeks?|days?|hours?|hrs?)\b|${WEARABLE_SIGNAL.source}`,
+      "i",
+    ),
     parts: (p) =>
       /\b(?:lamp|desk|wall|plug)\b/i.test(p)
         ? []
@@ -354,7 +421,10 @@ function runtimeGoalFromPrompt(promptLower: string): number | undefined {
 }
 
 const FALLBACK_USE_CASE_RULES: [RegExp, UseCase][] = [
-  [/\b(?:collar|wearable|band|ring|watch)\b/i, "wearable"],
+  // Minor 16: same tightened wearable signal as the battery-add rule above —
+  // "band"/"ring"/"watch" need a wearable word nearby, "collar"/"wearable"
+  // don't.
+  [WEARABLE_USE_CASE, "wearable"],
   [/\b(?:outdoor|garden|weather|bike)\b/i, "outdoor"],
   [/\b(?:waterproof|aquarium)\b/i, "waterproof"],
   [/\b(?:handheld|remote)\b/i, "handheld"],
