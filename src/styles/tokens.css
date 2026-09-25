@@ -143,9 +143,14 @@
   --letter-spacing-tight: -0.5px;
   --letter-spacing-normal: 0px;
   --letter-spacing-wide: 0.1px;
+  --letter-spacing-wider: 0.15px;
   /* Uppercase micro-labels need air between letters to stay legible at 10–11px;
-     they are all over the editor panels and the flow's section headings. */
-  --letter-spacing-caps: 0.5px;
+     they are all over the editor panels and the flow's section headings. The
+     design system's own value (Figma letter/spacing/caps) is 1.5px — it was
+     0.5px here, so every caps label read tighter than the design. */
+  --letter-spacing-caps: 1.5px;
+  /* Display headings a step under a full "tight" — Figma letter/spacing/slight. */
+  --letter-spacing-slight: -0.25px;
 
   /* ── Spacing (Desktop) ──────────────────────────────────────── */
   --spacing-0: 0;
@@ -264,6 +269,7 @@
     --font-size-6xl: 36px;
     --font-size-7xl: 44px;
     --font-size-8xl: 52px;
+    --letter-spacing-slight: -0.2px;
   }
 }
 
@@ -334,7 +340,7 @@
    * used to be an underline; it is a colour step now, so the letterforms stay
    * put and nothing shifts under the pointer. */
   --color-text-brand-hover: var(--color-violet-700);
-  --color-text-blue: var(--color-blue-600);
+  --color-text-blue: var(--color-blue-700);
   --color-text-link: var(--color-blue-600);
   --color-text-link-hover: var(--color-blue-700);
   --color-text-success: var(--color-green-700);
@@ -350,6 +356,13 @@
   --color-border-error: var(--color-red-500);
   --color-border-brand: var(--color-violet-600);
   --color-border-blue: var(--color-blue-500);
+  /* Figma color/card/border — a card's edge is the default border. */
+  --color-card-border: var(--color-border-default);
+  /* Figma color/badge/* — a blue status badge reads on the blue-subtle ground. */
+  --color-badge-blue-bg: var(--color-bg-blue-subtle);
+  --color-badge-blue-text: var(--color-text-blue);
+  /* Figma color/focus/halo — the soft ring round a focused slider thumb. */
+  --color-focus-halo: color-mix(in srgb, var(--color-violet-600) 45%, transparent);
   --color-border-ai: var(--color-violet-500);
   --color-border-success: var(--color-green-500);
   --color-border-warning: var(--color-yellow-500);
@@ -493,8 +506,11 @@
 
   /* Elevation */
   --elevation-0: none;
-  --elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
-  --elevation-2: 0px 2px 4px 0px rgba(0, 0, 0, 0.08);
+  /* Figma Elevation/1 — Card and Elevation/2 — Dropdown: two soft slate
+     shadows each. The effect styles carry no dark value, so the dark blocks
+     keep their own. */
+  --elevation-1: 0px 1px 3px 0px rgba(15, 23, 42, 0.06), 0px 1px 2px 0px rgba(15, 23, 42, 0.04);
+  --elevation-2: 0px 4px 16px 0px rgba(15, 23, 42, 0.1), 0px 2px 6px 0px rgba(15, 23, 42, 0.06);
   --elevation-3: 0px 4px 8px 0px rgba(0, 0, 0, 0.10);
   --elevation-4: 0px 8px 16px 0px rgba(0, 0, 0, 0.12);
   --elevation-5: 0px 12px 24px 0px rgba(0, 0, 0, 0.14);
@@ -581,6 +597,7 @@
   --color-border-error: var(--color-red-400);
   --color-border-brand: var(--color-violet-400);
   --color-border-blue: var(--color-blue-400);
+  --color-focus-halo: color-mix(in srgb, var(--color-violet-400) 55%, transparent);
   --color-border-ai: var(--color-violet-400);
   --color-border-success: var(--color-green-400);
   --color-border-warning: var(--color-yellow-400);
@@ -680,6 +697,7 @@
     --color-border-strong: var(--color-gray-600);
     --color-border-subtle: var(--color-gray-700);
     --color-border-focus: var(--color-violet-400);
+    --color-focus-halo: color-mix(in srgb, var(--color-violet-400) 55%, transparent);
 
     --color-pad-copper: var(--color-orange-500);
     --color-pad-mechanical: var(--color-gray-400);

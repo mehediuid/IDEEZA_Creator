@@ -52,8 +52,10 @@ export const ideezaPreset = {
       },
       letterSpacing: {
         tight: "var(--letter-spacing-tight)",
+        slight: "var(--letter-spacing-slight)",
         normal: "var(--letter-spacing-normal)",
         wide: "var(--letter-spacing-wide)",
+        wider: "var(--letter-spacing-wider)",
         caps: "var(--letter-spacing-caps)",
       },
       fontWeight: {
@@ -207,6 +209,16 @@ export const ideezaPreset = {
           error: "var(--color-border-error)",
           brand: "var(--color-border-brand)",
           ai: "var(--color-border-ai)",
+        },
+        card: {
+          border: "var(--color-card-border)",
+        },
+        badge: {
+          "blue-bg": "var(--color-badge-blue-bg)",
+          "blue-text": "var(--color-badge-blue-text)",
+        },
+        focus: {
+          halo: "var(--color-focus-halo)",
         },
         // Component-scoped — handy for direct utility access
         button: {
