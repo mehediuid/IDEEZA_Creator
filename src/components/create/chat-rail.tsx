@@ -13,7 +13,8 @@
 // Nothing here starts, buys or changes anything. Every action has one home on
 // the canvas; the rail only says what it is and takes you there — a row picks
 // the product the composer changes and brings its card into view, and "Show
-// on canvas" moves focus to the control that does the next step.
+// on canvas" moves focus to the control that does the next step — "Open its
+// spec" when that is a size, which is fixed in the product's spec sheet.
 //
 // What each line says is decided in `lib/create/project-state`, which the
 // canvas reads too, so the two can't disagree about "changed since the build"
@@ -195,7 +196,7 @@ export function ProjectRail({
       ) : (
         model.next && (
           <div className="px-[10px] pt-[14px]">
-            <NextStepLine step={model.next} onJump={onJump} />
+            <NextStepLine step={model.next} rows={model.rows} onJump={onJump} />
           </div>
         )
       )}
@@ -364,12 +365,22 @@ const SHOW_BUTTON =
 
 function NextStepLine({
   step,
+  rows,
   onJump,
 }: {
   step: NextStep;
+  rows: RailRow[];
   onJump: (target: JumpTarget) => void;
 }) {
   const target = step.target;
+  // A size to fix is in the product's spec sheet, which the jump opens with
+  // the keyboard in Length — "Show on canvas" sent the maker looking for a
+  // size on the card. Named by what it says first (WCAG 2.5.3), as the
+  // others are.
+  const toSpec = target?.kind === "spec";
+  const name = toSpec ? rows.find((r) => r.productId === target.productId)?.name : undefined;
+  const jump = toSpec ? "Open its spec" : "Show on canvas";
+  const jumpLabel = toSpec ? `${jump}${name ? ` — ${name}'s size` : ""}` : step.targetLabel;
   return (
     // A tint on the rail's surface, not a card in a card. Its edge lines up
     // with the product rows' fills, and its glyph with the text above.
@@ -400,11 +411,11 @@ function NextStepLine({
         {target && (
           <button
             type="button"
-            aria-label={step.targetLabel}
+            aria-label={jumpLabel}
             onClick={() => onJump(target)}
             className={`${SHOW_BUTTON} -ml-[6px] hover:bg-bg-surface`}
           >
-            Show on canvas
+            {jump}
             <Icon icon={ArrowRight01Icon} size={14} />
           </button>
         )}
@@ -635,7 +646,9 @@ function statusLine(row: RailRow): {
     case "failed":
       return { text: `Couldn't draw ${concept} · nothing charged`, tone: "error" };
     case "conflict":
-      return { text: "Doesn't fit its size · fix it on the card", tone: "error" };
+      // The size fields and their fixes are in the sheet, which the row
+      // itself opens — not on the card any more.
+      return { text: "Doesn't fit its size · fix it in its spec", tone: "error" };
     case "queued":
       return { text: `Waiting to start · 0 of ${total}`, tone: "tertiary" };
     case "running": {
