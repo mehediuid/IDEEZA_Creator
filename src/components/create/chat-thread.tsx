@@ -40,6 +40,7 @@ import {
   BUILD_REVIEW_ID,
   CREDITS_NOTICE_ID,
   SETUP_QUESTION_ID,
+  scrollWithin,
 } from "./anchors";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
@@ -169,7 +170,8 @@ export function ChatThread({
       return;
     }
     seenTurns.current = chat.turns.length;
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // The canvas alone scrolls — scrollIntoView moved the page's shell too.
+    if (endRef.current) scrollWithin(endRef.current, "end", "smooth");
   }, [chat.turns.length]);
 
   // The canvas shows the CURRENT state of the build, not its history: one

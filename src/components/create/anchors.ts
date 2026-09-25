@@ -28,3 +28,22 @@ export const ADD_PRODUCT_ID = "add-product";
  *  transition has to include box-shadow for the ring to fade. */
 export const ARRIVAL_RING =
   "data-[arrived=true]:ring-2 data-[arrived=true]:ring-border-focus";
+
+/** Brings `el` into view by scrolling the one box that scrolls it — the
+ *  canvas — and nothing else. `scrollIntoView` scrolls every ancestor that
+ *  can scroll, and a box clipped with `overflow: hidden` still scrolls from
+ *  script: a jump to a lower product moved the app shell itself up and left
+ *  a blank strip under it. */
+export function scrollWithin(
+  el: HTMLElement,
+  block: "start" | "end",
+  behavior: ScrollBehavior,
+): void {
+  let box = el.parentElement;
+  while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
+  if (!box) return;
+  const view = box.getBoundingClientRect();
+  const at = el.getBoundingClientRect();
+  const by = block === "start" ? at.top - view.top : at.bottom - view.bottom;
+  box.scrollTo({ top: Math.max(0, box.scrollTop + by), behavior });
+}

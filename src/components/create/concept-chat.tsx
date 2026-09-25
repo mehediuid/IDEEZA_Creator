@@ -51,6 +51,7 @@ import {
   SETUP_QUESTION_ID,
   productCardId,
   productRetryId,
+  scrollWithin,
 } from "./anchors";
 import { ProjectRail, RailAnnouncer, useRailModel } from "./chat-rail";
 import { BuildStatus } from "./build-status";
@@ -823,7 +824,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         const ring = document.getElementById(land.ring);
         if (!ring) return;
         const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        ring.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+        // The canvas alone scrolls — never the page around it.
+        scrollWithin(ring, "start", still ? "auto" : "smooth");
         const prev = arrived.current;
         if (prev) {
           window.clearTimeout(prev.timer);
