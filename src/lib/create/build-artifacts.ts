@@ -332,10 +332,11 @@ export type Nets = {
 
 const GND_NODE: NetNode = { id: "GND", label: "Ground" };
 
-/** Wired to nothing: the hardware that holds or seals the product (H) —
- *  its feet, screws, gasket, printed body — and the adapter it ships with
- *  (PS), which plugs into its jack. */
-const offBoard = (ref: string) => /^(?:H|PS)\d/.test(ref);
+/** Wired to nothing and on no board: the hardware that holds or seals the
+ *  product (H) — its feet, screws, gasket, printed body — and the adapter it
+ *  ships with (PS), which plugs into its jack. The nets leave them out, and
+ *  so does the PCB preview's drawing. */
+export const offBoard = (ref: string) => /^(?:H|PS)\d/.test(ref);
 
 export function netsFor(job: ArtifactSource): Nets {
   const bom = bomFor(job);

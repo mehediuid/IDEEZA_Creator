@@ -15,6 +15,7 @@ import {
   bookedSpec,
   firmwareFor,
   netsFor,
+  offBoard,
   specOfSource,
   type ArtifactSource,
   type NetWire,
@@ -266,8 +267,11 @@ const PCB_GAP_Y = 34;
 export function PcbPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   const nets = netsFor(job);
+  // Feet, screws, a gasket and the wall adapter are on no board and wired
+  // to nothing (offBoard): the BOM lists them, the board doesn't draw them.
+  const placed = bom.rows.filter((r) => !offBoard(r.ref));
 
-  const n = Math.max(bom.rows.length, 1);
+  const n = Math.max(placed.length, 1);
   const cols = n <= 4 ? 2 : n <= 9 ? 3 : 4;
   const rows = Math.ceil(n / cols);
 
@@ -280,7 +284,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
 
   const blocks = new Map<string, Box>();
   const cell = new Map<string, { col: number; row: number }>();
-  bom.rows.forEach((row, i) => {
+  placed.forEach((row, i) => {
     const col = i % cols;
     const rowIndex = Math.floor(i / cols);
     blocks.set(
@@ -329,7 +333,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
         role="img"
-        aria-label={`Board layout: ${bom.rows.length} parts on a 2-layer board`}
+        aria-label={`Board layout: ${placed.length} ${placed.length === 1 ? "part" : "parts"} on a 2-layer board`}
         style={{ width: "100%", height: "auto" }}
       >
         <rect
@@ -367,7 +371,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
           </g>
         ))}
 
-        {bom.rows.map((row) => {
+        {placed.map((row) => {
           const b = blocks.get(row.ref);
           if (!b) return null;
           return (
