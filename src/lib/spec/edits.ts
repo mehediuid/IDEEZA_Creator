@@ -378,6 +378,41 @@ export function withoutElectronics(edits: SpecEdits): SpecEdits {
 // concept they still apply to. Each carries the turn it was made on
 // (`basedOn`), so the sheet can say so — "Your part changes from Concept N
 // still apply · Reset parts".
+//
+// And the parts of that concept, as a short stamp ("turn#stamp"): a Read
+// again replaces a stand-in's parts with the reading on the same turn, and
+// edits made on the stand-in — a sensor added, a chip swapped — landed on
+// the reading with nothing said. The sheet stamps the turn (stampEdits);
+// the store adds the parts, which it holds (withConceptStamp).
+
+/** A concept's parts as a short stamp — the same parts, the same stamp. */
+function partsStamp(parts: ConceptPart[]): string {
+  let h = 0x811c9dc5;
+  for (const c of parts.map((p) => p.name.trim()).join("\n")) {
+    h ^= c.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** The turn a `basedOn` names, with or without its parts' stamp. */
+export function stampTurnOf(basedOn: string): string {
+  const at = basedOn.lastIndexOf("#");
+  return at < 0 ? basedOn : basedOn.slice(0, at);
+}
+
+/** The edits with their `basedOn` stamped with the parts of the concept it
+ *  names, once — `conceptParts` gives a turn's concept parts, undefined
+ *  while it has none. A stamp already there, or no `basedOn`, is left. */
+export function withConceptStamp(
+  edits: SpecEdits,
+  conceptParts: (turnId: string) => ConceptPart[] | undefined,
+): SpecEdits {
+  const on = edits.basedOn;
+  if (on === undefined || on.includes("#")) return edits;
+  const parts = conceptParts(on);
+  return parts ? { ...edits, basedOn: `${on}#${partsStamp(parts)}` } : edits;
+}
 
 const PART_CHOICES = [
   "mcu",
@@ -392,15 +427,19 @@ const PART_CHOICES = [
 ] as const satisfies readonly (keyof PartChoices)[];
 
 /** The edits as they stand on the concept of turn `turnId`, and whether they
- *  were made on an older one (`basedOn` set, and another turn). A removed
- *  name this concept doesn't carry is dropped: it takes nothing out here,
- *  and would take out a part of that name a later concept brings. */
+ *  were made on an older one (`basedOn` set, and another turn — or this
+ *  turn with other parts, read again since). A removed name this concept
+ *  doesn't carry is dropped: it takes nothing out here, and would take out
+ *  a part of that name a later concept brings. */
 export function rebaseEdits(
   edits: SpecEdits,
   conceptParts: ConceptPart[],
   turnId: string,
 ): { edits: SpecEdits; olderConcept: boolean } {
-  const olderConcept = edits.basedOn !== undefined && edits.basedOn !== turnId;
+  const on = edits.basedOn;
+  const olderConcept =
+    on !== undefined &&
+    (stampTurnOf(on) !== turnId || (on.includes("#") && on !== `${turnId}#${partsStamp(conceptParts)}`));
   if (!edits.removed) return { edits, olderConcept };
   const carried = new Set(conceptParts.map((p) => p.name));
   const kept = edits.removed.filter((n) => carried.has(n));

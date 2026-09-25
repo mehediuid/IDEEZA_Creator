@@ -21,7 +21,8 @@ import {
   type ConceptPartCategory,
   type ConceptSummary,
 } from "./concept";
-import { asResolvedSpec } from "../spec/hints";
+import { withConceptStamp } from "../spec/edits";
+import { asConceptSummary, asResolvedSpec } from "../spec/hints";
 import type { ResolvedSpec, SpecEdits } from "../spec/types";
 
 // ─────────────────────────── types ────────────────────────────────
@@ -1093,7 +1094,11 @@ export function CreateHistoryProvider({
   );
 
   const patchSetupAnswer = React.useCallback(
-    (chatId: string, turnId: string, patch: (a: SetupAnswer) => SetupAnswer) => {
+    (
+      chatId: string,
+      turnId: string,
+      patch: (a: SetupAnswer, turns: ChatTurn[]) => SetupAnswer,
+    ) => {
       setChats((arr) =>
         arr.map((c) =>
           c.id !== chatId
@@ -1103,7 +1108,7 @@ export function CreateHistoryProvider({
                 updatedAt: Date.now(),
                 turns: c.turns.map((t) =>
                   t.id === turnId && t.role === "setup" && t.answer
-                    ? { ...t, answer: patch(t.answer) }
+                    ? { ...t, answer: patch(t.answer, c.turns) }
                     : t,
                 ),
               },
@@ -1134,9 +1139,18 @@ export function CreateHistoryProvider({
 
   const setSpecEdits = React.useCallback(
     (chatId: string, turnId: string, productId: string, edits: SpecEdits) =>
-      patchSetupAnswer(chatId, turnId, (a) => ({
+      patchSetupAnswer(chatId, turnId, (a, turns) => ({
         ...a,
-        specs: { ...(a.specs ?? {}), [productId]: edits },
+        // Stamped with the parts of the concept they were made on, which
+        // only the store holds here: a Read again on the same turn is a
+        // new concept for them (rebaseEdits).
+        specs: {
+          ...(a.specs ?? {}),
+          [productId]: withConceptStamp(edits, (id) => {
+            const on = turns.find((t) => t.id === id);
+            return on?.role === "assistant" ? asConceptSummary(on.concept)?.parts : undefined;
+          }),
+        },
       })),
     [patchSetupAnswer],
   );

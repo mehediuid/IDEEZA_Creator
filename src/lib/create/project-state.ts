@@ -28,7 +28,7 @@ import {
 import { batteryOf } from "../spec/batteries";
 import { RADIOS, radioChoices, radioKeyOf } from "../spec/catalog";
 import { blocksBuild, deriveSpec, effectiveParts, specKey } from "../spec/derive";
-import { rebaseEdits } from "../spec/edits";
+import { rebaseEdits, stampTurnOf } from "../spec/edits";
 import { cleanEdits } from "../spec/hints";
 import { cardFactsOf, chargesOf, packCellOf, standaloneOf, type SpecFactTone } from "../spec/facts";
 // The radio as format.ts reads it — the card's reading — so the row, the
@@ -104,8 +104,8 @@ export type ProjectState = {
    *  a part taken out that this concept doesn't carry is no edit. By turn. */
   edits: Map<string, SpecEdits>;
   /** A product whose part changes were made on an older concept of it — the
-   *  turn they were made on, by the turn now on screen. The sheet says they
-   *  still apply. */
+   *  turn they were made on, by the turn now on screen, or "" when that is
+   *  this turn, read again since. The sheet says they still apply. */
   editedOn: Map<string, string>;
   /** Each ready card's spec. Null while the concept is still being read. */
   specs: Map<string, ResolvedSpec | null>;
@@ -187,7 +187,12 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     const rebased = concept ? rebaseEdits(stored, concept.parts, t.id) : { edits: stored, olderConcept: false };
     const edits = rebased.edits;
     editsBy.set(t.id, edits);
-    if (rebased.olderConcept && stored.basedOn) editedOn.set(t.id, stored.basedOn);
+    // The turn they were made on — or none to name, when it is this turn,
+    // read again since: the sheet says "an earlier concept".
+    if (rebased.olderConcept && stored.basedOn) {
+      const on = stampTurnOf(stored.basedOn);
+      editedOn.set(t.id, on === t.id ? "" : on);
+    }
     const spec = concept ? deriveSpec(concept.parts, concept.hints, edits) : null;
     specs.set(t.id, spec);
     // The parts the spec was worked out from — a barrel jack left from a
