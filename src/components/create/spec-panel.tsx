@@ -152,7 +152,7 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
         <SizeField productId={productId} spec={spec} edits={card.edits} onChange={change} conflictId={conflict && change ? `${specSizeInputId(productId)}-conflict` : undefined} />
         {conflict && change && <Fixes id={`${specSizeInputId(productId)}-conflict`} sizeId={specSizeInputId(productId)} spec={spec} edits={card.edits} onChange={change} />}
         {spec.draftAtSize && change && (
-            <p className="flex flex-wrap items-center gap-[8px] text-sm text-[color:var(--color-text-warning)]">
+            <p className="flex flex-wrap items-center gap-[8px] text-sm text-text-warning">
               <Icon icon={Alert02Icon} size={14} />
               {/* The keyboard lands on Undo when Draft is chosen, so Undo
                   carries the sentence that says what was chosen. */}
@@ -232,7 +232,7 @@ function SpecFacts({ spec, parts }: { spec: ResolvedSpec; parts: ConceptPart[] }
                 f.tone === "error"
                   ? "font-medium text-text-error"
                   : f.tone === "warn"
-                    ? "font-medium text-[color:var(--color-text-warning)]"
+                    ? "font-medium text-text-warning"
                     : "text-text-secondary",
               ].join(" ")}
             >
@@ -391,7 +391,7 @@ function Fixes({
   };
   return (
     <div role="group" aria-labelledby={id} className="flex flex-col gap-[8px]">
-      <p id={id} className="text-sm font-medium text-text-error">
+      <p id={id} role="status" aria-live="polite" className="text-sm font-medium text-text-error">
         Doesn&apos;t fit — needs at least {mm3(spec.minSize)}.
       </p>
       {/* Sized to their words and wrapping as a row: three bars the width of
@@ -465,7 +465,9 @@ function PowerField({
             ? `Draws about ${currentLabel(spec.drawMa)} of the ${currentLabel(spec.budgetMa)} USB gives.`
             : runtime
               ? `${runtime} at full draw — sleep modes stretch it · draws about ${currentLabel(spec.drawMa)}`
-              : `${powerLabel(spec)} · draws about ${currentLabel(spec.drawMa)}`}
+              : spec.drawMa === 0
+                ? "Draws almost nothing"
+                : `Draws about ${currentLabel(spec.drawMa)}`}
       </p>
     </Field>
   );
