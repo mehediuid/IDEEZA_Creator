@@ -28,7 +28,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
-import { ModelViewer } from "@/components/3d/model-viewer";
+import { deriveAssembly } from "@/lib/three/assembly";
+import { ModelPanel } from "./model-panel/model-panel";
 import {
   ITEM_LABELS,
   ITEM_KINDS,
@@ -39,16 +40,10 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
-import {
-  bookedSpec,
-  isSampleModel,
-  specOfSource,
-  type ArtifactSource,
-} from "@/lib/create/build-artifacts";
+import { isSampleModel, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
 import { NetworkAction } from "@/components/network/network-action";
-import { mm3 } from "@/lib/spec/units";
 import {
   coversFor,
   FirmwarePreview,
@@ -168,10 +163,9 @@ function ReviewPanel({
   // Falls back to the first real deliverable when the link (or a job
   // whose items changed underneath) names one this build doesn't have.
   // With nothing asked for, open on something there is to look at: a finished
-  // piece, and the 3D tab only once its mesh has landed. Opening on a spinner
-  // was the first thing a finished build showed.
-  const viewable = (i: (typeof deliverables)[number]) =>
-    i.status === "ready" && (i.kind !== "3d" || !!job.modelGlbUrl);
+  // piece. The 3D tab is one as soon as its piece is — the model is built
+  // from the parts, and the concept mesh only replaces its shell.
+  const viewable = (i: (typeof deliverables)[number]) => i.status === "ready";
   const shown =
     deliverables.find((i) => i.kind === wanted)?.kind ??
     deliverables.find(viewable)?.kind ??
@@ -179,6 +173,23 @@ function ReviewPanel({
     null;
 
   const shownItem = deliverables.find((i) => i.kind === shown) ?? null;
+
+  // The 3D tab's model: this product's own parts on its own board in its own
+  // enclosure. Only the primary has a concept mesh (the job generates one),
+  // so only its shell can take that shape.
+  const isPrimary = product.id === "primary";
+  const assembly = React.useMemo(
+    () =>
+      deriveAssembly({
+        title: product.title,
+        parts: product.parts,
+        spec: product.spec,
+        meshUrl: isPrimary ? job.modelGlbUrl : undefined,
+      }),
+    [product.title, product.parts, product.spec, isPrimary, job.modelGlbUrl],
+  );
+  const shellNote = !isPrimary ? null : job.modelFailed ? "failed" : !job.modelGlbUrl ? "pending" : null;
+  const showModel = shown === "3d" && shownItem?.status === "ready";
 
   // The project this build already belongs to — the Brief's Step 1 (or
   // Open in editor) is what put it there. A stored id whose project is gone
@@ -404,6 +415,24 @@ function ReviewPanel({
             })}
           </div>
 
+          {showModel ? (
+            // The model carries its own rail — the model, its systems, what
+            // ships — so it takes the whole width instead of sitting beside
+            // the aside.
+            <div
+              id="review-tabpanel"
+              role="tabpanel"
+              aria-labelledby={`review-tab-${shown}`}
+              className="px-10 pb-10"
+            >
+              <ModelPanel
+                key={product.id}
+                assembly={assembly}
+                shellNote={shellNote}
+                onRetryMesh={() => setBuildModelFailed(job.id, false)}
+              />
+            </div>
+          ) : (
           <div
             id="review-tabpanel"
             role="tabpanel"
@@ -452,17 +481,7 @@ function ReviewPanel({
                   )}
                 </div>
               ) : (
-                <DeliverablePanel
-                  kind={shown}
-                  product={product}
-                  job={job}
-                  // §4.4 — the mesh in the 3D tab is the job's, generated once
-                  // from the primary's concept image; a companion previews it
-                  // at its own size, not its own shape, and the caption says
-                  // so rather than claiming a shape that isn't its.
-                  isCompanion={product.id !== "primary"}
-                  onRetryModel={() => setBuildModelFailed(job.id, false)}
-                />
+                <DeliverablePanel kind={shown} product={product} />
               )}
             </div>
             {/* Beside the artifact, not a second card inside this one: a
@@ -488,6 +507,7 @@ function ReviewPanel({
               </section>
             </aside>
           </div>
+          )}
 
           {!building && (
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
@@ -591,127 +611,19 @@ function moveTab(
 function DeliverablePanel({
   kind,
   product,
-  job,
-  isCompanion,
-  onRetryModel,
 }: {
   kind: BuildItemKind;
   /** The product being reviewed — the primary, or one of its companions
    *  (§4.7). Every artifact below is derived from this product's own
    *  parts, so a remote's BOM is the remote's. */
   product: ArtifactSource;
-  /** Still the job, for the one thing that is the job's and not a
-   *  product's: the generated 3D model. */
-  job: BuildJob;
-  /** True for a companion: the 3D tab's mesh is generated once, from the
-   *  primary's concept image, so a companion's tab previews that same mesh
-   *  at its own size rather than a shape of its own. */
-  isCompanion: boolean;
-  onRetryModel: () => void;
 }) {
   if (kind === "pcb") return <PcbPreview job={product} />;
   if (kind === "code") return <FirmwarePreview job={product} />;
   if (kind === "wiring") return <WiringPreview job={product} />;
   if (kind === "parts") return <PartsPreview job={product} />;
-  return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-solid border-border bg-bg-surface-raised">
-      {job.modelGlbUrl ? (
-        <ModelViewer url={job.modelGlbUrl} />
-      ) : job.modelFailed ? (
-        <ModelFailed onRetry={onRetryModel} />
-      ) : (
-        <GeneratingModel />
-      )}
-      {/* The mesh is drawn from the concept image, so its proportions are the
-          concept's; the size it will be made at is the spec's, said here
-          rather than faked by stretching a model with no ruler beside it.
-          A build with no booked snapshot never fixed that size at booking
-          time (I4), so it reads as worked out from the parts, not as the
-          spec's own number. A companion has no mesh of its own (the job
-          only ever generates one), so its caption says whose shape this
-          preview is showing instead of implying it drew the companion's.
-          A build in demo mode has no mesh of its own either — every job
-          lands on the same bundled sample.glb — so the caption says that
-          plainly instead of claiming a shape it never drew (e2e #3). */}
-      <p
-        className="pointer-events-none absolute bottom-[10px] left-[12px] max-w-[calc(100%-24px)] truncate rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary"
-        title={modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
-      >
-        {modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
-      </p>
-    </div>
-  );
-}
-
-// The 3D tab's caption. A sample model's size note keeps the legacy
-// booked/worked-out-from-the-parts and companion wording (that part of the
-// number is still true), but its shape note replaces "shape from concept"
-// with the plain fact that the mesh is the demo placeholder, not this
-// concept's (e2e #3). Kept short — this sits in a fixed pill over the model,
-// and every demo build shows it, so it must not wrap at 400 px (Minor 12).
-function modelCaption(
-  product: ArtifactSource,
-  isCompanion: boolean,
-  isSample: boolean,
-): string {
-  const size = mm3(specOfSource(product).size);
-  const legacy = !bookedSpec(product);
-  if (isSample) {
-    const sizeNote = legacy ? "worked out from the parts" : "from spec";
-    return isCompanion
-      ? `Sample model (demo) · primary's shape · ${size} ${sizeNote}`
-      : `Sample model (demo) · ${size} ${sizeNote}`;
-  }
-  const sizeNote = legacy ? "size worked out from the parts" : "size from spec";
-  return isCompanion
-    ? `${size} · ${sizeNote} · this preview shows the primary's model`
-    : `${size} · shape from concept, ${sizeNote}`;
-}
-
-// Shown in the 3D tab while the enclosure mesh is still being generated from
-// the concept image. The build can flip to "ready" before a slow provider
-// finishes the mesh, so this keeps the panel honest until the model lands —
-// the panel's own space, pulsing quietly, with the state in words.
-function GeneratingModel() {
-  return (
-    <div
-      role="status"
-      className="absolute inset-0 flex flex-col items-center justify-center gap-[8px]"
-    >
-      {/* The ground pulses, not the words on it. */}
-      <span aria-hidden className="absolute inset-0 bg-bg-subtle motion-safe:animate-pulse" />
-      <p className="relative text-sm font-medium text-text-secondary">
-        Generating the 3D model…
-      </p>
-      <p className="relative text-sm text-text-tertiary">
-        The other pieces are ready to look at meanwhile.
-      </p>
-    </div>
-  );
-}
-
-// The mesh could not be made — the provider refused, failed or never
-// answered. Said plainly, with the one thing that can change it.
-function ModelFailed({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-[8px] px-[24px] text-center">
-      <p className="text-md font-medium text-text-secondary">
-        Couldn&apos;t make the 3D model
-      </p>
-      <p className="max-w-[40ch] text-sm text-text-tertiary">
-        The model service didn&apos;t return a mesh for this concept. The other
-        pieces are unaffected, and trying again costs nothing.
-      </p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-[4px] inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        <Icon icon={Refresh01Icon} size={16} />
-        Try again
-      </button>
-    </div>
-  );
+  // The 3D tab is the model panel, which takes this panel's place above.
+  return null;
 }
 
 /** A footer control that leaves this surface. It spins and says "Opening…"

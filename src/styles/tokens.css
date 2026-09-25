@@ -127,7 +127,8 @@
      font/size/4xl — which reads as a mismatch at every call site, so the
      pairing is made explicit here.) `relaxed` is the multi-line prose variant
      for any size. */
-  --line-height-2xs: 15px;
+  /* Figma line/height/2xs — it was 15px here. */
+  --line-height-2xs: 14px;
   --line-height-xs: 16px;
   --line-height-sm: 18px;
   --line-height-md: 20px;

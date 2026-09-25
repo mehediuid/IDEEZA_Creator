@@ -5,9 +5,10 @@
 // composed from them. Nothing here is guessed: a row with no source (a
 // component's material, its mass) is left off, never filled in.
 
+import { bomFor } from "../create/build-artifacts";
 import type { ConceptPart, ConceptPartCategory } from "../create/concept";
 import { batteryOf, isBatteryPart } from "../spec/batteries";
-import { bodyOf, qtyOf } from "../spec/bodies";
+import { bodyOf } from "../spec/bodies";
 import { deriveSpec } from "../spec/derive";
 import type { ResolvedSpec } from "../spec/types";
 
@@ -57,6 +58,10 @@ export type Assembly = {
   parts: AssemblyPart[];
   systems: AssemblySystem[];
   size: { l: number; w: number; h: number };
+  /** What the enclosure is printed in, and its wall — the spec's own. */
+  material: string;
+  wallMm: number;
+  board: { w: number; h: number } | null;
 };
 
 export const SYSTEM_ORDER: SystemId[] = [
@@ -99,16 +104,6 @@ const SHAPE_OF: Record<ConceptPartCategory, PartShape> = {
   "Connector & mech": "connector",
   Passive: "chip",
 };
-const REF_PREFIX: Record<SystemId, string> = {
-  enclosure: "MECH-",
-  board: "PCB-",
-  compute: "U",
-  sensing: "U",
-  motion: "M",
-  power: "BT",
-  interface: "J",
-  passives: "R",
-};
 
 /** The bundled demo model the no-key provider returns. It is a sample, not a
  *  shape made from this concept, so it never stands in for the shell. */
@@ -132,7 +127,19 @@ const norm = (v: Vec3): Vec3 => {
   const m = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / m, v[1] / m, v[2] / m];
 };
-const pad2 = (n: number) => String(n).padStart(2, "0");
+/** One designator per unit: "M1–M4" is four parts, M1 to M4; a single
+ *  designator with a quantity (a passive's estimate) is that designator on
+ *  each of them. */
+function unitRefs(ref: string, qty: number): string[] {
+  const range = ref.match(/^([A-Z]+)(\d+)–[A-Z]+(\d+)$/);
+  if (range) {
+    const [, prefix, from, to] = range;
+    const out: string[] = [];
+    for (let n = Number(from); n <= Number(to); n += 1) out.push(`${prefix}${n}`);
+    return out;
+  }
+  return Array.from({ length: Math.max(1, qty) }, () => ref);
+}
 
 type Draft = Omit<AssemblyPart, "explodeDir" | "inventoryAt" | "id" | "instance"> & {
   key: string;
@@ -241,67 +248,73 @@ export function deriveAssembly(input: {
   let rowDepth = 0;
   let cx = board ? boardX + board.w / 2 + GAP_MM : innerLeft;
   let ox = size.l / 2 + GAP_MM * 4;
-  const counter: Record<string, number> = {};
-  const nextRef = (system: SystemId) => {
-    const prefix = REF_PREFIX[system];
-    counter[prefix] = (counter[prefix] ?? 0) + 1;
-    return prefix.endsWith("-") ? `${prefix}${pad2(counter[prefix])}` : `${prefix}${counter[prefix]}`;
-  };
-  // A booked spec chose the pack, so a battery the concept listed is set
-  // aside for it; an old build keeps the one it named.
-  const buildParts = booked ? parts.filter((p) => !isBatteryPart(p)) : parts;
-  for (const part of buildParts) {
-    const system = SYSTEM_OF[part.category];
-    const { body, estimated } = bodyOf(part);
-    const qty = qtyOf(part.name);
-    for (let i = 0; i < qty; i += 1) {
-      let at: Vec3;
-      if (body.at === "board" && board) {
-        if (bx + body.l > boardRight && bx > boardLeft) {
-          bx = boardLeft;
-          bz += rowDepth + 1;
-          rowDepth = 0;
-        }
-        at = [bx + body.l / 2, boardTop + body.h / 2, bz + body.w / 2];
-        bx += body.l + 1;
-        rowDepth = Math.max(rowDepth, body.w);
-      } else if (body.at === "outside") {
-        at = [ox + body.l / 2, floorY + body.h / 2, 0];
-        ox += body.l + GAP_MM;
-      } else {
-        at = [cx + body.l / 2, floorY + wall + body.h / 2, 0];
-        cx += body.l + GAP_MM;
+  const place = (body: { l: number; w: number; h: number; at: "board" | "case" | "outside" }): Vec3 => {
+    if (body.at === "board" && board) {
+      if (bx + body.l > boardRight && bx > boardLeft) {
+        bx = boardLeft;
+        bz += rowDepth + 1;
+        rowDepth = 0;
       }
+      const at: Vec3 = [bx + body.l / 2, boardTop + body.h / 2, bz + body.w / 2];
+      bx += body.l + 1;
+      rowDepth = Math.max(rowDepth, body.w);
+      return at;
+    }
+    if (body.at === "outside") {
+      const at: Vec3 = [ox + body.l / 2, floorY + body.h / 2, 0];
+      ox += body.l + GAP_MM;
+      return at;
+    }
+    const at: Vec3 = [cx + body.l / 2, floorY + wall + body.h / 2, 0];
+    cx += body.l + GAP_MM;
+    return at;
+  };
+
+  // Designators and quantities are the BOM's own, so a part reads the same
+  // here as on the Parts tab: four motors are M1–M4, and a passive keeps the
+  // one designator its BOM row carries across the units it estimates.
+  const bom = bomFor({ title, parts, spec: input.spec });
+  const pack = batteryOf(spec.battery);
+  parts.forEach((part, index) => {
+    const row = bom.rows[index];
+    const system = SYSTEM_OF[part.category];
+    // The pack the spec chose is sized by the spec's own table, not guessed
+    // from its name; an old build's listed battery is sized like any part.
+    const isPack = booked && isBatteryPart(part) && pack.body;
+    const measured = isPack
+      ? { body: { ...pack.body!, at: "case" as const, mA: 0 }, estimated: false }
+      : bodyOf(part);
+    const { body, estimated } = measured;
+    const refs = unitRefs(row?.ref ?? "U?", row?.qty ?? 1);
+    refs.forEach((ref, i) => {
       drafts.push({
-        key: `${part.name}#${i}`,
-        name: part.name,
-        ref: nextRef(system),
+        key: `${index}:${part.name}#${i}`,
+        name: row?.name ?? part.name,
+        ref,
         system,
         description: estimated ? `${part.role} Size is an estimate from its category.` : part.role,
         body: { l: body.l, w: body.w, h: body.h },
-        shape: SHAPE_OF[part.category],
-        at,
+        shape: isPack ? "box" : SHAPE_OF[part.category],
+        at: place(body),
         source: estimated ? "estimate" : "spec",
       });
-    }
-  }
+    });
+  });
 
-  // ── The booked spec's pack, which it picked in place of a listed one.
-  if (booked) {
-    const info = batteryOf(spec.battery);
-    if (info.body) {
-      drafts.push({
-        key: "battery",
-        name: info.label,
-        ref: nextRef("power"),
-        system: "power",
-        description: "Powers the product.",
-        body: { l: info.body.l, w: info.body.w, h: info.body.h },
-        shape: "box",
-        at: [cx + info.body.l / 2, floorY + wall + info.body.h / 2, 0],
-        source: "spec",
-      });
-    }
+  // A booked spec that picked a pack the parts don't list (a build booked
+  // before its parts carried the pack) still shows it.
+  if (booked && pack.body && !parts.some(isBatteryPart)) {
+    drafts.push({
+      key: "battery",
+      name: pack.label,
+      ref: "BT1",
+      system: "power",
+      description: "Powers the product.",
+      body: { l: pack.body.l, w: pack.body.w, h: pack.body.h },
+      shape: "box",
+      at: place({ ...pack.body, at: "case" }),
+      source: "spec",
+    });
   }
 
   // ── Instances, ids, explode directions and the inventory grid.
@@ -351,6 +364,9 @@ export function deriveAssembly(input: {
       count: out.filter((p) => p.system === id).length,
     })).filter((s) => s.count > 0),
     size: { l: size.l, w: size.w, h: size.h },
+    material,
+    wallMm: wall,
+    board: board ? { w: board.w, h: board.h } : null,
   };
 }
 

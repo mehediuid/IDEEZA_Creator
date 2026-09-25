@@ -47,7 +47,9 @@ ideeza-creator-panel/
    │  │                      deliverable-previews (PCB/firmware/wiring/parts, derived),
    │  │                      spec-panel.tsx (the card's facts + Edit spec button),
    │  │                      spec-sheet.tsx + spec-sections.tsx (the part editor,
-   │  │                      docked beside the canvas or an overlay), buttons.ts
+   │  │                      docked beside the canvas or an overlay), buttons.ts,
+   │  │                      model-panel/ (the 3D tab: panel + view state, rail,
+   │  │                      viewer controls, overlays, states, the r3f viewer)
    │  ├─ package/            ★ New Package flow — shell + step rail, the two canvas
    │  │                      editors (symbol/footprint), 3D placement, finalize,
    │  │                      confirmation, and the chrome both editors share
@@ -91,6 +93,10 @@ ideeza-creator-panel/
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
+   │  ├─ three/              providers.ts (image→3D), assembly.ts (the build as
+   │  │                      an assembly of its parts: systems, placement,
+   │  │                      explode, inventory), use-tokens.ts (DS colours for
+   │  │                      three.js scenes)
    │  ├─ spec/               The product spec sheet — part bodies, packs,
    │  │                      size/board/power math, hint and snapshot checks, the
    │  │                      menu copy and part/radio/MCU tables, edit helpers and
@@ -102,7 +108,6 @@ ideeza-creator-panel/
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store)
-   │  ├─ three/              providers.ts (three.js setup)
    │  ├─ wiring/             types.ts
    │  ├─ feed.ts · feed-image-manifest.ts   community-feed data
    │  └─ utils.ts            shared helpers (cn, etc.)

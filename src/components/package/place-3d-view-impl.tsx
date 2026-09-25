@@ -17,27 +17,9 @@ import * as React from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { type PackageDraft, fpPads } from "@/lib/package/types";
+import { useTokens } from "@/lib/three/use-tokens";
 
 const BOARD_T = 1.6;
-
-/** Read design tokens as concrete colours — three.js needs a value, not a
- *  var(). Re-read when the theme flips so the scene follows the DS. */
-function useTokens(names: string[]): string[] {
-  const key = names.join("|");
-  const [vals, setVals] = React.useState<string[]>(() => names.map(() => "#888888"));
-  React.useEffect(() => {
-    const list = key.split("|");
-    const read = () => {
-      const cs = getComputedStyle(document.documentElement);
-      setVals(list.map((n) => cs.getPropertyValue(n).trim() || "#888888"));
-    };
-    read();
-    const mo = new MutationObserver(read);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, [key]);
-  return vals;
-}
 
 export type Extent = { minX: number; maxX: number; minY: number; maxY: number };
 
