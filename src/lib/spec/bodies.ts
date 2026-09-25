@@ -44,6 +44,19 @@ export function qtyOf(name: string): number {
   return Number.isFinite(count) && count > 0 ? Math.min(count, 16) : 1;
 }
 
+/** One unit's name — "TT gear motor (x4)", "4 x TT gear motor" and "TT gear
+ *  motor x4" are each "TT gear motor" — for a list that states the count in
+ *  a column of its own. A name that counts nothing is left as it is. */
+export function unitName(name: string): string {
+  if (qtyOf(name) === 1) return name;
+  const bare = name
+    .replace(/\s*\((?:[x×]\s*\d{1,2}|\d{1,2}\s*[x×])\)/i, "")
+    .replace(/^\s*\d{1,2}\s*[x×]\s+/i, "")
+    .replace(/\s+[x×]\s*\d{1,2}\s*$/i, "")
+    .trim();
+  return bare || name;
+}
+
 // A stated wattage on an LED is the part's own word for its current — read
 // straight off it instead of the single-status-LED default every "3 W
 // emitter" would otherwise take. "LED emitter"/"high-power LED" with no

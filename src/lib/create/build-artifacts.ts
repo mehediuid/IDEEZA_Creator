@@ -7,7 +7,7 @@
 
 import type { ConceptPart, ConceptPartCategory } from "./concept";
 import { isBatteryPart } from "../spec/batteries";
-import { qtyOf } from "../spec/bodies";
+import { qtyOf, unitName } from "../spec/bodies";
 import {
   isChargePort,
   isDriveMotor,
@@ -164,12 +164,19 @@ export function bomFor(job: ArtifactSource): Bom {
   const seen: Record<string, number> = {};
   const rows: BomRow[] = job.parts.map((part, i) => {
     const prefix = refPrefixOf(part);
-    seen[prefix] = (seen[prefix] ?? 0) + 1;
+    const qty = qtyFor(part, i);
+    // Each unit a name counts is a part of its own on the schematic: four
+    // motors are M1–M4, with the count in its own column, not "(x4)" left in
+    // the name beside it. A passive's quantity is the board's estimate, not
+    // a count the concept named, so it keeps one designator.
+    const counted = part.category !== "Passive" && qty > 1;
+    const first = (seen[prefix] ?? 0) + 1;
+    seen[prefix] = first + (counted ? qty - 1 : 0);
     return {
       category: part.category,
-      name: part.name,
-      ref: `${prefix}${seen[prefix]}`,
-      qty: qtyFor(part, i),
+      name: counted ? unitName(part.name) : part.name,
+      ref: counted ? `${prefix}${first}–${prefix}${first + qty - 1}` : `${prefix}${first}`,
+      qty,
     };
   });
   const passives = rows.filter((r) => r.category === "Passive").length;
@@ -201,12 +208,7 @@ export type PartChanges = {
 function plainName(part: ConceptPart): string {
   const name = readableName(part);
   const n = qtyOf(part.name);
-  if (n === 1) return name;
-  const bare = name
-    .replace(/\s*\((?:[x×]\s*\d+|\d+\s*[x×])\)\s*$/i, "")
-    .replace(/^\s*\d+\s*[x×]\s+|\s*[x×]\s*\d+\s*$/i, "")
-    .trim();
-  return `${n} × ${bare}`;
+  return n === 1 ? name : `${n} × ${unitName(name)}`;
 }
 
 // A removed part and an added one in the same place are one part swapped:
@@ -473,8 +475,20 @@ export function firmwareFor(job: ArtifactSource): Firmware {
   const addressed = job.parts.filter(
     (p) => !UNADDRESSED.includes(p.category),
   );
-  const defines = addressed.map(
-    (part, i) => `#define ${symbolFor(part.name)}_PIN ${i + 2}`,
+  // A pin for each unit: four motors are four pins, not one
+  // TT_GEAR_MOTOR_X4_PIN for all of them.
+  const units = addressed.flatMap((part) => {
+    const n = qtyOf(part.name);
+    if (n === 1) return [{ part, symbol: symbolFor(part.name), label: part.name }];
+    const name = unitName(part.name);
+    return Array.from({ length: n }, (_, k) => ({
+      part,
+      symbol: `${symbolFor(name)}_${k + 1}`,
+      label: `${name} ${k + 1} of ${n}`,
+    }));
+  });
+  const defines = units.map(
+    (unit, i) => `#define ${unit.symbol}_PIN ${i + 2}`,
   );
 
   const setup = ["void setup() {", "  Serial.begin(115200);"];
@@ -482,12 +496,12 @@ export function firmwareFor(job: ArtifactSource): Firmware {
   if (addressed.some((p) => p.category === "Sensor")) {
     setup.push("  Wire.begin();");
   }
-  for (const part of addressed) {
-    const pin = `${symbolFor(part.name)}_PIN`;
+  for (const { part, symbol, label } of units) {
+    const pin = `${symbol}_PIN`;
     setup.push(
       part.category === "Sensor"
-        ? `  pinMode(${pin}, INPUT);  // ${part.name} interrupt line`
-        : `  pinMode(${pin}, OUTPUT);  // ${part.name}`,
+        ? `  pinMode(${pin}, INPUT);  // ${label} interrupt line`
+        : `  pinMode(${pin}, OUTPUT);  // ${label}`,
     );
   }
   setup.push("}");
