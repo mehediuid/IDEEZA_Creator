@@ -254,14 +254,22 @@ function SheetPanel({
   // On a phone the rail row that opened it is on the other tab, hidden, so
   // handing focus back to it lands nowhere; the product's own card button,
   // on the canvas the sheet was over, takes it instead. Declared after the
-  // hook so this runs once the hook has tried.
+  // hook so this runs once the hook has tried. Only when the overlay really
+  // closes: the product is read through a ref, because switching the sheet
+  // to another one (its Open X) ran this cleanup too, and sent the keyboard
+  // to the old product's card behind the modal before the new title took it.
+  const productNow = React.useRef(productId);
+  React.useEffect(() => {
+    productNow.current = productId;
+  }, [productId]);
   React.useEffect(() => {
     if (!open || docked) return;
+    const last = productNow;
     return () => {
       const lost = !document.activeElement || document.activeElement === document.body;
-      if (lost) document.getElementById(specButtonId(productId))?.focus();
+      if (lost) document.getElementById(specButtonId(last.current))?.focus();
     };
-  }, [open, docked, productId]);
+  }, [open, docked]);
 
   // Docked, it is a column of the page: the rail and the canvas stay usable
   // beside it, and each ask puts the keyboard where that ask meant — a rail
