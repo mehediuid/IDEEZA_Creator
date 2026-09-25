@@ -239,10 +239,13 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
     **Inside**, read-only — the circuit board, what's on it and what does
     what, what's wired to it; no fab profile here, that stays on the build
     review.
-  - A standalone **charger** swaps Power for **Charges** (the cell it
-    charges, the port it plugs into, a mismatch note when its pack no
-    longer matches); a **spare pack** swaps it for **Pack** (the pack
-    itself, what it plugs in with, the same mismatch note). Either with no
+  - A standalone **charger** swaps Power for **Charges** (the cells it
+    charges — a choice, *1S Li-Po — one cell, 3.7 V* on a TP4056 or *2S
+    Li-Po — two cells, 7.4 V* on an IP2326 USB boost charger that balances
+    both cells, which swaps its charging IC for the build — the port it
+    plugs into, a mismatch note when its pack no longer matches); a
+    **spare pack** swaps it for **Pack** (the pack itself, what it plugs
+    in with, the same mismatch note). Either with no
     chip reads *No chip — add one to give it sensors, a screen or
     wireless* with **Add a chip** (an ESP32-C3, no port change, so a
     charger keeps its own); **Remove chip** takes the chip and its radio
@@ -281,13 +284,12 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
   One that no longer works reads in the **error** tone and names its way
   out: *X uses LoRa SX1276 — these two won't talk. Pick LoRa SX1276 here,
   or change X's radio.*; on the car, *Battery Charger charges 1S Li-Po —
-  it can't charge this 2S Li-Po 1500 mAh. Pick a 1S pack here to charge it
-  with Battery Charger.*; on the charger, *Change RC Car Controller's pack
-  to 1S — this charger charges one cell.* (from the cells the charger
-  names; a spare pack's note names the pack to pick the same way). What a
-  charger charges is read-only for now. A spare pack or charger pairs with
-  whichever product its pack matches, else with the primary; two
-  companions are never checked against each other.
+  it can't charge this 2S Li-Po 1500 mAh. Pick a 1S pack here, or change
+  Battery Charger to 2S.*; on the charger, *Pick 2S here, or change RC Car
+  Controller's pack to 1S.* (from the cells the charger fills; a spare
+  pack's note names the pack to pick the same way). A spare pack or
+  charger pairs with whichever product its pack matches, else with the
+  primary; two companions are never checked against each other.
 - **Stale edits.** A Refine or Regenerate that lands a new concept keeps
   the maker's part edits and rebases them onto it (a `removed` part the
   new concept no longer has is dropped). The sheet says so at its top:
