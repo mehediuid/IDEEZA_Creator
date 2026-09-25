@@ -114,9 +114,13 @@ function landingOf(target: JumpTarget): { ring: string; focus: string } {
   }
 }
 
-/** Side by side from `md` (768 px); below it the rail and the canvas are two
- *  tabs, and only one of them is on screen. */
-const sideBySide = () => window.matchMedia("(min-width: 768px)").matches;
+/** The breakpoint the page's CSS lays the two panes out by. */
+const MD = "(min-width: 768px)";
+
+/** Whether the rail and the canvas are both on screen: as measured
+ *  (useRoomToSplit), or before that by the breakpoint, as the CSS lays them
+ *  out. Otherwise they are two tabs, and only one of them is on screen. */
+const sideBySide = (split: boolean | null) => split ?? window.matchMedia(MD).matches;
 
 /** The gate's line for one product: its spec, then the radio and the one
  *  part the card names — read off the parts as edited, so what is paid for
@@ -147,10 +151,10 @@ function sheetNameOf(
   return productNameOf(setup, turn) ?? `Concept ${labels.get(turn.id) ?? "1"}`;
 }
 
-/** What the page needs beside a docked sheet, read off the classes that lay
- *  it out: the rail's `md:w-[360px]`, the canvas's `md:px-[32px]` on both
- *  sides, and one column of cards — the grid's `minmax(320px,1fr)`
- *  (chat-thread.tsx). */
+/** What the page needs beside the rail, and beside a docked sheet, read off
+ *  the classes that lay it out: the rail's `md:w-[360px]`, the canvas's
+ *  `md:px-[32px]` on both sides, and one column of cards — the grid's
+ *  `minmax(320px,1fr)` (chat-thread.tsx). */
 const RAIL_WIDTH = 360;
 const CANVAS_PADDING_X = 32 * 2;
 const CARD_MIN_WIDTH = 320;
@@ -167,22 +171,45 @@ function scrollbarWidth(): number {
   return w;
 }
 
-/** Whether the sheet docks (review C1): only when the page's own box — not
- *  the window, which the app's sidebar shares — holds the rail, the sheet
- *  and a whole column of cards. Docked below that, it crushed the canvas: a
- *  card ran under it and the canvas scrolled sideways. Less room gets the
- *  overlay. Watched, so the sidebar collapsing or the window resizing moves
- *  it either way. */
-function useRoomToDock(root: HTMLElement | null): boolean {
-  const [docked, setDocked] = React.useState(false);
-  React.useEffect(() => {
+/** Whether the page's own box — not the window, which the app's sidebar
+ *  shares — is at least `need` wide, with a scrollbar that takes room, from
+ *  the `from` breakpoint up. Measured as the box mounts, before it is
+ *  painted — the observer's first reading comes a frame late, and a page
+ *  too narrow for two panes showed them for that frame — then watched, so
+ *  the sidebar collapsing or the window resizing moves it either way. Null
+ *  until the box is measured. */
+function useRoomFor(root: HTMLElement | null, need: number, from?: string): boolean | null {
+  const [room, setRoom] = React.useState<boolean | null>(null);
+  React.useLayoutEffect(() => {
     if (!root) return;
-    const need = RAIL_WIDTH + SHEET_WIDTH + CARD_MIN_WIDTH + CANVAS_PADDING_X + scrollbarWidth();
-    const observer = new ResizeObserver(([entry]) => setDocked(entry.contentRect.width >= need));
+    const min = need + scrollbarWidth();
+    const fits = (width: number) => (!from || window.matchMedia(from).matches) && width >= min;
+    // A layout read, set before the paint on purpose — what a layout effect
+    // is for; the observer below takes every change after it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRoom(fits(root.getBoundingClientRect().width));
+    const observer = new ResizeObserver(([entry]) => setRoom(fits(entry.contentRect.width)));
     observer.observe(root);
     return () => observer.disconnect();
-  }, [root]);
-  return docked;
+  }, [root, need, from]);
+  return room;
+}
+
+/** Whether the sheet docks (review C1): only when the page's own box holds
+ *  the rail, the sheet and a whole column of cards. Docked below that, it
+ *  crushed the canvas: a card ran under it and the canvas scrolled
+ *  sideways. Less room gets the overlay. */
+function useRoomToDock(root: HTMLElement | null): boolean {
+  return useRoomFor(root, RAIL_WIDTH + SHEET_WIDTH + CARD_MIN_WIDTH + CANVAS_PADDING_X) ?? false;
+}
+
+/** Whether the rail and the canvas sit side by side: from `md`, and only
+ *  when the page's own box holds the rail and a whole column of cards. From
+ *  `md` alone, the 280 px sidebar left the canvas 128–360 px at 768–1000 px,
+ *  and it scrolled sideways. Less room gets the phone's Canvas and Chat
+ *  tabs. Null until measured, when the breakpoint decides, as the CSS does. */
+function useRoomToSplit(root: HTMLElement | null): boolean | null {
+  return useRoomFor(root, RAIL_WIDTH + CARD_MIN_WIDTH + CANVAS_PADDING_X, MD);
 }
 
 /** The maker's sentence as the tail of another one: a companion is drawn as
@@ -325,7 +352,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // row is selected, no card is edged, and the composer changes nothing
   // until a product is picked again.
   const [focusedProduct, setFocusedProduct] = React.useState<string | null>("primary");
-  // Which pane a phone shows; both show from `md`.
+  // Which pane shows when the two are tabs — on a phone, or where the page
+  // has no room for both (useRoomToSplit).
   const [pane, setPane] = React.useState<"work" | "chat">("work");
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
   // Part 4 §4.4 — the companion products offered for the concept the gate
@@ -438,11 +466,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // Everything the rail and the page's announcer say, worked out once.
   const rail = useRailModel(chat ?? NO_CHAT, activeBuild, labels, projectName, savedName);
 
-  // Whether the sheet docks beside the canvas: only where the page keeps a
-  // whole column of cards beside it, measured on this page's own box — not
-  // the window, which the app's sidebar (280 px, or 72 collapsed) shares.
+  // Whether the rail sits beside the canvas, and the sheet docks beside it
+  // too: only where the page keeps a whole column of cards beside them,
+  // measured on this page's own box — not the window, which the app's
+  // sidebar (280 px, or 72 collapsed) shares.
   const [chatRoot, setChatRoot] = React.useState<HTMLDivElement | null>(null);
+  const split = useRoomToSplit(chatRoot);
   const docked = useRoomToDock(chatRoot);
+  // Measured too narrow for both: the tabs, whatever the breakpoint says.
+  const tabs = split === false;
 
   // The one way the selection moves (review M11): a rail row, Edit spec, the
   // Build line's size, Add a product, Restore, a typed add, Regenerate,
@@ -472,9 +504,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // the dialog has handed it back to what opened it.
   const messageAboutSpec = React.useCallback(() => {
     setSpecSheet(null);
-    if (!sideBySide()) setPane("chat");
+    if (!sideBySide(split)) setPane("chat");
     requestAnimationFrame(() => document.getElementById(COMPOSER_INPUT_ID)?.focus());
-  }, []);
+  }, [split]);
   // Opens that product's sheet with the keyboard in its Length field
   // (specSizeInputId) — where the conflict the Build line names is fixed.
   // The sheet puts focus there itself once it has drawn.
@@ -911,7 +943,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // nothing on screen to scroll to.
   const jumpTo = React.useCallback(
     (target: JumpTarget, { focus }: { focus: boolean }) => {
-      if (!sideBySide()) setPane("work");
+      if (!sideBySide(split)) setPane("work");
       // The size field is reached the way the Build line reaches it: the
       // product's spec sheet opens with the keyboard in its size.
       if (target.kind === "spec") focusSpec(target.productId);
@@ -944,7 +976,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         if (document.activeElement !== control) ring.focus({ preventScroll: true });
       });
     },
-    [focusSpec],
+    [focusSpec, split],
   );
 
   // A rail row: the composer, the row and the review's product tab all follow
@@ -981,10 +1013,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       }
       const inReview = railRows.find((r) => r.productId === productId)?.build;
       jumpTo(inReview ? { kind: "review" } : { kind: "card", productId }, {
-        focus: !sideBySide(),
+        focus: !sideBySide(split),
       });
     },
-    [railState, railRows, jumpTo, openSpec, select, docked, sheetShowing, labels],
+    [railState, railRows, jumpTo, openSpec, select, docked, sheetShowing, labels, split],
   );
 
   // The setup question is still open. Typing then used to skip it: the text
@@ -1597,7 +1629,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     editorTurn?.role === "assistant" ? productNameOf(rail.state.setup, editorTurn) : undefined;
 
   return (
-    <div ref={setChatRoot} className="flex h-full flex-col md:flex-row">
+    <div ref={setChatRoot} className={["flex h-full flex-col", tabs ? "" : "md:flex-row"].join(" ")}>
       {/* The page's one h1, for the heading outline a screen reader walks,
           ahead of both panes: inside the canvas it came after the rail's
           h2 and h3s, so the outline opened on those. The rail and the
@@ -1607,14 +1639,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           panes, since on a phone the rail is hidden while the canvas shows,
           and that is where the maker is when a render lands. */}
       <RailAnnouncer model={rail} note={sheetNote} />
-      {/* At phone width the two panes are two tabs — side by side they needed
-          1000 px and the canvas was simply off the screen. The canvas leads,
-          because the question and the work are there; the chat tab carries
-          the account and the composer. */}
+      {/* At phone width, and wherever the page has no room for the rail and
+          a column of cards (useRoomToSplit), the two panes are two tabs —
+          side by side they needed 1000 px and the canvas was simply off the
+          screen. The canvas leads, because the question and the work are
+          there; the chat tab carries the account and the composer. */}
       <div
         role="tablist"
         aria-label="Chat panes"
-        className="flex shrink-0 gap-[4px] border-b border-solid border-border bg-bg-surface px-[12px] py-[8px] md:hidden"
+        className={[
+          "flex shrink-0 gap-[4px] border-b border-solid border-border bg-bg-surface px-[12px] py-[8px]",
+          tabs ? "" : "md:hidden",
+        ].join(" ")}
       >
         {(
           [
@@ -1650,8 +1686,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       <aside
         aria-label="Project"
         className={[
-          "min-h-0 flex-1 flex-col border-solid border-border bg-bg-surface md:w-[360px] md:flex-none md:shrink-0 md:border-r",
-          pane === "chat" ? "flex" : "hidden md:flex",
+          "min-h-0 flex-1 flex-col border-solid border-border bg-bg-surface",
+          tabs ? "" : "md:w-[360px] md:flex-none md:shrink-0 md:border-r",
+          pane === "chat" ? "flex" : tabs ? "hidden" : "hidden md:flex",
         ].join(" ")}
       >
         <div className="flex-1 overflow-y-auto">
@@ -1741,7 +1778,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       <main
         className={[
           "min-h-0 flex-1 overflow-y-auto bg-bg-page",
-          pane === "work" ? "block" : "hidden md:block",
+          pane === "work" ? "block" : tabs ? "hidden" : "hidden md:block",
         ].join(" ")}
       >
         <div className="w-full px-[16px] py-[20px] md:px-[32px] md:py-[32px]">
