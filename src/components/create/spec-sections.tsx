@@ -72,8 +72,10 @@ import {
   DOES_LABEL,
   chargesOf,
   insideOf,
+  packCellOf,
   readableName,
   replacedNotRecharged,
+  standaloneOf,
 } from "@/lib/spec/facts";
 import { MATERIAL_NOTE, needsNoPower } from "@/lib/spec/format";
 import { COUNT_MAX, WALL_MAX_MM, WALL_MIN_MM, WALL_STEP_MM, cleanEdits } from "@/lib/spec/hints";
@@ -272,14 +274,23 @@ function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
 
 /** What this product works with in the project, each with a way to open the
  *  other's sheet: "Talks to Remote Controller — both use nRF24L01.", or in
- *  the error tone what no longer works and how to put it right. */
-function LinkNotes({ links, onOpen }: { links: ProductLink[]; onOpen?: (productId: string) => void }) {
+ *  the error tone what no longer works and how to put it right — the link's
+ *  own words, then `wayOut`'s for a note whose words stop at what is wrong. */
+function LinkNotes({
+  links,
+  onOpen,
+  wayOut,
+}: {
+  links: ProductLink[];
+  onOpen?: (productId: string) => void;
+  wayOut?: (link: ProductLink) => string | null;
+}) {
   if (!links.length) return null;
   return (
     <>
       {links.map((l) => (
         <div key={`${l.about}-${l.otherId}`} className="flex flex-col items-start gap-[2px]">
-          <Note tone={l.ok ? "plain" : "error"}>{l.text}</Note>
+          <Note tone={l.ok ? "plain" : "error"}>{[l.text, wayOut?.(l)].filter(Boolean).join(" ")}</Note>
           {onOpen && (
             <button type="button" onClick={() => onOpen(l.otherId)} className={`-ml-[4px] text-sm ${QUIET_BUTTON}`}>
               Open {l.otherName}
@@ -309,6 +320,7 @@ const fromConcept = (p: ConceptPart | undefined, none: string) =>
 function CountField({
   id,
   value,
+  ariaLabel,
   what,
   disabled,
   describedBy,
@@ -316,6 +328,9 @@ function CountField({
 }: {
   id: string;
   value: number;
+  /** The field's own name — "How many motors": the label over it says only
+   *  "How many", and two of them sit in one section. */
+  ariaLabel: string;
   /** What it counts, for its −/+ buttons' names — "motor count". */
   what: string;
   disabled?: boolean;
@@ -337,6 +352,7 @@ function CountField({
       min={0}
       max={COUNT_MAX}
       disabled={disabled}
+      ariaLabel={ariaLabel}
       ariaDescribedBy={describedBy}
       stepsWhat={what}
       onChange={(v) => {
@@ -395,6 +411,93 @@ const powerReset = (product: SheetProduct, edit: Edit | undefined, id: string, n
     : undefined;
 
 const powerLinks = (product: SheetProduct) => product.links.filter((l) => l.about === "power");
+
+const COUNT_WORDS = ["one", "two", "three", "four", "five", "six"];
+
+/** A charger's cells as a pack is picked by them — "1S" and "one cell", "AA"
+ *  and "AA cells" — or null for cells nothing names ("batteries"). */
+function cellWords(cell: string): { short: string; count: string } | null {
+  const s = cell.match(/^(\d+)S\b/i);
+  if (s) {
+    const n = Number(s[1]);
+    return { short: `${n}S`, count: `${COUNT_WORDS[n - 1] ?? n} cell${n === 1 ? "" : "s"}` };
+  }
+  return /^AA\b/i.test(cell) ? { short: "AA", count: "AA cells" } : null;
+}
+
+const aPack = (short: string) => `${/^[AEIOU8]/i.test(short) ? "an" : "a"} ${short} pack`;
+
+/** What a charger in the project charges, as its own parts say it. */
+const cellOf = (p: { parts: ConceptPart[]; conceptParts: ConceptPart[] }) =>
+  (chargesOf(p.parts) ?? chargesOf(p.conceptParts))?.cell ?? null;
+
+/** The way out of a power note that says what no longer works, named from
+ *  the products the link joins — as the radio note names its own ("Pick Y
+ *  here, or change X's radio"): a pack to pick here, or the other product's
+ *  pack to change. Null for a note that is fine, or on a sheet that can't
+ *  change anything. What a charger charges can't be picked, so the way out
+ *  is always the pack's. */
+function powerWayOut(product: SheetProduct, link: ProductLink, editable: boolean): string | null {
+  if (link.ok || link.about !== "power" || !editable) return null;
+  const other = product.peers.find((p) => p.id === link.otherId);
+  if (!other) return null;
+  const mine = standaloneOf(product.conceptParts);
+  const theirs = standaloneOf(other.conceptParts);
+  // The packs this product's menu offers, and can give its draw.
+  const pickable = () => packOptions(product).filter((o) => !o.disabled).map((o) => o.value);
+
+  // This is the charger: the pack it is meant for has to change to its cells.
+  if (mine === "charger") {
+    const cell = cellOf(product);
+    const words = cell && cellWords(cell);
+    if (!cell || !words) return null;
+    const packs = PACKS.filter((b) => packCellOf(b.key) === cell);
+    if (!packs.length) return `There is no ${words.short} pack to give ${other.name} yet — this charger charges ${words.count}.`;
+    if (!packs.some((b) => b.maxMa >= other.spec.drawMa)) {
+      return `No ${words.short} pack gives ${other.name} enough power — this charger charges ${words.count}.`;
+    }
+    return theirs === "pack"
+      ? `Change ${other.name} to ${aPack(words.short)} — this charger charges ${words.count}.`
+      : `Change ${other.name}'s pack to ${words.short} — this charger charges ${words.count}.`;
+  }
+
+  // The charger is the other one: a pack of its cells, picked here.
+  if (theirs === "charger") {
+    const cell = cellOf(other);
+    const words = cell && cellWords(cell);
+    if (!cell || !words) return null;
+    const packs = PACKS.filter((b) => packCellOf(b.key) === cell);
+    if (!packs.length) return `There is no ${words.short} pack to pick here yet.`;
+    const open = pickable();
+    if (!packs.some((b) => open.includes(b.key))) {
+      return `No ${words.short} pack gives this enough power, so ${other.name} can't charge its pack.`;
+    }
+    return `Pick ${aPack(words.short)} here to charge it with ${other.name}.`;
+  }
+
+  // A spare and the product it swaps into: one pack, the same on both.
+  const theirPack = other.spec.battery;
+  const canPick = pickable().includes(theirPack);
+  if (mine === "pack") return canPick ? `Pick ${batteryOf(theirPack).label} here to swap it into ${other.name}.` : null;
+  if (theirs === "pack") {
+    return canPick
+      ? `Pick ${batteryOf(theirPack).label} here, or change ${other.name}'s pack.`
+      : `Change ${other.name}'s pack to ${batteryOf(product.spec.battery).label}.`;
+  }
+  return null;
+}
+
+/** A power section's notes on the products it works with, each with its way
+ *  out when it no longer works. */
+function PowerNotes({ product, edit, onOpen }: Props) {
+  return (
+    <LinkNotes
+      links={powerLinks(product)}
+      onOpen={onOpen}
+      wayOut={(l) => powerWayOut(product, l, !!edit)}
+    />
+  );
+}
 
 export function PowerSection({ product, edit, onOpen }: Props) {
   const { spec, edits, parts, conceptParts, hints } = product;
@@ -537,7 +640,7 @@ export function PowerSection({ product, edit, onOpen }: Props) {
           can still hold one. */}
       {spec.noUsbPort && <Note tone="warn">USB powered, but nothing takes the power in — pick a port.</Note>}
       <Note tone={over ? "error" : "plain"}>{line}</Note>
-      <LinkNotes links={powerLinks(product)} onOpen={onOpen} />
+      <PowerNotes product={product} edit={edit} onOpen={onOpen} />
     </Section>
   );
 }
@@ -591,7 +694,7 @@ export function ChargesSection({ product, edit, onOpen }: Props) {
       ) : (
         <ReadOnly>Plugs into {port && port !== "none" ? CHARGE_PORTS[port].label : (charges?.port ?? "nothing")}</ReadOnly>
       )}
-      <LinkNotes links={powerLinks(product)} onOpen={onOpen} />
+      <PowerNotes product={product} edit={edit} onOpen={onOpen} />
     </Section>
   );
 }
@@ -637,7 +740,7 @@ export function PackSection({ product, edit, onOpen }: Props) {
       )}
       <Rows rows={[["Plugs in with", connector ? readableName(connector) : "Nothing named yet"]]} />
       {links.length ? (
-        <LinkNotes links={links} onOpen={onOpen} />
+        <PowerNotes product={product} edit={edit} onOpen={onOpen} />
       ) : (
         pack.mAh > 0 && (
           <Note>
@@ -909,6 +1012,7 @@ export function MovesSection({ product, edit }: Props) {
                 <CountField
                   id={motorCountId}
                   value={motors.count}
+                  ariaLabel="How many motors"
                   what="motor count"
                   // A count is a count of a catalog motor: one the catalog
                   // doesn't list can't be multiplied without being swapped.
@@ -963,6 +1067,7 @@ export function MovesSection({ product, edit }: Props) {
               <CountField
                 id={servoCountId}
                 value={servos.count}
+                ariaLabel="How many servos"
                 what="servo count"
                 disabled={servos.kind === null}
                 onCommit={(n) =>
