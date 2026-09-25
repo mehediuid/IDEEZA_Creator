@@ -235,10 +235,15 @@ function ReviewPanel({
     [products],
   );
 
+  // The review lays out by its own width, not the window's: beside a docked
+  // spec sheet a 1440 px window leaves it about 340 px, where the window's
+  // `md:` still gave the aside its 260 px and the artifact the few left. So
+  // the card is the container, and its two columns and its header row wait
+  // for room of their own.
   return (
     <section
       aria-labelledby="review-heading"
-      className="overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface"
+      className="overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface [container-type:inline-size]"
     >
       {/* The eyebrow carries the state and the heading carries the subject.
           It used to spend the heading on "Review your deliverables", which
@@ -251,7 +256,7 @@ function ReviewPanel({
           full-width row below this header instead (L1), rather than
           widening this left column and pushing the actions onto a row of
           their own. */}
-      <header className="flex flex-col gap-6 px-10 pb-6 pt-8 md:flex-row md:items-start">
+      <header className="flex flex-col gap-6 px-10 pb-6 pt-8 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-text-tertiary">
             {building ? "Building" : "Build ready"}
@@ -398,7 +403,10 @@ function ReviewPanel({
             id="review-tabpanel"
             role="tabpanel"
             aria-labelledby={`review-tab-${shown}`}
-            className="grid gap-8 px-10 pb-10 md:grid-cols-[minmax(0,1fr)_260px]"
+            // Two columns once the artifact keeps 300 px beside the aside's
+            // 260 — 640 with the padding and the gap; under that the aside
+            // stacks below the artifact, full width.
+            className="grid gap-8 px-10 pb-10 [@container(min-width:640px)]:grid-cols-[minmax(0,1fr)_260px]"
           >
             {/* A wiring map or a long BOM is taller than the card; it
                 scrolls inside the panel instead of stretching the page
@@ -456,7 +464,7 @@ function ReviewPanel({
                 hairline divides the two columns, and the list is a list — the
                 check-mark pills read as "verified" and wrapped inside
                 themselves. */}
-            <aside className="flex flex-col gap-8 md:border-l md:border-solid md:border-border md:pl-8">
+            <aside className="flex flex-col gap-8 [@container(min-width:640px)]:border-l [@container(min-width:640px)]:border-solid [@container(min-width:640px)]:border-border [@container(min-width:640px)]:pl-8">
               {shown === "parts" && <PartsSummary job={product} />}
               <section>
                 <h3 className="text-sm font-semibold text-text-primary">
