@@ -246,7 +246,20 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
       }
       continue;
     }
-    const stored = cleanEdits(answer?.specs?.[productIdOf(t)]);
+    let stored = cleanEdits(answer?.specs?.[productIdOf(t)]);
+    // A built product drawn again starts from what was built: edits stored
+    // on the booked concept — after the booking, while it was locked — were
+    // never applied, and a Refine doesn't bring them back. Edits made on a
+    // later concept are the maker's own, and carry as any others.
+    const was = booked.get(productIdOf(t));
+    if (was?.spec) {
+      const bookedTurn = chat.turns.find(
+        (x) => x.role === "assistant" && productIdOf(x) === productIdOf(t) && x.imageUrl === was.conceptImageUrl,
+      )?.id;
+      if (!stored.basedOn || stampTurnOf(stored.basedOn) === bookedTurn) {
+        stored = { ...bookedEditsOf(was.spec), ...(stored.basedOn ? { basedOn: stored.basedOn } : null) };
+      }
+    }
     // Part edits outlive a Refine or a Regenerate; on the new concept they
     // are read as they apply to it.
     const rebased = concept ? rebaseEdits(stored, concept.parts, t.id) : { edits: stored, olderConcept: false };
