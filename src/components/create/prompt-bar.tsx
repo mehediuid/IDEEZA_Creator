@@ -45,9 +45,10 @@ export function PromptBar({
    *  or it reads as broken. */
   heldMessage?: string;
   /** Told true when that line appears under the box and false when it
-   *  clears — its clock, a keystroke, dictation, a send that goes, or the
-   *  listening view taking the bar — so a hint beside the composer that
-   *  would say the same can step aside exactly while it shows. */
+   *  clears — its clock, a keystroke, dictation, a send that goes, the
+   *  listening view taking the bar, or `heldMessage` going (the reason to
+   *  hold is gone) — so a hint beside the composer that would say the same
+   *  can step aside exactly while it shows. */
   onHeldChange?: (held: boolean) => void;
   placeholder?: string;
   /** False when the balance cannot cover one concept render. The send is
@@ -83,9 +84,13 @@ export function PromptBar({
   });
   const listening = voice.status === "listening";
 
-  // The line is on screen while a send is held and the bar isn't the
-  // listening view.
-  const heldShows = held !== null && !listening;
+  // The line is on screen while a send is held, the host still has a reason
+  // to hold it, and the bar isn't the listening view. Picking a product takes
+  // the reason away (`heldMessage` goes), and the line with it that moment —
+  // not on its clock — so the hint that names the pick can show. The held
+  // send is dropped as well, so deselecting again brings no stale line back.
+  if (held !== null && !heldMessage) setHeld(null);
+  const heldShows = held !== null && !!heldMessage && !listening;
   React.useEffect(() => {
     onHeldChange?.(heldShows);
   }, [heldShows, onHeldChange]);
@@ -255,8 +260,8 @@ export function PromptBar({
       {/* Why the last send did nothing, for a moment — polite, and always
           in the DOM for the same reason as the line below. Guidance, not an
           error: the words carry it, in the secondary ink. */}
-      <p role="status" className={cn("px-[4px] text-sm text-text-secondary", held && "mt-[10px]")}>
-        {held && (
+      <p role="status" className={cn("px-[4px] text-sm text-text-secondary", heldShows && "mt-[10px]")}>
+        {heldShows && held && (
           <span
             key={held.n}
             className="block motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal motion-safe:ease-decelerate"
