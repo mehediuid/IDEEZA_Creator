@@ -24,3 +24,20 @@ export function elapsedLabel(since: number, now: number): string {
   const m = Math.floor(s / 60);
   return `${m} min ${s % 60} s`;
 }
+
+/** "just now", "12 min ago", "3 hr ago", or a short date — a past moment in
+ *  words, moved here from image-turn.tsx's `formatRelative` so the rail's
+ *  Activity list (chat-rail-redesign spec §2.5) can read it too. */
+export function relativeLabel(ts: number, now: number): string {
+  const delta = Math.max(0, now - ts);
+  const sec = Math.floor(delta / 1000);
+  if (sec < 45) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hr ago`;
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}

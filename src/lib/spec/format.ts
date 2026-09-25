@@ -47,3 +47,30 @@ export function ioOf(parts: ConceptPart[]): string[] {
 export function mcuOf(parts: ConceptPart[]): string | null {
   return parts.find((p) => p.category === "Microcontroller")?.name ?? null;
 }
+
+export type SpecFactTone = "plain" | "warn" | "error";
+
+/** The spec sheet's one-line facts — size, power, radio (when the concept
+ *  names one), board — moved here from `SpecFacts` in spec-panel.tsx so the
+ *  card and the rail (chat-rail-redesign spec §2.4, which takes only size,
+ *  power and radio) read the same array instead of two copies of this
+ *  logic drifting apart. */
+export function specFacts(
+  spec: ResolvedSpec,
+  parts: ConceptPart[],
+): { key: string; text: string; tone: SpecFactTone }[] {
+  const radio = radioOf(parts);
+  const sizeTone: SpecFactTone = spec.fits ? "plain" : spec.draftAtSize ? "warn" : "error";
+  return [
+    {
+      key: "size",
+      text: spec.fits
+        ? mm3(spec.size)
+        : `${mm3(spec.size)} · ${spec.draftAtSize ? "Draft" : "doesn't fit"}`,
+      tone: sizeTone,
+    },
+    { key: "power", text: powerLabel(spec), tone: "plain" },
+    ...(radio ? [{ key: "radio", text: radio, tone: "plain" as const }] : []),
+    { key: "board", text: spec.board ? "2-layer" : "No board", tone: "plain" },
+  ];
+}

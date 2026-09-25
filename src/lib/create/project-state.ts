@@ -1,0 +1,778 @@
+// One project model, read by both the canvas (chat-thread.tsx) and the rail
+// (chat-rail.tsx) — docs/superpowers/specs/2026-09-25-chat-rail-redesign-
+// design.md §5. Before this module the same "changed since the build" and
+// "doesn't fit" answers were worked out twice, in two components, and could
+// drift. Everything here is a pure function of a ChatSession (and, once a
+// build exists, its BuildJob): no hooks, no `use client`, so the same
+// derivation runs in the browser and in the node:test harness.
+//
+// Relative imports only (like lib/spec): the test harness compiles this
+// file alone with a plain `tsc`, with no `paths` mapping, so an `@/…` import
+// anywhere in its dependency chain would not resolve.
+
+import type { Companion } from "./companions";
+import { buildCost } from "./credits";
+import { asConceptSummary } from "../spec/hints";
+import type { ConceptSummary } from "./concept";
+import {
+  productsOf,
+  statusOf,
+  type BuildItem,
+  type BuildItemKind,
+  type BuildJob,
+  type BuildStatus,
+  type ChatSession,
+  type ChatTurn,
+  type SetupAnswer,
+} from "./history";
+import { blocksBuild, deriveSpec, specKey } from "../spec/derive";
+import { cleanEdits } from "../spec/hints";
+import { specFacts } from "../spec/format";
+import type { ResolvedSpec } from "../spec/types";
+
+type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
+type AssistantTurn = Extract<ChatTurn, { role: "assistant" }>;
+
+/** The key a product's spec edits, its build membership and its build
+ *  snapshot are all filed under — "primary" or a companion id. */
+export function productIdOf(t: AssistantTurn): string {
+  return t.companionOf ?? "primary";
+}
+
+/** The name the question gave this turn's product — the same name the rail,
+ *  the composer and the card use. Undefined before the question answers
+ *  (or on a pre-setup chat), which callers fall back from on their own,
+ *  since the fallback differs by surface ("Your product" here, "concept 1"
+ *  on the card). */
+export function productNameOf(setup: SetupTurn | undefined, t: AssistantTurn): string | undefined {
+  if (!setup) return undefined;
+  if (!t.companionOf) return setup.productName?.trim() || undefined;
+  return setup.companions.find((c) => c.id === t.companionOf)?.name;
+}
+
+// ─────────────────────────── projectState ───────────────────────────
+
+export type ProjectState = {
+  setup: SetupTurn | undefined;
+  answer: SetupAnswer | undefined;
+  /** One turn per product — its CURRENT concept — primary first. */
+  products: AssistantTurn[];
+  /** companionIds ticked off the next build; the concepts stay. */
+  leftOut: Set<string>;
+  /** What the next build takes: the primary always, plus every product not
+   *  ticked off. */
+  selected: AssistantTurn[];
+  /** Each ready card's concept, as read back from storage and checked —
+   *  exposed so `railRows` doesn't parse `t.concept` a second time and risk
+   *  disagreeing with the specs computed here. Not part of the spec's §5
+   *  table; see the R1 report's deviations. */
+  concepts: Map<string, ConceptSummary | undefined>;
+  /** Each ready card's spec. Null while the concept is still being read. */
+  specs: Map<string, ResolvedSpec | null>;
+  /** A chosen product whose size its parts can't fit, not agreed as Draft —
+   *  holds the build (spec S3). */
+  specBlock: AssistantTurn | undefined;
+  /** Concept image URLs the current build was made from. */
+  builtImages: Set<string>;
+  /** Is this exact drawing what the current build was made from. */
+  inBuild: (t: AssistantTurn) => boolean;
+  /** A chosen product's concept differs from the build (drawn again, not
+   *  ready, or added since). */
+  conceptChanged: boolean;
+  /** A chosen, built product's spec differs from what the build booked. */
+  specChanged: boolean;
+  changedSinceBuild: boolean;
+  /** Offered, never drawn — not yet in the project. */
+  available: Companion[];
+  /** Drawn once, then taken out of the project — free to restore. */
+  removed: Companion[];
+  /** Every chosen product has a ready concept. */
+  allReady: boolean;
+  /** A chosen product whose latest concept failed. */
+  failedChoice: AssistantTurn | undefined;
+};
+
+/** Exactly the memo block that lived in chat-thread.tsx (products, leftOut,
+ *  selected, specs, specBlock, builtImages, inBuild, conceptChanged,
+ *  specChanged, changedSinceBuild, available, removed, allReady,
+ *  failedChoice) — moved here, not rewritten, so the canvas and the rail
+ *  can't disagree about what a chat and its build mean. */
+export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectState {
+  const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup");
+  const answer = setup?.answer;
+
+  // A product taken out of the project keeps its turns (the rail is the
+  // history), so membership is read from the answer, not from which
+  // products happen to have been drawn.
+  const products = (() => {
+    const latest = new Map<string, AssistantTurn>();
+    for (const t of chat.turns) {
+      if (t.role !== "assistant") continue;
+      latest.set(t.companionOf ?? "primary", t);
+    }
+    // Primary first; the companions keep the order they were offered in.
+    const primary = latest.get("primary");
+    const rest = [...latest.entries()]
+      .filter(([k]) => k !== "primary" && (!answer || answer.picked.includes(k)))
+      .map(([, t]) => t);
+    return primary ? [primary, ...rest] : rest;
+  })();
+
+  // What the next build takes: the primary always (Part 4 §4.4.4), and
+  // every other product the maker has not ticked off.
+  const leftOut = new Set(answer?.leftOut ?? []);
+  const selected = products.filter((t) => !t.companionOf || !leftOut.has(t.companionOf));
+
+  // Each card's concept as read back from storage — checked, because a
+  // stored reading from an older build of this page, or a hand-edited one,
+  // put a part with no name straight into the spec's rules.
+  const concepts = new Map<string, ConceptSummary | undefined>();
+  for (const t of products) concepts.set(t.id, asConceptSummary(t.concept));
+
+  // Each ready card's spec, worked out from its concept's parts, the
+  // model's hints and the maker's edits. Null while the concept is still
+  // being read.
+  const specs = new Map<string, ResolvedSpec | null>();
+  for (const t of products) {
+    const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
+    specs.set(
+      t.id,
+      concept
+        ? deriveSpec(concept.parts, concept.hints, cleanEdits(answer?.specs?.[productIdOf(t)]))
+        : null,
+    );
+  }
+
+  // A chosen product whose size its parts can't fit, and that the maker has
+  // not agreed to build as Draft, holds the build (spec S3).
+  const specBlock = selected.find((t) => {
+    const s = specs.get(t.id);
+    return s && blocksBuild(s);
+  });
+
+  // Offered, and not being built: no concept has been drawn for it and the
+  // answer did not include it.
+  const drawn = new Set(
+    chat.turns
+      .filter((t): t is AssistantTurn => t.role === "assistant" && !!t.companionOf)
+      .map((t) => t.companionOf!),
+  );
+  const available =
+    setup?.status === "answered" ? setup.companions.filter((x) => !drawn.has(x.id)) : [];
+  // Drawn once, then taken out: their concepts are still here to put back.
+  const removed = setup?.answer
+    ? setup.companions.filter((x) => drawn.has(x.id) && !setup.answer!.picked.includes(x.id))
+    : [];
+
+  // Which drawings the current build was made from. A concept changed after
+  // the build — refined, regenerated, or a product added — is not in it.
+  const builtImages = new Set(
+    job ? productsOf(job).map((p) => p.conceptImageUrl).filter(Boolean) : [],
+  );
+  const inBuild = (t: AssistantTurn) => !!t.imageUrl && builtImages.has(t.imageUrl);
+
+  // Changed means the next build would differ from the one on screen: a
+  // chosen product drawn again or added, or one the build holds that has
+  // since been left out or removed.
+  // A spec edited after the build is a change too: the booked snapshot is
+  // what the deliverables say, so a different size or pack needs a new
+  // build. A build booked before products had a spec has no snapshot to
+  // compare with — it was made with no decisions at all, so any edit since
+  // is one.
+  const specChanged =
+    !!job &&
+    selected.some((t) => {
+      const now = specs.get(t.id);
+      if (!now || !inBuild(t)) return false;
+      const booked = productsOf(job).find((p) => p.id === productIdOf(t))?.spec;
+      if (!booked) return Object.keys(cleanEdits(answer?.specs?.[productIdOf(t)])).length > 0;
+      return specKey(now) !== specKey(booked);
+    });
+  const conceptChanged =
+    !!job &&
+    (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
+      builtImages.size !== selected.filter(inBuild).length);
+  const changedSinceBuild = conceptChanged || specChanged;
+
+  const allReady = selected.length > 0 && selected.every((t) => t.status === "ready");
+  const failedChoice = selected.find((t) => t.status === "failed");
+
+  return {
+    setup,
+    answer,
+    products,
+    leftOut,
+    selected,
+    concepts,
+    specs,
+    specBlock,
+    builtImages,
+    inBuild,
+    conceptChanged,
+    specChanged,
+    changedSinceBuild,
+    available,
+    removed,
+    allReady,
+    failedChoice,
+  };
+}
+
+// ─────────────────────────── railRows ───────────────────────────
+
+/** The order spec §2.4's status line picks from — the first that applies
+ *  wins. `conflict` outranks every build phase: a spec edited after the
+ *  build to no longer fit says so before the pipeline does. */
+export type RailPhase =
+  | "drawing"
+  | "failed"
+  | "conflict"
+  | "queued"
+  | "running"
+  | "piece-failed"
+  | "built"
+  | "reading"
+  | "draft"
+  | "ready";
+
+export type FactTone = "plain" | "warn" | "error";
+
+export type RailRow = {
+  productId: string;
+  name: string;
+  turnId: string;
+  conceptLabel: string;
+  imageUrl?: string;
+  phase: RailPhase;
+  /** When the current turn started drawing — the row's own elapsed clock. */
+  since?: number;
+  /** size, power, radio — the board fact is dropped (spec §2.4). Omitted
+   *  while drawing, failed, or before a spec exists. */
+  facts: { key: string; text: string; tone: FactTone }[];
+  leftOut: boolean;
+  tag?: "Left out" | "Not in this build" | "Changed";
+  /** Present whenever a build exists and covers this product, regardless of
+   *  `phase` — the pipeline is a separate element from the status line and
+   *  keeps showing even while the status line reads `conflict`. */
+  build?: {
+    ready: number;
+    total: number;
+    /** 0–1, for the row's own progress bar (`scaleX`). */
+    progress: number;
+    failedKinds: BuildItemKind[];
+    items: BuildItem[];
+  };
+};
+
+function buildInfoFor(items: BuildItem[]) {
+  const live = items.filter((i) => i.status !== "skipped");
+  const ready = live.filter((i) => i.status === "ready").length;
+  return {
+    ready,
+    total: live.length,
+    progress: live.length ? ready / live.length : 0,
+    failedKinds: live.filter((i) => i.status === "failed").map((i) => i.kind),
+    items: live,
+  };
+}
+
+function phaseFor(
+  t: AssistantTurn,
+  spec: ResolvedSpec | null,
+  buildItems: ReturnType<typeof buildInfoFor> | undefined,
+  jobStatus: BuildStatus | undefined,
+): RailPhase {
+  if (t.status === "pending") return "drawing";
+  if (t.status === "failed") return "failed";
+  if (spec && blocksBuild(spec)) return "conflict";
+  if (buildItems) {
+    if (jobStatus === "queued") return "queued";
+    const failed = buildItems.failedKinds.length > 0;
+    const building = buildItems.items.some((i) => i.status === "building" || i.status === "pending");
+    if (failed && !building) return "piece-failed";
+    if (buildItems.total > 0 && buildItems.ready === buildItems.total) return "built";
+    return "running";
+  }
+  if (t.status === "ready" && !spec) return "reading";
+  if (spec?.draftAtSize) return "draft";
+  return "ready";
+}
+
+/** One selectable row per product — spec §2.4. Reads the state both the
+ *  canvas and the rail share, plus the concept-numbering map every card
+ *  already computes (`conceptLabels`, kept in chat-thread.tsx: it names
+ *  turns from the whole chat's lineage, not this module's concern). */
+export function railRows(
+  state: ProjectState,
+  labels: Map<string, string>,
+  job?: BuildJob | null,
+): RailRow[] {
+  const jobStatus = job ? statusOf(job) : undefined;
+  const buildProducts = job ? productsOf(job) : [];
+  const buildByProductId = new Map(buildProducts.map((p) => [p.id, p]));
+
+  return state.products.map((t) => {
+    const productId = productIdOf(t);
+    const name = productNameOf(state.setup, t) ?? "Your product";
+    const conceptLabel = labels.get(t.id) ?? "1";
+    const spec = state.specs.get(t.id) ?? null;
+    const leftOut = !!t.companionOf && state.leftOut.has(t.companionOf);
+    const isPrimary = !t.companionOf;
+
+    const buildProduct = job ? buildByProductId.get(productId) : undefined;
+    const build = buildProduct ? buildInfoFor(buildProduct.items) : undefined;
+    const phase = phaseFor(t, spec, build, jobStatus);
+
+    const facts =
+      t.status === "ready" && spec
+        ? specFacts(spec, state.concepts.get(t.id)?.parts ?? []).filter((f) => f.key !== "board")
+        : [];
+
+    // The primary carries no tag — its "Always built" lives on its card
+    // (spec §2.4 Line 1).
+    let tag: RailRow["tag"];
+    if (!isPrimary) {
+      if (leftOut) {
+        tag = "Left out";
+      } else if (job && !buildProduct) {
+        tag = "Not in this build";
+      } else if (job && buildProduct) {
+        const bookedSpec = buildProduct.spec;
+        const changedHere =
+          t.status !== "ready" ||
+          !state.inBuild(t) ||
+          (!!spec && !!bookedSpec && specKey(spec) !== specKey(bookedSpec));
+        if (changedHere) tag = "Changed";
+      }
+    }
+
+    return {
+      productId,
+      name,
+      turnId: t.id,
+      conceptLabel,
+      imageUrl: t.imageUrl,
+      phase,
+      since: t.status === "pending" ? t.ts : undefined,
+      facts,
+      leftOut,
+      tag,
+      build,
+    };
+  });
+}
+
+// ─────────────────────────── stageOf ───────────────────────────
+
+export type Stage = "idea" | "concepts" | "build" | "save" | "saved";
+
+/** Where the header's stepper is — spec §2.2. */
+export function stageOf(chat: ChatSession, job?: BuildJob | null): Stage {
+  const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup");
+  if (setup && setup.status !== "answered") return "idea";
+  if (!job) return "concepts";
+  if (statusOf(job) !== "ready") return "build";
+  if (!job.projectId) return "save";
+  return "saved";
+}
+
+// ─────────────────────────── nextStep ───────────────────────────
+
+export type NextStepTone = "working" | "attention" | "neutral";
+
+export type JumpTarget =
+  | { kind: "setup" }
+  | { kind: "card" | "retry" | "spec"; productId: string }
+  | { kind: "build" | "credits" | "review" | "add" };
+
+export type NextStep = {
+  tone: NextStepTone;
+  text: string;
+  target?: JumpTarget;
+  targetLabel?: string;
+};
+
+/** The next-step slot's one sentence — spec §2.3. The first rule that
+ *  matches wins; `rows` (not raw turns) decide 4–6, so the sentence can
+ *  never say something the rail's own rows disagree with. */
+export function nextStep(args: {
+  state: ProjectState;
+  rows: RailRow[];
+  job?: BuildJob | null;
+  balance: number;
+  hydrated: boolean;
+  projectName?: string;
+  savedName?: string;
+}): NextStep | null {
+  const { state, rows, job, balance, hydrated, projectName, savedName } = args;
+  const setup = state.setup;
+
+  // #1
+  if (setup && setup.status === "loading") {
+    return {
+      tone: "working",
+      text: "Reading your idea. Nothing is charged until you answer its questions.",
+    };
+  }
+  // #2
+  if (setup && setup.status === "asking") {
+    return {
+      tone: "attention",
+      text: "Answer the question on the canvas. Nothing is drawn or charged until you do.",
+      target: { kind: "setup" },
+      targetLabel: "Show the question on the canvas",
+    };
+  }
+  // #3 — the slot shows BuildStatus instead; nothing to say here.
+  if (job && statusOf(job) !== "ready") return null;
+
+  const chosen = rows.filter((r) => !r.leftOut);
+
+  // #4
+  const failedRow = chosen.find((r) => r.phase === "failed");
+  if (failedRow) {
+    return {
+      tone: "attention",
+      text: `${failedRow.name} couldn't be drawn. Try again on its card · 1 credit.`,
+      target: { kind: "retry", productId: failedRow.productId },
+      targetLabel: `Show ${failedRow.name}'s Try again on the canvas`,
+    };
+  }
+
+  // #5
+  const conflictRow = chosen.find((r) => r.phase === "conflict");
+  if (conflictRow) {
+    return {
+      tone: "attention",
+      text: `${conflictRow.name} doesn't fit the size you set. Fix the size, or build it as Draft.`,
+      target: { kind: "spec", productId: conflictRow.productId },
+      targetLabel: `Show ${conflictRow.name}'s size on the canvas`,
+    };
+  }
+
+  // #6
+  const drawingRows = chosen.filter((r) => r.phase === "drawing");
+  if (drawingRows.length === 1) {
+    return {
+      tone: "working",
+      text: `Drawing ${drawingRows[0].name}. The build opens when it lands.`,
+    };
+  }
+  if (drawingRows.length > 1) {
+    return {
+      tone: "working",
+      text: `Drawing ${drawingRows.length} concepts. The build opens when they land.`,
+    };
+  }
+
+  const n = state.selected.length;
+  const cost = buildCost(n);
+  const short = hydrated && balance < cost;
+
+  if (job && statusOf(job) === "ready") {
+    // #7 / #7b
+    if (state.changedSinceBuild) {
+      if (short) {
+        return {
+          tone: "attention",
+          text: `Building again costs ${cost} credits. You have ${balance}.`,
+          target: { kind: "credits" },
+          targetLabel: "Show the credits notice on the canvas",
+        };
+      }
+      return {
+        tone: "neutral",
+        text: `Changed since the build. Build again to carry it into the deliverables · ${cost} credits.`,
+        target: { kind: "build" },
+        targetLabel: "Show the Build button on the canvas",
+      };
+    }
+    // #9
+    if (job.projectId) {
+      const name = savedName || projectName || "your project";
+      return {
+        tone: "neutral",
+        text: `Saved to ${name}. Add a brief to sell, give or keep it.`,
+        target: { kind: "review" },
+        targetLabel: "Show the build on the canvas",
+      };
+    }
+    // #8
+    const text = projectName
+      ? `Build ready. Save it to ${projectName}, or open it in the editor.`
+      : "Build ready. Save it as a project, or open it in the editor.";
+    return { tone: "neutral", text, target: { kind: "review" }, targetLabel: "Show the build on the canvas" };
+  }
+
+  // #10 / #10b
+  if (!job && n > 0 && state.allReady) {
+    if (short) {
+      return {
+        tone: "attention",
+        text: `The build costs ${cost} credits. You have ${balance}. Top up to build.`,
+        target: { kind: "credits" },
+        targetLabel: "Show the credits notice on the canvas",
+      };
+    }
+    const label = n === 1 ? "this product" : `${n} products`;
+    return {
+      tone: "neutral",
+      text: `Next: build ${label} · ${cost} credits. You have ${balance}.`,
+      target: { kind: "build" },
+      targetLabel: "Show the Build button on the canvas",
+    };
+  }
+
+  // Nothing matches — the slot is empty.
+  return null;
+}
+
+// ─────────────────────────── activityOf ───────────────────────────
+
+export type ActivityTone = "plain" | "done" | "working" | "waiting" | "error" | "neutral";
+
+export type ActivityEntry = {
+  id: string;
+  tone: ActivityTone;
+  title: string;
+  detail?: string;
+  ts: number;
+};
+
+/** The full history, oldest first — spec §2.5. A failed render that was
+ *  later redrawn reads as `Couldn't draw · redrawn as Concept {label}` in a
+ *  NEUTRAL tone, never red: the loudest thing in the rail must not be
+ *  something that no longer matters (diagnosis item 2). `names` is the
+ *  host's own `productNameOf` bound to its `setup`, so this module never
+ *  has to special-case which turn's product needs which fallback. */
+export function activityOf(
+  chat: ChatSession,
+  labels: Map<string, string>,
+  names: (t: AssistantTurn) => string | undefined,
+  job?: BuildJob | null,
+  projectName?: string,
+): ActivityEntry[] {
+  const turns = chat.turns;
+  const entries: ActivityEntry[] = [];
+
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+
+    if (t.role === "user") {
+      entries.push({ id: t.id, tone: "plain", title: "You", detail: t.text, ts: t.ts });
+      continue;
+    }
+
+    if (t.role === "setup") {
+      if (t.status === "loading") {
+        entries.push({ id: `${t.id}-reading`, tone: "working", title: "Reading your idea", ts: t.ts });
+        entries.push({
+          id: `${t.id}-working`,
+          tone: "waiting",
+          title: "Working out what it needs",
+          ts: t.ts,
+        });
+        continue;
+      }
+
+      entries.push({ id: `${t.id}-read`, tone: "done", title: "Read your idea", ts: t.ts });
+
+      if (t.status === "asking") {
+        const n = 1 + t.companions.length;
+        if (n === 1) {
+          entries.push({
+            id: `${t.id}-needs`,
+            tone: "done",
+            title: "One product, nothing else needed",
+            ts: t.ts,
+          });
+        } else {
+          const primaryName = t.productName?.trim() || "Your product";
+          entries.push({
+            id: `${t.id}-needs`,
+            tone: "done",
+            title: `This needs ${n} products`,
+            detail: [primaryName, ...t.companions.map((c) => c.name)].join(" · "),
+            ts: t.ts,
+          });
+        }
+        entries.push({
+          id: `${t.id}-waiting`,
+          tone: "waiting",
+          title: "Waiting on your answer on the canvas",
+          ts: t.ts,
+        });
+        continue;
+      }
+
+      // answered
+      if (t.answer) {
+        const n = 1 + t.answer.picked.length;
+        const name = projectName || t.answer.projectName || "your project";
+        const title = t.answer.projectId
+          ? `Added to ${name} · ${n} product${n === 1 ? "" : "s"}`
+          : `Started project ${name} · ${n} product${n === 1 ? "" : "s"}`;
+        entries.push({ id: `${t.id}-answered`, tone: "done", title, ts: t.ts });
+      }
+      continue;
+    }
+
+    // assistant turn
+    const name = names(t) ?? "Your product";
+    const label = labels.get(t.id) ?? "1";
+    const title = `${name} · Concept ${label}`;
+
+    if (t.status === "pending") {
+      entries.push({ id: t.id, tone: "working", title, detail: "Drawing", ts: t.ts });
+      continue;
+    }
+
+    if (t.status === "failed") {
+      const pid = productIdOf(t);
+      const later = turns
+        .slice(i + 1)
+        .find(
+          (o): o is AssistantTurn =>
+            o.role === "assistant" &&
+            productIdOf(o) === pid &&
+            (o.status === "ready" || o.status === "pending"),
+        );
+      if (later) {
+        const laterLabel = labels.get(later.id) ?? "1";
+        entries.push({
+          id: t.id,
+          tone: "neutral",
+          title,
+          detail:
+            later.status === "ready"
+              ? `Couldn't draw · redrawn as Concept ${laterLabel}`
+              : `Couldn't draw · redrawing as Concept ${laterLabel}`,
+          ts: t.ts,
+        });
+      } else {
+        entries.push({
+          id: t.id,
+          tone: "error",
+          title,
+          detail: "Couldn't draw · nothing was charged",
+          ts: t.ts,
+        });
+      }
+      continue;
+    }
+
+    // ready
+    if (t.kind === "refine") {
+      const parentLabel = t.parentTurnId ? labels.get(t.parentTurnId) ?? "1" : "1";
+      entries.push({
+        id: t.id,
+        tone: "done",
+        title,
+        detail: `Refined from Concept ${parentLabel}`,
+        ts: t.ts,
+      });
+    } else {
+      const pid = productIdOf(t);
+      const isFirst = !turns
+        .slice(0, i)
+        .some((o) => o.role === "assistant" && productIdOf(o) === pid);
+      entries.push({
+        id: t.id,
+        tone: "done",
+        title,
+        detail: isFirst ? "Drawn" : "A fresh take",
+        ts: t.ts,
+      });
+    }
+  }
+
+  if (job) {
+    const bookedAt = job.startedAt ?? job.createdAt;
+    const n = productsOf(job).length;
+    const cost = buildCost(n);
+    entries.push({
+      id: `${job.id}-started`,
+      tone: "done",
+      title: `Build started · ${n} product${n === 1 ? "" : "s"} · ${cost} credits`,
+      ts: bookedAt,
+    });
+    if (job.endedAt) {
+      const ready = statusOf(job) === "ready";
+      const title = ready
+        ? "Build ready"
+        : job.creditsRefunded
+          ? "Build stopped · credits refunded"
+          : "Build stopped";
+      entries.push({
+        id: `${job.id}-ended`,
+        tone: ready ? "done" : "error",
+        title,
+        ts: job.endedAt,
+      });
+    }
+  }
+
+  // Array.prototype.sort is stable (ES2019+), so entries sharing one turn's
+  // timestamp (the setup's synthetic rows) keep the order they were pushed.
+  entries.sort((a, b) => a.ts - b.ts);
+  return entries;
+}
+
+// ─────────────────────────── announcementFor ───────────────────────────
+
+/** What the root announcer reads, and what `railRows` was built from at
+ *  that moment — enough to notice a transition without re-deriving it. */
+export type RailSnapshot = {
+  rows: Pick<RailRow, "productId" | "name" | "conceptLabel" | "phase">[];
+  buildStatus?: BuildStatus;
+};
+
+function rowTransition(
+  prev: RailSnapshot["rows"][number],
+  next: RailSnapshot["rows"][number],
+): string | null {
+  if (prev.phase === next.phase) return null;
+  // A conflict is the most actionable thing this row can say, so it wins
+  // even over "the render just landed".
+  if (next.phase === "conflict" && prev.phase !== "conflict") {
+    return `${next.name} doesn't fit the size you set.`;
+  }
+  if (next.phase === "drawing") {
+    return `Drawing ${next.name}, Concept ${next.conceptLabel}.`;
+  }
+  if (prev.phase === "drawing" && next.phase === "failed") {
+    return `${next.name}: Concept ${next.conceptLabel} couldn't be drawn. Nothing was charged.`;
+  }
+  if (prev.phase === "drawing") {
+    return `${next.name}: Concept ${next.conceptLabel} is ready.`;
+  }
+  return null;
+}
+
+function buildTransition(prev: BuildStatus | undefined, next: BuildStatus | undefined): string | null {
+  if (prev === next) return null;
+  if (!next) return null;
+  if (!prev) return "Build started.";
+  if (next === "ready") return "Build ready to review.";
+  if (next === "partial") return "Build needs a retry.";
+  if (next === "failed") return "Build stopped.";
+  return null;
+}
+
+/** One sentence for the root-level announcer, or null — spec §6. Fires only
+ *  on a transition between two snapshots, never on mount: called with the
+ *  same snapshot twice (or two that happen to match), it says nothing.
+ *  Several transitions in one render join with a space. */
+export function announcementFor(prev: RailSnapshot, next: RailSnapshot): string | null {
+  const sentences: string[] = [];
+  const prevByProduct = new Map(prev.rows.map((r) => [r.productId, r]));
+  for (const row of next.rows) {
+    const prevRow = prevByProduct.get(row.productId);
+    if (!prevRow) continue;
+    const s = rowTransition(prevRow, row);
+    if (s) sentences.push(s);
+  }
+  const buildSentence = buildTransition(prev.buildStatus, next.buildStatus);
+  if (buildSentence) sentences.push(buildSentence);
+  return sentences.length ? sentences.join(" ") : null;
+}
