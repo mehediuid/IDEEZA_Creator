@@ -5,7 +5,7 @@
 // function.
 
 import { parseHints } from "../spec/hints";
-import type { AiHints } from "../spec/types";
+import type { AiHints, UseCase } from "../spec/types";
 
 export type ConceptPartCategory =
   | "Microcontroller"
@@ -132,39 +132,289 @@ export function firstNoun(prompt: string): string {
   return "ambient";
 }
 
+// The base every stand-in concept starts from — a real, buildable
+// microcontroller-plus-power trio, unchanged since before the keyword table
+// below existed. Kept as its own constant so `fallbackConcept` reads as
+// "base, then what the prompt asked for" rather than a wall of literals.
+const FALLBACK_BASE: ConceptPart[] = [
+  {
+    name: "ESP32",
+    role: "Runs the firmware and talks to the sensor",
+    category: "Microcontroller",
+  },
+  {
+    name: "USB-C connector",
+    role: "Power and programming",
+    category: "Connector & mech",
+  },
+  {
+    name: "3V3 LDO",
+    role: "Regulates 5V from USB down to 3.3V",
+    category: "Power Management",
+  },
+];
+
+const FALLBACK_PART_CAP = 6;
+
+// A word the maker typed, matched to a real part with a real name, role and
+// category. This exists because the fallback concept is what most makers
+// actually see — the text model often doesn't answer in time, and until
+// this table, every prompt got the same USB-powered box with a "<first
+// noun> sensor" bolted on, whatever the maker actually asked for.
+//
+// Each rule's `trigger` is tested against the whole prompt; a rule that
+// matches contributes its part(s) at the position of its first match, so
+// the parts a prompt gets back come out in the order the maker mentioned
+// them (checked with `String.prototype.search`, which reports the leftmost
+// match regardless of the rule's own word order).
+//
+// Bluetooth/BLE/"phone app" words are deliberately not a rule here: the
+// ESP32 already in FALLBACK_BASE has BLE on chip, so matching those words
+// would add a second, redundant radio rather than a real part.
+type FallbackRule = {
+  trigger: RegExp;
+  parts: (promptLower: string) => ConceptPart[];
+};
+
+const FALLBACK_RULES: FallbackRule[] = [
+  {
+    trigger: /\b(?:gps|tracker|location)\b/i,
+    parts: () => [
+      { name: "NEO-6M GPS module", role: "Gets the fix the firmware reports", category: "Connectivity" },
+    ],
+  },
+  {
+    // "strip" picked out over the single-fixture default only when the
+    // maker's own word is there — otherwise every "light" would read as a
+    // metre of LED strip instead of the bulb a lamp or fixture means.
+    trigger: /\b(?:lamp|light|leds?|glow\w*)\b/i,
+    parts: (p) =>
+      /\bstrip\b/i.test(p)
+        ? [{ name: "LED strip", role: "Lights the surface the product illuminates", category: "Actuator" }]
+        : [{ name: "High-power LED", role: "Gives the product its light output", category: "Actuator" }],
+  },
+  {
+    trigger: /\b(?:dimm\w*|brightness)\b/i,
+    parts: () => [
+      { name: "MOSFET PWM driver", role: "Dims the LED by switching its current", category: "Power Management" },
+    ],
+  },
+  {
+    trigger: /\btouch\w*\b/i,
+    parts: () => [
+      { name: "TTP223 touch sensor", role: "Reads the maker's touch as an on/off signal", category: "Sensor" },
+    ],
+  },
+  {
+    trigger: /\bbuttons?\b/i,
+    parts: () => [
+      { name: "Tactile button", role: "Gives the maker a physical control", category: "Display & I/O" },
+    ],
+  },
+  {
+    trigger: /\b(?:screen|display)\b/i,
+    parts: () => [
+      { name: '0.96" OLED display', role: "Shows status and readings to the maker", category: "Display & I/O" },
+    ],
+  },
+  {
+    trigger: /\bcamera\b/i,
+    parts: () => [{ name: "OV2640 camera", role: "Captures the image the product uses", category: "Sensor" }],
+  },
+  {
+    trigger: /\bspeaker\b|\bsound\b|\balarm\b|\bbuzz\w*|\bbeep\w*/i,
+    parts: (p) =>
+      /\bspeaker\b/i.test(p)
+        ? [{ name: "Speaker", role: "Plays audio back to the maker", category: "Actuator" }]
+        : [{ name: "Buzzer", role: "Sounds the alert the product raises", category: "Actuator" }],
+  },
+  {
+    trigger: /\b(?:temperature|thermo\w*)\b/i,
+    parts: () => [
+      {
+        name: "DHT22 temperature and humidity sensor",
+        role: "Reads the temperature and humidity around it",
+        category: "Sensor",
+      },
+    ],
+  },
+  {
+    trigger: /\b(?:soil|plant)\b/i,
+    parts: () => [
+      { name: "Capacitive soil moisture sensor", role: "Reads how wet the soil is", category: "Sensor" },
+    ],
+  },
+  {
+    trigger: /\b(?:motion|presence)\b/i,
+    parts: () => [{ name: "PIR motion sensor", role: "Detects movement nearby", category: "Sensor" }],
+  },
+  {
+    trigger: /\b(?:motor|car|wheels?|drive)\b/i,
+    parts: () => [
+      { name: "TT gear motor", role: "Turns the wheels the product drives on", category: "Actuator" },
+      {
+        name: "TB6612FNG motor driver",
+        role: "Switches motor current the microcontroller can't supply directly",
+        category: "Power Management",
+      },
+    ],
+  },
+  {
+    trigger: /\b(?:drone|propellers?)\b/i,
+    parts: () => [
+      { name: "Brushless motors (x4)", role: "Spins the propellers that lift the drone", category: "Actuator" },
+      { name: "4-in-1 ESC", role: "Drives all four motors from one board", category: "Power Management" },
+    ],
+  },
+  {
+    trigger: /\b(?:servo|arm)\b/i,
+    parts: () => [{ name: "SG90 servo", role: "Moves the arm to the commanded angle", category: "Actuator" }],
+  },
+  {
+    trigger: /\block\w*\b/i,
+    parts: () => [
+      {
+        name: "Solenoid lock",
+        role: "Locks and unlocks under the microcontroller's command",
+        category: "Actuator",
+      },
+      { name: "Relay module", role: "Switches the lock's higher current safely", category: "Actuator" },
+    ],
+  },
+  {
+    // A product worn, carried, or stated to keep running untethered for a
+    // stretch of time gets its own pack — unless the same prompt also names
+    // a fixture that's plugged in (a desk lamp, a wall unit), in which case
+    // that wins and the product stays USB/adapter powered.
+    trigger: /\b(?:collar|wearable|band|ring|watch|portable|lasts?|batter(?:y|ies)|weeks?|days?|hours?|hrs?)\b/i,
+    parts: (p) =>
+      /\b(?:lamp|desk|wall|plug)\b/i.test(p)
+        ? []
+        : [
+            { name: "1S Li-Po battery", role: "Powers the product without a cord", category: "Power Management" },
+            { name: "TP4056 charger", role: "Recharges the battery over USB", category: "Power Management" },
+          ],
+  },
+  {
+    trigger: /\bcellular\b|\bsim\b/i,
+    parts: () => [
+      {
+        name: "SIM800L GSM module",
+        role: "Connects to the cellular network for data or SMS",
+        category: "Connectivity",
+      },
+    ],
+  },
+  {
+    trigger: /\blora\b|long[\s-]?range/i,
+    parts: () => [
+      { name: "SX1276 LoRa module", role: "Sends data over a long-range radio link", category: "Connectivity" },
+    ],
+  },
+];
+
+/** The keyword table's parts for a prompt: one entry per rule that matched,
+ *  in the order the maker's words appear, with duplicate part names dropped
+ *  (a base part, or two rules naming the same thing, wins only once). */
+function fallbackPartsFromPrompt(prompt: string): ConceptPart[] {
+  const promptLower = prompt.toLowerCase();
+  const hits: { index: number; parts: ConceptPart[] }[] = [];
+  for (const rule of FALLBACK_RULES) {
+    const index = promptLower.search(rule.trigger);
+    if (index === -1) continue;
+    const parts = rule.parts(promptLower);
+    if (parts.length) hits.push({ index, parts });
+  }
+  hits.sort((a, b) => a.index - b.index);
+  const seen = new Set(FALLBACK_BASE.map((p) => p.name.toLowerCase()));
+  const out: ConceptPart[] = [];
+  for (const hit of hits) {
+    for (const part of hit.parts) {
+      const key = part.name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(part);
+    }
+  }
+  return out;
+}
+
+// Runtime words a maker uses instead of a number of hours — read the same
+// way the keyword table reads parts, so "lasts a week" becomes a battery
+// big enough to actually last one, not the rule's silent 1 h default.
+function runtimeGoalFromPrompt(promptLower: string): number | undefined {
+  const hours = promptLower.match(/\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b/);
+  if (hours) {
+    const n = Number(hours[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  if (/\ba\s+week\b/.test(promptLower)) return 168;
+  if (/\ba\s+day\b/.test(promptLower)) return 24;
+  return undefined;
+}
+
+const FALLBACK_USE_CASE_RULES: [RegExp, UseCase][] = [
+  [/\b(?:collar|wearable|band|ring|watch)\b/i, "wearable"],
+  [/\b(?:outdoor|garden|weather|bike)\b/i, "outdoor"],
+  [/\b(?:waterproof|aquarium)\b/i, "waterproof"],
+  [/\b(?:handheld|remote)\b/i, "handheld"],
+  [/\b(?:desk|lamp)\b/i, "desk"],
+];
+
+function matchedUseCases(promptLower: string): UseCase[] {
+  const found: UseCase[] = [];
+  for (const [trigger, useCase] of FALLBACK_USE_CASE_RULES) {
+    if (trigger.test(promptLower)) found.push(useCase);
+  }
+  return [...new Set(found)];
+}
+
+/** What the fallback concept can tell the spec without a model: a runtime
+ *  goal and a use case, read off the same words the parts table reads.
+ *  Shaped exactly as `parseHints` accepts, but built directly rather than
+ *  routed through it — these values are already known-good, not untrusted
+ *  input to re-check. */
+function fallbackHints(prompt: string): AiHints | undefined {
+  const promptLower = prompt.toLowerCase();
+  const out: AiHints = {};
+  const goal = runtimeGoalFromPrompt(promptLower);
+  if (goal !== undefined) out.runtimeGoalH = goal;
+  const useCase = matchedUseCases(promptLower);
+  if (useCase.length) out.useCase = useCase;
+  return Object.keys(out).length ? out : undefined;
+}
+
 // What we return when the model is unreachable or answers with
-// something we can't parse: a real, buildable four-part concept rather
-// than an empty shell. Every use of it stands in for a model answer, so it
-// is marked as one here rather than at each caller.
+// something we can't parse: a real, buildable concept built from what the
+// prompt actually asked for, rather than an empty shell or a generic box
+// with the same four parts every time. Every use of it stands in for a
+// model answer, so it is marked as one here rather than at each caller.
 export function fallbackConcept(prompt: string): ConceptSummary {
-  const noun = firstNoun(prompt);
-  const parts: ConceptPart[] = [
-    {
-      name: "ESP32",
-      role: "Runs the firmware and talks to the sensor",
-      category: "Microcontroller",
-    },
-    {
-      name: "USB-C connector",
-      role: "Power and programming",
-      category: "Connector & mech",
-    },
-    {
-      name: "3V3 LDO",
-      role: "Regulates 5V from USB down to 3.3V",
-      category: "Power Management",
-    },
-    {
-      name: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} sensor`,
-      role: `Reads the ${noun} the project reacts to`,
-      category: "Sensor",
-    },
-  ];
+  const matched = fallbackPartsFromPrompt(prompt);
+  let parts: ConceptPart[];
+  if (matched.length) {
+    parts = [...FALLBACK_BASE, ...matched.slice(0, FALLBACK_PART_CAP - FALLBACK_BASE.length)];
+  } else {
+    // Nothing in the prompt matched a real part — the same generic sensor
+    // line the fallback has always used, named after the maker's own words
+    // rather than inventing a part nobody asked for.
+    const noun = firstNoun(prompt);
+    parts = [
+      ...FALLBACK_BASE,
+      {
+        name: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} sensor`,
+        role: `Reads the ${noun} the project reacts to`,
+        category: "Sensor",
+      },
+    ];
+  }
+  const hints = fallbackHints(prompt);
   return {
     title: deriveTitle(prompt),
     summary: summaryFromParts(parts),
     description: describeFallback(prompt),
     parts,
+    ...(hints ? { hints } : {}),
     fallback: true,
   };
 }
