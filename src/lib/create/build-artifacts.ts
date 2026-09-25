@@ -21,7 +21,7 @@ import {
 import { deriveSpec, partsForBuild } from "../spec/derive";
 import { readableName } from "../spec/facts";
 import { radioOf } from "../spec/format";
-import type { AiHints, ResolvedSpec } from "../spec/types";
+import type { AiHints, RadioKey, ResolvedSpec } from "../spec/types";
 
 // The fields these builders read. BuildJob satisfies it; a fixture
 // doesn't have to carry the whole job to be summarised.
@@ -423,12 +423,22 @@ const INCLUDE_FOR: Partial<Record<ConceptPartCategory, string>> = {
 // LoRa or BLE compiled against the Wi-Fi stack it doesn't use. Zigbee and
 // cellular modules talk AT over a serial port, and a chip with its radio
 // off talks over nothing: no library for either.
+//
+// So does a Wi-Fi or BLE module beside a chip that isn't an ESP — an ESP-01
+// on an ATmega, an nRF52840 on an RP2040: it takes AT commands over a
+// serial port, and the ESP core's WiFi.h, or ArduinoBLE (for a radio on the
+// chip's own die), can't drive it. An nRF24 or a LoRa module is an SPI
+// transceiver with a library of its own on any chip.
+const SERIAL_RADIOS: RadioKey[] = ["wifi", "ble", "esp-now"];
+
 function radioIncludes(parts: ConceptPart[]): string[] {
   const mcu = parts.find((p) => p.category === "Microcontroller");
   const chip = (mcu?.name ?? "").toLowerCase();
   // The ESP8266 core names its Wi-Fi and ESP-NOW headers after itself.
   const esp8266 = /esp8266|esp-?12|esp-?01/.test(chip);
-  switch (radioKeyOf(parts)) {
+  const key = radioKeyOf(parts);
+  if (key && SERIAL_RADIOS.includes(key) && parts.some(isRadioPart) && !/\besp/.test(chip)) return [];
+  switch (key) {
     case "wifi":
       return [esp8266 ? "#include <ESP8266WiFi.h>" : "#include <WiFi.h>"];
     case "esp-now":
