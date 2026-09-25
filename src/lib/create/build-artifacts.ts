@@ -6,6 +6,7 @@
 // describe one build instead of three plausible-looking inventions.
 
 import type { ConceptPart, ConceptPartCategory } from "./concept";
+import { qtyOf } from "../spec/bodies";
 import { deriveSpec } from "../spec/derive";
 import type { ResolvedSpec } from "../spec/types";
 
@@ -62,9 +63,11 @@ export type Bom = {
 };
 
 // A passive is never alone on a board — decoupling, dividers, pull-ups.
-// 2–4 by position so the count is stable across renders.
-function qtyFor(category: ConceptPartCategory, index: number): number {
-  return category === "Passive" ? 2 + (index % 3) : 1;
+// 2–4 by position so the count is stable across renders. Anything else is as
+// many as its own name says — "N20 gear motor (x2)", the count the spec
+// sheet writes and the spec's size and draw already multiply in.
+function qtyFor(part: ConceptPart, index: number): number {
+  return part.category === "Passive" ? 2 + (index % 3) : qtyOf(part.name);
 }
 
 export function bomFor(job: ArtifactSource): Bom {
@@ -76,7 +79,7 @@ export function bomFor(job: ArtifactSource): Bom {
       category: part.category,
       name: part.name,
       ref: `${prefix}${seen[prefix]}`,
-      qty: qtyFor(part.category, i),
+      qty: qtyFor(part, i),
     };
   });
   const passives = rows.filter((r) => r.category === "Passive").length;

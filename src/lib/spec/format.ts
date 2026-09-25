@@ -2,7 +2,7 @@
 // review aside — so every surface says the same thing about the same product.
 
 import type { ConceptPart } from "../create/concept";
-import { protocolOf } from "../create/confidence";
+import { radioOf } from "../create/confidence";
 import { batteryOf } from "./batteries";
 import { cardFactsOf, needsNoPower, type CardFact } from "./facts";
 import type { Material, ResolvedSpec } from "./types";
@@ -48,12 +48,10 @@ export function specLine(name: string, spec: ResolvedSpec): string {
   return `${name} — ${mm3(spec.size)} · ${board} · ${powerLabel(spec)}`;
 }
 
-export function radioOf(parts: ConceptPart[]): string | null {
-  // The MCU's built-in radio is the fallback, not the answer, when the
-  // concept names a dedicated radio part — an ESP32's on-chip Wi-Fi would
-  // otherwise outrank an nRF24L01 the concept actually carries.
-  return protocolOf(parts.filter((p) => p.category === "Connectivity")) ?? protocolOf(parts);
-}
+/** The radio the product uses — a dedicated radio part first, then the one
+ *  on its MCU's die (confidence.ts reads it the way the sheet does). Pass
+ *  the edited parts: an ESP32 the maker set to None has no radio. */
+export { radioOf };
 
 export function ioOf(parts: ConceptPart[]): string[] {
   return parts

@@ -13,7 +13,7 @@
 import type { Companion } from "./companions";
 import { buildCost } from "./credits";
 import { asConceptSummary } from "../spec/hints";
-import type { ConceptSummary } from "./concept";
+import type { ConceptPart, ConceptSummary } from "./concept";
 import {
   productsOf,
   statusOf,
@@ -26,6 +26,7 @@ import {
   type SetupAnswer,
 } from "./history";
 import { blocksBuild, deriveSpec, specKey } from "../spec/derive";
+import { applyEdits } from "../spec/edits";
 import { cleanEdits } from "../spec/hints";
 import { cardFacts, type SpecFactTone } from "../spec/format";
 import type { ResolvedSpec } from "../spec/types";
@@ -74,6 +75,11 @@ export type ProjectState = {
    *  disagreeing with the specs computed here. Not part of the spec's §5
    *  table; see the R1 report's deviations. */
   concepts: Map<string, ConceptSummary | undefined>;
+  /** Each ready card's parts as the maker has edited them on the sheet
+   *  (lib/spec/edits.ts) — what its card, its rail row and its sheet say it
+   *  is made of, and what a build of it is made from. Absent while the
+   *  concept is still being read. */
+  parts: Map<string, ConceptPart[]>;
   /** Each ready card's spec. Null while the concept is still being read. */
   specs: Map<string, ResolvedSpec | null>;
   /** A chosen product whose size its parts can't fit, not agreed as Draft —
@@ -143,14 +149,12 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   // model's hints and the maker's edits. Null while the concept is still
   // being read.
   const specs = new Map<string, ResolvedSpec | null>();
+  const parts = new Map<string, ConceptPart[]>();
   for (const t of products) {
     const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
-    specs.set(
-      t.id,
-      concept
-        ? deriveSpec(concept.parts, concept.hints, cleanEdits(answer?.specs?.[productIdOf(t)]))
-        : null,
-    );
+    const edits = cleanEdits(answer?.specs?.[productIdOf(t)]);
+    specs.set(t.id, concept ? deriveSpec(concept.parts, concept.hints, edits) : null);
+    if (concept) parts.set(t.id, applyEdits(concept.parts, edits));
   }
 
   // A chosen product whose size its parts can't fit, and that the maker has
@@ -216,6 +220,7 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     leftOut,
     selected,
     concepts,
+    parts,
     specs,
     specBlock,
     inBuild,
@@ -342,8 +347,9 @@ export function railRows(
     const facts =
       t.status === "ready" && spec && !standIn
         ? // The card's own facts, run into one line: the row and the card
-          // can't say two different things about the same product.
-          cardFacts(spec, state.concepts.get(t.id)?.parts ?? []).map((f) => ({
+          // can't say two different things about the same product — both
+          // read the parts as edited, the ones the build is made from.
+          cardFacts(spec, state.parts.get(t.id) ?? []).map((f) => ({
             key: f.key,
             text: f.label ? `${f.label} ${f.value}` : f.value,
             tone: f.tone,

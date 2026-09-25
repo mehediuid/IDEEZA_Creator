@@ -28,11 +28,12 @@ import {
   type ConceptFailReason,
   type SetupAnswer,
 } from "@/lib/create/history";
-import type { ConceptSummary } from "@/lib/create/concept";
+import { summaryFromParts, type ConceptSummary } from "@/lib/create/concept";
 import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { blocksBuild, deriveSpec, partsForBuild } from "@/lib/spec/derive";
+import { applyEdits } from "@/lib/spec/edits";
 import { specLine } from "@/lib/spec/format";
-import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
+import { asConceptSummary, cleanChoices, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -117,6 +118,14 @@ const sideBySide = () => window.matchMedia("(min-width: 768px)").matches;
  *  is the last thing read before credits move (review 2 I4). */
 function gateLine(name: string, spec: ResolvedSpec, concept: ConceptSummary): string {
   return `${specLine(name, spec)}${concept.fallback ? " · stand-in parts" : ""}`;
+}
+
+/** The parts line under a build's title, of the parts the maker edited —
+ *  the concept's own line, word for word, when nothing was changed. */
+function summaryOf(concept: ConceptSummary, edits: SpecEdits): string {
+  const choices = cleanChoices(edits);
+  if (!Object.keys(choices).length) return concept.summary;
+  return summaryFromParts(applyEdits(concept.parts, choices));
 }
 
 /** The maker's sentence as the tail of another one: a companion is drawn as
@@ -1074,7 +1083,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           const brief = conceptBriefOf(chat.turns, turn.id);
           const known = read.get(turn.id);
           return (known ? Promise.resolve(known) : readForBuild(turn, brief)).then((concept) => {
-            const spec = deriveSpec(concept.parts, concept.hints, editsNow.current(companion.id));
+            // One read of the edits for both: the spec and the parts it was
+            // worked out from can't come from two different sets of them.
+            const edits = editsNow.current(companion.id);
+            const spec = deriveSpec(concept.parts, concept.hints, edits);
             return {
               id: companion.id,
               name: companion.name,
@@ -1083,9 +1095,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               // The name the canvas and the rail already call it, as the
               // primary keeps the name its question gave it.
               title: companion.name || concept.title,
-              summary: concept.summary,
+              summary: summaryOf(concept, edits),
               description: concept.description,
-              parts: partsForBuild(concept.parts, spec.battery),
+              // The parts as the maker edited them on the sheet, with the
+              // spec's pack — what the BOM, the wiring and the firmware say.
+              parts: partsForBuild(concept.parts, spec.battery, edits),
               spec,
             };
           });
@@ -1110,7 +1124,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // the gate taking focus as it opens, one edit after its lines. A
       // product that no longer fits is not booked; the gate closes on its
       // size instead.
-      const spec = deriveSpec(concept.parts, concept.hints, editsNow.current("primary"));
+      const edits = editsNow.current("primary");
+      const spec = deriveSpec(concept.parts, concept.hints, edits);
       const blocked = blocksBuild(spec)
         ? "primary"
         : companions.find((c) => c.spec && blocksBuild(c.spec))?.id;
@@ -1159,11 +1174,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           prompt: source.prompt,
           conceptNumber: labels.get(source.turnId) ?? "1",
           title: namedAt || concept.title || deriveTitle(source.prompt),
-          summary: concept.summary,
+          summary: summaryOf(concept, edits),
           description: concept.description,
           projectChoiceId: decidedProject?.projectId,
           projectChoiceName: decidedProject?.projectName,
-          parts: partsForBuild(concept.parts, spec.battery),
+          parts: partsForBuild(concept.parts, spec.battery, edits),
           spec,
           companions,
         });
@@ -1442,7 +1457,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             `Concept ${labels.get(sheetTurn.id) ?? "1"}`,
           conceptLabel: labels.get(sheetTurn.id) ?? "1",
           spec: sheetSpec,
-          parts: rail.state.concepts.get(sheetTurn.id)?.parts ?? [],
+          parts: rail.state.parts.get(sheetTurn.id) ?? [],
           edits: cleanEdits(sheetAnswer?.specs?.[focusedProduct]),
           onChange: sheetAnswer
             ? (edits) => handleSpecChange(focusedProduct, edits)

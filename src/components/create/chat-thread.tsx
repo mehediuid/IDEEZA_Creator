@@ -189,6 +189,7 @@ export function ChatThread({
     leftOut,
     selected,
     concepts,
+    parts,
     specs,
     specBlock,
     inBuild,
@@ -259,7 +260,8 @@ export function ChatThread({
               ? {
                   productId: productIdOf(turn),
                   spec: specs.get(turn.id) ?? null,
-                  parts: concepts.get(turn.id)?.parts ?? [],
+                  // As edited on the sheet — the parts the build will use.
+                  parts: parts.get(turn.id) ?? [],
                   fallback: !!concepts.get(turn.id)?.fallback,
                   rereading: rereading?.has(turn.id) ?? false,
                   onReread:
