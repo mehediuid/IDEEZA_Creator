@@ -6,7 +6,7 @@
 // describe one build instead of three plausible-looking inventions.
 
 import type { ConceptPart, ConceptPartCategory } from "./concept";
-import { isBatteryPart } from "../spec/batteries";
+import { batteryOf, isBatteryPart } from "../spec/batteries";
 import { qtyOf, unitName } from "../spec/bodies";
 import {
   isChargePort,
@@ -246,6 +246,21 @@ export function partChangesOf(
   // The concept as it would have been built with no edit — the same pack
   // unless the maker picked this one — so the difference is theirs.
   const pack = pickedPack ? deriveSpec(concept.parts, concept.hints).battery : spec.battery;
+  if (!Object.keys(spec.choices ?? {}).length) {
+    // The pack is the only change: said as the pack. A diff of the whole
+    // lists works `before` out with today's rules, and a port they now add,
+    // which an older build never carried, read as the maker's removal.
+    const supply = (k: typeof pack): ConceptPart | null =>
+      k === "none" ? null : { name: batteryOf(k).label, role: "", category: "Power Management" };
+    const from = supply(pack);
+    const to = supply(spec.battery);
+    if (pack === spec.battery) return null;
+    return {
+      removed: from && !to ? [plainName(from)] : [],
+      added: to && !from ? [plainName(to)] : [],
+      swapped: from && to ? [{ from: plainName(from), to: plainName(to) }] : [],
+    };
+  }
   const before = partsForBuild(concept.parts, pack);
   const after = job.parts;
 
