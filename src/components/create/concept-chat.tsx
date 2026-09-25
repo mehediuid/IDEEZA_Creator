@@ -345,17 +345,19 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     read: ReadonlyMap<string, ConceptSummary>;
   } | null>(null);
   const [submittingBuild, setSubmittingBuild] = React.useState(false);
-  // Full-screen image editor: editorTurnId is the concept currently shown in
-  // the lightbox (null = closed). Submitting an edit closes the editor; the
-  // refine then continues in the thread (pending → ready), where the user can
-  // watch it land and reopen Refine to iterate.
-  // Null once Done or Close on the spec sheet has cleared the selection: no
-  // row is selected, no card is edged, and the composer changes nothing
-  // until a product is picked again.
+  // The product selected — the one the composer changes, whose row and card
+  // are marked, and whose sheet shows when one is open. Null once Done,
+  // Close or Esc on the spec sheet has cleared the selection: no row is
+  // selected, no card is edged, and the composer changes nothing until a
+  // product is picked again.
   const [focusedProduct, setFocusedProduct] = React.useState<string | null>("primary");
   // Which pane shows when the two are tabs — on a phone, or where the page
   // has no room for both (useRoomToSplit).
   const [pane, setPane] = React.useState<"work" | "chat">("work");
+  // Full-screen image editor: editorTurnId is the concept currently shown in
+  // the lightbox (null = closed). Submitting an edit closes the editor; the
+  // refine then continues in the thread (pending → ready), where the user can
+  // watch it land and reopen Refine to iterate.
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
   // Part 4 §4.4 — the companion products offered for the concept the gate
   // is open on, and which of them are ticked. The concepts themselves live
@@ -1385,7 +1387,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         void readForBuild(t, source.prompt).then((concept) => {
           const edits = editsAt(companionId, concept.parts, t.id);
           const spec = deriveSpec(concept.parts, concept.hints, edits);
-          // A size that can't be built goes to its card, as the primary's does.
+          // A size that can't be built opens its sheet at Length, as the
+          // primary's does.
           if (blocksBuild(spec)) focusSpec(companionId);
           else
             goToGate(
@@ -1615,7 +1618,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   if (specSheet && !sheetProduct) setSpecSheet(null);
 
   if (!hydrated) {
-    return <LoadingShell />;
+    return <LoadingShell rootRef={setChatRoot} split={split} />;
   }
   if (!chat) {
     return <NotFoundShell />;
@@ -1858,19 +1861,39 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
 // The page's own shape while the chat is read from storage — the rail's
 // header, next step and product rows, the composer and two cards — so nothing
-// jumps when it lands. It was a line of centred text. Below `md` the page is
-// two tabs over the canvas, so the shape there is the tab bar and the cards.
-function LoadingShell() {
+// jumps when it lands. It was a line of centred text. It splits by the same
+// measure as the page (useRoomToSplit, read off this box as it mounts): two
+// panes where the page will show two, else the tab bar over the cards. Until
+// the script has measured it — the server's render, the first paint — it
+// shows the tabs below 1024 px, where a window with the app's sidebar open
+// (as the sidebar paints until the stores are read) has no room for two panes.
+function LoadingShell({
+  rootRef,
+  split,
+}: {
+  rootRef: (el: HTMLDivElement | null) => void;
+  split: boolean | null;
+}) {
+  const [row, tabBar, rail] =
+    split === null
+      ? ["lg:flex-row", "lg:hidden", "hidden lg:flex"]
+      : split
+        ? ["flex-row", "hidden", "flex"]
+        : ["", "", "hidden"];
   return (
-    <div role="status" aria-label="Loading the chat" className="flex h-full flex-col md:flex-row">
+    <div ref={rootRef} role="status" aria-label="Loading the chat" className={`flex h-full flex-col ${row}`}>
       <span className="sr-only">Loading the chat</span>
-      <div className="flex shrink-0 gap-[4px] border-b border-solid border-border bg-bg-surface px-[12px] py-[8px] motion-safe:animate-pulse md:hidden">
+      <div
+        className={`flex shrink-0 gap-[4px] border-b border-solid border-border bg-bg-surface px-[12px] py-[8px] motion-safe:animate-pulse ${tabBar}`}
+      >
         <div className="h-[36px] flex-1 rounded-lg bg-bg-subtle" />
         <div className="flex h-[36px] flex-1 items-center justify-center rounded-lg">
           <div className="h-[12px] w-[48px] rounded bg-bg-subtle" />
         </div>
       </div>
-      <div className="hidden w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface motion-safe:animate-pulse md:flex">
+      <div
+        className={`w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface motion-safe:animate-pulse ${rail}`}
+      >
         <div className="flex flex-col gap-[8px] border-b border-solid border-border px-[18px] pb-[14px] pt-[16px]">
           <div className="h-[14px] w-[140px] rounded bg-bg-subtle" />
           <div className="h-[12px] w-[220px] rounded bg-bg-subtle" />
