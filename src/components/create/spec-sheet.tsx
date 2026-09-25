@@ -19,15 +19,19 @@
 // BOM, the wiring and the firmware follow — and the concept image stays as
 // the look. They apply as they are made; there is nothing to save, and
 // nothing is paid until Build. A size the parts cannot fit says so here,
-// with its ways out, before anything is paid.
+// with its ways out, before anything is paid. Once the product is built its
+// spec is what was built, and the sheet only shows it: a change is made in
+// the editor the build review opens, which the sheet takes the maker to.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
   Alert02Icon,
+  ArrowRight01Icon,
   BatteryLowIcon,
   BubbleChatEditIcon,
   Cancel01Icon,
+  LockIcon,
   Maximize01Icon,
   Undo02Icon,
 } from "@hugeicons/core-free-icons";
@@ -59,7 +63,7 @@ import {
   QUIET_BUTTON,
   Section,
   WirelessSection,
-  tagFor,
+  tagOf,
   type Edit,
 } from "./spec-sections";
 import { useDialogFocus } from "./use-dialog-focus";
@@ -100,8 +104,15 @@ export type SheetProduct = {
   links: ProductLink[];
   peers: LinkPeer[];
   /** Absent on a chat from before the setup question — it has nowhere to keep
-   *  an edit, so the spec shows and cannot change. */
+   *  an edit, so the spec shows and cannot change — and on a built product. */
   onChange?: (edits: SpecEdits) => void;
+  /** Built: the spec and parts are the build's (projectState's `locked`), and
+   *  the sheet shows what was built, with no control, tag or Reset. It is
+   *  changed in the editor the build review opens. */
+  locked: boolean;
+  /** Locked to a build still queued or running — made from this spec, not
+   *  made yet. */
+  building?: boolean;
   /** Selects another product — the sheet follows to it. */
   onOpenProduct?: (productId: string) => void;
   /** The parts are the generic stand-in; the header says so. */
@@ -202,6 +213,7 @@ export function SpecSheet({
   docked,
   onClose,
   onMessage,
+  onShowEditor,
 }: {
   /** The selected product's spec; null when the sheet is closed, or when the
    *  selected product has no spec to show yet. */
@@ -216,6 +228,10 @@ export function SpecSheet({
    *  the composer, which then changes this product. Docked, the composer is
    *  already on screen beside it, so it isn't offered. */
   onMessage?: () => void;
+  /** A built product's way to where it changes now: the build review's Open
+   *  in editor, on the canvas. The host closes an overlay first, keeping the
+   *  selection, as Change by message does. */
+  onShowEditor?: () => void;
 }) {
   // Closing an overlay unmounts nothing at once: the last product stays
   // drawn, inert, for the length of the exit, then goes. Kept as state from
@@ -236,7 +252,14 @@ export function SpecSheet({
 
   if (docked) {
     return product ? (
-      <SheetPanel docked product={product} open request={request} onClose={onClose} />
+      <SheetPanel
+        docked
+        product={product}
+        open
+        request={request}
+        onClose={onClose}
+        onShowEditor={onShowEditor}
+      />
     ) : null;
   }
   const shown = product ?? leaving;
@@ -249,6 +272,7 @@ export function SpecSheet({
       request={request}
       onClose={onClose}
       onMessage={onMessage}
+      onShowEditor={onShowEditor}
     />,
     document.body,
   );
@@ -261,6 +285,7 @@ function SheetPanel({
   request,
   onClose,
   onMessage,
+  onShowEditor,
 }: {
   /** A column beside the canvas, not a dialog: nothing behind it is held. */
   docked: boolean;
@@ -270,6 +295,7 @@ function SheetPanel({
   request: SheetRequest | null;
   onClose: () => void;
   onMessage?: () => void;
+  onShowEditor?: () => void;
 }) {
   const { productId, onChange } = product;
   const panelRef = React.useRef<HTMLElement>(null);
@@ -371,8 +397,9 @@ function SheetPanel({
   }, [docked, open]);
   // Over the page the composer is behind the sheet (or on the other tab, on a
   // phone), and Done clears the selection — so this is the way to change the
-  // product in words: out of the sheet, still selected.
-  const offersMessage = !docked && !!onMessage;
+  // product in words: out of the sheet, still selected. Not for a built
+  // product: its spec changes in the editor, and the note at the top says so.
+  const offersMessage = !docked && !!onMessage && !product.locked;
   const message = () => {
     blurInside();
     onMessage?.();
@@ -447,6 +474,7 @@ function SheetPanel({
           </h2>
           <p id={subtitleId} className="text-sm text-text-tertiary">
             Concept {product.conceptLabel}
+            {product.locked ? " · Built" : ""}
             {product.fallback ? " · Stand-in parts" : ""}
           </p>
         </div>
@@ -468,7 +496,42 @@ function SheetPanel({
         key={productId}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[16px] md:px-[24px]"
       >
-        {product.editedOn !== null && (
+        {product.locked && (
+          // Where the sheet starts: this is the build's spec, and where it
+          // changes — one jump to the review's Open in editor, the control
+          // that does it, never a second copy of it here. The sentence and
+          // the jump under it, as the rail's next step lays its own out; the
+          // lock is the card's "Always built" glyph. No rule under it: the
+          // Size section's own rule is the one between them.
+          <div className="flex gap-[8px] py-[12px] text-sm text-text-secondary">
+            <span aria-hidden className="mt-[3px] inline-flex shrink-0 self-start text-text-tertiary">
+              <Icon icon={LockIcon} size={14} />
+            </span>
+            <div className="flex min-w-0 flex-col items-start gap-[4px]">
+              <p>
+                {product.building
+                  ? "This is what is being built. Once it is ready, change it in the editor."
+                  : "This is what was built. To change it, open the build in the editor."}
+              </p>
+              {onShowEditor && !product.building && (
+                <button
+                  type="button"
+                  // Named by what it says first (WCAG 2.5.3), then where it goes.
+                  aria-label="Show on canvas — the build's Open in editor"
+                  className={`-ml-[4px] gap-[4px] ${QUIET_BUTTON}`}
+                  onClick={() => {
+                    blurInside();
+                    onShowEditor();
+                  }}
+                >
+                  Show on canvas
+                  <Icon icon={ArrowRight01Icon} size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {product.editedOn !== null && !product.locked && (
           // A Refine or a Regenerate brought a new concept; the maker's part
           // changes carried over to it, and this says so where the sheet starts.
           <p className="flex flex-wrap items-baseline gap-x-[6px] border-b border-solid border-border py-[12px] text-sm text-text-secondary">
@@ -542,11 +605,14 @@ function SheetPanel({
           {moved?.productId === productId && (
             <p className="text-sm tabular-nums text-text-secondary">{moved.text}</p>
           )}
-          <p className="text-sm text-text-tertiary">
-            {onChange
-              ? "Changes save as you go · the build uses these parts · the image stays as the look"
-              : "This chat is from before specs were kept, so this one can't change."}
-          </p>
+          {/* Built, the note at the top says it all, and Done is alone. */}
+          {!product.locked && (
+            <p className="text-sm text-text-tertiary">
+              {onChange
+                ? "Changes save as you go · the build uses these parts · the image stays as the look"
+                : "This chat is from before specs were kept, so this one can't change."}
+            </p>
+          )}
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-[8px]">
           {offersMessage && (
@@ -695,7 +761,7 @@ function SizeSection({
     <Section
       id="size"
       title="Size"
-      tag={tagFor(spec.sizeSource === "you")}
+      tag={tagOf(product, spec.sizeSource === "you")}
       reset={
         spec.sizeSource === "you" && edit
           ? {
@@ -774,9 +840,9 @@ function SizeSection({
             )
           ) : spec.kind === "mechanical" ? (
             // Feet and screws and nothing else: no body names a size either.
-            <>Nothing inside it sets a size — type the size you want.</>
+            <>Nothing inside it sets a size{edit ? " — type the size you want" : ""}.</>
           ) : atSmallest ? (
-            <>This is the smallest the parts fit in, give or take 15%. Bigger is fine.</>
+            <>This is the smallest the parts fit in, give or take 15%.{edit ? " Bigger is fine." : ""}</>
           ) : (
             <>
               Smallest the parts fit in: <span className="tabular-nums">{mm3(spec.minSize)}</span>, give or take
@@ -786,6 +852,13 @@ function SizeSection({
         </p>
       )}
 
+      {/* Built as Draft, it says so, with nothing to undo. */}
+      {spec.draftAtSize && !edit && (
+        <p className="flex items-center gap-[8px] text-sm text-text-warning">
+          <Icon icon={Alert02Icon} size={14} />
+          The parts don&apos;t fit this case — the build is marked Draft and lists what to fix.
+        </p>
+      )}
       {spec.draftAtSize && edit && (
         <p className="flex flex-wrap items-center gap-[8px] text-sm text-text-warning">
           <Icon icon={Alert02Icon} size={14} />

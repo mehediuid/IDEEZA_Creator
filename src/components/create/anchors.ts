@@ -20,6 +20,10 @@ export const CREDITS_NOTICE_ID = "build-credits";
 /** The review wrapper a build's deliverables land in. */
 export const BUILD_REVIEW_ID = "build-review";
 
+/** The review's Open in editor (Open Project, once saved) — where a built
+ *  product's spec changes, and where its sheet's jump lands. */
+export const OPEN_IN_EDITOR_ID = "build-open-in-editor";
+
 /** The Add-a-product section (suggested chips, removed chips, the name field). */
 export const ADD_PRODUCT_ID = "add-product";
 
@@ -33,10 +37,11 @@ export const ARRIVAL_RING =
  *  canvas — and nothing else. `scrollIntoView` scrolls every ancestor that
  *  can scroll, and a box clipped with `overflow: hidden` still scrolls from
  *  script: a jump to a lower product moved the app shell itself up and left
- *  a blank strip under it. */
+ *  a blank strip under it. "nearest" moves only as far as it takes to show
+ *  it, 16 px clear of the edge — for a control at the foot of a tall box. */
 export function scrollWithin(
   el: HTMLElement,
-  block: "start" | "end",
+  block: "start" | "end" | "nearest",
   behavior: ScrollBehavior,
 ): void {
   let box = el.parentElement;
@@ -44,6 +49,15 @@ export function scrollWithin(
   if (!box) return;
   const view = box.getBoundingClientRect();
   const at = el.getBoundingClientRect();
-  const by = block === "start" ? at.top - view.top : at.bottom - view.bottom;
-  box.scrollTo({ top: Math.max(0, box.scrollTop + by), behavior });
+  const by =
+    block === "start"
+      ? at.top - view.top
+      : block === "end"
+        ? at.bottom - view.bottom
+        : at.top < view.top + 16
+          ? at.top - view.top - 16
+          : at.bottom > view.bottom - 16
+            ? at.bottom - view.bottom + 16
+            : 0;
+  if (by) box.scrollTo({ top: Math.max(0, box.scrollTop + by), behavior });
 }

@@ -9,7 +9,10 @@
 // number. The concept image stays as the look: the parts change here, the
 // drawing does not. Every edit applies as it is made through the sheet's
 // `edit`, which also says what happened — and what it did elsewhere — to a
-// screen reader, and puts the keyboard where the change shows.
+// screen reader, and puts the keyboard where the change shows. Once a product
+// is built its sheet is read-only (SheetProduct.locked): each section says
+// what was built in the same order under the same heading, with no control,
+// no tag, no Reset and no note that only says how to change it.
 
 import * as React from "react";
 import { Add01Icon, Alert02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -112,6 +115,11 @@ import type { SheetProduct } from "./spec-sheet";
  *  the concept, the AI or the rules put there reads as one word: the maker
  *  needs to know whether they set it, not which of three sources did. */
 export const tagFor = (edited: boolean) => (edited ? "You set" : "Suggested");
+
+/** A section's tag, or none on a built product's sheet: who set a value is a
+ *  question about changing it, and that one can't change here. */
+export const tagOf = (product: SheetProduct, edited: boolean) =>
+  product.locked ? undefined : tagFor(edited);
 
 /** An edit, with what to tell a screen reader it did, where the keyboard
  *  goes once it has rendered — the control that was pressed is often gone —
@@ -282,22 +290,28 @@ function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
 /** What this product works with in the project, each with a way to open the
  *  other's sheet: "Talks to Remote Controller — both use nRF24L01.", or in
  *  the error tone what no longer works and how to put it right — the link's
- *  own words, then `wayOut`'s for a note whose words stop at what is wrong. */
+ *  own words, then `wayOut`'s for a note whose words stop at what is wrong.
+ *  `plain`, on a sheet that can't change anything, says only what is: "…
+ *  these two won't talk." */
 function LinkNotes({
   links,
   onOpen,
   wayOut,
+  plain = false,
 }: {
   links: ProductLink[];
   onOpen?: (productId: string) => void;
   wayOut?: (link: ProductLink) => string | null;
+  plain?: boolean;
 }) {
   if (!links.length) return null;
   return (
     <>
       {links.map((l) => (
         <div key={`${l.about}-${l.otherId}`} className="flex flex-col items-start gap-[2px]">
-          <Note tone={l.ok ? "plain" : "error"}>{[l.text, wayOut?.(l)].filter(Boolean).join(" ")}</Note>
+          <Note tone={l.ok ? "plain" : "error"}>
+            {plain ? l.fact : [l.text, wayOut?.(l)].filter(Boolean).join(" ")}
+          </Note>
           {onOpen && (
             <button type="button" onClick={() => onOpen(l.otherId)} className={`-ml-[4px] text-sm ${QUIET_BUTTON}`}>
               Open {l.otherName}
@@ -529,6 +543,7 @@ function PowerNotes({ product, edit, onOpen }: Props) {
       links={powerLinks(product)}
       onOpen={onOpen}
       wayOut={(l) => powerWayOut(product, l, !!edit)}
+      plain={!edit}
     />
   );
 }
@@ -581,11 +596,13 @@ export function PowerSection({ product, edit, onOpen }: Props) {
   const over = spec.drawMa > spec.budgetMa;
   const runtime = runtimeLabel(spec.runtimeH)?.replace(/^~/, "");
   const numbers = `${currentLabel(spec.drawMa)} of ${currentLabel(spec.budgetMa)}`;
+  // What to pick instead, only where something can be picked.
+  const instead = (words: string) => (edit ? ` ${words}` : "");
   const line = over
     ? mode === "battery"
-      ? `Needs more power than this gives — ${numbers}. Pick a bigger pack.`
+      ? `Needs more power than this gives — ${numbers}.${instead("Pick a bigger pack.")}`
       : mode === "usb"
-        ? `Needs more power than USB gives — ${numbers}. Use a wall adapter or a battery.`
+        ? `Needs more power than USB gives — ${numbers}.${instead("Use a wall adapter or a battery.")}`
         : `Needs more power than the adapter gives — ${numbers}.`
     : mode === "usb"
       ? "No battery — it runs only while plugged in."
@@ -603,7 +620,7 @@ export function PowerSection({ product, edit, onOpen }: Props) {
       // "Power", whichever it is: the choice between a battery and a cord is
       // the section's first control, so its heading can't be one of them.
       title="Power"
-      tag={tagFor(edited)}
+      tag={tagOf(product, edited)}
       reset={reset}
     >
       {edit ? (
@@ -665,14 +682,20 @@ export function PowerSection({ product, edit, onOpen }: Props) {
           </div>
         </>
       ) : (
-        <ReadOnly>
-          {batteryOf(spec.battery).label}
-          {portPart ? ` · ${readableName(portPart)}` : ""}
-        </ReadOnly>
+        // The controls' own labels, each with what it was set to.
+        <Rows
+          rows={[
+            ["Power source", mode === "wall" ? batteryOf("adapter").label : MODE_WORD[mode]],
+            ...(mode === "battery" ? [["Pack", batteryOf(spec.battery).label] as [string, string]] : []),
+            [portLabel, port ? CHARGE_PORTS[port].label : portPart ? readableName(portPart) : "None"],
+          ]}
+        />
       )}
       {/* A port set to None on something the cable powers — an older edit
           can still hold one. */}
-      {spec.noUsbPort && <Note tone="warn">USB powered, but nothing takes the power in — pick a port.</Note>}
+      {spec.noUsbPort && (
+        <Note tone="warn">USB powered, but nothing takes the power in{edit ? " — pick a port" : ""}.</Note>
+      )}
       <Note tone={over ? "error" : "plain"}>{line}</Note>
       <PowerNotes product={product} edit={edit} onOpen={onOpen} />
     </Section>
@@ -717,50 +740,53 @@ export function ChargesSection({ product, edit, onOpen }: Props) {
     <Section
       id={id}
       title="Charges"
-      tag={tagFor(sectionEdited(edits, "power", conceptParts))}
+      tag={tagOf(product, sectionEdited(edits, "power", conceptParts))}
       reset={powerReset(product, edit, id, "Charges")}
     >
       {edit ? (
-        <Field id={cellsId} label="Pack it charges">
-          <SelectMenu<ChargeCellKey>
-            id={cellsId}
-            ariaLabel="Pack it charges"
-            // Cells the catalog has no charger for (3S, AA) are the concept's.
-            placeholder={fromConcept(chargerOf(parts), "Choose what it charges")}
-            value={chargeCellsOf(parts)}
-            options={cellOptions(conceptParts)}
-            onChange={(v) =>
-              edit(withCharges(edits, v, conceptParts), {
-                say: `Charges ${CHARGERS[v].plain}.`,
-                cause: `Charges → ${CELL_WORD[v]}`,
-              })
-            }
-          />
-        </Field>
+        <>
+          <Field id={cellsId} label="Pack it charges">
+            <SelectMenu<ChargeCellKey>
+              id={cellsId}
+              ariaLabel="Pack it charges"
+              // Cells the catalog has no charger for (3S, AA) are the concept's.
+              placeholder={fromConcept(chargerOf(parts), "Choose what it charges")}
+              value={chargeCellsOf(parts)}
+              options={cellOptions(conceptParts)}
+              onChange={(v) =>
+                edit(withCharges(edits, v, conceptParts), {
+                  say: `Charges ${CHARGERS[v].plain}.`,
+                  cause: `Charges → ${CELL_WORD[v]}`,
+                })
+              }
+            />
+          </Field>
+          <Field id={portId} label="Plugs into">
+            <SelectMenu<ChargePortKey>
+              id={portId}
+              ariaLabel="Plugs into"
+              placeholder={fromConcept(portPart, "Choose a port")}
+              value={port}
+              options={chargePortChoices(spec.battery, conceptParts).map((k) => ({
+                label: CHARGE_PORTS[k].label,
+                value: k,
+              }))}
+              onChange={(v) =>
+                edit({ ...edits, chargePort: v }, {
+                  say: `Plugs into ${CHARGE_PORTS[v].label}.`,
+                  cause: `Plugs into → ${CHARGE_PORTS[v].label}`,
+                })
+              }
+            />
+          </Field>
+        </>
       ) : (
-        <ReadOnly>{cell}</ReadOnly>
-      )}
-      {edit ? (
-        <Field id={portId} label="Plugs into">
-          <SelectMenu<ChargePortKey>
-            id={portId}
-            ariaLabel="Plugs into"
-            placeholder={fromConcept(portPart, "Choose a port")}
-            value={port}
-            options={chargePortChoices(spec.battery, conceptParts).map((k) => ({
-              label: CHARGE_PORTS[k].label,
-              value: k,
-            }))}
-            onChange={(v) =>
-              edit({ ...edits, chargePort: v }, {
-                say: `Plugs into ${CHARGE_PORTS[v].label}.`,
-                cause: `Plugs into → ${CHARGE_PORTS[v].label}`,
-              })
-            }
-          />
-        </Field>
-      ) : (
-        <ReadOnly>Plugs into {port && port !== "none" ? CHARGE_PORTS[port].label : (charges?.port ?? "nothing")}</ReadOnly>
+        <Rows
+          rows={[
+            ["Pack it charges", cell],
+            ["Plugs into", port && port !== "none" ? CHARGE_PORTS[port].label : (charges?.port ?? "Nothing")],
+          ]}
+        />
       )}
       <PowerNotes product={product} edit={edit} onOpen={onOpen} />
     </Section>
@@ -784,10 +810,10 @@ export function PackSection({ product, edit, onOpen }: Props) {
     <Section
       id={id}
       title="Pack"
-      tag={tagFor(sectionEdited(edits, "power", conceptParts))}
+      tag={tagOf(product, sectionEdited(edits, "power", conceptParts))}
       reset={powerReset(product, edit, id, "Pack")}
     >
-      {edit ? (
+      {edit && (
         <Field id={packId} label="Pack">
           <SelectMenu<BatteryKey>
             id={packId}
@@ -803,10 +829,14 @@ export function PackSection({ product, edit, onOpen }: Props) {
             }
           />
         </Field>
-      ) : (
-        <ReadOnly>{pack.label}</ReadOnly>
       )}
-      <Rows rows={[["Plugs in with", connector ? readableName(connector) : "Nothing named yet"]]} />
+      {/* Read-only, the pack is the first row of the two. */}
+      <Rows
+        rows={[
+          ...(edit ? [] : [["Pack", pack.label] as [string, string]]),
+          ["Plugs in with", connector ? readableName(connector) : edit ? "Nothing named yet" : "Nothing named"],
+        ]}
+      />
       {links.length ? (
         <PowerNotes product={product} edit={edit} onOpen={onOpen} />
       ) : (
@@ -837,7 +867,7 @@ export function BrainSection({ product, edit }: Props) {
     if (!canAddBrain(parts)) return null;
     return (
       <Section id={id} title="Brain">
-        <ReadOnly>No chip — add one to give it sensors, a screen or wireless</ReadOnly>
+        <ReadOnly>{edit ? "No chip — add one to give it sensors, a screen or wireless" : "No chip"}</ReadOnly>
         {edit && (
           <div>
             <button
@@ -881,7 +911,7 @@ export function BrainSection({ product, edit }: Props) {
         }
       : undefined;
   return (
-    <Section id={id} title="Brain" tag={tagFor(edited)} reset={reset}>
+    <Section id={id} title="Brain" tag={tagOf(product, edited)} reset={reset}>
       {edit ? (
         <Field id={brainSelectId} label="Chip that runs it">
           <SelectMenu<McuKey>
@@ -962,7 +992,7 @@ export function WirelessSection({ product, edit, onOpen }: Props) {
     <Section
       id={id}
       title="Wireless"
-      tag={tagFor(edited)}
+      tag={tagOf(product, edited)}
       reset={
         edit && edited
           ? {
@@ -996,7 +1026,7 @@ export function WirelessSection({ product, edit, onOpen }: Props) {
       ) : (
         <ReadOnly>{current}</ReadOnly>
       )}
-      <LinkNotes links={product.links.filter((l) => l.about === "radio")} onOpen={onOpen} />
+      <LinkNotes links={product.links.filter((l) => l.about === "radio")} onOpen={onOpen} plain={!edit} />
     </Section>
   );
 }
@@ -1041,7 +1071,7 @@ export function MovesSection({ product, edit }: Props) {
     <Section
       id={id}
       title="Moves"
-      tag={tagFor(edited)}
+      tag={tagOf(product, edited)}
       reset={
         edit && edited
           ? {
@@ -1180,8 +1210,9 @@ export function MovesSection({ product, edit }: Props) {
 // ─────────────────── Senses · Controls · Shows · … ───────────────────
 
 /** What the maker took out of a role, said once it is empty: "The Joystick
- *  is out of the build, so nothing controls it." */
-function emptiedNote(role: ChipRole, edits: SpecEdits, concept: ConceptPart[]): string {
+ *  is out of the build, so nothing controls it." — and that Reset puts it
+ *  back, on a sheet that has one. */
+function emptiedNote(role: ChipRole, edits: SpecEdits, concept: ConceptPart[], canReset: boolean): string {
   const names = (edits.removed ?? [])
     .map((n) => concept.find((p) => p.name === n))
     .filter((p): p is ConceptPart => !!p && partRole(p) === role)
@@ -1190,7 +1221,7 @@ function emptiedNote(role: ChipRole, edits: SpecEdits, concept: ConceptPart[]): 
   const list = many ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
   const what = list ? `${list} ${many ? "are" : "is"} out of the build` : "Nothing is left here";
   const why = role === "controls" ? ", so nothing controls it" : "";
-  return `None — ${what}${why}. Reset puts ${many ? "them" : "it"} back.`;
+  return `None — ${what}${why}.${canReset ? ` Reset puts ${many ? "them" : "it"} back.` : ""}`;
 }
 
 const chipId = (name: string) =>
@@ -1214,7 +1245,7 @@ export function ChipSections({ product, edit }: Props) {
             key={role}
             id={role}
             title={title}
-            tag={tagFor(edited)}
+            tag={tagOf(product, edited)}
             reset={
               edit && edited
                 ? {
@@ -1229,7 +1260,14 @@ export function ChipSections({ product, edit }: Props) {
                 : undefined
             }
           >
-            {own.length ? (
+            {own.length && !edit ? (
+              // Built, a list of what is in it: a chip is a thing to take out.
+              <ul role="list" className="flex flex-col gap-[4px] text-md text-text-primary">
+                {own.map((p) => (
+                  <li key={p.name}>{counted(p)}</li>
+                ))}
+              </ul>
+            ) : own.length ? (
               <ul role="list" className="flex flex-wrap gap-[8px]">
                 {own.map((p, i) => {
                   // The keyboard goes to the chip that takes this one's
@@ -1265,7 +1303,7 @@ export function ChipSections({ product, edit }: Props) {
                 })}
               </ul>
             ) : (
-              <Note>{emptiedNote(role, edits, conceptParts)}</Note>
+              <Note>{emptiedNote(role, edits, conceptParts, !!edit)}</Note>
             )}
           </Section>
         );
@@ -1361,7 +1399,7 @@ export function CaseSection({
     <Section
       id={id}
       title="Case"
-      tag={tagFor(edited)}
+      tag={tagOf(product, edited)}
       reset={
         edit && edited
           ? {
@@ -1433,10 +1471,13 @@ export function CaseSection({
           )}
         </>
       ) : (
-        <ReadOnly>
-          {spec.material} · {spec.wallMm} mm wall
-          {sealing ? ` · ${ENVIRONMENTS[environment].label}` : ""}
-        </ReadOnly>
+        <Rows
+          rows={[
+            ["Plastic", spec.material],
+            ["Wall", `${spec.wallMm.toFixed(1)} mm`],
+            ...(sealing ? [["Where it's used", ENVIRONMENTS[environment].label] as [string, string]] : []),
+          ]}
+        />
       )}
     </Section>
   );
@@ -1455,7 +1496,7 @@ export function MountingSection({ product, edit, always }: Props & { always: boo
     <Section
       id={id}
       title="Mounting"
-      tag={edited || current ? tagFor(edited) : undefined}
+      tag={edited || current ? tagOf(product, edited) : undefined}
       reset={
         edit && edited
           ? {
@@ -1488,7 +1529,7 @@ export function MountingSection({ product, edit, always }: Props & { always: boo
       <Note>
         {part
           ? `${counted(asPart(part))} — ${part.role.charAt(0).toLowerCase()}${part.role.slice(1)}.`
-          : "Nothing holds it where it sits yet."}
+          : `Nothing holds it where it sits${edit ? " yet" : ""}.`}
       </Note>
     </Section>
   );

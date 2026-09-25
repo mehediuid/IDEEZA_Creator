@@ -54,12 +54,20 @@ what will be built. Today:
   field, an open menu or another dialog, which keep Esc to themselves; over
   the page it is the dialog's own Esc.
 - **S5** The build keeps a **snapshot** of each product's spec. Editing the
-  canvas afterwards doesn't change a finished build.
+  canvas afterwards doesn't change a finished build — and a built product's
+  spec can't be edited on the canvas at all (S8).
 - **S6** Review keeps the §4.7 tabs. The aside's fixed "What this covers"
   lines become that tab's real spec.
 - **S7** The fab profile is a fixed default until the business names a fab
   partner (§4.9 #1): **Standard 2-layer — 0.15 mm track/space, 0.3 mm
   drill, 1.6 mm FR-4, HASL**.
+- **S8** (owner, 2026-09-25: *jokhon build hoye jabe tokhon spec ekhane ar
+  change kora jabena. change ja korar seta edit a jeye korbe*) **Once a
+  product is built, its spec sheet is read-only and shows what was built.**
+  Any change to it is made in the editor, which the build review opens with
+  **Open in editor**. Refine and Regenerate still draw a new concept, and a
+  new concept is not what was built: its sheet is editable, and building it
+  again works as before. See *Once built*, below.
 
 ## What a spec holds
 
@@ -214,9 +222,11 @@ system prompt gains a `spec` object:
   - A product left out of the build doesn't block.
 - **Confirm dialog.** One line per product:
   `RC Car Controller — 118 × 64 × 38 mm · 2-layer 58 × 42 · ~45 min`.
-- **Changed since build.** A spec edit after a build counts as a change,
-  like a concept change does today: *Spec changed — building again makes a
-  new version.*
+- **Changed since build.** Only a new concept is a change now — Refine,
+  Regenerate, Restore, or a product added after the booking. A built
+  product's spec can't be edited (S8), so no spec edit makes it *Changed*;
+  a spec edit counts only where nothing is locked to the build (one that
+  failed).
 
 ## Editing parts
 
@@ -298,8 +308,9 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
   gate's line per product (it names the radio and the part the card
   names), the booked snapshot's `choices`, and `partsForBuild` — so the
   BOM, the wiring and the firmware — all read `applyEdits(concept.parts,
-  edits)`. A part edit after a build is a spec change (*Spec changed since
-  this build*). The concept image stays as the look; the footer says so:
+  edits)`. A built product's parts can't be edited at all (S8); only a new
+  concept of it is editable again. The concept image stays as the look;
+  the footer says so:
   *Changes save as you go · the build uses these parts · the image stays
   as the look*. Edits are free; credits move only at Build.
 - **Power and its port.** A product powered over USB whose parts name no
@@ -318,6 +329,46 @@ product onuzayi sob kichu thakbe"). The model is in `src/lib/spec/`
   Nothing inside it has to fit, so the only minimum is the printable shell;
   a plate given electronics keeps its plate, grown to hold them. An
   electronic product's "enclosure" part is never read as a body.
+
+## Once built (S8)
+
+- **When a product is locked.** While all three hold (`project-state.ts`
+  `projectState().locked`, `lockedOf`): the chat's booked build includes
+  it; that build is queued, running, ready or partial — a failed build,
+  which made nothing, locks nothing; and the product's latest concept is
+  the one booked.
+- **Where its spec comes from.** The booked snapshot — `BuildProduct.spec`
+  and its parts — not `answer.specs`. An edit stored after the booking is
+  left in storage and never applied: not on the sheet, the card, the rail
+  row, nor a later Build again, which books the snapshot's own decisions
+  (`bookedEditsOf`). A build booked before products had a spec shows its
+  concept as drawn, with no decisions. A spec edit can no longer make a
+  product *Changed*; *Changed*, *Spec changed since this build* and **Build
+  again** come only from a new concept.
+- **The sheet.** The title stays *{Name} spec*; the subtitle reads *Concept
+  N · Built*. Its body opens with a plain note — *This is what was built.
+  To change it, open the build in the editor.* — and a quiet **Show on
+  canvas** under it that lands on the build review's **Open in editor**
+  (`anchors.ts` `OPEN_IN_EDITOR_ID`); over the page it closes the sheet
+  first and keeps the selection, as Change by message does. There is no
+  second Open in editor in the sheet: one control, one home. Every section
+  shows its values as text, in the same order under the same headings —
+  label–value rows where it has several (*Power source · Pack · Charge
+  port*; *Plastic · Wall · Where it's used*), a line where it has one — with
+  no input, menu, segmented control, stepper, chip ✕ or **Add a part**, no
+  *Suggested*/*You set* tag and no **Reset**, no **Change by message**, and
+  no fit fix. A note that only guides an edit (*Pick 2S here*, a pairing's
+  way out, *Bigger is fine*) is dropped; a mismatch that was built is still
+  said plainly (*RC Car Controller uses nRF24L01 — these two won't talk.*).
+  **Inside** still lists everything. The footer is **Done** alone.
+- **The card.** Its first action reads **View spec** and opens the same
+  sheet; the caption under the actions reads *Refine and Regenerate redraw
+  the image, 1 credit each*.
+- **The composer.** With a locked product as its target the hint reads
+  *Redraws {Name}'s image · 1 credit. Its built spec changes in the
+  editor.*
+- **The rail.** A row's facts come from the locked spec; nothing else
+  changes.
 
 ## Build and review
 
