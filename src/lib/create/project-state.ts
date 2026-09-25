@@ -263,10 +263,12 @@ export type RailRow = {
   phase: RailPhase;
   /** When the current turn started drawing — the row's own elapsed clock. */
   since?: number;
-  /** The card's facts for this product (format.ts `cardFacts`) — size first,
-   *  then what this product is for. Omitted while drawing, failed, before a
-   *  spec exists, and for a stand-in: those numbers are generic parts', not
-   *  this product's. */
+  /** The card's facts for this product (format.ts `cardFacts`) but its size —
+   *  its power, its radio and what it is for. One line in the row, and with
+   *  the size in front it was the fact that says what the product does that
+   *  got cut. A size that doesn't fit is the row's status line already.
+   *  Omitted while drawing, failed, before a spec exists, and for a stand-in:
+   *  those numbers are generic parts', not this product's. */
   facts: { key: string; text: string; tone: SpecFactTone }[];
   /** The model didn't answer, so the card's parts are the generic stand-in
    *  (review 2 I4) — the row says so instead of showing its numbers. */
@@ -351,11 +353,13 @@ export function railRows(
         ? // The card's own facts, run into one line: the row and the card
           // can't say two different things about the same product — both
           // read the parts as edited, the ones the build is made from.
-          cardFacts(spec, state.parts.get(t.id) ?? []).map((f) => ({
-            key: f.key,
-            text: f.label ? `${f.label} ${f.value}` : f.value,
-            tone: f.tone,
-          }))
+          cardFacts(spec, state.parts.get(t.id) ?? [])
+            .filter((f) => f.key !== "size")
+            .map((f) => ({
+              key: f.key,
+              text: f.label ? `${f.label} ${f.value}` : f.value,
+              tone: f.tone,
+            }))
         : [];
 
     // The primary carries no tag — its "Always built" lives on its card
@@ -386,6 +390,23 @@ export function railRows(
       build,
     };
   });
+}
+
+// ─────────────────────────── sheetTurnOf ───────────────────────────
+
+/** The drawing the spec sheet shows for a product: its current one, landed
+ *  and read, with a spec worked out. Null while it draws (a Regenerate or a
+ *  Refine starts a new one), when it failed, while it is still being read,
+ *  and for a product the project doesn't hold. The sheet closes then, and
+ *  stays closed — it used to vanish and come back by itself when the
+ *  reading landed. */
+export function sheetTurnOf(
+  state: ProjectState,
+  productId: string | null,
+): AssistantTurn | null {
+  if (productId === null) return null;
+  const t = state.products.find((x) => productIdOf(x) === productId);
+  return t && t.status === "ready" && state.specs.get(t.id) ? t : null;
 }
 
 // ─────────────────────────── stageOf ───────────────────────────
