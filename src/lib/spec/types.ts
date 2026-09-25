@@ -86,6 +86,10 @@ export type MountingKey = (typeof MOUNTING_KEYS)[number];
 export const ENVIRONMENT_KEYS = ["indoor", "splash-proof", "waterproof"] as const;
 export type EnvironmentKey = (typeof ENVIRONMENT_KEYS)[number];
 
+/** What a standalone charger fills: one Li-Po cell, or two in series. */
+export const CHARGE_CELL_KEYS = ["1s", "2s"] as const;
+export type ChargeCellKey = (typeof CHARGE_CELL_KEYS)[number];
+
 /** How many of one kind — 0 takes them all out. */
 export type Drive<K extends string> = { kind: K; count: number };
 
@@ -112,6 +116,9 @@ export type PartChoices = {
   chargePort?: ChargePortKey;
   environment?: EnvironmentKey;
   mounting?: MountingKey;
+  /** The cells a standalone charger fills — its charging IC swapped for the
+   *  catalog's charger of those cells (CHARGERS, catalog.ts). */
+  charges?: ChargeCellKey;
 };
 
 /** The maker's own changes. An absent field follows the hints and the math. */

@@ -12,9 +12,11 @@ import type { ConceptPart, ConceptPartCategory } from "../create/concept";
 import { isBatteryPart } from "./batteries";
 import { qtyOf } from "./bodies";
 import {
+  CHARGE_CELL_KEYS,
   RADIO_KEYS,
   type AddableKey,
   type AiHints,
+  type ChargeCellKey,
   type ChargePortKey,
   type EnvironmentKey,
   type McuKey,
@@ -286,6 +288,29 @@ export const ENVIRONMENTS: Record<EnvironmentKey, { label: string }> = {
 /** What Waterproof puts in: a seal in the lid's seam. */
 export const GASKET = part("Gasket", "Silicone O-ring gasket", "Seals the case", "Connector & mech");
 
+/** A standalone charger's IC for the cells it fills, fed 5 V from its USB
+ *  port; `plain` is what the sheet leads with. A 2S pack is 8.4 V full,
+ *  above USB's 5 V, so its charger boosts — the IP2326 is Injoinic's
+ *  synchronous boost charger for 2S Li-ion and Li-Po, with each cell
+ *  balanced on the chip. */
+export type ChargerInfo = CatalogPart & { plain: string };
+
+export const CHARGERS: Record<ChargeCellKey, ChargerInfo> = {
+  "1s": {
+    ...part("TP4056", "TP4056 charger", "Charges a 1S Li-Po cell from USB", "Power Management"),
+    plain: "1S Li-Po — one cell, 3.7 V",
+  },
+  "2s": {
+    ...part(
+      "IP2326",
+      "IP2326 2S boost charger",
+      "Charges a 2S Li-Po pack from USB · balances its two cells",
+      "Power Management",
+    ),
+    plain: "2S Li-Po — two cells, 7.4 V",
+  },
+};
+
 // ───────────────────────── what a list already has ─────────────────────────
 
 const lower = (p: ConceptPart) => p.name.toLowerCase();
@@ -554,6 +579,49 @@ export function mountingOf(parts: ConceptPart[]): MountingKey | null {
 
 export function isGasket(p: ConceptPart): boolean {
   return p.category === "Connector & mech" && /gasket|\bo-?ring/.test(lower(p));
+}
+
+// A charging IC, by name or by what it is called.
+const CHARGER = /charg|tp40\d\d|mcp738\d\d|bq24\d+|ip5306|ip2326/;
+
+/** A charging IC — not the port a product charges through, and not a pack. */
+export function isChargerIc(p: ConceptPart): boolean {
+  return p.category !== "Connector & mech" && !isChargePort(p) && !isBatteryPart(p) && CHARGER.test(lower(p));
+}
+
+/** The charging IC of a product that is a charger: one with no pack of its
+ *  own to charge — one inside a handheld is only how that handheld's cell
+ *  gets filled. */
+export function chargerOf(parts: ConceptPart[]): ConceptPart | undefined {
+  if (parts.some(isBatteryPart)) return undefined;
+  return parts.find(isChargerIc);
+}
+
+// The cells a charger's own name says it fills, first match wins — a 3S
+// balance charger is a 3S one, not the 2S that "balance" alone reads as.
+const CELLS: [RegExp, string][] = [
+  [/\b3s\b|11\.1\s*v/, "3S Li-Po"],
+  [/\b2s\b|7\.4\s*v|balanc|ip2326/, "2S Li-Po"],
+  [/ni-?mh|\baaa?\b/, "AA cells"],
+  [/tp40\d\d|mcp738\d\d|\b1s\b|li-?po|li-?ion|18650/, "1S Li-Po"],
+];
+
+/** The cells the catalog's chargers fill, in a charger's words. */
+export const CELL_WORD: Record<ChargeCellKey, string> = { "1s": "1S Li-Po", "2s": "2S Li-Po" };
+
+/** "1S Li-Po", "2S Li-Po", "AA cells" — or "batteries" for a charger whose
+ *  name says none. */
+export function chargerCellOf(charger: ConceptPart): string {
+  return kindOf(CELLS, lower(charger)) ?? "batteries";
+}
+
+/** The sheet's Charges: which of the catalog's cells a charger fills. Null
+ *  for a product that is no charger, and for cells the catalog has no
+ *  charger for (3S, AA). */
+export function chargeCellsOf(parts: ConceptPart[]): ChargeCellKey | null {
+  const charger = chargerOf(parts);
+  const cell = charger && chargerCellOf(charger);
+  return CHARGE_CELL_KEYS.find((k) => CELL_WORD[k] === cell) ?? null;
 }
 
 /** A sealed case, or the use the model said the product has. */

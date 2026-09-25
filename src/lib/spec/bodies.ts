@@ -109,6 +109,9 @@ const RULES: [RegExp, Body][] = [
   // brushless rules its own name would otherwise fall into.
   [/uln2003|stepper driver/, b(35, 32, 15, "board", 5)],
   [/\besc\b(?!\s*(?:key|button))/, b(45, 24, 8, "case", 5)],
+  // The IP2326 takes a charger module's room, and runs at about 20 mA
+  // while it charges (its datasheet).
+  [/ip2326/, b(26, 17, 4, "board", 20)],
   [/tp4056|charger|charging (?:module|board|ic)/, b(26, 17, 4, "board", 2)],
   [/mp1584|lm2596|mt3608|buck|boost/, b(22, 17, 4, "board", 5)],
   [/ams1117|lm1117|ap2112|\bldo\b|regulator/, b(7, 6.5, 1.8, "board", 5)],

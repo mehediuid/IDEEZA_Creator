@@ -548,6 +548,7 @@ export function specKey(s: ResolvedSpec): string {
     c.chargePort ?? null,
     c.environment ?? null,
     c.mounting ?? null,
+    c.charges ?? null,
   ]);
   // The Draft choice, not whether it applies: the size fitting under a
   // newer fit rule is no change the maker made.

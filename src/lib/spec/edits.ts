@@ -5,15 +5,17 @@
 //
 // Pure, and idempotent — the edited list edited again with the same edits is
 // the same list, so a caller that already holds edited parts can't double
-// them. What keeps it so is a fixed order: the concept's parts (the MCU
-// swapped where it stood), then what each edit puts in — radio, motors,
-// servos, port, mounting, gasket — then the parts added from the catalog.
+// them. What keeps it so is a fixed order: the concept's parts (the MCU and
+// a charger's IC swapped where they stood), then what each edit puts in —
+// radio, motors, servos, port, mounting, gasket — then the parts added from
+// the catalog.
 // Every kind an edit owns is taken out before it is put back, so a second
 // pass takes out exactly what the first put in, and puts it back in place.
 
 import type { ConceptPart } from "../create/concept";
 import {
   ADDABLE,
+  CHARGERS,
   CHARGE_PORTS,
   GASKET,
   MCUS,
@@ -23,7 +25,9 @@ import {
   SERVOS,
   builtInRadioOf,
   builtInRadios,
+  chargeCellsOf,
   chargePortOf,
+  chargerOf,
   isChargePort,
   isDriveMotor,
   isGasket,
@@ -41,6 +45,7 @@ import {
   CHARGE_PORT_KEYS,
   type AddableKey,
   type BatteryKey,
+  type ChargeCellKey,
   type ChargePortKey,
   type McuKey,
   type PartChoices,
@@ -59,10 +64,23 @@ function swapMcu(parts: ConceptPart[], key: McuKey): ConceptPart[] {
   return at < 0 ? [chip, ...parts] : parts.map((p, i) => (i === at ? chip : p));
 }
 
+/** A charger's IC swapped where it stood for the catalog's one of `key`'s
+ *  cells — unless it fills those cells already, so the concept's own
+ *  MCP73831 stays when the maker picks the 1S it already is, and a second
+ *  pass leaves the first one's swap. */
+function swapCharger(parts: ConceptPart[], key: ChargeCellKey): ConceptPart[] {
+  const charger = chargerOf(parts);
+  if (!charger || chargeCellsOf(parts) === key) return parts;
+  const next = asPart(CHARGERS[key]);
+  return parts.map((p) => (p === charger ? next : p));
+}
+
 /** The edits with every choice the parts can't honour taken out, or put
  *  right. Such a choice is no choice: applyEdits reads the edits through
  *  this, deriveSpec records these as its `choices`, and the sheet keeps
  *  these, so nothing a maker left behind comes back by itself.
+ *  - A charger's cells on a product that is no charger are dropped — left
+ *    from a concept that was one, they fill nothing.
  *  - ESP-NOW on a chip that isn't an ESP is dropped (every other radio
  *    comes on a module when the die lacks it), so swapping back to an ESP
  *    never turns ESP-NOW back on.
@@ -83,6 +101,10 @@ export function effectiveEdits<E extends PartChoices>(
   battery?: BatteryKey,
 ): E {
   let out = edits;
+  if (edits.charges && !chargerOf(conceptParts)) {
+    out = { ...out };
+    delete out.charges;
+  }
   const radio = edits.radio;
   if (radio && radio !== "none" && !RADIOS[radio].module) {
     const removed = new Set(edits.removed ?? []);
@@ -152,6 +174,16 @@ export function withSupply(edits: SpecEdits, battery: BatteryKey, conceptParts: 
   return withPort(next, defaultPort(battery, own), own);
 }
 
+/** The edits with a charger set to fill `key`'s cells — or its edit taken
+ *  out when the concept's own charger fills those already, so going back
+ *  to them puts the concept's own part back, not the catalog's. */
+export function withCharges(edits: SpecEdits, key: ChargeCellKey, conceptParts: ConceptPart[]): SpecEdits {
+  const next = { ...edits };
+  if (chargeCellsOf(conceptParts) === key) delete next.charges;
+  else next.charges = key;
+  return next;
+}
+
 /** The ports the sheet's port control offers for a supply: none for USB or
  *  the wall — each needs a way in — and a barrel jack only for the wall, or
  *  on a concept that charges through its own. */
@@ -175,6 +207,7 @@ export function applyEdits(parts: ConceptPart[], choices: PartChoices = {}): Con
   // maker picked a radio themselves.
   const carried = edits.mcu && !edits.radio ? builtInRadioOf(out) : null;
   if (edits.mcu) out = swapMcu(out, edits.mcu);
+  if (edits.charges) out = swapCharger(out, edits.charges);
   const radio = edits.radio ?? carried;
   if (radio) {
     const mcu = out.find(isMcu);
@@ -246,7 +279,7 @@ function removedRole(name: string, concept: ConceptPart[]) {
 export function sectionEdited(edits: SpecEdits, section: PartSection, concept: ConceptPart[]): boolean {
   switch (section) {
     case "power":
-      return edits.battery !== undefined || edits.chargePort !== undefined;
+      return edits.battery !== undefined || edits.chargePort !== undefined || edits.charges !== undefined;
     case "brain":
       return edits.mcu !== undefined;
     case "connects":
@@ -285,6 +318,7 @@ export function resetSection(edits: SpecEdits, section: PartSection, concept: Co
     case "power":
       delete next.battery;
       delete next.chargePort;
+      delete next.charges;
       return next;
     case "brain":
       delete next.mcu;
@@ -424,6 +458,7 @@ const PART_CHOICES = [
   "chargePort",
   "environment",
   "mounting",
+  "charges",
 ] as const satisfies readonly (keyof PartChoices)[];
 
 /** The edits as they stand on the concept of turn `turnId`, and whether they

@@ -13,7 +13,18 @@
 import type { ConceptPart } from "../create/concept";
 import { batteryOf, isBatteryPart } from "./batteries";
 import { bodyOf, qtyOf } from "./bodies";
-import { RADIOS, isChargePort, isMcu, isMotorDriver, isServo, partRole, radioKeyOf } from "./catalog";
+import {
+  RADIOS,
+  chargerCellOf,
+  chargerOf,
+  isChargePort,
+  isChargerIc,
+  isMcu,
+  isMotorDriver,
+  isServo,
+  partRole,
+  radioKeyOf,
+} from "./catalog";
 import type { BatteryKey, ResolvedSpec } from "./types";
 import { mm3 } from "./units";
 
@@ -125,8 +136,6 @@ function powerFact(spec: ResolvedSpec): CardFact | null {
   return runtime ? { key: "power", label: "Battery", value: `${runtime} ${per}`, tone: "plain" } : null;
 }
 
-// A charging IC, by name or by what it is called.
-const CHARGER = /charg|tp40\d\d|mcp738\d\d|bq24\d+|ip5306/i;
 // Parts that drive an actuator rather than being one — the motor they drive
 // is the one that says what the product does.
 const DRIVER =
@@ -238,14 +247,6 @@ export function whatItDoes(parts: ConceptPart[]): { does: Does; part: ConceptPar
   return best && { does: best.does, part: best.part };
 }
 
-/** The charging IC of a product that is a charger: one with no pack of its
- *  own to charge — one inside a handheld is only how that handheld's cell
- *  gets filled. A "charging port" is a connector, not a charger. */
-function chargerPartOf(parts: ConceptPart[]): ConceptPart | undefined {
-  if (parts.some(isBatteryPart)) return undefined;
-  return parts.find((p) => CHARGER.test(p.name) && p.category !== "Connector & mech" && !isBatteryPart(p));
-}
-
 /** A product with no chip that is there for a pack: a charger, which fills
  *  one it doesn't carry, or a spare pack, which is one. Null for anything
  *  else — a product with a chip is what it runs, whatever it charges. Read
@@ -253,14 +254,15 @@ function chargerPartOf(parts: ConceptPart[]): ConceptPart | undefined {
  *  charger. */
 export function standaloneOf(parts: ConceptPart[]): "charger" | "pack" | null {
   if (parts.some(isMcu)) return null;
-  if (chargerPartOf(parts)) return "charger";
+  if (chargerOf(parts)) return "charger";
   return parts.some(isBatteryPart) ? "pack" : null;
 }
 
 /** What a charger fills and what it plugs into — "1S Li-Po", "USB-C" — or
- *  null for a product that isn't one. */
+ *  null for a product that isn't one. Read off the parts as edited, so a
+ *  charger set to 2S says 2S (chargerOf, catalog.ts). */
 export function chargesOf(parts: ConceptPart[]): { cell: string; port: string | null } | null {
-  const charger = chargerPartOf(parts);
+  const charger = chargerOf(parts);
   return charger ? chargeParts(charger, parts) : null;
 }
 
@@ -276,7 +278,7 @@ export function packCellOf(key: BatteryKey): string | null {
 /** The one part that says what the product does — the first that applies of
  *  a charger, a pack, then whatItDoes. */
 function partFact(spec: ResolvedSpec, parts: ConceptPart[]): CardFact | null {
-  const charger = chargerPartOf(parts);
+  const charger = chargerOf(parts);
   if (charger) {
     return { key: "part", label: "Charges", value: chargeOf(charger, parts), tone: "plain" };
   }
@@ -309,16 +311,7 @@ function chargeOf(charger: ConceptPart, parts: ConceptPart[]): string {
 }
 
 function chargeParts(charger: ConceptPart, parts: ConceptPart[]): { cell: string; port: string | null } {
-  const n = charger.name;
-  const cell = /\b2s\b|7\.4\s*v|balanc/i.test(n)
-    ? "2S Li-Po"
-    : /\b3s\b|11\.1\s*v/i.test(n)
-      ? "3S Li-Po"
-      : /ni-?mh|\baaa?\b/i.test(n)
-        ? "AA cells"
-        : /tp40\d\d|mcp738\d\d|\b1s\b|li-?po|li-?ion|18650/i.test(n)
-          ? "1S Li-Po"
-          : "batteries";
+  const cell = chargerCellOf(charger);
   const names = parts.map((p) => p.name).join(" ");
   const port = /usb-?c|type-?c/i.test(names)
     ? "USB-C"
@@ -349,7 +342,7 @@ export function partDoes(p: ConceptPart): string {
     case "power":
       if (isChargePort(p)) return "where the power comes in";
       if (isBatteryPart(p)) return "powers it";
-      if (CHARGER.test(n)) return "charges the battery";
+      if (isChargerIc(p)) return "charges the battery";
       if (/ldo|regulator|ams1117|lm1117|ap2112|3v3|3\.3\s*v/.test(n)) return "steady power for the chip";
       if (/buck|boost|mp1584|lm2596|mt3608/.test(n)) return "sets the voltage";
       return "handles the power";

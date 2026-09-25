@@ -8,6 +8,7 @@ import { namesRadio } from "./catalog";
 import {
   ADDABLE_KEYS,
   BATTERY_KEYS,
+  CHARGE_CELL_KEYS,
   CHARGE_PORT_KEYS,
   ENVIRONMENT_KEYS,
   MATERIALS,
@@ -130,6 +131,8 @@ export function cleanChoices(raw: unknown): PartChoices {
   if (isOne(ENVIRONMENT_KEYS, environment)) out.environment = environment;
   const mounting = e.mounting;
   if (isOne(MOUNTING_KEYS, mounting)) out.mounting = mounting;
+  const charges = e.charges;
+  if (isOne(CHARGE_CELL_KEYS, charges)) out.charges = charges;
   return out;
 }
 

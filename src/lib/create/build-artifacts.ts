@@ -10,6 +10,7 @@ import { batteryOf, isBatteryPart } from "../spec/batteries";
 import { qtyOf, unitName } from "../spec/bodies";
 import {
   isChargePort,
+  isChargerIc,
   isDriveMotor,
   isMcu,
   isMotorDriver,
@@ -212,12 +213,13 @@ function plainName(part: ConceptPart): string {
 }
 
 // A removed part and an added one in the same place are one part swapped:
-// the chip, the pack, the port, the motors, their driver, the servos, what
-// holds the product where it sits.
+// the chip, the pack, the port, a charger's IC, the motors, their driver,
+// the servos, what holds the product where it sits.
 function slotOf(p: ConceptPart): string | null {
   if (isMcu(p)) return "mcu";
   if (isBatteryPart(p)) return "pack";
   if (isChargePort(p)) return "port";
+  if (isChargerIc(p)) return "charger";
   if (isMotorDriver(p)) return "driver";
   if (isDriveMotor(p)) return "motor";
   if (isServo(p)) return "servo";
