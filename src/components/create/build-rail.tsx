@@ -33,7 +33,7 @@ import {
 
 // What the build is doing, in one word — the rail used to say "Building"
 // beside "every piece is ready".
-const STATE_WORD: Record<ReturnType<typeof statusOf>, string> = {
+export const STATE_WORD: Record<ReturnType<typeof statusOf>, string> = {
   queued: "Queued",
   running: "Building",
   ready: "Build ready",
@@ -113,7 +113,7 @@ export function BuildRail({
   );
 }
 
-function PipelineRow({ item }: { item: BuildItem }) {
+export function PipelineRow({ item }: { item: BuildItem }) {
   const tone =
     item.status === "ready"
       ? "done"
