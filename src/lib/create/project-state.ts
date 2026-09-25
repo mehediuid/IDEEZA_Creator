@@ -25,11 +25,16 @@ import {
   type ChatTurn,
   type SetupAnswer,
 } from "./history";
-import { blocksBuild, deriveSpec, specKey, withSupplyPort } from "../spec/derive";
-import { applyEdits } from "../spec/edits";
+import { batteryOf } from "../spec/batteries";
+import { RADIOS, radioChoices, radioKeyOf } from "../spec/catalog";
+import { blocksBuild, deriveSpec, effectiveParts, specKey } from "../spec/derive";
+import { rebaseEdits } from "../spec/edits";
 import { cleanEdits } from "../spec/hints";
-import { cardFacts, type SpecFactTone } from "../spec/format";
-import type { ResolvedSpec } from "../spec/types";
+import { cardFactsOf, chargesOf, packCellOf, standaloneOf, type SpecFactTone } from "../spec/facts";
+// The radio as format.ts reads it — the card's reading — so the row, the
+// card and the pairing below say one radio the same way.
+import { radioOf } from "../spec/format";
+import type { BatteryKey, ResolvedSpec, SpecEdits } from "../spec/types";
 
 type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
 type AssistantTurn = Extract<ChatTurn, { role: "assistant" }>;
@@ -76,10 +81,18 @@ export type ProjectState = {
    *  table; see the R1 report's deviations. */
   concepts: Map<string, ConceptSummary | undefined>;
   /** Each ready card's parts as the maker has edited them on the sheet
-   *  (lib/spec/edits.ts) — what its card, its rail row and its sheet say it
-   *  is made of, and what a build of it is made from. Absent while the
-   *  concept is still being read. */
+   *  (lib/spec/edits.ts), with the socket its supply comes in by — the list
+   *  its spec was worked out from (effectiveParts), so what its card, its
+   *  rail row and its sheet say it is made of is what a build of it is made
+   *  from. Absent while the concept is still being read. */
   parts: Map<string, ConceptPart[]>;
+  /** Each product's edits as they apply to its current concept (rebaseEdits):
+   *  a part taken out that this concept doesn't carry is no edit. By turn. */
+  edits: Map<string, SpecEdits>;
+  /** A product whose part changes were made on an older concept of it — the
+   *  turn they were made on, by the turn now on screen. The sheet says they
+   *  still apply. */
+  editedOn: Map<string, string>;
   /** Each ready card's spec. Null while the concept is still being read. */
   specs: Map<string, ResolvedSpec | null>;
   /** A chosen product whose size its parts can't fit, not agreed as Draft —
@@ -150,13 +163,23 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   // being read.
   const specs = new Map<string, ResolvedSpec | null>();
   const parts = new Map<string, ConceptPart[]>();
+  const editsBy = new Map<string, SpecEdits>();
+  const editedOn = new Map<string, string>();
   for (const t of products) {
     const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
-    const edits = cleanEdits(answer?.specs?.[productIdOf(t)]);
+    const stored = cleanEdits(answer?.specs?.[productIdOf(t)]);
+    // Part edits outlive a Refine or a Regenerate; on the new concept they
+    // are read as they apply to it.
+    const rebased = concept ? rebaseEdits(stored, concept.parts, t.id) : { edits: stored, olderConcept: false };
+    const edits = rebased.edits;
+    editsBy.set(t.id, edits);
+    if (rebased.olderConcept && stored.basedOn) editedOn.set(t.id, stored.basedOn);
     const spec = concept ? deriveSpec(concept.parts, concept.hints, edits) : null;
     specs.set(t.id, spec);
-    // With the socket its supply comes in by, as the spec and the build have.
-    if (concept && spec) parts.set(t.id, withSupplyPort(applyEdits(concept.parts, edits), spec.battery));
+    // The parts the spec was worked out from — a barrel jack left from a
+    // switch to the wall and back, or a port set to None, never shows here
+    // when the spec and the build have dropped it.
+    if (concept && spec) parts.set(t.id, effectiveParts(concept.parts, spec.battery, edits));
   }
 
   // A chosen product whose size its parts can't fit, and that the maker has
@@ -200,7 +223,8 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     const now = specs.get(t.id);
     if (!now || !inBuild(t)) return false;
     const booked = productsOf(job).find((p) => p.id === productIdOf(t))?.spec;
-    if (!booked) return Object.keys(cleanEdits(answer?.specs?.[productIdOf(t)])).length > 0;
+    // The turn the edits were made on decides nothing that is built.
+    if (!booked) return Object.keys(editsBy.get(t.id) ?? {}).some((k) => k !== "basedOn");
     return specKey(now) !== specKey(booked);
   };
   const productChanged = (t: AssistantTurn) =>
@@ -223,6 +247,8 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     selected,
     concepts,
     parts,
+    edits: editsBy,
+    editedOn,
     specs,
     specBlock,
     inBuild,
@@ -334,6 +360,7 @@ export function railRows(
   const jobStatus = job ? statusOf(job) : undefined;
   const buildProducts = job ? productsOf(job) : [];
   const buildByProductId = new Map(buildProducts.map((p) => [p.id, p]));
+  const peers = peersOf(state);
 
   return state.products.map((t) => {
     const productId = productIdOf(t);
@@ -352,8 +379,9 @@ export function railRows(
       t.status === "ready" && spec && !standIn
         ? // The card's own facts, run into one line: the row and the card
           // can't say two different things about the same product — both
-          // read the parts as edited, the ones the build is made from.
-          cardFacts(spec, state.parts.get(t.id) ?? [])
+          // read the parts as edited, the ones the build is made from. A
+          // product that talks to another says who, in place of its radio.
+          rowFacts(spec, state.parts.get(t.id) ?? [], linksFor(peers, productId))
             .filter((f) => f.key !== "size")
             .map((f) => ({
               key: f.key,
@@ -390,6 +418,191 @@ export function railRows(
       build,
     };
   });
+}
+
+/** The card's facts (format.ts `cardFacts`), with the products it pairs
+ *  with over its radio in place of the radio itself. */
+function rowFacts(spec: ResolvedSpec, parts: ConceptPart[], links: ProductLink[]) {
+  const pairs = links.filter((l) => l.about === "radio");
+  return cardFactsOf(spec, parts, radioOf(parts), pairs);
+}
+
+// ─────────────────────────── linksOf ───────────────────────────
+//
+// The products of one project work together: a car and its remote are one
+// system, a spare pack swaps into the car, a charger fills its pack. An edit
+// to one can break that, so the sheet says so at the edit, not the build
+// review after the credits are spent (confidence.ts's compatibilityIssues is
+// the same radio check, read there).
+
+/** One product another works with, as that other one's sheet says it. */
+export type ProductLink = {
+  otherId: string;
+  otherName: string;
+  about: "radio" | "power";
+  /** They still work together. */
+  ok: boolean;
+  text: string;
+};
+
+/** A ready product as linksFor reads it. */
+export type LinkPeer = {
+  id: string;
+  name: string;
+  primary: boolean;
+  /** As edited — what is built. */
+  parts: ConceptPart[];
+  conceptParts: ConceptPart[];
+  spec: ResolvedSpec;
+};
+
+/** The project's ready products, read with their specs. A stand-in's parts
+ *  are generic ones, not the product's, so it pairs with nothing. */
+export function peersOf(state: ProjectState): LinkPeer[] {
+  return state.products.flatMap((t) => {
+    const spec = state.specs.get(t.id);
+    const concept = state.concepts.get(t.id);
+    if (t.status !== "ready" || !spec || !concept || concept.fallback) return [];
+    return [
+      {
+        id: productIdOf(t),
+        name: railNameOf(state.setup, t),
+        primary: !t.companionOf,
+        parts: state.parts.get(t.id) ?? concept.parts,
+        conceptParts: concept.parts,
+        spec,
+      },
+    ];
+  });
+}
+
+/** What `productId` works with in its project, and whether it still does:
+ *  the products it talks to over a radio, the spare pack that swaps into it
+ *  or the product it swaps into, and the charger that fills its pack or the
+ *  pack it fills. Pure; `linksFor` over the same products, so a sheet can
+ *  ask it of an edit before it is made. */
+export function linksOf(state: ProjectState, productId: string): ProductLink[] {
+  return linksFor(peersOf(state), productId);
+}
+
+export function linksFor(peers: LinkPeer[], productId: string): ProductLink[] {
+  const me = peers.find((p) => p.id === productId);
+  if (!me) return [];
+  return [...radioLinks(peers, me), ...powerLinks(peers, me)];
+}
+
+/** The sheet's word for a product's radio — "nRF24L01", "Bluetooth LE" —
+ *  or the card's reading for a module the catalog doesn't list. */
+function radioLabel(parts: ConceptPart[]): string | null {
+  const key = radioKeyOf(parts);
+  if (key === "none") return null;
+  return key ? RADIOS[key].label : radioOf(parts);
+}
+
+/** A product that has, or its concept had, a radio: one taken off is a
+ *  pairing broken, not a product that never had one. */
+const speaks = (p: LinkPeer) => !!radioOf(p.parts) || !!radioOf(p.conceptParts);
+
+function radioLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
+  if (!speaks(me)) return [];
+  return peers.flatMap((o): ProductLink[] => {
+    if (o.id === me.id || !speaks(o)) return [];
+    // Compared the way the build review compares them (compatibilityIssues).
+    const a = radioOf(me.parts);
+    const b = radioOf(o.parts);
+    if (!a && !b) return [];
+    const ok = !!a && a === b;
+    const mine = radioLabel(me.parts);
+    const theirs = radioLabel(o.parts);
+    let text: string;
+    if (ok) {
+      text = `Talks to ${o.name} — both use ${mine}.`;
+    } else if (theirs) {
+      const key = radioKeyOf(o.parts);
+      const canPick = key !== null && radioChoices(me.parts).some((c) => c.key === key);
+      text = canPick
+        ? `${o.name} uses ${theirs} — these two won't talk. Pick ${theirs} here, or change ${o.name}'s radio.`
+        : `${o.name} uses ${theirs} — these two won't talk. Change ${o.name}'s radio${mine ? ` to ${mine}` : ""}.`;
+    } else {
+      text = `${o.name} has no wireless — these two won't talk until it has ${mine} too.`;
+    }
+    return [{ otherId: o.id, otherName: o.name, about: "radio", ok, text }];
+  });
+}
+
+const isPack = (k: BatteryKey) => k !== "none" && k !== "adapter";
+
+/** Those of `candidates` that match; with none that does, the one it is
+ *  meant for — the primary, else the first — so a pack that fits nothing
+ *  says so once, not once per product. */
+function meantFor(candidates: LinkPeer[], match: (p: LinkPeer) => boolean): LinkPeer[] {
+  const matching = candidates.filter(match);
+  if (matching.length) return matching;
+  const one = candidates.find((p) => p.primary) ?? candidates[0];
+  return one ? [one] : [];
+}
+
+function powerLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
+  const kind = (p: LinkPeer) => standaloneOf(p.conceptParts);
+  // Products that carry a pack of their own, and the spare packs.
+  const users = peers.filter((p) => !kind(p) && isPack(p.spec.battery));
+  const spares = peers.filter((p) => kind(p) === "pack" && isPack(p.spec.battery));
+  const chargers = peers.filter((p) => kind(p) === "charger");
+  const pack = (p: LinkPeer) => batteryOf(p.spec.battery).label;
+  const out: ProductLink[] = [];
+  const link = (other: LinkPeer, ok: boolean, text: string) =>
+    out.push({ otherId: other.id, otherName: other.name, about: "power", ok, text });
+
+  // A spare pack has to be the pack of the product it swaps into.
+  for (const spare of spares) {
+    for (const user of meantFor(users, (u) => u.spec.battery === spare.spec.battery)) {
+      const ok = user.spec.battery === spare.spec.battery;
+      if (me.id === spare.id) {
+        const b = batteryOf(spare.spec.battery);
+        link(
+          user,
+          ok,
+          ok
+            ? `${b.mAh} mAh at ${b.volts} V · swaps into ${user.name}.`
+            : `${user.name} uses ${pack(user)} — this won't swap into it any more.`,
+        );
+      } else if (me.id === user.id) {
+        link(
+          spare,
+          ok,
+          ok
+            ? `${spare.name} swaps in — the same ${pack(spare)}.`
+            : `${spare.name} is ${pack(spare)} — it won't swap into this any more.`,
+        );
+      }
+    }
+  }
+
+  // A charger has to charge that pack's cells; with no product carrying a
+  // pack, it is the spare pack's charger.
+  for (const charger of chargers) {
+    const cell = (chargesOf(charger.parts) ?? chargesOf(charger.conceptParts))?.cell;
+    if (!cell) continue;
+    const fills = (p: LinkPeer) => packCellOf(p.spec.battery) === cell;
+    for (const target of meantFor(users.length ? users : spares, fills)) {
+      const ok = fills(target);
+      if (me.id === charger.id) {
+        const verb = kind(target) === "pack" ? "is" : "uses";
+        link(
+          target,
+          ok,
+          ok ? `Charges ${target.name}'s ${pack(target)}.` : `Charges ${cell} — ${target.name} ${verb} ${pack(target)}.`,
+        );
+      } else if (me.id === target.id) {
+        link(
+          charger,
+          ok,
+          ok ? `${charger.name} charges this pack.` : `${charger.name} charges ${cell} — it can't charge this ${pack(target)}.`,
+        );
+      }
+    }
+  }
+  return out;
 }
 
 // ─────────────────────────── sheetTurnOf ───────────────────────────

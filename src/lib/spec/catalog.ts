@@ -25,12 +25,16 @@ import {
 } from "./types";
 
 export type CatalogPart = {
-  /** What the sheet's control says. */
+  /** What the sheet's control says — the part a maker buys. */
   label: string;
   /** What the BOM says. */
   name: string;
   role: string;
   category: ConceptPartCategory;
+  /** What it is for, in a maker's words — the line under its name in a
+   *  menu ("Plastic gearbox for wheels · cheap"), so a list of part numbers
+   *  says what each one does. The card and the sheet both read it here. */
+  forWhat?: string;
 };
 
 const part = (
@@ -38,55 +42,98 @@ const part = (
   name: string,
   role: string,
   category: ConceptPartCategory,
-): CatalogPart => ({ label, name, role, category });
+  forWhat?: string,
+): CatalogPart => ({ label, name, role, category, ...(forWhat ? { forWhat } : {}) });
 
 export const FIRMWARE_ROLE = "Runs the firmware";
 
 export const MCUS: Record<McuKey, CatalogPart> = {
-  esp32: part("ESP32-WROOM-32", "ESP32-WROOM-32", FIRMWARE_ROLE, "Microcontroller"),
-  "esp32-c3": part("ESP32-C3", "ESP32-C3", FIRMWARE_ROLE, "Microcontroller"),
-  rp2040: part("RP2040 (Pico)", "RP2040 (Pico)", FIRMWARE_ROLE, "Microcontroller"),
+  esp32: part(
+    "ESP32-WROOM-32",
+    "ESP32-WROOM-32",
+    FIRMWARE_ROLE,
+    "Microcontroller",
+    "Wi-Fi + Bluetooth built in · the usual pick",
+  ),
+  "esp32-c3": part(
+    "ESP32-C3",
+    "ESP32-C3",
+    FIRMWARE_ROLE,
+    "Microcontroller",
+    "Wi-Fi + Bluetooth built in · smaller, uses less power",
+  ),
+  rp2040: part(
+    "RP2040 (Pico)",
+    "RP2040 (Pico)",
+    FIRMWARE_ROLE,
+    "Microcontroller",
+    "Fast, no wireless — a radio module is added if you pick one",
+  ),
   atmega328p: part(
     "ATmega328P (Arduino Nano)",
     "ATmega328P (Arduino Nano)",
     FIRMWARE_ROLE,
     "Microcontroller",
+    "Simple Arduino chip, no wireless — a radio module is added if you pick one",
   ),
 };
 
 /** `module` is the part that carries the radio when the MCU doesn't have it
  *  on its die. ESP-NOW has none — it is Espressif's own protocol, so only an
- *  ESP speaks it. */
-export type RadioInfo = { label: string; module: CatalogPart | null };
+ *  ESP speaks it. `forWhat` is what the radio is for; `adds` is what picking
+ *  it on a chip without it puts in. */
+export type RadioInfo = { label: string; module: CatalogPart | null; forWhat: string; adds?: string };
 
 export const RADIOS: Record<RadioKey, RadioInfo> = {
-  none: { label: "None", module: null },
+  none: { label: "None", module: null, forWhat: "No wireless" },
   wifi: {
     label: "Wi-Fi",
     module: part("ESP-01 (ESP8266)", "ESP-01 Wi-Fi module (ESP8266)", "Connects over Wi-Fi", "Connectivity"),
+    forWhat: "Phone app or home network",
+    adds: "adds a module",
   },
   ble: {
-    label: "BLE",
+    label: "Bluetooth LE",
     module: part("nRF52840", "nRF52840 BLE module", "Connects over Bluetooth LE", "Connectivity"),
+    forWhat: "Phone app, a few metres",
+    adds: "adds a module",
   },
-  "esp-now": { label: "ESP-NOW", module: null },
+  "esp-now": { label: "ESP-NOW", module: null, forWhat: "Direct link between two ESP chips, no router" },
   nrf24: {
     label: "nRF24L01",
     module: part("nRF24L01", "nRF24L01+ 2.4 GHz module", "Links over nRF24", "Connectivity"),
+    forWhat: "Direct link to a remote, about 100 m",
+    adds: "adds a small module",
   },
   lora: {
     label: "LoRa SX1276",
     module: part("LoRa SX1276", "LoRa SX1276 module", "Links over LoRa", "Connectivity"),
+    forWhat: "Kilometres, short messages",
+    adds: "adds a module",
   },
   zigbee: {
     label: "Zigbee (CC2530)",
     module: part("CC2530", "CC2530 Zigbee module", "Joins a Zigbee network", "Connectivity"),
+    forWhat: "Smart-home hubs",
+    adds: "adds a module",
   },
   cellular: {
     label: "Cellular (SIM800L)",
     module: part("SIM800L", "SIM800L GSM module", "Connects over the cellular network", "Connectivity"),
+    forWhat: "Anywhere with phone signal · needs a SIM",
+    adds: "adds a module",
   },
 };
+
+/** A radio's line in the sheet's menu: what it is for, then where it sits —
+ *  "Phone app or home network · built into the chip", or "· adds a module"
+ *  on a chip that doesn't have it. */
+export function radioSub(key: RadioKey, builtIn: boolean): string {
+  const r = RADIOS[key];
+  if (key === "none") return r.forWhat;
+  const where = builtIn ? (key === "esp-now" ? "built in" : "built into the chip") : (r.adds ?? "adds a module");
+  return `${r.forWhat} · ${where}`;
+}
 
 /** A drive motor and the driver it needs — `per` motors to one driver. */
 export type MotorInfo = CatalogPart & { driver: { part: CatalogPart; per: number } };
@@ -95,22 +142,33 @@ const TB6612 = part("TB6612FNG", "TB6612FNG motor driver", "Drives the motors", 
 
 export const MOTORS: Record<MotorKey, MotorInfo> = {
   tt: {
-    ...part("TT gear motor", "TT gear motor", "Drives the product", "Actuator"),
+    ...part("TT gear motor", "TT gear motor", "Drives the product", "Actuator", "Plastic gearbox for wheels · cheap"),
     driver: { part: TB6612, per: 2 },
   },
   n20: {
-    ...part("N20 gear motor", "N20 gear motor", "Drives the product", "Actuator"),
+    ...part("N20 gear motor", "N20 gear motor", "Drives the product", "Actuator", "Tiny metal gearbox · small robots"),
     driver: { part: TB6612, per: 2 },
   },
   brushless: {
-    ...part("Brushless motor", "Brushless motor", "Drives the product", "Actuator"),
+    ...part(
+      "Brushless motor",
+      "Brushless motor",
+      "Drives the product",
+      "Actuator",
+      "Very fast · racers and drones · adds a speed controller",
+    ),
     driver: { part: part("ESC", "30A brushless ESC", "Drives the brushless motor", "Actuator"), per: 1 },
   },
   "28byj": {
-    ...part("28BYJ stepper", "28BYJ-48 stepper motor", "Turns in steps", "Actuator"),
+    ...part("28BYJ stepper", "28BYJ-48 stepper motor", "Turns in steps", "Actuator", "Slow, precise steps · not for wheels"),
     driver: { part: part("ULN2003", "ULN2003 stepper driver", "Drives the stepper", "Actuator"), per: 1 },
   },
 };
+
+/** What a motor's driver is, in words: a speed controller for a brushless
+ *  motor, a motor driver chip for the rest. */
+export const driverWord = (driver: CatalogPart) =>
+  /\besc\b/i.test(driver.name) ? "speed controller" : "motor driver chip";
 
 export const SERVOS: Record<ServoKey, CatalogPart> = {
   sg90: part("SG90 servo", "SG90 servo", "Moves to an angle", "Actuator"),
@@ -120,43 +178,82 @@ export const SERVOS: Record<ServoKey, CatalogPart> = {
 /** The "+ Add a part" menu's groups, in the order it lists them. */
 export const ADD_GROUPS = ["Senses", "Controls", "Shows", "Sounds", "Switches"] as const;
 export type AddGroup = (typeof ADD_GROUPS)[number];
-export type AddablePart = CatalogPart & { group: AddGroup };
+/** An addable part leads with what it is for (`plain`, "Temperature &
+ *  humidity"); its `label` is the part itself ("DHT22"), the menu row's sub. */
+export type AddablePart = CatalogPart & { group: AddGroup; plain: string };
 
 const add = (
   group: AddGroup,
+  plain: string,
   label: string,
   name: string,
   role: string,
   category: ConceptPartCategory,
-): AddablePart => ({ ...part(label, name, role, category), group });
+): AddablePart => ({ ...part(label, name, role, category), group, plain });
 
 export const ADDABLE: Record<AddableKey, AddablePart> = {
   dht22: add(
     "Senses",
-    "DHT22 temperature and humidity",
+    "Temperature & humidity",
+    "DHT22",
     "DHT22 temperature and humidity sensor",
     "Senses temperature and humidity",
     "Sensor",
   ),
-  pir: add("Senses", "PIR motion", "HC-SR501 PIR motion sensor", "Senses motion", "Sensor"),
-  gps: add("Senses", "NEO-6M GPS", "NEO-6M GPS module", "Finds its position", "Sensor"),
-  imu: add("Senses", "MPU-6050 IMU", "MPU-6050 IMU", "Senses tilt and motion", "Sensor"),
-  ultrasonic: add("Senses", "HC-SR04 ultrasonic", "HC-SR04 ultrasonic sensor", "Measures distance", "Sensor"),
-  light: add("Senses", "BH1750 light", "BH1750 light sensor", "Senses light", "Sensor"),
-  soil: add("Senses", "Capacitive soil moisture", "Capacitive soil moisture sensor", "Senses soil moisture", "Sensor"),
-  button: add("Controls", "Tactile button", "Tactile button", "Takes a press", "Display & I/O"),
-  joystick: add("Controls", "Joystick", "Joystick module", "Takes a direction", "Display & I/O"),
-  encoder: add("Controls", "Rotary encoder", "Rotary encoder", "Takes a turn", "Display & I/O"),
-  touch: add("Controls", "TTP223 touch", "TTP223 touch sensor", "Takes a touch", "Display & I/O"),
-  oled: add("Shows", '0.96" OLED', '0.96" OLED display', "Shows text and icons", "Display & I/O"),
-  tft: add("Shows", '1.8" TFT', '1.8" TFT display', "Shows colour graphics", "Display & I/O"),
-  eink: add("Shows", '2.13" e-ink', '2.13" e-ink display', "Shows a still image without power", "Display & I/O"),
-  led: add("Shows", "LED", "Status LED", "Shows its state", "Actuator"),
-  "led-strip": add("Shows", "WS2812 LED strip", "WS2812B LED strip", "Lights up in colour", "Actuator"),
-  buzzer: add("Sounds", "Buzzer", "Piezo buzzer", "Beeps", "Actuator"),
-  speaker: add("Sounds", "Speaker", "Mini speaker", "Plays sound", "Actuator"),
-  relay: add("Switches", "Relay module", "5V relay module", "Switches a high-current load", "Actuator"),
+  pir: add("Senses", "People moving nearby", "HC-SR501 PIR", "HC-SR501 PIR motion sensor", "Senses motion", "Sensor"),
+  gps: add("Senses", "Position (GPS)", "NEO-6M", "NEO-6M GPS module", "Finds its position", "Sensor"),
+  imu: add("Senses", "Tilt & motion", "MPU-6050", "MPU-6050 IMU", "Senses tilt and motion", "Sensor"),
+  ultrasonic: add(
+    "Senses",
+    "Distance",
+    "HC-SR04 ultrasonic",
+    "HC-SR04 ultrasonic sensor",
+    "Measures distance",
+    "Sensor",
+  ),
+  light: add("Senses", "Light level", "BH1750", "BH1750 light sensor", "Senses light", "Sensor"),
+  soil: add(
+    "Senses",
+    "Soil moisture",
+    "Capacitive sensor",
+    "Capacitive soil moisture sensor",
+    "Senses soil moisture",
+    "Sensor",
+  ),
+  button: add("Controls", "Push button", "Tactile button", "Tactile button", "Takes a press", "Display & I/O"),
+  joystick: add("Controls", "Joystick", "2-axis module", "Joystick module", "Takes a direction", "Display & I/O"),
+  encoder: add("Controls", "Turn knob", "Rotary encoder", "Rotary encoder", "Takes a turn", "Display & I/O"),
+  touch: add("Controls", "Touch pad", "TTP223", "TTP223 touch sensor", "Takes a touch", "Display & I/O"),
+  oled: add("Shows", "Small screen, text", '0.96" OLED', '0.96" OLED display', "Shows text and icons", "Display & I/O"),
+  tft: add("Shows", "Colour screen", '1.8" TFT', '1.8" TFT display', "Shows colour graphics", "Display & I/O"),
+  eink: add(
+    "Shows",
+    "Paper-like screen",
+    '2.13" e-ink',
+    '2.13" e-ink display',
+    "Shows a still image without power",
+    "Display & I/O",
+  ),
+  led: add("Shows", "Status light", "LED", "Status LED", "Shows its state", "Actuator"),
+  "led-strip": add("Shows", "Colour light strip", "WS2812B", "WS2812B LED strip", "Lights up in colour", "Actuator"),
+  buzzer: add("Sounds", "Beeper", "Piezo buzzer", "Piezo buzzer", "Beeps", "Actuator"),
+  speaker: add("Sounds", "Speaker", "Mini speaker", "Mini speaker", "Plays sound", "Actuator"),
+  relay: add("Switches", "Switch a big load on/off", "5 V relay", "5V relay module", "Switches a high-current load", "Actuator"),
 };
+
+/** What each case wall is like, by its thickness — the Wall menu's sub. */
+const WALL_NOTES: Record<string, string> = {
+  "1.2": "Lightest, flexes",
+  "1.6": "Light",
+  "2.0": "Standard",
+  "2.4": "Sturdy",
+  "2.8": "Tough",
+  "3.2": "Very tough",
+  "3.6": "Drop-proof",
+  "4.0": "Drop-proof, heaviest",
+};
+
+export const wallNote = (mm: number): string | undefined => WALL_NOTES[mm.toFixed(1)];
 
 export const CHARGE_PORTS: Record<ChargePortKey, { label: string; part: CatalogPart | null }> = {
   "usb-c": {

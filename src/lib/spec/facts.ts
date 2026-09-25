@@ -6,13 +6,15 @@
 // what it does — with nothing shown that would only read "None".
 //
 // Pure: the radio is passed in (format.ts reads it off the parts through
-// confidence.ts), so this compiles and tests on its own.
+// confidence.ts), so this compiles and tests on its own. A radio the sheet
+// can set is said in the sheet's own word for it (RADIOS), so the card, the
+// rail and the sheet spell it one way.
 
 import type { ConceptPart } from "../create/concept";
 import { batteryOf, isBatteryPart } from "./batteries";
-import { qtyOf } from "./bodies";
-import { partRole } from "./catalog";
-import type { ResolvedSpec } from "./types";
+import { bodyOf, qtyOf } from "./bodies";
+import { RADIOS, isChargePort, isMcu, isMotorDriver, isServo, partRole, radioKeyOf } from "./catalog";
+import type { BatteryKey, ResolvedSpec } from "./types";
 import { mm3 } from "./units";
 
 /** How a spec fact reads — the card and the rail's rows both use it. */
@@ -45,13 +47,24 @@ export function runtimeShort(hours: number | null): string | null {
   return `~${Math.round(hours)} h`;
 }
 
+/** A product this one talks to over its radio, and whether they share it —
+ *  project-state.ts's linksOf works it out across the project. */
+export type RadioPair = { otherName: string; ok: boolean };
+
+/** Packs that are thrown away, not charged — AA cells and a 9 V: the sheet
+ *  and the card say "per battery", and the port is a power port. */
+export const replacedNotRecharged = (key: BatteryKey) => key === "aa-2" || key === "aa-4" || key === "9v";
+
 /** Up to four: Size, then — for a thing with no circuit — its plastic and
  *  "No electronics"; otherwise its power, its radio when it names one, and
- *  one part that says what it does. */
+ *  one part that says what it does. A product that talks to another says
+ *  that instead of its radio: "Pairs with Remote Controller", or in the warn
+ *  tone "Can't pair with Remote Controller" once they no longer share one. */
 export function cardFactsOf(
   spec: ResolvedSpec,
   parts: ConceptPart[],
   radio: string | null,
+  pairs: RadioPair[] = [],
 ): CardFact[] {
   const size: CardFact = {
     key: "size",
@@ -71,10 +84,30 @@ export function cardFactsOf(
   const facts: CardFact[] = [size];
   const power = powerFact(spec);
   if (power) facts.push(power);
-  if (radio) facts.push({ key: "radio", label: "Radio", value: radio, tone: "plain" });
+  // One that no longer pairs is the thing to say, ahead of one that does.
+  const pair = pairs.find((p) => !p.ok) ?? pairs[0];
+  const word = radioWord(parts, radio);
+  if (pair) {
+    facts.push({
+      key: "radio",
+      label: pair.ok ? "Pairs with" : "Can't pair with",
+      value: pair.otherName,
+      tone: pair.ok ? "plain" : "warn",
+    });
+  } else if (word) {
+    facts.push({ key: "radio", label: "Radio", value: word, tone: "plain" });
+  }
   const part = partFact(spec, parts);
   if (part) facts.push(part);
   return facts;
+}
+
+/** The sheet's word for the radio the parts use — "Bluetooth LE", not
+ *  "BLE" — and the caller's reading for a module the catalog doesn't list. */
+function radioWord(parts: ConceptPart[], radio: string | null): string | null {
+  const key = radioKeyOf(parts);
+  if (key === null) return radio;
+  return key === "none" ? null : RADIOS[key].label;
 }
 
 function powerFact(spec: ResolvedSpec): CardFact | null {
@@ -85,8 +118,11 @@ function powerFact(spec: ResolvedSpec): CardFact | null {
   if (spec.battery === "adapter") return { key: "power", value: "Wall adapter", tone: "plain" };
   // A pack with nothing drawing on it has no runtime to state; a spare pack
   // says what it is in its own fact instead.
+  // Said the way the sheet says it: per charge, or per battery for a pack
+  // that is replaced rather than charged.
   const runtime = runtimeShort(spec.runtimeH);
-  return runtime ? { key: "power", label: "Battery", value: runtime, tone: "plain" } : null;
+  const per = replacedNotRecharged(spec.battery) ? "per battery" : "per charge";
+  return runtime ? { key: "power", label: "Battery", value: `${runtime} ${per}`, tone: "plain" } : null;
 }
 
 // A charging IC, by name or by what it is called.
@@ -202,16 +238,46 @@ export function whatItDoes(parts: ConceptPart[]): { does: Does; part: ConceptPar
   return best && { does: best.does, part: best.part };
 }
 
+/** The charging IC of a product that is a charger: one with no pack of its
+ *  own to charge — one inside a handheld is only how that handheld's cell
+ *  gets filled. A "charging port" is a connector, not a charger. */
+function chargerPartOf(parts: ConceptPart[]): ConceptPart | undefined {
+  if (parts.some(isBatteryPart)) return undefined;
+  return parts.find((p) => CHARGER.test(p.name) && p.category !== "Connector & mech" && !isBatteryPart(p));
+}
+
+/** A product with no chip that is there for a pack: a charger, which fills
+ *  one it doesn't carry, or a spare pack, which is one. Null for anything
+ *  else — a product with a chip is what it runs, whatever it charges. Read
+ *  it off the concept's own parts: a charger given a chip is still a
+ *  charger. */
+export function standaloneOf(parts: ConceptPart[]): "charger" | "pack" | null {
+  if (parts.some(isMcu)) return null;
+  if (chargerPartOf(parts)) return "charger";
+  return parts.some(isBatteryPart) ? "pack" : null;
+}
+
+/** What a charger fills and what it plugs into — "1S Li-Po", "USB-C" — or
+ *  null for a product that isn't one. */
+export function chargesOf(parts: ConceptPart[]): { cell: string; port: string | null } | null {
+  const charger = chargerPartOf(parts);
+  return charger ? chargeParts(charger, parts) : null;
+}
+
+/** The cells a pack is, in a charger's words — the two are compared when a
+ *  charger in the project is meant to fill a product's pack. */
+export function packCellOf(key: BatteryKey): string | null {
+  if (key.startsWith("li-1s")) return "1S Li-Po";
+  if (key.startsWith("li-2s")) return "2S Li-Po";
+  if (key.startsWith("aa-")) return "AA cells";
+  return key === "9v" ? "9 V battery" : null;
+}
+
 /** The one part that says what the product does — the first that applies of
  *  a charger, a pack, then whatItDoes. */
 function partFact(spec: ResolvedSpec, parts: ConceptPart[]): CardFact | null {
-  // A charger is the product when it has no pack of its own to charge; one
-  // inside a handheld is only how that handheld's cell gets filled.
-  // A "charging port" is a connector, not a charger.
-  const charger = parts.find(
-    (p) => CHARGER.test(p.name) && p.category !== "Connector & mech" && !isBatteryPart(p),
-  );
-  if (charger && !parts.some(isBatteryPart)) {
+  const charger = chargerPartOf(parts);
+  if (charger) {
     return { key: "part", label: "Charges", value: chargeOf(charger, parts), tone: "plain" };
   }
   // A named pack with nothing to run it is a pack — a spare, a power bank.
@@ -238,6 +304,11 @@ function partFact(spec: ResolvedSpec, parts: ConceptPart[]): CardFact | null {
 /** "1S Li-Po over USB-C" — the cell the charger's own name says it fills,
  *  and the port it is fed from. */
 function chargeOf(charger: ConceptPart, parts: ConceptPart[]): string {
+  const { cell, port } = chargeParts(charger, parts);
+  return port ? `${cell} over ${port}` : cell;
+}
+
+function chargeParts(charger: ConceptPart, parts: ConceptPart[]): { cell: string; port: string | null } {
   const n = charger.name;
   const cell = /\b2s\b|7\.4\s*v|balanc/i.test(n)
     ? "2S Li-Po"
@@ -258,5 +329,87 @@ function chargeOf(charger: ConceptPart, parts: ConceptPart[]): string {
         : /barrel|dc jack/i.test(names)
           ? "DC jack"
           : null;
-  return port ? `${cell} over ${port}` : cell;
+  return { cell, port };
+}
+
+// ───────────────────────── what is inside it ─────────────────────────
+
+/** A part's own words for what it does, as the rest of a sentence: its role
+ *  when it has one ("runs the firmware"), else what the sheet files it
+ *  under (partRole) — the same classifier the sections use. */
+export function partDoes(p: ConceptPart): string {
+  const role = p.role.trim();
+  if (role) return /^[A-Z][a-z]/.test(role) ? role.charAt(0).toLowerCase() + role.slice(1) : role;
+  const n = p.name.toLowerCase();
+  switch (partRole(p)) {
+    case "brain":
+      return "runs it";
+    case "connects":
+      return "its wireless link";
+    case "power":
+      if (isChargePort(p)) return "where the power comes in";
+      if (isBatteryPart(p)) return "powers it";
+      if (CHARGER.test(n)) return "charges the battery";
+      if (/ldo|regulator|ams1117|lm1117|ap2112|3v3|3\.3\s*v/.test(n)) return "steady power for the chip";
+      if (/buck|boost|mp1584|lm2596|mt3608/.test(n)) return "sets the voltage";
+      return "handles the power";
+    case "moves":
+      if (isMotorDriver(p)) return "drives the motors";
+      if (isServo(p)) return "moves to an angle";
+      return "makes it move";
+    case "senses":
+      return `senses ${SENSES.find(([re]) => re.test(p.name))?.[1] ?? "what is around it"}`;
+    case "controls":
+      return "takes your input";
+    case "shows":
+      return /oled|lcd|tft|e-?ink|e-?paper|display|screen/.test(n) ? "shows text and pictures" : "lights up";
+    case "sounds":
+      return "makes sound";
+    case "switches":
+      return "switches a load on and off";
+    case "case":
+      return "part of the case";
+    default:
+      return KIND_WORD[p.category]?.toLowerCase() ?? "a part";
+  }
+}
+
+/** A pack as a thing wired in: "2S Li-Po 1500 mAh battery", "2 × AA
+ *  batteries", "9 V battery". */
+export function packWords(key: BatteryKey): string {
+  const label = batteryOf(key).label;
+  if (/batter(?:y|ies)$/i.test(label)) return label;
+  return key.startsWith("aa-") ? `${label} batteries` : `${label} battery`;
+}
+
+export type InsideRow = { name: string; does: string };
+
+/** What the build will make, part by part: the board, what sits on it and
+ *  what it does, and what is wired to it off the board — the motors, the
+ *  pack. The sheet's read-only Inside lists this. */
+export function insideOf(
+  spec: ResolvedSpec,
+  parts: ConceptPart[],
+): { board: string; on: InsideRow[]; wired: string[] } {
+  const on: InsideRow[] = [];
+  const wired: string[] = [];
+  for (const p of parts) {
+    // The pack is the spec's, named once below, not the concept's listing.
+    if (isBatteryPart(p)) continue;
+    const at = bodyOf(p).body.at;
+    if (at === "board") on.push({ name: readableCounted(p), does: partDoes(p) });
+    else if (at === "case") wired.push(readableCounted(p));
+  }
+  if (spec.battery !== "none" && spec.battery !== "adapter") wired.push(packWords(spec.battery));
+  return {
+    board: spec.board ? `${spec.board.w} × ${spec.board.h} mm · 2 layers` : "None — nothing in it sits on a board",
+    on,
+    wired,
+  };
+}
+
+/** "2 × TT gear motor", or a designator by what kind of part it is. */
+function readableCounted(p: ConceptPart): string {
+  const m = p.name.match(/^(.*?)\s*\(x(\d+)\)$/);
+  return m ? `${m[2]} × ${m[1]}` : readableName(p);
 }

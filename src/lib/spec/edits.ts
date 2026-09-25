@@ -400,6 +400,18 @@ export function rebaseEdits(
   return { edits: withList(edits, "removed", kept), olderConcept };
 }
 
+/** The edits as the sheet stores them: stamped with `turnId` when this write
+ *  changed a part (so they were made on the concept of that turn), left as
+ *  stamped when it changed something else — a size, a pack — and unstamped
+ *  once no part change is left, so there is nothing to say "still applies". */
+export function stampEdits(next: SpecEdits, prev: SpecEdits, turnId: string): SpecEdits {
+  const partsOf = (e: SpecEdits) => JSON.stringify(PART_CHOICES.map((k) => e[k] ?? null));
+  const out = { ...next };
+  if (PART_CHOICES.every((k) => next[k] === undefined)) delete out.basedOn;
+  else if (partsOf(next) !== partsOf(prev)) out.basedOn = turnId;
+  return out;
+}
+
 /** Reset parts: every part change taken out, and the turn they were made
  *  on. The size, the pack, the plastic and the wall are not parts, and stay. */
 export function resetParts(edits: SpecEdits): SpecEdits {
