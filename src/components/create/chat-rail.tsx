@@ -176,8 +176,9 @@ export function ProjectRail({
   slot,
 }: {
   model: RailModel;
-  /** The product the composer changes — the row drawn as chosen. */
-  focusedProduct: string;
+  /** The product the composer changes — the row drawn as chosen. Null when
+   *  nothing is selected (the spec sheet's Done or Close cleared it). */
+  focusedProduct: string | null;
   onSelectProduct: (productId: string) => void;
   /** Take the maker to a place on the canvas. The host owns the scroll, the
    *  arrival ring, the phone's tab switch and where focus lands. */
@@ -407,7 +408,7 @@ function ProductList({
   onSelectProduct,
 }: {
   model: RailModel;
-  focusedProduct: string;
+  focusedProduct: string | null;
   onSelectProduct: (productId: string) => void;
 }) {
   const { rows, build } = model;

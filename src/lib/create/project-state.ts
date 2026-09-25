@@ -27,7 +27,7 @@ import {
 } from "./history";
 import { blocksBuild, deriveSpec, specKey } from "../spec/derive";
 import { cleanEdits } from "../spec/hints";
-import { specFacts, type SpecFactTone } from "../spec/format";
+import { cardFacts, type SpecFactTone } from "../spec/format";
 import type { ResolvedSpec } from "../spec/types";
 
 type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
@@ -256,9 +256,10 @@ export type RailRow = {
   phase: RailPhase;
   /** When the current turn started drawing — the row's own elapsed clock. */
   since?: number;
-  /** size, power, radio — the board fact is dropped (spec §2.4). Omitted
-   *  while drawing, failed, before a spec exists, and for a stand-in: those
-   *  numbers are generic parts', not this product's. */
+  /** The card's facts for this product (format.ts `cardFacts`) — size first,
+   *  then what this product is for. Omitted while drawing, failed, before a
+   *  spec exists, and for a stand-in: those numbers are generic parts', not
+   *  this product's. */
   facts: { key: string; text: string; tone: SpecFactTone }[];
   /** The model didn't answer, so the card's parts are the generic stand-in
    *  (review 2 I4) — the row says so instead of showing its numbers. */
@@ -340,7 +341,13 @@ export function railRows(
     const standIn = t.status === "ready" && !!state.concepts.get(t.id)?.fallback;
     const facts =
       t.status === "ready" && spec && !standIn
-        ? specFacts(spec, state.concepts.get(t.id)?.parts ?? []).filter((f) => f.key !== "board")
+        ? // The card's own facts, run into one line: the row and the card
+          // can't say two different things about the same product.
+          cardFacts(spec, state.concepts.get(t.id)?.parts ?? []).map((f) => ({
+            key: f.key,
+            text: f.label ? `${f.label} ${f.value}` : f.value,
+            tone: f.tone,
+          }))
         : [];
 
     // The primary carries no tag — its "Always built" lives on its card
@@ -824,6 +831,10 @@ export type ComposerTarget =
   /** Nothing has been drawn to change: a pre-setup chat's first words, or a
    *  chat whose question is still open (the composer is held for that). */
   | { kind: "fresh" }
+  /** No product is selected — Done or Close on the spec sheet cleared it. A
+   *  sentence changes nothing until one is picked; naming a new product
+   *  still adds it. */
+  | { kind: "none" }
   /** The composer refines this product's own latest drawing. `name` is the
    *  row's, so the composer and the selected row always agree. */
   | { kind: "refine"; productId: string; name: string; turn: AssistantTurn }
@@ -841,11 +852,14 @@ export type ComposerTarget =
 
 /** Which drawing the composer's next sentence changes. Only the product in
  *  focus — the one every label under the composer names — and only its own
- *  drawing. The one exception is a chat from before the setup question: it
- *  has no products to choose between, so it refines its latest drawing, as
- *  it always did. A product the project no longer holds (removed) is not a
- *  target; the primary is. */
-export function composerTarget(chat: ChatSession, focusedProduct: string): ComposerTarget {
+ *  drawing; with none in focus, none. The one exception is a chat from
+ *  before the setup question: it has no products to choose between, so it
+ *  refines its latest drawing, as it always did. A product the project no
+ *  longer holds (removed) is not a target; the primary is. */
+export function composerTarget(
+  chat: ChatSession,
+  focusedProduct: string | null,
+): ComposerTarget {
   const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup");
   const drawings = chat.turns.filter((t): t is AssistantTurn => t.role === "assistant");
   const lastReady = (productId?: string) => {
@@ -858,16 +872,21 @@ export function composerTarget(chat: ChatSession, focusedProduct: string): Compo
   };
 
   if (!setup) {
-    const t = lastReady(focusedProduct) ?? lastReady();
+    const t = lastReady(focusedProduct ?? undefined) ?? lastReady();
     return t
       ? { kind: "refine", productId: productIdOf(t), name: railNameOf(undefined, t), turn: t }
       : { kind: "fresh" };
   }
 
+  // Only once there is something to choose between: with the question
+  // still open the composer is held, and says so, as "fresh".
+  if (focusedProduct === null && drawings.length) return { kind: "none" };
   const inProject = (id: string) =>
     id === "primary" || !setup.answer || setup.answer.picked.includes(id);
   const productId =
-    inProject(focusedProduct) && drawings.some((t) => productIdOf(t) === focusedProduct)
+    focusedProduct !== null &&
+    inProject(focusedProduct) &&
+    drawings.some((t) => productIdOf(t) === focusedProduct)
       ? focusedProduct
       : "primary";
   const own = drawings.filter((t) => productIdOf(t) === productId);

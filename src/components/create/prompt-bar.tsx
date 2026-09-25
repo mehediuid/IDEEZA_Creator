@@ -27,7 +27,9 @@ export function PromptBar({
   blockedReason,
   enhanceMode = "brief",
 }: {
-  onSubmit: (text: string) => void;
+  /** Return false to keep the draft — the host couldn't act on it (nothing
+   *  is selected to change), and clearing it would lose what was typed. */
+  onSubmit: (text: string) => void | boolean;
   placeholder?: string;
   /** False when the balance cannot cover one concept render. The send is
    *  shut with that as its reason rather than letting a submit start a
@@ -71,7 +73,7 @@ export function PromptBar({
   const send = () => {
     const trimmed = value.trim();
     if (!trimmed || refining || blockedReason || !canRender) return;
-    onSubmit(trimmed);
+    if (onSubmit(trimmed) === false) return;
     setValue("");
   };
 

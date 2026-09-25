@@ -90,8 +90,9 @@ export function ImageTurn({
   buildChoice?: { included: boolean; locked?: boolean; onToggle?: () => void };
   /** Takes the product out of the project. Absent for the primary. */
   onRemove?: () => void;
-  /** The product's spec sheet — facts, and the editor behind "Spec". Ready
-   *  cards only: a drawing still under way has no parts to read yet. */
+  /** What the product will be — four labelled facts, and the button that
+   *  opens its spec sheet. Ready cards only: a drawing still under way has no
+   *  parts to read yet. */
   spec?: SpecCard;
   /** The composer changes this product — said with the card's edge, and
    *  only when there is more than one card to tell it from. */

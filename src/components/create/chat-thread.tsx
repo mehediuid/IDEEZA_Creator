@@ -27,7 +27,6 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import { cleanEdits } from "@/lib/spec/hints";
 import type { SpecEdits } from "@/lib/spec/types";
 import {
   productIdOf,
@@ -99,8 +98,8 @@ export function ChatThread({
   job,
   focusedProduct,
   onFocusProduct,
-  openSpecs,
-  onSpecOpenChange,
+  specSheetFor,
+  onOpenSpec,
   onFocusSpec,
   onSpecChange,
   rereading,
@@ -140,11 +139,13 @@ export function ChatThread({
    *  composer so all three name the same thing. */
   focusedProduct?: string;
   onFocusProduct?: (productId: string) => void;
-  /** Cards whose spec is open, shared with the build path that opens one. */
-  openSpecs?: ReadonlySet<string>;
-  onSpecOpenChange?: (productId: string, open: boolean) => void;
-  /** Opens a card's spec and focuses its size — the Build line's way to a
-   *  size that can't be built. */
+  /** The product the spec sheet is showing — the selected one, while the
+   *  sheet is open. The sheet itself sits beside the canvas (concept-chat). */
+  specSheetFor?: string | null;
+  /** Selects this product and opens its spec sheet — the card's Edit spec. */
+  onOpenSpec?: (productId: string) => void;
+  /** Opens a product's spec sheet with the keyboard in its size — the Build
+   *  line's way to a size that can't be built. */
   onFocusSpec?: (productId: string) => void;
   onSpecChange?: (productId: string, edits: SpecEdits) => void;
   /** Turns whose concept is being read again right now. */
@@ -219,8 +220,9 @@ export function ChatThread({
   const shortForBuild = creditsHydrated && balance < cost;
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
-  // Top-aligned: an open spec makes one card tall, and stretched rows gave
-  // its neighbour a matching void under its buttons.
+  // Top-aligned: a stand-in line or a size that doesn't fit makes one card
+  // a line taller, and stretched rows gave its neighbour a void under its
+  // buttons. The spec itself opens in a sheet, so no card grows for it.
   const conceptGrid = (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-[20px]">
       {products.map((turn) => (
@@ -264,13 +266,9 @@ export function ChatThread({
                     concepts.get(turn.id)?.fallback && onRereadConcept
                       ? () => onRereadConcept(turn.id)
                       : undefined,
-                  edits: cleanEdits(answer?.specs?.[productIdOf(turn)]),
-                  open: openSpecs?.has(productIdOf(turn)) ?? false,
-                  onOpenChange: (open) => onSpecOpenChange?.(productIdOf(turn), open),
-                  onChange:
-                    answer && onSpecChange
-                      ? (edits) => onSpecChange(productIdOf(turn), edits)
-                      : undefined,
+                  open: specSheetFor === productIdOf(turn),
+                  onOpen: () => onOpenSpec?.(productIdOf(turn)),
+                  editable: !!answer && !!onSpecChange,
                 }
               : undefined
           }

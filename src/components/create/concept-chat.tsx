@@ -38,6 +38,7 @@ import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
   composerTarget,
+  productIdOf,
   productNameOf,
   type JumpTarget,
 } from "@/lib/create/project-state";
@@ -63,7 +64,12 @@ import {
 } from "@/lib/create/companions";
 
 import { ImageEditorModal } from "./image-editor-modal";
-import { specSizeInputId } from "./spec-panel";
+import {
+  SpecSheet,
+  type SheetFocus,
+  type SheetProduct,
+  type SheetRequest,
+} from "./spec-sheet";
 
 const POLL_MS = 2_500;
 /** Longer than the generator’s own budget, so the server is what gives up
@@ -249,7 +255,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // the lightbox (null = closed). Submitting an edit closes the editor; the
   // refine then continues in the thread (pending → ready), where the user can
   // watch it land and reopen Refine to iterate.
-  const [focusedProduct, setFocusedProduct] = React.useState("primary");
+  // Null once Done or Close on the spec sheet has cleared the selection: no
+  // row is selected, no card is edged, and the composer changes nothing
+  // until a product is picked again.
+  const [focusedProduct, setFocusedProduct] = React.useState<string | null>("primary");
   // Which pane a phone shows; both show from `md`.
   const [pane, setPane] = React.useState<"work" | "chat">("work");
   const [editorTurnId, setEditorTurnId] = React.useState<string | null>(null);
@@ -266,27 +275,29 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const [preparingTurnId, setPreparingTurnId] = React.useState<string | null>(
     null,
   );
-  // Which cards have their spec open. Held here, not in the card, because the
-  // build path opens a card itself when that product's size can't be built.
-  const [openSpecs, setOpenSpecs] = React.useState<ReadonlySet<string>>(() => new Set());
-  const setSpecOpen = React.useCallback((productId: string, open: boolean) => {
-    setOpenSpecs((prev) => {
-      const next = new Set(prev);
-      if (open) next.add(productId);
-      else next.delete(productId);
-      return next;
-    });
+  // The spec sheet shows the selected product's spec, and follows the
+  // selection while it is open: selecting a product anywhere opens it — a
+  // rail row, the card's Edit spec, the Build line's "Fix …'s size" — and
+  // Done or Close shut it and clear the selection. Held here, beside the
+  // selection, because the rail, the canvas and the build path all open it.
+  const [specSheet, setSpecSheet] = React.useState<SheetRequest | null>(null);
+  const openSpec = React.useCallback((productId: string, focus: SheetFocus) => {
+    setFocusedProduct(productId);
+    setSpecSheet((prev) => ({ focus, req: (prev?.req ?? 0) + 1 }));
   }, []);
-  // Opens the card's spec and puts the keyboard on its size — where the
-  // conflict the Build line names can be fixed.
+  const closeSpec = React.useCallback(() => {
+    setSpecSheet(null);
+    setFocusedProduct(null);
+  }, []);
+  // Opens that product's sheet with the keyboard in its Length field
+  // (specSizeInputId) — where the conflict the Build line names is fixed.
+  // The sheet puts focus there itself once it has drawn.
   const focusSpec = React.useCallback(
     (productId: string) => {
-      setSpecOpen(productId, true);
-      setFocusedProduct(productId);
+      openSpec(productId, "size");
       setPane("work");
-      requestAnimationFrame(() => document.getElementById(specSizeInputId(productId))?.focus());
     },
-    [setSpecOpen],
+    [openSpec],
   );
   const handleSpecChange = React.useCallback(
     (productId: string, edits: SpecEdits) => {
@@ -794,8 +805,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const jumpTo = React.useCallback(
     (target: JumpTarget, { focus }: { focus: boolean }) => {
       if (!sideBySide()) setPane("work");
-      // The size field is reached the way the Build line reaches it: the spec
-      // opens and the keyboard lands on the size.
+      // The size field is reached the way the Build line reaches it: the
+      // product's spec sheet opens with the keyboard in its size.
       if (target.kind === "spec") focusSpec(target.productId);
       const land = landingOf(target);
       // After the tab switch and the opened spec have rendered.
@@ -836,15 +847,29 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // the row, so the maker can go on choosing with the canvas in view; on a
   // phone the rail has just been hidden, so it goes to the canvas.
   const railRows = rail.rows;
+  //
+  // Selecting a row also opens that product's spec sheet, or moves an open
+  // one to it in place — when there is a spec to show. A product still
+  // drawing, failed or being read has none, and a sheet that appeared on its
+  // own when the reading landed would be a surprise; the sheet closes, and
+  // the row stays selected.
+  const railState = rail.state;
   const selectProduct = React.useCallback(
     (productId: string) => {
-      setFocusedProduct(productId);
+      const turn = railState.products.find(
+        (t) => t.status === "ready" && productIdOf(t) === productId,
+      );
+      if (turn && railState.specs.get(turn.id)) openSpec(productId, "keep");
+      else {
+        setFocusedProduct(productId);
+        setSpecSheet(null);
+      }
       const inReview = railRows.find((r) => r.productId === productId)?.build;
       jumpTo(inReview ? { kind: "review" } : { kind: "card", productId }, {
         focus: !sideBySide(),
       });
     },
-    [railRows, jumpTo],
+    [railState, railRows, jumpTo, openSpec],
   );
 
   // The setup question is still open. Typing then used to skip it: the text
@@ -876,11 +901,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   }, [chat, editorTurnId]);
 
   const handleUserSubmit = React.useCallback(
-    (text: string) => {
-      if (!chat || !canAfford(CONCEPT_COST) || setupPending) return;
+    (text: string): boolean => {
+      if (!chat || !canAfford(CONCEPT_COST) || setupPending) return false;
       // The composer is held for this already; a sentence that reaches here
       // anyway must not be drawn over some other product's concept.
-      if (target.kind === "blocked") return;
+      if (target.kind === "blocked") return false;
+      // With nothing selected, only naming a new product means anything: a
+      // change has no product to change, and drawing it over the primary
+      // would charge a render nobody chose. The draft stays in the box.
+      if (target.kind === "none" && !parseProductRequest(text)) return false;
       appendUserTurn(chat.id, text);
 
       // Two different things get typed into this box, and treating them the
@@ -911,7 +940,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           kind: "fresh",
           companionOf: id,
         });
-        return;
+        return true;
       }
       // Prompt-bar submissions REFINE the focused product's latest concept
       // (spec §4b). Only a chat with nothing drawn at all takes a fresh one.
@@ -925,9 +954,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           // replaced the drone's card instead of its own.
           companionOf: target.turn.companionOf,
         });
-        return;
+        return true;
       }
       appendAssistantTurn(chat.id, { prompt: text, kind: "fresh" });
+      return true;
     },
     [
       chat,
@@ -1393,6 +1423,34 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const editorProduct =
     editorTurn?.role === "assistant" ? productNameOf(rail.state.setup, editorTurn) : undefined;
 
+  // The selected product's spec, for the sheet — from the rail's project
+  // model, the one the cards read too, so the two can't disagree about it.
+  const sheetTurn =
+    specSheet && focusedProduct
+      ? rail.state.products.find(
+          (t) => t.status === "ready" && productIdOf(t) === focusedProduct,
+        )
+      : undefined;
+  const sheetSpec = sheetTurn ? rail.state.specs.get(sheetTurn.id) : null;
+  const sheetAnswer = rail.state.answer;
+  const sheetProduct: SheetProduct | null =
+    sheetTurn && sheetSpec && focusedProduct
+      ? {
+          productId: focusedProduct,
+          name:
+            productNameOf(rail.state.setup, sheetTurn) ??
+            `Concept ${labels.get(sheetTurn.id) ?? "1"}`,
+          conceptLabel: labels.get(sheetTurn.id) ?? "1",
+          spec: sheetSpec,
+          parts: rail.state.concepts.get(sheetTurn.id)?.parts ?? [],
+          edits: cleanEdits(sheetAnswer?.specs?.[focusedProduct]),
+          onChange: sheetAnswer
+            ? (edits) => handleSpecChange(focusedProduct, edits)
+            : undefined,
+          fallback: !!rail.state.concepts.get(sheetTurn.id)?.fallback,
+        }
+      : null;
+
   return (
     <div className="flex h-full flex-col md:flex-row">
       {/* The page's one h1, for the heading outline a screen reader walks,
@@ -1472,7 +1530,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           <div className="w-full px-[14px] py-[14px]">
           <PromptBar
             onSubmit={(text) => {
-              handleUserSubmit(text);
+              if (!handleUserSubmit(text)) return false;
               // On a phone the answer appears on the other tab.
               setPane("work");
             }}
@@ -1488,7 +1546,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             placeholder={
               target.kind === "refine"
                 ? `Describe a change to ${target.name}…`
-                : undefined
+                : target.kind === "none"
+                  ? "Pick a product to change, or describe a new one…"
+                  : undefined
             }
           />
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
@@ -1498,7 +1558,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                 ? "Answer the question on the canvas first — nothing is drawn or charged until you do."
                 : target.kind === "blocked"
                   ? `${target.hint}.`
-                  : target.kind === "refine"
+                  : target.kind === "none"
+                    ? `Pick a product above to refine it · ${CONCEPT_COST} credit, or name a new one to add it.`
+                    : target.kind === "refine"
                     ? `Refines ${target.name} · ${CONCEPT_COST} credit.${
                         // A chat from before the question has one product and
                         // nowhere to add another.
@@ -1540,10 +1602,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             onRestoreProduct={handleRestoreProduct}
             onToggleInBuild={handleToggleInBuild}
             job={activeBuild}
-            focusedProduct={focusedProduct}
+            focusedProduct={focusedProduct ?? undefined}
             onFocusProduct={setFocusedProduct}
-            openSpecs={openSpecs}
-            onSpecOpenChange={setSpecOpen}
+            specSheetFor={sheetProduct?.productId ?? null}
+            onOpenSpec={(productId) => openSpec(productId, "sheet")}
             onFocusSpec={focusSpec}
             onSpecChange={handleSpecChange}
             rereading={rereading}
@@ -1551,6 +1613,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           />
         </div>
       </main>
+
+      {/* The selected product's spec: a column beside the canvas from `lg`,
+          which narrows the canvas; an overlay below that. */}
+      <SpecSheet product={sheetProduct} request={specSheet} onClose={closeSpec} />
 
       {/* Part 4 §4.4.2 — the products this build covers are chosen here,
           in the same dialog that confirms the build. One decision, one

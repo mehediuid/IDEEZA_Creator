@@ -4,8 +4,11 @@
 import type { ConceptPart } from "../create/concept";
 import { protocolOf } from "../create/confidence";
 import { batteryOf } from "./batteries";
-import type { ResolvedSpec } from "./types";
+import { cardFactsOf, needsNoPower, type CardFact } from "./facts";
+import type { Material, ResolvedSpec } from "./types";
 import { mm3, runtimeLabel } from "./units";
+
+export { needsNoPower, type CardFact, type SpecFactTone } from "./facts";
 
 /** §4.9 #1 — until a fab partner is named, every board is drawn and checked
  *  against this one profile. One constant, so naming a partner is one edit. */
@@ -13,15 +16,31 @@ export const FAB_PROFILE =
   "Standard 2-layer — 0.15 mm track/space, 0.3 mm drill, 1.6 mm FR-4, HASL";
 
 export function boardLabel(spec: ResolvedSpec): string {
-  return spec.board
-    ? `2-layer · ${spec.board.w} × ${spec.board.h} mm · ${spec.board.parts} part${spec.board.parts === 1 ? "" : "s"}`
-    : "No board — none of its parts sits on one";
+  if (spec.board) {
+    return `2-layer · ${spec.board.w} × ${spec.board.h} mm · ${spec.board.parts} part${spec.board.parts === 1 ? "" : "s"}`;
+  }
+  return needsNoPower(spec) ? "None — no electronics" : "No board — none of its parts sits on one";
 }
 
 export function powerLabel(spec: ResolvedSpec): string {
+  if (needsNoPower(spec)) return "No power needed";
   if (spec.battery === "none") return "USB powered";
   return runtimeLabel(spec.runtimeH) ?? batteryOf(spec.battery).label;
 }
+
+/** A pack is carried; USB and a wall adapter are plugged in — so the sheet
+ *  heads its power section "Battery" only when there is one. */
+export function powerTitle(spec: ResolvedSpec): "Battery" | "Power" {
+  return spec.battery === "none" || spec.battery === "adapter" ? "Power" : "Battery";
+}
+
+/** What each case plastic is for, in the words a maker picks one by. */
+export const MATERIAL_NOTE: Record<Material, string> = {
+  PLA: "easy to print, indoor",
+  PETG: "tough, everyday",
+  ASA: "outdoor, UV-safe",
+  TPU: "flexible, wearable",
+};
 
 /** "RC Car Controller — 118 × 64 × 38 mm · 2-layer 58 × 42 · ~45 min". */
 export function specLine(name: string, spec: ResolvedSpec): string {
@@ -48,30 +67,8 @@ export function mcuOf(parts: ConceptPart[]): string | null {
   return parts.find((p) => p.category === "Microcontroller")?.name ?? null;
 }
 
-/** How a spec fact reads — the card and the rail's rows both use it. */
-export type SpecFactTone = "plain" | "warn" | "error";
-
-/** The spec sheet's one-line facts — size, power, radio (when the concept
- *  names one), board — moved here from `SpecFacts` in spec-panel.tsx so the
- *  card and the rail (chat-rail-redesign spec §2.4, which takes only size,
- *  power and radio) read the same array instead of two copies of this
- *  logic drifting apart. */
-export function specFacts(
-  spec: ResolvedSpec,
-  parts: ConceptPart[],
-): { key: string; text: string; tone: SpecFactTone }[] {
-  const radio = radioOf(parts);
-  const sizeTone: SpecFactTone = spec.fits ? "plain" : spec.draftAtSize ? "warn" : "error";
-  return [
-    {
-      key: "size",
-      text: spec.fits
-        ? mm3(spec.size)
-        : `${mm3(spec.size)} · ${spec.draftAtSize ? "Draft" : "doesn't fit"}`,
-      tone: sizeTone,
-    },
-    { key: "power", text: powerLabel(spec), tone: "plain" },
-    ...(radio ? [{ key: "radio", text: radio, tone: "plain" as const }] : []),
-    { key: "board", text: spec.board ? "2-layer" : "No board", tone: "plain" },
-  ];
+/** What a card and its rail row say the product will be — chosen by what
+ *  the product is (facts.ts), with the radio read off its parts here. */
+export function cardFacts(spec: ResolvedSpec, parts: ConceptPart[]): CardFact[] {
+  return cardFactsOf(spec, parts, radioOf(parts));
 }
