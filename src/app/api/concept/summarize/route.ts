@@ -8,7 +8,9 @@
 // something we can't parse — the build must never start on an empty
 // parts list.
 //
-// Request:  { prompt: string }
+// Request:  { prompt: string; companion?: string — the companion's own name,
+//             sent only when the prompt is a companion's brief, so the
+//             stand-in reads its own words and not the idea it serves }
 // Response: { title: string; summary: string; parts: ConceptPart[]; hints?;
 //             fallback?: true — the parts are the stand-in, not a reading }
 
@@ -97,14 +99,17 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const prompt =
-    typeof body === "object" && body !== null && "prompt" in body
-      ? String((body as { prompt?: unknown }).prompt ?? "").trim()
-      : "";
+  const fields =
+    typeof body === "object" && body !== null
+      ? (body as { prompt?: unknown; companion?: unknown })
+      : {};
+  const prompt = String(fields.prompt ?? "").trim();
   if (!prompt) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
-  const concept = (await summarizeWithAI(prompt)) ?? fallbackConcept(prompt);
+  const companion =
+    typeof fields.companion === "string" ? fields.companion.trim().slice(0, 120) || undefined : undefined;
+  const concept = (await summarizeWithAI(prompt)) ?? fallbackConcept(prompt, companion);
   return NextResponse.json({
     title: concept.title,
     description: concept.description,

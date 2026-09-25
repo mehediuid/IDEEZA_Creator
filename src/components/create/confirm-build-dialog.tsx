@@ -71,6 +71,10 @@ export function summarizeConcept(
   /** The reading already kept on the turn — used as is, no request. A kept
    *  stand-in is not a reading, so it is asked again instead. */
   known?: ConceptSummary,
+  /** The companion's own name, when `prompt` is a companion's brief
+   *  ("{name} for {the maker's idea}"): the stand-in reads the product's own
+   *  words, not the idea it serves. Absent for the primary. */
+  companion?: string,
 ): Promise<ConceptSummary> {
   if (known && !known.fallback) summaryCache.set(turnId, known);
   const cached = summaryCache.get(turnId);
@@ -82,7 +86,7 @@ export function summarizeConcept(
       const res = await fetch("/api/concept/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(companion ? { prompt, companion } : { prompt }),
       });
       if (!res.ok) throw new Error("summarize failed");
       // Checked the way a stored reading is, so what is kept on the turn
@@ -96,7 +100,7 @@ export function summarizeConcept(
       // The same deterministic concept the route falls back to, so a
       // build started offline still carries a real parts list — marked as
       // the stand-in it is.
-      return fallbackConcept(prompt);
+      return fallbackConcept(prompt, companion);
     }
   });
   queue = request.catch(() => null);
@@ -116,6 +120,7 @@ export function ConfirmBuildDialog({
   open,
   turnId,
   conceptPrompt,
+  companionName,
   initialConcept,
   products,
   productNames = [],
@@ -128,6 +133,9 @@ export function ConfirmBuildDialog({
   /** The concept this build comes from — the cache key for its summary. */
   turnId: string;
   conceptPrompt: string;
+  /** The companion's own name, when this is a companion's concept — see
+   *  `summarizeConcept`. */
+  companionName?: string;
   /** The reading Build already did for this turn — real or stand-in. When
    *  given, the dialog shows it as is and does not ask again: Build just
    *  read this same turn, on a stand-in or not, and a second ask here for a
@@ -165,21 +173,21 @@ export function ConfirmBuildDialog({
     summaryCache.get(turnId) ??
     initialConcept ??
     (resolved && resolved.turnId === turnId ? resolved.concept : null) ??
-    fallbackConcept(conceptPrompt);
+    fallbackConcept(conceptPrompt, companionName);
 
   React.useEffect(() => {
     if (!open || !turnId || summaryCache.has(turnId) || initialConcept) return;
     let live = true;
     // summarizeConcept files a real reading itself, and a stand-in must not
     // be filed at all — so this only shows what came back.
-    summarizeConcept(turnId, conceptPrompt).then((result) => {
+    summarizeConcept(turnId, conceptPrompt, undefined, companionName).then((result) => {
       if (!live) return;
       setResolved({ turnId, concept: result });
     });
     return () => {
       live = false;
     };
-  }, [open, turnId, conceptPrompt, initialConcept]);
+  }, [open, turnId, conceptPrompt, companionName, initialConcept]);
 
   // Esc / outside-click dismiss.
   React.useEffect(() => {

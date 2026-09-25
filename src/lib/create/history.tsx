@@ -15,6 +15,7 @@
 import * as React from "react";
 import type { Companion } from "./companions";
 import {
+  BRIEF_CHANGES,
   deriveTitle,
   type ConceptPart,
   type ConceptPartCategory,
@@ -171,7 +172,7 @@ export function conceptBriefOf(turns: ChatTurn[], turnId: string): string {
   const kept = changes.filter(Boolean);
   if (!root) return kept.join("; ");
   if (!kept.length) return root;
-  return `${root.replace(/[.\s]+$/, "")}. Changes: ${kept.join("; ")}`;
+  return `${root.replace(/[.\s]+$/, "")}${BRIEF_CHANGES}${kept.join("; ")}`;
 }
 
 export type ChatSession = {

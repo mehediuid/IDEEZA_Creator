@@ -38,6 +38,7 @@ import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
+  companionNameOf,
   composerTarget,
   linksFor,
   peersOf,
@@ -541,7 +542,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       reading.current.add(turnId);
       setRereading((prev) => new Set(prev).add(turnId));
       const readChatId = chat.id;
-      void summarizeConcept(turnId, conceptBriefOf(chat.turns, turnId)).then((concept) => {
+      const brief = conceptBriefOf(chat.turns, turnId);
+      void summarizeConcept(turnId, brief, undefined, companionNameOf(chat.turns, turnId)).then((concept) => {
         setTurnConcept(readChatId, turnId, concept);
         reading.current.delete(turnId);
         setRereading((prev) => {
@@ -1182,7 +1184,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         asked.add(turn.id);
         saveRereadTurnIds(asked);
       }
-      const concept = await summarizeConcept(turn.id, brief, kept);
+      const companion = chat ? companionNameOf(chat.turns, turn.id) : undefined;
+      const concept = await summarizeConcept(turn.id, brief, kept, companion);
       if (chat && kept?.fallback && !concept.fallback) setTurnConcept(chat.id, turn.id, concept);
       return concept;
     },
@@ -1830,6 +1833,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         open={confirmFor !== null}
         turnId={confirmFor?.turnId ?? ""}
         conceptPrompt={confirmFor?.prompt ?? ""}
+        companionName={chat && confirmFor ? companionNameOf(chat.turns, confirmFor.turnId) : undefined}
         initialConcept={confirmFor?.read.get(confirmFor.turnId)}
         products={pickedCompanions.size + 1}
         productNames={gateNames}

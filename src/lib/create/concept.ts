@@ -378,6 +378,34 @@ const FALLBACK_RULES: FallbackRule[] = [
       { name: "SX1276 LoRa module", role: "Sends data over a long-range radio link", category: "Connectivity" },
     ],
   },
+  {
+    // A case "with a cooling fan" asked for the fan — without this rule its
+    // stand-in was a printed case and nothing else.
+    trigger: /\bfans?\b/i,
+    parts: () => [{ name: "5V cooling fan", role: "Moves air through the product", category: "Actuator" }],
+  },
+  {
+    // A stand "with a wireless charger" charges what sits on it, through a
+    // coil — not a pack of its own, so not the TP4056 below.
+    trigger: /\b(?:wireless|qi)\s+charg\w*|\bqi\b/i,
+    parts: () => [
+      {
+        name: "Qi wireless charging module",
+        role: "Charges the device set on it, without a cable",
+        category: "Power Management",
+      },
+    ],
+  },
+  {
+    // A charger, or a charging dock, is the electronics that fills a pack —
+    // a companion "Charging dock" read nothing here and came back as a
+    // "Charging sensor". "USB charging" on a product with a pack is the
+    // battery rule's, which names the same charger.
+    trigger: /(?<!\b(?:wireless|qi)\s+)\bcharg(?:ers?|ing\s+(?:dock|station|pad|base|stand|cradle)s?)\b/i,
+    parts: () => [
+      { name: "TP4056 charger", role: "Charges the pack it is connected to", category: "Power Management" },
+    ],
+  },
 ];
 
 /** The keyword table's parts for a prompt: one entry per rule that matched,
@@ -454,17 +482,30 @@ function fallbackHints(prompt: string): AiHints | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
-// A companion's own prompt is "{companion.name} for {parent prompt}"
-// (concept-chat.tsx) — a plate ordered alongside an RC car arrives as
-// "Ground Standing Plate for rc car". Judging *that whole string* for what
-// electronics to add would read the parent's own words as the product's:
-// "car" alone trips the motor rule, and the plate would come back with a
-// gear motor it never asked for. So the mechanical check below judges only
-// the text before " for " — the product's own name — never the parent's.
-function productNamePart(prompt: string): string {
-  const idx = prompt.search(/\bfor\b/i);
-  const head = idx === -1 ? prompt : prompt.slice(0, idx);
-  return head.trim() || prompt.trim();
+/** What joins a refine's changes onto the brief it refines
+ *  (`conceptBriefOf`): "{brief}. Changes: {change}; {change}". */
+export const BRIEF_CHANGES = ". Changes: ";
+
+// A companion's brief is "{its name} for {the maker's idea}" (concept-chat),
+// plus the changes asked of it since. Judging that whole string would read
+// the idea it serves as the product's own: "Charging dock for an rc car"
+// trips the motor rule on "car", and "Ground Standing Plate for rc car"
+// came back with a gear motor. Its own words are its name and its changes.
+//
+// Only the caller knows a brief is a companion's, so it says so by passing
+// the name. A primary's brief is all its own words — it used to be cut at
+// its first "for" too, and "A case for my Raspberry Pi with a cooling fan"
+// lost its fan, leaving a case with no electronics.
+function ownWordsOf(prompt: string, companion: string | undefined): string {
+  const name = companion?.trim();
+  if (!name) return prompt;
+  const at = prompt.indexOf(BRIEF_CHANGES);
+  const head = at === -1 ? prompt : prompt.slice(0, at);
+  const changes = at === -1 ? "" : prompt.slice(at + BRIEF_CHANGES.length);
+  // A chain whose first concept is gone has no "{name} for …" line; what
+  // it has is the maker's own changes, which count.
+  const drawnFor = head.trim().toLowerCase().startsWith(`${name.toLowerCase()} for `);
+  return [name, drawnFor ? "" : head.trim(), changes.trim()].filter(Boolean).join(". ");
 }
 
 // A passive, mechanical companion — a plate, a stand, a bracket, a case —
@@ -479,14 +520,15 @@ const MECHANICAL_NAME = new RegExp(
   "i",
 );
 
-/** True only when the product's own name (never the parent's, for a
- *  companion prompt) both names a mechanical/passive product and matches
- *  none of the electronic keyword table — a "Sensor Mount" still gets its
- *  sensor; a "Ground Standing Plate" does not get a car's motor. */
-function mechanicalName(prompt: string): string | null {
-  const name = productNamePart(prompt);
+/** The product's name when it is a mechanical, passive one — its name
+ *  names one, and none of its own words match the electronic keyword
+ *  table: a "Sensor Mount" still gets its sensor, a "Ground Standing Plate"
+ *  companion does not get a car's motor, and a "Wall mount … with
+ *  temperature sensor" gets the sensor. The name is the companion's own,
+ *  or the head of a primary's brief ("Case", for "A case for my …"). */
+function mechanicalName(name: string, own: string): string | null {
   if (!MECHANICAL_NAME.test(name)) return null;
-  if (fallbackPartsFromPrompt(name).length > 0) return null;
+  if (fallbackPartsFromPrompt(own).length > 0) return null;
   return name;
 }
 
@@ -514,14 +556,15 @@ function mechanicalExtras(name: string): ConceptPart[] {
 
 /** The mechanical stand-in: a printed body plus whatever hardware its own
  *  name calls for, all "Connector & mech" — no MCU, no power, no radio.
- *  Hints carry only a use case (read off the product's own name too), never
- *  a runtime goal or a battery hint, because nothing here draws current. */
-function mechanicalFallbackConcept(prompt: string, name: string): ConceptSummary {
+ *  Hints carry only a use case (read off the product's own words too),
+ *  never a runtime goal or a battery hint, because nothing here draws
+ *  current. */
+function mechanicalFallbackConcept(prompt: string, name: string, own: string): ConceptSummary {
   const parts: ConceptPart[] = [
     { name: `${name} body (printed)`, role: "The product's own printed structure", category: "Connector & mech" },
     ...mechanicalExtras(name),
   ];
-  const useCase = matchedUseCases(name.toLowerCase());
+  const useCase = matchedUseCases(own.toLowerCase());
   return {
     title: deriveTitle(prompt),
     summary: summaryFromParts(parts),
@@ -537,10 +580,14 @@ function mechanicalFallbackConcept(prompt: string, name: string): ConceptSummary
 // prompt actually asked for, rather than an empty shell or a generic box
 // with the same four parts every time. Every use of it stands in for a
 // model answer, so it is marked as one here rather than at each caller.
-export function fallbackConcept(prompt: string): ConceptSummary {
-  const mechanical = mechanicalName(prompt);
-  if (mechanical) return mechanicalFallbackConcept(prompt, mechanical);
-  const matched = fallbackPartsFromPrompt(prompt);
+//
+// `companion` is the companion's own name, given only when `prompt` is a
+// companion's brief ("{name} for {the maker's idea}"); see `ownWordsOf`.
+export function fallbackConcept(prompt: string, companion?: string): ConceptSummary {
+  const own = ownWordsOf(prompt, companion);
+  const mechanical = mechanicalName(companion?.trim() || deriveTitle(prompt), own);
+  if (mechanical) return mechanicalFallbackConcept(prompt, mechanical, own);
+  const matched = fallbackPartsFromPrompt(own);
   let parts: ConceptPart[];
   if (matched.length) {
     parts = [...FALLBACK_BASE, ...matched.slice(0, FALLBACK_PART_CAP - FALLBACK_BASE.length)];
@@ -548,7 +595,7 @@ export function fallbackConcept(prompt: string): ConceptSummary {
     // Nothing in the prompt matched a real part — the same generic sensor
     // line the fallback has always used, named after the maker's own words
     // rather than inventing a part nobody asked for.
-    const noun = firstNoun(prompt);
+    const noun = firstNoun(own);
     parts = [
       ...FALLBACK_BASE,
       {
@@ -558,7 +605,7 @@ export function fallbackConcept(prompt: string): ConceptSummary {
       },
     ];
   }
-  const hints = fallbackHints(prompt);
+  const hints = fallbackHints(own);
   return {
     title: deriveTitle(prompt),
     summary: summaryFromParts(parts),

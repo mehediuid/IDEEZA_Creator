@@ -56,6 +56,19 @@ export function productNameOf(setup: SetupTurn | undefined, t: AssistantTurn): s
   return setup.companions.find((c) => c.id === t.companionOf)?.name;
 }
 
+/** A companion's own name, for the turn by this id — what its brief opens
+ *  with ("{name} for {the maker's idea}"), and what the stand-in reads as
+ *  the product's own words in place of the idea it serves. Undefined for
+ *  the primary, whose whole brief is its own. */
+export function companionNameOf(turns: ChatTurn[], turnId: string): string | undefined {
+  const t = turns.find((x) => x.id === turnId);
+  if (!t || t.role !== "assistant" || !t.companionOf) return undefined;
+  return productNameOf(
+    turns.find((x): x is SetupTurn => x.role === "setup"),
+    t,
+  );
+}
+
 /** The name the rail's row gives a product, which the composer uses too:
  *  the question's name, else "Your product" — a chat from before the
  *  question, or a product the question didn't name. */
