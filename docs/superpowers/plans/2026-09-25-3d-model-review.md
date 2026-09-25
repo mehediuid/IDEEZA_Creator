@@ -265,13 +265,12 @@ git push -q origin main
 **Files:**
 - Modify: `src/components/ideeza/toggle.tsx` (the `SIZES` table, lines 10–14; the header comment).
 - Modify: `src/app/globals.css` (the `.ds-slider` thumb rules, lines 66–88).
-- Modify: `src/components/ideeza/slider.tsx` (optional value bubble).
 
 **Interfaces:**
-- Consumes (Task 1): `--color-focus-halo`, `tracking-wider`.
+- Consumes (Task 1): `--color-focus-halo`.
 - Produces:
   - `Toggle` sizes `sm` 36 × 20 and `md` 44 × 24;
-  - `Slider` prop `valueLabel?: (value: number) => string`, which shows the A11 value bubble while the thumb is being dragged or keyboard-focused.
+  - the A11 thumb: a surface ring with a brand edge and the focus halo.
 
 - [ ] **Step 1: Toggle sizes.** Replace the `SIZES` table and the header comment:
 
@@ -327,93 +326,7 @@ const SIZES: Record<string, { w: number; h: number; knob: number; pad: number }>
 
 (Keep the existing `.ds-slider` track rules and the `-moz-range-progress` rule as they are. If the old file carried more rules after the hover one, keep those too; only the thumb, hover and focus rules are replaced.)
 
-- [ ] **Step 3: Value bubble.** Replace `slider.tsx`'s component with:
-
-```tsx
-export interface SliderProps {
-  value: number;
-  onValueChange?: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  disabled?: boolean;
-  className?: string;
-  /** A11's value bubble: shown over the thumb while it is dragged or
-   *  keyboard-focused, reading what this returns ("45%"). */
-  valueLabel?: (value: number) => string;
-  "aria-label"?: string;
-  "aria-labelledby"?: string;
-  id?: string;
-}
-
-// The thumb is 16px, so its centre travels from 8px to (width − 8px): the
-// bubble follows the centre, not the raw percentage.
-const THUMB_PX = 16;
-
-export function Slider({
-  value,
-  onValueChange,
-  min = 0,
-  max = 100,
-  step = 1,
-  disabled,
-  className,
-  valueLabel,
-  id,
-  ...aria
-}: SliderProps) {
-  const span = max - min;
-  const pct = span > 0 ? Math.min(100, Math.max(0, ((value - min) / span) * 100)) : 0;
-  const [active, setActive] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!active) return;
-    const end = () => setActive(false);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-    return () => {
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
-    };
-  }, [active]);
-
-  const input = (
-    <input
-      id={id}
-      type="range"
-      className={cn("ds-slider", valueLabel ? "block" : className)}
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onValueChange?.(Number(e.target.value))}
-      onPointerDown={valueLabel ? () => setActive(true) : undefined}
-      onKeyDown={valueLabel ? () => setActive(true) : undefined}
-      onBlur={valueLabel ? () => setActive(false) : undefined}
-      style={{ ["--ds-slider-fill" as string]: `${pct}%` }}
-      {...aria}
-    />
-  );
-  if (!valueLabel) return input;
-  return (
-    <div className={cn("relative", className)}>
-      {input}
-      {active && (
-        // Figma 47167:21949 — the value label. Its raw drop shadow has no
-        // design-system effect style, so it is left out (reported).
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -top-[24px] -translate-x-1/2 whitespace-nowrap rounded-full bg-bg-inverse px-[8px] py-[3px] text-xs font-semibold leading-xs tracking-wider text-text-inverse"
-          style={{ left: `calc(${pct}% + ${THUMB_PX / 2 - (pct / 100) * THUMB_PX}px)` }}
-        >
-          {valueLabel(value)}
-        </span>
-      )}
-    </div>
-  );
-}
-```
+- [ ] **Step 3: (moved)** The value bubble lands in Task 4, beside its first use — an atom prop nothing calls yet is dead code.
 
 - [ ] **Step 4: Verify in the browser.** Write `scratchpad/p3d/t2-check.mjs`:
 
@@ -1106,7 +1019,95 @@ export { Divider } from "./divider";
 export { StateCard } from "./state-card";
 ```
 
-- [ ] **Step 2: Typecheck and lint.** `npx tsc --noEmit -p tsconfig.json && npx eslint src/components/ideeza/{tooltip,badge,spinner,progress-bar,divider,state-card,index}.ts*`. Expected: clean. The atoms are verified in the browser through Task 6; commit them with Task 6 so no atom lands unused.
+- [ ] **Step 1b: Slider value bubble** (moved from Task 2; `src/components/ideeza/slider.tsx`). Replace `slider.tsx`'s component with:
+
+```tsx
+export interface SliderProps {
+  value: number;
+  onValueChange?: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+  className?: string;
+  /** A11's value bubble: shown over the thumb while it is dragged or
+   *  keyboard-focused, reading what this returns ("45%"). */
+  valueLabel?: (value: number) => string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
+  id?: string;
+}
+
+// The thumb is 16px, so its centre travels from 8px to (width − 8px): the
+// bubble follows the centre, not the raw percentage.
+const THUMB_PX = 16;
+
+export function Slider({
+  value,
+  onValueChange,
+  min = 0,
+  max = 100,
+  step = 1,
+  disabled,
+  className,
+  valueLabel,
+  id,
+  ...aria
+}: SliderProps) {
+  const span = max - min;
+  const pct = span > 0 ? Math.min(100, Math.max(0, ((value - min) / span) * 100)) : 0;
+  const [active, setActive] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!active) return;
+    const end = () => setActive(false);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => {
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+    };
+  }, [active]);
+
+  const input = (
+    <input
+      id={id}
+      type="range"
+      className={cn("ds-slider", valueLabel ? "block" : className)}
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onValueChange?.(Number(e.target.value))}
+      onPointerDown={valueLabel ? () => setActive(true) : undefined}
+      onKeyDown={valueLabel ? () => setActive(true) : undefined}
+      onBlur={valueLabel ? () => setActive(false) : undefined}
+      style={{ ["--ds-slider-fill" as string]: `${pct}%` }}
+      {...aria}
+    />
+  );
+  if (!valueLabel) return input;
+  return (
+    <div className={cn("relative", className)}>
+      {input}
+      {active && (
+        // Figma 47167:21949 — the value label. Its raw drop shadow has no
+        // design-system effect style, so it is left out (reported).
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-[24px] -translate-x-1/2 whitespace-nowrap rounded-full bg-bg-inverse px-[8px] py-[3px] text-xs font-semibold leading-xs tracking-wider text-text-inverse"
+          style={{ left: `calc(${pct}% + ${THUMB_PX / 2 - (pct / 100) * THUMB_PX}px)` }}
+        >
+          {valueLabel(value)}
+        </span>
+      )}
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Typecheck and lint.** `npx tsc --noEmit -p tsconfig.json && npx eslint src/components/ideeza/{tooltip,badge,spinner,progress-bar,divider,state-card,index}.ts*` and `slider.tsx`. Expected: clean. The atoms are verified in the browser through Task 6; commit them with Task 6 so no atom lands unused.
 
 ### Task 5: The assembly viewer
 

@@ -2,14 +2,15 @@
 
 // IDEEZA Design System — A10 Toggle (iOS-style switch)
 // Token-driven on/off switch. Track fills brand on, neutral off; the knob
-// slides via transform. Mirrors the Figma _Toggle base helper.
+// slides via transform. Sizes are A10's own (Figma 45367:717): SM 36×20 and
+// MD 44×24, a 2px inset round the knob. LG is ours, for the rare big switch.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const SIZES: Record<string, { w: number; h: number; knob: number; pad: number }> = {
-  sm: { w: 32, h: 18, knob: 14, pad: 2 },
-  md: { w: 40, h: 22, knob: 18, pad: 2 },
+  sm: { w: 36, h: 20, knob: 16, pad: 2 },
+  md: { w: 44, h: 24, knob: 20, pad: 2 },
   lg: { w: 48, h: 28, knob: 23, pad: 2.5 },
 };
 

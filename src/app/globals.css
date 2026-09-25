@@ -63,6 +63,8 @@
   border-radius: var(--radius-full);
   background: var(--color-bg-brand);
 }
+/* A11 (Figma 47167:21946): the thumb is the surface with a brand edge — a
+   ring, not a solid dot — and focus adds the design system's soft halo. */
 .ds-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -70,18 +72,16 @@
   height: 16px;
   width: 16px;
   border-radius: var(--radius-full);
-  border: var(--border-width-2) solid var(--color-bg-surface);
-  background: var(--color-bg-brand);
-  box-shadow: var(--elevation-1);
+  border: var(--border-width-2) solid var(--color-border-brand);
+  background: var(--color-bg-surface);
   transition: transform var(--motion-duration-fast) var(--motion-easing-standard);
 }
 .ds-slider::-moz-range-thumb {
   height: 16px;
   width: 16px;
   border-radius: var(--radius-full);
-  border: var(--border-width-2) solid var(--color-bg-surface);
-  background: var(--color-bg-brand);
-  box-shadow: var(--elevation-1);
+  border: var(--border-width-2) solid var(--color-border-brand);
+  background: var(--color-bg-surface);
 }
 .ds-slider:hover:not(:disabled)::-webkit-slider-thumb {
   transform: scale(1.1);
@@ -90,10 +90,10 @@
   outline: none;
 }
 .ds-slider:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
+  box-shadow: 0 0 0 3px var(--color-focus-halo);
 }
 .ds-slider:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
+  box-shadow: 0 0 0 3px var(--color-focus-halo);
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-slider::-webkit-slider-thumb {
