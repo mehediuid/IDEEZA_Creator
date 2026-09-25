@@ -477,7 +477,8 @@ export function peersOf(state: ProjectState): LinkPeer[] {
 }
 
 /** What `productId` works with in its project, and whether it still does:
- *  the products it talks to over a radio, the spare pack that swaps into it
+ *  the companions it talks to over a radio, or for a companion the primary
+ *  it talks to, the spare pack that swaps into it
  *  or the product it swaps into, and the charger that fills its pack or the
  *  pack it fills. Pure; `linksFor` over the same products, so a sheet can
  *  ask it of an edit before it is made. */
@@ -506,10 +507,16 @@ function radioLabel(parts: ConceptPart[]): string | null {
 const speaks = (p: LinkPeer) =>
   !!radioOf(p.conceptParts) || (!!p.spec.choices?.radio && p.spec.choices.radio !== "none");
 
+/** The primary and each companion that names a radio, and no other pair: a
+ *  car talks to its remote, and to a charger given a radio, but those two
+ *  are each the car's, not each other's. Every pair used to be taken as
+ *  meant to talk, so two companions on different radios were told they
+ *  won't, when nothing asked them to. */
 function radioLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
   if (!speaks(me)) return [];
   return peers.flatMap((o): ProductLink[] => {
-    if (o.id === me.id || !speaks(o)) return [];
+    // One of the two is the primary — which also leaves out `me` itself.
+    if (o.primary === me.primary || !speaks(o)) return [];
     // Compared the way the build review compares them (compatibilityIssues).
     const a = radioOf(me.parts);
     const b = radioOf(o.parts);
