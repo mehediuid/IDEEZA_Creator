@@ -6,6 +6,7 @@
 // reported as an estimate, never passed off as measured.
 
 import type { ConceptPart, ConceptPartCategory } from "../create/concept";
+import type { Mm3 } from "./types";
 
 /** On the PCB, loose inside the enclosure, or not inside it at all. */
 export type Placement = "board" | "case" | "outside";
@@ -217,4 +218,45 @@ export function bodyOf(part: ConceptPart): { body: Body; estimated: boolean } {
     // takes no room inside; neither is worth calling an estimate.
     estimated: part.category !== "Passive" && part.category !== "Connector & mech",
   };
+}
+
+// ───────────────────── a printed product's own body ─────────────────────
+
+// What a product with nothing inside it is, by the thing its main part is
+// called — the size it starts from, typical for that thing. A plate's parts
+// are all "outside" (a standoff, a foot), so the box around them came to the
+// 6 × 6 × 6 mm shell floor. Only a mechanical concept reads this (derive.ts):
+// an electronic product's "enclosure" part is the box around its board, and
+// its size comes from what goes in the box.
+const MAIN_BODIES: [RegExp, MainBody["thing"], Mm3][] = [
+  [/\bdock\b|\bcradle\b/, "dock", { l: 120, w: 80, h: 40 }],
+  [/\bplates?\b|\bbase\b|\btray\b/, "plate", { l: 150, w: 100, h: 6 }],
+  [/\bstand\b|\bholder\b|\bmount\b|\bbracket\b/, "stand", { l: 80, w: 60, h: 100 }],
+  [/\bcase\b|\bbag\b|\bpouch\b|\bcover\b|\bsleeve\b|\bshell\b/, "case", { l: 200, w: 150, h: 60 }],
+];
+
+// Hardware that goes on a body rather than being one — "M3 mounting screws",
+// "Rubber feet (x4)" — however its name reads.
+const FITTING = /screw|standoff|\bfeet\b|\bfoot\b|magnet|gasket|o-?ring|\bnuts?\b|\bbolts?\b|insert/;
+
+export type MainBody = { thing: "plate" | "stand" | "case" | "dock"; size: Mm3 };
+
+/** The first part that names the thing the product is, and that thing's
+ *  typical size. A name is read by its head noun — the last thing-word before
+ *  any "with …"/"for …" — so a "phone stand with weighted base" is a stand
+ *  and a "wall mount plate" is a plate. */
+export function mainBodyOf(parts: ConceptPart[]): MainBody | null {
+  for (const p of parts) {
+    const name = p.name.toLowerCase();
+    if (FITTING.test(name)) continue;
+    const head = name.split(/\s(?:with|for|and|to)\s|[,(]/)[0];
+    let found: { at: number; thing: MainBody["thing"]; size: Mm3 } | null = null;
+    for (const [re, thing, size] of MAIN_BODIES) {
+      const all = [...head.matchAll(new RegExp(re.source, "g"))];
+      const at = all.length ? (all[all.length - 1].index ?? -1) : -1;
+      if (at >= 0 && (!found || at > found.at)) found = { at, thing, size };
+    }
+    if (found) return { thing: found.thing, size: found.size };
+  }
+  return null;
 }

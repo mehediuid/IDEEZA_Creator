@@ -7,7 +7,7 @@
 
 import type { ConceptPart } from "../create/concept";
 import { BATTERIES, USB_BUDGET_MA, batteryOf, isBatteryPart } from "./batteries";
-import { bodyOf, qtyOf, type Body } from "./bodies";
+import { bodyOf, mainBodyOf, qtyOf, type Body } from "./bodies";
 import { applyEdits } from "./edits";
 import { asWallMm, cleanChoices } from "./hints";
 import {
@@ -132,6 +132,18 @@ export function fitsIn(size: Mm3, min: Mm3): boolean {
   const a = desc(size);
   const m = desc(min);
   return a.every((v, i) => v >= m[i]);
+}
+
+/** `size`, each side grown — longest to shortest, as fitsIn compares them —
+ *  to at least the matching side of `min`, keeping `size`'s own axes. */
+export function growTo(size: Mm3, min: Mm3): Mm3 {
+  const axes = (["l", "w", "h"] as const).slice().sort((a, b) => size[b] - size[a]);
+  const m = desc(min);
+  const out = { ...size };
+  axes.forEach((axis, i) => {
+    out[axis] = Math.max(size[axis], m[i]);
+  });
+  return out;
 }
 
 export function drawOf(list: Placed[]): number {
@@ -283,7 +295,15 @@ export function deriveSpec(
   const battery = edits.battery ?? listed ?? hinted ?? ruleBattery(parts, hints.runtimeGoalH, hints.useCase);
   const minWith = (key: BatteryKey) => minSizeFor(board, stack, caseBodies(list, key), wallMm);
   const minSize = minWith(battery);
-  const size = edits.size ?? minSize;
+  // A plate, a stand or a case has nothing inside it to set a smallest size,
+  // so it starts at the size typical for the thing it is — and a maker who
+  // adds electronics to one still has that plate, grown to hold them, which
+  // is why the concept's own parts are asked too, not only the edited ones.
+  // An electronic product's "enclosure" part is never a body: it is the box
+  // around the board, and the board decides it.
+  const mechanical = productKind(concept) === "mechanical" || productKind(parts) === "mechanical";
+  const typical = mechanical ? mainBodyOf(parts) : null;
+  const size = edits.size ?? (typical ? growTo(typical.size, minSize) : minSize);
   const fits = fitsIn(size, minSize);
 
   // Largest capacity first, so the fix gives up as little runtime as it can.
