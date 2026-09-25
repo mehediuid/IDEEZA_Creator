@@ -443,8 +443,10 @@ export function WiringPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   const nets = netsFor(job);
 
+  // Feet, screws, a gasket and the wall adapter take no wire (offBoard), so
+  // the map draws no block for them either, as the PCB preview doesn't.
   const columns = WIRING_ROLES.map((roles) =>
-    bom.rows.filter((r) => roles.includes(r.category)),
+    bom.rows.filter((r) => roles.includes(r.category) && !offBoard(r.ref)),
   ).filter((col) => col.length > 0);
 
   const order = new Map<string, number>();
