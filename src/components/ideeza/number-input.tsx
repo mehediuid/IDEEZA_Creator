@@ -31,6 +31,10 @@ export interface NumberInputProps {
    *  buttons are named, so the number between them has to be too. */
   ariaLabel?: string;
   ariaDescribedBy?: string;
+  /** What the −/+ buttons step, for their names — "motor count" makes them
+   *  "Decrease motor count" and "Increase motor count", so two steppers on
+   *  one screen can be told apart by touch, out of context. */
+  stepsWhat?: string;
   onBlur?: () => void;
 }
 
@@ -47,9 +51,13 @@ export function NumberInput({
   id,
   ariaLabel,
   ariaDescribedBy,
+  stepsWhat,
   onBlur,
 }: NumberInputProps) {
   const s = SIZES[size];
+  // A half-typed value has no number to state; the field still says its
+  // range.
+  const now = value.trim() === "" ? NaN : Number(value);
 
   const bump = (dir: 1 | -1) => {
     const n = parseFloat(value);
@@ -65,7 +73,7 @@ export function NumberInput({
       tabIndex={-1}
       disabled={disabled}
       onClick={() => bump(dir)}
-      aria-label={dir === 1 ? "Increase" : "Decrease"}
+      aria-label={`${dir === 1 ? "Increase" : "Decrease"}${stepsWhat ? ` ${stepsWhat}` : ""}`}
       className="inline-flex items-center justify-center text-[color:var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
       style={{ width: s.btn, height: "100%", flex: "0 0 auto" }}
     >
@@ -84,9 +92,15 @@ export function NumberInput({
       style={{ height: s.h }}
     >
       {stepBtn(-1, "M6 12h12")}
+      {/* A spinbutton, as a native number field is: a screen reader says the
+          value with its range, not "edit text". */}
       <input
         id={id}
+        role="spinbutton"
         inputMode="decimal"
+        aria-valuenow={Number.isFinite(now) ? now : undefined}
+        aria-valuemin={min}
+        aria-valuemax={max}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         value={value}
