@@ -584,7 +584,9 @@ function FailedImageTurn({
   focused: boolean;
 }) {
   const body = (
-    <div role="alert" className="flex gap-[12px]">
+    // No role="alert" — the page-root RailAnnouncer already says this turn
+    // failed the moment it lands, so a live region here spoke it twice.
+    <div className="flex gap-[12px]">
       <span className="mt-[2px] inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-bg-error-subtle text-[var(--color-icon-error)]">
         <Icon icon={Alert02Icon} size={16} />
       </span>

@@ -116,6 +116,7 @@ export function ConfirmBuildDialog({
   open,
   turnId,
   conceptPrompt,
+  initialConcept,
   products,
   productNames = [],
   specLines,
@@ -127,6 +128,11 @@ export function ConfirmBuildDialog({
   /** The concept this build comes from — the cache key for its summary. */
   turnId: string;
   conceptPrompt: string;
+  /** The reading Build already did for this turn — real or stand-in. When
+   *  given, the dialog shows it as is and does not ask again: Build just
+   *  read this same turn, on a stand-in or not, and a second ask here for a
+   *  stand-in primary sent a request the maker never saw the point of. */
+  initialConcept?: ConceptSummary;
   /** How many products the build covers. The price is per product, and the
    *  canvas behind this dialog says the same number. */
   products: number;
@@ -150,16 +156,19 @@ export function ConfirmBuildDialog({
     concept: ConceptSummary;
   } | null>(null);
 
-  // The concept the build is filed under. Read in the background, with the
-  // same deterministic fallback the route uses standing in meanwhile, so
-  // Confirm is never blocked on a network round-trip.
+  // The concept the build is filed under. `initialConcept` is what Build
+  // itself just read for this turn, so it outranks a fresh fallback and — via
+  // the effect below — stands in for reading it again. Absent that, the same
+  // deterministic fallback the route uses stands in meanwhile, so Confirm is
+  // never blocked on a network round-trip.
   const concept =
     summaryCache.get(turnId) ??
+    initialConcept ??
     (resolved && resolved.turnId === turnId ? resolved.concept : null) ??
     fallbackConcept(conceptPrompt);
 
   React.useEffect(() => {
-    if (!open || !turnId || summaryCache.has(turnId)) return;
+    if (!open || !turnId || summaryCache.has(turnId) || initialConcept) return;
     let live = true;
     // summarizeConcept files a real reading itself, and a stand-in must not
     // be filed at all — so this only shows what came back.
@@ -170,7 +179,7 @@ export function ConfirmBuildDialog({
     return () => {
       live = false;
     };
-  }, [open, turnId, conceptPrompt]);
+  }, [open, turnId, conceptPrompt, initialConcept]);
 
   // Esc / outside-click dismiss.
   React.useEffect(() => {

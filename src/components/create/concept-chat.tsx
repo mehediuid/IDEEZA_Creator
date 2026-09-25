@@ -1560,6 +1560,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         open={confirmFor !== null}
         turnId={confirmFor?.turnId ?? ""}
         conceptPrompt={confirmFor?.prompt ?? ""}
+        initialConcept={confirmFor?.read.get(confirmFor.turnId)}
         products={pickedCompanions.size + 1}
         productNames={gateNames}
         specLines={confirmFor?.lines ?? []}
