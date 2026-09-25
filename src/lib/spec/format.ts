@@ -28,12 +28,6 @@ export function powerLabel(spec: ResolvedSpec): string {
   return runtimeLabel(spec.runtimeH) ?? batteryOf(spec.battery).label;
 }
 
-/** A pack is carried; USB and a wall adapter are plugged in — so the sheet
- *  heads its power section "Battery" only when there is one. */
-export function powerTitle(spec: ResolvedSpec): "Battery" | "Power" {
-  return spec.battery === "none" || spec.battery === "adapter" ? "Power" : "Battery";
-}
-
 /** What each case plastic is for, in the words a maker picks one by. */
 export const MATERIAL_NOTE: Record<Material, string> = {
   PLA: "easy to print, indoor",
@@ -52,14 +46,6 @@ export function specLine(name: string, spec: ResolvedSpec): string {
  *  on its MCU's die (confidence.ts reads it the way the sheet does). Pass
  *  the edited parts: an ESP32 the maker set to None has no radio. */
 export { radioOf };
-
-export function ioOf(parts: ConceptPart[]): string[] {
-  return parts
-    .filter(
-      (p) => p.category === "Sensor" || p.category === "Actuator" || p.category === "Display & I/O",
-    )
-    .map((p) => p.name);
-}
 
 export function mcuOf(parts: ConceptPart[]): string | null {
   return parts.find((p) => p.category === "Microcontroller")?.name ?? null;

@@ -1479,6 +1479,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           conceptLabel: labels.get(sheetTurn.id) ?? "1",
           spec: sheetSpec,
           parts: rail.state.parts.get(sheetTurn.id) ?? [],
+          conceptParts: rail.state.concepts.get(sheetTurn.id)?.parts ?? [],
+          hints: rail.state.concepts.get(sheetTurn.id)?.hints,
           edits: cleanEdits(sheetAnswer?.specs?.[focusedProduct]),
           onChange: sheetAnswer
             ? (edits) => handleSpecChange(focusedProduct, edits)

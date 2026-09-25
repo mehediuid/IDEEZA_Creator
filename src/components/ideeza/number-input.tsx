@@ -26,9 +26,29 @@ export interface NumberInputProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  id?: string;
+  /** The field's name when no `<label htmlFor>` points at it — the −/+
+   *  buttons are named, so the number between them has to be too. */
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
+  onBlur?: () => void;
 }
 
-export function NumberInput({ value, onChange, step = 1, min, max, size = "md", disabled, placeholder, className }: NumberInputProps) {
+export function NumberInput({
+  value,
+  onChange,
+  step = 1,
+  min,
+  max,
+  size = "md",
+  disabled,
+  placeholder,
+  className,
+  id,
+  ariaLabel,
+  ariaDescribedBy,
+  onBlur,
+}: NumberInputProps) {
   const s = SIZES[size];
 
   const bump = (dir: 1 | -1) => {
@@ -65,11 +85,22 @@ export function NumberInput({ value, onChange, step = 1, min, max, size = "md", 
     >
       {stepBtn(-1, "M6 12h12")}
       <input
+        id={id}
         inputMode="decimal"
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         value={value}
         disabled={disabled}
         placeholder={placeholder}
         onChange={(e) => onChange?.(e.target.value)}
+        onBlur={onBlur}
+        // The steppers are not Tab stops, so the arrows step from the field
+        // itself, as a native number field's do.
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+          e.preventDefault();
+          bump(e.key === "ArrowUp" ? 1 : -1);
+        }}
         className={cn(
           "w-full min-w-0 flex-1 border-x border-[var(--color-border-subtle)] bg-transparent px-[var(--spacing-4)] text-center text-[color:var(--color-text-primary)] outline-none font-[family-name:var(--font-family-body)]",
           s.text,

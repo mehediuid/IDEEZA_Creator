@@ -6,11 +6,15 @@
 // "Fix …'s size" — and it follows the selection until Done or Close, which
 // clear it. From `lg` it is a column docked beside the canvas, not a dialog;
 // below that, a side sheet over the page, and a bottom sheet on a phone. No
-// card grows for it. The three things the maker decides — size,
-// battery, case plastic — sit above the ones the parts decide, which change
-// only through Refine. Edits apply as they are made, through the same
-// onChange the card used; there is nothing to save. A size the parts cannot
-// fit says so here, with its ways out, before anything is paid.
+// card grows for it. Everything the product is made of can be changed here,
+// and only what this product has is shown: an electronic product's power,
+// brain, radio, what moves, senses, controls and shows, and its case; a
+// plate's size, case and mounting, and a way to give it electronics
+// (spec-sections.tsx). The edits change the parts the build uses — the BOM,
+// the wiring and the firmware follow — and the concept image stays as the
+// look. They apply as they are made; there is nothing to save, and nothing
+// is paid until Build. A size the parts cannot fit says so here, with its
+// ways out, before anything is paid.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -22,32 +26,30 @@ import {
   Undo02Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Segmented } from "@/components/ideeza/segmented";
-import { SelectMenu } from "@/components/ideeza/select-menu";
 import { TextInput } from "@/components/ideeza/text-input";
 import type { ConceptPart } from "@/lib/create/concept";
-import { BATTERIES, batteryOf } from "@/lib/spec/batteries";
-import { blocksBuild } from "@/lib/spec/derive";
-import {
-  FAB_PROFILE,
-  MATERIAL_NOTE,
-  boardLabel,
-  ioOf,
-  needsNoPower,
-  powerTitle,
-  radioOf,
-} from "@/lib/spec/format";
-import { MM_MAX, MM_MIN, asMm3 } from "@/lib/spec/hints";
-import {
-  MATERIALS,
-  type BatteryKey,
-  type Mm3,
-  type ResolvedSpec,
-  type SpecEdits,
-} from "@/lib/spec/types";
+import { batteryOf } from "@/lib/spec/batteries";
+import { blocksBuild, deriveSpec, productKind, typicalBodyOf } from "@/lib/spec/derive";
+import { readableName } from "@/lib/spec/facts";
+import { MM_MAX, MM_MIN, asMm3, cleanEdits } from "@/lib/spec/hints";
+import type { AiHints, Mm3, ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { currentLabel, mm3, runtimeLabel } from "@/lib/spec/units";
 import { OUTLINE_BUTTON } from "./buttons";
 import { SPEC_SHEET_ID, specButtonId, specSizeInputId } from "./spec-panel";
+import {
+  AddPart,
+  BrainSection,
+  CaseSection,
+  ChipSections,
+  ConnectsSection,
+  DECIDED,
+  ElectronicsSection,
+  MountingSection,
+  MovesSection,
+  PowerSection,
+  Section,
+  type Edit,
+} from "./spec-sections";
 import { useDialogFocus } from "./use-dialog-focus";
 
 /** The exit's length — the panel stays on the page this long after it is
@@ -60,15 +62,6 @@ const EXIT_MS = 200;
 const focusSoon = (id: string) =>
   requestAnimationFrame(() => document.getElementById(id)?.focus());
 
-/** Who decided each value, in words a maker reads without a legend. */
-const DECIDED: Record<"you" | "concept" | "ai" | "rule" | "calc", string> = {
-  you: "You set",
-  concept: "From the concept",
-  ai: "Suggested by AI",
-  rule: "Default",
-  calc: "Estimated",
-};
-
 /** What the sheet shows, for the one product it is open on. */
 export type SheetProduct = {
   productId: string;
@@ -76,7 +69,12 @@ export type SheetProduct = {
   name: string;
   conceptLabel: string;
   spec: ResolvedSpec;
+  /** The parts as edited — what the build uses, and what the sheet shows. */
   parts: ConceptPart[];
+  /** The concept's own parts — what each section's Reset goes back to, and
+   *  what "From the concept" means. */
+  conceptParts: ConceptPart[];
+  hints?: AiHints;
   edits: SpecEdits;
   /** Absent on a chat from before the setup question — it has nowhere to keep
    *  an edit, so the spec shows and cannot change. */
@@ -93,6 +91,24 @@ export type SheetFocus = "keep" | "sheet" | "size";
 /** The latest ask to show the sheet. `req` counts them, so asking again —
  *  the Build line pressed twice — lands the keyboard again. */
 export type SheetRequest = { focus: SheetFocus; req: number };
+
+/** "Now: Size 229 × 63 × 23 mm · board 77 × 57 mm · ~4.6 h per charge" —
+ *  what a part edit moved elsewhere in the spec. Null when nothing did. The
+ *  plastic is left out when the maker picked it: they can see it change. */
+function movedBy(before: ResolvedSpec, after: ResolvedSpec, pickedPlastic: boolean): string | null {
+  const out: string[] = [];
+  if (mm3(before.size) !== mm3(after.size) || before.fits !== after.fits) {
+    out.push(`Size ${mm3(after.size)}${after.fits ? "" : " — doesn't fit"}`);
+  }
+  const board = (s: ResolvedSpec) => (s.board ? `board ${s.board.w} × ${s.board.h} mm` : "no board");
+  if (board(before) !== board(after)) out.push(board(after));
+  const runtime = runtimeLabel(after.runtimeH);
+  if (before.drawMa !== after.drawMa) {
+    out.push(runtime ? `${runtime} per charge` : `draws ${currentLabel(after.drawMa)}`);
+  }
+  if (!pickedPlastic && before.material !== after.material) out.push(`${after.material} case`);
+  return out.length ? `Now: ${out.join(" · ")}` : null;
+}
 
 /** Docked beside the canvas from `lg`; an overlay below it, where there is
  *  no room for a 420 px column next to the rail and the canvas. */
@@ -173,7 +189,7 @@ function SheetPanel({
   request: SheetRequest | null;
   onClose: () => void;
 }) {
-  const { spec, productId, onChange } = product;
+  const { productId, onChange } = product;
   const panelRef = React.useRef<HTMLElement>(null);
   const sizeRef = React.useRef<HTMLInputElement>(null);
   const closeRef = React.useRef<HTMLButtonElement>(null);
@@ -237,6 +253,25 @@ function SheetPanel({
     if (active instanceof HTMLElement && panelRef.current?.contains(active)) active.blur();
     onClose();
   };
+  // Every section edits through this: the change, then what it did in words
+  // and where the keyboard goes once it has rendered.
+  const [said, setSaid] = React.useState("");
+  // A part changed moves numbers in other sections — the size, the board,
+  // the draw — often off screen; what moved is said once, in the footer.
+  const [moved, setMoved] = React.useState<{ productId: string; text: string } | null>(null);
+  const edit: Edit | undefined = onChange
+    ? (next, after) => {
+        const now = deriveSpec(product.conceptParts, product.hints, cleanEdits(next));
+        const text = movedBy(product.spec, now, next.material !== product.edits.material);
+        onChange(next);
+        setMoved(text ? { productId, text } : null);
+        const words = [after?.say, text].filter(Boolean).join(" ");
+        if (words) setSaid(words);
+        if (after?.focus) focusSoon(after.focus);
+      }
+    : undefined;
+  const mechanical = productKind(product.parts) === "mechanical";
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     // A menu open inside the sheet takes its own Escape first.
     if (e.key === "Escape" && !e.defaultPrevented) {
@@ -276,31 +311,44 @@ function SheetPanel({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[16px] md:px-[24px]"
       >
         <SizeSection product={product} sizeRef={sizeRef} />
-        <PowerSection spec={spec} edits={product.edits} onChange={onChange} />
-        <Section id={`${SPEC_SHEET_ID}-case`} title="Case" tag={DECIDED[spec.materialSource]}>
-          {onChange ? (
-            <Segmented
-              label="Case plastic"
-              value={spec.material}
-              options={MATERIALS.map((m) => ({ label: m, value: m }))}
-              onChange={(m) => onChange({ ...product.edits, material: m })}
-            />
-          ) : (
-            <p className="text-md text-text-primary">{spec.material}</p>
-          )}
-          <p className="text-sm text-text-tertiary">
-            {spec.material} — {MATERIAL_NOTE[spec.material]} · {spec.wallMm} mm wall
-          </p>
-        </Section>
-        <FromParts spec={spec} parts={product.parts} />
+        {mechanical ? (
+          // Nothing in it to power: its body, how it is held, and a way to
+          // give it electronics — no power, brain or radio to set.
+          <>
+            <CaseSection product={product} edit={edit} sealing={false} />
+            <MountingSection product={product} edit={edit} always />
+            <ElectronicsSection product={product} edit={edit} />
+          </>
+        ) : (
+          <>
+            <PowerSection product={product} edit={edit} />
+            <BrainSection product={product} edit={edit} />
+            <ConnectsSection product={product} edit={edit} />
+            <MovesSection product={product} edit={edit} />
+            <ChipSections product={product} edit={edit} />
+            <AddPart product={product} edit={edit} />
+            <CaseSection product={product} edit={edit} sealing />
+            <MountingSection product={product} edit={edit} always={false} />
+          </>
+        )}
+        {/* What an edit did, for a screen reader: the control that was
+            pressed is often gone, and the keyboard lands somewhere else. */}
+        <p role="status" className="sr-only">
+          {said}
+        </p>
       </div>
 
       <footer className="flex shrink-0 items-center gap-[12px] border-t border-solid border-border px-[16px] pb-[max(12px,env(safe-area-inset-bottom))] pt-[12px] md:px-[24px]">
-        <p className="min-w-0 flex-1 text-sm text-text-tertiary">
-          {onChange
-            ? "Changes save as you go"
-            : "This chat is from before specs were kept, so this one can't change."}
-        </p>
+        <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+          {moved?.productId === productId && (
+            <p className="text-sm tabular-nums text-text-secondary">{moved.text}</p>
+          )}
+          <p className="text-sm text-text-tertiary">
+            {onChange
+              ? "Changes save as you go · the build uses these parts · the image stays as the look"
+              : "This chat is from before specs were kept, so this one can't change."}
+          </p>
+        </div>
         <button type="button" onClick={close} className={`${OUTLINE_BUTTON} shrink-0`}>
           Done
         </button>
@@ -367,36 +415,6 @@ function SheetPanel({
   );
 }
 
-function Section({
-  id,
-  title,
-  tag,
-  children,
-}: {
-  id: string;
-  title: string;
-  /** Who decided it — "You set", "Estimated", … */
-  tag?: string;
-  children: React.ReactNode;
-}) {
-  // A rule between sections, on the sheet's own surface — not a box per
-  // section, which would be a card in a sheet.
-  return (
-    <section
-      aria-labelledby={id}
-      className="flex flex-col gap-[10px] border-t border-solid border-border py-[20px] first:border-t-0"
-    >
-      <div className="flex items-baseline justify-between gap-[12px]">
-        <h3 id={id} className="text-md font-semibold text-text-primary">
-          {title}
-        </h3>
-        {tag && <span className="shrink-0 text-xs text-text-tertiary">{tag}</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 const AXES: { key: keyof Mm3; label: string }[] = [
   { key: "l", label: "Length" },
   { key: "w", label: "Width" },
@@ -411,6 +429,9 @@ function SizeSection({
   sizeRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const { productId, spec, edits, onChange } = product;
+  // A plate, a stand or a case starts at the size typical for it — nothing
+  // inside sets a smallest one — so its hint says that instead.
+  const typical = typicalBodyOf(product.conceptParts, product.parts);
   const sizeId = specSizeInputId(productId);
   const errorId = `${sizeId}-error`;
   const hintId = `${sizeId}-hint`;
@@ -448,7 +469,12 @@ function SizeSection({
   };
 
   return (
-    <Section id={`${SPEC_SHEET_ID}-size`} title="Size" tag={DECIDED[spec.sizeSource]}>
+    <Section
+      id="size"
+      title="Size"
+      // A plate's typical size is a default, not a sum over its parts.
+      tag={DECIDED[spec.sizeSource === "calc" && typical && !spec.board ? "rule" : spec.sizeSource]}
+    >
       {onChange ? (
         <div
           className="grid grid-cols-3 gap-[8px]"
@@ -496,8 +522,24 @@ function SizeSection({
         <Fixes id={conflictId!} sizeId={sizeId} spec={spec} edits={edits} onChange={onChange} />
       ) : (
         <p id={hintId} className="text-sm text-text-tertiary">
-          Smallest that fits: <span className="tabular-nums">{mm3(spec.minSize)}</span> (±15%,
-          nothing is routed yet)
+          {typical ? (
+            spec.board ? (
+              <>
+                Typical for a {typical.thing}, grown to hold its electronics — they need{" "}
+                <span className="tabular-nums">{mm3(spec.minSize)}</span> (±15%)
+              </>
+            ) : (
+              <>
+                Typical for a {typical.thing}: <span className="tabular-nums">{mm3(typical.size)}</span> —
+                nothing inside it sets a smallest size
+              </>
+            )
+          ) : (
+            <>
+              Smallest that fits: <span className="tabular-nums">{mm3(spec.minSize)}</span> (±15%,
+              nothing is routed yet)
+            </>
+          )}
           {spec.sizeSource === "you" && onChange && (
             <>
               {" "}
@@ -509,7 +551,7 @@ function SizeSection({
                 }}
                 className="inline-flex min-h-[24px] items-center rounded-sm px-[4px] align-baseline font-semibold text-text-secondary underline-offset-2 outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
               >
-                Use smallest
+                {typical ? "Use typical size" : "Use smallest"}
               </button>
             </>
           )}
@@ -535,6 +577,21 @@ function SizeSection({
             <Icon icon={Undo02Icon} size={14} />
             Undo
           </button>
+        </p>
+      )}
+
+      {/* A part no datasheet rule knows is sized by its kind — said where
+          the size it moved is. */}
+      {spec.estimated.length > 0 && (
+        <p className="text-sm text-text-tertiary">
+          Sized by type, not by datasheet:{" "}
+          {spec.estimated
+            .map((n) => {
+              const p = product.parts.find((x) => x.name === n);
+              return p ? readableName(p) : n;
+            })
+            .join(", ")}
+          .
         </p>
       )}
     </Section>
@@ -601,110 +658,5 @@ function Fixes({
         </button>
       </div>
     </div>
-  );
-}
-
-function PowerSection({
-  spec,
-  edits,
-  onChange,
-}: {
-  spec: ResolvedSpec;
-  edits: SpecEdits;
-  onChange?: (edits: SpecEdits) => void;
-}) {
-  const id = `${SPEC_SHEET_ID}-power`;
-  // A plate or a stand draws nothing: there is no pack to pick, and a list
-  // of them would ask the maker to power a thing with no circuit.
-  if (needsNoPower(spec)) {
-    return (
-      <Section id={id} title="Power">
-        <p className="text-md text-text-primary">No power needed</p>
-        <p className="text-sm text-text-tertiary">Nothing in it draws current.</p>
-      </Section>
-    );
-  }
-  const over = spec.drawMa > spec.budgetMa;
-  const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
-  // A pack's runtime is every part's typical current summed as if it never
-  // slept — honest arithmetic, but "~4.8 h" alone reads as a promise. The
-  // model has no duty-cycle data to do better, so the caveat rides beside
-  // the number instead of implying the number is more precise than it is.
-  const runtime = spec.battery !== "none" ? runtimeLabel(spec.runtimeH) : null;
-  return (
-    <Section id={id} title={powerTitle(spec)} tag={DECIDED[spec.batterySource]}>
-      {onChange ? (
-        // SelectMenu, not Select: its list is drawn on the popover layer,
-        // above the sheet — Select's sits on the dropdown layer, under it.
-        <SelectMenu<BatteryKey>
-          ariaLabel="Power source"
-          placeholder="Choose a power source"
-          value={spec.battery}
-          options={BATTERIES.map((b) => ({ label: b.label, value: b.key }))}
-          onChange={(v) => onChange({ ...edits, battery: v })}
-        />
-      ) : (
-        <p className="text-md text-text-primary">{batteryOf(spec.battery).label}</p>
-      )}
-      <p className={["text-sm", over ? "text-text-error" : "text-text-tertiary"].join(" ")}>
-        {over
-          ? `Draws about ${currentLabel(spec.drawMa)} — more than ${supply} gives (${currentLabel(spec.budgetMa)}).`
-          : spec.battery === "none"
-            ? `Draws about ${currentLabel(spec.drawMa)} of the ${currentLabel(spec.budgetMa)} USB gives.`
-            : runtime
-              ? `${runtime} per charge at full draw — sleep modes stretch it · draws about ${currentLabel(spec.drawMa)}`
-              : spec.drawMa === 0
-                ? "Draws almost nothing"
-                : `Draws about ${currentLabel(spec.drawMa)}`}
-      </p>
-    </Section>
-  );
-}
-
-function FromParts({ spec, parts }: { spec: ResolvedSpec; parts: ConceptPart[] }) {
-  const io = ioOf(parts);
-  const rows: [string, string][] = [
-    ["Circuit board", boardLabel(spec)],
-    // A product with no board is not made to a board house's rules.
-    ...(spec.board ? [["Made to", FAB_PROFILE] as [string, string]] : []),
-    ["Connects", radioOf(parts) ?? "No radio"],
-    ["Inputs and outputs", io.length ? io.join(" · ") : "None named"],
-  ];
-  return (
-    <Section id={`${SPEC_SHEET_ID}-parts`} title="From the parts">
-      {/* One grid, so every value starts on the same line: a wrapping row
-          per pair pushed a long value (the fab profile) into a ragged
-          block and dropped a short one under its label. */}
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] text-sm">
-        {rows.map(([label, value], i) => (
-          <React.Fragment key={label}>
-            <dt
-              className={[
-                "py-[8px] pr-[16px] text-text-tertiary",
-                i > 0 ? "border-t border-solid border-border" : "",
-              ].join(" ")}
-            >
-              {label}
-            </dt>
-            <dd
-              className={[
-                "min-w-0 py-[8px] text-text-primary",
-                i > 0 ? "border-t border-solid border-border" : "",
-              ].join(" ")}
-            >
-              {value}
-            </dd>
-          </React.Fragment>
-        ))}
-      </dl>
-      {spec.estimated.length > 0 && (
-        <p className="text-sm text-text-tertiary">
-          Sized by type, not by datasheet: {spec.estimated.join(", ")}.
-        </p>
-      )}
-      <p className="text-sm text-text-tertiary">
-        These come from the concept&apos;s parts — change them with Refine.
-      </p>
-    </Section>
   );
 }
