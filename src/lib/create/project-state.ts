@@ -443,11 +443,16 @@ export function railRows(
  *  with over its radio in place of the radio itself — and that radio fact
  *  last. The row is one line, cut at its end, and "Pairs with Remote
  *  Controller" ahead of the part cut "Drives TT gear motor", the fact that
- *  says what the product is: so power, then what it does, then its radio. */
+ *  says what the product is: so power, then what it does, then its radio.
+ *  A broken pairing ("Can't pair with X") is a warning, and the cut must
+ *  never take a warning, so that one leads the row instead. */
 function rowFacts(spec: ResolvedSpec, parts: ConceptPart[], links: ProductLink[]) {
   const pairs = links.filter((l) => l.about === "radio");
   const facts = cardFactsOf(spec, parts, radioOf(parts), pairs);
-  return [...facts.filter((f) => f.key !== "radio"), ...facts.filter((f) => f.key === "radio")];
+  const radio = facts.filter((f) => f.key === "radio");
+  const rest = facts.filter((f) => f.key !== "radio");
+  const warned = radio.filter((f) => f.tone !== "plain");
+  return [...warned, ...rest, ...radio.filter((f) => f.tone === "plain")];
 }
 
 // ─────────────────────────── linksOf ───────────────────────────
