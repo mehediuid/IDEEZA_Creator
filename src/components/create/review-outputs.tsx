@@ -114,8 +114,13 @@ function ReviewPanel({
   // more than one; a single-product build is the surface it always was.
   const products = React.useMemo(() => productsOf(job), [job]);
   // Controlled when the shell shares the selection with the rail beside it,
-  // so picking a product in either moves both.
-  const [ownProductId, setOwnProductId] = React.useState("primary");
+  // so picking a product in either moves both. The review keeps the last
+  // product it was told to show, adopted while rendering: Done, Close and
+  // Esc on the spec sheet clear the selection, and the review stays where it
+  // was rather than snapping back to the primary — the rail picked that
+  // companion to look at its deliverables.
+  const [ownProductId, setOwnProductId] = React.useState(controlledProductId ?? "primary");
+  if (controlledProductId && controlledProductId !== ownProductId) setOwnProductId(controlledProductId);
   const productId = controlledProductId ?? ownProductId;
   const setProductId = (id: string) => {
     setOwnProductId(id);
