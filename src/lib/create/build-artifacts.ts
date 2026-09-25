@@ -23,6 +23,14 @@ export function specOfSource(job: ArtifactSource): ResolvedSpec {
   return job.spec ?? deriveSpec(job.parts);
 }
 
+/** The snapshot this build was actually booked with, or null for a build
+ *  that predates spec booking. Callers that need to know "is this number a
+ *  real decision or something worked out from the parts just now" read this
+ *  instead of repeating `job.spec` themselves. */
+export function bookedSpec(job: ArtifactSource): ResolvedSpec | null {
+  return job.spec ?? null;
+}
+
 // Reference designator per category, the way a schematic names them:
 // ICs (MCU, regulators, radios) are U, sensors S, actuators and
 // indicators D, displays DSP, connectors and mechanics J, passives R.

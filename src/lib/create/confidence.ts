@@ -21,7 +21,6 @@
 // §4.4.10's cross-product compatibility, which two parts lists are enough for.
 
 import { batteryOf } from "../spec/batteries";
-import { deriveSpec } from "../spec/derive";
 import { mm3 } from "../spec/units";
 import type { BuildJob, BuildProduct } from "./history";
 import type { ConceptPart } from "./concept";
@@ -130,10 +129,24 @@ const NOT_RUN: Issue[] = [
   },
 ];
 
-/** §4.3.5 Assembly — from the booked spec, or from the parts for a build
- *  older than the spec. */
+/** §4.3.5 Assembly — from the booked spec. A build older than spec booking
+ *  has no snapshot to check: it never chose a size against its parts or a
+ *  pack against its draw, so there is nothing here to pass or fail, only to
+ *  say so (I4 — a legacy build claims neither a check nor a battery). */
 export function assemblyChecks(p: BuildProduct): { issues: Issue[]; passed: string[] } {
-  const s = p.spec ?? deriveSpec(p.parts);
+  if (!p.spec) {
+    return {
+      issues: [
+        {
+          group: "assembly",
+          notRun: true,
+          text: "Assembly checks have not run — this build was booked before products had a spec, so there is no size or pack to check.",
+        },
+      ],
+      passed: [],
+    };
+  }
+  const s = p.spec;
   const supply = s.battery === "none" ? "USB" : batteryOf(s.battery).label;
   const issues: Issue[] = [];
   const passed: string[] = [];

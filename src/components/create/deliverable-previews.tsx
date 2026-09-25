@@ -12,6 +12,7 @@
 import type { BuildItemKind } from "@/lib/create/history";
 import {
   bomFor,
+  bookedSpec,
   firmwareFor,
   netsFor,
   pcbMetaFor,
@@ -20,7 +21,7 @@ import {
   type NetWire,
 } from "@/lib/create/build-artifacts";
 import type { ConceptPartCategory } from "@/lib/create/concept";
-import { batteryOf } from "@/lib/spec/batteries";
+import { batteryOf, isBatteryPart } from "@/lib/spec/batteries";
 import { FAB_PROFILE, mcuOf, powerLabel, radioOf } from "@/lib/spec/format";
 import { mm3 } from "@/lib/spec/units";
 
@@ -32,25 +33,40 @@ import { mm3 } from "@/lib/spec/units";
 // control lives on this panel, so no line names a file you could take away
 // (CLAUDE.md §6, "no promises without delivery").
 export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[] {
+  const booked = bookedSpec(product);
   const spec = specOfSource(product);
+  // A build with no booked snapshot never checked these numbers against a
+  // real board or pack at booking time — they are read off the current
+  // parts instead, same arithmetic, just not something this build actually
+  // committed to (I4).
+  const withNote = (text: string) =>
+    booked ? text : `${text}, worked out from the parts`;
   const asked =
     !spec.fits && spec.draftAtSize
       ? [`Asked ${mm3(spec.size)} · needs ${mm3(spec.minSize)}`]
       : [];
+  // A legacy build's battery is one of those numbers — a rule's guess, never
+  // a decision the maker or the concept actually made — so it is stated
+  // only when the parts themselves name a pack.
+  const knowsBattery = !!booked || product.parts.some(isBatteryPart);
   const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
   switch (kind) {
     case "3d":
       return [
         ...asked,
-        `Enclosure · ${mm3(spec.size)}`,
+        withNote(`Enclosure · ${mm3(spec.size)}`),
         `${spec.material} · ${spec.wallMm} mm wall · 0.2 mm layers`,
-        "Shape from the concept image, size from the spec",
+        booked
+          ? "Shape from the concept image, size from the spec"
+          : "Shape from the concept image, size worked out from the parts",
         "Mount points sized for the PCB",
       ];
     case "pcb":
       return [
         spec.board
-          ? `2-layer board · ${spec.board.w} × ${spec.board.h} mm · ${spec.board.parts} parts`
+          ? withNote(
+              `2-layer board · ${spec.board.w} × ${spec.board.h} mm · ${spec.board.parts} parts`,
+            )
           : "No board — none of this product's parts sits on one",
         `Fab profile: ${FAB_PROFILE}`,
         "Schematic, converted into a board layout",
@@ -68,7 +84,7 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
     }
     case "wiring":
       return [
-        `Power in: ${supply}`,
+        ...(knowsBattery ? [`Power in: ${supply}`] : []),
         "Netlist + pin-to-pin table",
         "Wire colors per net class",
         "Harness lengths, 22 AWG",
@@ -77,7 +93,9 @@ export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[
       ];
     case "parts":
       return [
-        spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`,
+        ...(knowsBattery
+          ? [spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`]
+          : []),
         `Draws about ${spec.drawMa} mA · ${powerLabel(spec)}`,
         "Every part — category, name, reference and quantity",
         "Grouped by function, quantities per board",

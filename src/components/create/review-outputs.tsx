@@ -39,7 +39,7 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
-import { specOfSource, type ArtifactSource } from "@/lib/create/build-artifacts";
+import { bookedSpec, specOfSource, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge } from "./confidence-badge";
 import { NetworkAction } from "@/components/network/network-action";
@@ -563,9 +563,15 @@ function DeliverablePanel({
       )}
       {/* The mesh is drawn from the concept image, so its proportions are the
           concept's; the size it will be made at is the spec's, said here
-          rather than faked by stretching a model with no ruler beside it. */}
+          rather than faked by stretching a model with no ruler beside it.
+          A build with no booked snapshot never fixed that size at booking
+          time (I4), so it reads as worked out from the parts, not as the
+          spec's own number. */}
       <p className="pointer-events-none absolute bottom-[10px] left-[12px] rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary">
-        {mm3(specOfSource(product).size)} · shape from concept, size from spec
+        {mm3(specOfSource(product).size)} ·{" "}
+        {bookedSpec(product)
+          ? "shape from concept, size from spec"
+          : "shape from concept, size worked out from the parts"}
       </p>
     </div>
   );
