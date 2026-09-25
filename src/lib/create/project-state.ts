@@ -1123,8 +1123,10 @@ export type ComposerTarget =
 
 /** Which drawing the composer's next sentence changes. Only the product in
  *  focus — the one every label under the composer names — and only its own
- *  drawing; with none in focus, none. The one exception is a chat from
- *  before the setup question: it has no products to choose between, so it
+ *  drawing; with none in focus, none, where there is a choice to make. A
+ *  chat whose project holds one product has none: with nothing selected,
+ *  that one is the target — Done left the composer asking the maker to pick
+ *  from a list of one. So does a chat from before the setup question, which
  *  refines its latest drawing, as it always did. A product the project no
  *  longer holds (removed) is not a target; the primary is. */
 export function composerTarget(
@@ -1149,16 +1151,19 @@ export function composerTarget(
       : { kind: "fresh" };
   }
 
-  // Only once there is something to choose between: with the question
-  // still open the composer is held, and says so, as "fresh".
-  if (focusedProduct === null && drawings.length) return { kind: "none" };
   const inProject = (id: string) =>
     id === "primary" || !setup.answer || setup.answer.picked.includes(id);
+  // A project of one product, drawn, is no choice to make. One whose
+  // companions are chosen but not drawn yet still is.
+  const drawn = new Set(drawings.map(productIdOf).filter(inProject));
+  const alone = drawn.size === 1 && !setup.answer?.picked.length;
+  const focus = focusedProduct ?? (alone ? [...drawn][0] : null);
+  // Only once there is something to choose between: with the question
+  // still open the composer is held, and says so, as "fresh".
+  if (focus === null && drawings.length) return { kind: "none" };
   const productId =
-    focusedProduct !== null &&
-    inProject(focusedProduct) &&
-    drawings.some((t) => productIdOf(t) === focusedProduct)
-      ? focusedProduct
+    focus !== null && inProject(focus) && drawings.some((t) => productIdOf(t) === focus)
+      ? focus
       : "primary";
   const own = drawings.filter((t) => productIdOf(t) === productId);
   if (!own.length) return { kind: "fresh" };
