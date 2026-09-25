@@ -4,6 +4,7 @@
 // dropped, never bent into the nearest one, and the rules fill the gap.
 
 import { CONCEPT_CATEGORIES, type ConceptPart, type ConceptSummary } from "../create/concept";
+import { namesRadio } from "./catalog";
 import {
   ADDABLE_KEYS,
   BATTERY_KEYS,
@@ -164,8 +165,10 @@ const batteryDecidedBy = (v: unknown): "you" | "concept" | "ai" | "rule" =>
   v === "you" || v === "concept" || v === "ai" ? v : "rule";
 
 /** A build's snapshot as stored. Anything that isn't a whole spec is no spec,
- *  and the reader falls back to working one out from the parts. */
-export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
+ *  and the reader falls back to working one out from the parts. `booked` is
+ *  the parts the build was made from, which a snapshot from before a field
+ *  existed is read by. */
+export function asResolvedSpec(raw: unknown, booked: ConceptPart[] = []): ResolvedSpec | undefined {
   if (typeof raw !== "object" || raw === null) return undefined;
   const s = raw as Record<string, unknown>;
   const size = asBox(s.size);
@@ -199,6 +202,7 @@ export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
   // Checked like an edit's: a wall off the printer's steps is no wall, and
   // the snapshot reads as the rule's 2 mm — never as one the maker chose.
   const wallMm = asWallMm(s.wallMm);
+  const choices = cleanChoices(s.choices);
   return {
     // A snapshot from before `kind` says it by the rule it used then: no
     // board, nothing drawing, no pack.
@@ -217,6 +221,11 @@ export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
     battery,
     batterySource: batteryDecidedBy(s.batterySource),
     noUsbPort: s.noUsbPort === true,
+    // A snapshot from before `speaks` keeps only the parts as built, not the
+    // concept's: one that carries a radio, or had its radio picked — None
+    // included — is taken to be meant to talk.
+    speaks:
+      typeof s.speaks === "boolean" ? s.speaks : namesRadio(booked) || choices.radio !== undefined,
     drawMa,
     budgetMa,
     runtimeH: isNum(s.runtimeH) ? s.runtimeH : null,
@@ -226,7 +235,7 @@ export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
     // A snapshot from before part edits made none, so it reads as the rule's
     // wall and no choices — the same key a spec with no edits gives today.
     wallSource: s.wallSource === "you" && wallMm !== undefined ? "you" : "rule",
-    choices: cleanChoices(s.choices),
+    choices,
     estimated: Array.isArray(s.estimated)
       ? s.estimated.filter((x): x is string => typeof x === "string")
       : [],

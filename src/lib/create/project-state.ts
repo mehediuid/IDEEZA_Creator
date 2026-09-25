@@ -34,6 +34,7 @@ import { cardFactsOf, chargesOf, packCellOf, standaloneOf, type SpecFactTone } f
 // The radio as format.ts reads it — the card's reading — so the row, the
 // card and the pairing below say one radio the same way.
 import { radioOf } from "../spec/format";
+import { pairsOf } from "./confidence";
 import type { BatteryKey, ResolvedSpec, SpecEdits } from "../spec/types";
 
 type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
@@ -513,23 +514,19 @@ function radioLabel(parts: ConceptPart[]): string | null {
   return key ? RADIOS[key].label : radioOf(parts);
 }
 
-/** A product meant to talk over a radio: its concept named one — so one
- *  taken off is a pairing broken, not a product that never had one — or the
- *  maker picked one. A chip given to a charger has Wi-Fi on its die, and
- *  that alone doesn't make the charger something the car should talk to. */
-const speaks = (p: LinkPeer) =>
-  !!radioOf(p.conceptParts) || (!!p.spec.choices?.radio && p.spec.choices.radio !== "none");
-
-/** The primary and each companion that names a radio, and no other pair: a
- *  car talks to its remote, and to a charger given a radio, but those two
- *  are each the car's, not each other's. Every pair used to be taken as
- *  meant to talk, so two companions on different radios were told they
- *  won't, when nothing asked them to. */
+/** The primary and each companion that is meant to talk over a radio
+ *  (ResolvedSpec.speaks), and no other pair: a car talks to its remote, and
+ *  to a charger given a radio, but those two are each the car's, not each
+ *  other's. The build review pairs by the same rule (confidence.ts
+ *  pairsOf), so it never says two products won't talk that this never
+ *  paired. */
 function radioLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
-  if (!speaks(me)) return [];
-  return peers.flatMap((o): ProductLink[] => {
-    // One of the two is the primary — which also leaves out `me` itself.
-    if (o.primary === me.primary || !speaks(o)) return [];
+  if (!me.spec.speaks) return [];
+  const others = pairsOf(peers, (p) => p.primary).flatMap(([a, b]) =>
+    a === me ? [b] : b === me ? [a] : [],
+  );
+  return others.flatMap((o): ProductLink[] => {
+    if (!o.spec.speaks) return [];
     // Compared the way the build review compares them (compatibilityIssues).
     const a = radioOf(me.parts);
     const b = radioOf(o.parts);

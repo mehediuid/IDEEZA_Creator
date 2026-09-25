@@ -410,6 +410,12 @@ export function radioKeyOf(parts: ConceptPart[]): RadioKey | null {
   return builtInRadioOf(parts) ?? "none";
 }
 
+/** Whether these parts carry a radio: a module — one this catalog doesn't
+ *  list included — or one on the MCU's die that isn't switched off. */
+export function namesRadio(parts: ConceptPart[]): boolean {
+  return radioKeyOf(parts) !== "none";
+}
+
 export type RadioChoice = { key: RadioKey; label: string; builtIn: boolean };
 
 /** The radios these parts' MCU can have: its own, and every one a module

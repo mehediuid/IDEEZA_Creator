@@ -222,6 +222,26 @@ export function assemblyChecks(p: BuildProduct): { issues: Issue[]; passed: stri
   return { issues, passed };
 }
 
+/** §4.4.10 — the products of a project meant to work together: the primary
+ *  and each companion, never two companions — a car's remote and its
+ *  charger are each the car's. The rail's pairing (project-state.ts
+ *  radioLinks) takes its pairs from here too, so the review never says two
+ *  products won't talk that the rail never paired. Every pair used to be
+ *  checked here, and two companions on different radios were told they
+ *  won't talk when nothing asked them to. */
+export function pairsOf<T>(products: T[], isPrimary: (p: T) => boolean): [T, T][] {
+  const primary = products.find(isPrimary);
+  return primary ? products.filter((p) => p !== primary).map((p): [T, T] => [primary, p]) : [];
+}
+
+/** A booked product meant to talk over a radio (ResolvedSpec.speaks) — a
+ *  build older than spec booking, by the parts it was built from. A spare
+ *  pack isn't, so its missing radio is no issue to raise. */
+const speaks = (p: BuildProduct) => (p.spec ? p.spec.speaks : radioKeyOf(p.parts) !== "none");
+
+/** Meant to talk, and has no radio: set to None, or its radio taken off. */
+const radioOff = (p: BuildProduct) => radioKeyOf(p.parts) === "none";
+
 /** §4.4.10 — the cross-product pass. Returns the issues for the pair,
  *  which the caller files against **both** products. */
 export function compatibilityIssues(
@@ -230,22 +250,37 @@ export function compatibilityIssues(
 ): Issue[] {
   const out: Issue[] = [];
 
-  const pa = radioOf(a.parts);
-  const pb = radioOf(b.parts);
-  if (pa && pb && pa !== pb) {
-    out.push({
-      group: "compatibility",
-      text: `${a.name} uses ${pa} and ${b.name} uses ${pb} — they cannot talk to each other until both use the same radio.`,
-    });
-  } else if (!pa || !pb) {
-    // Saying nothing here would read as a pass.
-    out.push({
-      group: "compatibility",
-      notRun: true,
-      text: `Radio match between ${a.name} and ${b.name} could not be checked — ${
-        !pa && !pb ? "neither names a radio" : `${!pa ? a.name : b.name} does not name a radio`
-      } we recognise.`,
-    });
+  // Only between two products meant to talk: a pack, a plate or a charger
+  // has no radio to match, by design.
+  if (speaks(a) && speaks(b)) {
+    const pa = radioOf(a.parts);
+    const pb = radioOf(b.parts);
+    if (pa && pb) {
+      if (pa !== pb) {
+        out.push({
+          group: "compatibility",
+          text: `${a.name} uses ${pa} and ${b.name} uses ${pb} — they cannot talk to each other until both use the same radio.`,
+        });
+      }
+    } else if ((pa && radioOff(b)) || (pb && radioOff(a))) {
+      // A radio set to None is a pairing broken, as the sheet says — not a
+      // check that couldn't run.
+      const [has, lacks, radio] = pa ? [a, b, pa] : [b, a, pb];
+      out.push({
+        group: "compatibility",
+        text: `${lacks.name} has no radio and ${has.name} uses ${radio} — they cannot talk to each other until both use the same radio.`,
+      });
+    } else if (!(radioOff(a) && radioOff(b))) {
+      // A radio we can't name. Saying nothing here would read as a pass.
+      const unknown = [a, b].filter((p) => !radioOf(p.parts) && !radioOff(p));
+      out.push({
+        group: "compatibility",
+        notRun: true,
+        text: `Radio match between ${a.name} and ${b.name} could not be checked — ${
+          unknown.length === 2 ? "neither names a radio" : `${unknown[0].name} does not name a radio`
+        } we recognise.`,
+      });
+    }
   }
 
   const ca = connectorOf(a.parts);
@@ -277,14 +312,14 @@ export function checkBuild(
     };
   });
 
-  // §4.4.10 — every pair, and a failure lands on both sides of it.
-  for (let i = 0; i < products.length; i += 1) {
-    for (let k = i + 1; k < products.length; k += 1) {
-      const issues = compatibilityIssues(products[i], products[k]);
-      if (!issues.length) continue;
-      byProduct[i].issues.push(...issues);
-      byProduct[k].issues.push(...issues);
-    }
+  // §4.4.10 — the primary and each companion, and a failure lands on both
+  // sides of it.
+  const entryOf = new Map(products.map((p, i) => [p, byProduct[i]]));
+  for (const [a, b] of pairsOf(products, (p) => p.id === "primary")) {
+    const issues = compatibilityIssues(a, b);
+    if (!issues.length) continue;
+    entryOf.get(a)!.issues.push(...issues);
+    entryOf.get(b)!.issues.push(...issues);
   }
 
   for (const entry of byProduct) {

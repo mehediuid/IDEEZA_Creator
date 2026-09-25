@@ -151,6 +151,13 @@ export type ResolvedSpec = {
    *  the maker set the port to None. It stays on USB rather than being
    *  quietly given a pack, and the sheet says what is missing. */
   noUsbPort: boolean;
+  /** Meant to talk over a radio: its concept's parts name one — so one the
+   *  maker set to None or took off is a pairing broken, not a product that
+   *  never had one — or the maker picked one. A chip given to a charger has
+   *  Wi-Fi on its die, and that alone doesn't make the charger something the
+   *  car should talk to. The rail's pairing and the build review both read
+   *  this (project-state.ts, confidence.ts), so they pair the same products. */
+  speaks: boolean;
   drawMa: number;
   budgetMa: number;
   runtimeH: number | null;

@@ -8,7 +8,7 @@
 import type { ConceptPart } from "../create/concept";
 import { BATTERIES, USB_BUDGET_MA, batteryOf, isBatteryPart } from "./batteries";
 import { bodyOf, mainBodyOf, qtyOf, type Body, type MainBody } from "./bodies";
-import { CHARGE_PORTS, isChargePort, isMcu } from "./catalog";
+import { CHARGE_PORTS, isChargePort, isMcu, namesRadio } from "./catalog";
 import { applyEdits, asPart, effectiveEdits } from "./edits";
 import { MM_MIN, asWallMm, cleanChoices } from "./hints";
 import {
@@ -325,8 +325,10 @@ export function typicalBodyOf(conceptParts: ConceptPart[], parts: ConceptPart[])
  *  still says a plate given electronics is a plate (typicalBodyOf), which
  *  port is the concept's own (a USB product's before the maker set it to
  *  None; a barrel jack the concept charges by, as against one left from a
- *  switch to the wall). Handed the edited list, every other product gets
- *  the same spec — applyEdits is idempotent — but those do not. */
+ *  switch to the wall), and that a radio set to None was the concept's, so
+ *  the product is still meant to talk (`speaks`). Handed the edited list,
+ *  every other product gets the same spec — applyEdits is idempotent — but
+ *  those do not. */
 export function deriveSpec(
   conceptParts: ConceptPart[],
   hints: AiHints = {},
@@ -431,6 +433,7 @@ export function deriveSpec(
     battery,
     batterySource: edits.battery ? "you" : listed ? "concept" : hinted ? "ai" : "rule",
     noUsbPort: battery === "none" && drawMa > 0 && !parts.some(isChargePort),
+    speaks: namesRadio(conceptParts) || (!!choices.radio && choices.radio !== "none"),
     drawMa,
     budgetMa: budgetOf(battery),
     runtimeH: runtimeOf(battery, drawMa),

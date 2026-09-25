@@ -577,7 +577,7 @@ function normalizeJob(raw: BuildJob): BuildJob {
             : null),
           parts: Array.isArray(c.parts) ? c.parts : [],
           ...(() => {
-            const spec = asResolvedSpec(c.spec);
+            const spec = asResolvedSpec(c.spec, Array.isArray(c.parts) ? c.parts : []);
             return spec ? { spec } : null;
           })(),
           items: normalizeItems(c.items),
@@ -599,7 +599,7 @@ function normalizeJob(raw: BuildJob): BuildJob {
       ? { projectChoiceName: stored.projectChoiceName }
       : null),
     parts: Array.isArray(stored.parts) ? stored.parts : [],
-    spec: asResolvedSpec(stored.spec),
+    spec: asResolvedSpec(stored.spec, Array.isArray(stored.parts) ? stored.parts : []),
     conceptNumber: stored.conceptNumber || "1",
     status,
     estimateMin: stored.estimateMin ?? BUILD_ESTIMATE_MIN,
