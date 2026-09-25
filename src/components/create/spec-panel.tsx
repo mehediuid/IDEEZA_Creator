@@ -88,9 +88,12 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
       {/* Generic parts shown as this product's would be a claim nobody
           checked — the facts under this line are the stand-in's. Flowing
           text, not a flex row: the sentence wraps on a card, and as a flex
-          item it pushed Read again onto a line of its own. */}
+          item it pushed Read again onto a line of its own. Not a live
+          region: it mounts with its words, so every stand-in card spoke on
+          page load. A Read again that lands is said by the page's one
+          announcer instead. */}
       {card.fallback && (
-        <p role="status" className="text-sm text-text-tertiary">
+        <p className="text-sm text-text-tertiary">
           {card.rereading ? (
             <span className="motion-safe:animate-pulse">Reading again…</span>
           ) : (
@@ -379,7 +382,9 @@ function Fixes({
   };
   return (
     <div role="group" aria-labelledby={id} className="flex flex-col gap-[8px]">
-      <p id={id} role="status" aria-live="polite" className="text-sm font-medium text-text-error">
+      {/* Not a live region: the page's announcer says "doesn't fit" when the
+          size stops fitting, and this line mounts with its text anyway. */}
+      <p id={id} className="text-sm font-medium text-text-error">
         Doesn&apos;t fit — needs at least {mm3(spec.minSize)}.
       </p>
       {/* Sized to their words and wrapping as a row: three bars the width of

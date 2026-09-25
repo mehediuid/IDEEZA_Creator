@@ -120,9 +120,10 @@ export function useRailModel(
     [rows],
   );
   const buildStatus = build ? statusOf(build) : undefined;
+  const buildId = build?.id;
   const snapshot = React.useMemo(
-    () => ({ rows, buildStatus }),
-    [rows, buildStatus],
+    () => ({ rows, buildId, buildStatus }),
+    [rows, buildId, buildStatus],
   );
 
   const setup = chat.turns.find(
@@ -653,10 +654,17 @@ function statusLine(row: RailRow): {
       return { text: `Built · ${total} of ${total} pieces`, tone: "secondary" };
     case "reading":
       return { text: `${concept} · reading the spec…`, tone: "tertiary" };
+    // A stand-in is said where the row's facts would be, which it drops:
+    // generic parts' numbers are not this product's (review 2 I4).
     case "draft":
-      return { text: `${concept} · Draft at this size`, tone: "warn" };
+      return {
+        text: `${concept} · Draft at this size${row.standIn ? " · stand-in parts" : ""}`,
+        tone: "warn",
+      };
     case "ready":
-      return { text: `${concept} · ready`, tone: "secondary" };
+      return row.standIn
+        ? { text: `${concept} · stand-in parts`, tone: "tertiary" }
+        : { text: `${concept} · ready`, tone: "secondary" };
   }
 }
 

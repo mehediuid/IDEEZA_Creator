@@ -29,7 +29,7 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
-import type { SpecEdits } from "@/lib/spec/types";
+import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { blocksBuild, deriveSpec, partsForBuild } from "@/lib/spec/derive";
 import { specLine } from "@/lib/spec/format";
 import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
@@ -106,6 +106,12 @@ function landingOf(target: JumpTarget): { ring: string; focus: string } {
 /** Side by side from `md` (768 px); below it the rail and the canvas are two
  *  tabs, and only one of them is on screen. */
 const sideBySide = () => window.matchMedia("(min-width: 768px)").matches;
+
+/** The gate's line for one product. A stand-in says so here too: the gate
+ *  is the last thing read before credits move (review 2 I4). */
+function gateLine(name: string, spec: ResolvedSpec, concept: ConceptSummary): string {
+  return `${specLine(name, spec)}${concept.fallback ? " · stand-in parts" : ""}`;
+}
 
 /** The maker's sentence as the tail of another one: a companion is drawn as
  *  "Charger for a handheld soil meter…", not "…for A handheld soil meter". */
@@ -233,6 +239,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     prompt: string;
     /** One line per product — size · board · power — read before paying. */
     lines: string[];
+    /** Each product's concept as it was read for those lines, by turn id —
+     *  what Confirm builds from, so it doesn't queue the same readings a
+     *  second time behind the gate's own (review 2 I5). */
+    read: ReadonlyMap<string, ConceptSummary>;
   } | null>(null);
   const [submittingBuild, setSubmittingBuild] = React.useState(false);
   // Full-screen image editor: editorTurnId is the concept currently shown in
@@ -349,27 +359,16 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [chat, setTurnConcept],
   );
-  React.useEffect(() => {
-    if (!chat) return;
+  // The turns asked again this session, read from sessionStorage once. The
+  // background reader and the Build path share it, so a stand-in is asked
+  // again once per session whichever of them gets there first.
+  const retriedTurns = React.useCallback(() => {
     if (!retriedLoaded.current) {
       retried.current = loadRereadTurnIds();
       retriedLoaded.current = true;
     }
-    const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
-    for (const t of chat.turns) {
-      if (t.role === "assistant") latest.set(t.companionOf ?? "primary", t);
-    }
-    for (const t of latest.values()) {
-      if (t.status !== "ready") continue;
-      // A stored concept that doesn't check out is read as if absent.
-      const kept = asConceptSummary(t.concept);
-      if (kept && !kept.fallback) continue;
-      if (kept && retried.current.has(t.id)) continue;
-      retried.current.add(t.id);
-      saveRereadTurnIds(retried.current);
-      readConcept(t.id);
-    }
-  }, [chat, readConcept]);
+    return retried.current;
+  }, []);
 
   // The build's 3D enclosure is generated where the build is reviewed, which
   // is here.
@@ -758,6 +757,25 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // Everything the rail and the page's announcer say, worked out once.
   const rail = useRailModel(chat ?? NO_CHAT, activeBuild, labels, projectName, savedName);
 
+  // The background reader described at `readConcept`: each product the
+  // project holds, by its current concept — the rail's own list, so a
+  // product taken out of the project isn't read for nothing.
+  const projectProducts = rail.state.products;
+  React.useEffect(() => {
+    if (!chat) return;
+    const asked = retriedTurns();
+    for (const t of projectProducts) {
+      if (t.status !== "ready") continue;
+      // A stored concept that doesn't check out is read as if absent.
+      const kept = asConceptSummary(t.concept);
+      if (kept && !kept.fallback) continue;
+      if (kept && asked.has(t.id)) continue;
+      asked.add(t.id);
+      saveRereadTurnIds(asked);
+      readConcept(t.id);
+    }
+  }, [chat, projectProducts, readConcept, retriedTurns]);
+
   // The ring a jump left on where it landed, and the timer that takes it off.
   // Set on the element itself rather than through state: it lasts a second,
   // and threading it through the canvas would re-render every card for it.
@@ -811,18 +829,22 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 
   // A rail row: the composer, the row and the review's product tab all follow
-  // `focusedProduct`, and the canvas brings that product into view — its
-  // card, or with a build its tab in the review. Side by side the keyboard
-  // stays on the row, so the maker can go on choosing with the canvas in
-  // view; on a phone the rail has just been hidden, so it goes to the canvas.
+  // `focusedProduct`, and the canvas brings that product into view — its tab
+  // in the review when the build holds it, else its card: the review has no
+  // tab for a product added or left out before the build, and showed another
+  // product's deliverables under its name. Side by side the keyboard stays on
+  // the row, so the maker can go on choosing with the canvas in view; on a
+  // phone the rail has just been hidden, so it goes to the canvas.
+  const railRows = rail.rows;
   const selectProduct = React.useCallback(
     (productId: string) => {
       setFocusedProduct(productId);
-      jumpTo(activeBuild ? { kind: "review" } : { kind: "card", productId }, {
+      const inReview = railRows.find((r) => r.productId === productId)?.build;
+      jumpTo(inReview ? { kind: "review" } : { kind: "card", productId }, {
         focus: !sideBySide(),
       });
     },
-    [activeBuild, jumpTo],
+    [railRows, jumpTo],
   );
 
   // The setup question is still open. Typing then used to skip it: the text
@@ -960,20 +982,37 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   //
   // Every product's concept on this path is read the same way: the reading
   // kept on the turn, checked, is used as is — but a kept stand-in is asked
-  // again rather than built from, and a real answer that comes back is kept
-  // on the turn too, so the card stops showing parts the build won't use.
+  // again, and a real answer that comes back is kept on the turn too, so the
+  // card stops showing parts the build won't use.
+  //
+  // That ask happens once per browser session, by whichever of this path and
+  // the background reader gets there first. With the model down every ask
+  // queues for up to 45 s, one product at a time, so asking on every Build
+  // press held "Preparing the build…" for minutes. A turn already asked again
+  // is built from its stand-in, which the card, the rail and the gate all say
+  // it is — unless that ask is still out, which this waits on rather than
+  // starting another.
   const readForBuild = React.useCallback(
     async (turn: Extract<ChatTurn, { role: "assistant" }>, brief: string) => {
       const kept = asConceptSummary(turn.concept);
+      if (kept?.fallback) {
+        const asked = retriedTurns();
+        if (asked.has(turn.id) && !reading.current.has(turn.id)) return kept;
+        asked.add(turn.id);
+        saveRereadTurnIds(asked);
+      }
       const concept = await summarizeConcept(turn.id, brief, kept);
       if (chat && kept?.fallback && !concept.fallback) setTurnConcept(chat.id, turn.id, concept);
       return concept;
     },
-    [chat, setTurnConcept],
+    [chat, setTurnConcept, retriedTurns],
   );
   const companionProductsFor = React.useCallback(
     async (
       companions: Companion[],
+      /** The readings the gate's lines were drawn from, by turn id. A turn
+       *  found here isn't read again. */
+      read: ReadonlyMap<string, ConceptSummary> = new Map(),
     ): Promise<Omit<BuildProduct, "items">[]> => {
       if (!chat || !companions.length) return [];
       const turnFor = (id: string) => {
@@ -1003,7 +1042,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       return Promise.all(
         ready.map(({ companion, turn }) => {
           const brief = conceptBriefOf(chat.turns, turn.id);
-          return readForBuild(turn, brief).then((concept) => {
+          const known = read.get(turn.id);
+          return (known ? Promise.resolve(known) : readForBuild(turn, brief)).then((concept) => {
             const spec = deriveSpec(concept.parts, concept.hints, editsNow.current(companion.id));
             return {
               id: companion.id,
@@ -1118,8 +1158,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     (
       source: { turnId: string; imageUrl: string; prompt: string },
       lines: string[],
+      read: ReadonlyMap<string, ConceptSummary>,
     ) => {
-      setConfirmFor({ ...source, lines });
+      setConfirmFor({ ...source, lines, read });
     },
     [],
   );
@@ -1141,18 +1182,16 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         imageUrl: t.imageUrl,
         prompt: conceptBriefOf(chat.turns, t.id),
       };
+      const names = rail.state.setup;
       if (t.companionOf) {
         const companionId = t.companionOf;
-        const setupTurn = chat.turns.find((x) => x.role === "setup");
-        const name =
-          setupTurn?.role === "setup"
-            ? setupTurn.companions.find((c) => c.id === companionId)?.name
-            : undefined;
+        const name = productNameOf(names, t);
         void readForBuild(t, source.prompt).then((concept) => {
           const spec = deriveSpec(concept.parts, concept.hints, editsNow.current(companionId));
           // A size that can't be built goes to its card, as the primary's does.
           if (blocksBuild(spec)) focusSpec(companionId);
-          else goToGate(source, [specLine(name || concept.title, spec)]);
+          else
+            goToGate(source, [gateLine(name || concept.title, spec, concept)], new Map([[t.id, concept]]));
         });
         return;
       }
@@ -1192,13 +1231,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         }
         return null;
       };
-      const primaryName =
-        setup && setup.role === "setup" ? setup.productName?.trim() : undefined;
       const reads = [
-        { productId: "primary", name: primaryName, turn: t },
+        { productId: "primary", turn: t },
         ...decided.flatMap((c) => {
           const turn = latestReady(c.id);
-          return turn ? [{ productId: c.id, name: c.name as string | undefined, turn }] : [];
+          return turn ? [{ productId: c.id, turn }] : [];
         }),
       ];
       setPreparingTurnId(t.id);
@@ -1211,14 +1248,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // then — the readings can take seconds, and the card stays editable.
         const read = reads.map((r, i) => {
           const spec = deriveSpec(concepts[i].parts, concepts[i].hints, editsNow.current(r.productId));
-          return { productId: r.productId, line: specLine(r.name || concepts[i].title, spec), spec };
+          const name = productNameOf(names, r.turn) || concepts[i].title;
+          return { productId: r.productId, line: gateLine(name, spec, concepts[i]), spec };
         });
         const blocked = read.find((r) => blocksBuild(r.spec));
         if (blocked) focusSpec(blocked.productId);
-        else goToGate(source, read.map((r) => r.line));
+        else
+          goToGate(
+            source,
+            read.map((r) => r.line),
+            new Map(reads.map((r, i) => [r.turn.id, concepts[i]])),
+          );
       })().finally(() => setPreparingTurnId(null));
     },
-    [chat, goToGate, readForBuild, focusSpec],
+    [chat, rail.state.setup, goToGate, readForBuild, focusSpec],
   );
 
 
@@ -1300,23 +1343,36 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // again believing they had missed.
       setSubmittingBuild(true);
       try {
+        // The readings the gate's lines came from, not a second round of
+        // them: with the model down each companion queued up to 45 s again
+        // here, behind the gate's own read of the primary. The gate's
+        // reading of the primary wins only when it is a real one — a model
+        // that answered while the gate was open — and is kept on the turn.
+        const readBefore = confirmFor.read.get(confirmFor.turnId);
+        const primary = concept.fallback && readBefore ? readBefore : concept;
+        if (chat && !concept.fallback && readBefore?.fallback) {
+          setTurnConcept(chat.id, confirmFor.turnId, concept);
+        }
         // Each companion's spec is worked out here, at the press, from the
         // edits as they are now; `startBuildFor` does the primary's and
         // books nothing if any of them no longer fits.
         const companions = await companionProductsFor(
           companionPlan.filter((c) => pickedCompanions.has(c.id)),
+          confirmFor.read,
         );
-        await startBuildFor(confirmFor, concept, companions);
+        await startBuildFor(confirmFor, primary, companions);
       } finally {
         setSubmittingBuild(false);
       }
     },
     [
+      chat,
       confirmFor,
       companionPlan,
       pickedCompanions,
       companionProductsFor,
       startBuildFor,
+      setTurnConcept,
     ],
   );
 

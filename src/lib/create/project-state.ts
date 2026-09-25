@@ -27,7 +27,7 @@ import {
 } from "./history";
 import { blocksBuild, deriveSpec, specKey } from "../spec/derive";
 import { cleanEdits } from "../spec/hints";
-import { specFacts } from "../spec/format";
+import { specFacts, type SpecFactTone } from "../spec/format";
 import type { ResolvedSpec } from "../spec/types";
 
 type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
@@ -79,10 +79,13 @@ export type ProjectState = {
   /** A chosen product whose size its parts can't fit, not agreed as Draft —
    *  holds the build (spec S3). */
   specBlock: AssistantTurn | undefined;
-  /** Concept image URLs the current build was made from. */
-  builtImages: Set<string>;
   /** Is this exact drawing what the current build was made from. */
   inBuild: (t: AssistantTurn) => boolean;
+  /** This product's next build would differ from what the build holds — its
+   *  drawing, or its spec. The one per-product answer: `specChanged` and the
+   *  rail's "Changed" tag both read it, so a legacy build with edits can't
+   *  say "Spec changed" on the canvas and nothing on the row. */
+  productChanged: (t: AssistantTurn) => boolean;
   /** A chosen product's concept differs from the build (drawn again, not
    *  ready, or added since). */
   conceptChanged: boolean;
@@ -99,11 +102,11 @@ export type ProjectState = {
   failedChoice: AssistantTurn | undefined;
 };
 
-/** Exactly the memo block that lived in chat-thread.tsx (products, leftOut,
- *  selected, specs, specBlock, builtImages, inBuild, conceptChanged,
- *  specChanged, changedSinceBuild, available, removed, allReady,
- *  failedChoice) — moved here, not rewritten, so the canvas and the rail
- *  can't disagree about what a chat and its build mean. */
+/** The memo block that lived in chat-thread.tsx (products, leftOut,
+ *  selected, specs, specBlock, inBuild, conceptChanged, specChanged,
+ *  changedSinceBuild, available, removed, allReady, failedChoice) — moved
+ *  here so the canvas and the rail can't disagree about what a chat and its
+ *  build mean. */
 export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectState {
   const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup");
   const answer = setup?.answer;
@@ -186,15 +189,17 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   // build. A build booked before products had a spec has no snapshot to
   // compare with — it was made with no decisions at all, so any edit since
   // is one.
-  const specChanged =
-    !!job &&
-    selected.some((t) => {
-      const now = specs.get(t.id);
-      if (!now || !inBuild(t)) return false;
-      const booked = productsOf(job).find((p) => p.id === productIdOf(t))?.spec;
-      if (!booked) return Object.keys(cleanEdits(answer?.specs?.[productIdOf(t)])).length > 0;
-      return specKey(now) !== specKey(booked);
-    });
+  const specChangedFor = (t: AssistantTurn) => {
+    if (!job) return false;
+    const now = specs.get(t.id);
+    if (!now || !inBuild(t)) return false;
+    const booked = productsOf(job).find((p) => p.id === productIdOf(t))?.spec;
+    if (!booked) return Object.keys(cleanEdits(answer?.specs?.[productIdOf(t)])).length > 0;
+    return specKey(now) !== specKey(booked);
+  };
+  const productChanged = (t: AssistantTurn) =>
+    !!job && (t.status !== "ready" || !inBuild(t) || specChangedFor(t));
+  const specChanged = !!job && selected.some(specChangedFor);
   const conceptChanged =
     !!job &&
     (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
@@ -213,8 +218,8 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     concepts,
     specs,
     specBlock,
-    builtImages,
     inBuild,
+    productChanged,
     conceptChanged,
     specChanged,
     changedSinceBuild,
@@ -242,8 +247,6 @@ export type RailPhase =
   | "draft"
   | "ready";
 
-export type FactTone = "plain" | "warn" | "error";
-
 export type RailRow = {
   productId: string;
   name: string;
@@ -254,8 +257,12 @@ export type RailRow = {
   /** When the current turn started drawing — the row's own elapsed clock. */
   since?: number;
   /** size, power, radio — the board fact is dropped (spec §2.4). Omitted
-   *  while drawing, failed, or before a spec exists. */
-  facts: { key: string; text: string; tone: FactTone }[];
+   *  while drawing, failed, before a spec exists, and for a stand-in: those
+   *  numbers are generic parts', not this product's. */
+  facts: { key: string; text: string; tone: SpecFactTone }[];
+  /** The model didn't answer, so the card's parts are the generic stand-in
+   *  (review 2 I4) — the row says so instead of showing its numbers. */
+  standIn: boolean;
   leftOut: boolean;
   tag?: "Left out" | "Not in this build" | "Changed";
   /** Present whenever a build exists and covers this product, regardless of
@@ -330,8 +337,9 @@ export function railRows(
     const build = buildProduct ? buildInfoFor(buildProduct.items) : undefined;
     const phase = phaseFor(t, spec, build, jobStatus);
 
+    const standIn = t.status === "ready" && !!state.concepts.get(t.id)?.fallback;
     const facts =
-      t.status === "ready" && spec
+      t.status === "ready" && spec && !standIn
         ? specFacts(spec, state.concepts.get(t.id)?.parts ?? []).filter((f) => f.key !== "board")
         : [];
 
@@ -343,13 +351,8 @@ export function railRows(
         tag = "Left out";
       } else if (job && !buildProduct) {
         tag = "Not in this build";
-      } else if (job && buildProduct) {
-        const bookedSpec = buildProduct.spec;
-        const changedHere =
-          t.status !== "ready" ||
-          !state.inBuild(t) ||
-          (!!spec && !!bookedSpec && specKey(spec) !== specKey(bookedSpec));
-        if (changedHere) tag = "Changed";
+      } else if (job && buildProduct && state.productChanged(t)) {
+        tag = "Changed";
       }
     }
 
@@ -362,6 +365,7 @@ export function railRows(
       phase,
       since: t.status === "pending" ? t.ts : undefined,
       facts,
+      standIn,
       leftOut,
       tag,
       build,
@@ -732,7 +736,11 @@ export function activityOf(
 /** What the root announcer reads, and what `railRows` was built from at
  *  that moment — enough to notice a transition without re-deriving it. */
 export type RailSnapshot = {
-  rows: Pick<RailRow, "productId" | "name" | "conceptLabel" | "phase">[];
+  rows: (Pick<RailRow, "productId" | "name" | "conceptLabel" | "phase"> &
+    Partial<Pick<RailRow, "standIn">>)[];
+  /** Which build is on screen — a Build again is a new job at the same
+   *  status the last one started at, so the status alone can't see it. */
+  buildId?: string;
   buildStatus?: BuildStatus;
 };
 
@@ -740,7 +748,15 @@ function rowTransition(
   prev: RailSnapshot["rows"][number],
   next: RailSnapshot["rows"][number],
 ): string | null {
-  if (prev.phase === next.phase) return null;
+  if (prev.phase === next.phase) {
+    // A stand-in read again, for real this time: the phase doesn't move, but
+    // the row's spec is the product's own now — the one change a Read again
+    // makes, so it is said (review 2 Minor 3).
+    if (prev.standIn && !next.standIn) {
+      return `${next.name}: read again — the spec now comes from Concept ${next.conceptLabel}'s own parts.`;
+    }
+    return null;
+  }
   // A conflict is the most actionable thing this row can say, so it wins
   // even over "the render just landed".
   if (next.phase === "conflict" && prev.phase !== "conflict") {
@@ -758,13 +774,24 @@ function rowTransition(
   return null;
 }
 
-function buildTransition(prev: BuildStatus | undefined, next: BuildStatus | undefined): string | null {
-  if (prev === next) return null;
-  if (!next) return null;
-  if (!prev) return "Build started.";
-  if (next === "ready") return "Build ready to review.";
-  if (next === "partial") return "Build needs a retry.";
-  if (next === "failed") return "Build stopped.";
+const working = (s?: BuildStatus) => s === "queued" || s === "running";
+
+function buildTransition(prev: RailSnapshot, next: RailSnapshot): string | null {
+  if (prev.buildId !== next.buildId) {
+    // A new job is a new build, whatever status the last one was in.
+    if (working(next.buildStatus)) return "Build started.";
+    // The newest build went and an older one (or none) is back. Only a
+    // queued build can be taken away, by its Cancel — and the build now on
+    // screen is not "ready to review" news.
+    return prev.buildStatus === "queued" ? "Build cancelled." : null;
+  }
+  const from = prev.buildStatus;
+  const to = next.buildStatus;
+  if (from === to || !to) return null;
+  if (!from) return "Build started.";
+  if (to === "ready") return "Build ready to review.";
+  if (to === "partial") return "Build needs a retry.";
+  if (to === "failed") return "Build stopped.";
   return null;
 }
 
@@ -781,7 +808,7 @@ export function announcementFor(prev: RailSnapshot, next: RailSnapshot): string 
     const s = rowTransition(prevRow, row);
     if (s) sentences.push(s);
   }
-  const buildSentence = buildTransition(prev.buildStatus, next.buildStatus);
+  const buildSentence = buildTransition(prev, next);
   if (buildSentence) sentences.push(buildSentence);
   return sentences.length ? sentences.join(" ") : null;
 }
