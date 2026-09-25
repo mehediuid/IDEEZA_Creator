@@ -7,7 +7,7 @@
 
 import type { ConceptPart } from "../create/concept";
 import { BATTERIES, USB_BUDGET_MA, batteryOf, isBatteryPart } from "./batteries";
-import { bodyOf, type Body } from "./bodies";
+import { bodyOf, qtyOf, type Body } from "./bodies";
 import type {
   AiHints,
   BatteryKey,
@@ -36,7 +36,7 @@ const RUNTIME_GOAL_H = 1;
  *  A product like that is not left on USB power alone by the rules. */
 const MOVES = /motor|servo|stepper|brushless|bldc|pump|\bfan\b|vibration|haptic|propeller/i;
 
-type Placed = { name: string; body: Body; estimated: boolean };
+type Placed = { name: string; body: Body; estimated: boolean; qty: number };
 
 // Whole millimetres, rounded up — a size that rounds down no longer fits.
 const up = (n: number) => Math.ceil(n - 1e-9);
@@ -47,17 +47,19 @@ const desc = (m: Mm3): [number, number, number] => {
 };
 
 /** Every part but a battery: the spec picks the pack, so a listed one is
- *  set aside rather than counted beside it. */
+ *  set aside rather than counted beside it. A count in the name itself
+ *  ("(x4)", "4 x") rides along as `qty` — the body stays one unit's own
+ *  size, and the callers below are the ones who multiply it in. */
 export function placedParts(parts: ConceptPart[]): Placed[] {
   return parts
     .filter((p) => !isBatteryPart(p))
-    .map((p) => ({ name: p.name, ...bodyOf(p) }));
+    .map((p) => ({ name: p.name, qty: qtyOf(p.name), ...bodyOf(p) }));
 }
 
 export function boardFor(list: Placed[]): { w: number; h: number; parts: number } | null {
   const on = list.filter((p) => p.body.at === "board");
   if (!on.length) return null;
-  const area = on.reduce((s, p) => s + p.body.l * p.body.w, 0) * ROUTING_FACTOR;
+  const area = on.reduce((s, p) => s + p.body.l * p.body.w * p.qty, 0) * ROUTING_FACTOR;
   const w = Math.sqrt(area * BOARD_ASPECT);
   const h = area / w;
   const longest = Math.max(...on.map((p) => Math.max(p.body.l, p.body.w)));
@@ -66,7 +68,8 @@ export function boardFor(list: Placed[]): { w: number; h: number; parts: number 
   return {
     w: up(Math.max(w + edge, longest + edge, BOARD_MIN.w)),
     h: up(Math.max(h + edge, widest + edge, BOARD_MIN.h)),
-    parts: on.length,
+    // Once per unit, not once per row — "SG90 servos (x4)" reads as 4 parts.
+    parts: on.reduce((s, p) => s + p.qty, 0),
   };
 }
 
@@ -78,7 +81,9 @@ function stackOf(list: Placed[]): number {
 function caseBodies(list: Placed[], battery: BatteryKey): Mm3[] {
   const loose = list
     .filter((p) => p.body.at === "case")
-    .map(({ body }) => ({ l: body.l, w: body.w, h: body.h }));
+    // "(x4)" lays four case bodies in the row, not one — the enclosure has
+    // to hold four motors, not the footprint of a single one.
+    .flatMap(({ body, qty }) => Array(qty).fill({ l: body.l, w: body.w, h: body.h }));
   const pack = batteryOf(battery).body;
   return pack ? [...loose, pack] : loose;
 }
@@ -126,7 +131,7 @@ export function fitsIn(size: Mm3, min: Mm3): boolean {
 }
 
 export function drawOf(list: Placed[]): number {
-  return Math.round(list.reduce((s, p) => s + p.body.mA, 0));
+  return Math.round(list.reduce((s, p) => s + p.body.mA * p.qty, 0));
 }
 
 export function runtimeOf(battery: BatteryKey, drawMa: number): number | null {
@@ -140,6 +145,14 @@ export function budgetOf(battery: BatteryKey): number {
 
 const hasUsb = (parts: ConceptPart[]) => parts.some((p) => /usb/i.test(p.name));
 
+// A barrel/DC jack, a wall or DC adapter, mains, an AC-DC brick (an
+// HLK-PM01 and friends) or a stated dual-rail mains supply — a product that
+// names one of these is wired to the wall, not carrying a cell.
+const WALL_POWER =
+  /barrel|dc jack|wall adapter|dc adapter|\bmains\b|hlk-pm\d+|ac[\s-]?\/?[\s-]?dc|\d+\s*v\s*\/\s*\d+\s*v\s*supply/i;
+
+export const hasWallPower = (parts: ConceptPart[]) => parts.some((p) => WALL_POWER.test(p.name));
+
 /** The pack a concept already names, read as one of ours — so a spare
  *  battery, or a product that lists its own cell, keeps that cell. Null when
  *  it names none, or names one too vaguely to place. */
@@ -152,15 +165,23 @@ export function listedBattery(parts: ConceptPart[]): BatteryKey | null {
   if (/\baaa?\b/.test(n)) {
     return /\b(?:4|four)\s*[x×]?\s*aa|aa\s*[x×]\s*4/.test(n) ? "aa-4" : "aa-2";
   }
-  const mah = Number(n.match(/(\d{3,5})\s*mah/)?.[1]);
-  if (mah) return mah >= 1500 ? "li-1s-2000" : mah >= 700 ? "li-1s-1000" : "li-1s-400";
+  if (/\b9\s*v\b/.test(n)) return "9v";
+  const mah = Number(n.match(/(\d{2,5})\s*mah/)?.[1]);
+  if (mah) {
+    if (mah <= 150) return "li-1s-100";
+    return mah >= 1500 ? "li-1s-2000" : mah >= 700 ? "li-1s-1000" : "li-1s-400";
+  }
+  // A LiPo/cell named "coin" or "tiny" with no stated capacity — sized for
+  // a ring or a wearable, not the 1S 400 mAh default a bare "LiPo" takes.
+  if (/coin|tiny/.test(n) && /li-?po|li-?ion|\bcells?\b/.test(n)) return "li-1s-100";
   return null;
 }
 
 /** Without a hint: the pack the concept lists, when it names one we can place;
- *  otherwise USB power for a product that has a USB port, no pack, nothing
- *  that moves and nothing the maker carries; otherwise the smallest Li pack
- *  that can supply it and lasts the goal (an hour when nobody said). */
+ *  wall power for a product wired to a barrel/DC jack or mains with no pack
+ *  named; otherwise USB power for a product that has a USB port, no pack,
+ *  nothing that moves and nothing the maker carries; otherwise the smallest
+ *  Li pack that can supply it and lasts the goal (an hour when nobody said). */
 export function ruleBattery(
   parts: ConceptPart[],
   goalH: number = RUNTIME_GOAL_H,
@@ -173,6 +194,10 @@ export function ruleBattery(
   // A cord to the wall is a fine answer for something that sits on a desk;
   // it is not an answer for something worn, carried or left outdoors.
   const carried = useCase.some((u) => u === "handheld" || u === "wearable" || u === "outdoor");
+  // Checked before the USB rule: a barrel jack or a mains brick answers "how
+  // is this powered" on its own, whether or not the concept also carries a
+  // USB port for firmware.
+  if (hasWallPower(parts) && !parts.some(isBatteryPart)) return "adapter";
   if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving && !carried) return "none";
   const draw = drawOf(list);
   const packs = BATTERIES.filter((b) => b.key.startsWith("li-")).sort((a, b) => a.mAh - b.mAh);
@@ -196,26 +221,39 @@ export function deriveSpec(
   const list = placedParts(parts);
   const board = boardFor(list);
   const stack = stackOf(list);
+  const drawMa = drawOf(list);
   // The pack the parts themselves name outranks the AI's hint — the maker
-  // already told the model what battery is in the thing.
+  // already told the model what battery is in the thing. A hint whose pack
+  // can't supply this concept's own draw is dropped rather than kept and
+  // shown against an impossible budget — same "dropped, never repaired"
+  // rule as a hint outside the allowed set, just checked against the parts
+  // instead of a fixed list.
   const listed = listedBattery(parts);
-  const battery =
-    edits.battery ?? listed ?? hints.battery ?? ruleBattery(parts, hints.runtimeGoalH, hints.useCase);
+  const hinted =
+    hints.battery && batteryOf(hints.battery).maxMa >= drawMa ? hints.battery : undefined;
+  const battery = edits.battery ?? listed ?? hinted ?? ruleBattery(parts, hints.runtimeGoalH, hints.useCase);
   const minWith = (key: BatteryKey) => minSizeFor(board, stack, caseBodies(list, key));
   const minSize = minWith(battery);
   const size = edits.size ?? minSize;
   const fits = fitsIn(size, minSize);
-  const drawMa = drawOf(list);
 
   // Largest capacity first, so the fix gives up as little runtime as it can.
   // USB power is offered only where there is a port and it can carry the
-  // draw; every other pack is held to the same rule — a pack whose maxMa
-  // can't supply the draw is not a fix, it is a new problem.
+  // draw; wall power only where the parts themselves name a wall/DC input;
+  // every other pack is held to the same rule — a pack whose maxMa can't
+  // supply the draw is not a fix, it is a new problem.
   let smallerBattery: ResolvedSpec["smallerBattery"] = null;
   if (!fits) {
     const usbOk = hasUsb(parts) && drawMa <= USB_BUDGET_MA;
+    const wallOk = hasWallPower(parts);
     const tries = BATTERIES
-      .filter((p) => p.key !== battery && p.maxMa >= drawMa && (p.key !== "none" || usbOk))
+      .filter(
+        (p) =>
+          p.key !== battery &&
+          p.maxMa >= drawMa &&
+          (p.key !== "none" || usbOk) &&
+          (p.key !== "adapter" || wallOk),
+      )
       .sort((a, b) => b.mAh - a.mAh);
     for (const pack of tries) {
       const need = minWith(pack.key);
@@ -234,7 +272,7 @@ export function deriveSpec(
     draftAtSize: !fits && edits.draftAtSize === true,
     board: board ? { ...board, layers: 2 as const } : null,
     battery,
-    batterySource: edits.battery ? "you" : listed ? "concept" : hints.battery ? "ai" : "rule",
+    batterySource: edits.battery ? "you" : listed ? "concept" : hinted ? "ai" : "rule",
     drawMa,
     budgetMa: budgetOf(battery),
     runtimeH: runtimeOf(battery, drawMa),

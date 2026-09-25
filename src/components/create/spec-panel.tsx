@@ -440,6 +440,11 @@ function PowerField({
 }) {
   const over = spec.drawMa > spec.budgetMa;
   const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
+  // A pack's runtime is every part's typical current summed as if it never
+  // slept — honest arithmetic, but "~4.8 h" alone reads as a promise. The
+  // model has no duty-cycle data to do better, so the caveat rides beside
+  // the number instead of implying the number is more precise than it is.
+  const runtime = spec.battery !== "none" ? runtimeLabel(spec.runtimeH) : null;
   return (
     <Field label="Power" decided={DECIDED[spec.batterySource]}>
       {onChange ? (
@@ -458,7 +463,9 @@ function PowerField({
           ? `Draws about ${currentLabel(spec.drawMa)} — more than ${supply} gives (${currentLabel(spec.budgetMa)}).`
           : spec.battery === "none"
             ? `Draws about ${currentLabel(spec.drawMa)} of the ${currentLabel(spec.budgetMa)} USB gives.`
-            : `${powerLabel(spec)} · draws about ${currentLabel(spec.drawMa)}`}
+            : runtime
+              ? `${runtime} at full draw — sleep modes stretch it · draws about ${currentLabel(spec.drawMa)}`
+              : `${powerLabel(spec)} · draws about ${currentLabel(spec.drawMa)}`}
       </p>
     </Field>
   );

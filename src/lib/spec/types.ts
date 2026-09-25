@@ -14,12 +14,15 @@ export type Material = (typeof MATERIALS)[number];
 
 export const BATTERY_KEYS = [
   "none",
+  "adapter",
+  "li-1s-100",
   "li-1s-400",
   "li-1s-1000",
   "li-1s-2000",
   "li-2s-1500",
   "aa-2",
   "aa-4",
+  "9v",
 ] as const;
 export type BatteryKey = (typeof BATTERY_KEYS)[number];
 

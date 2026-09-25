@@ -20,12 +20,17 @@ export const USB_BUDGET_MA = 500;
 
 export const BATTERIES: BatteryInfo[] = [
   { key: "none", label: "USB powered", mAh: 0, volts: 5, maxMa: USB_BUDGET_MA, body: null },
+  // Wired to a barrel jack, an AC-DC brick or the mains — not a pack at all,
+  // so it has no body to place and no capacity to run flat.
+  { key: "adapter", label: "Wall adapter (12 V · 2 A)", mAh: 0, volts: 12, maxMa: 2000, body: null },
+  { key: "li-1s-100", label: "1S Li-Po 100 mAh", mAh: 100, volts: 3.7, maxMa: 100, body: { l: 20, w: 12, h: 4 } },
   { key: "li-1s-400", label: "1S Li-Po 400 mAh", mAh: 400, volts: 3.7, maxMa: 400, body: { l: 35, w: 25, h: 5 } },
   { key: "li-1s-1000", label: "1S Li-Po 1000 mAh", mAh: 1000, volts: 3.7, maxMa: 1000, body: { l: 50, w: 34, h: 6 } },
   { key: "li-1s-2000", label: "1S 18650 2000 mAh", mAh: 2000, volts: 3.7, maxMa: 4000, body: { l: 65, w: 18.5, h: 18.5 } },
   { key: "li-2s-1500", label: "2S Li-Po 1500 mAh", mAh: 1500, volts: 7.4, maxMa: 15000, body: { l: 72, w: 34, h: 17 } },
   { key: "aa-2", label: "2 × AA", mAh: 2000, volts: 3, maxMa: 1000, body: { l: 58, w: 32, h: 16 } },
   { key: "aa-4", label: "4 × AA", mAh: 2000, volts: 6, maxMa: 1000, body: { l: 62, w: 58, h: 16 } },
+  { key: "9v", label: "9 V battery", mAh: 550, volts: 9, maxMa: 300, body: { l: 48.5, w: 26.5, h: 17.5 } },
 ];
 
 export function batteryOf(key: BatteryKey): BatteryInfo {

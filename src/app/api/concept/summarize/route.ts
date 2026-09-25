@@ -33,7 +33,9 @@ const SYSTEM =
   'summary is the part names joined by " · ". ' +
   "role is a short phrase saying what that part does in this project. " +
   `category is exactly one of: ${CONCEPT_CATEGORIES.join(", ")}. ` +
-  "spec.battery is exactly one of: none (USB powered), li-1s-400, li-1s-1000, li-1s-2000 (an 18650 cell), li-2s-1500, aa-2, aa-4 — the pack this product would really use. " +
+  "spec.battery is exactly one of: none (USB powered), adapter (a wall/DC adapter or mains supply, no battery), " +
+  "li-1s-100 (a coin-size pack for a ring or a tiny wearable), li-1s-400, li-1s-1000, li-1s-2000 (an 18650 cell), " +
+  "li-2s-1500, aa-2, aa-4, 9v (a 9 V PP3 battery) — the pack this product would really use. " +
   "spec.material is exactly one of: PLA, PETG, ASA, TPU — the enclosure plastic for where it is used. " +
   "spec.useCase lists whichever apply of: handheld, outdoor, waterproof, wearable, desk. " +
   "spec.runtimeGoalH is how many hours it should run on one charge; leave it out when it is USB powered.";

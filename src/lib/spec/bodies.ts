@@ -19,6 +19,55 @@ const b = (l: number, w: number, h: number, at: Placement, mA: number): Body => 
   mA,
 });
 
+// A leading "(x4)"/"x4" or a trailing "4 x"/"4×" states how many of this
+// part the concept means — a bare digit next to the word is read, never a
+// number spelled out, so "four SG90 servos" still counts as one until the
+// maker or the AI writes the digit form.
+const QTY_AFTER_X = /(?:^|[(\s,])[x×]\s*(\d{1,2})\b/i;
+const QTY_BEFORE_X = /\b(\d{1,2})\s*[x×](?:[)\s,]|$)/i;
+
+/** How many of this part its own name says there are — 1 when it says
+ *  nothing, capped at 16 so a typo can't blow up the board or the draw. */
+export function qtyOf(name: string): number {
+  const n = name.toLowerCase();
+  const m = n.match(QTY_AFTER_X) ?? n.match(QTY_BEFORE_X);
+  const count = m ? Number(m[1]) : 1;
+  return Number.isFinite(count) && count > 0 ? Math.min(count, 16) : 1;
+}
+
+// A stated wattage on an LED is the part's own word for its current — read
+// straight off it instead of the single-status-LED default every "3 W
+// emitter" would otherwise take. "LED emitter"/"high-power LED" with no
+// number named still means more than a 5 mm indicator, so it takes 3 W.
+const LED_WATTS = /(\d+(?:\.\d+)?)\s*w\b/;
+const HIGH_POWER_NAME = /high-?power\s+led|led\s+emitter/;
+
+function highPowerLedBody(name: string): Body | null {
+  const watts = name.match(LED_WATTS)?.[1];
+  // A wattage only counts when it is stated on an LED — "3 W buzzer" is not
+  // one — but "LED emitter"/"high-power LED" names it plainly enough
+  // without a number.
+  if (watts && /\bleds?\b/.test(name)) {
+    return b(10, 10, 5, "board", Math.round((Number(watts) / 3.7) * 1000));
+  }
+  if (HIGH_POWER_NAME.test(name)) return b(10, 10, 5, "board", Math.round((3 / 3.7) * 1000));
+  return null;
+}
+
+// An addressable matrix/panel names its own grid ("8x32") — the whole panel
+// is the part, not one pixel, so its footprint and draw scale with N × M
+// rather than falling to the bare-pixel rule below.
+const MATRIX_GRID = /(\d{1,3})\s*[x×]\s*(\d{1,3})/;
+const MATRIX_NAME = /\bleds?\b|pixel|ws2812\w*|sk6812\w*|neopixel|matrix|panel/;
+
+function ledMatrixBody(name: string): Body | null {
+  const grid = name.match(MATRIX_GRID);
+  if (!grid || !MATRIX_NAME.test(name)) return null;
+  const n = Number(grid[1]);
+  const m = Number(grid[2]);
+  return b(m * 10, n * 10, 3, "case", Math.min(n * m * 10, 3000));
+}
+
 // First match wins, so a driver or a charger sits ahead of the motor or the
 // battery its own name mentions.
 const RULES: [RegExp, Body][] = [
@@ -32,6 +81,9 @@ const RULES: [RegExp, Body][] = [
   [/esp32|wroom/, b(25.5, 18, 3.1, "board", 80)],
   [/esp8266|esp-?12/, b(24, 16, 3, "board", 70)],
   [/arduino nano/, b(45, 18, 8, "board", 20)],
+  // Ahead of the bare ATmega rule below — a maker who spells it out as
+  // "ATmega32U4 Pro Micro" still means this board, not the ATtiny default.
+  [/pro\s*micro|32u4/, b(33, 18, 4, "board", 15)],
   [/atmega|attiny/, b(9, 9, 1.2, "board", 10)],
   [/rp2040|\bpico\b/, b(51, 21, 4, "board", 25)],
   [/stm32/, b(10, 10, 1.6, "board", 20)],
@@ -43,10 +95,24 @@ const RULES: [RegExp, Body][] = [
   [/sim800|sim7\d\d|\bgsm\b|\blte\b/, b(24, 24, 3, "board", 100)],
   [/dht22|am2302/, b(25, 15, 7.7, "board", 2)],
   [/dht11/, b(15.5, 12, 5.5, "board", 2)],
+  // An NDIR CO2 module carries its own IR source and pump; a plain gas
+  // sensor default (a 15x12x3 mm breakout) is an order of magnitude small.
+  [/mh-?z19|ndir/, b(33, 20, 9, "board", 20)],
+  // A particulate sensor's fan and housing make it the largest "sensor" in
+  // most air-quality concepts, not the smallest.
+  [/pms5003|particulate/, b(50, 38, 21, "case", 100)],
   [/mpu-?\d{4}|\bimu\b|accelerometer|gyro/, b(20, 16, 3, "board", 4)],
   [/hc-?sr04|ultrasonic/, b(45, 20, 15, "case", 15)],
   [/\bpir\b|hc-?sr501/, b(32, 24, 25, "case", 1)],
   [/soil|moisture probe/, b(60, 20, 2, "outside", 5)],
+  // A solar panel is normally the largest external part of what it powers;
+  // a cup anemometer is a mechanical assembly outside the enclosure too —
+  // neither is the tiny board-mounted part its category default assumes.
+  [/solar panel|anemometer/, b(0, 0, 0, "outside", 0)],
+  // A reed switch is a magnetic position sensor mounted away from the
+  // board (a fork, a door frame) — ahead of the generic switch rule below,
+  // which would otherwise read it as a panel-mounted tactile button.
+  [/reed/, b(14, 3, 3, "board", 0)],
   [/ds18b20/, b(5, 5, 5, "board", 1)],
   [/camera|ov2640|ov5640/, b(24, 24, 10, "board", 100)],
   [/microphone|\bmic\b|inmp441/, b(14, 12, 3, "board", 1)],
@@ -61,6 +127,9 @@ const RULES: [RegExp, Body][] = [
   [/stepper|nema|28byj/, b(42, 42, 34, "case", 400)],
   [/pump/, b(45, 24, 24, "case", 200)],
   [/\bfan\b/, b(40, 40, 10, "case", 150)],
+  // A PTC element or resistive heater draws well past the generic Actuator
+  // default — close to what a real mug/kettle warmer pulls off a 1S pack.
+  [/heater|heating|\bptc\b/, b(30, 20, 5, "case", 1000)],
   [/vibration|haptic/, b(10, 10, 3, "case", 80)],
   [/motor/, b(70, 22, 19, "case", 150)],
   [/relay/, b(19, 15, 15, "board", 70)],
@@ -105,6 +174,13 @@ const DEFAULTS: Record<ConceptPartCategory, Body> = {
 
 export function bodyOf(part: ConceptPart): { body: Body; estimated: boolean } {
   const name = part.name.toLowerCase();
+  // Both read a number out of the name itself, so they run ahead of the
+  // fixed-body table — a matrix or a stated wattage before the single-pixel
+  // and single-status-LED rules they'd otherwise fall into.
+  const highPowerLed = highPowerLedBody(name);
+  if (highPowerLed) return { body: highPowerLed, estimated: false };
+  const ledMatrix = ledMatrixBody(name);
+  if (ledMatrix) return { body: ledMatrix, estimated: false };
   for (const [re, body] of RULES) if (re.test(name)) return { body, estimated: false };
   return {
     body: DEFAULTS[part.category] ?? DEFAULTS.Sensor,
