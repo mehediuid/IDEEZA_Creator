@@ -117,39 +117,46 @@ export function ConfidenceBadge({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setOpen(!isOpen)}
-      aria-expanded={isOpen}
-      aria-controls={issuesPanelId(confidence.productId)}
-      className="inline-flex w-fit flex-wrap items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-    >
-      {badge}
-      <span className="whitespace-nowrap text-sm text-text-secondary">
-        {[
-          passed.length ? `${passed.length} passed` : null,
-          found ? `${found} to review` : null,
-          total - found ? `${total - found} not run` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </span>
-      <svg
-        width={12}
-        height={12}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.2}
-        aria-hidden
-        className={[
-          "text-text-tertiary transition-transform duration-fast",
-          isOpen ? "rotate-180" : "",
-        ].join(" ")}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls={open === undefined ? issuesPanelId(confidence.productId) : undefined}
+        className="inline-flex w-fit flex-wrap items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <path d="M6 9l6 6 6-6" />
-      </svg>
-    </button>
+        {badge}
+        <span className="whitespace-nowrap text-sm text-text-secondary">
+          {[
+            passed.length ? `${passed.length} passed` : null,
+            found ? `${found} to review` : null,
+            total - found ? `${total - found} not run` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+        <svg
+          width={12}
+          height={12}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          aria-hidden
+          className={[
+            "text-text-tertiary transition-transform duration-fast",
+            isOpen ? "rotate-180" : "",
+          ].join(" ")}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open === undefined && (
+        <div hidden={!isOpen}>
+          <ConfidenceIssuesPanel confidence={confidence} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -188,9 +195,9 @@ export function ConfidenceIssuesPanel({
       </p>
       {groups.map(({ group, issues, passes }) => (
         <section key={group} className="flex flex-col gap-[6px]">
-          <h4 className="text-sm font-semibold text-text-primary">
+          <h3 className="text-sm font-semibold text-text-primary">
             {GROUP_LABEL[group]}
-          </h4>
+          </h3>
           <ul role="list" className="flex flex-col gap-[6px]">
             {issues.map((issue) => (
               <IssueRow key={issue.text} issue={issue} />
