@@ -90,6 +90,11 @@ function ledMatrixBody(name: string): Body | null {
 const RULES: [RegExp, Body][] = [
   [/l298/, b(43, 43, 27, "board", 20)],
   [/tb6612|drv88\d\d|l9110|l293|motor driver|h-?bridge/, b(20, 20, 3, "board", 5)],
+  // A stepper's driver board and a brushless motor's ESC carry the motor's
+  // current, they don't add to it — each one sits ahead of the stepper and
+  // brushless rules its own name would otherwise fall into.
+  [/uln2003|stepper driver/, b(35, 32, 15, "board", 5)],
+  [/\besc\b(?!\s*(?:key|button))/, b(45, 24, 8, "case", 5)],
   [/tp4056|charger|charging (?:module|board|ic)/, b(26, 17, 4, "board", 2)],
   [/mp1584|lm2596|mt3608|buck|boost/, b(22, 17, 4, "board", 5)],
   [/ams1117|lm1117|ap2112|\bldo\b|regulator/, b(7, 6.5, 1.8, "board", 5)],
@@ -107,6 +112,7 @@ const RULES: [RegExp, Body][] = [
   [/nrf52/, b(16, 10, 2, "board", 10)],
   [/nrf24/, b(29, 15, 12, "board", 12)],
   [/lora|sx12\d\d|rfm9\d/, b(16, 16, 3, "board", 40)],
+  [/zigbee|cc25\d\d/, b(28, 16, 3, "board", 30)],
   [/hc-?0[56]/, b(27, 13, 3, "board", 30)],
   [/\bgps\b|neo-?[678]m/, b(35, 25, 8, "board", 45)],
   [/sim800|sim7\d\d|\bgsm\b|\blte\b/, b(24, 24, 3, "board", 100)],
@@ -131,6 +137,7 @@ const RULES: [RegExp, Body][] = [
   // which would otherwise read it as a panel-mounted tactile button.
   [/reed/, b(14, 3, 3, "board", 0)],
   [/ds18b20/, b(5, 5, 5, "board", 1)],
+  [/bh1750/, b(19, 14, 3, "board", 1)],
   [/camera|ov2640|ov5640/, b(24, 24, 10, "board", 100)],
   [/microphone|\bmic\b|inmp441/, b(14, 12, 3, "board", 1)],
   // A "motor mount" or a "servo bracket" is the hardware that holds the
@@ -141,7 +148,9 @@ const RULES: [RegExp, Body][] = [
   [/servo|sg90|mg90/, b(23, 12, 29, "case", 100)],
   [/\bn20\b/, b(34, 12, 10, "case", 60)],
   [/brushless|bldc/, b(28, 28, 20, "case", 1000)],
-  [/stepper|nema|28byj/, b(42, 42, 34, "case", 400)],
+  // A 28BYJ-48 is a small geared 5 V stepper, not the NEMA 17 below.
+  [/28byj/, b(42, 28, 19, "case", 240)],
+  [/stepper|nema/, b(42, 42, 34, "case", 400)],
   [/pump/, b(45, 24, 24, "case", 200)],
   [/\bfan\b/, b(40, 40, 10, "case", 150)],
   // A PTC element or resistive heater draws well past the generic Actuator
@@ -162,6 +171,9 @@ const RULES: [RegExp, Body][] = [
   [/joystick|thumbstick/, b(34, 26, 32, "case", 1)],
   [/keypad/, b(77, 70, 10, "case", 0)],
   [/encoder/, b(13, 12, 20, "board", 1)],
+  // A capacitive touch pad on its breakout — ahead of the button rule, which
+  // a "touch button" would otherwise read as a 6 mm tactile switch.
+  [/ttp223|touch (?:sensor|pad|button)/, b(24, 16, 3, "board", 2)],
   [/button|switch|tactile/, b(6, 6, 5, "board", 0)],
   [/usb-?c|type-?c/, b(9, 7.5, 3.2, "board", 0)],
   [/micro-?usb/, b(8, 6, 3, "board", 0)],
@@ -171,7 +183,7 @@ const RULES: [RegExp, Body][] = [
   [/\bjst\b/, b(6, 4.5, 6, "board", 0)],
   [/header/, b(25, 2.5, 8.5, "board", 0)],
   [
-    /enclosure|housing|\bcase\b|chassis|frame|wheel|screw|standoff|mount|strap|lid|knob|gear|propeller|antenna/,
+    /enclosure|housing|\bcase\b|chassis|frame|wheel|screw|standoff|mount|strap|lid|knob|gear|propeller|antenna|\bfeet\b|\bmagnets?\b|gasket|o-?ring/,
     b(0, 0, 0, "outside", 0),
   ],
 ];

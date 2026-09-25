@@ -29,6 +29,66 @@ export type BatteryKey = (typeof BATTERY_KEYS)[number];
 export const USE_CASES = ["handheld", "outdoor", "waterproof", "wearable", "desk"] as const;
 export type UseCase = (typeof USE_CASES)[number];
 
+// The parts the sheet can put in — keys only; catalog.ts holds the part each
+// key stands for. An edit stores the key, never the part's name, so renaming
+// a part in the catalog can't strand an edit a maker already made.
+export const MCU_KEYS = ["esp32", "esp32-c3", "rp2040", "atmega328p"] as const;
+export type McuKey = (typeof MCU_KEYS)[number];
+
+export const RADIO_KEYS = [
+  "none",
+  "wifi",
+  "ble",
+  "esp-now",
+  "nrf24",
+  "lora",
+  "zigbee",
+  "cellular",
+] as const;
+export type RadioKey = (typeof RADIO_KEYS)[number];
+
+/** Motors that drive the product along — a servo is counted apart. */
+export const MOTOR_KEYS = ["tt", "n20", "brushless", "28byj"] as const;
+export type MotorKey = (typeof MOTOR_KEYS)[number];
+
+export const SERVO_KEYS = ["sg90", "mg996r"] as const;
+export type ServoKey = (typeof SERVO_KEYS)[number];
+
+export const ADDABLE_KEYS = [
+  "dht22",
+  "pir",
+  "gps",
+  "imu",
+  "ultrasonic",
+  "light",
+  "soil",
+  "button",
+  "joystick",
+  "encoder",
+  "touch",
+  "oled",
+  "tft",
+  "eink",
+  "led",
+  "led-strip",
+  "buzzer",
+  "speaker",
+  "relay",
+] as const;
+export type AddableKey = (typeof ADDABLE_KEYS)[number];
+
+export const CHARGE_PORT_KEYS = ["usb-c", "micro-usb", "barrel", "none"] as const;
+export type ChargePortKey = (typeof CHARGE_PORT_KEYS)[number];
+
+export const MOUNTING_KEYS = ["rubber-feet", "screws", "magnets"] as const;
+export type MountingKey = (typeof MOUNTING_KEYS)[number];
+
+export const ENVIRONMENT_KEYS = ["indoor", "splash-proof", "waterproof"] as const;
+export type EnvironmentKey = (typeof ENVIRONMENT_KEYS)[number];
+
+/** How many of one kind — 0 takes them all out. */
+export type Drive<K extends string> = { kind: K; count: number };
+
 /** What the model suggested, every value already checked against the sets
  *  above. A value that failed the check is absent — never repaired into a
  *  guess — and the rules fill that field instead. */
@@ -39,13 +99,30 @@ export type AiHints = {
   runtimeGoalH?: number;
 };
 
+/** The maker's changes to what is in the product. Each field replaces the
+ *  concept's own parts of that kind (edits.ts); an absent one leaves them. */
+export type PartChoices = {
+  mcu?: McuKey;
+  radio?: RadioKey;
+  motors?: Drive<MotorKey>;
+  servos?: Drive<ServoKey>;
+  /** Concept part names taken out. */
+  removed?: string[];
+  added?: AddableKey[];
+  chargePort?: ChargePortKey;
+  environment?: EnvironmentKey;
+  mounting?: MountingKey;
+};
+
 /** The maker's own changes. An absent field follows the hints and the math. */
-export type SpecEdits = {
+export type SpecEdits = PartChoices & {
   size?: Mm3;
   battery?: BatteryKey;
   material?: Material;
   /** Chose to build at a size the parts don't fit — the product ships Draft. */
   draftAtSize?: boolean;
+  /** 1.2–4 mm in 0.4 mm steps (hints.ts). */
+  wallMm?: number;
 };
 
 export type ResolvedSpec = {
@@ -67,6 +144,10 @@ export type ResolvedSpec = {
   material: Material;
   materialSource: "you" | "ai" | "rule";
   wallMm: number;
+  wallSource: "you" | "rule";
+  /** The part changes this spec was worked out with, as checked — so a
+   *  booked snapshot says what was swapped, not only what it came to. */
+  choices: PartChoices;
   /** Parts no body entry matched, sized by their category instead. */
   estimated: string[];
   /** The largest pack that makes the maker's size fit, when one does. */

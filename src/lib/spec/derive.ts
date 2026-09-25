@@ -8,14 +8,17 @@
 import type { ConceptPart } from "../create/concept";
 import { BATTERIES, USB_BUDGET_MA, batteryOf, isBatteryPart } from "./batteries";
 import { bodyOf, qtyOf, type Body } from "./bodies";
-import type {
-  AiHints,
-  BatteryKey,
-  Material,
-  Mm3,
-  ResolvedSpec,
-  SpecEdits,
-  UseCase,
+import { applyEdits } from "./edits";
+import { asWallMm, cleanChoices } from "./hints";
+import {
+  BATTERY_KEYS,
+  type AiHints,
+  type BatteryKey,
+  type Material,
+  type Mm3,
+  type ResolvedSpec,
+  type SpecEdits,
+  type UseCase,
 } from "./types";
 
 export const WALL_MM = 2;
@@ -89,12 +92,13 @@ function caseBodies(list: Placed[], battery: BatteryKey): Mm3[] {
 }
 
 /** The loose parts lie flat in a row along the length, either under the
- *  board or beside it — whichever box is smaller — inside a 2 mm wall with
- *  1 mm clearance all round. */
+ *  board or beside it — whichever box is smaller — inside the wall (2 mm
+ *  unless the maker set it) with 1 mm clearance all round. */
 export function minSizeFor(
   board: { w: number; h: number } | null,
   stack: number,
   inCase: Mm3[],
+  wallMm: number = WALL_MM,
 ): Mm3 {
   const bw = board?.w ?? 0;
   const bh = board?.h ?? 0;
@@ -118,7 +122,7 @@ export function minSizeFor(
     };
     inner = volume(stacked) <= volume(side) ? stacked : side;
   }
-  const shell = 2 * (WALL_MM + CLEARANCE_MM);
+  const shell = 2 * (wallMm + CLEARANCE_MM);
   return { l: up(inner.l + shell), w: up(inner.w + shell), h: up(inner.h + shell) };
 }
 
@@ -160,6 +164,12 @@ export function listedBattery(parts: ConceptPart[]): BatteryKey | null {
   const pack = parts.find(isBatteryPart);
   if (!pack) return null;
   const n = pack.name.toLowerCase();
+  // A model that names the pack by one of our own keys ("Li-1s-400") means
+  // exactly that pack. Only the keys with a dash — "9v" as a word is the
+  // rule below's, which knows "3.9V" is a cell voltage and not a 9 V battery.
+  const words = n.split(/[^a-z0-9.-]+/);
+  const key = BATTERY_KEYS.find((k) => k.includes("-") && words.includes(k));
+  if (key) return key;
   if (/\b2s\b|7\.4\s*v/.test(n)) return "li-2s-1500";
   if (/18650/.test(n)) return "li-1s-2000";
   if (/\baaa?\b/.test(n)) {
@@ -235,11 +245,28 @@ export function ruleMaterial(useCase: UseCase[] = []): Material {
   return "PETG";
 }
 
+/** A product with nothing in it to power — every part hardware (a plate, a
+ *  case, feet), no pack, nothing on a board and nothing drawing current.
+ *  Read off the edited parts, so adding an MCU or an LED to a plate makes
+ *  it electronic. */
+export function productKind(parts: ConceptPart[]): "electronic" | "mechanical" {
+  const list = placedParts(parts);
+  const hardware = parts.every((p) => p.category === "Connector & mech" && !isBatteryPart(p));
+  return hardware && drawOf(list) === 0 && !boardFor(list) ? "mechanical" : "electronic";
+}
+
+/** Everything below works on the edited parts (edits.ts) — a swapped radio,
+ *  a motor count, an added sensor all move the size, the draw and the pack
+ *  the same way a part the concept named would. */
 export function deriveSpec(
-  parts: ConceptPart[],
+  concept: ConceptPart[],
   hints: AiHints = {},
   edits: SpecEdits = {},
 ): ResolvedSpec {
+  const choices = cleanChoices(edits);
+  const parts = applyEdits(concept, choices);
+  const wallEdit = asWallMm(edits.wallMm);
+  const wallMm = wallEdit ?? WALL_MM;
   const list = placedParts(parts);
   const board = boardFor(list);
   const stack = stackOf(list);
@@ -254,7 +281,7 @@ export function deriveSpec(
   const hinted =
     hints.battery && batteryOf(hints.battery).maxMa >= drawMa ? hints.battery : undefined;
   const battery = edits.battery ?? listed ?? hinted ?? ruleBattery(parts, hints.runtimeGoalH, hints.useCase);
-  const minWith = (key: BatteryKey) => minSizeFor(board, stack, caseBodies(list, key));
+  const minWith = (key: BatteryKey) => minSizeFor(board, stack, caseBodies(list, key), wallMm);
   const minSize = minWith(battery);
   const size = edits.size ?? minSize;
   const fits = fitsIn(size, minSize);
@@ -286,6 +313,15 @@ export function deriveSpec(
     }
   }
 
+  // A sealed case wants the UV- and water-safe plastic whatever the model
+  // guessed, and a maker who says Indoor has overruled an outdoor use case;
+  // only the plastic the maker picked outranks either.
+  const sealed = choices.environment === "waterproof" || choices.environment === "splash-proof";
+  const useCase =
+    choices.environment === "indoor"
+      ? hints.useCase?.filter((u) => u !== "outdoor" && u !== "waterproof")
+      : hints.useCase;
+
   return {
     size,
     sizeSource: edits.size ? "you" : "calc",
@@ -298,19 +334,26 @@ export function deriveSpec(
     drawMa,
     budgetMa: budgetOf(battery),
     runtimeH: runtimeOf(battery, drawMa),
-    material: edits.material ?? hints.material ?? ruleMaterial(hints.useCase),
-    materialSource: edits.material ? "you" : hints.material ? "ai" : "rule",
-    wallMm: WALL_MM,
+    material: edits.material ?? (sealed ? "ASA" : (hints.material ?? ruleMaterial(useCase))),
+    materialSource: edits.material ? "you" : !sealed && hints.material ? "ai" : "rule",
+    wallMm,
+    wallSource: wallEdit === undefined ? "rule" : "you",
+    choices,
     estimated: list.filter((p) => p.estimated).map((p) => p.name),
     smallerBattery,
   };
 }
 
-/** The parts a build is made from: the concept's, with its pack swapped for
- *  the spec's — so the BOM, the wiring and the firmware carry the battery the
- *  maker chose, and a USB-powered product carries none. */
-export function partsForBuild(parts: ConceptPart[], battery: BatteryKey): ConceptPart[] {
-  const rest = parts.filter((p) => !isBatteryPart(p));
+/** The parts a build is made from: the concept's with the maker's edits
+ *  applied, and its pack swapped for the spec's — so the BOM, the wiring and
+ *  the firmware carry the parts and the battery the maker chose, and a
+ *  USB-powered product carries none. */
+export function partsForBuild(
+  parts: ConceptPart[],
+  battery: BatteryKey,
+  edits: SpecEdits = {},
+): ConceptPart[] {
+  const rest = applyEdits(parts, cleanChoices(edits)).filter((p) => !isBatteryPart(p));
   if (battery === "none") return rest;
   return [
     ...rest,
@@ -326,12 +369,29 @@ export function partsForBuild(parts: ConceptPart[], battery: BatteryKey): Concep
  *  material follow the same rule: a "rule"/"concept"/"ai" pack or material
  *  moves whenever the parts or the rule that picks it does — reordering the
  *  battery rule, say — with nothing the maker chose, so only a "you"-sourced
- *  pick is compared; anything else reads as "auto" too. */
+ *  pick is compared; anything else reads as "auto" too. The wall and the
+ *  part choices are the maker's by definition; the lists are compared as
+ *  sets, since the order chips were added in decides nothing. */
 export function specKey(s: ResolvedSpec): string {
   const size = s.sizeSource === "you" ? `${s.size.l}x${s.size.w}x${s.size.h}` : "auto";
   const battery = s.batterySource === "you" ? s.battery : "auto";
   const material = s.materialSource === "you" ? s.material : "auto";
-  return [size, battery, material, s.draftAtSize].join("|");
+  const wall = s.wallSource === "you" ? String(s.wallMm) : "auto";
+  // asResolvedSpec gives every stored snapshot its choices; a spec built by
+  // hand, field by field, may not carry them.
+  const c = s.choices ?? {};
+  const parts = JSON.stringify([
+    c.mcu ?? null,
+    c.radio ?? null,
+    c.motors ? `${c.motors.kind}x${c.motors.count}` : null,
+    c.servos ? `${c.servos.kind}x${c.servos.count}` : null,
+    [...(c.removed ?? [])].sort(),
+    [...(c.added ?? [])].sort(),
+    c.chargePort ?? null,
+    c.environment ?? null,
+    c.mounting ?? null,
+  ]);
+  return [size, battery, material, s.draftAtSize, wall, parts].join("|");
 }
 
 /** A product whose size its parts can't fit, and that the maker hasn't

@@ -47,7 +47,11 @@ export function batteryOf(key: BatteryKey): BatteryInfo {
 // capacity/cell-count and left a duplicate generic body in the BOM. Only the
 // phrase "battery connector/level/indicator" — the word immediately after
 // "battery" — names an accessory instead of the cell.
-const PACK = /batter|li-?po|li-?ion|18650|\bcells?\b|\baaa?\b/i;
+// A cell count ("1S", "2s", or our own key's "li-1s") and a stated capacity
+// ("1000 mAh") name a pack too — a model that answers with a key like
+// "Li-1s-400" as the part's name means the pack, not an unknown part to size
+// by its category.
+const PACK = /batter|li-?po|li-?ion|18650|\bcells?\b|\baaa?\b|\b(?:li-?)?\d\s?s\b|\d{2,5}\s*mah\b/i;
 const NOT_PACK = /charg|gauge|monitor|protect|\bbms\b|solar|photo|batter(?:y|ies)\s+(?:connector|level|indicator)/i;
 
 export function isBatteryPart(part: ConceptPart): boolean {
