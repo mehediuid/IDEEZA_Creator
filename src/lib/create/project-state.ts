@@ -440,10 +440,14 @@ export function railRows(
 }
 
 /** The card's facts (format.ts `cardFacts`), with the products it pairs
- *  with over its radio in place of the radio itself. */
+ *  with over its radio in place of the radio itself — and that radio fact
+ *  last. The row is one line, cut at its end, and "Pairs with Remote
+ *  Controller" ahead of the part cut "Drives TT gear motor", the fact that
+ *  says what the product is: so power, then what it does, then its radio. */
 function rowFacts(spec: ResolvedSpec, parts: ConceptPart[], links: ProductLink[]) {
   const pairs = links.filter((l) => l.about === "radio");
-  return cardFactsOf(spec, parts, radioOf(parts), pairs);
+  const facts = cardFactsOf(spec, parts, radioOf(parts), pairs);
+  return [...facts.filter((f) => f.key !== "radio"), ...facts.filter((f) => f.key === "radio")];
 }
 
 // ─────────────────────────── linksOf ───────────────────────────
