@@ -36,7 +36,11 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
-import type { JumpTarget } from "@/lib/create/project-state";
+import {
+  composerTarget,
+  productNameOf,
+  type JumpTarget,
+} from "@/lib/create/project-state";
 import {
   ADD_PRODUCT_ID,
   BUILD_ACTION_ID,
@@ -717,31 +721,21 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [chat?.turns],
   );
 
-  // The most-recent READY assistant turn — what a prompt-bar submission
-  // evolves from. If nothing is ready yet (the first generation is still
-  // pending), refinement degrades to a fresh take so the user is never
-  // blocked.
   // Which product the composer is talking about. It used to be "the last
   // turn that happened to finish", which with more than one product is not a
   // choice at all — the drone and its remote render in parallel, so whichever
   // crossed the line last became the thing your next sentence refined. That
   // was usually the first card, and never something the maker had picked.
   //
-  // It is the product they last acted on instead: pressed Refine or
-  // Regenerate on, or added. The primary until then, and the composer says
-  // which so it is never a guess.
-  const latestReadyTurn = React.useMemo(() => {
-    if (!chat) return null;
-    type Ready = Extract<(typeof chat.turns)[number], { role: "assistant" }>;
-    let last: Ready | null = null;
-    let fallback: Ready | null = null;
-    for (const t of chat.turns) {
-      if (t.role !== "assistant" || t.status !== "ready" || !t.imageUrl) continue;
-      fallback = t;
-      if ((t.companionOf ?? "primary") === focusedProduct) last = t;
-    }
-    return last ?? fallback;
-  }, [chat, focusedProduct]);
+  // It is the product they last picked instead — its row, or Refine,
+  // Regenerate or Add on its card. The primary until then, and the composer
+  // says which so it is never a guess. Only that product's own drawing: one
+  // with none yet (a failed first render, one still drawing) holds the send
+  // rather than refining another product's drawing in its name.
+  const target = React.useMemo(
+    () => composerTarget(chat ?? NO_CHAT, focusedProduct),
+    [chat, focusedProduct],
+  );
 
   // The project this chat's work belongs to, by name: typed at the question
   // for a new one, or the existing project picked there.
@@ -839,14 +833,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     [chat],
   );
 
-  /** What the composer will refine, by name, for the line under it. */
-  const focusedName = React.useMemo(() => {
-    const setup = chat?.turns.find((t) => t.role === "setup");
-    if (setup?.role !== "setup") return null;
-    if (focusedProduct === "primary") return setup.productName?.trim() || null;
-    return setup.companions.find((c) => c.id === focusedProduct)?.name ?? null;
-  }, [chat, focusedProduct]);
-
   // The concept open in the editor, and which refine of it the next edit
   // will be — the editor names the number the result will carry.
   const editorConceptLabel = editorTurnId
@@ -870,6 +856,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   const handleUserSubmit = React.useCallback(
     (text: string) => {
       if (!chat || !canAfford(CONCEPT_COST) || setupPending) return;
+      // The composer is held for this already; a sentence that reaches here
+      // anyway must not be drawn over some other product's concept.
+      if (target.kind === "blocked") return;
       appendUserTurn(chat.id, text);
 
       // Two different things get typed into this box, and treating them the
@@ -902,18 +891,17 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         });
         return;
       }
-      // Prompt-bar submissions REFINE the latest ready concept (spec
-      // §4b). They only fall back to "fresh" when nothing has rendered
-      // yet (so the user isn't stuck on first load).
-      if (latestReadyTurn) {
+      // Prompt-bar submissions REFINE the focused product's latest concept
+      // (spec §4b). Only a chat with nothing drawn at all takes a fresh one.
+      if (target.kind === "refine") {
         appendAssistantTurn(chat.id, {
           prompt: text,
           kind: "refine",
-          parentTurnId: latestReadyTurn.id,
+          parentTurnId: target.turn.id,
           // A refine is a new take on the SAME product. Without this it
           // landed under the primary, so refining the remote controller
           // replaced the drone's card instead of its own.
-          companionOf: latestReadyTurn.companionOf,
+          companionOf: target.turn.companionOf,
         });
         return;
       }
@@ -923,7 +911,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       chat,
       canAfford,
       setupPending,
-      latestReadyTurn,
+      target,
       appendUserTurn,
       appendAssistantTurn,
       addSetupProduct,
@@ -1346,13 +1334,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     editorTurn && editorTurn.role === "assistant"
       ? (editorTurn.imageUrl ?? null)
       : null;
-  const editorSetup = chat.turns.find((t) => t.role === "setup");
   const editorProduct =
-    editorTurn?.role === "assistant" && editorSetup?.role === "setup"
-      ? editorTurn.companionOf
-        ? editorSetup.companions.find((c) => c.id === editorTurn.companionOf)?.name
-        : editorSetup.productName?.trim()
-      : undefined;
+    editorTurn?.role === "assistant" ? productNameOf(rail.state.setup, editorTurn) : undefined;
 
   return (
     <div className="flex h-full flex-col md:flex-row">
@@ -1433,11 +1416,17 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               setPane("work");
             }}
             canRender={canRender}
-            blockedReason={setupPending ? "Answer the question first" : undefined}
-            enhanceMode={latestReadyTurn ? "change" : "brief"}
+            blockedReason={
+              setupPending
+                ? "Answer the question first"
+                : target.kind === "blocked"
+                  ? target.hint
+                  : undefined
+            }
+            enhanceMode={target.kind === "refine" ? "change" : "brief"}
             placeholder={
-              focusedName && latestReadyTurn
-                ? `Describe a change to ${focusedName}…`
+              target.kind === "refine"
+                ? `Describe a change to ${target.name}…`
                 : undefined
             }
           />
@@ -1446,9 +1435,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               ? "You are out of credits — top them up to draw another concept."
               : setupPending
                 ? "Answer the question on the canvas first — nothing is drawn or charged until you do."
-                : focusedName && latestReadyTurn
-                  ? `Refines ${focusedName} · ${CONCEPT_COST} credit. Pick another product above, or name a new one to add it.`
-                  : `Each drawing costs ${CONCEPT_COST} credit.`}
+                : target.kind === "blocked"
+                  ? `${target.hint}.`
+                  : target.kind === "refine"
+                    ? `Refines ${target.name} · ${CONCEPT_COST} credit.${
+                        // A chat from before the question has one product and
+                        // nowhere to add another.
+                        rail.state.setup ? " Pick another product above, or name a new one to add it." : ""
+                      }`
+                    : `Each drawing costs ${CONCEPT_COST} credit.`}
           </p>
           </div>
         </div>

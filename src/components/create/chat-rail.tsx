@@ -51,6 +51,7 @@ import {
   type ActivityEntry,
   type JumpTarget,
   type NextStep,
+  type ProjectState,
   type RailRow,
   type RailSnapshot,
   type Stage,
@@ -84,6 +85,9 @@ export type RailModel = {
   drawing: Set<string>;
   /** What the announcer compares between renders. */
   snapshot: RailSnapshot;
+  /** The project model the rows were read from — the host reads it too
+   *  rather than working the same answers out a second time. */
+  state: ProjectState;
 };
 
 export function useRailModel(
@@ -157,6 +161,7 @@ export function useRailModel(
     activity,
     drawing,
     snapshot,
+    state,
   };
 }
 

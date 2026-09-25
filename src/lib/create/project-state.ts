@@ -50,6 +50,13 @@ export function productNameOf(setup: SetupTurn | undefined, t: AssistantTurn): s
   return setup.companions.find((c) => c.id === t.companionOf)?.name;
 }
 
+/** The name the rail's row gives a product, which the composer uses too:
+ *  the question's name, else "Your product" — a chat from before the
+ *  question, or a product the question didn't name. */
+export function railNameOf(setup: SetupTurn | undefined, t: AssistantTurn): string {
+  return productNameOf(setup, t) ?? "Your product";
+}
+
 // ─────────────────────────── projectState ───────────────────────────
 
 export type ProjectState = {
@@ -313,7 +320,7 @@ export function railRows(
 
   return state.products.map((t) => {
     const productId = productIdOf(t);
-    const name = productNameOf(state.setup, t) ?? "Your product";
+    const name = railNameOf(state.setup, t);
     const conceptLabel = labels.get(t.id) ?? "1";
     const spec = state.specs.get(t.id) ?? null;
     const leftOut = !!t.companionOf && state.leftOut.has(t.companionOf);
@@ -777,4 +784,75 @@ export function announcementFor(prev: RailSnapshot, next: RailSnapshot): string 
   const buildSentence = buildTransition(prev.buildStatus, next.buildStatus);
   if (buildSentence) sentences.push(buildSentence);
   return sentences.length ? sentences.join(" ") : null;
+}
+
+// ─────────────────────────── composerTarget ───────────────────────────
+
+export type ComposerTarget =
+  /** Nothing has been drawn to change: a pre-setup chat's first words, or a
+   *  chat whose question is still open (the composer is held for that). */
+  | { kind: "fresh" }
+  /** The composer refines this product's own latest drawing. `name` is the
+   *  row's, so the composer and the selected row always agree. */
+  | { kind: "refine"; productId: string; name: string; turn: AssistantTurn }
+  /** The product in focus has no drawing yet — a failed first render, or one
+   *  still drawing. Send is held: refining any other product's drawing in
+   *  its name would charge a render to the wrong product (review 2 C1). */
+  | {
+      kind: "blocked";
+      productId: string;
+      name: string;
+      why: "failed" | "drawing";
+      /** Shown under the composer and on its send button, without a stop. */
+      hint: string;
+    };
+
+/** Which drawing the composer's next sentence changes. Only the product in
+ *  focus — the one every label under the composer names — and only its own
+ *  drawing. The one exception is a chat from before the setup question: it
+ *  has no products to choose between, so it refines its latest drawing, as
+ *  it always did. A product the project no longer holds (removed) is not a
+ *  target; the primary is. */
+export function composerTarget(chat: ChatSession, focusedProduct: string): ComposerTarget {
+  const setup = chat.turns.find((t): t is SetupTurn => t.role === "setup");
+  const drawings = chat.turns.filter((t): t is AssistantTurn => t.role === "assistant");
+  const lastReady = (productId?: string) => {
+    for (let i = drawings.length - 1; i >= 0; i -= 1) {
+      const t = drawings[i];
+      if (t.status !== "ready" || !t.imageUrl) continue;
+      if (productId === undefined || productIdOf(t) === productId) return t;
+    }
+    return undefined;
+  };
+
+  if (!setup) {
+    const t = lastReady(focusedProduct) ?? lastReady();
+    return t
+      ? { kind: "refine", productId: productIdOf(t), name: railNameOf(undefined, t), turn: t }
+      : { kind: "fresh" };
+  }
+
+  const inProject = (id: string) =>
+    id === "primary" || !setup.answer || setup.answer.picked.includes(id);
+  const productId =
+    inProject(focusedProduct) && drawings.some((t) => productIdOf(t) === focusedProduct)
+      ? focusedProduct
+      : "primary";
+  const own = drawings.filter((t) => productIdOf(t) === productId);
+  if (!own.length) return { kind: "fresh" };
+
+  const name = railNameOf(setup, own[own.length - 1]);
+  const turn = lastReady(productId);
+  if (turn) return { kind: "refine", productId, name, turn };
+
+  const drawing = own.some((t) => t.status === "pending");
+  return {
+    kind: "blocked",
+    productId,
+    name,
+    why: drawing ? "drawing" : "failed",
+    hint: drawing
+      ? `${name} has no drawing to change yet — wait for it to land`
+      : `${name} has no drawing to change yet — Try again on its card`,
+  };
 }
