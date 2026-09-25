@@ -21,6 +21,7 @@
 // §4.4.10's cross-product compatibility, which two parts lists are enough for.
 
 import { batteryOf } from "../spec/batteries";
+import { needsNoPower } from "../spec/facts";
 import { RADIOS, radioKeyOf } from "../spec/catalog";
 import type { RadioKey } from "../spec/types";
 import { currentLabel, mm3 } from "../spec/units";
@@ -201,7 +202,11 @@ export function assemblyChecks(p: BuildProduct): { issues: Issue[]; passed: stri
   const supply = s.battery === "none" ? "USB" : batteryOf(s.battery).label;
   const issues: Issue[] = [];
   const passed: string[] = [];
-  if (s.drawMa > s.budgetMa) {
+  if (needsNoPower(s)) {
+    // A plate, a stand, a case: the card says "No power needed", and so
+    // does this — not "0 mA of the 500 mA USB gives" from a USB it hasn't.
+    passed.push(`Power — nothing in ${p.name} draws current.`);
+  } else if (s.drawMa > s.budgetMa) {
     issues.push({
       group: "assembly",
       text: `${p.name} draws about ${currentLabel(s.drawMa)}, but ${supply} gives ${currentLabel(s.budgetMa)} — it will brown out under load.`,

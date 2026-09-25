@@ -22,7 +22,7 @@ import {
 import type { ConceptPartCategory } from "@/lib/create/concept";
 import { connectorPartsOf } from "@/lib/create/confidence";
 import { batteryOf, isBatteryPart } from "@/lib/spec/batteries";
-import { boardLabel, FAB_PROFILE, mcuOf, powerLabel, radioOf } from "@/lib/spec/format";
+import { boardLabel, FAB_PROFILE, mcuOf, needsNoPower, powerLabel, radioOf } from "@/lib/spec/format";
 import { currentLabel, mm3 } from "@/lib/spec/units";
 
 // ─────────────────────── what each artifact covers ──────────────────
@@ -60,6 +60,9 @@ export function coversFor(
   // a decision the maker or the concept actually made — so it is stated
   // only when the parts themselves name a pack.
   const knowsBattery = !!booked || product.parts.some(isBatteryPart);
+  // A plate, a stand, a case: nothing in it is powered, so no line says what
+  // powers it — the card and the sheet say "No power needed".
+  const powered = !needsNoPower(spec);
   const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
   switch (kind) {
     case "3d":
@@ -111,7 +114,7 @@ export function coversFor(
     case "wiring": {
       const connectors = connectorPartsOf(product.parts);
       return [
-        ...(knowsBattery ? [`Power in: ${supply}`] : []),
+        ...(knowsBattery && powered ? [`Power in: ${supply}`] : []),
         "Netlist + pin-to-pin table",
         "Wire colors per net class",
         "Harness lengths, 22 AWG",
@@ -123,7 +126,7 @@ export function coversFor(
     }
     case "parts":
       return [
-        ...(knowsBattery
+        ...(knowsBattery && powered
           ? [spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`]
           : []),
         // powerLabel reads spec.battery for its runtime estimate — a real
@@ -132,9 +135,11 @@ export function coversFor(
         // just to keep the arithmetic running, and printing its runtime here
         // would claim a battery life for a battery nobody confirmed (Minor
         // 10), the same thing knowsBattery already keeps off the line above.
-        knowsBattery
-          ? `Draws about ${currentLabel(spec.drawMa)} · ${powerLabel(spec)}`
-          : `Draws about ${currentLabel(spec.drawMa)}`,
+        !powered
+          ? powerLabel(spec)
+          : knowsBattery
+            ? `Draws about ${currentLabel(spec.drawMa)} · ${powerLabel(spec)}`
+            : `Draws about ${currentLabel(spec.drawMa)}`,
         "Every part — category, name, reference and quantity",
         "Grouped by function, quantities per board",
       ];
