@@ -4,8 +4,9 @@
 //   • Pending  — a bare rendering tile: dotted texture + a centred
 //                "Drawing <product> · P%" pill, no card chrome
 //   • Ready    — the product's name with its concept number beside it, the
-//                image, the prompt on one line with a copy button, then
-//                Refine · Regenerate and what each costs
+//                image, the prompt on one line with a copy button, what will
+//                be built, then Edit spec · Refine · Regenerate and what
+//                each costs
 //   • Failed   — error card with a retry control
 //
 // Spec §4b: regenerate is a FRESH from-scratch take; refinement is a change
@@ -39,7 +40,13 @@ import { productIdOf } from "@/lib/create/project-state";
 import { ARRIVAL_RING, productCardId, productRetryId } from "./anchors";
 import { useMinuteClock } from "./build-status";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
-import { SpecPanel, type SpecCard } from "./spec-panel";
+import {
+  CARD_ACTION_ICON,
+  CARD_ACTION_ROW,
+  EditSpecButton,
+  SpecPanel,
+  type SpecCard,
+} from "./spec-panel";
 import { elapsedLabel, relativeLabel, useSecondClock } from "./use-clock";
 
 /** Said on both concept controls when the balance cannot cover a render. */
@@ -211,7 +218,11 @@ export function ImageTurn({
 
       <div aria-hidden className="h-px w-full bg-border" />
 
-      <div className="flex flex-wrap items-center gap-[8px]">
+      {/* The free way to change the product first, then the two that redraw
+          the image, and what each costs under them — a maker who types
+          "add a buzzer" into Refine pays for what Edit spec does free. */}
+      <div className={`flex flex-wrap items-center gap-[8px] ${CARD_ACTION_ROW}`}>
+        {spec && <EditSpecButton card={spec} />}
         <button
           type="button"
           onClick={onRefine}
@@ -224,7 +235,7 @@ export function ImageTurn({
           }
           className={shortForRender ? OUTLINE_BUTTON_OFF : OUTLINE_BUTTON}
         >
-          <Icon icon={MagicWand01Icon} />
+          <Icon icon={MagicWand01Icon} className={CARD_ACTION_ICON} />
           Refine
         </button>
         <button
@@ -249,13 +260,17 @@ export function ImageTurn({
                 : OUTLINE_BUTTON
           }
         >
-          <Icon icon={Refresh01Icon} />
+          <Icon icon={Refresh01Icon} className={CARD_ACTION_ICON} />
           Regenerate
         </button>
-        <span className="text-sm text-text-tertiary">
-          {CONCEPT_COST} credit each
-        </span>
         {inBuild && !leftOut && <BuiltChip />}
+        {/* A line of its own: beside three buttons it only ever fitted by
+            wrapping somewhere different on every card width. The price
+            never breaks from its unit. */}
+        <p className="basis-full text-sm text-text-tertiary">
+          {spec?.editable ? "Edit spec is free · " : ""}
+          Refine and Regenerate redraw the image, {CONCEPT_COST}&nbsp;credit each
+        </p>
       </div>
     </article>
   );

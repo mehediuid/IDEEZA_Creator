@@ -2,10 +2,11 @@
 // review aside — so every surface says the same thing about the same product.
 
 import type { ConceptPart } from "../create/concept";
-import { radioOf } from "../create/confidence";
+import { protocolOf } from "../create/confidence";
 import { batteryOf } from "./batteries";
-import { cardFactsOf, needsNoPower, type CardFact } from "./facts";
-import type { Material, ResolvedSpec } from "./types";
+import { RADIOS, radioKeyOf } from "./catalog";
+import { cardFactsOf, needsNoPower, type CardFact, type RadioPair } from "./facts";
+import type { Material, RadioKey, ResolvedSpec } from "./types";
 import { mm3, runtimeLabel } from "./units";
 
 export { needsNoPower, type CardFact, type SpecFactTone } from "./facts";
@@ -42,17 +43,45 @@ export function specLine(name: string, spec: ResolvedSpec): string {
   return `${name} — ${mm3(spec.size)} · ${board} · ${powerLabel(spec)}`;
 }
 
-/** The radio the product uses — a dedicated radio part first, then the one
- *  on its MCU's die (confidence.ts reads it the way the sheet does). Pass
- *  the edited parts: an ESP32 the maker set to None has no radio. */
-export { radioOf };
+// confidence.ts's name table, for a radio module the catalog doesn't list,
+// read back to the sheet's key — so an unlisted nRF24 board is "nRF24L01"
+// here too. Its "Bluetooth" is Bluetooth Classic (an HC-05), which no key is.
+const PROTOCOL_KEY: Record<string, RadioKey> = {
+  "Wi-Fi": "wifi",
+  "Bluetooth LE": "ble",
+  "ESP-NOW": "esp-now",
+  nRF24: "nrf24",
+  LoRa: "lora",
+  Zigbee: "zigbee",
+};
+
+/** The radio the product uses, in the words the spec sheet picks it by
+ *  (`RADIOS[key].label`) — the card, the rail and the review said "nRF24"
+ *  beside a sheet that said "nRF24L01". A dedicated radio part first, then
+ *  the one on its MCU's die, the way the sheet reads it (catalog.ts). Pass
+ *  the edited parts: an ESP32 the maker set to None has no radio. Null for
+ *  none. */
+export function radioOf(parts: ConceptPart[]): string | null {
+  const key = radioKeyOf(parts);
+  if (key) return key === "none" ? null : RADIOS[key].label;
+  const word =
+    protocolOf(parts.filter((p) => p.category === "Connectivity")) ?? protocolOf(parts);
+  const said = word ? PROTOCOL_KEY[word] : undefined;
+  return said ? RADIOS[said].label : word;
+}
 
 export function mcuOf(parts: ConceptPart[]): string | null {
   return parts.find((p) => p.category === "Microcontroller")?.name ?? null;
 }
 
 /** What a card and its rail row say the product will be — chosen by what
- *  the product is (facts.ts), with the radio read off its parts here. */
-export function cardFacts(spec: ResolvedSpec, parts: ConceptPart[]): CardFact[] {
-  return cardFactsOf(spec, parts, radioOf(parts));
+ *  the product is (facts.ts), with the radio read off its parts here, or
+ *  the products it pairs with over it (project-state.ts linksOf) in its
+ *  place, as the rail row says them. */
+export function cardFacts(
+  spec: ResolvedSpec,
+  parts: ConceptPart[],
+  pairs: RadioPair[] = [],
+): CardFact[] {
+  return cardFactsOf(spec, parts, radioOf(parts), pairs);
 }

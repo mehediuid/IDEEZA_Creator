@@ -29,6 +29,8 @@ import {
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { SpecEdits } from "@/lib/spec/types";
 import {
+  linksFor,
+  peersOf,
   productIdOf,
   productNameOf as sharedProductNameOf,
   projectState,
@@ -187,6 +189,8 @@ export function ChatThread({
   // so the canvas and the rail can't work out two different answers to
   // "what changed since the build" or "what doesn't fit" from the same chat.
   const state = React.useMemo(() => projectState(chat, job), [chat, job]);
+  // The products that work together, read once for every card's radio fact.
+  const peers = React.useMemo(() => peersOf(state), [state]);
   const {
     setup,
     answer,
@@ -228,9 +232,12 @@ export function ChatThread({
 
   // Top-aligned: a stand-in line or a size that doesn't fit makes one card
   // a line taller, and stretched rows gave its neighbour a void under its
-  // buttons. The spec itself opens in a sheet, so no card grows for it.
+  // buttons. The spec itself opens in a sheet, so no card grows for it. A
+  // column is 320 px, or the whole canvas where the canvas is narrower —
+  // 768–1000 px windows with the sidebar open left it about 260 px, and a
+  // fixed 320 px column scrolled the canvas sideways.
   const conceptGrid = (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-[20px]">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] items-start gap-[20px]">
       {products.map((turn) => (
         <ImageTurn
           key={turn.id}
@@ -267,6 +274,7 @@ export function ChatThread({
                   spec: specs.get(turn.id) ?? null,
                   // As edited on the sheet — the parts the build will use.
                   parts: parts.get(turn.id) ?? [],
+                  pairs: linksFor(peers, productIdOf(turn)).filter((l) => l.about === "radio"),
                   fallback: !!concepts.get(turn.id)?.fallback,
                   rereading: rereading?.has(turn.id) ?? false,
                   onReread:
