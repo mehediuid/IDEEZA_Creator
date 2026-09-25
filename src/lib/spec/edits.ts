@@ -36,6 +36,7 @@ import {
   isMounting,
   isRadioPart,
   isServo,
+  mcuKeyOf,
   mcuRole,
   partRole,
   type CatalogPart,
@@ -204,9 +205,12 @@ export function applyEdits(parts: ConceptPart[], choices: PartChoices = {}): Con
 
   // A swapped chip would take the radio on its die with it. The product
   // keeps it instead — on the new chip's die, or on a module — unless the
-  // maker picked a radio themselves.
-  const carried = edits.mcu && !edits.radio ? builtInRadioOf(out) : null;
-  if (edits.mcu) out = swapMcu(out, edits.mcu);
+  // maker picked a radio themselves. A chip that is already the one picked
+  // is left as it stands, role and all: a second pass over the first's
+  // output — or a chip given to a chipless product — then carries nothing.
+  const swap = !!edits.mcu && mcuKeyOf(out) !== edits.mcu;
+  const carried = swap && !edits.radio ? builtInRadioOf(out) : null;
+  if (swap && edits.mcu) out = swapMcu(out, edits.mcu);
   if (edits.charges) out = swapCharger(out, edits.charges);
   const radio = edits.radio ?? carried;
   if (radio) {
