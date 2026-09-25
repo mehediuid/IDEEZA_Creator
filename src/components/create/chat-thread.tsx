@@ -17,17 +17,19 @@ import { Add01Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons
 import { Icon } from "@/components/dashboard/icon";
 import { TextInput } from "@/components/ideeza/text-input";
 import {
-  productsOf,
   type BuildJob,
   type ChatSession,
   type ChatTurn,
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import { blocksBuild, deriveSpec, specKey } from "@/lib/spec/derive";
-import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
-import type { ConceptSummary } from "@/lib/create/concept";
-import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
+import { cleanEdits } from "@/lib/spec/hints";
+import type { SpecEdits } from "@/lib/spec/types";
+import {
+  productIdOf,
+  productNameOf as sharedProductNameOf,
+  projectState,
+} from "@/lib/create/project-state";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
@@ -57,9 +59,6 @@ export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
   }
   return out;
 }
-
-/** The key a product's spec edits and open state are filed under. */
-const idOf = (t: Extract<ChatTurn, { role: "assistant" }>) => t.companionOf ?? "primary";
 
 export function ChatThread({
   chat,
@@ -156,141 +155,38 @@ export function ChatThread({
   // stack another card here, so a two-product build with a few refines
   // became a column nobody could see the shape of. The history is not
   // lost — the rail beside this records every render as it happened.
-  const setup = React.useMemo(
-    () => chat.turns.find((t) => t.role === "setup"),
-    [chat.turns],
-  );
-  const answer = setup?.role === "setup" ? setup.answer : undefined;
-
-  // A product taken out of the project keeps its turns (the rail is the
-  // history), so the canvas reads membership from the answer, not from
-  // which products happen to have been drawn.
-  const products = React.useMemo(() => {
-    const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
-    for (const t of chat.turns) {
-      if (t.role !== "assistant") continue;
-      latest.set(t.companionOf ?? "primary", t);
-    }
-    // Primary first; the companions keep the order they were offered in.
-    const primary = latest.get("primary");
-    const rest = [...latest.entries()]
-      .filter(([k]) => k !== "primary" && (!answer || answer.picked.includes(k)))
-      .map(([, t]) => t);
-    return primary ? [primary, ...rest] : rest;
-  }, [chat.turns, answer]);
-
-  // What the next build takes: the primary always (Part 4 §4.4.4), and
-  // every other product the maker has not ticked off.
-  const leftOut = React.useMemo(() => new Set(answer?.leftOut ?? []), [answer]);
-  const selected = React.useMemo(
-    () => products.filter((t) => !t.companionOf || !leftOut.has(t.companionOf)),
-    [products, leftOut],
-  );
-
-  // Each card's concept as read back from storage — checked, because a
-  // stored reading from an older build of this page, or a hand-edited one,
-  // put a part with no name straight into the spec's rules.
-  const concepts = React.useMemo(() => {
-    const out = new Map<string, ConceptSummary | undefined>();
-    for (const t of products) out.set(t.id, asConceptSummary(t.concept));
-    return out;
-  }, [products]);
-
-  // Each ready card's spec, worked out from its concept's parts, the model's
-  // hints and the maker's edits. Null while the concept is still being read.
-  const specs = React.useMemo(() => {
-    const out = new Map<string, ResolvedSpec | null>();
-    for (const t of products) {
-      const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
-      out.set(
-        t.id,
-        concept
-          ? deriveSpec(concept.parts, concept.hints, cleanEdits(answer?.specs?.[idOf(t)]))
-          : null,
-      );
-    }
-    return out;
-  }, [products, concepts, answer]);
-
-  // A chosen product whose size its parts can't fit, and that the maker has
-  // not agreed to build as Draft, holds the build (spec S3).
-  const specBlock = selected.find((t) => {
-    const s = specs.get(t.id);
-    return s && blocksBuild(s);
-  });
+  //
+  // This is the one project model the rail reads too (project-state.ts) —
+  // so the canvas and the rail can't work out two different answers to
+  // "what changed since the build" or "what doesn't fit" from the same chat.
+  const state = React.useMemo(() => projectState(chat, job), [chat, job]);
+  const {
+    setup,
+    answer,
+    products,
+    leftOut,
+    selected,
+    concepts,
+    specs,
+    specBlock,
+    inBuild,
+    conceptChanged,
+    specChanged,
+    changedSinceBuild,
+    available,
+    removed,
+    allReady,
+    failedChoice,
+  } = state;
 
   // Every card is titled with the product it is a drawing of — the name the
   // question gave it, which is the name the rail and the composer use too.
-  const productNameOf = (t: Extract<ChatTurn, { role: "assistant" }>) => {
-    if (setup?.role !== "setup") return undefined;
-    if (!t.companionOf) return setup.productName?.trim() || undefined;
-    return setup.companions.find((c) => c.id === t.companionOf)?.name;
-  };
-
-  // Offered, and not being built: no concept has been drawn for it and the
-  // answer did not include it.
-  const drawn = React.useMemo(
-    () =>
-      new Set(
-        chat.turns
-          .filter((t) => t.role === "assistant" && t.companionOf)
-          .map((t) => (t.role === "assistant" ? t.companionOf! : "")),
-      ),
-    [chat.turns],
-  );
-  const available = React.useMemo(() => {
-    if (setup?.role !== "setup" || setup.status !== "answered") return [];
-    return setup.companions.filter((x) => !drawn.has(x.id));
-  }, [setup, drawn]);
-  // Drawn once, then taken out: their concepts are still here to put back.
-  const removed = React.useMemo(() => {
-    if (setup?.role !== "setup" || !setup.answer) return [];
-    const picked = setup.answer.picked;
-    return setup.companions.filter((x) => drawn.has(x.id) && !picked.includes(x.id));
-  }, [setup, drawn]);
-
-  // Which drawings the current build was made from. A concept changed after
-  // the build — refined, regenerated, or a product added — is not in it, and
-  // the canvas says so: that change used to be charged and then hidden
-  // behind the review card, because the canvas showed nothing else once a
-  // build existed.
-  const builtImages = React.useMemo(
-    () =>
-      new Set(
-        job ? productsOf(job).map((p) => p.conceptImageUrl).filter(Boolean) : [],
-      ),
-    [job],
-  );
-  const inBuild = (t: Extract<ChatTurn, { role: "assistant" }>) =>
-    !!t.imageUrl && builtImages.has(t.imageUrl);
-  // Changed means the next build would differ from the one on screen: a
-  // chosen product drawn again or added, or one the build holds that has
-  // since been left out or removed.
-  // A spec edited after the build is a change too: the booked snapshot is
-  // what the deliverables say, so a different size or pack needs a new build.
-  // A build booked before products had a spec has no snapshot to compare
-  // with — it was made with no decisions at all, so any edit since is one.
-  const specChanged =
-    !!job &&
-    selected.some((t) => {
-      const now = specs.get(t.id);
-      if (!now || !inBuild(t)) return false;
-      const booked = productsOf(job).find((p) => p.id === idOf(t))?.spec;
-      if (!booked) return Object.keys(cleanEdits(answer?.specs?.[idOf(t)])).length > 0;
-      return specKey(now) !== specKey(booked);
-    });
-  const conceptChanged =
-    !!job &&
-    (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
-      builtImages.size !== selected.filter(inBuild).length);
-  const changedSinceBuild = conceptChanged || specChanged;
+  const productNameOf = (t: Extract<ChatTurn, { role: "assistant" }>) =>
+    sharedProductNameOf(setup, t);
 
   const buildable = products.find(
     (t) => t.status === "ready" && !t.companionOf,
   );
-  const allReady =
-    selected.length > 0 && selected.every((t) => t.status === "ready");
-  const failedChoice = selected.find((t) => t.status === "failed");
   const offerBuild = !!buildable && (!job || changedSinceBuild);
 
   // The credit gate is explained ONCE, beside the one build action — every
@@ -336,7 +232,7 @@ export function ChatThread({
           spec={
             turn.status === "ready"
               ? {
-                  productId: idOf(turn),
+                  productId: productIdOf(turn),
                   spec: specs.get(turn.id) ?? null,
                   parts: concepts.get(turn.id)?.parts ?? [],
                   fallback: !!concepts.get(turn.id)?.fallback,
@@ -345,12 +241,12 @@ export function ChatThread({
                     concepts.get(turn.id)?.fallback && onRereadConcept
                       ? () => onRereadConcept(turn.id)
                       : undefined,
-                  edits: cleanEdits(answer?.specs?.[idOf(turn)]),
-                  open: openSpecs?.has(idOf(turn)) ?? false,
-                  onOpenChange: (open) => onSpecOpenChange?.(idOf(turn), open),
+                  edits: cleanEdits(answer?.specs?.[productIdOf(turn)]),
+                  open: openSpecs?.has(productIdOf(turn)) ?? false,
+                  onOpenChange: (open) => onSpecOpenChange?.(productIdOf(turn), open),
                   onChange:
                     answer && onSpecChange
-                      ? (edits) => onSpecChange(idOf(turn), edits)
+                      ? (edits) => onSpecChange(productIdOf(turn), edits)
                       : undefined,
                 }
               : undefined
@@ -466,7 +362,7 @@ export function ChatThread({
               preparing={preparingTurnId === buildable.id}
               specBlock={specBlock ? productNameOf(specBlock) ?? "One product" : undefined}
               onBuild={() =>
-                specBlock ? onFocusSpec?.(idOf(specBlock)) : onBuild(buildable.id)
+                specBlock ? onFocusSpec?.(productIdOf(specBlock)) : onBuild(buildable.id)
               }
             />
           )}

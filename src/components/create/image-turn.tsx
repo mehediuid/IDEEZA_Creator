@@ -38,7 +38,7 @@ import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
 import { useMinuteClock } from "./build-status";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { SpecPanel, type SpecCard } from "./spec-panel";
-import { elapsedLabel, useSecondClock } from "./use-clock";
+import { elapsedLabel, relativeLabel, useSecondClock } from "./use-clock";
 
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
@@ -363,7 +363,7 @@ function ConceptHeader({
 }) {
   // Re-read on the minute clock, so "just now" does not stay "just now".
   const now = useMinuteClock();
-  const time = ts ? formatRelative(ts, now) : "";
+  const time = ts ? relativeLabel(ts, now) : "";
   return (
     <header className="flex items-start justify-between gap-[12px]">
       <div className="flex min-w-0 flex-col gap-[2px]">
@@ -570,18 +570,4 @@ function FailedImageTurn({
       <div className={header ? "px-[4px] pb-[4px]" : "p-[4px]"}>{body}</div>
     </div>
   );
-}
-
-function formatRelative(ts: number, now: number): string {
-  const delta = Math.max(0, now - ts);
-  const sec = Math.floor(delta / 1000);
-  if (sec < 45) return "just now";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} hr ago`;
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
 }
