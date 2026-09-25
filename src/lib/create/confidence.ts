@@ -21,7 +21,7 @@
 // §4.4.10's cross-product compatibility, which two parts lists are enough for.
 
 import { batteryOf } from "../spec/batteries";
-import { radioKeyOf } from "../spec/catalog";
+import { RADIOS, radioKeyOf } from "../spec/catalog";
 import type { RadioKey } from "../spec/types";
 import { currentLabel, mm3 } from "../spec/units";
 import type { BuildJob, BuildProduct } from "./history";
@@ -120,28 +120,34 @@ export function protocolOf(parts: ConceptPart[]): string | null {
   return firstMatch(parts, PROTOCOLS, ["Connectivity", "Microcontroller"]);
 }
 
-/** Each radio the spec sheet can set, in the word the card, the review and
- *  the check below all say it in. */
-const RADIO_WORD: Record<RadioKey, string | null> = {
-  none: null,
-  wifi: "Wi-Fi",
-  ble: "Bluetooth LE",
-  "esp-now": "ESP-NOW",
-  nrf24: "nRF24",
-  lora: "LoRa",
-  zigbee: "Zigbee",
-  cellular: "Cellular",
+/** The name table's words the catalog has a radio for — so a module it
+ *  doesn't list still prints the way the sheet names that radio. Its
+ *  "Bluetooth" is Bluetooth Classic (an HC-05), which no key is. */
+const PROTOCOL_KEY: Record<string, RadioKey> = {
+  "Wi-Fi": "wifi",
+  "Bluetooth LE": "ble",
+  "ESP-NOW": "esp-now",
+  nRF24: "nrf24",
+  LoRa: "lora",
+  Zigbee: "zigbee",
 };
 
-/** The radio a product uses, read the way the spec sheet reads it
- *  (catalog.ts): its radio module first, then the one on its MCU's die —
- *  so an ESP32 set to None says no radio, and one beside a LoRa module says
- *  LoRa, not the Wi-Fi its name carries. A module the catalog has no word
- *  for falls back to the name table above. Null for none. */
+/** The radio a product uses, in the words the spec sheet picks it by
+ *  (`RADIOS[key].label` — "nRF24L01", "LoRa SX1276"), so the review's
+ *  compatibility issues name it as the sheet, the card and the rail do: a
+ *  word table of its own here said "nRF24" beside a sheet that said
+ *  "nRF24L01". Read the way the sheet reads it (catalog.ts): its radio
+ *  module first, then the one on its MCU's die — so an ESP32 set to None
+ *  says no radio, and one beside a LoRa module says LoRa, not the Wi-Fi its
+ *  name carries. A module the catalog doesn't list falls back to the name
+ *  table above. Null for none. */
 export function radioOf(parts: ConceptPart[]): string | null {
   const key = radioKeyOf(parts);
-  if (key) return RADIO_WORD[key];
-  return protocolOf(parts.filter((p) => p.category === "Connectivity")) ?? protocolOf(parts);
+  if (key) return key === "none" ? null : RADIOS[key].label;
+  const word =
+    protocolOf(parts.filter((p) => p.category === "Connectivity")) ?? protocolOf(parts);
+  const said = word ? PROTOCOL_KEY[word] : undefined;
+  return said ? RADIOS[said].label : word;
 }
 
 export function connectorOf(parts: ConceptPart[]): string | null {
