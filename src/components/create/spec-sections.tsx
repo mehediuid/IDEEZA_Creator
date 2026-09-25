@@ -1,21 +1,26 @@
 "use client";
 
-// The spec sheet's sections below Size — what powers the product, its brain,
-// its radio, what moves, senses, controls and shows, its case — each one a
-// set of controls over the parts the build will use (lib/spec/edits.ts), and
-// only the ones this product has. The concept image stays as the look: the
-// parts change here, the drawing does not. Every edit applies as it is made
-// through the sheet's `edit`, which also says what happened to a screen
-// reader and puts the keyboard where the change shows.
+// The spec sheet's sections below Size — what powers the product, what moves,
+// senses, controls and shows, its radio, its case, its brain and what is
+// inside it — each one a set of controls over the parts the build will use
+// (lib/spec/edits.ts), and only the ones this product has. A charger says
+// what it charges and a spare pack what pack it is, in place of a power
+// source neither has. Every choice says what it is for before its part
+// number. The concept image stays as the look: the parts change here, the
+// drawing does not. Every edit applies as it is made through the sheet's
+// `edit`, which also says what happened — and what it did elsewhere — to a
+// screen reader, and puts the keyboard where the change shows.
 
 import * as React from "react";
-import { Add01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { NumberInput } from "@/components/ideeza/number-input";
 import { Segmented } from "@/components/ideeza/segmented";
 import { SelectMenu, type SelectOption } from "@/components/ideeza/select-menu";
 import type { ConceptPart } from "@/lib/create/concept";
+import type { ProductLink } from "@/lib/create/project-state";
 import { BATTERIES, batteryOf } from "@/lib/spec/batteries";
+import { qtyOf } from "@/lib/spec/bodies";
 import {
   ADDABLE,
   ADD_GROUPS,
@@ -26,13 +31,15 @@ import {
   MOUNTINGS,
   RADIOS,
   SERVOS,
-  builtInRadios,
   chargePortOf,
+  driverWord,
   environmentOf,
   isChargePort,
   isDriveMotor,
+  isGasket,
   isMcu,
   isMotorDriver,
+  isMounting,
   isRadioPart,
   isServo,
   mcuKeyOf,
@@ -41,25 +48,36 @@ import {
   partRole,
   radioChoices,
   radioKeyOf,
+  radioSub,
   servosOf,
+  wallNote,
 } from "@/lib/spec/catalog";
-import { productKind, smallestPack } from "@/lib/spec/derive";
+import { canAddBrain, deriveSpec, productKind, smallestPack } from "@/lib/spec/derive";
 import {
   CHIP_ROLES,
   addableFor,
   asPart,
+  chargePortChoices,
   removePart,
   resetSection,
   sectionEdited,
+  withBrain,
   withElectronics,
+  withSupply,
+  withoutBrain,
   withoutElectronics,
   type ChipRole,
 } from "@/lib/spec/edits";
-import { readableName } from "@/lib/spec/facts";
-import { FAB_PROFILE, MATERIAL_NOTE, boardLabel, needsNoPower } from "@/lib/spec/format";
-import { COUNT_MAX, WALL_MAX_MM, WALL_MIN_MM, WALL_STEP_MM } from "@/lib/spec/hints";
 import {
-  CHARGE_PORT_KEYS,
+  DOES_LABEL,
+  chargesOf,
+  insideOf,
+  readableName,
+  replacedNotRecharged,
+} from "@/lib/spec/facts";
+import { MATERIAL_NOTE, needsNoPower } from "@/lib/spec/format";
+import { COUNT_MAX, WALL_MAX_MM, WALL_MIN_MM, WALL_STEP_MM, cleanEdits } from "@/lib/spec/hints";
+import {
   ENVIRONMENT_KEYS,
   MATERIALS,
   MCU_KEYS,
@@ -76,25 +94,32 @@ import {
   type ServoKey,
   type SpecEdits,
 } from "@/lib/spec/types";
-import { currentLabel, runtimeLabel } from "@/lib/spec/units";
+import { currentLabel, mm3, runtimeLabel } from "@/lib/spec/units";
 import { OUTLINE_BUTTON } from "./buttons";
 import { SPEC_SHEET_ID } from "./spec-panel";
 import type { SheetProduct } from "./spec-sheet";
 
-/** Who decided each value, in words a maker reads without a legend. */
-export const DECIDED: Record<"you" | "concept" | "ai" | "rule" | "calc", string> = {
-  you: "You set",
-  concept: "From the concept",
-  ai: "Suggested by AI",
-  rule: "Default",
-  calc: "Estimated",
+/** Whether the maker changed a section — the only thing its tag says. What
+ *  the concept, the AI or the rules put there reads as one word: the maker
+ *  needs to know whether they set it, not which of three sources did. */
+export const tagFor = (edited: boolean) => (edited ? "You set" : "Suggested");
+
+/** An edit, with what to tell a screen reader it did, where the keyboard
+ *  goes once it has rendered — the control that was pressed is often gone —
+ *  and what caused it, which the knock-on line names ("Radio → Wi-Fi: …").
+ *  `size` marks a change to the size itself: the fields show it, so the
+ *  knock-on line is cleared rather than restating it. */
+export type Edit = (
+  next: SpecEdits,
+  after?: { say?: string; focus?: string; cause?: string; size?: boolean },
+) => void;
+
+type Props = {
+  product: SheetProduct;
+  edit?: Edit;
+  /** Selects another product of the project — its sheet opens in place. */
+  onOpen?: (productId: string) => void;
 };
-
-/** An edit, with what to tell a screen reader it did and where the keyboard
- *  goes once it has rendered — the control that was pressed is often gone. */
-export type Edit = (next: SpecEdits, after?: { say?: string; focus?: string }) => void;
-
-type Props = { product: SheetProduct; edit?: Edit };
 
 export const sectionId = (s: string) => `${SPEC_SHEET_ID}-${s}`;
 const headingId = (s: string) => `${sectionId(s)}-title`;
@@ -105,7 +130,7 @@ const focusHeading = (s: string) => headingId(s);
 
 // 24 px tall to the eye; the press reaches 10 px above and below, so a
 // thumb finds it (44 px) without the header row growing on a phone.
-const QUIET_BUTTON =
+export const QUIET_BUTTON =
   "relative inline-flex min-h-[24px] items-center rounded-sm px-[4px] font-medium text-text-secondary underline-offset-2 outline-none after:absolute after:inset-x-0 after:-inset-y-[10px] after:content-[''] hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-border-focus";
 
 export function Section({
@@ -117,7 +142,7 @@ export function Section({
 }: {
   id: string;
   title: string;
-  /** Who decided it — "You set", "From the concept", … */
+  /** "You set" or "Suggested"; none on a section there is nothing to set in. */
   tag?: string;
   /** A quiet way back to the concept, while the section has edits. */
   reset?: { label?: string; name: string; onReset: () => void };
@@ -198,11 +223,71 @@ function ReadOnly({ children }: { children: React.ReactNode }) {
   return <p className="text-md text-text-primary">{children}</p>;
 }
 
-function Note({ children, tone = "plain" }: { children: React.ReactNode; tone?: "plain" | "error" }) {
+type Tone = "plain" | "warn" | "error";
+
+/** A line under a control. A warning or an error carries its icon too — the
+ *  colour alone is not the message. */
+function Note({ children, tone = "plain" }: { children: React.ReactNode; tone?: Tone }) {
+  const ink = tone === "error" ? "text-text-error" : tone === "warn" ? "text-text-warning" : "text-text-tertiary";
   return (
-    <p className={["text-sm", tone === "error" ? "text-text-error" : "text-text-tertiary"].join(" ")}>
+    <p className={`text-sm ${ink}`}>
+      {tone !== "plain" && (
+        <span aria-hidden className="mr-[6px] inline-flex translate-y-[2px]">
+          <Icon icon={Alert02Icon} size={14} />
+        </span>
+      )}
       {children}
     </p>
+  );
+}
+
+/** Label and value rows, every value starting on the same line — a wrapping
+ *  row per pair dropped a short value under its label. */
+function Rows({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] text-sm">
+      {rows.map(([label, value], i) => (
+        <React.Fragment key={label}>
+          <dt
+            className={[
+              "py-[6px] pr-[16px] text-text-tertiary",
+              i > 0 ? "border-t border-solid border-border" : "",
+            ].join(" ")}
+          >
+            {label}
+          </dt>
+          <dd
+            className={[
+              "min-w-0 py-[6px] text-text-primary",
+              i > 0 ? "border-t border-solid border-border" : "",
+            ].join(" ")}
+          >
+            {value}
+          </dd>
+        </React.Fragment>
+      ))}
+    </dl>
+  );
+}
+
+/** What this product works with in the project, each with a way to open the
+ *  other's sheet: "Talks to Remote Controller — both use nRF24L01.", or in
+ *  the error tone what no longer works and how to put it right. */
+function LinkNotes({ links, onOpen }: { links: ProductLink[]; onOpen?: (productId: string) => void }) {
+  if (!links.length) return null;
+  return (
+    <>
+      {links.map((l) => (
+        <div key={`${l.about}-${l.otherId}`} className="flex flex-col items-start gap-[2px]">
+          <Note tone={l.ok ? "plain" : "error"}>{l.text}</Note>
+          {onOpen && (
+            <button type="button" onClick={() => onOpen(l.otherId)} className={`-ml-[4px] text-sm ${QUIET_BUTTON}`}>
+              Open {l.otherName}
+            </button>
+          )}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -224,12 +309,15 @@ const fromConcept = (p: ConceptPart | undefined, none: string) =>
 function CountField({
   id,
   value,
+  what,
   disabled,
   describedBy,
   onCommit,
 }: {
   id: string;
   value: number;
+  /** What it counts, for its −/+ buttons' names — "motor count". */
+  what: string;
   disabled?: boolean;
   describedBy?: string;
   onCommit: (n: number) => void;
@@ -250,6 +338,7 @@ function CountField({
       max={COUNT_MAX}
       disabled={disabled}
       ariaDescribedBy={describedBy}
+      stepsWhat={what}
       onChange={(v) => {
         setDraft(v);
         const n = Number(v);
@@ -267,20 +356,51 @@ type PowerMode = "battery" | "usb" | "wall";
 
 const PACKS = BATTERIES.filter((b) => b.key !== "none" && b.key !== "adapter");
 
-export function PowerSection({ product, edit }: Props) {
-  const { spec, edits, parts, conceptParts, hints } = product;
-  const id = "power";
-  const edited = sectionEdited(edits, id, conceptParts);
-  const reset = edit && edited
+const MODE_WORD: Record<PowerMode, string> = { battery: "Battery", usb: "USB cable", wall: "Wall adapter" };
+
+/** The pack menu: each pack with what it would give this product — its
+ *  runtime here, its size, whether it is charged or replaced — worked out as
+ *  if it were picked. A pack that can't give the draw can't be picked, and
+ *  says why: the one place the milliamps earn their place. */
+function packOptions(product: SheetProduct): SelectOption<BatteryKey>[] {
+  const { edits, conceptParts, hints } = product;
+  return PACKS.map((b) => {
+    const s = deriveSpec(conceptParts, hints, cleanEdits(withSupply(edits, b.key, conceptParts)));
+    const weak = b.maxMa < s.drawMa;
+    const runtime = runtimeLabel(s.runtimeH);
+    const sub = weak
+      ? `Too weak for this — gives ${currentLabel(b.maxMa)}, needs ${currentLabel(s.drawMa)}`
+      : [
+          runtime ? `${runtime} here` : null,
+          b.body ? mm3(b.body) : null,
+          replacedNotRecharged(b.key) ? "replace, not recharge" : "rechargeable",
+        ]
+          .filter(Boolean)
+          .join(" · ");
+    return { label: b.label, value: b.key, sub, disabled: weak };
+  });
+}
+
+const powerReset = (product: SheetProduct, edit: Edit | undefined, id: string, name: string) =>
+  edit && sectionEdited(product.edits, "power", product.conceptParts)
     ? {
-        name: "Power",
+        name,
         onReset: () =>
-          edit(resetSection(edits, id, conceptParts), {
-            say: "Power is back to the concept's.",
+          edit(resetSection(product.edits, "power", product.conceptParts), {
+            say: `${name} is back to the concept's.`,
             focus: focusHeading(id),
+            cause: `${name} reset`,
           }),
       }
     : undefined;
+
+const powerLinks = (product: SheetProduct) => product.links.filter((l) => l.about === "power");
+
+export function PowerSection({ product, edit, onOpen }: Props) {
+  const { spec, edits, parts, conceptParts, hints } = product;
+  const id = "power";
+  const edited = sectionEdited(edits, id, conceptParts);
+  const reset = powerReset(product, edit, id, "Power");
 
   // Nothing in it draws current: there is no pack to pick, and a list of
   // them would ask the maker to power a thing with no circuit.
@@ -299,49 +419,46 @@ export function PowerSection({ product, edit }: Props) {
   const portPart = parts.find(isChargePort);
   const packId = `${sectionId(id)}-pack`;
   const portId = `${sectionId(id)}-port`;
+  // A pack that is thrown away is not charged through anything.
+  const replaced = mode === "battery" && replacedNotRecharged(spec.battery);
+  const portLabel = mode === "battery" && !replaced ? "Charge port" : "Power port";
 
-  // A supply comes with the socket it needs: a wall adapter a barrel jack,
-  // USB a USB-C port where there was none — so the parts the build uses can
-  // take the power the sheet says. A pack keeps whatever port charges it.
+  // A supply comes with the socket it needs (withSupply): a wall adapter a
+  // barrel jack, USB a USB port — and a barrel jack left from the wall goes
+  // again when the product comes back to a pack or USB.
   const setMode = (m: PowerMode) => {
     if (!edit || m === mode) return;
-    const next: SpecEdits = { ...edits };
-    if (m === "usb") {
-      next.battery = "none";
-      if (port === "barrel" || port === "none") next.chargePort = "usb-c";
-    } else if (m === "wall") {
-      next.battery = "adapter";
-      if (port !== "barrel") next.chargePort = "barrel";
-    } else {
-      next.battery = smallestPack(spec.drawMa, hints?.runtimeGoalH, hints?.useCase);
-    }
-    edit(next, {
+    const battery: BatteryKey =
+      m === "usb" ? "none" : m === "wall" ? "adapter" : smallestPack(spec.drawMa, hints?.runtimeGoalH, hints?.useCase);
+    edit(withSupply(edits, battery, conceptParts), {
       say:
         m === "battery"
-          ? `Battery: ${batteryOf(next.battery as BatteryKey).label}.`
+          ? `Battery: ${batteryOf(battery).label}.`
           : m === "usb"
-            ? "Powered over USB."
+            ? "Powered over a USB cable."
             : "Powered by a wall adapter.",
+      cause: `Power → ${m === "battery" ? batteryOf(battery).label : MODE_WORD[m]}`,
     });
   };
 
   const over = spec.drawMa > spec.budgetMa;
-  const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
-  // A pack's runtime is every part's typical current summed as if it never
-  // slept — honest arithmetic, but "~4.8 h" alone reads as a promise. The
-  // model has no duty-cycle data to do better, so the caveat rides beside
-  // the number instead of implying the number is more precise than it is.
-  const runtime = mode === "battery" ? runtimeLabel(spec.runtimeH) : null;
+  const runtime = runtimeLabel(spec.runtimeH)?.replace(/^~/, "");
+  const numbers = `${currentLabel(spec.drawMa)} of ${currentLabel(spec.budgetMa)}`;
   const line = over
-    ? `Draws about ${currentLabel(spec.drawMa)} — more than ${supply} gives (${currentLabel(spec.budgetMa)}).`
-    : spec.battery === "none"
-      ? `Draws about ${currentLabel(spec.drawMa)} of the ${currentLabel(spec.budgetMa)} USB gives.`
-      : runtime
-        ? `${runtime} per charge at full draw — sleep modes stretch it · draws about ${currentLabel(spec.drawMa)}`
-        : spec.drawMa === 0
-          ? "Draws almost nothing"
-          : `Draws about ${currentLabel(spec.drawMa)}`;
-  const portLabel = mode === "battery" ? "Charge port" : "Power port";
+    ? mode === "battery"
+      ? `Needs more power than this gives — ${numbers}. Pick a bigger pack.`
+      : mode === "usb"
+        ? `Needs more power than USB gives — ${numbers}. Use a wall adapter or a battery.`
+        : `Needs more power than the adapter gives — ${numbers}.`
+    : mode === "usb"
+      ? "No battery — it runs only while plugged in."
+      : mode === "wall"
+        ? "No battery — it runs only while plugged into the wall."
+        : runtime
+          ? replaced
+            ? `Runs about ${runtime} per battery with everything on — replace, not recharge.`
+            : `Runs about ${runtime} per charge with everything on — longer when it rests.`
+          : "Draws almost nothing.";
 
   return (
     <Section
@@ -349,7 +466,7 @@ export function PowerSection({ product, edit }: Props) {
       // "Power", whichever it is: the choice between a battery and a cord is
       // the section's first control, so its heading can't be one of them.
       title="Power"
-      tag={edited ? DECIDED.you : DECIDED[spec.batterySource]}
+      tag={tagFor(edited)}
       reset={reset}
     >
       {edit ? (
@@ -357,18 +474,16 @@ export function PowerSection({ product, edit }: Props) {
           <Segmented<PowerMode>
             label="Power source"
             value={mode}
-            options={[
-              { label: "Battery", value: "battery" },
-              { label: "USB", value: "usb" },
-              { label: "Wall adapter", value: "wall" },
-            ]}
+            options={(["battery", "usb", "wall"] as const).map((m) => ({ label: MODE_WORD[m], value: m }))}
             onChange={setMode}
           />
+          {/* One track when the port is alone, so it fills the row; the
+              sheet's own width decides this, never the window's. */}
           <div
             className={
               mode === "battery"
                 ? "grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-[8px]"
-                : "grid grid-cols-[minmax(0,1fr)] gap-[8px] sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+                : "grid grid-cols-[minmax(0,1fr)] gap-[8px]"
             }
           >
             {mode === "battery" && (
@@ -380,8 +495,13 @@ export function PowerSection({ product, edit }: Props) {
                   ariaLabel="Pack"
                   placeholder="Choose a pack"
                   value={spec.battery}
-                  options={PACKS.map((b) => ({ label: b.label, value: b.key }))}
-                  onChange={(v) => edit({ ...edits, battery: v }, { say: `Battery: ${batteryOf(v).label}.` })}
+                  options={packOptions(product)}
+                  onChange={(v) =>
+                    edit(withSupply(edits, v, conceptParts), {
+                      say: `Battery: ${batteryOf(v).label}.`,
+                      cause: `Pack → ${batteryOf(v).label}`,
+                    })
+                  }
                 />
               </Field>
             )}
@@ -391,15 +511,16 @@ export function PowerSection({ product, edit }: Props) {
                 ariaLabel={portLabel}
                 placeholder={fromConcept(portPart, "Choose a port")}
                 value={port}
-                // Plugged in, the power comes through the port, so "None"
-                // is a battery's alone — one that is never charged.
-                options={CHARGE_PORT_KEYS.filter((k) => mode === "battery" || k !== "none").map((k) => ({
+                // Plugged in, the power comes through the port, so "None" is
+                // a pack's alone; a barrel jack is the wall's.
+                options={chargePortChoices(spec.battery, conceptParts).map((k) => ({
                   label: CHARGE_PORTS[k].label,
                   value: k,
                 }))}
                 onChange={(v) =>
                   edit({ ...edits, chargePort: v }, {
                     say: v === "none" ? "No port." : `${CHARGE_PORTS[v].label} port.`,
+                    cause: `${portLabel} → ${CHARGE_PORTS[v].label}`,
                   })
                 }
               />
@@ -412,101 +533,201 @@ export function PowerSection({ product, edit }: Props) {
           {portPart ? ` · ${readableName(portPart)}` : ""}
         </ReadOnly>
       )}
+      {/* A port set to None on something the cable powers — an older edit
+          can still hold one. */}
+      {spec.noUsbPort && <Note tone="warn">USB powered, but nothing takes the power in — pick a port.</Note>}
       <Note tone={over ? "error" : "plain"}>{line}</Note>
+      <LinkNotes links={powerLinks(product)} onOpen={onOpen} />
+    </Section>
+  );
+}
+
+/** A charger's cells in words a maker knows them by. */
+const CELL_WORDS: Record<string, string> = {
+  "1S Li-Po": "1S Li-Po (one cell, 3.7 V)",
+  "2S Li-Po": "2S Li-Po (two cells, 7.4 V)",
+  "3S Li-Po": "3S Li-Po (three cells, 11.1 V)",
+  "AA cells": "AA cells",
+};
+
+/** A charger's section, in place of a power source it isn't choosing: what
+ *  it charges, what it plugs into, and whether that is the pack of the
+ *  product it is for. No draw — it is the thing that gives the power. */
+export function ChargesSection({ product, edit, onOpen }: Props) {
+  const { spec, edits, parts, conceptParts } = product;
+  const id = "charges";
+  const charges = chargesOf(parts) ?? chargesOf(conceptParts);
+  const port = chargePortOf(parts);
+  const portPart = parts.find(isChargePort);
+  const portId = `${sectionId(id)}-port`;
+  const cell = charges ? (CELL_WORDS[charges.cell] ?? charges.cell) : "Batteries";
+  return (
+    <Section
+      id={id}
+      title="Charges"
+      tag={tagFor(sectionEdited(edits, "power", conceptParts))}
+      reset={powerReset(product, edit, id, "Charges")}
+    >
+      <ReadOnly>{cell}</ReadOnly>
+      {edit ? (
+        <Field id={portId} label="Plugs into">
+          <SelectMenu<ChargePortKey>
+            id={portId}
+            ariaLabel="Plugs into"
+            placeholder={fromConcept(portPart, "Choose a port")}
+            value={port}
+            options={chargePortChoices(spec.battery, conceptParts).map((k) => ({
+              label: CHARGE_PORTS[k].label,
+              value: k,
+            }))}
+            onChange={(v) =>
+              edit({ ...edits, chargePort: v }, {
+                say: `Plugs into ${CHARGE_PORTS[v].label}.`,
+                cause: `Plugs into → ${CHARGE_PORTS[v].label}`,
+              })
+            }
+          />
+        </Field>
+      ) : (
+        <ReadOnly>Plugs into {port && port !== "none" ? CHARGE_PORTS[port].label : (charges?.port ?? "nothing")}</ReadOnly>
+      )}
+      <LinkNotes links={powerLinks(product)} onOpen={onOpen} />
+    </Section>
+  );
+}
+
+/** A spare pack's section: the pack it is and what it plugs in with — it is
+ *  the power, so there is no battery, USB or wall adapter to choose — and
+ *  whether it still swaps into the product it is a spare for. */
+export function PackSection({ product, edit, onOpen }: Props) {
+  const { spec, edits, parts, conceptParts } = product;
+  const id = "pack";
+  const packId = `${sectionId(id)}-select`;
+  const pack = batteryOf(spec.battery);
+  // What its lead ends in: the concept's own connector, not a case fitting.
+  const connector = parts.find(
+    (p) => p.category === "Connector & mech" && !isMounting(p) && !isGasket(p),
+  );
+  const links = powerLinks(product);
+  return (
+    <Section
+      id={id}
+      title="Pack"
+      tag={tagFor(sectionEdited(edits, "power", conceptParts))}
+      reset={powerReset(product, edit, id, "Pack")}
+    >
+      {edit ? (
+        <Field id={packId} label="Pack">
+          <SelectMenu<BatteryKey>
+            id={packId}
+            ariaLabel="Pack"
+            placeholder="Choose a pack"
+            value={spec.battery === "none" || spec.battery === "adapter" ? null : spec.battery}
+            options={packOptions(product)}
+            onChange={(v) =>
+              edit(withSupply(edits, v, conceptParts), {
+                say: `Pack: ${batteryOf(v).label}.`,
+                cause: `Pack → ${batteryOf(v).label}`,
+              })
+            }
+          />
+        </Field>
+      ) : (
+        <ReadOnly>{pack.label}</ReadOnly>
+      )}
+      <Rows rows={[["Plugs in with", connector ? readableName(connector) : "Nothing named yet"]]} />
+      {links.length ? (
+        <LinkNotes links={links} onOpen={onOpen} />
+      ) : (
+        pack.mAh > 0 && (
+          <Note>
+            {pack.mAh} mAh at {pack.volts} V
+            {replacedNotRecharged(spec.battery) ? " — replace, not recharge." : "."}
+          </Note>
+        )
+      )}
     </Section>
   );
 }
 
 // ───────────────────────────── Brain ─────────────────────────────
 
-const RADIO_WORDS = (keys: RadioKey[]) => keys.map((k) => RADIOS[k].label);
-
-/** "Wi-Fi, BLE and ESP-NOW built in" — what a chip speaks with no module. */
-function onDieNote(k: McuKey): string {
-  const words = RADIO_WORDS(builtInRadios(asPart(MCUS[k])));
-  if (!words.length) return "No radio on the chip";
-  const list = words.length > 1 ? `${words.slice(0, -1).join(", ")} and ${words.at(-1)}` : words[0];
-  return `${list} built in`;
-}
-
 export const brainSelectId = `${sectionId("brain")}-mcu`;
 export const addElectronicsId = `${sectionId("electronics")}-add`;
+const addChipId = `${sectionId("brain")}-add`;
 
 export function BrainSection({ product, edit }: Props) {
-  const { spec, edits, parts, conceptParts } = product;
-  const chip = parts.find(isMcu);
-  if (!chip) return null;
+  const { edits, parts, conceptParts } = product;
   const id = "brain";
+  const chip = parts.find(isMcu);
+  if (!chip) {
+    // Electronics with nothing to run them — a charger, a spare pack — can
+    // be given a chip, which opens its radio and the parts it can run.
+    if (!canAddBrain(parts)) return null;
+    return (
+      <Section id={id} title="Brain">
+        <ReadOnly>No chip — add one to give it sensors, a screen or wireless</ReadOnly>
+        {edit && (
+          <div>
+            <button
+              id={addChipId}
+              type="button"
+              className={OUTLINE_BUTTON}
+              onClick={() =>
+                edit(withBrain(edits), {
+                  say: "Added an ESP32-C3 — the sheet now shows its radio, and parts can be added.",
+                  focus: brainSelectId,
+                  cause: "Added a chip",
+                })
+              }
+            >
+              <Icon icon={Add01Icon} size={16} />
+              Add a chip
+            </button>
+          </div>
+        )}
+      </Section>
+    );
+  }
   const key = mcuKeyOf(parts);
   // Electronics a plate was given are undone as one thing — taking the chip
   // out alone would leave its port on a board of its own.
-  const given = productKind(conceptParts) === "mechanical";
-  const edited = given || sectionEdited(edits, id, conceptParts);
-  // A plate's electronics come out with their own button, below: that takes
-  // the power and the radio with it, which no one section's Reset does.
+  const givenElectronics = productKind(conceptParts) === "mechanical";
+  // A chip a charger or a pack was given comes out with its radio, by its
+  // own button — Brain's Reset alone would leave the radio's module behind.
+  const givenChip = canAddBrain(conceptParts) && !!edits.mcu;
+  const edited = givenElectronics || givenChip || sectionEdited(edits, id, conceptParts);
   const reset =
-    edit && edited && !given
+    edit && edited && !givenElectronics && !givenChip
       ? {
           name: "Brain",
           onReset: () =>
             edit(resetSection(edits, id, conceptParts), {
               say: "The brain is back to the concept's.",
               focus: focusHeading(id),
+              cause: "Brain reset",
             }),
         }
       : undefined;
-  const rows: [string, string][] = [
-    ["Circuit board", boardLabel(spec)],
-    // A product with no board is not made to a board house's rules.
-    ...(spec.board ? [["Made to", FAB_PROFILE] as [string, string]] : []),
-  ];
   return (
-    <Section
-      id={id}
-      title="Brain"
-      tag={edited ? DECIDED.you : DECIDED.concept}
-      reset={reset}
-    >
+    <Section id={id} title="Brain" tag={tagFor(edited)} reset={reset}>
       {edit ? (
-        <Field id={brainSelectId} label="Microcontroller">
+        <Field id={brainSelectId} label="Chip that runs it">
           <SelectMenu<McuKey>
             id={brainSelectId}
-            ariaLabel="Microcontroller"
-            placeholder={fromConcept(chip, "Choose a microcontroller")}
+            ariaLabel="Chip that runs it"
+            placeholder={fromConcept(chip, "Choose a chip")}
             value={key}
-            options={MCU_KEYS.map((k) => ({ label: MCUS[k].label, value: k, sub: onDieNote(k) }))}
-            onChange={(v) => edit({ ...edits, mcu: v }, { say: `Runs on the ${MCUS[v].label}.` })}
+            options={MCU_KEYS.map((k) => ({ label: MCUS[k].label, value: k, sub: MCUS[k].forWhat }))}
+            onChange={(v) =>
+              edit({ ...edits, mcu: v }, { say: `Runs on the ${MCUS[v].label}.`, cause: `Chip → ${MCUS[v].label}` })
+            }
           />
         </Field>
       ) : (
         <ReadOnly>{readableName(chip)}</ReadOnly>
       )}
-      {/* One grid, so every value starts on the same line: a wrapping row
-          per pair pushed a long value (the fab profile) into a ragged block
-          and dropped a short one under its label. */}
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] text-sm">
-        {rows.map(([label, value], i) => (
-          <React.Fragment key={label}>
-            <dt
-              className={[
-                "py-[6px] pr-[16px] text-text-tertiary",
-                i > 0 ? "border-t border-solid border-border" : "",
-              ].join(" ")}
-            >
-              {label}
-            </dt>
-            <dd
-              className={[
-                "min-w-0 py-[6px] text-text-primary",
-                i > 0 ? "border-t border-solid border-border" : "",
-              ].join(" ")}
-            >
-              {value}
-            </dd>
-          </React.Fragment>
-        ))}
-      </dl>
-      {given && edit && (
+      {givenElectronics && edit && (
         <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[8px]">
           <button
             type="button"
@@ -515,6 +736,7 @@ export function BrainSection({ product, edit }: Props) {
               edit(withoutElectronics(edits), {
                 say: "Electronics removed — this product has no parts to power.",
                 focus: addElectronicsId,
+                cause: "Removed electronics",
               })
             }
           >
@@ -525,13 +747,31 @@ export function BrainSection({ product, edit }: Props) {
           </span>
         </div>
       )}
+      {givenChip && edit && (
+        <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[8px]">
+          <button
+            type="button"
+            className={OUTLINE_BUTTON}
+            onClick={() =>
+              edit(withoutBrain(edits), {
+                say: "Chip removed.",
+                focus: addChipId,
+                cause: "Removed the chip",
+              })
+            }
+          >
+            Remove chip
+          </button>
+          <span className="text-sm text-text-tertiary">Takes the chip and its radio back out.</span>
+        </div>
+      )}
     </Section>
   );
 }
 
-// ─────────────────────────── Connects ───────────────────────────
+// ─────────────────────────── Wireless ───────────────────────────
 
-export function ConnectsSection({ product, edit }: Props) {
+export function WirelessSection({ product, edit, onOpen }: Props) {
   const { edits, parts, conceptParts } = product;
   const chip = parts.find(isMcu);
   // A radio needs a chip to speak through it.
@@ -541,34 +781,26 @@ export function ConnectsSection({ product, edit }: Props) {
   const edited = sectionEdited(edits, id, conceptParts);
   const key = radioKeyOf(parts);
   const radioPart = parts.find(isRadioPart);
-  const chipLabel = mcuKeyOf(parts) ? MCUS[mcuKeyOf(parts)!].label : readableName(chip);
   const options: SelectOption<RadioKey>[] = radioChoices(parts).map((c) => ({
     value: c.key,
     label: c.label,
-    sub:
-      c.key === "none"
-        ? "No radio"
-        : c.builtIn
-          ? `Built into the ${chipLabel}`
-          : `On a separate ${RADIOS[c.key].module?.label ?? c.label} module`,
+    sub: radioSub(c.key, c.builtIn),
   }));
-  const current = key ? RADIOS[key].label : radioPart ? readableName(radioPart) : "No radio";
-  // A plate given electronics speaks what its new chip has on its die — the
-  // default, not anything its concept said.
-  const given = productKind(conceptParts) === "mechanical";
+  const current = key ? RADIOS[key].label : radioPart ? readableName(radioPart) : "No wireless";
   return (
     <Section
       id={id}
-      title="Connects"
-      tag={edited ? DECIDED.you : given ? DECIDED.rule : DECIDED.concept}
+      title="Wireless"
+      tag={tagFor(edited)}
       reset={
         edit && edited
           ? {
-              name: "Connects",
+              name: "Wireless",
               onReset: () =>
                 edit(resetSection(edits, id, conceptParts), {
                   say: "The radio is back to the concept's.",
                   focus: focusHeading(id),
+                  cause: "Wireless reset",
                 }),
             }
           : undefined
@@ -583,13 +815,17 @@ export function ConnectsSection({ product, edit }: Props) {
             value={key}
             options={options}
             onChange={(v) =>
-              edit({ ...edits, radio: v }, { say: v === "none" ? "No radio." : `Connects over ${RADIOS[v].label}.` })
+              edit({ ...edits, radio: v }, {
+                say: v === "none" ? "No wireless." : `Connects over ${RADIOS[v].label}.`,
+                cause: `Radio → ${RADIOS[v].label}`,
+              })
             }
           />
         </Field>
       ) : (
         <ReadOnly>{current}</ReadOnly>
       )}
+      <LinkNotes links={product.links.filter((l) => l.about === "radio")} onOpen={onOpen} />
     </Section>
   );
 }
@@ -598,6 +834,21 @@ export function ConnectsSection({ product, edit }: Props) {
 
 const servoSelectId = `${sectionId("moves")}-servo`;
 const motorSelectId = `${sectionId("moves")}-motor`;
+
+/** "A motor driver chip (TB6612FNG) is added to run it." — the part the
+ *  motors bring with them, by what it is and then its number. */
+function driverNote(driver: ConceptPart, kind: MotorKey | null, motors: number): string {
+  const drivers = qtyOf(driver.name);
+  const bare = driver.name.replace(/\s*\(x\d+\)$/, "");
+  const known = kind ? MOTORS[kind].driver.part : undefined;
+  const catalog = known && known.name === bare ? known : Object.values(MOTORS).find((m) => m.driver.part.name === bare)?.driver.part;
+  const label = catalog?.label ?? bare.replace(/\s+(?:motor|stepper)?\s*driver(?:\s+(?:module|board))?$/i, "");
+  const word = catalog ? driverWord(catalog) : /\besc\b/i.test(bare) ? "speed controller" : "motor driver chip";
+  const them = motors > 1 ? "them" : "it";
+  return drivers > 1
+    ? `${drivers} ${word}s (${label}) are added to run ${them}.`
+    : `A ${word} (${label}) is added to run ${them}.`;
+}
 
 export function MovesSection({ product, edit }: Props) {
   const { edits, parts, conceptParts } = product;
@@ -619,7 +870,7 @@ export function MovesSection({ product, edit }: Props) {
     <Section
       id={id}
       title="Moves"
-      tag={edited ? DECIDED.you : DECIDED.concept}
+      tag={tagFor(edited)}
       reset={
         edit && edited
           ? {
@@ -628,6 +879,7 @@ export function MovesSection({ product, edit }: Props) {
                 edit(resetSection(edits, id, conceptParts), {
                   say: "What moves is back to the concept's.",
                   focus: focusHeading(id),
+                  cause: "Moves reset",
                 }),
             }
           : undefined
@@ -643,15 +895,12 @@ export function MovesSection({ product, edit }: Props) {
                   ariaLabel="Motor"
                   placeholder={fromConcept(motorPart, "Choose a motor")}
                   value={motors.kind}
-                  options={MOTOR_KEYS.map((k) => ({
-                    label: MOTORS[k].label,
-                    value: k,
-                    sub: `Driver: ${MOTORS[k].driver.part.label}`,
-                  }))}
+                  // The note under the row names the driver it brings.
+                  options={MOTOR_KEYS.map((k) => ({ label: MOTORS[k].label, value: k, sub: MOTORS[k].forWhat }))}
                   onChange={(v) =>
                     edit(
                       { ...edits, motors: { kind: v, count: Math.max(1, motors.count) } },
-                      { say: `${Math.max(1, motors.count)} × ${MOTORS[v].label}.` },
+                      { say: `${Math.max(1, motors.count)} × ${MOTORS[v].label}.`, cause: `Motor → ${MOTORS[v].label}` },
                     )
                   }
                 />
@@ -660,6 +909,7 @@ export function MovesSection({ product, edit }: Props) {
                 <CountField
                   id={motorCountId}
                   value={motors.count}
+                  what="motor count"
                   // A count is a count of a catalog motor: one the catalog
                   // doesn't list can't be multiplied without being swapped.
                   disabled={motors.kind === null}
@@ -668,7 +918,10 @@ export function MovesSection({ product, edit }: Props) {
                     motors.kind &&
                     edit(
                       { ...edits, motors: { kind: motors.kind, count: n } },
-                      { say: n ? `${n} × ${MOTORS[motors.kind].label}.` : "No drive motors." },
+                      {
+                        say: n ? `${n} × ${MOTORS[motors.kind].label}.` : "No drive motors.",
+                        cause: `Motors → ${n}`,
+                      },
                     )
                   }
                 />
@@ -679,7 +932,7 @@ export function MovesSection({ product, edit }: Props) {
                 <span id={motorHintId}>Pick a motor from the list to change how many.</span>
               </Note>
             ) : driver ? (
-              <Note>Driven by {counted(driver)}.</Note>
+              <Note>{driverNote(driver, motors.kind, motors.count)}</Note>
             ) : motors.count === 0 ? (
               <Note>No drive motors — the product stays where it is put.</Note>
             ) : null}
@@ -701,7 +954,7 @@ export function MovesSection({ product, edit }: Props) {
                 onChange={(v) =>
                   edit(
                     { ...edits, servos: { kind: v, count: Math.max(1, servos.count) } },
-                    { say: `${Math.max(1, servos.count)} × ${SERVOS[v].label}.` },
+                    { say: `${Math.max(1, servos.count)} × ${SERVOS[v].label}.`, cause: `Servo → ${SERVOS[v].label}` },
                   )
                 }
               />
@@ -710,12 +963,13 @@ export function MovesSection({ product, edit }: Props) {
               <CountField
                 id={servoCountId}
                 value={servos.count}
+                what="servo count"
                 disabled={servos.kind === null}
                 onCommit={(n) =>
                   servos.kind &&
                   edit(
                     { ...edits, servos: { kind: servos.kind, count: n } },
-                    { say: n ? `${n} × ${SERVOS[servos.kind].label}.` : "No servos." },
+                    { say: n ? `${n} × ${SERVOS[servos.kind].label}.` : "No servos.", cause: `Servos → ${n}` },
                   )
                 }
               />
@@ -725,6 +979,8 @@ export function MovesSection({ product, edit }: Props) {
           <ReadOnly>{servoPart ? counted(servoPart) : "No servos"}</ReadOnly>
         )
       ) : (
+        // The one way a moving product gains a servo: Add a part leaves
+        // servos out while this section shows.
         edit && (
           <div>
             <button
@@ -734,11 +990,12 @@ export function MovesSection({ product, edit }: Props) {
                 edit({ ...edits, servos: { kind: "sg90", count: 1 } }, {
                   say: "Added SG90 servo.",
                   focus: servoSelectId,
+                  cause: "Added SG90 servo",
                 })
               }
             >
               <Icon icon={Add01Icon} size={14} />
-              Add a servo
+              Add a servo — steering, flaps or an arm
             </button>
           </div>
         )
@@ -748,14 +1005,6 @@ export function MovesSection({ product, edit }: Props) {
 }
 
 // ─────────────────── Senses · Controls · Shows · … ───────────────────
-
-const ROLE_TITLE: Record<ChipRole, string> = {
-  senses: "Senses",
-  controls: "Controls",
-  shows: "Shows",
-  sounds: "Sounds",
-  switches: "Switches",
-};
 
 /** What the maker took out of a role, said once it is empty: "The Joystick
  *  is out of the build, so nothing controls it." */
@@ -776,7 +1025,8 @@ const chipId = (name: string) =>
 export const addPartId = `${SPEC_SHEET_ID}-add-part`;
 
 /** One section per role the product has parts in — or had, before the maker
- *  took them out, so its Reset can still bring them back. */
+ *  took them out, so its Reset can still bring them back. Titled by the
+ *  card's own words for what a part does (DOES_LABEL), one classifier. */
 export function ChipSections({ product, edit }: Props) {
   const { edits, parts, conceptParts } = product;
   return (
@@ -785,20 +1035,22 @@ export function ChipSections({ product, edit }: Props) {
         const own = parts.filter((p) => partRole(p) === role);
         const edited = sectionEdited(edits, role, conceptParts);
         if (!own.length && !edited) return null;
+        const title = DOES_LABEL[role];
         return (
           <Section
             key={role}
             id={role}
-            title={ROLE_TITLE[role]}
-            tag={edited ? DECIDED.you : DECIDED.concept}
+            title={title}
+            tag={tagFor(edited)}
             reset={
               edit && edited
                 ? {
-                    name: ROLE_TITLE[role],
+                    name: title,
                     onReset: () =>
                       edit(resetSection(edits, role, conceptParts), {
-                        say: `${ROLE_TITLE[role]} is back to the concept's.`,
+                        say: `${title} is back to the concept's.`,
                         focus: focusHeading(role),
+                        cause: `${title} reset`,
                       }),
                   }
                 : undefined
@@ -825,6 +1077,7 @@ export function ChipSections({ product, edit }: Props) {
                             edit(removePart(edits, p, conceptParts), {
                               say: `Removed ${readableName(p)}.`,
                               focus: next ? chipId(next.name) : addPartId,
+                              cause: `Removed ${readableName(p)}`,
                             })
                           }
                           // The press reaches past the circle to 32 × 44 — not
@@ -848,53 +1101,65 @@ export function ChipSections({ product, edit }: Props) {
   );
 }
 
-/** The one "+ Add a part" menu, grouped the way the sections are — and a
- *  Moves group for a product with nothing that moves yet. Only on a product
- *  with a chip to run what it adds. */
+/** The one "Add a part" menu, grouped the way the sections are, each part
+ *  by what it is for with its part number under it — and a Moves group for
+ *  a product with nothing that moves yet. Once Moves shows, it adds its own
+ *  servo, so servos leave this menu; motors leave it once there are motors.
+ *  Only on a product with a chip to run what it adds. */
 export function AddPart({ product, edit }: Props) {
   const { edits, parts } = product;
   if (!edit || !parts.some(isMcu)) return null;
   const hasMotors = !!(edits.motors ?? motorsOf(parts));
   const hasServos = !!(edits.servos ?? servosOf(parts));
+  const movesShown = hasMotors || hasServos;
   const options: SelectOption[] = [
     ...(hasMotors
       ? []
-      : MOTOR_KEYS.map((k) => ({ value: `motor:${k}`, label: MOTORS[k].label, section: "Moves" }))),
-    ...(hasServos
+      : MOTOR_KEYS.map((k) => ({ value: `motor:${k}`, label: MOTORS[k].label, sub: MOTORS[k].forWhat, section: "Moves" }))),
+    ...(movesShown
       ? []
-      : SERVO_KEYS.map((k) => ({ value: `servo:${k}`, label: SERVOS[k].label, section: "Moves" }))),
+      : SERVO_KEYS.map((k) => ({ value: `servo:${k}`, label: SERVOS[k].label, sub: SERVOS[k].role, section: "Moves" }))),
     ...ADD_GROUPS.flatMap((g) =>
       addableFor(parts)
         .filter((k) => ADDABLE[k].group === g)
-        .map((k) => ({ value: `part:${k}`, label: ADDABLE[k].label, section: g })),
+        .map((k) => ({ value: `part:${k}`, label: ADDABLE[k].plain, sub: ADDABLE[k].label, section: g })),
     ),
   ];
   const add = (v: string) => {
     const [kind, key] = v.split(":");
     if (kind === "motor") {
       const k = key as MotorKey;
-      edit({ ...edits, motors: { kind: k, count: 1 } }, { say: `Added ${MOTORS[k].label}.`, focus: motorSelectId });
+      edit(
+        { ...edits, motors: { kind: k, count: 1 } },
+        { say: `Added ${MOTORS[k].label}.`, focus: motorSelectId, cause: `Added ${MOTORS[k].label}` },
+      );
     } else if (kind === "servo") {
       const k = key as ServoKey;
-      edit({ ...edits, servos: { kind: k, count: 1 } }, { say: `Added ${SERVOS[k].label}.`, focus: servoSelectId });
+      edit(
+        { ...edits, servos: { kind: k, count: 1 } },
+        { say: `Added ${SERVOS[k].label}.`, focus: servoSelectId, cause: `Added ${SERVOS[k].label}` },
+      );
     } else {
       const k = key as keyof typeof ADDABLE;
-      edit({ ...edits, added: [...(edits.added ?? []), k] }, { say: `Added ${ADDABLE[k].name}.` });
+      edit(
+        { ...edits, added: [...(edits.added ?? []), k] },
+        { say: `Added ${ADDABLE[k].name}.`, cause: `Added ${ADDABLE[k].label}` },
+      );
     }
   };
+  // A heading of its own, so it reads as the way in to the sections above
+  // it rather than one more field; the heading names the menu.
   return (
-    <div className="border-t border-solid border-border py-[16px]">
-      <Field id={addPartId} label="Add a part">
-        <SelectMenu<string>
-          id={addPartId}
-          ariaLabel="Add a part"
-          placeholder="Choose a sensor, control, display…"
-          value={null}
-          options={options}
-          onChange={add}
-        />
-      </Field>
-    </div>
+    <Section id="add" title="Add a part">
+      <SelectMenu<string>
+        id={addPartId}
+        ariaLabel="Add a part"
+        placeholder="Choose a sensor, control, display…"
+        value={null}
+        options={options}
+        onChange={add}
+      />
+    </Section>
   );
 }
 
@@ -923,7 +1188,7 @@ export function CaseSection({
     <Section
       id={id}
       title="Case"
-      tag={edited ? DECIDED.you : DECIDED[spec.materialSource]}
+      tag={tagFor(edited)}
       reset={
         edit && edited
           ? {
@@ -932,6 +1197,7 @@ export function CaseSection({
                 edit(resetSection(edits, id, conceptParts), {
                   say: "The case is back to the concept's.",
                   focus: focusHeading(id),
+                  cause: "Case reset",
                 }),
             }
           : undefined
@@ -944,22 +1210,28 @@ export function CaseSection({
               label="Case plastic"
               value={spec.material}
               options={MATERIALS.map((m) => ({ label: m, value: m }))}
-              onChange={(m) => edit({ ...edits, material: m }, { say: `${m} case.` })}
+              onChange={(m) => edit({ ...edits, material: m }, { say: `${m} case.`, cause: `Plastic → ${m}` })}
             />
           </Choice>
           <Note>
             {spec.material} — {MATERIAL_NOTE[spec.material]}
           </Note>
-          <Field id={wallId} label="Wall" className="max-w-[160px]">
+          <Field id={wallId} label="Wall" className="max-w-[200px]">
             <SelectMenu<string>
               id={wallId}
               ariaLabel="Wall"
               placeholder="Choose a wall"
               value={String(spec.wallMm)}
-              options={WALLS.map((w) => ({ label: `${w.toFixed(1)} mm`, value: String(w) }))}
-              onChange={(v) => edit({ ...edits, wallMm: Number(v) }, { say: `${Number(v).toFixed(1)} mm wall.` })}
+              options={WALLS.map((w) => ({ label: `${w.toFixed(1)} mm`, value: String(w), sub: wallNote(w) }))}
+              onChange={(v) =>
+                edit(
+                  { ...edits, wallMm: Number(v) },
+                  { say: `${Number(v).toFixed(1)} mm wall.`, cause: `Wall → ${Number(v).toFixed(1)} mm` },
+                )
+              }
             />
           </Field>
+          <Note>Thicker walls make the outside bigger.</Note>
           {sealing && (
             <>
               <Choice label="Where it's used">
@@ -967,7 +1239,12 @@ export function CaseSection({
                   label="Where it's used"
                   value={environment}
                   options={ENVIRONMENT_KEYS.map((k) => ({ label: ENVIRONMENTS[k].label, value: k }))}
-                  onChange={(v) => edit({ ...edits, environment: v }, { say: `${ENVIRONMENTS[v].label}.` })}
+                  onChange={(v) =>
+                    edit(
+                      { ...edits, environment: v },
+                      { say: `${ENVIRONMENTS[v].label}.`, cause: `Where it's used → ${ENVIRONMENTS[v].label}` },
+                    )
+                  }
                 />
               </Choice>
               {environment !== "indoor" && (
@@ -1004,7 +1281,7 @@ export function MountingSection({ product, edit, always }: Props & { always: boo
     <Section
       id={id}
       title="Mounting"
-      tag={edited ? DECIDED.you : current ? DECIDED.concept : undefined}
+      tag={edited || current ? tagFor(edited) : undefined}
       reset={
         edit && edited
           ? {
@@ -1013,6 +1290,7 @@ export function MountingSection({ product, edit, always }: Props & { always: boo
                 edit(resetSection(edits, id, conceptParts), {
                   say: "Mounting is back to the concept's.",
                   focus: focusHeading(id),
+                  cause: "Mounting reset",
                 }),
             }
           : undefined
@@ -1025,7 +1303,10 @@ export function MountingSection({ product, edit, always }: Props & { always: boo
           label="Mounting"
           value={current ?? "none"}
           options={MOUNTING_KEYS.map((k) => ({ label: MOUNTINGS[k].label, value: k }))}
-          onChange={(v) => v !== "none" && edit({ ...edits, mounting: v }, { say: `${MOUNTINGS[v].label}.` })}
+          onChange={(v) =>
+            v !== "none" &&
+            edit({ ...edits, mounting: v }, { say: `${MOUNTINGS[v].label}.`, cause: `Mounting → ${MOUNTINGS[v].label}` })
+          }
         />
       ) : (
         <ReadOnly>{part ? part.label : "None"}</ReadOnly>
@@ -1057,6 +1338,7 @@ export function ElectronicsSection({ product, edit }: Props) {
               edit(withElectronics(edits), {
                 say: "Added an ESP32-C3 and a USB-C port — the sheet now shows its power, brain and radio.",
                 focus: brainSelectId,
+                cause: "Added electronics",
               })
             }
           >
@@ -1065,6 +1347,36 @@ export function ElectronicsSection({ product, edit }: Props) {
           </button>
         </div>
       )}
+    </Section>
+  );
+}
+
+// ───────────────────────────── Inside ─────────────────────────────
+
+/** Everything the build will make, in one place and in plain words: the
+ *  board, each part on it and what it does, and what is wired to it off
+ *  the board. Read-only — every part is changed in the section it belongs
+ *  to — so it carries no tag and no Reset. */
+export function InsideSection({ product }: Props) {
+  const { spec, parts } = product;
+  const inside = insideOf(spec, parts);
+  const rows: [string, React.ReactNode][] = [["Circuit board", <span key="b" className="tabular-nums">{inside.board}</span>]];
+  if (inside.on.length) {
+    rows.push([
+      "On the board",
+      <ul key="on" role="list" className="flex flex-col gap-[4px]">
+        {inside.on.map((r, i) => (
+          <li key={`${r.name}-${i}`}>
+            {r.name} <span className="text-text-tertiary">— {r.does}</span>
+          </li>
+        ))}
+      </ul>,
+    ]);
+  }
+  if (inside.wired.length) rows.push(["Wired to it", inside.wired.join(" · ")]);
+  return (
+    <Section id="inside" title="Inside">
+      <Rows rows={rows} />
     </Section>
   );
 }

@@ -30,15 +30,17 @@ import {
 } from "@/lib/create/history";
 import { summaryFromParts, type ConceptSummary } from "@/lib/create/concept";
 import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
-import { blocksBuild, deriveSpec, partsForBuild } from "@/lib/spec/derive";
-import { applyEdits } from "@/lib/spec/edits";
+import { blocksBuild, deriveSpec, effectiveParts, partsForBuild } from "@/lib/spec/derive";
+import { rebaseEdits } from "@/lib/spec/edits";
 import { cardFacts, specLine } from "@/lib/spec/format";
-import { asConceptSummary, cleanChoices, cleanEdits } from "@/lib/spec/hints";
+import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
   composerTarget,
+  linksFor,
+  peersOf,
   productNameOf,
   sheetTurnOf,
   type JumpTarget,
@@ -126,7 +128,7 @@ function gateLine(
   concept: ConceptSummary,
   edits: SpecEdits,
 ): string {
-  const parts = applyEdits(concept.parts, cleanChoices(edits));
+  const parts = effectiveParts(concept.parts, spec.battery, edits);
   const line = specLine(name, spec);
   const what = cardFacts(spec, parts)
     // A spare pack's pack is its power already — said once.
@@ -348,6 +350,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // What the page's announcer says for the sheet: a docked one opening beside
   // the canvas moves no focus, so it is said instead.
   const [sheetNote, setSheetNote] = React.useState<{ text: string; n: number } | null>(null);
+  // Counts the sends the composer held — nothing selected to change — while
+  // its line under the box says so (PromptBar's HELD_MS, 6 s, or the next
+  // keystroke). A second send restarts the clock, as it does the line.
+  const [held, setHeld] = React.useState(0);
+  React.useEffect(() => {
+    if (!held) return;
+    const timer = window.setTimeout(() => setHeld(0), 6_000);
+    return () => window.clearTimeout(timer);
+  }, [held]);
   const handleSpecChange = React.useCallback(
     (productId: string, edits: SpecEdits) => {
       if (!chat) return;
@@ -371,6 +382,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   React.useEffect(() => {
     editsNow.current = editsFor;
   }, [editsFor]);
+  // Those edits as they apply to the concept being built — as the sheet and
+  // the card read them (rebaseEdits): a part taken out that this concept
+  // doesn't carry takes nothing out of it.
+  const editsAt = (productId: string, conceptParts: ConceptSummary["parts"], turnId: string) =>
+    rebaseEdits(editsNow.current(productId), conceptParts, turnId).edits;
   // The build this chat started, if it has one. Derived rather than held
   // in state, so a reload lands back on the build instead of an empty
   // canvas — the job record already knows which chat it came from.
@@ -1185,7 +1201,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           return (known ? Promise.resolve(known) : readForBuild(turn, brief)).then((concept) => {
             // One read of the edits for both: the spec and the parts it was
             // worked out from can't come from two different sets of them.
-            const edits = editsNow.current(companion.id);
+            const edits = editsAt(companion.id, concept.parts, turn.id);
             const spec = deriveSpec(concept.parts, concept.hints, edits);
             // The parts as the maker edited them on the sheet, with the
             // spec's pack — what the BOM, the wiring and the firmware say,
@@ -1226,7 +1242,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // the gate taking focus as it opens, one edit after its lines. A
       // product that no longer fits is not booked; the gate closes on its
       // size instead.
-      const edits = editsNow.current("primary");
+      const edits = editsAt("primary", concept.parts, source.turnId);
       const spec = deriveSpec(concept.parts, concept.hints, edits);
       const blocked = blocksBuild(spec)
         ? "primary"
@@ -1338,7 +1354,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         const companionId = t.companionOf;
         const name = productNameOf(names, t);
         void readForBuild(t, source.prompt).then((concept) => {
-          const edits = editsNow.current(companionId);
+          const edits = editsAt(companionId, concept.parts, t.id);
           const spec = deriveSpec(concept.parts, concept.hints, edits);
           // A size that can't be built goes to its card, as the primary's does.
           if (blocksBuild(spec)) focusSpec(companionId);
@@ -1403,7 +1419,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         // Worked out once every reading is in, from the edits as they are
         // then — the readings can take seconds, and the card stays editable.
         const read = reads.map((r, i) => {
-          const edits = editsNow.current(r.productId);
+          const edits = editsAt(r.productId, concepts[i].parts, r.turn.id);
           const spec = deriveSpec(concepts[i].parts, concepts[i].hints, edits);
           const name = productNameOf(names, r.turn) || concepts[i].title;
           return { productId: r.productId, line: gateLine(name, spec, concepts[i], edits), spec };
@@ -1542,6 +1558,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     if (!turn || !spec || focusedProduct === null) return null;
     const answer = railState.answer;
     const concept = railState.concepts.get(turn.id);
+    const editedOn = railState.editedOn.get(turn.id);
+    const peers = peersOf(railState);
     return {
       productId: focusedProduct,
       name: sheetNameOf(railState.setup, turn, labels),
@@ -1550,11 +1568,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       parts: railState.parts.get(turn.id) ?? [],
       conceptParts: concept?.parts ?? [],
       hints: concept?.hints,
-      edits: cleanEdits(answer?.specs?.[focusedProduct]),
+      // As they apply to this concept — the ones the spec was worked out with.
+      edits: railState.edits.get(turn.id) ?? {},
+      turnId: turn.id,
+      editedOn: editedOn === undefined ? null : (labels.get(editedOn) ?? ""),
+      links: linksFor(peers, focusedProduct),
+      peers,
       onChange: answer ? (edits) => handleSpecChange(focusedProduct, edits) : undefined,
+      // The sheet follows the selection to the product it works with.
+      onOpenProduct: (productId) => select(productId),
       fallback: !!concept?.fallback,
     };
-  }, [specSheet, focusedProduct, railState, labels, handleSpecChange]);
+  }, [specSheet, focusedProduct, railState, labels, handleSpecChange, select]);
   // select's other half (review M11): an open sheet whose product has nothing
   // to show — drawing again, failed, just added, being read — closes here,
   // whichever path moved the selection or the drawing, and stays closed.
@@ -1653,10 +1678,24 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           />
         </div>
         <div className="border-t border-solid border-border">
-          <div className="w-full px-[14px] py-[14px]">
+          <div
+            className="w-full px-[14px] py-[14px]"
+            // The composer clears its held line on the next keystroke; the
+            // hint under it comes back with it.
+            onKeyDown={(e) => {
+              if (!held || (e.key === "Enter" && !e.shiftKey)) return;
+              if (!["Shift", "Control", "Alt", "Meta"].includes(e.key)) setHeld(0);
+            }}
+          >
           <PromptBar
             onSubmit={(text) => {
-              if (!handleUserSubmit(text)) return false;
+              if (!handleUserSubmit(text)) {
+                // The composer says why under the box (heldMessage); the
+                // hint below would say it again, so it steps aside.
+                if (target.kind === "none") setHeld((n) => n + 1);
+                return false;
+              }
+              setHeld(0);
               // On a phone the answer appears on the other tab.
               setPane("work");
             }}
@@ -1684,6 +1723,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                   : undefined
             }
           />
+          {!(held && target.kind === "none") && (
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
             {!canRender
               ? "You are out of credits — top them up to draw another concept."
@@ -1694,13 +1734,16 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                   : target.kind === "none"
                     ? `Pick a product above to refine it · ${CONCEPT_COST} credit, or name a new one to add it.`
                     : target.kind === "refine"
-                    ? `Refines ${target.name} · ${CONCEPT_COST} credit.${
-                        // A chat from before the question has one product and
-                        // nowhere to add another.
-                        rail.state.setup ? " Pick another product above, or name a new one to add it." : ""
+                    ? // What a sentence here costs, beside what doesn't: the
+                      // parts, the size and the power change in the spec,
+                      // for nothing, and the image stays.
+                      `Redraws ${target.name}'s image · ${CONCEPT_COST} credit.${
+                        // A chat from before the question has no spec to edit.
+                        rail.state.setup ? " Parts, size and power change free in its spec." : ""
                       }`
                     : `Each drawing costs ${CONCEPT_COST} credit.`}
           </p>
+          )}
           </div>
         </div>
       </aside>

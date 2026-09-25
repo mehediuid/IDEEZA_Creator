@@ -368,7 +368,7 @@ export function partDoes(p: ConceptPart): string {
     case "switches":
       return "switches a load on and off";
     case "case":
-      return "part of the case";
+      return /jst|header|terminal|connector|socket|plug/.test(n) ? "where the wires plug in" : "part of the case";
     default:
       return KIND_WORD[p.category]?.toLowerCase() ?? "a part";
   }
