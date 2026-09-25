@@ -123,9 +123,18 @@ export type SpecEdits = PartChoices & {
   draftAtSize?: boolean;
   /** 1.2–4 mm in 0.4 mm steps (hints.ts). */
   wallMm?: number;
+  /** The turn whose concept the part changes were made on — so a newer
+   *  concept can say they still apply (rebaseEdits, edits.ts). It decides
+   *  nothing that is built, so specKey never sees it. */
+  basedOn?: string;
 };
 
 export type ResolvedSpec = {
+  /** "mechanical" when the parts it was worked out from are nothing but
+   *  hardware — no pack, nothing on a board, nothing drawing current
+   *  (productKind, derive.ts). The one rule every surface says "No
+   *  electronics" by (needsNoPower, facts.ts). */
+  kind: "electronic" | "mechanical";
   size: Mm3;
   sizeSource: "you" | "calc";
   /** Nothing is routed yet, so this is the parts' own footprint — ±15%. */
@@ -138,6 +147,10 @@ export type ResolvedSpec = {
   /** "concept" is the pack the parts themselves name — ranked above the AI's
    *  hint, since the maker already told the model what battery it has. */
   batterySource: "you" | "concept" | "ai" | "rule";
+  /** USB powered and drawing current, with no port to take the power in —
+   *  the maker set the port to None. It stays on USB rather than being
+   *  quietly given a pack, and the sheet says what is missing. */
+  noUsbPort: boolean;
   drawMa: number;
   budgetMa: number;
   runtimeH: number | null;

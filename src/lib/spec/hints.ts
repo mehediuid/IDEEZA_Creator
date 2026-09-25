@@ -145,6 +145,9 @@ export function cleanEdits(raw: unknown): SpecEdits {
   if (e.draftAtSize === true) out.draftAtSize = true;
   const wallMm = asWallMm(e.wallMm);
   if (wallMm !== undefined) out.wallMm = wallMm;
+  // A turn id is the client's own, so it is only held to being text.
+  const basedOn = typeof e.basedOn === "string" ? e.basedOn.trim() : "";
+  if (basedOn && basedOn.length <= NAME_MAX) out.basedOn = basedOn;
   return out;
 }
 
@@ -189,27 +192,40 @@ export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
       : null;
   const smallerKey = smaller?.key;
   const smallerMin = smaller ? asBox(smaller.minSize) : undefined;
+  const boardRead =
+    board && isNum(board.w) && isNum(board.h) && isNum(board.parts)
+      ? { w: board.w, h: board.h, parts: board.parts, layers: 2 as const }
+      : null;
+  // Checked like an edit's: a wall off the printer's steps is no wall, and
+  // the snapshot reads as the rule's 2 mm — never as one the maker chose.
+  const wallMm = asWallMm(s.wallMm);
   return {
+    // A snapshot from before `kind` says it by the rule it used then: no
+    // board, nothing drawing, no pack.
+    kind:
+      s.kind === "mechanical" || s.kind === "electronic"
+        ? s.kind
+        : !boardRead && drawMa === 0 && battery === "none"
+          ? "mechanical"
+          : "electronic",
     size,
     sizeSource: s.sizeSource === "you" ? "you" : "calc",
     minSize,
     fits: s.fits !== false,
     draftAtSize: s.draftAtSize === true,
-    board:
-      board && isNum(board.w) && isNum(board.h) && isNum(board.parts)
-        ? { w: board.w, h: board.h, parts: board.parts, layers: 2 }
-        : null,
+    board: boardRead,
     battery,
     batterySource: batteryDecidedBy(s.batterySource),
+    noUsbPort: s.noUsbPort === true,
     drawMa,
     budgetMa,
     runtimeH: isNum(s.runtimeH) ? s.runtimeH : null,
     material,
     materialSource: decidedBy(s.materialSource),
-    wallMm: isNum(s.wallMm) ? s.wallMm : 2,
+    wallMm: wallMm ?? 2,
     // A snapshot from before part edits made none, so it reads as the rule's
     // wall and no choices — the same key a spec with no edits gives today.
-    wallSource: s.wallSource === "you" ? "you" : "rule",
+    wallSource: s.wallSource === "you" && wallMm !== undefined ? "you" : "rule",
     choices: cleanChoices(s.choices),
     estimated: Array.isArray(s.estimated)
       ? s.estimated.filter((x): x is string => typeof x === "string")

@@ -11,6 +11,7 @@
 import type { ConceptPart } from "../create/concept";
 import { batteryOf, isBatteryPart } from "./batteries";
 import { qtyOf } from "./bodies";
+import { partRole } from "./catalog";
 import type { ResolvedSpec } from "./types";
 import { mm3 } from "./units";
 
@@ -26,11 +27,14 @@ export type CardFact = {
   tone: SpecFactTone;
 };
 
-/** A product with nothing in it that draws current — a plate, a case, a
- *  stand. The rules leave it on "none", which reads as USB power; for a part
- *  with no port and no circuit that is a claim, not a fact. */
+/** A product with no electronics — a plate, a case, a stand: nothing but
+ *  hardware, so no pack, nothing on a board and nothing drawing current
+ *  (the spec's `kind`, productKind in derive.ts). The one rule the card's
+ *  "No electronics", the power line's "No power needed" and boardLabel's
+ *  "None — no electronics" all say it by. A spare battery pack is not one:
+ *  a pack is power, not hardware. */
 export function needsNoPower(spec: ResolvedSpec): boolean {
-  return spec.drawMa === 0 && spec.battery === "none";
+  return spec.kind === "mechanical";
 }
 
 /** "~7 h", "~45 min" — the card's rounder runtime. The sheet keeps
@@ -57,7 +61,7 @@ export function cardFactsOf(
       : `${mm3(spec.size)} — ${spec.draftAtSize ? "Draft" : "doesn't fit"}`,
     tone: spec.fits ? "plain" : spec.draftAtSize ? "warn" : "error",
   };
-  if (!spec.board && spec.drawMa === 0) {
+  if (needsNoPower(spec)) {
     return [
       size,
       { key: "material", label: "Material", value: spec.material, tone: "plain" },
@@ -91,8 +95,11 @@ const CHARGER = /charg|tp40\d\d|mcp738\d\d|bq24\d+|ip5306/i;
 // is the one that says what the product does.
 const DRIVER =
   /driver|controller|\besc\b|h-bridge|\bl29[38]|\bdrv\d|tb6612|a4988|tmc2\d{3}|uln2003|pca9685/i;
-const DISPLAY = /oled|lcd|tft|e-?ink|e-?paper|display|screen|matrix|segment|neopixel|led ring/i;
+// partRole files every I/O part that isn't a display under Controls; the
+// card names one only when its name says it is one.
 const CONTROL = /joystick|button|keypad|encoder|potentiometer|\bknob|switch|touch|slider|trigger|d-?pad/i;
+// A status or indicator LED is on nearly everything, so it says the least.
+const INDICATOR = /\bleds?\b.*\b(?:status|indicator)\b|\b(?:status|indicator)\b.*\bleds?\b/i;
 // What a sensor measures, from the names the models use for them.
 const SENSES: [RegExp, string][] = [
   [/gps|gnss|neo-?\d?m/i, "GPS"],
@@ -155,8 +162,48 @@ function counted(part: ConceptPart): string {
   return `${n} × ${short(bare)}`;
 }
 
+/** What a part can say a product does, in the order a card picks one: what
+ *  it moves, shows, is controlled by, switches, sounds, then senses. The
+ *  roles are the sheet's own sections — one classifier, partRole. */
+export const DOES = ["moves", "shows", "controls", "switches", "sounds", "senses"] as const;
+export type Does = (typeof DOES)[number];
+
+/** The word a card says each in: the sheet's section titles, but for what
+ *  moves — the product drives a motor, a servo, a pump. */
+export const DOES_LABEL: Record<Does, string> = {
+  moves: "Drives",
+  shows: "Shows",
+  controls: "Controls",
+  switches: "Switches",
+  sounds: "Sounds",
+  senses: "Senses",
+};
+
+/** The one part that says what the product does, and what that is — read
+ *  by partRole, the classifier the sheet files its sections by, so the card
+ *  and the sheet never disagree. A motor driver is passed over for the
+ *  motor it drives; a designator, or an I/O part whose name says nothing,
+ *  says nothing; a status LED comes last. Null when no part says. */
+export function whatItDoes(parts: ConceptPart[]): { does: Does; part: ConceptPart } | null {
+  const said: { does: Does; part: ConceptPart; rank: number }[] = [];
+  for (const part of parts) {
+    if (isDesignator(part)) continue;
+    const role = partRole(part);
+    const does = DOES.find((d) => d === role);
+    if (!does) continue;
+    if (does === "moves" && DRIVER.test(part.name)) continue;
+    if (does === "controls" && !CONTROL.test(part.name)) continue;
+    const rank = does === "shows" && INDICATOR.test(part.name) ? DOES.length : DOES.indexOf(does);
+    said.push({ does, part, rank });
+  }
+  // The first part in the list wins a tie.
+  let best: (typeof said)[number] | null = null;
+  for (const s of said) if (!best || s.rank < best.rank) best = s;
+  return best && { does: best.does, part: best.part };
+}
+
 /** The one part that says what the product does — the first that applies of
- *  a charger or a pack, an actuator, a display or control, a sensor. */
+ *  a charger, a pack, then whatItDoes. */
 function partFact(spec: ResolvedSpec, parts: ConceptPart[]): CardFact | null {
   // A charger is the product when it has no pack of its own to charge; one
   // inside a handheld is only how that handheld's cell gets filled.
@@ -178,21 +225,14 @@ function partFact(spec: ResolvedSpec, parts: ConceptPart[]): CardFact | null {
       tone: "plain",
     };
   }
-  // A part named only by its designator says nothing about what it does.
-  const named = parts.filter((p) => !isDesignator(p));
-  const actuator = named.find((p) => p.category === "Actuator" && !DRIVER.test(p.name));
-  if (actuator) return { key: "part", label: "Drives", value: counted(actuator), tone: "plain" };
-  for (const p of named) {
-    if (p.category !== "Display & I/O") continue;
-    if (DISPLAY.test(p.name)) return { key: "part", label: "Shows", value: counted(p), tone: "plain" };
-    if (CONTROL.test(p.name)) return { key: "part", label: "Controls", value: counted(p), tone: "plain" };
-  }
-  const sensor = named.find((p) => p.category === "Sensor");
-  if (sensor) {
-    const what = SENSES.find(([re]) => re.test(sensor.name))?.[1] ?? short(sensor.name);
-    return { key: "part", label: "Senses", value: what, tone: "plain" };
-  }
-  return null;
+  const found = whatItDoes(parts);
+  if (!found) return null;
+  const { does, part } = found;
+  // A sensor is said by what it measures ("Senses temperature"), anything
+  // else by its name, with its count.
+  const sensed = () => SENSES.find(([re]) => re.test(part.name))?.[1] ?? short(part.name);
+  const value = does === "senses" ? sensed() : counted(part);
+  return { key: "part", label: DOES_LABEL[does], value, tone: "plain" };
 }
 
 /** "1S Li-Po over USB-C" — the cell the charger's own name says it fills,

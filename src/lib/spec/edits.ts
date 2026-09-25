@@ -23,6 +23,7 @@ import {
   SERVOS,
   builtInRadioOf,
   builtInRadios,
+  chargePortOf,
   isChargePort,
   isDriveMotor,
   isGasket,
@@ -35,7 +36,16 @@ import {
   partRole,
   type CatalogPart,
 } from "./catalog";
-import { ADDABLE_KEYS, type AddableKey, type McuKey, type PartChoices, type SpecEdits } from "./types";
+import {
+  ADDABLE_KEYS,
+  CHARGE_PORT_KEYS,
+  type AddableKey,
+  type BatteryKey,
+  type ChargePortKey,
+  type McuKey,
+  type PartChoices,
+  type SpecEdits,
+} from "./types";
 
 /** A catalog part as the parts list carries it — "TT gear motor (x2)" for
  *  more than one, the count qtyOf reads back. */
@@ -49,7 +59,102 @@ function swapMcu(parts: ConceptPart[], key: McuKey): ConceptPart[] {
   return at < 0 ? [chip, ...parts] : parts.map((p, i) => (i === at ? chip : p));
 }
 
-export function applyEdits(parts: ConceptPart[], edits: PartChoices = {}): ConceptPart[] {
+/** The edits with every choice the parts can't honour taken out, or put
+ *  right. Such a choice is no choice: applyEdits reads the edits through
+ *  this, deriveSpec records these as its `choices`, and the sheet keeps
+ *  these, so nothing a maker left behind comes back by itself.
+ *  - ESP-NOW on a chip that isn't an ESP is dropped (every other radio
+ *    comes on a module when the die lacks it), so swapping back to an ESP
+ *    never turns ESP-NOW back on.
+ *  - Given the supply (`battery`), a barrel jack on anything but a wall
+ *    adapter — left from a switch to the wall and back — becomes the port
+ *    that supply takes (defaultPort), unless the concept itself charges by
+ *    one.
+ *  `conceptParts` is the concept's own list: its port is the one a barrel
+ *  jack is checked against (an edited list reads the same chip, but not
+ *  the same port). Idempotent; the same object when nothing changes. */
+export function effectiveEdits<E extends PartChoices>(
+  edits: E,
+  conceptParts: ConceptPart[],
+  battery?: BatteryKey,
+): E {
+  let out = edits;
+  const radio = edits.radio;
+  if (radio && radio !== "none" && !RADIOS[radio].module) {
+    const removed = new Set(edits.removed ?? []);
+    const chip = edits.mcu
+      ? asPart(MCUS[edits.mcu])
+      : conceptParts.find((p) => isMcu(p) && !removed.has(p.name));
+    if (!builtInRadios(chip).includes(radio)) {
+      out = { ...out };
+      delete out.radio;
+    }
+  }
+  if (battery !== undefined && edits.chargePort === "barrel") {
+    const own = chargePortOf(conceptParts);
+    if (!barrelFits(battery, own)) out = withPort(out, defaultPort(battery, own), own);
+  }
+  return out;
+}
+
+// ───────────────────── the supply and its port ─────────────────────
+
+/** A port of a USB kind — null is one the catalog doesn't list by name. */
+const isUsbPort = (k: ChargePortKey | null) => k !== "barrel" && k !== "none";
+
+/** A barrel jack is a wall adapter's — or any supply's, on a concept that
+ *  names one to charge by itself. */
+const barrelFits = (battery: BatteryKey, own: ChargePortKey | null) =>
+  battery === "adapter" || own === "barrel";
+
+/** The port a supply takes when the one it had belongs to another: a wall
+ *  adapter's barrel jack; USB's USB port — the concept's own, or USB-C; a
+ *  pack's charging port — the concept's own, or USB-C. */
+function defaultPort(battery: BatteryKey, own: ChargePortKey | null): ChargePortKey | null {
+  if (battery === "adapter") return "barrel";
+  if (battery === "none") return isUsbPort(own) ? own : "usb-c";
+  return own === "none" ? "usb-c" : own;
+}
+
+/** Whether a port is one this supply comes in by. */
+function portSuits(port: ChargePortKey | null, battery: BatteryKey, own: ChargePortKey | null) {
+  if (battery === "adapter") return port === "barrel";
+  if (battery === "none") return isUsbPort(port);
+  return port !== "barrel" || own === "barrel";
+}
+
+/** The edits with the port set — or its edit taken out when the concept's
+ *  own port is that one already. */
+function withPort<E extends PartChoices>(edits: E, port: ChargePortKey | null, own: ChargePortKey | null): E {
+  const next = { ...edits };
+  if (port === null || port === own) delete next.chargePort;
+  else next.chargePort = port;
+  return next;
+}
+
+/** The edits with the product's supply set to `battery` — "adapter" for a
+ *  wall adapter, "none" for USB, a pack's key — and the port it comes in
+ *  by. A port that belongs to the old supply never stays: going to the
+ *  wall puts in a barrel jack, and coming back takes it out again for the
+ *  concept's own port, or USB-C. A port that suits the new supply is kept. */
+export function withSupply(edits: SpecEdits, battery: BatteryKey, conceptParts: ConceptPart[]): SpecEdits {
+  const own = chargePortOf(conceptParts);
+  const next: SpecEdits = { ...edits, battery };
+  if (portSuits(edits.chargePort ?? own, battery, own)) return next;
+  return withPort(next, defaultPort(battery, own), own);
+}
+
+/** The ports the sheet's port control offers for a supply: none for USB or
+ *  the wall — each needs a way in — and a barrel jack only for the wall, or
+ *  on a concept that charges through its own. */
+export function chargePortChoices(battery: BatteryKey, conceptParts: ConceptPart[]): ChargePortKey[] {
+  const barrel = barrelFits(battery, chargePortOf(conceptParts));
+  const pack = battery !== "none" && battery !== "adapter";
+  return CHARGE_PORT_KEYS.filter((k) => (k === "barrel" ? barrel : k !== "none" || pack));
+}
+
+export function applyEdits(parts: ConceptPart[], choices: PartChoices = {}): ConceptPart[] {
+  const edits = effectiveEdits(choices, parts);
   const removed = new Set(edits.removed ?? []);
   const added = (edits.added ?? []).map((k) => asPart(ADDABLE[k]));
   // A concept part with an added part's own name is that part, listed once.
@@ -68,8 +173,9 @@ export function applyEdits(parts: ConceptPart[], edits: PartChoices = {}): Conce
     const onDie = builtInRadios(mcu);
     const onChip = onDie.includes(radio);
     const carrier = RADIOS[radio].module;
-    // ESP-NOW with no ESP to speak it: the choice is dropped, not bent into
-    // another radio, and the parts stay as they were.
+    // A carried ESP-NOW with no ESP to speak it is dropped, not bent into
+    // another radio, and the parts stay as they were. (A picked one never
+    // gets here: effectiveEdits has taken it out.)
     if (radio === "none" || onChip || carrier) {
       // A radio on the die makes the separate module redundant.
       if (edits.radio) out = out.filter((p) => !isRadioPart(p));
@@ -221,10 +327,31 @@ export function addableFor(parts: ConceptPart[]): AddableKey[] {
   return ADDABLE_KEYS.filter((k) => !names.has(ADDABLE[k].name.toLowerCase()));
 }
 
+/** The chip a product given one gets: the smallest the catalog has that
+ *  speaks a radio. */
+const FIRST_CHIP: McuKey = "esp32-c3";
+
 /** A product with no parts to power, given some: the smallest chip the
  *  catalog has that speaks a radio, and a USB-C port to power it by. */
 export function withElectronics(edits: SpecEdits): SpecEdits {
-  return { ...edits, mcu: "esp32-c3", chargePort: "usb-c" };
+  return { ...edits, mcu: FIRST_CHIP, chargePort: "usb-c" };
+}
+
+/** A product that has electronics but no chip — a charger, a spare pack —
+ *  given one (canAddBrain, derive.ts, says which). The chip alone: it
+ *  already has its power and its port, and the spec adds a USB-C port only
+ *  if a USB supply turns out to have none. */
+export function withBrain(edits: SpecEdits): SpecEdits {
+  return { ...edits, mcu: FIRST_CHIP };
+}
+
+/** withBrain taken back out — and the radio picked for that chip with it,
+ *  or its module would stay on a product with nothing to run it. */
+export function withoutBrain(edits: SpecEdits): SpecEdits {
+  const next = { ...edits };
+  delete next.mcu;
+  delete next.radio;
+  return next;
 }
 
 /** Everything withElectronics — and every section it opened — put in,
@@ -234,5 +361,50 @@ export function withoutElectronics(edits: SpecEdits): SpecEdits {
   for (const k of ["mcu", "radio", "motors", "servos", "added", "chargePort", "battery"] as const) {
     delete next[k];
   }
+  return next;
+}
+
+// ───────────────────── edits made on an older concept ─────────────────────
+//
+// Part edits are kept per product, so a Refine or a Regenerate brings a new
+// concept they still apply to. Each carries the turn it was made on
+// (`basedOn`), so the sheet can say so — "Your part changes from Concept N
+// still apply · Reset parts".
+
+const PART_CHOICES = [
+  "mcu",
+  "radio",
+  "motors",
+  "servos",
+  "removed",
+  "added",
+  "chargePort",
+  "environment",
+  "mounting",
+] as const satisfies readonly (keyof PartChoices)[];
+
+/** The edits as they stand on the concept of turn `turnId`, and whether they
+ *  were made on an older one (`basedOn` set, and another turn). A removed
+ *  name this concept doesn't carry is dropped: it takes nothing out here,
+ *  and would take out a part of that name a later concept brings. */
+export function rebaseEdits(
+  edits: SpecEdits,
+  conceptParts: ConceptPart[],
+  turnId: string,
+): { edits: SpecEdits; olderConcept: boolean } {
+  const olderConcept = edits.basedOn !== undefined && edits.basedOn !== turnId;
+  if (!edits.removed) return { edits, olderConcept };
+  const carried = new Set(conceptParts.map((p) => p.name));
+  const kept = edits.removed.filter((n) => carried.has(n));
+  if (kept.length === edits.removed.length) return { edits, olderConcept };
+  return { edits: withList(edits, "removed", kept), olderConcept };
+}
+
+/** Reset parts: every part change taken out, and the turn they were made
+ *  on. The size, the pack, the plastic and the wall are not parts, and stay. */
+export function resetParts(edits: SpecEdits): SpecEdits {
+  const next = { ...edits };
+  for (const k of PART_CHOICES) delete next[k];
+  delete next.basedOn;
   return next;
 }
