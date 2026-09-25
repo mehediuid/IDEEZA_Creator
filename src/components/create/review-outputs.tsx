@@ -41,7 +41,7 @@ import {
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
 import { bookedSpec, specOfSource, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
-import { ConfidenceBadge } from "./confidence-badge";
+import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
 import { NetworkAction } from "@/components/network/network-action";
 import { mm3 } from "@/lib/spec/units";
 import {
@@ -136,6 +136,21 @@ function ReviewPanel({
   const productConfidence =
     confidence.byProduct.find((c) => c.productId === product.id) ??
     confidence.byProduct[0];
+  // L1 — the toggle stays beside the heading, but the list it opens needs
+  // real width, so it renders as its own full-width row below the header
+  // instead of squeezed into the header's left column beside its actions.
+  // Keyed by product (derived, not an effect) so switching products closes
+  // one product's open list rather than carrying it open onto another's.
+  const [issuesOpenState, setIssuesOpenState] = React.useState<{
+    productId: string;
+    open: boolean;
+  }>({ productId: productConfidence.productId, open: false });
+  const issuesOpen =
+    issuesOpenState.productId === productConfidence.productId
+      ? issuesOpenState.open
+      : false;
+  const setIssuesOpen = (open: boolean) =>
+    setIssuesOpenState({ productId: productConfidence.productId, open });
 
   const [picked, setPicked] = React.useState<BuildItemKind | null>(null);
   const linked = query.get("tab");
@@ -227,8 +242,10 @@ function ReviewPanel({
           card could not tell you was which project this is. */}
       {/* The state and the subject in one line of hierarchy: a small state
           word, then the project. The actions stay beside the heading at any
-          width the card is given — the issue list used to widen the left
-          column and push them onto a row of their own. */}
+          width the card is given — the issue list renders as its own
+          full-width row below this header instead (L1), rather than
+          widening this left column and pushing the actions onto a row of
+          their own. */}
       <header className="flex flex-col gap-6 px-10 pb-6 pt-8 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-text-tertiary">
@@ -240,13 +257,15 @@ function ReviewPanel({
           >
             {heading}
           </h2>
-          {/* §4.3 + §4.4.9 — the product's own tier, keyed by product so
-              switching products closes one product's open list rather than
-              carrying it onto another's issues. */}
+          {/* §4.3 + §4.4.9 — the product's own tier. The list this opens is
+              rendered below the whole header (L1), controlled from here so
+              switching products closes it rather than carrying it open onto
+              another product's issues. */}
           <div className="mt-4">
             <ConfidenceBadge
-              key={productConfidence.productId}
               confidence={productConfidence}
+              open={issuesOpen}
+              onOpenChange={setIssuesOpen}
             />
           </div>
         </div>
@@ -261,6 +280,15 @@ function ReviewPanel({
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>
+
+      {/* L1 — full width under the header row, not squeezed beside the
+          actions above: grouped issues, passes and the credit note need
+          more than the ~150 px the header's left column left them. */}
+      {issuesOpen && productConfidence.tier === "draft" && (
+        <div className="px-10 pb-6">
+          <ConfidenceIssuesPanel confidence={productConfidence} />
+        </div>
+      )}
 
       {shown === null ? (
         <div className="flex flex-col items-center gap-5 px-10 pb-24 pt-4 text-center">
