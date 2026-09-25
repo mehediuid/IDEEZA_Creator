@@ -20,6 +20,7 @@ import {
   type BuildItem,
   type BuildItemKind,
   type BuildJob,
+  type BuildProduct,
   type BuildStatus,
   type ChatSession,
   type ChatTurn,
@@ -98,16 +99,25 @@ export type ProjectState = {
    *  (lib/spec/edits.ts), with the socket its supply comes in by — the list
    *  its spec was worked out from (effectiveParts), so what its card, its
    *  rail row and its sheet say it is made of is what a build of it is made
-   *  from. Absent while the concept is still being read. */
+   *  from — a locked product's as they were booked. Absent while the concept
+   *  is still being read. */
   parts: Map<string, ConceptPart[]>;
   /** Each product's edits as they apply to its current concept (rebaseEdits):
-   *  a part taken out that this concept doesn't carry is no edit. By turn. */
+   *  a part taken out that this concept doesn't carry is no edit. By turn.
+   *  A locked product's are the decisions its snapshot was booked with
+   *  (bookedEditsOf), not the ones stored since. */
   edits: Map<string, SpecEdits>;
+  /** The products whose spec is what was built — each current concept the
+   *  build holds, by turn, with the product as it was booked. Its spec and
+   *  parts are the snapshot's, and the sheet only shows them: a change is
+   *  made in the editor the build review opens. See `lockedOf`. */
+  locked: Map<string, BuildProduct>;
   /** A product whose part changes were made on an older concept of it — the
    *  turn they were made on, by the turn now on screen, or "" when that is
    *  this turn, read again since. The sheet says they still apply. */
   editedOn: Map<string, string>;
-  /** Each ready card's spec. Null while the concept is still being read. */
+  /** Each ready card's spec — a locked product's is the booked snapshot.
+   *  Null while the concept is still being read. */
   specs: Map<string, ResolvedSpec | null>;
   /** A chosen product whose size its parts can't fit, not agreed as Draft —
    *  holds the build (spec S3). */
@@ -117,12 +127,14 @@ export type ProjectState = {
   /** This product's next build would differ from what the build holds — its
    *  drawing, or its spec. The one per-product answer: `specChanged` and the
    *  rail's "Changed" tag both read it, so a legacy build with edits can't
-   *  say "Spec changed" on the canvas and nothing on the row. */
+   *  say "Spec changed" on the canvas and nothing on the row. A locked
+   *  product's spec is the build's, so only a new concept changes it. */
   productChanged: (t: AssistantTurn) => boolean;
   /** A chosen product's concept differs from the build (drawn again, not
    *  ready, or added since). */
   conceptChanged: boolean;
-  /** A chosen, built product's spec differs from what the build booked. */
+  /** A chosen, built product's spec differs from what the build booked —
+   *  only where nothing is locked to the build: one that failed. */
   specChanged: boolean;
   changedSinceBuild: boolean;
   /** Offered, never drawn — not yet in the project. */
@@ -134,6 +146,25 @@ export type ProjectState = {
   /** A chosen product whose latest concept failed. */
   failedChoice: AssistantTurn | undefined;
 };
+
+/** The build states that hold what they booked — every one but a failed
+ *  build, which made nothing and gave the credits back. */
+const LOCKS: ReadonlySet<BuildStatus> = new Set(["queued", "running", "ready", "partial"]);
+
+/** The maker's decisions a booked snapshot was worked out with, as edits —
+ *  the fields specKey compares, so the spec they work out to keys as the
+ *  snapshot does. A locked product built again is booked from these, not
+ *  from an edit stored after the booking. */
+export function bookedEditsOf(spec: ResolvedSpec): SpecEdits {
+  return {
+    ...spec.choices,
+    ...(spec.sizeSource === "you" ? { size: spec.size } : null),
+    ...(spec.batterySource === "you" ? { battery: spec.battery } : null),
+    ...(spec.materialSource === "you" ? { material: spec.material } : null),
+    ...(spec.wallSource === "you" ? { wallMm: spec.wallMm } : null),
+    ...(spec.draftChosen ? { draftAtSize: true } : null),
+  };
+}
 
 /** The memo block that lived in chat-thread.tsx (products, leftOut,
  *  selected, specs, specBlock, inBuild, conceptChanged, specChanged,
@@ -172,6 +203,22 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   const concepts = new Map<string, ConceptSummary | undefined>();
   for (const t of products) concepts.set(t.id, asConceptSummary(t.concept));
 
+  // Once a product is built, its spec is what was built: it can't change on
+  // the sheet any more, only in the editor the build review opens. Locked
+  // while the build holds this product, the build is booked, not failed —
+  // a failed one made nothing — and the product's latest concept is the one
+  // booked. A Refine or a Regenerate draws a new concept, which is not what
+  // was built, and a product the build doesn't hold was never built: those
+  // are edited, and built again, as any other.
+  const booked = new Map(
+    job && LOCKS.has(statusOf(job)) ? productsOf(job).map((p) => [p.id, p]) : [],
+  );
+  const locked = new Map<string, BuildProduct>();
+  for (const t of products) {
+    const b = booked.get(productIdOf(t));
+    if (b && t.status === "ready" && !!t.imageUrl && b.conceptImageUrl === t.imageUrl) locked.set(t.id, b);
+  }
+
   // Each ready card's spec, worked out from its concept's parts, the
   // model's hints and the maker's edits. Null while the concept is still
   // being read.
@@ -181,6 +228,24 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   const editedOn = new Map<string, string>();
   for (const t of products) {
     const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
+    const built = locked.get(t.id);
+    if (built) {
+      // The snapshot, and nothing stored since: an edit kept from after the
+      // booking stays in storage, unapplied. A build booked before products
+      // had a spec was made with no decisions at all — its concept as drawn.
+      const spec = built.spec ?? (concept ? deriveSpec(concept.parts, concept.hints) : null);
+      const edits = built.spec ? bookedEditsOf(built.spec) : {};
+      editsBy.set(t.id, edits);
+      specs.set(t.id, spec);
+      // The parts as booked — what the BOM, the wiring and the firmware say.
+      if (spec) {
+        parts.set(
+          t.id,
+          built.parts.length ? built.parts : concept ? effectiveParts(concept.parts, spec.battery, edits) : [],
+        );
+      }
+      continue;
+    }
     const stored = cleanEdits(answer?.specs?.[productIdOf(t)]);
     // Part edits outlive a Refine or a Regenerate; on the new concept they
     // are read as they apply to it.
@@ -232,13 +297,13 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
   // Changed means the next build would differ from the one on screen: a
   // chosen product drawn again or added, or one the build holds that has
   // since been left out or removed.
-  // A spec edited after the build is a change too: the booked snapshot is
-  // what the deliverables say, so a different size or pack needs a new
-  // build. A build booked before products had a spec has no snapshot to
-  // compare with — it was made with no decisions at all, so any edit since
-  // is one.
+  // A spec edited after the build is a change too — but only where nothing is
+  // locked to the build (a failed one): a locked product's spec is the
+  // snapshot, so an edit can't move it. A build booked before products had a
+  // spec has no snapshot to compare with — it was made with no decisions at
+  // all, so any edit since is one.
   const specChangedFor = (t: AssistantTurn) => {
-    if (!job) return false;
+    if (!job || locked.has(t.id)) return false;
     const now = specs.get(t.id);
     if (!now || !inBuild(t)) return false;
     const booked = productsOf(job).find((p) => p.id === productIdOf(t))?.spec;
@@ -267,6 +332,7 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     concepts,
     parts,
     edits: editsBy,
+    locked,
     editedOn,
     specs,
     specBlock,
@@ -280,6 +346,15 @@ export function projectState(chat: ChatSession, job?: BuildJob | null): ProjectS
     allReady,
     failedChoice,
   };
+}
+
+/** Whether this product's spec is what was built, and so shown and not
+ *  changed on the sheet: the build holds its current concept, and was booked
+ *  and did not fail (projectState's `locked`). False for a product the
+ *  project doesn't hold, and for one drawn again or added since the build. */
+export function lockedOf(state: ProjectState, productId: string): boolean {
+  const t = state.products.find((x) => productIdOf(x) === productId);
+  return !!t && state.locked.has(t.id);
 }
 
 // ─────────────────────────── railRows ───────────────────────────
@@ -471,6 +546,9 @@ export type ProductLink = {
   /** They still work together. */
   ok: boolean;
   text: string;
+  /** The same, as a plain statement with no way out named — what a sheet
+   *  that can't change anything says: a built product's. */
+  fact: string;
 };
 
 /** A ready product as linksFor reads it. */
@@ -549,18 +627,21 @@ function radioLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
     const mine = radioLabel(me.parts);
     const theirs = radioLabel(o.parts);
     let text: string;
+    let fact: string;
     if (ok) {
-      text = `Talks to ${o.name} — both use ${mine}.`;
+      text = fact = `Talks to ${o.name} — both use ${mine}.`;
     } else if (theirs) {
       const key = radioKeyOf(o.parts);
       const canPick = key !== null && radioChoices(me.parts).some((c) => c.key === key);
+      fact = `${o.name} uses ${theirs} — these two won't talk.`;
       text = canPick
-        ? `${o.name} uses ${theirs} — these two won't talk. Pick ${theirs} here, or change ${o.name}'s radio.`
-        : `${o.name} uses ${theirs} — these two won't talk. Change ${o.name}'s radio${mine ? ` to ${mine}` : ""}.`;
+        ? `${fact} Pick ${theirs} here, or change ${o.name}'s radio.`
+        : `${fact} Change ${o.name}'s radio${mine ? ` to ${mine}` : ""}.`;
     } else {
+      fact = `${o.name} has no wireless — these two won't talk.`;
       text = `${o.name} has no wireless — these two won't talk until it has ${mine} too.`;
     }
-    return [{ otherId: o.id, otherName: o.name, about: "radio", ok, text }];
+    return [{ otherId: o.id, otherName: o.name, about: "radio", ok, text, fact }];
   });
 }
 
@@ -584,8 +665,10 @@ function powerLinks(peers: LinkPeer[], me: LinkPeer): ProductLink[] {
   const chargers = peers.filter((p) => kind(p) === "charger");
   const pack = (p: LinkPeer) => batteryOf(p.spec.battery).label;
   const out: ProductLink[] = [];
+  // A power note names no way out of its own (the sheet adds one where it
+  // can change something), so its words are its fact.
   const link = (other: LinkPeer, ok: boolean, text: string) =>
-    out.push({ otherId: other.id, otherName: other.name, about: "power", ok, text });
+    out.push({ otherId: other.id, otherName: other.name, about: "power", ok, text, fact: text });
 
   // A spare pack has to be the pack of the product it swaps into.
   for (const spare of spares) {
@@ -677,7 +760,9 @@ export type NextStepTone = "working" | "attention" | "neutral";
 export type JumpTarget =
   | { kind: "setup" }
   | { kind: "card" | "retry" | "spec"; productId: string }
-  | { kind: "build" | "credits" | "review" | "add" };
+  // "editor": the build review's Open in editor — where a built product's
+  // spec changes now.
+  | { kind: "build" | "credits" | "review" | "add" | "editor" };
 
 export type NextStep = {
   tone: NextStepTone;

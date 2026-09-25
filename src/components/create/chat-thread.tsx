@@ -200,6 +200,7 @@ export function ChatThread({
     concepts,
     parts,
     specs,
+    locked,
     specBlock,
     inBuild,
     conceptChanged,
@@ -285,7 +286,8 @@ export function ChatThread({
                   open: specSheetFor === productIdOf(turn),
                   docked: specDocked,
                   onOpen: () => onOpenSpec?.(productIdOf(turn)),
-                  editable: !!answer && !!onSpecChange,
+                  // A built product's spec is what was built: View spec.
+                  editable: !!answer && !!onSpecChange && !locked.has(turn.id),
                 }
               : undefined
           }

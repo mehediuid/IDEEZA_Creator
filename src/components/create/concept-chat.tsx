@@ -41,16 +41,19 @@ import {
   companionNameOf,
   composerTarget,
   linksFor,
+  lockedOf,
   peersOf,
   productNameOf,
   sheetTurnOf,
   type JumpTarget,
+  type ProjectState,
 } from "@/lib/create/project-state";
 import {
   ADD_PRODUCT_ID,
   BUILD_ACTION_ID,
   BUILD_REVIEW_ID,
   CREDITS_NOTICE_ID,
+  OPEN_IN_EDITOR_ID,
   SETUP_QUESTION_ID,
   productCardId,
   productRetryId,
@@ -94,8 +97,9 @@ const ARRIVAL_MS = 1_200;
 
 /** Where a jump lands: the element scrolled to and ringed, and the one the
  *  keyboard goes to — the control itself, inside its card, when the jump
- *  names one. */
-function landingOf(target: JumpTarget): { ring: string; focus: string } {
+ *  names one. `near`: the control is what is scrolled into view, as little
+ *  as it takes — it sits at the foot of a box taller than the canvas. */
+function landingOf(target: JumpTarget): { ring: string; focus: string; near?: boolean } {
   switch (target.kind) {
     case "setup":
       return { ring: SETUP_QUESTION_ID, focus: SETUP_QUESTION_ID };
@@ -112,6 +116,10 @@ function landingOf(target: JumpTarget): { ring: string; focus: string } {
       return { ring: BUILD_REVIEW_ID, focus: BUILD_REVIEW_ID };
     case "add":
       return { ring: ADD_PRODUCT_ID, focus: ADD_PRODUCT_ID };
+    case "editor":
+      // Until the build is ready the review has no Open in editor; the review
+      // takes the keyboard then.
+      return { ring: BUILD_REVIEW_ID, focus: OPEN_IN_EDITOR_ID, near: true };
   }
 }
 
@@ -407,11 +415,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   React.useEffect(() => {
     editsNow.current = editsFor;
   }, [editsFor]);
+  // The project as the rail reads it now — set once it is worked out, below.
+  const projectNow = React.useRef<ProjectState | null>(null);
   // Those edits as they apply to the concept being built — as the sheet and
   // the card read them (rebaseEdits): a part taken out that this concept
-  // doesn't carry takes nothing out of it.
-  const editsAt = (productId: string, conceptParts: ConceptSummary["parts"], turnId: string) =>
-    rebaseEdits(editsNow.current(productId), conceptParts, turnId).edits;
+  // doesn't carry takes nothing out of it. A built product, booked again
+  // beside a product drawn since, is booked as it was built: the decisions
+  // its snapshot holds, never an edit stored after it.
+  const editsAt = (productId: string, conceptParts: ConceptSummary["parts"], turnId: string) => {
+    const built = projectNow.current;
+    if (built?.locked.has(turnId)) return built.edits.get(turnId) ?? {};
+    return rebaseEdits(editsNow.current(productId), conceptParts, turnId).edits;
+  };
   // The build this chat started, if it has one. Derived rather than held
   // in state, so a reload lands back on the build instead of an empty
   // canvas — the job record already knows which chat it came from.
@@ -468,6 +483,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   // Everything the rail and the page's announcer say, worked out once.
   const rail = useRailModel(chat ?? NO_CHAT, activeBuild, labels, projectName, savedName);
+  React.useEffect(() => {
+    projectNow.current = rail.state;
+  }, [rail.state]);
 
   // Whether the rail sits beside the canvas, and the sheet docks beside it
   // too: only where the page keeps a whole column of cards beside them,
@@ -958,7 +976,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         if (!ring) return;
         const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         // The canvas alone scrolls — never the page around it.
-        scrollWithin(ring, "start", still ? "auto" : "smooth");
+        const near = land.near ? document.getElementById(land.focus) : null;
+        if (near) scrollWithin(near, "nearest", still ? "auto" : "smooth");
+        else scrollWithin(ring, "start", still ? "auto" : "smooth");
         const prev = arrived.current;
         if (prev) {
           window.clearTimeout(prev.timer);
@@ -982,6 +1002,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [focusSpec, split],
   );
+
+  // A built product's sheet shows what was built, and its spec changes in the
+  // editor now: its Show on canvas lands on the review's Open in editor. Over
+  // the page the sheet goes first and the product stays selected, as Change
+  // by message leaves it; docked it stays open beside the canvas.
+  const showEditor = React.useCallback(() => {
+    if (!docked) setSpecSheet(null);
+    jumpTo({ kind: "editor" }, { focus: true });
+  }, [docked, jumpTo]);
 
   // A rail row: the composer, the row and the review's product tab all follow
   // `focusedProduct`, and the canvas brings that product into view — its tab
@@ -1592,6 +1621,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     const concept = railState.concepts.get(turn.id);
     const editedOn = railState.editedOn.get(turn.id);
     const peers = peersOf(railState);
+    // Built: the build's spec and parts, shown and not changed here.
+    const locked = railState.locked.has(turn.id);
     return {
       productId: focusedProduct,
       name: sheetNameOf(railState.setup, turn, labels),
@@ -1606,7 +1637,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       editedOn: editedOn === undefined ? null : (labels.get(editedOn) ?? ""),
       links: linksFor(peers, focusedProduct),
       peers,
-      onChange: answer ? (edits) => handleSpecChange(focusedProduct, edits) : undefined,
+      onChange: answer && !locked ? (edits) => handleSpecChange(focusedProduct, edits) : undefined,
+      locked,
       // The sheet follows the selection to the product it works with.
       onOpenProduct: (productId) => select(productId),
       fallback: !!concept?.fallback,
@@ -1762,10 +1794,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                     : target.kind === "refine"
                     ? // What a sentence here costs, beside what doesn't: the
                       // parts, the size and the power change in the spec,
-                      // for nothing, and the image stays.
+                      // for nothing, and the image stays — or, once the
+                      // product is built, in the editor.
                       `Redraws ${target.name}'s image · ${CONCEPT_COST} credit.${
-                        // A chat from before the question has no spec to edit.
-                        rail.state.setup ? " Parts, size and power change free in its spec." : ""
+                        lockedOf(rail.state, target.productId)
+                          ? " Its built spec changes in the editor."
+                          : // A chat from before the question has no spec to edit.
+                            rail.state.setup
+                            ? " Parts, size and power change free in its spec."
+                            : ""
                       }`
                     : `Each drawing costs ${CONCEPT_COST} credit.`}
           </p>
@@ -1826,6 +1863,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         docked={docked}
         onClose={closeSpec}
         onMessage={messageAboutSpec}
+        onShowEditor={showEditor}
       />
 
       {/* Part 4 §4.4.2 — the products this build covers are chosen here,

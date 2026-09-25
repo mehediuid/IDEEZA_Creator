@@ -12,7 +12,9 @@
 // buttons. The editor used to open inside the card, under a "Spec ⌄" that
 // read as a dropdown, and grew that one card in a row of three; the sheet
 // sits over the page instead, so no card changes height. A size the parts
-// can't fit says so here, on the size itself, before anything is paid.
+// can't fit says so here, on the size itself, before anything is paid. Once
+// the product is built the button reads View spec: its sheet shows what was
+// built.
 
 import * as React from "react";
 import { SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
@@ -54,7 +56,10 @@ export type SpecCard = {
   docked?: boolean;
   onOpen: () => void;
   /** False on a chat from before the setup question — it has nowhere to keep
-   *  an edit, so the sheet shows the spec and cannot change it. */
+   *  an edit — and on a built product, whose spec is what was built and
+   *  changes in the editor: the sheet shows the spec and cannot change it,
+   *  so the button reads View spec, and the card's cost line drops "Edit spec
+   *  is free". */
   editable: boolean;
   /** The model didn't answer this concept, so the parts are the generic
    *  stand-in — the spec is worked out from them, and the card says so. */

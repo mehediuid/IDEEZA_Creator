@@ -57,6 +57,7 @@ import {
   PcbPreview,
   WiringPreview,
 } from "./deliverable-previews";
+import { OPEN_IN_EDITOR_ID } from "./anchors";
 
 export function ReviewOutputs({
   job,
@@ -513,6 +514,7 @@ function ReviewPanel({
                     Add Brief
                   </LeaveButton>
                   <LeaveButton
+                    id={OPEN_IN_EDITOR_ID}
                     tone="quiet"
                     busy={leaving === "editor"}
                     blocked={leaving !== null}
@@ -544,6 +546,7 @@ function ReviewPanel({
                     Save Project
                   </button>
                   <LeaveButton
+                    id={OPEN_IN_EDITOR_ID}
                     tone="quiet"
                     busy={leaving === "editor"}
                     blocked={leaving !== null}
@@ -718,6 +721,7 @@ function ModelFailed({ onRetry }: { onRetry: () => void }) {
  *  from the click, and every one of them is shut while any is under way —
  *  two navigations at once is not a thing the maker can have meant. */
 function LeaveButton({
+  id,
   tone,
   busy,
   blocked,
@@ -725,6 +729,7 @@ function LeaveButton({
   icon,
   children,
 }: {
+  id?: string;
   tone: "primary" | "quiet";
   busy: boolean;
   blocked: boolean;
@@ -740,6 +745,7 @@ function LeaveButton({
       : "border border-solid border-border bg-bg-surface text-text-primary hover:bg-bg-surface-raised";
   return (
     <button
+      id={id}
       type="button"
       onClick={onClick}
       disabled={blocked}
