@@ -70,6 +70,10 @@ function swapMcu(parts: ConceptPart[], key: McuKey): ConceptPart[] {
  *    adapter — left from a switch to the wall and back — becomes the port
  *    that supply takes (defaultPort), unless the concept itself charges by
  *    one.
+ *  - Given the supply, a port set to None on a plugged-in product — USB or
+ *    the wall — becomes that supply's port too. None is a pack's choice:
+ *    one set on a pack, then left when an edit moved the product onto USB,
+ *    booked a USB product with no socket for its power.
  *  `conceptParts` is the concept's own list: its port is the one a barrel
  *  jack is checked against (an edited list reads the same chip, but not
  *  the same port). Idempotent; the same object when nothing changes. */
@@ -93,6 +97,10 @@ export function effectiveEdits<E extends PartChoices>(
   if (battery !== undefined && edits.chargePort === "barrel") {
     const own = chargePortOf(conceptParts);
     if (!barrelFits(battery, own)) out = withPort(out, defaultPort(battery, own), own);
+  }
+  if (edits.chargePort === "none" && (battery === "none" || battery === "adapter")) {
+    const own = chargePortOf(conceptParts);
+    out = withPort(out, defaultPort(battery, own), own);
   }
   return out;
 }
