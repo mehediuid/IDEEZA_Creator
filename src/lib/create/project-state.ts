@@ -483,8 +483,10 @@ export function nextStep(args: {
   const short = hydrated && balance < cost;
 
   if (job && statusOf(job) === "ready") {
-    // #7 / #7b
+    // #7 / #7b — which of the two is only known once the balance has been
+    // read, so until then the slot says nothing rather than "You have 0."
     if (state.changedSinceBuild) {
+      if (!hydrated) return null;
       if (short) {
         return {
           tone: "attention",
@@ -517,8 +519,9 @@ export function nextStep(args: {
     return { tone: "neutral", text, target: { kind: "review" }, targetLabel: "Show on canvas — the build" };
   }
 
-  // #10 / #10b
+  // #10 / #10b — both name the balance, so neither speaks before it's read.
   if (!job && n > 0 && state.allReady) {
+    if (!hydrated) return null;
     if (short) {
       return {
         tone: "attention",
@@ -685,10 +688,12 @@ export function activityOf(
         ts: t.ts,
       });
     } else {
+      // First DRAWN, not first asked: a first attempt that failed drew
+      // nothing, so the render after it is this product's first drawing.
       const pid = productIdOf(t);
       const isFirst = !turns
         .slice(0, i)
-        .some((o) => o.role === "assistant" && productIdOf(o) === pid);
+        .some((o) => o.role === "assistant" && productIdOf(o) === pid && o.status === "ready");
       entries.push({
         id: t.id,
         tone: "done",

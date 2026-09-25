@@ -48,6 +48,7 @@ export function mcuOf(parts: ConceptPart[]): string | null {
   return parts.find((p) => p.category === "Microcontroller")?.name ?? null;
 }
 
+/** How a spec fact reads — the card and the rail's rows both use it. */
 export type SpecFactTone = "plain" | "warn" | "error";
 
 /** The spec sheet's one-line facts — size, power, radio (when the concept

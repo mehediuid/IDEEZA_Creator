@@ -31,7 +31,8 @@ export function elapsedLabel(since: number, now: number): string {
 export function relativeLabel(ts: number, now: number): string {
   const delta = Math.max(0, now - ts);
   const sec = Math.floor(delta / 1000);
-  if (sec < 45) return "just now";
+  // Under a minute is "just now": from 45 s it used to read "0 min ago".
+  if (sec < 60) return "just now";
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min} min ago`;
   const hr = Math.floor(min / 60);

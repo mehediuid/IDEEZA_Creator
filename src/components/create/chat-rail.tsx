@@ -366,9 +366,7 @@ function NextStepLine({
         aria-hidden
         className={[
           "mt-[1px] inline-flex h-[16px] w-[16px] shrink-0 self-start",
-          step.tone === "attention"
-            ? "text-[color:var(--color-text-warning)]"
-            : "text-text-tertiary",
+          step.tone === "attention" ? "text-text-warning" : "text-text-tertiary",
           step.tone === "working" ? "motion-safe:animate-spin" : "",
         ].join(" ")}
       >
@@ -598,11 +596,11 @@ const STATUS_TONE: Record<StatusTone, string> = {
   secondary: "text-text-secondary",
   tertiary: "text-text-tertiary",
   error: "text-text-error",
-  warn: "text-[color:var(--color-text-warning)]",
+  warn: "text-text-warning",
 };
 const FACT_TONE: Record<RailRow["facts"][number]["tone"], string> = {
   plain: "",
-  warn: "text-[color:var(--color-text-warning)]",
+  warn: "text-text-warning",
   error: "text-text-error",
 };
 

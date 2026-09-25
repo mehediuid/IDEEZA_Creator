@@ -346,7 +346,12 @@ export function ChatThread({
           ) : (
             projectName && (
               <header className="flex flex-col gap-[2px]">
+                {/* The rail's header already carries the project's name as
+                    its h2; here it heads the concepts, as "Concepts" does
+                    once a build exists — so the outline isn't the same name
+                    twice. */}
                 <h2 className="text-lg font-semibold text-text-primary">
+                  <span className="sr-only">Concepts — </span>
                   {projectName}
                 </h2>
                 <p className="text-sm text-text-tertiary">

@@ -324,7 +324,7 @@ function SizeField({
             aria-label={`${axis.label} in millimetres`}
             aria-describedby={error ? errorId : conflictId}
             aria-invalid={error || conflictId ? true : undefined}
-            invalid={!!error || (!spec.fits && !spec.draftAtSize)}
+            invalid={!!error || blocksBuild(spec)}
             disabled={!onChange}
             value={draft[axis.key]}
             onValueChange={(v) => setDraft((d) => ({ ...d, [axis.key]: v }))}

@@ -1395,6 +1395,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   return (
     <div className="flex h-full flex-col md:flex-row">
+      {/* The page's one h1, for the heading outline a screen reader walks,
+          ahead of both panes: inside the canvas it came after the rail's
+          h2 and h3s, so the outline opened on those. The rail and the
+          review card already say the name on screen. */}
+      <h1 className="sr-only">{chat.title}</h1>
       {/* The one place a screen reader hears the flow change — outside both
           panes, since on a phone the rail is hidden while the canvas shows,
           and that is where the maker is when a render lands. */}
@@ -1519,10 +1524,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         ].join(" ")}
       >
         <div className="w-full px-[16px] py-[20px] md:px-[32px] md:py-[32px]">
-          {/* The page's one h1, for the heading outline a screen reader walks:
-              the chat had none, so it opened on an h3. The rail and the
-              review card already say the name on screen. */}
-          <h1 className="sr-only">{chat.title}</h1>
           <ChatThread
             chat={chat}
             regeneratingFrom={regeneratingFrom}
@@ -1582,11 +1583,18 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
 // The page's own shape while the chat is read from storage — the rail's
 // header, next step and product rows, the composer and two cards — so nothing
-// jumps when it lands. It was a line of centred text.
+// jumps when it lands. It was a line of centred text. Below `md` the page is
+// two tabs over the canvas, so the shape there is the tab bar and the cards.
 function LoadingShell() {
   return (
-    <div role="status" aria-label="Loading the chat" className="flex h-full">
+    <div role="status" aria-label="Loading the chat" className="flex h-full flex-col md:flex-row">
       <span className="sr-only">Loading the chat</span>
+      <div className="flex shrink-0 gap-[4px] border-b border-solid border-border bg-bg-surface px-[12px] py-[8px] motion-safe:animate-pulse md:hidden">
+        <div className="h-[36px] flex-1 rounded-lg bg-bg-subtle" />
+        <div className="flex h-[36px] flex-1 items-center justify-center rounded-lg">
+          <div className="h-[12px] w-[48px] rounded bg-bg-subtle" />
+        </div>
+      </div>
       <div className="hidden w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface motion-safe:animate-pulse md:flex">
         <div className="flex flex-col gap-[8px] border-b border-solid border-border px-[18px] pb-[14px] pt-[16px]">
           <div className="h-[14px] w-[140px] rounded bg-bg-subtle" />
