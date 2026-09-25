@@ -234,8 +234,9 @@ export function ChatThread({
   // a line taller, and stretched rows gave its neighbour a void under its
   // buttons. The spec itself opens in a sheet, so no card grows for it. A
   // column is 320 px, or the whole canvas where the canvas is narrower —
-  // 768–1000 px windows with the sidebar open left it about 260 px, and a
-  // fixed 320 px column scrolled the canvas sideways.
+  // which is only a phone's now: wherever the page has no room for the rail
+  // and a column beside it, it shows its tabs (concept-chat.tsx
+  // useRoomToSplit). There a fixed 320 px column scrolled sideways.
   const conceptGrid = (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] items-start gap-[20px]">
       {products.map((turn) => (
@@ -449,7 +450,7 @@ function BuildAction({
   failedName?: string;
   preparing: boolean;
   /** A chosen product whose size its parts can't fit. The button stays live
-   *  and takes the maker to that card's size instead of the gate. */
+   *  and opens that product's spec sheet at Length instead of the gate. */
   specBlock?: string;
   onBuild: () => void;
 }) {
