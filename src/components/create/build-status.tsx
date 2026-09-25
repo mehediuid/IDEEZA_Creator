@@ -124,6 +124,13 @@ export function stateRowFor(
   job: BuildJob,
   now: number,
   ahead: number,
+  // The chat rail (§2.3 rule 3) puts this card in a narrow column above
+  // the product rows — naming every safe piece by full name can run
+  // longer than the viewport and push those rows off it. The maker acts
+  // on what failed, not on what's safe, so the rail counts the safe
+  // pieces instead of listing them once there are more than a couple;
+  // the build page has the room to keep naming them all.
+  inChat = false,
 ): StateRow {
   const status = statusOf(job);
   const elapsed = elapsedMinutes(job, now);
@@ -208,9 +215,14 @@ export function stateRowFor(
     const failed = labelsOf(job, "failed");
     const done = labelsOf(job, "ready");
     const failedList = joinLabels(failed);
-    const safe = done.length
-      ? `Your ${joinLabels(done)} ${done.length === 1 ? "is" : "are"} safe. `
-      : "";
+    // Named when there are only one or two — otherwise a count, so the
+    // rail's compact banner can't outgrow the viewport it shares with
+    // the product rows (see `inChat` above).
+    const safe = !done.length
+      ? ""
+      : inChat && done.length > 2
+        ? `The other ${done.length} pieces are safe. `
+        : `Your ${joinLabels(done)} ${done.length === 1 ? "is" : "are"} safe. `;
     return {
       badge: { text: "Partial — retry needed", tone: "warning" },
       sectionLabel: "Build results",
@@ -318,7 +330,7 @@ export function BuildStatus({
   const router = useRouter();
   const products = productsOf(job);
   const now = useMinuteClock();
-  const row = stateRowFor(job, now, queuedAhead(job, builds));
+  const row = stateRowFor(job, now, queuedAhead(job, builds), inChat);
   // The whole build died, so no single row failed to generate — none of
   // them ran. The retry that makes sense is the whole build's.
   const systemFailure = statusOf(job) === "failed";

@@ -367,7 +367,9 @@ export function SelectMenu<V extends string = string>({
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate">{o.label}</span>
-          {o.sub ? <span className="block truncate text-[length:var(--font-size-xs)] text-[color:var(--color-text-tertiary)]">{o.sub}</span> : null}
+          {/* The sub wraps: it is the line that says what the option is for,
+              and cut at the panel's edge it lost the half that decides. */}
+          {o.sub ? <span className="block break-words text-[length:var(--font-size-xs)] text-[color:var(--color-text-tertiary)]">{o.sub}</span> : null}
         </span>
         {isSelected ? <Check /> : null}
         {o.info ? (
@@ -429,7 +431,10 @@ export function SelectMenu<V extends string = string>({
             : "bg-[var(--color-input-bg)] text-[color:var(--color-text-primary)]",
           !disabled && error && "border-[var(--color-border-error)]",
           !disabled && !error && (open ? "border-[var(--color-border-brand)] shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]" : "border-[var(--color-border-default)] hover:border-[var(--color-border-strong)]"),
-          !disabled && "focus-visible:border-[var(--color-border-brand)] focus-visible:shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]",
+          // The app's ring, as Close, Done and a Segmented's radios have it: the
+          // focus colour at 2px, which clears 3:1 in both themes. The subtle
+          // brand tint is a fill — as a ring it was about 1.1:1.
+          !disabled && "focus-visible:border-[var(--color-border-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]",
         )}
       >
         <span className={cn("min-w-0 flex-1 truncate", !selected && "text-[color:var(--color-input-placeholder)]")}>{selected ? selected.label : placeholder}</span>

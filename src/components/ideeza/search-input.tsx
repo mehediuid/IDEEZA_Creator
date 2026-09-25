@@ -34,7 +34,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <div
         className={cn(
-          "group flex items-center gap-[var(--spacing-4)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-[var(--spacing-6)] py-[var(--spacing-4)] transition-[background-color,border-color,box-shadow] duration-150 focus-within:border-[var(--color-border-brand)] focus-within:bg-[var(--color-bg-surface)] focus-within:shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]",
+          "group flex items-center gap-[var(--spacing-4)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-[var(--spacing-6)] py-[var(--spacing-4)] transition-[background-color,border-color,box-shadow] duration-150 focus-within:border-[var(--color-border-focus)] focus-within:bg-[var(--color-bg-surface)] focus-within:ring-2 focus-within:ring-[var(--color-border-focus)]",
           containerClassName,
         )}
       >

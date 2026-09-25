@@ -4,8 +4,9 @@
 //   • Pending  — a bare rendering tile: dotted texture + a centred
 //                "Drawing <product> · P%" pill, no card chrome
 //   • Ready    — the product's name with its concept number beside it, the
-//                image, the prompt on one line with a copy button, then
-//                Refine · Regenerate and what each costs
+//                image, the prompt on one line with a copy button, what will
+//                be built, then Edit spec · Refine · Regenerate and what
+//                each costs
 //   • Failed   — error card with a retry control
 //
 // Spec §4b: regenerate is a FRESH from-scratch take; refinement is a change
@@ -35,16 +36,34 @@ import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import type { ChatTurn, ConceptFailReason } from "@/lib/create/history";
+import { productIdOf } from "@/lib/create/project-state";
+import { ARRIVAL_RING, productCardId, productRetryId } from "./anchors";
 import { useMinuteClock } from "./build-status";
-import { elapsedLabel, useSecondClock } from "./use-clock";
+import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
+import {
+  CARD_ACTION_ICON,
+  CARD_ACTION_ROW,
+  EditSpecButton,
+  SpecPanel,
+  type SpecCard,
+} from "./spec-panel";
+import { elapsedLabel, relativeLabel, useSecondClock } from "./use-clock";
 
 /** Said on both concept controls when the balance cannot cover a render. */
 const NO_RENDER = `Not enough credits — a concept render costs ${CONCEPT_COST}`;
 
-export const OUTLINE_BUTTON =
-  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[12px] text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus";
-export const OUTLINE_BUTTON_OFF =
-  "inline-flex h-[36px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-subtle px-[12px] text-sm font-medium text-text-disabled outline-none";
+/** Every card's root, whichever state it is in, is where the rail's jumps
+ *  land: an id to find it by, focusable from script only (it is not a
+ *  control, so no tab stop), clear of the canvas's top edge when scrolled
+ *  to, and the ring a jump draws. The edge turns brand while the composer
+ *  is aimed at this product. */
+function cardRoot(focused: boolean): string {
+  return [
+    "scroll-mt-[16px] outline-none transition-[border-color,box-shadow] duration-normal ease-decelerate motion-reduce:transition-none",
+    ARRIVAL_RING,
+    focused ? "border-border-brand" : "border-border",
+  ].join(" ");
+}
 
 export function ImageTurn({
   turn,
@@ -57,6 +76,8 @@ export function ImageTurn({
   onRefine,
   buildChoice,
   onRemove,
+  spec,
+  focused = false,
 }: {
   turn: Extract<ChatTurn, { role: "assistant" }>;
   conceptLabel: string;
@@ -76,6 +97,13 @@ export function ImageTurn({
   buildChoice?: { included: boolean; locked?: boolean; onToggle?: () => void };
   /** Takes the product out of the project. Absent for the primary. */
   onRemove?: () => void;
+  /** What the product will be — four labelled facts, and the button that
+   *  opens its spec sheet. Ready cards only: a drawing still under way has no
+   *  parts to read yet. */
+  spec?: SpecCard;
+  /** The composer changes this product — said with the card's edge, and
+   *  only when there is more than one card to tell it from. */
+  focused?: boolean;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
   // The rendered balance, not canAfford(): that reads a ref the provider
@@ -89,6 +117,7 @@ export function ImageTurn({
 
   const what = productName ?? `concept ${conceptLabel}`;
   const leftOut = !!buildChoice && !buildChoice.included;
+  const productId = productIdOf(turn);
   // The card's own choices, on the right of its title: in or out of the
   // next build, and out of the project. The name keeps the rest of the line.
   const choices =
@@ -121,6 +150,8 @@ export function ImageTurn({
         kind={turn.kind}
         since={turn.ts}
         header={titleLine}
+        productId={productId}
+        focused={focused}
       />
     );
   }
@@ -131,6 +162,8 @@ export function ImageTurn({
         onRetry={onRegenerate}
         disabled={shortForRender}
         header={titleLine}
+        productId={productId}
+        focused={focused}
       />
     );
   }
@@ -139,8 +172,10 @@ export function ImageTurn({
   const name = productName ? `${productName}, concept ${conceptLabel}` : `Concept ${conceptLabel}`;
   return (
     <article
+      id={productCardId(productId)}
+      tabIndex={-1}
       aria-label={name}
-      className="flex w-full max-w-[640px] flex-col gap-[12px] rounded-2xl border border-border bg-bg-surface p-[16px]"
+      className={`flex w-full max-w-[640px] flex-col gap-[12px] rounded-2xl border bg-bg-surface p-[16px] ${cardRoot(focused)}`}
     >
       <ConceptHeader
         conceptLabel={conceptLabel}
@@ -179,9 +214,15 @@ export function ImageTurn({
         <CopyPromptButton prompt={turn.prompt} />
       </div>
 
+      {spec && <SpecPanel card={spec} />}
+
       <div aria-hidden className="h-px w-full bg-border" />
 
-      <div className="flex flex-wrap items-center gap-[8px]">
+      {/* The free way to change the product first, then the two that redraw
+          the image, and what each costs under them — a maker who types
+          "add a buzzer" into Refine pays for what Edit spec does free. */}
+      <div className={`flex flex-wrap items-center gap-[8px] ${CARD_ACTION_ROW}`}>
+        {spec && <EditSpecButton card={spec} />}
         <button
           type="button"
           onClick={onRefine}
@@ -194,7 +235,7 @@ export function ImageTurn({
           }
           className={shortForRender ? OUTLINE_BUTTON_OFF : OUTLINE_BUTTON}
         >
-          <Icon icon={MagicWand01Icon} />
+          <Icon icon={MagicWand01Icon} className={CARD_ACTION_ICON} />
           Refine
         </button>
         <button
@@ -219,13 +260,17 @@ export function ImageTurn({
                 : OUTLINE_BUTTON
           }
         >
-          <Icon icon={Refresh01Icon} />
+          <Icon icon={Refresh01Icon} className={CARD_ACTION_ICON} />
           Regenerate
         </button>
-        <span className="text-sm text-text-tertiary">
-          {CONCEPT_COST} credit each
-        </span>
         {inBuild && !leftOut && <BuiltChip />}
+        {/* A line of its own: beside three buttons it only ever fitted by
+            wrapping somewhere different on every card width. The price
+            never breaks from its unit. */}
+        <p className="basis-full text-sm text-text-tertiary">
+          {spec?.editable ? "Edit spec is free · " : ""}
+          Refine and Regenerate redraw the image, {CONCEPT_COST}&nbsp;credit each
+        </p>
       </div>
     </article>
   );
@@ -360,7 +405,7 @@ function ConceptHeader({
 }) {
   // Re-read on the minute clock, so "just now" does not stay "just now".
   const now = useMinuteClock();
-  const time = ts ? formatRelative(ts, now) : "";
+  const time = ts ? relativeLabel(ts, now) : "";
   return (
     <header className="flex items-start justify-between gap-[12px]">
       <div className="flex min-w-0 flex-col gap-[2px]">
@@ -448,6 +493,8 @@ function PendingImageTurn({
   productName,
   since,
   header,
+  productId,
+  focused,
 }: {
   conceptLabel: string;
   parentConceptLabel?: string;
@@ -456,6 +503,8 @@ function PendingImageTurn({
   since: number;
   /** The card's title line, pinned to the top of the tile. */
   header?: React.ReactNode;
+  productId: string;
+  focused: boolean;
 }) {
   // The real elapsed time, and what a render usually takes — not a
   // percentage the generator never reported.
@@ -463,11 +512,19 @@ function PendingImageTurn({
   const what = productName ?? `concept ${conceptLabel}`;
   return (
     // Not a live region: the clock moves every second, and announcing each
-    // tick is noise. The rail beside the canvas reports when it lands.
+    // tick is noise. The page's announcer says when it lands.
+    //
+    // The root itself is a plain group, not role="img" — that used to make
+    // the whole tile presentational, taking the header's In build toggle
+    // and Remove button out of the accessibility tree along with the
+    // texture. Only the texture-and-pill block is really one decorative
+    // picture (and its elapsed time would otherwise chatter every second),
+    // so that block alone carries role="img" with the same label; the
+    // header stays a normal sibling, in the tree.
     <div
-      role="img"
-      aria-label={`Drawing ${what}`}
-      className="relative flex aspect-[64/53] w-full max-w-[640px] flex-col items-center justify-center gap-[10px] overflow-hidden rounded-2xl border border-solid border-border bg-bg-subtle"
+      id={productCardId(productId)}
+      tabIndex={-1}
+      className={`relative flex aspect-[64/53] w-full max-w-[640px] flex-col items-center justify-center gap-[10px] overflow-hidden rounded-2xl border border-solid bg-bg-subtle ${cardRoot(focused)}`}
     >
       <span
         aria-hidden
@@ -479,18 +536,24 @@ function PendingImageTurn({
         }}
       />
       {header && <div className="absolute inset-x-0 top-0 p-[16px]">{header}</div>}
-      <span
-        data-testid="turn-progress"
-        className="relative inline-flex items-center gap-[8px] rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
+      <div
+        role="img"
+        aria-label={`Drawing ${what}`}
+        className="relative flex flex-col items-center gap-[10px]"
       >
-        <span aria-hidden className="inline-flex motion-safe:animate-spin text-text-tertiary">
-          <Icon icon={Refresh01Icon} size={14} />
+        <span
+          data-testid="turn-progress"
+          className="inline-flex items-center gap-[8px] rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
+        >
+          <span aria-hidden className="inline-flex motion-safe:animate-spin text-text-tertiary">
+            <Icon icon={Refresh01Icon} size={14} />
+          </span>
+          Drawing {what} · {elapsedLabel(since, now)}
         </span>
-        Drawing {what} · {elapsedLabel(since, now)}
-      </span>
-      <span className="relative text-sm text-text-tertiary">
-        Usually 30–60 seconds
-      </span>
+        <span className="text-sm text-text-tertiary">
+          Usually 30–60 seconds
+        </span>
+      </div>
     </div>
   );
 }
@@ -524,6 +587,8 @@ function FailedImageTurn({
   onRetry,
   disabled,
   header,
+  productId,
+  focused,
 }: {
   reason?: ConceptFailReason;
   onRetry: () => void;
@@ -531,9 +596,13 @@ function FailedImageTurn({
   disabled?: boolean;
   /** The card's title line, as on a finished card. */
   header?: React.ReactNode;
+  productId: string;
+  focused: boolean;
 }) {
   const body = (
-    <div role="alert" className="flex gap-[12px]">
+    // No role="alert" — the page-root RailAnnouncer already says this turn
+    // failed the moment it lands, so a live region here spoke it twice.
+    <div className="flex gap-[12px]">
       <span className="mt-[2px] inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-bg-error-subtle text-[var(--color-icon-error)]">
         <Icon icon={Alert02Icon} size={16} />
       </span>
@@ -545,6 +614,7 @@ function FailedImageTurn({
           {reason ? FAIL_COPY[reason] : FAIL_FALLBACK}
         </p>
         <button
+          id={productRetryId(productId)}
           type="button"
           onClick={onRetry}
           disabled={disabled}
@@ -562,23 +632,13 @@ function FailedImageTurn({
     </div>
   );
   return (
-    <div className="flex w-full max-w-[640px] flex-col gap-[16px] rounded-2xl border border-border bg-bg-surface p-[16px]">
+    <div
+      id={productCardId(productId)}
+      tabIndex={-1}
+      className={`flex w-full max-w-[640px] flex-col gap-[16px] rounded-2xl border bg-bg-surface p-[16px] ${cardRoot(focused)}`}
+    >
       {header}
       <div className={header ? "px-[4px] pb-[4px]" : "p-[4px]"}>{body}</div>
     </div>
   );
-}
-
-function formatRelative(ts: number, now: number): string {
-  const delta = Math.max(0, now - ts);
-  const sec = Math.floor(delta / 1000);
-  if (sec < 45) return "just now";
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} hr ago`;
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
 }

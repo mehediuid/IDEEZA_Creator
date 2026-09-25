@@ -39,16 +39,22 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
-import type { ArtifactSource } from "@/lib/create/build-artifacts";
-import { confidenceFor } from "@/lib/create/confidence";
-import { ConfidenceBadge } from "./confidence-badge";
-import { NetworkAction } from "@/components/network/network-action";
 import {
+  bookedSpec,
+  isSampleModel,
+  specOfSource,
+  type ArtifactSource,
+} from "@/lib/create/build-artifacts";
+import { confidenceFor } from "@/lib/create/confidence";
+import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
+import { NetworkAction } from "@/components/network/network-action";
+import { mm3 } from "@/lib/spec/units";
+import {
+  coversFor,
   FirmwarePreview,
   PartsPreview,
   PartsSummary,
   PcbPreview,
-  WHAT_SHIPS,
   WiringPreview,
 } from "./deliverable-previews";
 
@@ -108,8 +114,13 @@ function ReviewPanel({
   // more than one; a single-product build is the surface it always was.
   const products = React.useMemo(() => productsOf(job), [job]);
   // Controlled when the shell shares the selection with the rail beside it,
-  // so picking a product in either moves both.
-  const [ownProductId, setOwnProductId] = React.useState("primary");
+  // so picking a product in either moves both. The review keeps the last
+  // product it was told to show, adopted while rendering: Done, Close and
+  // Esc on the spec sheet clear the selection, and the review stays where it
+  // was rather than snapping back to the primary — the rail picked that
+  // companion to look at its deliverables.
+  const [ownProductId, setOwnProductId] = React.useState(controlledProductId ?? "primary");
+  if (controlledProductId && controlledProductId !== ownProductId) setOwnProductId(controlledProductId);
   const productId = controlledProductId ?? ownProductId;
   const setProductId = (id: string) => {
     setOwnProductId(id);
@@ -135,6 +146,21 @@ function ReviewPanel({
   const productConfidence =
     confidence.byProduct.find((c) => c.productId === product.id) ??
     confidence.byProduct[0];
+  // L1 — the toggle stays beside the heading, but the list it opens needs
+  // real width, so it renders as its own full-width row below the header
+  // instead of squeezed into the header's left column beside its actions.
+  // Keyed by product (derived, not an effect) so switching products closes
+  // one product's open list rather than carrying it open onto another's.
+  const [issuesOpenState, setIssuesOpenState] = React.useState<{
+    productId: string;
+    open: boolean;
+  }>({ productId: productConfidence.productId, open: false });
+  const issuesOpen =
+    issuesOpenState.productId === productConfidence.productId
+      ? issuesOpenState.open
+      : false;
+  const setIssuesOpen = (open: boolean) =>
+    setIssuesOpenState({ productId: productConfidence.productId, open });
 
   const [picked, setPicked] = React.useState<BuildItemKind | null>(null);
   const linked = query.get("tab");
@@ -214,10 +240,15 @@ function ReviewPanel({
     [products],
   );
 
+  // The review lays out by its own width, not the window's: beside a docked
+  // spec sheet a 1440 px window leaves it about 340 px, where the window's
+  // `md:` still gave the aside its 260 px and the artifact the few left. So
+  // the card is the container, and its two columns and its header row wait
+  // for room of their own.
   return (
     <section
       aria-labelledby="review-heading"
-      className="overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface"
+      className="overflow-hidden rounded-2xl border border-solid border-border bg-bg-surface [container-type:inline-size]"
     >
       {/* The eyebrow carries the state and the heading carries the subject.
           It used to spend the heading on "Review your deliverables", which
@@ -226,9 +257,11 @@ function ReviewPanel({
           card could not tell you was which project this is. */}
       {/* The state and the subject in one line of hierarchy: a small state
           word, then the project. The actions stay beside the heading at any
-          width the card is given — the issue list used to widen the left
-          column and push them onto a row of their own. */}
-      <header className="flex flex-col gap-6 px-10 pb-6 pt-8 md:flex-row md:items-start">
+          width the card is given — the issue list renders as its own
+          full-width row below this header instead (L1), rather than
+          widening this left column and pushing the actions onto a row of
+          their own. */}
+      <header className="flex flex-col gap-6 px-10 pb-6 pt-8 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-text-tertiary">
             {building ? "Building" : "Build ready"}
@@ -239,13 +272,15 @@ function ReviewPanel({
           >
             {heading}
           </h2>
-          {/* §4.3 + §4.4.9 — the product's own tier, keyed by product so
-              switching products closes one product's open list rather than
-              carrying it onto another's issues. */}
+          {/* §4.3 + §4.4.9 — the product's own tier. The list this opens is
+              rendered below the whole header (L1), controlled from here so
+              switching products closes it rather than carrying it open onto
+              another product's issues. */}
           <div className="mt-4">
             <ConfidenceBadge
-              key={productConfidence.productId}
               confidence={productConfidence}
+              open={issuesOpen}
+              onOpenChange={setIssuesOpen}
             />
           </div>
         </div>
@@ -260,6 +295,15 @@ function ReviewPanel({
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>
+
+      {/* L1 — full width under the header row, not squeezed beside the
+          actions above: grouped issues, passes and the credit note need
+          more than the ~150 px the header's left column left them. */}
+      {issuesOpen && productConfidence.tier === "draft" && (
+        <div className="px-10 pb-6">
+          <ConfidenceIssuesPanel confidence={productConfidence} />
+        </div>
+      )}
 
       {shown === null ? (
         <div className="flex flex-col items-center gap-5 px-10 pb-24 pt-4 text-center">
@@ -364,7 +408,10 @@ function ReviewPanel({
             id="review-tabpanel"
             role="tabpanel"
             aria-labelledby={`review-tab-${shown}`}
-            className="grid gap-8 px-10 pb-10 md:grid-cols-[minmax(0,1fr)_260px]"
+            // Two columns once the artifact keeps 300 px beside the aside's
+            // 260 — 640 with the padding and the gap; under that the aside
+            // stacks below the artifact, full width.
+            className="grid gap-8 px-10 pb-10 [@container(min-width:640px)]:grid-cols-[minmax(0,1fr)_260px]"
           >
             {/* A wiring map or a long BOM is taller than the card; it
                 scrolls inside the panel instead of stretching the page
@@ -409,6 +456,11 @@ function ReviewPanel({
                   kind={shown}
                   product={product}
                   job={job}
+                  // §4.4 — the mesh in the 3D tab is the job's, generated once
+                  // from the primary's concept image; a companion previews it
+                  // at its own size, not its own shape, and the caption says
+                  // so rather than claiming a shape that isn't its.
+                  isCompanion={product.id !== "primary"}
                   onRetryModel={() => setBuildModelFailed(job.id, false)}
                 />
               )}
@@ -417,14 +469,19 @@ function ReviewPanel({
                 hairline divides the two columns, and the list is a list — the
                 check-mark pills read as "verified" and wrapped inside
                 themselves. */}
-            <aside className="flex flex-col gap-8 md:border-l md:border-solid md:border-border md:pl-8">
+            <aside className="flex flex-col gap-8 [@container(min-width:640px)]:border-l [@container(min-width:640px)]:border-solid [@container(min-width:640px)]:border-border [@container(min-width:640px)]:pl-8">
               {shown === "parts" && <PartsSummary job={product} />}
               <section>
                 <h3 className="text-sm font-semibold text-text-primary">
                   What this covers
                 </h3>
                 <ul role="list" className="mt-3 flex list-disc flex-col gap-2 pl-5 text-sm leading-relaxed text-text-secondary marker:text-text-tertiary">
-                  {WHAT_SHIPS[shown].map((line) => (
+                  {coversFor(
+                    shown,
+                    product,
+                    isSampleModel(job.modelGlbUrl),
+                    product.id !== "primary",
+                  ).map((line) => (
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
@@ -535,6 +592,7 @@ function DeliverablePanel({
   kind,
   product,
   job,
+  isCompanion,
   onRetryModel,
 }: {
   kind: BuildItemKind;
@@ -545,6 +603,10 @@ function DeliverablePanel({
   /** Still the job, for the one thing that is the job's and not a
    *  product's: the generated 3D model. */
   job: BuildJob;
+  /** True for a companion: the 3D tab's mesh is generated once, from the
+   *  primary's concept image, so a companion's tab previews that same mesh
+   *  at its own size rather than a shape of its own. */
+  isCompanion: boolean;
   onRetryModel: () => void;
 }) {
   if (kind === "pcb") return <PcbPreview job={product} />;
@@ -560,8 +622,50 @@ function DeliverablePanel({
       ) : (
         <GeneratingModel />
       )}
+      {/* The mesh is drawn from the concept image, so its proportions are the
+          concept's; the size it will be made at is the spec's, said here
+          rather than faked by stretching a model with no ruler beside it.
+          A build with no booked snapshot never fixed that size at booking
+          time (I4), so it reads as worked out from the parts, not as the
+          spec's own number. A companion has no mesh of its own (the job
+          only ever generates one), so its caption says whose shape this
+          preview is showing instead of implying it drew the companion's.
+          A build in demo mode has no mesh of its own either — every job
+          lands on the same bundled sample.glb — so the caption says that
+          plainly instead of claiming a shape it never drew (e2e #3). */}
+      <p
+        className="pointer-events-none absolute bottom-[10px] left-[12px] max-w-[calc(100%-24px)] truncate rounded-md bg-bg-surface px-[8px] py-[2px] text-sm text-text-secondary"
+        title={modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
+      >
+        {modelCaption(product, isCompanion, isSampleModel(job.modelGlbUrl))}
+      </p>
     </div>
   );
+}
+
+// The 3D tab's caption. A sample model's size note keeps the legacy
+// booked/worked-out-from-the-parts and companion wording (that part of the
+// number is still true), but its shape note replaces "shape from concept"
+// with the plain fact that the mesh is the demo placeholder, not this
+// concept's (e2e #3). Kept short — this sits in a fixed pill over the model,
+// and every demo build shows it, so it must not wrap at 400 px (Minor 12).
+function modelCaption(
+  product: ArtifactSource,
+  isCompanion: boolean,
+  isSample: boolean,
+): string {
+  const size = mm3(specOfSource(product).size);
+  const legacy = !bookedSpec(product);
+  if (isSample) {
+    const sizeNote = legacy ? "worked out from the parts" : "from spec";
+    return isCompanion
+      ? `Sample model (demo) · primary's shape · ${size} ${sizeNote}`
+      : `Sample model (demo) · ${size} ${sizeNote}`;
+  }
+  const sizeNote = legacy ? "size worked out from the parts" : "size from spec";
+  return isCompanion
+    ? `${size} · ${sizeNote} · this preview shows the primary's model`
+    : `${size} · shape from concept, ${sizeNote}`;
 }
 
 // Shown in the 3D tab while the enclosure mesh is still being generated from

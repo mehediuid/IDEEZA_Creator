@@ -15,10 +15,15 @@
 import * as React from "react";
 import type { Companion } from "./companions";
 import {
+  BRIEF_CHANGES,
   deriveTitle,
   type ConceptPart,
   type ConceptPartCategory,
+  type ConceptSummary,
 } from "./concept";
+import { withConceptStamp } from "../spec/edits";
+import { asConceptSummary, asResolvedSpec } from "../spec/hints";
+import type { ResolvedSpec, SpecEdits } from "../spec/types";
 
 // ─────────────────────────── types ────────────────────────────────
 
@@ -66,6 +71,9 @@ export type SetupAnswer = {
   /** Products still in the project that the maker left out of the next
    *  build — ticked off on the canvas, their concepts kept. */
   leftOut?: string[];
+  /** The maker's spec edits per product — "primary" or a companion id. Kept
+   *  per product, not per drawing, so a size set once survives a refine. */
+  specs?: Record<string, SpecEdits>;
 };
 
 export type ChatTurn =
@@ -126,6 +134,10 @@ export type ChatTurn =
       // `companionId`. Absent on the primary concept, which is the
       // product the chat started from and is always included.
       companionOf?: string;
+      // The concept as the summarizer read it — parts and spec hints — kept
+      // on the turn so the spec on the card survives a reload without the
+      // model being asked again. Read in the background once the image lands.
+      concept?: ConceptSummary;
       ts: number;
     };
 
@@ -161,7 +173,7 @@ export function conceptBriefOf(turns: ChatTurn[], turnId: string): string {
   const kept = changes.filter(Boolean);
   if (!root) return kept.join("; ");
   if (!kept.length) return root;
-  return `${root.replace(/[.\s]+$/, "")}. Changes: ${kept.join("; ")}`;
+  return `${root.replace(/[.\s]+$/, "")}${BRIEF_CHANGES}${kept.join("; ")}`;
 }
 
 export type ChatSession = {
@@ -218,6 +230,9 @@ export type BuildProduct = {
    *  "one line · what does it do?" with "ATmega328P · GPS Receiver · IMU …". */
   description?: string;
   parts: ConceptPart[];
+  /** The spec as it stood when the build was booked. The canvas can change
+   *  afterwards; this build does not. Absent on builds older than the spec. */
+  spec?: ResolvedSpec;
   items: BuildItem[];
 };
 
@@ -236,6 +251,8 @@ export type BuildJob = {
    *  carry one: `summary` is a parts line. */
   description?: string;
   parts: ConceptPart[];
+  /** The primary product's booked spec — see BuildProduct.spec. */
+  spec?: ResolvedSpec;
   /** The project this build was always meant for, answered at the setup
    *  question long before Save: an existing project by id, or the name typed
    *  for a new one. Not `projectId`, which is only set once the build really
@@ -386,6 +403,7 @@ export function productsOf(job: BuildJob): BuildProduct[] {
       title: job.title,
       summary: job.summary,
       parts: job.parts,
+      ...(job.spec ? { spec: job.spec } : null),
       items: job.items,
     },
     ...(job.companions ?? []),
@@ -559,6 +577,10 @@ function normalizeJob(raw: BuildJob): BuildJob {
             ? { description: c.description }
             : null),
           parts: Array.isArray(c.parts) ? c.parts : [],
+          ...(() => {
+            const spec = asResolvedSpec(c.spec, Array.isArray(c.parts) ? c.parts : []);
+            return spec ? { spec } : null;
+          })(),
           items: normalizeItems(c.items),
         }))
     : [];
@@ -578,6 +600,7 @@ function normalizeJob(raw: BuildJob): BuildJob {
       ? { projectChoiceName: stored.projectChoiceName }
       : null),
     parts: Array.isArray(stored.parts) ? stored.parts : [],
+    spec: asResolvedSpec(stored.spec, Array.isArray(stored.parts) ? stored.parts : []),
     conceptNumber: stored.conceptNumber || "1",
     status,
     estimateMin: stored.estimateMin ?? BUILD_ESTIMATE_MIN,
@@ -699,6 +722,10 @@ type Ctx = {
   dropSetupPick: (chatId: string, turnId: string, companionId: string) => void;
   /** In or out of the next build, for a product that stays in the project. */
   setSetupLeftOut: (chatId: string, turnId: string, companionId: string, out: boolean) => void;
+  /** The concept as read back — parts and spec hints — kept on its turn. */
+  setTurnConcept: (chatId: string, turnId: string, concept: ConceptSummary) => void;
+  /** The maker's spec edits for one product, on the answered question. */
+  setSpecEdits: (chatId: string, turnId: string, productId: string, edits: SpecEdits) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -714,6 +741,8 @@ type Ctx = {
     projectChoiceId?: string;
     projectChoiceName?: string;
     parts: ConceptPart[];
+    /** The primary's spec at booking — see BuildJob.spec. */
+    spec?: ResolvedSpec;
     companions?: Omit<BuildProduct, "items">[];
   }) => BuildJob;
   updateBuildItem: (
@@ -1065,7 +1094,11 @@ export function CreateHistoryProvider({
   );
 
   const patchSetupAnswer = React.useCallback(
-    (chatId: string, turnId: string, patch: (a: SetupAnswer) => SetupAnswer) => {
+    (
+      chatId: string,
+      turnId: string,
+      patch: (a: SetupAnswer, turns: ChatTurn[]) => SetupAnswer,
+    ) => {
       setChats((arr) =>
         arr.map((c) =>
           c.id !== chatId
@@ -1075,7 +1108,7 @@ export function CreateHistoryProvider({
                 updatedAt: Date.now(),
                 turns: c.turns.map((t) =>
                   t.id === turnId && t.role === "setup" && t.answer
-                    ? { ...t, answer: patch(t.answer) }
+                    ? { ...t, answer: patch(t.answer, c.turns) }
                     : t,
                 ),
               },
@@ -1102,6 +1135,42 @@ export function CreateHistoryProvider({
         return { ...a, leftOut: out ? [...rest, companionId] : rest };
       }),
     [patchSetupAnswer],
+  );
+
+  const setSpecEdits = React.useCallback(
+    (chatId: string, turnId: string, productId: string, edits: SpecEdits) =>
+      patchSetupAnswer(chatId, turnId, (a, turns) => ({
+        ...a,
+        // Stamped with the parts of the concept they were made on, which
+        // only the store holds here: a Read again on the same turn is a
+        // new concept for them (rebaseEdits).
+        specs: {
+          ...(a.specs ?? {}),
+          [productId]: withConceptStamp(edits, (id) => {
+            const on = turns.find((t) => t.id === id);
+            return on?.role === "assistant" ? asConceptSummary(on.concept)?.parts : undefined;
+          }),
+        },
+      })),
+    [patchSetupAnswer],
+  );
+
+  const setTurnConcept = React.useCallback(
+    (chatId: string, turnId: string, concept: ConceptSummary) => {
+      setChats((arr) =>
+        arr.map((c) =>
+          c.id !== chatId
+            ? c
+            : {
+                ...c,
+                turns: c.turns.map((t) =>
+                  t.id === turnId && t.role === "assistant" ? { ...t, concept } : t,
+                ),
+              },
+        ),
+      );
+    },
+    [],
   );
 
   // The job token for a render in flight. Written once, as soon as the
@@ -1150,6 +1219,8 @@ export function CreateHistoryProvider({
        *  Carried onto the job so Save does not ask it again. */
       projectChoiceId?: string;
       projectChoiceName?: string;
+      /** The primary's spec at booking — see BuildJob.spec. */
+      spec?: ResolvedSpec;
       /** §4.4 — the companion products whose concepts are ready. Absent
        *  on every single-product build. */
       companions?: Omit<BuildProduct, "items">[];
@@ -1172,6 +1243,7 @@ export function CreateHistoryProvider({
           ? { projectChoiceName: input.projectChoiceName }
           : null),
         parts: input.parts,
+        ...(input.spec ? { spec: input.spec } : null),
         conceptNumber: input.conceptNumber,
         status: busy ? "queued" : "running",
         startedAt: busy ? undefined : now,
@@ -1627,6 +1699,8 @@ export function CreateHistoryProvider({
     addSetupProduct,
     dropSetupPick,
     setSetupLeftOut,
+    setTurnConcept,
+    setSpecEdits,
     getChat,
     startBuild,
     updateBuildItem,

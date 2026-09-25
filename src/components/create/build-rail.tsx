@@ -33,7 +33,7 @@ import {
 
 // What the build is doing, in one word — the rail used to say "Building"
 // beside "every piece is ready".
-const STATE_WORD: Record<ReturnType<typeof statusOf>, string> = {
+export const STATE_WORD: Record<ReturnType<typeof statusOf>, string> = {
   queued: "Queued",
   running: "Building",
   ready: "Build ready",
@@ -113,7 +113,7 @@ export function BuildRail({
   );
 }
 
-function PipelineRow({ item }: { item: BuildItem }) {
+export function PipelineRow({ item }: { item: BuildItem }) {
   const tone =
     item.status === "ready"
       ? "done"
@@ -131,27 +131,37 @@ function PipelineRow({ item }: { item: BuildItem }) {
         tone === "waiting" ? "text-text-tertiary" : "",
       ].join(" ")}
     >
-      <span
-        aria-hidden
-        className={[
-          "inline-flex shrink-0",
-          tone === "working" ? "animate-spin text-text-tertiary" : "",
-          tone === "done" ? "text-text-success" : "",
-          tone === "bad" ? "text-[var(--color-icon-error)]" : "",
-          tone === "waiting" ? "text-text-disabled" : "",
-        ].join(" ")}
-      >
-        <Icon
-          icon={
-            tone === "done"
-              ? CheckmarkCircle02Icon
-              : tone === "bad"
-                ? Alert02Icon
-                : Loading03Icon
-          }
-          size={14}
-        />
-      </span>
+      {tone === "waiting" ? (
+        // Not started yet: a still dot, never a spinner that doesn't spin —
+        // the rail's Activity draws waiting the same way.
+        <span
+          aria-hidden
+          className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center"
+        >
+          <span className="h-[8px] w-[8px] rounded-full border border-solid border-border-strong" />
+        </span>
+      ) : (
+        <span
+          aria-hidden
+          className={[
+            "inline-flex shrink-0",
+            tone === "working" ? "text-text-tertiary motion-safe:animate-spin" : "",
+            tone === "done" ? "text-text-success" : "",
+            tone === "bad" ? "text-[var(--color-icon-error)]" : "",
+          ].join(" ")}
+        >
+          <Icon
+            icon={
+              tone === "done"
+                ? CheckmarkCircle02Icon
+                : tone === "bad"
+                  ? Alert02Icon
+                  : Loading03Icon
+            }
+            size={14}
+          />
+        </span>
+      )}
       <span className="min-w-0 flex-1 truncate">{ITEM_LABELS[item.kind]}</span>
       <span className="shrink-0 tabular-nums text-sm text-text-tertiary">
         {item.status === "ready"

@@ -20,14 +20,36 @@ import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 
+/** The composer's text box — where the spec sheet's Change by message puts
+ *  the keyboard. */
+export const COMPOSER_INPUT_ID = "chat-prompt";
+
+/** How long a held send's line stays under the box, unless typing clears it
+ *  first. */
+const HELD_MS = 6_000;
+
 export function PromptBar({
   onSubmit,
   placeholder = "Describe your electronics project…",
   canRender = true,
   blockedReason,
+  heldMessage,
+  onHeldChange,
   enhanceMode = "brief",
 }: {
-  onSubmit: (text: string) => void;
+  /** Return false to keep the draft — the host couldn't act on it (nothing
+   *  is selected to change), and clearing it would lose what was typed. */
+  onSubmit: (text: string) => void | boolean;
+  /** What to say, for a moment, when `onSubmit` keeps the draft: Enter and
+   *  the send arrow look ready, so a send that does nothing has to say why
+   *  or it reads as broken. */
+  heldMessage?: string;
+  /** Told true when that line appears under the box and false when it
+   *  clears — its clock, a keystroke, dictation, a send that goes, the
+   *  listening view taking the bar, or `heldMessage` going (the reason to
+   *  hold is gone) — so a hint beside the composer that would say the same
+   *  can step aside exactly while it shows. */
+  onHeldChange?: (held: boolean) => void;
   placeholder?: string;
   /** False when the balance cannot cover one concept render. The send is
    *  shut with that as its reason rather than letting a submit start a
@@ -44,14 +66,34 @@ export function PromptBar({
   const [value, setValue] = React.useState("");
   const [refining, setRefining] = React.useState(false);
   const taRef = React.useRef<HTMLTextAreaElement>(null);
+  // The line a held send shows. `n` counts the sends, so a second one
+  // replays the line and restarts its clock.
+  const [held, setHeld] = React.useState<{ text: string; n: number } | null>(null);
+  React.useEffect(() => {
+    if (!held) return;
+    const timer = window.setTimeout(() => setHeld(null), HELD_MS);
+    return () => window.clearTimeout(timer);
+  }, [held]);
 
   // Dictation appends what was said to whatever is already typed.
   const voice = useVoiceInput({
     onFinal: (said) => {
       setValue((cur) => (cur.trim() ? `${cur.trim()} ${said}` : said));
+      setHeld(null);
     },
   });
   const listening = voice.status === "listening";
+
+  // The line is on screen while a send is held, the host still has a reason
+  // to hold it, and the bar isn't the listening view. Picking a product takes
+  // the reason away (`heldMessage` goes), and the line with it that moment —
+  // not on its clock — so the hint that names the pick can show. The held
+  // send is dropped as well, so deselecting again brings no stale line back.
+  if (held !== null && !heldMessage) setHeld(null);
+  const heldShows = held !== null && !!heldMessage && !listening;
+  React.useEffect(() => {
+    onHeldChange?.(heldShows);
+  }, [heldShows, onHeldChange]);
 
   // Auto-grow the textarea up to ~5 lines. `listening` is in the deps
   // because Cancel leaves the draft exactly as it was: the textarea
@@ -71,7 +113,12 @@ export function PromptBar({
   const send = () => {
     const trimmed = value.trim();
     if (!trimmed || refining || blockedReason || !canRender) return;
-    onSubmit(trimmed);
+    if (onSubmit(trimmed) === false) {
+      // The draft stays; the line says why nothing happened.
+      if (heldMessage) setHeld((prev) => ({ text: heldMessage, n: (prev?.n ?? 0) + 1 }));
+      return;
+    }
+    setHeld(null);
     setValue("");
   };
 
@@ -132,7 +179,10 @@ export function PromptBar({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
+      return;
     }
+    // The next keystroke clears a held send's line — the maker is on it.
+    if (held && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) setHeld(null);
   };
 
   const hasText = value.trim().length > 0;
@@ -159,11 +209,11 @@ export function PromptBar({
   return (
     <div>
       <div className="rounded-2xl border-1-5 border-border bg-bg-surface focus-within:border-border-brand">
-        <label htmlFor="chat-prompt" className="sr-only">
+        <label htmlFor={COMPOSER_INPUT_ID} className="sr-only">
           Continue the concept conversation
         </label>
         <textarea
-          id="chat-prompt"
+          id={COMPOSER_INPUT_ID}
           ref={taRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -206,6 +256,20 @@ export function PromptBar({
           </div>
         </div>
       </div>
+
+      {/* Why the last send did nothing, for a moment — polite, and always
+          in the DOM for the same reason as the line below. Guidance, not an
+          error: the words carry it, in the secondary ink. */}
+      <p role="status" className={cn("px-[4px] text-sm text-text-secondary", heldShows && "mt-[10px]")}>
+        {heldShows && held && (
+          <span
+            key={held.n}
+            className="block motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal motion-safe:ease-decelerate"
+          >
+            {held.text}
+          </span>
+        )}
+      </p>
 
       {/* Why the last session produced nothing. It is derived from the
           hook's status, so the next successful start clears it. The

@@ -29,11 +29,23 @@ import { Icon, type IconValue } from "@/components/dashboard/icon";
 import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
+  productsOf,
   useCreateHistory,
   type BuildItem,
   type BuildJob,
+  type BuildProduct,
+  type ChatSession,
 } from "@/lib/create/history";
-import { bomFor } from "@/lib/create/build-artifacts";
+import type { ConceptSummary } from "@/lib/create/concept";
+import {
+  bomFor,
+  bookedSpec,
+  partChangesOf,
+  partChangesText,
+  specOfSource,
+} from "@/lib/create/build-artifacts";
+import { specLine } from "@/lib/spec/format";
+import { asConceptSummary } from "@/lib/spec/hints";
 import { NetworkSection } from "@/components/network/network-section";
 import {
   FLOW_STEPS,
@@ -49,7 +61,7 @@ import {
 export function ProjectDetails({ id }: { id: string }) {
   const router = useRouter();
   const { hydrated, projects, selectProject } = useManualProjects();
-  const { hydrated: buildsHydrated, builds } = useCreateHistory();
+  const { hydrated: buildsHydrated, builds, chats } = useCreateHistory();
 
   // Cards link by id; a slug in the address bar resolves too, so a
   // hand-typed /projects/<slug> finds the same project.
@@ -63,6 +75,19 @@ export function ProjectDetails({ id }: { id: string }) {
     if (!buildId) return null;
     return builds.find((b) => b.id === buildId) ?? null;
   }, [buildId, builds]);
+
+  // Each product the maker changed on the spec sheet before it was built,
+  // and how — the description above is the concept's, written before any
+  // edit, so a buzzer taken out still "beeps when dry" there (e2e #2).
+  const changes = React.useMemo(() => {
+    if (!build) return [];
+    const chat = chats.find((c) => c.id === build.chatId);
+    return productsOf(build).flatMap((p) => {
+      const concept = conceptOf(chat, build, p);
+      const c = concept ? partChangesOf(p, concept) : null;
+      return c ? [{ id: p.id, name: p.name, text: partChangesText(c) }] : [];
+    });
+  }, [build, chats]);
 
   if (!hydrated || !buildsHydrated) {
     return (
@@ -128,6 +153,21 @@ export function ProjectDetails({ id }: { id: string }) {
             </span>
           </p>
 
+          {build && (
+            <ul role="list" aria-label="What each product is" className="mt-[6px] flex flex-col gap-[2px]">
+              {productsOf(build).map((p) => (
+                <li key={p.id} className="text-sm text-text-secondary">
+                  {specLine(p.name, specOfSource(p))}
+                  {/* A build that predates spec booking has this number
+                      worked out from its parts just now, not a decision
+                      the maker made at booking time (Minor 10) — said here
+                      the same way the build's own asides already say it. */}
+                  {!bookedSpec(p) ? " · worked out from the parts" : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+
           {build?.conceptImageUrl && (
             <div className="mt-[18px] overflow-hidden rounded-[12px] border border-border bg-bg-surface-raised">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -142,6 +182,24 @@ export function ProjectDetails({ id }: { id: string }) {
           <p className="mt-[18px] max-w-[68ch] text-sm leading-relaxed text-text-secondary">
             {project.description || "No description yet."}
           </p>
+          {changes.length > 0 && (
+            <ul role="list" aria-label="Part changes" className="mt-[8px] flex max-w-[68ch] flex-col gap-[4px]">
+              {changes.map((c) => (
+                <li key={c.id} className="text-sm leading-relaxed text-text-secondary">
+                  {/* One product needs no name; in a system the line says
+                      which of them it is about. */}
+                  {build && productsOf(build).length > 1 ? (
+                    <>
+                      <span className="font-semibold text-text-primary">{c.name}</span> — built
+                      with your part changes: {c.text}
+                    </>
+                  ) : (
+                    <>Built with your part changes: {c.text}</>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
 
           {/* Deliverables from the build this project came from */}
           <section aria-labelledby="deliverables-heading" className="mt-[32px]">
@@ -458,4 +516,27 @@ function formatDate(ts: number): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+/** The concept a booked product was drawn from, as its chat still has it —
+ *  the primary's by the turn that started this build, a companion's by its
+ *  drawing. None once the chat is gone, and then nothing is compared. */
+function conceptOf(
+  chat: ChatSession | undefined,
+  build: BuildJob,
+  product: BuildProduct,
+): ConceptSummary | undefined {
+  const primary = product.id === "primary";
+  let drawn: ConceptSummary | undefined;
+  for (const t of chat?.turns ?? []) {
+    if (t.role !== "assistant" || t.status !== "ready" || !t.concept) continue;
+    if (primary ? t.companionOf : t.companionOf !== product.id) continue;
+    // Read back the way every other reader takes a stored concept: one an
+    // older build of the app kept without its parts is no concept at all,
+    // and comparing its parts would throw.
+    if (primary && t.usedForBuild === build.id) return asConceptSummary(t.concept);
+    // The latest drawing with this image, should a regenerate repeat one.
+    if (product.conceptImageUrl && t.imageUrl === product.conceptImageUrl) drawn = asConceptSummary(t.concept);
+  }
+  return drawn;
 }

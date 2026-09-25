@@ -35,21 +35,20 @@ const SIZES = {
 
 type Size = keyof typeof SIZES;
 
-// The focus ring is a literal `0 0 0 3px` rather than an `--elevation-*`: the
-// elevation scale is six drop shadows in rgba black, and none of them is a
-// flat 3px ring in a theme colour — a focus ring is a different thing from a
-// lift. A real token for it (`--ring-focus`) would be the right answer, and
-// minting one is the design-system owner's call, not an agent's. Until then
-// the same literal is written in Search, Select's menu and this field, so the
-// three at least agree.
+// The focus ring is the app's own — the focus colour at 2px, as its buttons,
+// Segmented's radios, Search and Select's menu all draw it — not an
+// `--elevation-*`: the elevation scale is drop shadows in rgba black, and a
+// focus ring is a different thing from a lift. It used to be a 3px glow of
+// the subtle brand tint, a fill colour that came to about 1.1:1 against the
+// surface in both themes; the focus colour clears 3:1 in both.
 const shell = (invalid?: boolean, disabled?: boolean) =>
   cn(
     "flex items-stretch overflow-hidden border bg-[var(--color-input-bg)] transition-[border-color,box-shadow] duration-fast",
     disabled
       ? "cursor-not-allowed border-[var(--color-border-default)] bg-[var(--color-input-bg-disabled)]"
       : invalid
-        ? "border-[var(--color-input-border-error)] focus-within:shadow-[0_0_0_3px_var(--color-bg-error-subtle)]"
-        : "border-[var(--color-input-border)] hover:border-[var(--color-input-border-hover)] focus-within:border-[var(--color-input-border-focus)] focus-within:shadow-[0_0_0_3px_var(--color-bg-brand-subtle)]",
+        ? "border-[var(--color-input-border-error)] focus-within:ring-2 focus-within:ring-[var(--color-border-error)]"
+        : "border-[var(--color-input-border)] hover:border-[var(--color-input-border-hover)] focus-within:border-[var(--color-input-border-focus)] focus-within:ring-2 focus-within:ring-[var(--color-border-focus)]",
   );
 
 const field = (s: (typeof SIZES)[Size]) =>

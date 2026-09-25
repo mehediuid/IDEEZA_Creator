@@ -12,50 +12,140 @@
 import type { BuildItemKind } from "@/lib/create/history";
 import {
   bomFor,
+  bookedSpec,
   firmwareFor,
   netsFor,
-  pcbMetaFor,
+  offBoard,
+  specOfSource,
   type ArtifactSource,
   type NetWire,
 } from "@/lib/create/build-artifacts";
 import type { ConceptPartCategory } from "@/lib/create/concept";
+import { connectorPartsOf } from "@/lib/create/confidence";
+import { batteryOf, isBatteryPart } from "@/lib/spec/batteries";
+import { boardLabel, FAB_PROFILE, mcuOf, needsNoPower, powerLabel, radioOf } from "@/lib/spec/format";
+import { currentLabel, mm3 } from "@/lib/spec/units";
 
 // ─────────────────────── what each artifact covers ──────────────────
 //
-// This panel has no download or export control — the review step is a
-// preview, not a delivery mechanism. So every line here describes what
-// the artifact *covers* (what was designed, what it accounts for),
-// never a file format or a document you could take away, per CLAUDE.md
-// §6 ("no promises without delivery").
-
-export const WHAT_SHIPS: Record<BuildItemKind, string[]> = {
-  "3d": [
-    "3D enclosure model, sized to the board",
-    "Print settings: PETG, 0.2 mm layer",
-    "Mount points sized for the PCB",
-  ],
-  pcb: [
-    "Schematic, converted into a 2-layer board layout",
-    "Placement and copper routing between every part",
-    "Bill of materials for this board",
-  ],
-  code: [
-    "Arduino-style sketch, fully commented",
-    "Library list pinned to versions",
-    "Wiring map to the PCB pins",
-  ],
-  wiring: [
-    "Netlist + pin-to-pin table",
-    "Wire colors per net class",
-    "Harness lengths, 22 AWG",
-    "Connector pinouts: USB-C, JST-PH",
-    "Continuity test checklist",
-  ],
-  parts: [
-    "Every part — category, name, reference and quantity",
-    "Grouped by function, quantities per board",
-  ],
-};
+// What each artifact covers, for this product — the aside beside every tab.
+// Read from the spec the build was booked with, so the numbers here are the
+// numbers the maker saw on the card and at the gate. No download or export
+// control lives on this panel, so no line names a file you could take away
+// (CLAUDE.md §6, "no promises without delivery").
+export function coversFor(
+  kind: BuildItemKind,
+  product: ArtifactSource,
+  // True when the 3D tab is showing the bundled placeholder mesh rather than
+  // a shape generated for this concept (e2e #3) — only the "3d" case reads
+  // this; every other kind ignores it.
+  sampleModel = false,
+  // True for a companion (§4.7): the job only ever generates one mesh, from
+  // the primary's concept image, so a companion's 3D tab previews that mesh
+  // rather than one drawn from its own — only the "3d" case reads this.
+  isCompanion = false,
+): string[] {
+  const booked = bookedSpec(product);
+  const spec = specOfSource(product);
+  // A build with no booked snapshot never checked these numbers against a
+  // real board or pack at booking time — they are read off the current
+  // parts instead, same arithmetic, just not something this build actually
+  // committed to (I4).
+  const withNote = (text: string) =>
+    booked ? text : `${text}, worked out from the parts`;
+  const asked =
+    !spec.fits && spec.draftAtSize
+      ? [`Asked ${mm3(spec.size)} · needs ${mm3(spec.minSize)}`]
+      : [];
+  // A legacy build's battery is one of those numbers — a rule's guess, never
+  // a decision the maker or the concept actually made — so it is stated
+  // only when the parts themselves name a pack.
+  const knowsBattery = !!booked || product.parts.some(isBatteryPart);
+  // A plate, a stand, a case: nothing in it is powered, so no line says what
+  // powers it — the card and the sheet say "No power needed".
+  const powered = !needsNoPower(spec);
+  const supply = spec.battery === "none" ? "USB" : batteryOf(spec.battery).label;
+  switch (kind) {
+    case "3d":
+      return [
+        ...asked,
+        withNote(`Enclosure · ${mm3(spec.size)}`),
+        `${spec.material} · ${spec.wallMm} mm wall · 0.2 mm layers`,
+        // A sample mesh is never this concept's shape, whoever's product this
+        // is — checked first, ahead of the companion disclosure. A companion
+        // has no mesh of its own even for a real model, so its line says
+        // whose shape this is instead of claiming its own concept image; the
+        // booked/worked-out distinction stays on the size line above
+        // (withNote), not repeated here (qa-review #2).
+        sampleModel
+          ? "Sample 3D model — not generated from this concept (demo mode)"
+          : isCompanion
+            ? "Shape: the primary's model — this product has no mesh of its own"
+            : booked
+              ? "Shape from the concept image, size from the spec"
+              : "Shape from the concept image, size worked out from the parts",
+        // Only a product with a board has anything for a mount point to sit
+        // on — a case-only product (a strap, a shell) gets no PCB to fit.
+        ...(spec.board ? ["Mount points sized for the PCB"] : []),
+      ];
+    case "pcb":
+      return [
+        spec.board ? withNote(boardLabel(spec)) : boardLabel(spec),
+        `Fab profile: ${FAB_PROFILE}`,
+        "Schematic, converted into a board layout",
+        "Bill of materials for this board",
+      ];
+    case "code": {
+      const mcu = mcuOf(product.parts);
+      // A battery-only or connector-only product (a charger, a spare pack)
+      // has no Microcontroller part at all, so there is no sketch, no
+      // library list and no wiring map either — nothing here runs firmware,
+      // full stop, rather than saying so and then listing three files that
+      // don't exist (Minor 11).
+      if (!mcu) return ["No microcontroller — nothing runs firmware"];
+      const radio = radioOf(product.parts);
+      return [
+        `Runs on ${mcu}`,
+        radio ? `Talks over ${radio}` : "No radio named in the parts",
+        "Arduino-style sketch, fully commented",
+        "Library list pinned to versions",
+        "Wiring map to the PCB pins",
+      ];
+    }
+    case "wiring": {
+      const connectors = connectorPartsOf(product.parts);
+      return [
+        ...(knowsBattery && powered ? [`Power in: ${supply}`] : []),
+        "Netlist + pin-to-pin table",
+        "Wire colors per net class",
+        "Harness lengths, 22 AWG",
+        connectors.length
+          ? `Connector pinouts: ${connectors.join(", ")}`
+          : "No connectors named",
+        "Continuity test checklist",
+      ];
+    }
+    case "parts":
+      return [
+        ...(knowsBattery && powered
+          ? [spec.battery === "none" ? "Powered over USB" : `Battery: ${supply}`]
+          : []),
+        // powerLabel reads spec.battery for its runtime estimate — a real
+        // number only when the parts (or the booked spec) actually name a
+        // pack. A legacy build with no named battery gets one from the rule
+        // just to keep the arithmetic running, and printing its runtime here
+        // would claim a battery life for a battery nobody confirmed (Minor
+        // 10), the same thing knowsBattery already keeps off the line above.
+        !powered
+          ? powerLabel(spec)
+          : knowsBattery
+            ? `Draws about ${currentLabel(spec.drawMa)} · ${powerLabel(spec)}`
+            : `Draws about ${currentLabel(spec.drawMa)}`,
+        "Every part — category, name, reference and quantity",
+        "Grouped by function, quantities per board",
+      ];
+  }
+}
 
 // ─────────────────────────── shared geometry ───────────────────────
 
@@ -176,10 +266,12 @@ const PCB_GAP_Y = 34;
 
 export function PcbPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
-  const meta = pcbMetaFor(job);
   const nets = netsFor(job);
+  // Feet, screws, a gasket and the wall adapter are on no board and wired
+  // to nothing (offBoard): the BOM lists them, the board doesn't draw them.
+  const placed = bom.rows.filter((r) => !offBoard(r.ref));
 
-  const n = Math.max(bom.rows.length, 1);
+  const n = Math.max(placed.length, 1);
   const cols = n <= 4 ? 2 : n <= 9 ? 3 : 4;
   const rows = Math.ceil(n / cols);
 
@@ -192,7 +284,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
 
   const blocks = new Map<string, Box>();
   const cell = new Map<string, { col: number; row: number }>();
-  bom.rows.forEach((row, i) => {
+  placed.forEach((row, i) => {
     const col = i % cols;
     const rowIndex = Math.floor(i / cols);
     blocks.set(
@@ -241,7 +333,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
         role="img"
-        aria-label={`Board layout: ${bom.rows.length} parts on a ${meta.layers}-layer board`}
+        aria-label={`Board layout: ${placed.length} ${placed.length === 1 ? "part" : "parts"} on a 2-layer board`}
         style={{ width: "100%", height: "auto" }}
       >
         <rect
@@ -279,7 +371,7 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
           </g>
         ))}
 
-        {bom.rows.map((row) => {
+        {placed.map((row) => {
           const b = blocks.get(row.ref);
           if (!b) return null;
           return (
@@ -306,9 +398,9 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
         })}
       </svg>
       <figcaption>
-        <MetaLine
-          text={`${meta.layers}-layer · ${meta.widthMm} × ${meta.heightMm} mm · ${meta.partCount} parts`}
-        />
+        {/* boardLabel, not a repeat of this arithmetic — the caption used to
+            say "parts" even for a lone one. */}
+        <MetaLine text={boardLabel(specOfSource(job))} />
       </figcaption>
     </figure>
   );
@@ -351,8 +443,10 @@ export function WiringPreview({ job }: { job: ArtifactSource }) {
   const bom = bomFor(job);
   const nets = netsFor(job);
 
+  // Feet, screws, a gasket and the wall adapter take no wire (offBoard), so
+  // the map draws no block for them either, as the PCB preview doesn't.
   const columns = WIRING_ROLES.map((roles) =>
-    bom.rows.filter((r) => roles.includes(r.category)),
+    bom.rows.filter((r) => roles.includes(r.category) && !offBoard(r.ref)),
   ).filter((col) => col.length > 0);
 
   const order = new Map<string, number>();

@@ -37,6 +37,7 @@ import {
   fallbackConcept,
   type ConceptSummary,
 } from "@/lib/create/concept";
+import { asConceptSummary } from "@/lib/spec/hints";
 
 // The estimate in words — a build here takes about a minute.
 const TIME_CHIP =
@@ -45,7 +46,9 @@ const TIME_CHIP =
     : `About ${BUILD_ESTIMATE_MIN} minutes`;
 
 // One summarize call per concept: reopening the dialog on the same turn
-// shows what it read the first time instead of asking again.
+// shows what it read the first time instead of asking again. Only a real
+// reading is filed — a stand-in kept here would answer every later caller
+// with the generic parts for the rest of the session.
 const summaryCache = new Map<string, ConceptSummary>();
 
 // In-flight requests, keyed the same way — a quick close/reopen (or a
@@ -53,44 +56,62 @@ const summaryCache = new Map<string, ConceptSummary>();
 // instead of firing a second /api/concept/summarize call.
 const pendingSummaries = new Map<string, Promise<ConceptSummary>>();
 
+// Pollinations queues one request per IP and answers a second with a 429
+// that sends it to the fallback — so every summarize call made through
+// `summarizeConcept` (the background reader, Read again, the Build path and
+// the gate) goes through this one line, each request starting when the one
+// ahead of it has answered. It serialises those callers only: the setup
+// question's own two readings and Enhance go straight to the network,
+// outside it.
+let queue: Promise<unknown> = Promise.resolve();
+
 export function summarizeConcept(
   turnId: string,
   prompt: string,
+  /** The reading already kept on the turn — used as is, no request. A kept
+   *  stand-in is not a reading, so it is asked again instead. */
+  known?: ConceptSummary,
+  /** The companion's own name, when `prompt` is a companion's brief
+   *  ("{name} for {the maker's idea}"): the stand-in reads the product's own
+   *  words, not the idea it serves. Absent for the primary. */
+  companion?: string,
 ): Promise<ConceptSummary> {
+  if (known && !known.fallback) summaryCache.set(turnId, known);
   const cached = summaryCache.get(turnId);
   if (cached) return Promise.resolve(cached);
   const pending = pendingSummaries.get(turnId);
   if (pending) return pending;
-  const request = (async (): Promise<ConceptSummary> => {
+  const request = queue.then(async (): Promise<ConceptSummary> => {
     try {
       const res = await fetch("/api/concept/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(companion ? { prompt, companion } : { prompt }),
       });
       if (!res.ok) throw new Error("summarize failed");
-      const data = (await res.json()) as Partial<ConceptSummary>;
-      if (!data.title || !Array.isArray(data.parts) || !data.parts.length) {
-        throw new Error("empty concept");
-      }
-      return {
-        title: data.title,
-        summary: data.summary ?? "",
-        description: data.description ?? describeFallback(prompt),
-        parts: data.parts,
-      };
+      // Checked the way a stored reading is, so what is kept on the turn
+      // always reads back — and `fallback` comes through only as the route
+      // said it.
+      const data: unknown = await res.json();
+      const read = asConceptSummary(data);
+      if (!read || !(data as { title?: unknown }).title) throw new Error("empty concept");
+      return { ...read, description: read.description || describeFallback(prompt) };
     } catch {
       // The same deterministic concept the route falls back to, so a
-      // build started offline still carries a real parts list.
-      return fallbackConcept(prompt);
+      // build started offline still carries a real parts list — marked as
+      // the stand-in it is.
+      return fallbackConcept(prompt, companion);
     }
-  })();
+  });
+  queue = request.catch(() => null);
   pendingSummaries.set(turnId, request);
   // The cache used to be written by the dialog's own effect, so a path that
   // never opens the dialog — a dismissed gate — asked the model the same
   // question twice for the same concept, once to read it back and once to
   // file the build under it. The answer is filed here, where it is made.
-  void request.then((concept) => summaryCache.set(turnId, concept));
+  void request.then((concept) => {
+    if (!concept.fallback) summaryCache.set(turnId, concept);
+  });
   request.finally(() => pendingSummaries.delete(turnId));
   return request;
 }
@@ -99,8 +120,11 @@ export function ConfirmBuildDialog({
   open,
   turnId,
   conceptPrompt,
+  companionName,
+  initialConcept,
   products,
   productNames = [],
+  specLines,
   onCancel,
   onConfirm,
   submitting,
@@ -109,12 +133,23 @@ export function ConfirmBuildDialog({
   /** The concept this build comes from — the cache key for its summary. */
   turnId: string;
   conceptPrompt: string;
+  /** The companion's own name, when this is a companion's concept — see
+   *  `summarizeConcept`. */
+  companionName?: string;
+  /** The reading Build already did for this turn — real or stand-in. When
+   *  given, the dialog shows it as is and does not ask again: Build just
+   *  read this same turn, on a stand-in or not, and a second ask here for a
+   *  stand-in primary sent a request the maker never saw the point of. */
+  initialConcept?: ConceptSummary;
   /** How many products the build covers. The price is per product, and the
    *  canvas behind this dialog says the same number. */
   products: number;
   /** What the canvas calls each product being paid for. "and 1 more" asked
    *  the maker to pay for a product the dialog would not name. */
   productNames?: string[];
+  /** One line per product — size · board · power — so what each build will
+   *  be is on screen before the credits move. */
+  specLines: string[];
   onCancel: () => void;
   onConfirm: (concept: ConceptSummary) => void;
   submitting: boolean;
@@ -129,26 +164,30 @@ export function ConfirmBuildDialog({
     concept: ConceptSummary;
   } | null>(null);
 
-  // The concept the build is filed under. Read in the background, with the
-  // same deterministic fallback the route uses standing in meanwhile, so
-  // Confirm is never blocked on a network round-trip.
+  // The concept the build is filed under. `initialConcept` is what Build
+  // itself just read for this turn, so it outranks a fresh fallback and — via
+  // the effect below — stands in for reading it again. Absent that, the same
+  // deterministic fallback the route uses stands in meanwhile, so Confirm is
+  // never blocked on a network round-trip.
   const concept =
     summaryCache.get(turnId) ??
+    initialConcept ??
     (resolved && resolved.turnId === turnId ? resolved.concept : null) ??
-    fallbackConcept(conceptPrompt);
+    fallbackConcept(conceptPrompt, companionName);
 
   React.useEffect(() => {
-    if (!open || !turnId || summaryCache.has(turnId)) return;
+    if (!open || !turnId || summaryCache.has(turnId) || initialConcept) return;
     let live = true;
-    summarizeConcept(turnId, conceptPrompt).then((result) => {
-      summaryCache.set(turnId, result);
+    // summarizeConcept files a real reading itself, and a stand-in must not
+    // be filed at all — so this only shows what came back.
+    summarizeConcept(turnId, conceptPrompt, undefined, companionName).then((result) => {
       if (!live) return;
       setResolved({ turnId, concept: result });
     });
     return () => {
       live = false;
     };
-  }, [open, turnId, conceptPrompt]);
+  }, [open, turnId, conceptPrompt, companionName, initialConcept]);
 
   // Esc / outside-click dismiss.
   React.useEffect(() => {
@@ -213,6 +252,17 @@ export function ConfirmBuildDialog({
             piece is ready.
           </p>
         </div>
+
+        {specLines.length > 0 && (
+          <ul role="list" aria-label="What each product will be" className="flex flex-col gap-[6px]">
+            {/* By position: two products can read the same line. */}
+            {specLines.map((line, i) => (
+              <li key={i} className="text-sm leading-relaxed text-text-primary">
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {/* §4.5 — both of these are on screen before any money moves. They
             are what stops a Draft result becoming a refund dispute. */}

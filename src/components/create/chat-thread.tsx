@@ -11,25 +11,41 @@
 //
 // Spec §4c: each concept carries a lineage number ("1.1" is the first refine
 // of concept 1) beside the product's name.
+//
+// The places the rail's jumps land carry the ids in anchors.ts. A wrapper
+// that is not a control is focusable from script only (tabIndex -1), and
+// every landing place draws the arrival ring the host sets for 1.2 s.
 
 import * as React from "react";
 import { Add01Icon, Refresh01Icon, Undo02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { TextInput } from "@/components/ideeza/text-input";
 import {
-  productsOf,
   type BuildJob,
   type ChatSession,
   type ChatTurn,
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import type { SpecEdits } from "@/lib/spec/types";
 import {
-  ImageTurn,
-  InsufficientCreditsBanner,
-  OUTLINE_BUTTON,
-  OUTLINE_BUTTON_OFF,
-} from "./image-turn";
+  linksFor,
+  peersOf,
+  productIdOf,
+  productNameOf as sharedProductNameOf,
+  projectState,
+} from "@/lib/create/project-state";
+import {
+  ADD_PRODUCT_ID,
+  ARRIVAL_RING,
+  BUILD_ACTION_ID,
+  BUILD_REVIEW_ID,
+  CREDITS_NOTICE_ID,
+  SETUP_QUESTION_ID,
+  scrollWithin,
+} from "./anchors";
+import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
+import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
 import { SetupTurn, type SetupProject } from "./setup-turn";
 import { ReviewOutputs } from "./review-outputs";
 
@@ -58,6 +74,15 @@ export function conceptLabels(turns: ChatTurn[]): Map<string, string> {
   return out;
 }
 
+/** A wrapper a jump lands on: clear of the canvas's top edge, no outline
+ *  when script focuses it (it is not a control), and the arrival ring, drawn
+ *  round the card inside it. */
+const LANDING = `scroll-mt-[16px] rounded-2xl outline-none transition-shadow duration-normal ease-decelerate motion-reduce:transition-none ${ARRIVAL_RING}`;
+/** The same, for a place with no edge of its own (the question, the add
+ *  row): the ring stands off it in the page's colour rather than touching
+ *  its words and buttons. */
+const LANDING_BARE = `${LANDING} data-[arrived=true]:ring-offset-8 data-[arrived=true]:ring-offset-bg-page`;
+
 export function ChatThread({
   chat,
   regeneratingFrom,
@@ -76,6 +101,13 @@ export function ChatThread({
   job,
   focusedProduct,
   onFocusProduct,
+  specSheetFor,
+  specDocked = false,
+  onOpenSpec,
+  onFocusSpec,
+  onSpecChange,
+  rereading,
+  onRereadConcept,
 }: {
   projects: SetupProject[];
   onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
@@ -111,6 +143,21 @@ export function ChatThread({
    *  composer so all three name the same thing. */
   focusedProduct?: string;
   onFocusProduct?: (productId: string) => void;
+  /** The product the spec sheet is showing — the selected one, while the
+   *  sheet is open. The sheet itself sits beside the canvas (concept-chat). */
+  specSheetFor?: string | null;
+  /** The sheet opens docked beside the canvas rather than over it. */
+  specDocked?: boolean;
+  /** Selects this product and opens its spec sheet — the card's Edit spec. */
+  onOpenSpec?: (productId: string) => void;
+  /** Opens a product's spec sheet with the keyboard in its size — the Build
+   *  line's way to a size that can't be built. */
+  onFocusSpec?: (productId: string) => void;
+  onSpecChange?: (productId: string, edits: SpecEdits) => void;
+  /** Turns whose concept is being read again right now. */
+  rereading?: ReadonlySet<string>;
+  /** Read a turn's concept again — offered on a card showing the stand-in. */
+  onRereadConcept?: (turnId: string) => void;
 }) {
   // One label per concept, so a card, its breadcrumb and the editor all
   // name the same thing.
@@ -128,7 +175,8 @@ export function ChatThread({
       return;
     }
     seenTurns.current = chat.turns.length;
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // The canvas alone scrolls — scrollIntoView moved the page's shell too.
+    if (endRef.current) scrollWithin(endRef.current, "end", "smooth");
   }, [chat.turns.length]);
 
   // The canvas shows the CURRENT state of the build, not its history: one
@@ -136,95 +184,41 @@ export function ChatThread({
   // stack another card here, so a two-product build with a few refines
   // became a column nobody could see the shape of. The history is not
   // lost — the rail beside this records every render as it happened.
-  const setup = React.useMemo(
-    () => chat.turns.find((t) => t.role === "setup"),
-    [chat.turns],
-  );
-  const answer = setup?.role === "setup" ? setup.answer : undefined;
-
-  // A product taken out of the project keeps its turns (the rail is the
-  // history), so the canvas reads membership from the answer, not from
-  // which products happen to have been drawn.
-  const products = React.useMemo(() => {
-    const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
-    for (const t of chat.turns) {
-      if (t.role !== "assistant") continue;
-      latest.set(t.companionOf ?? "primary", t);
-    }
-    // Primary first; the companions keep the order they were offered in.
-    const primary = latest.get("primary");
-    const rest = [...latest.entries()]
-      .filter(([k]) => k !== "primary" && (!answer || answer.picked.includes(k)))
-      .map(([, t]) => t);
-    return primary ? [primary, ...rest] : rest;
-  }, [chat.turns, answer]);
-
-  // What the next build takes: the primary always (Part 4 §4.4.4), and
-  // every other product the maker has not ticked off.
-  const leftOut = React.useMemo(() => new Set(answer?.leftOut ?? []), [answer]);
-  const selected = React.useMemo(
-    () => products.filter((t) => !t.companionOf || !leftOut.has(t.companionOf)),
-    [products, leftOut],
-  );
+  //
+  // This is the one project model the rail reads too (project-state.ts) —
+  // so the canvas and the rail can't work out two different answers to
+  // "what changed since the build" or "what doesn't fit" from the same chat.
+  const state = React.useMemo(() => projectState(chat, job), [chat, job]);
+  // The products that work together, read once for every card's radio fact.
+  const peers = React.useMemo(() => peersOf(state), [state]);
+  const {
+    setup,
+    answer,
+    products,
+    leftOut,
+    selected,
+    concepts,
+    parts,
+    specs,
+    specBlock,
+    inBuild,
+    conceptChanged,
+    specChanged,
+    changedSinceBuild,
+    available,
+    removed,
+    allReady,
+    failedChoice,
+  } = state;
 
   // Every card is titled with the product it is a drawing of — the name the
   // question gave it, which is the name the rail and the composer use too.
-  const productNameOf = (t: Extract<ChatTurn, { role: "assistant" }>) => {
-    if (setup?.role !== "setup") return undefined;
-    if (!t.companionOf) return setup.productName?.trim() || undefined;
-    return setup.companions.find((c) => c.id === t.companionOf)?.name;
-  };
-
-  // Offered, and not being built: no concept has been drawn for it and the
-  // answer did not include it.
-  const drawn = React.useMemo(
-    () =>
-      new Set(
-        chat.turns
-          .filter((t) => t.role === "assistant" && t.companionOf)
-          .map((t) => (t.role === "assistant" ? t.companionOf! : "")),
-      ),
-    [chat.turns],
-  );
-  const available = React.useMemo(() => {
-    if (setup?.role !== "setup" || setup.status !== "answered") return [];
-    return setup.companions.filter((x) => !drawn.has(x.id));
-  }, [setup, drawn]);
-  // Drawn once, then taken out: their concepts are still here to put back.
-  const removed = React.useMemo(() => {
-    if (setup?.role !== "setup" || !setup.answer) return [];
-    const picked = setup.answer.picked;
-    return setup.companions.filter((x) => drawn.has(x.id) && !picked.includes(x.id));
-  }, [setup, drawn]);
-
-  // Which drawings the current build was made from. A concept changed after
-  // the build — refined, regenerated, or a product added — is not in it, and
-  // the canvas says so: that change used to be charged and then hidden
-  // behind the review card, because the canvas showed nothing else once a
-  // build existed.
-  const builtImages = React.useMemo(
-    () =>
-      new Set(
-        job ? productsOf(job).map((p) => p.conceptImageUrl).filter(Boolean) : [],
-      ),
-    [job],
-  );
-  const inBuild = (t: Extract<ChatTurn, { role: "assistant" }>) =>
-    !!t.imageUrl && builtImages.has(t.imageUrl);
-  // Changed means the next build would differ from the one on screen: a
-  // chosen product drawn again or added, or one the build holds that has
-  // since been left out or removed.
-  const changedSinceBuild =
-    !!job &&
-    (selected.some((t) => t.status !== "ready" || !inBuild(t)) ||
-      builtImages.size !== selected.filter(inBuild).length);
+  const productNameOf = (t: Extract<ChatTurn, { role: "assistant" }>) =>
+    sharedProductNameOf(setup, t);
 
   const buildable = products.find(
     (t) => t.status === "ready" && !t.companionOf,
   );
-  const allReady =
-    selected.length > 0 && selected.every((t) => t.status === "ready");
-  const failedChoice = selected.find((t) => t.status === "failed");
   const offerBuild = !!buildable && (!job || changedSinceBuild);
 
   // The credit gate is explained ONCE, beside the one build action — every
@@ -236,8 +230,15 @@ export function ChatThread({
   const shortForBuild = creditsHydrated && balance < cost;
   const shortForRender = creditsHydrated && balance < CONCEPT_COST;
 
+  // Top-aligned: a stand-in line or a size that doesn't fit makes one card
+  // a line taller, and stretched rows gave its neighbour a void under its
+  // buttons. The spec itself opens in a sheet, so no card grows for it. A
+  // column is 320 px, or the whole canvas where the canvas is narrower —
+  // which is only a phone's now: wherever the page has no room for the rail
+  // and a column beside it, it shows its tabs (concept-chat.tsx
+  // useRoomToSplit). There a fixed 320 px column scrolled sideways.
   const conceptGrid = (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-[20px]">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] items-start gap-[20px]">
       {products.map((turn) => (
         <ImageTurn
           key={turn.id}
@@ -249,6 +250,8 @@ export function ChatThread({
               : undefined
           }
           productName={productNameOf(turn)}
+          // With one card there is nothing to tell it from.
+          focused={products.length > 1 && productIdOf(turn) === focusedProduct}
           inBuild={!!job && inBuild(turn)}
           regenerating={regeneratingFrom?.has(turn.id) ?? false}
           onRegenerate={() => onRegenerateAt(turn.prompt, turn.id)}
@@ -263,6 +266,27 @@ export function ChatThread({
                     onToggle: () => onToggleInBuild(turn.companionOf!),
                   }
                 : { included: true, locked: true }
+              : undefined
+          }
+          spec={
+            turn.status === "ready"
+              ? {
+                  productId: productIdOf(turn),
+                  spec: specs.get(turn.id) ?? null,
+                  // As edited on the sheet — the parts the build will use.
+                  parts: parts.get(turn.id) ?? [],
+                  pairs: linksFor(peers, productIdOf(turn)).filter((l) => l.about === "radio"),
+                  fallback: !!concepts.get(turn.id)?.fallback,
+                  rereading: rereading?.has(turn.id) ?? false,
+                  onReread:
+                    concepts.get(turn.id)?.fallback && onRereadConcept
+                      ? () => onRereadConcept(turn.id)
+                      : undefined,
+                  open: specSheetFor === productIdOf(turn),
+                  docked: specDocked,
+                  onOpen: () => onOpenSpec?.(productIdOf(turn)),
+                  editable: !!answer && !!onSpecChange,
+                }
               : undefined
           }
           onRemove={
@@ -284,22 +308,24 @@ export function ChatThread({
           answered the rail carries the decision, and a read-back of it at the
           top of the canvas says the same thing twice in the same eyeful. */}
       {setup?.role === "setup" && setup.status !== "answered" && (
-        <SetupTurn
-          prompt={setup.prompt}
-          status={setup.status}
-          companions={setup.companions}
-          productName={setup.productName}
-          productSummary={setup.productSummary}
-          answer={setup.answer}
-          projects={projects}
-          onAnswer={(a) => onAnswerSetup(setup.id, a)}
-        />
+        <div id={SETUP_QUESTION_ID} tabIndex={-1} className={`w-full max-w-[640px] ${LANDING_BARE}`}>
+          <SetupTurn
+            prompt={setup.prompt}
+            status={setup.status}
+            companions={setup.companions}
+            productName={setup.productName}
+            productSummary={setup.productSummary}
+            answer={setup.answer}
+            projects={projects}
+            onAnswer={(a) => onAnswerSetup(setup.id, a)}
+          />
+        </div>
       )}
 
       {/* Once a build exists it leads the canvas: its products as tabs, each
           deliverable as a tab under them, filling in as they land. */}
       {job && (
-        <div className="w-full">
+        <div id={BUILD_REVIEW_ID} tabIndex={-1} className={`w-full ${LANDING}`}>
           <ReviewOutputs
             job={job}
             productId={focusedProduct}
@@ -325,15 +351,22 @@ export function ChatThread({
                 Concepts
               </h2>
               <p className="text-sm text-text-tertiary">
-                {changedSinceBuild
+                {conceptChanged
                   ? "Changed since this build — build again to carry the change into the deliverables."
-                  : "The drawings this build was made from. Refine one to change the next build."}
+                  : specChanged
+                    ? "Spec changed since this build — building again makes a new version."
+                    : "The drawings this build was made from. Refine one to change the next build."}
               </p>
             </header>
           ) : (
             projectName && (
               <header className="flex flex-col gap-[2px]">
+                {/* The rail's header already carries the project's name as
+                    its h2; here it heads the concepts, as "Concepts" does
+                    once a build exists — so the outline isn't the same name
+                    twice. */}
                 <h2 className="text-lg font-semibold text-text-primary">
+                  <span className="sr-only">Concepts — </span>
                   {projectName}
                 </h2>
                 <p className="text-sm text-text-tertiary">
@@ -372,11 +405,16 @@ export function ChatThread({
               allReady={allReady}
               failedName={failedChoice ? productNameOf(failedChoice) ?? "One product" : undefined}
               preparing={preparingTurnId === buildable.id}
-              onBuild={() => onBuild(buildable.id)}
+              specBlock={specBlock ? productNameOf(specBlock) ?? "One product" : undefined}
+              onBuild={() =>
+                specBlock ? onFocusSpec?.(productIdOf(specBlock)) : onBuild(buildable.id)
+              }
             />
           )}
           {offerBuild && allReady && shortForBuild && (
-            <InsufficientCreditsBanner cost={cost} />
+            <div id={CREDITS_NOTICE_ID} tabIndex={-1} className={`w-full max-w-[640px] ${LANDING}`}>
+              <InsufficientCreditsBanner cost={cost} />
+            </div>
           )}
         </div>
       )}
@@ -396,6 +434,7 @@ function BuildAction({
   allReady,
   failedName,
   preparing,
+  specBlock,
   onBuild,
 }: {
   /** The products this build takes. */
@@ -410,6 +449,9 @@ function BuildAction({
    *  drawn again, left out or removed. */
   failedName?: string;
   preparing: boolean;
+  /** A chosen product whose size its parts can't fit. The button stays live
+   *  and opens that product's spec sheet at Length instead of the gate. */
+  specBlock?: string;
   onBuild: () => void;
 }) {
   const { hydrated, balance } = useCredits();
@@ -423,7 +465,9 @@ function BuildAction({
       ? `${failedName}'s concept didn't come through — try it again, or leave it out of this build`
       : !allReady
         ? "One of the concepts is still drawing"
-        : undefined;
+        : specBlock
+          ? `${specBlock} doesn't fit the size you set — fix it, or build it as Draft`
+          : undefined;
   const label = again
     ? "Build again"
     : products === 1
@@ -446,6 +490,7 @@ function BuildAction({
       {/* Busy looks like the gate's own busy: the brand fill, dimmed, turning
           — not a grey that reads as disabled while the work is under way. */}
       <button
+        id={BUILD_ACTION_ID}
         type="button"
         data-testid="build-action"
         onClick={preparing ? undefined : onBuild}
@@ -453,20 +498,21 @@ function BuildAction({
         aria-disabled={blocked || preparing}
         aria-busy={preparing}
         title={reason}
-        className={
+        className={[
+          "scroll-mt-[16px]",
           preparing
             ? "ml-auto inline-flex h-[40px] cursor-wait items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand opacity-80"
             : blocked
               ? "ml-auto inline-flex h-[40px] cursor-not-allowed items-center gap-[8px] rounded-lg bg-bg-subtle px-[16px] text-md font-semibold text-text-disabled"
-              : "ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-        }
+              : `ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-bg-brand px-[16px] text-md font-semibold text-text-on-brand outline-none transition-[color,background-color,box-shadow] duration-fast motion-reduce:transition-none hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus ${ARRIVAL_RING}`,
+        ].join(" ")}
       >
         {preparing && (
           <span aria-hidden className="inline-flex motion-safe:animate-spin">
             <Icon icon={Refresh01Icon} size={16} />
           </span>
         )}
-        {preparing ? "Preparing the build…" : label}
+        {preparing ? "Preparing the build…" : specBlock ? `Fix ${specBlock}'s size` : label}
       </button>
       {/* The reason a disabled button is off, where the keyboard and a touch
           screen can reach it — a title on a disabled button reaches neither. */}
@@ -563,7 +609,12 @@ function AddProductSection({
   );
 
   return (
-    <section aria-label="Add a product" className="flex w-full flex-col gap-[12px]">
+    <section
+      id={ADD_PRODUCT_ID}
+      tabIndex={-1}
+      aria-label="Add a product"
+      className={`flex w-full flex-col gap-[12px] ${LANDING_BARE}`}
+    >
       {open ? (
         <form
           className="flex w-full max-w-[640px] flex-col gap-[6px]"

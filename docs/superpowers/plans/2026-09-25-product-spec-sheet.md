@@ -316,7 +316,8 @@ const RULES: [RegExp, Body][] = [
   [/relay/, b(19, 15, 15, "board", 70)],
   [/buzzer/, b(12, 12, 9.5, "board", 20)],
   [/speaker/, b(28, 28, 8, "case", 100)],
-  [/ws2812|neopixel|led strip|led ring/, b(100, 10, 3, "case", 300)],
+  [/(?:led|pixel|ws2812\w*|sk6812\w*|neopixel)\s+(?:strip|ring)/, b(100, 10, 3, "case", 300)],
+  [/ws2812|sk6812|neopixel/, b(5, 5, 1.6, "board", 20)],
   [/\bleds?\b/, b(5, 5, 1.6, "board", 10)],
   [/oled|ssd1306|sh1106/, b(27, 27, 4, "board", 20)],
   [/1602|2004|character lcd/, b(80, 36, 12, "case", 25)],
@@ -519,6 +520,9 @@ const ROW_GAP_MM = 2;
 /** A pack gives about 80% of its rating before the cut-off. */
 const DERATE = 0.8;
 const RUNTIME_GOAL_H = 1;
+/** Something that moves — a motor, or a part that only exists to drive one.
+ *  A product like that is not left on USB power alone by the rules. */
+const MOVES = /motor|servo|stepper|brushless|bldc|pump|\bfan\b|vibration|haptic|propeller/i;
 
 type Placed = { name: string; body: Body; estimated: boolean };
 
@@ -619,7 +623,7 @@ export function runtimeOf(battery: BatteryKey, drawMa: number): number | null {
 }
 
 export function budgetOf(battery: BatteryKey): number {
-  return battery === "none" ? USB_BUDGET_MA : batteryOf(battery).maxMa;
+  return batteryOf(battery).maxMa;
 }
 
 const hasUsb = (parts: ConceptPart[]) => parts.some((p) => /usb/i.test(p.name));
@@ -629,7 +633,7 @@ const hasUsb = (parts: ConceptPart[]) => parts.some((p) => /usb/i.test(p.name));
  *  lasts the goal (an hour when nobody said). */
 export function ruleBattery(parts: ConceptPart[], goalH: number = RUNTIME_GOAL_H): BatteryKey {
   const list = placedParts(parts);
-  const moving = list.some((p) => p.body.at === "case" && p.body.mA >= 60);
+  const moving = parts.some((p) => MOVES.test(p.name));
   if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving) return "none";
   const draw = drawOf(list);
   const packs = BATTERIES.filter((b) => b.key.startsWith("li-")).sort((a, b) => a.mAh - b.mAh);
@@ -665,7 +669,7 @@ export function deriveSpec(
   let smallerBattery: ResolvedSpec["smallerBattery"] = null;
   if (!fits) {
     const usbOk = hasUsb(parts) && drawMa <= USB_BUDGET_MA;
-    const tries = [...BATTERIES]
+    const tries = BATTERIES
       .filter((p) => p.key !== battery && (p.key !== "none" || usbOk))
       .sort((a, b) => b.mAh - a.mAh);
     for (const pack of tries) {
