@@ -497,11 +497,17 @@ function PendingImageTurn({
   return (
     // Not a live region: the clock moves every second, and announcing each
     // tick is noise. The page's announcer says when it lands.
+    //
+    // The root itself is a plain group, not role="img" — that used to make
+    // the whole tile presentational, taking the header's In build toggle
+    // and Remove button out of the accessibility tree along with the
+    // texture. Only the texture-and-pill block is really one decorative
+    // picture (and its elapsed time would otherwise chatter every second),
+    // so that block alone carries role="img" with the same label; the
+    // header stays a normal sibling, in the tree.
     <div
       id={productCardId(productId)}
       tabIndex={-1}
-      role="img"
-      aria-label={`Drawing ${what}`}
       className={`relative flex aspect-[64/53] w-full max-w-[640px] flex-col items-center justify-center gap-[10px] overflow-hidden rounded-2xl border border-solid bg-bg-subtle ${cardRoot(focused)}`}
     >
       <span
@@ -514,18 +520,24 @@ function PendingImageTurn({
         }}
       />
       {header && <div className="absolute inset-x-0 top-0 p-[16px]">{header}</div>}
-      <span
-        data-testid="turn-progress"
-        className="relative inline-flex items-center gap-[8px] rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
+      <div
+        role="img"
+        aria-label={`Drawing ${what}`}
+        className="relative flex flex-col items-center gap-[10px]"
       >
-        <span aria-hidden className="inline-flex motion-safe:animate-spin text-text-tertiary">
-          <Icon icon={Refresh01Icon} size={14} />
+        <span
+          data-testid="turn-progress"
+          className="inline-flex items-center gap-[8px] rounded-full border border-solid border-border bg-bg-surface px-[16px] py-[8px] text-md font-medium tabular-nums text-text-secondary"
+        >
+          <span aria-hidden className="inline-flex motion-safe:animate-spin text-text-tertiary">
+            <Icon icon={Refresh01Icon} size={14} />
+          </span>
+          Drawing {what} · {elapsedLabel(since, now)}
         </span>
-        Drawing {what} · {elapsedLabel(since, now)}
-      </span>
-      <span className="relative text-sm text-text-tertiary">
-        Usually 30–60 seconds
-      </span>
+        <span className="text-sm text-text-tertiary">
+          Usually 30–60 seconds
+        </span>
+      </div>
     </div>
   );
 }
