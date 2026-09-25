@@ -9,7 +9,8 @@
 // parts list.
 //
 // Request:  { prompt: string }
-// Response: { title: string; summary: string; parts: ConceptPart[]; hints? }
+// Response: { title: string; summary: string; parts: ConceptPart[]; hints?;
+//             fallback?: true — the parts are the stand-in, not a reading }
 
 import { NextResponse } from "next/server";
 import {
@@ -112,5 +113,8 @@ export async function POST(req: Request) {
     // The spec sheet's hints, already checked by parseConcept; absent when
     // the model gave none we recognise or the fallback answered.
     ...(concept.hints ? { hints: concept.hints } : null),
+    // Said out loud, so the client neither caches the stand-in as the
+    // reading nor lets the card present generic parts as this product's.
+    ...(concept.fallback ? { fallback: true } : null),
   });
 }

@@ -24,9 +24,9 @@ import {
 } from "@/lib/create/history";
 import type { ConceptSummary } from "@/lib/create/concept";
 import type { SpecEdits } from "@/lib/spec/types";
-import { deriveSpec, partsForBuild } from "@/lib/spec/derive";
+import { blocksBuild, deriveSpec, partsForBuild } from "@/lib/spec/derive";
 import { specLine } from "@/lib/spec/format";
-import { cleanEdits } from "@/lib/spec/hints";
+import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -208,6 +208,13 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [chat],
   );
+  // The same edits as they are now, for the build path's async steps. A size
+  // typed while "Preparing the build…" is out lands after the click that
+  // started it, and that click's closure still holds the size before it.
+  const editsNow = React.useRef(editsFor);
+  React.useEffect(() => {
+    editsNow.current = editsFor;
+  }, [editsFor]);
   // The build this chat started, if it has one. Derived rather than held
   // in state, so a reload lands back on the build instead of an empty
   // canvas — the job record already knows which chat it came from.
@@ -225,7 +232,33 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // product's latest drawing is read as soon as it lands rather than when
   // Build is pressed. summarizeConcept runs them one at a time, and the
   // reading is kept on the turn, so a reload never asks again.
+  //
+  // A stand-in is kept too, so the card has something honest to show, but
+  // it is not a reading: each page load asks once more — once, so a model
+  // that is down is not asked in a loop — and the card's Read again asks
+  // whenever the maker wants.
   const reading = React.useRef(new Set<string>());
+  const retried = React.useRef(new Set<string>());
+  // The same set as state, for the card's "Reading again…".
+  const [rereading, setRereading] = React.useState<ReadonlySet<string>>(() => new Set());
+  const readConcept = React.useCallback(
+    (turnId: string) => {
+      if (!chat || reading.current.has(turnId)) return;
+      reading.current.add(turnId);
+      setRereading((prev) => new Set(prev).add(turnId));
+      const readChatId = chat.id;
+      void summarizeConcept(turnId, conceptBriefOf(chat.turns, turnId)).then((concept) => {
+        setTurnConcept(readChatId, turnId, concept);
+        reading.current.delete(turnId);
+        setRereading((prev) => {
+          const next = new Set(prev);
+          next.delete(turnId);
+          return next;
+        });
+      });
+    },
+    [chat, setTurnConcept],
+  );
   React.useEffect(() => {
     if (!chat) return;
     const latest = new Map<string, Extract<ChatTurn, { role: "assistant" }>>();
@@ -233,16 +266,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       if (t.role === "assistant") latest.set(t.companionOf ?? "primary", t);
     }
     for (const t of latest.values()) {
-      if (t.status !== "ready" || t.concept || reading.current.has(t.id)) continue;
-      reading.current.add(t.id);
-      const chatId = chat.id;
-      const turnId = t.id;
-      void summarizeConcept(turnId, conceptBriefOf(chat.turns, turnId)).then((concept) => {
-        setTurnConcept(chatId, turnId, concept);
-        reading.current.delete(turnId);
-      });
+      if (t.status !== "ready") continue;
+      // A stored concept that doesn't check out is read as if absent.
+      const kept = asConceptSummary(t.concept);
+      if (kept && !kept.fallback) continue;
+      if (kept && retried.current.has(t.id)) continue;
+      retried.current.add(t.id);
+      readConcept(t.id);
     }
-  }, [chat, setTurnConcept]);
+  }, [chat, readConcept]);
 
   // The build's 3D enclosure is generated where the build is reviewed, which
   // is here.
@@ -770,6 +802,20 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // React has not re-rendered yet, so reading state there saw the previous
   // value — empty — and a dismissed gate booked a three-product project as
   // one product, silently, at the price of three.
+  //
+  // Every product's concept on this path is read the same way: the reading
+  // kept on the turn, checked, is used as is — but a kept stand-in is asked
+  // again rather than built from, and a real answer that comes back is kept
+  // on the turn too, so the card stops showing parts the build won't use.
+  const readForBuild = React.useCallback(
+    async (turn: Extract<ChatTurn, { role: "assistant" }>, brief: string) => {
+      const kept = asConceptSummary(turn.concept);
+      const concept = await summarizeConcept(turn.id, brief, kept);
+      if (chat && kept?.fallback && !concept.fallback) setTurnConcept(chat.id, turn.id, concept);
+      return concept;
+    },
+    [chat, setTurnConcept],
+  );
   const companionProductsFor = React.useCallback(
     async (
       companions: Companion[],
@@ -802,8 +848,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       return Promise.all(
         ready.map(({ companion, turn }) => {
           const brief = conceptBriefOf(chat.turns, turn.id);
-          return summarizeConcept(turn.id, brief, turn.concept).then((concept) => {
-            const spec = deriveSpec(concept.parts, concept.hints, editsFor(companion.id));
+          return readForBuild(turn, brief).then((concept) => {
+            const spec = deriveSpec(concept.parts, concept.hints, editsNow.current(companion.id));
             return {
               id: companion.id,
               name: companion.name,
@@ -821,7 +867,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         }),
       );
     },
-    [chat, editsFor],
+    [chat, readForBuild],
   );
 
   const startBuildFor = React.useCallback(
@@ -833,6 +879,22 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       companions: Omit<BuildProduct, "items">[] = [],
     ) => {
       if (!chat) return;
+      // Checked again against the edits as they are now, not as they were
+      // when the gate's lines were drawn: a size typed while the build was
+      // being prepared, and not yet committed, commits on blur — which is
+      // the gate taking focus as it opens, one edit after its lines. A
+      // product that no longer fits is not booked; the gate closes on its
+      // size instead.
+      const spec = deriveSpec(concept.parts, concept.hints, editsNow.current("primary"));
+      const blocked = blocksBuild(spec)
+        ? "primary"
+        : companions.find((c) => c.spec && blocksBuild(c.spec))?.id;
+      if (blocked) {
+        setConfirmFor(null);
+        // After the gate has closed and handed focus back to Build.
+        requestAnimationFrame(() => focusSpec(blocked));
+        return;
+      }
       setSubmittingBuild(true);
       try {
         await fetch("/api/build/start", {
@@ -865,7 +927,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           answered && answered.role === "setup"
             ? answered.productName?.trim()
             : undefined;
-        const spec = deriveSpec(concept.parts, concept.hints, editsFor("primary"));
         startBuild({
           chatId: chat.id,
           turnId: source.turnId,
@@ -892,7 +953,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         setConfirmFor(null);
       }
     },
-    [chat, labels, startBuild, editsFor],
+    [chat, labels, startBuild, focusSpec],
   );
 
   // The last step before money moves is always the gate. It used to offer
@@ -932,14 +993,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           setupTurn?.role === "setup"
             ? setupTurn.companions.find((c) => c.id === companionId)?.name
             : undefined;
-        void summarizeConcept(t.id, source.prompt, t.concept).then((concept) =>
-          goToGate(source, [
-            specLine(
-              name || concept.title,
-              deriveSpec(concept.parts, concept.hints, editsFor(companionId)),
-            ),
-          ]),
-        );
+        void readForBuild(t, source.prompt).then((concept) => {
+          const spec = deriveSpec(concept.parts, concept.hints, editsNow.current(companionId));
+          // A size that can't be built goes to its card, as the primary's does.
+          if (blocksBuild(spec)) focusSpec(companionId);
+          else goToGate(source, [specLine(name || concept.title, spec)]);
+        });
         return;
       }
       // What this build contains was settled before anything was drawn, in
@@ -989,26 +1048,22 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       ];
       setPreparingTurnId(t.id);
       void (async () => {
-        const read: { productId: string; line: string; fits: boolean }[] = [];
+        const concepts: ConceptSummary[] = [];
         for (const r of reads) {
-          const concept = await summarizeConcept(
-            r.turn.id,
-            conceptBriefOf(chat.turns, r.turn.id),
-            r.turn.concept,
-          );
-          const spec = deriveSpec(concept.parts, concept.hints, editsFor(r.productId));
-          read.push({
-            productId: r.productId,
-            line: specLine(r.name || concept.title, spec),
-            fits: spec.fits || spec.draftAtSize,
-          });
+          concepts.push(await readForBuild(r.turn, conceptBriefOf(chat.turns, r.turn.id)));
         }
-        const blocked = read.find((r) => !r.fits);
+        // Worked out once every reading is in, from the edits as they are
+        // then — the readings can take seconds, and the card stays editable.
+        const read = reads.map((r, i) => {
+          const spec = deriveSpec(concepts[i].parts, concepts[i].hints, editsNow.current(r.productId));
+          return { productId: r.productId, line: specLine(r.name || concepts[i].title, spec), spec };
+        });
+        const blocked = read.find((r) => blocksBuild(r.spec));
         if (blocked) focusSpec(blocked.productId);
         else goToGate(source, read.map((r) => r.line));
       })().finally(() => setPreparingTurnId(null));
     },
-    [chat, goToGate, editsFor, focusSpec],
+    [chat, goToGate, readForBuild, focusSpec],
   );
 
 
@@ -1090,6 +1145,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // again believing they had missed.
       setSubmittingBuild(true);
       try {
+        // Each companion's spec is worked out here, at the press, from the
+        // edits as they are now; `startBuildFor` does the primary's and
+        // books nothing if any of them no longer fits.
         const companions = await companionProductsFor(
           companionPlan.filter((c) => pickedCompanions.has(c.id)),
         );
@@ -1271,6 +1329,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             onSpecOpenChange={setSpecOpen}
             onFocusSpec={focusSpec}
             onSpecChange={handleSpecChange}
+            rereading={rereading}
+            onRereadConcept={readConcept}
           />
         </div>
       </main>

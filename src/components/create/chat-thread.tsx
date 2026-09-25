@@ -25,7 +25,8 @@ import {
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { blocksBuild, deriveSpec, specKey } from "@/lib/spec/derive";
-import { cleanEdits } from "@/lib/spec/hints";
+import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
+import type { ConceptSummary } from "@/lib/create/concept";
 import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
 import { ImageTurn, InsufficientCreditsBanner } from "./image-turn";
@@ -82,6 +83,8 @@ export function ChatThread({
   onSpecOpenChange,
   onFocusSpec,
   onSpecChange,
+  rereading,
+  onRereadConcept,
 }: {
   projects: SetupProject[];
   onAnswerSetup: (turnId: string, answer: SetupAnswer) => void;
@@ -124,6 +127,10 @@ export function ChatThread({
    *  size that can't be built. */
   onFocusSpec?: (productId: string) => void;
   onSpecChange?: (productId: string, edits: SpecEdits) => void;
+  /** Turns whose concept is being read again right now. */
+  rereading?: ReadonlySet<string>;
+  /** Read a turn's concept again — offered on a card showing the stand-in. */
+  onRereadConcept?: (turnId: string) => void;
 }) {
   // One label per concept, so a card, its breadcrumb and the editor all
   // name the same thing.
@@ -180,21 +187,30 @@ export function ChatThread({
     [products, leftOut],
   );
 
+  // Each card's concept as read back from storage — checked, because a
+  // stored reading from an older build of this page, or a hand-edited one,
+  // put a part with no name straight into the spec's rules.
+  const concepts = React.useMemo(() => {
+    const out = new Map<string, ConceptSummary | undefined>();
+    for (const t of products) out.set(t.id, asConceptSummary(t.concept));
+    return out;
+  }, [products]);
+
   // Each ready card's spec, worked out from its concept's parts, the model's
   // hints and the maker's edits. Null while the concept is still being read.
   const specs = React.useMemo(() => {
     const out = new Map<string, ResolvedSpec | null>();
     for (const t of products) {
-      const read = t.status === "ready" && t.concept && Array.isArray(t.concept.parts);
+      const concept = t.status === "ready" ? concepts.get(t.id) : undefined;
       out.set(
         t.id,
-        read
-          ? deriveSpec(t.concept!.parts, t.concept!.hints, cleanEdits(answer?.specs?.[idOf(t)]))
+        concept
+          ? deriveSpec(concept.parts, concept.hints, cleanEdits(answer?.specs?.[idOf(t)]))
           : null,
       );
     }
     return out;
-  }, [products, answer]);
+  }, [products, concepts, answer]);
 
   // A chosen product whose size its parts can't fit, and that the maker has
   // not agreed to build as Draft, holds the build (spec S3).
@@ -252,12 +268,16 @@ export function ChatThread({
   // since been left out or removed.
   // A spec edited after the build is a change too: the booked snapshot is
   // what the deliverables say, so a different size or pack needs a new build.
+  // A build booked before products had a spec has no snapshot to compare
+  // with — it was made with no decisions at all, so any edit since is one.
   const specChanged =
     !!job &&
     selected.some((t) => {
       const now = specs.get(t.id);
+      if (!now || !inBuild(t)) return false;
       const booked = productsOf(job).find((p) => p.id === idOf(t))?.spec;
-      return !!now && !!booked && inBuild(t) && specKey(now) !== specKey(booked);
+      if (!booked) return Object.keys(cleanEdits(answer?.specs?.[idOf(t)])).length > 0;
+      return specKey(now) !== specKey(booked);
     });
   const conceptChanged =
     !!job &&
@@ -318,7 +338,13 @@ export function ChatThread({
               ? {
                   productId: idOf(turn),
                   spec: specs.get(turn.id) ?? null,
-                  parts: turn.concept?.parts ?? [],
+                  parts: concepts.get(turn.id)?.parts ?? [],
+                  fallback: !!concepts.get(turn.id)?.fallback,
+                  rereading: rereading?.has(turn.id) ?? false,
+                  onReread:
+                    concepts.get(turn.id)?.fallback && onRereadConcept
+                      ? () => onRereadConcept(turn.id)
+                      : undefined,
                   edits: cleanEdits(answer?.specs?.[idOf(turn)]),
                   open: openSpecs?.has(idOf(turn)) ?? false,
                   onOpenChange: (open) => onSpecOpenChange?.(idOf(turn), open),

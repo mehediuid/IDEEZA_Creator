@@ -37,7 +37,7 @@ import {
   fallbackConcept,
   type ConceptSummary,
 } from "@/lib/create/concept";
-import { parseHints } from "@/lib/spec/hints";
+import { asConceptSummary } from "@/lib/spec/hints";
 
 // The estimate in words — a build here takes about a minute.
 const TIME_CHIP =
@@ -46,7 +46,9 @@ const TIME_CHIP =
     : `About ${BUILD_ESTIMATE_MIN} minutes`;
 
 // One summarize call per concept: reopening the dialog on the same turn
-// shows what it read the first time instead of asking again.
+// shows what it read the first time instead of asking again. Only a real
+// reading is filed — a stand-in kept here would answer every later caller
+// with the generic parts for the rest of the session.
 const summaryCache = new Map<string, ConceptSummary>();
 
 // In-flight requests, keyed the same way — a quick close/reopen (or a
@@ -55,18 +57,22 @@ const summaryCache = new Map<string, ConceptSummary>();
 const pendingSummaries = new Map<string, Promise<ConceptSummary>>();
 
 // Pollinations queues one request per IP and answers a second with a 429
-// that sends it to the fallback — so the background reader, the Build path
-// and the gate all go through this one line, each request starting when the
-// one ahead of it has answered.
+// that sends it to the fallback — so every summarize call made through
+// `summarizeConcept` (the background reader, Read again, the Build path and
+// the gate) goes through this one line, each request starting when the one
+// ahead of it has answered. It serialises those callers only: the setup
+// question's own two readings and Enhance go straight to the network,
+// outside it.
 let queue: Promise<unknown> = Promise.resolve();
 
 export function summarizeConcept(
   turnId: string,
   prompt: string,
-  /** The reading already kept on the turn — used as is, no request. */
+  /** The reading already kept on the turn — used as is, no request. A kept
+   *  stand-in is not a reading, so it is asked again instead. */
   known?: ConceptSummary,
 ): Promise<ConceptSummary> {
-  if (known) summaryCache.set(turnId, known);
+  if (known && !known.fallback) summaryCache.set(turnId, known);
   const cached = summaryCache.get(turnId);
   if (cached) return Promise.resolve(cached);
   const pending = pendingSummaries.get(turnId);
@@ -79,23 +85,17 @@ export function summarizeConcept(
         body: JSON.stringify({ prompt }),
       });
       if (!res.ok) throw new Error("summarize failed");
-      const data = (await res.json()) as Partial<ConceptSummary> & { hints?: unknown };
-      if (!data.title || !Array.isArray(data.parts) || !data.parts.length) {
-        throw new Error("empty concept");
-      }
-      return {
-        title: data.title,
-        summary: data.summary ?? "",
-        description: data.description ?? describeFallback(prompt),
-        parts: data.parts,
-        ...(() => {
-          const hints = parseHints(data.hints);
-          return hints ? { hints } : null;
-        })(),
-      };
+      // Checked the way a stored reading is, so what is kept on the turn
+      // always reads back — and `fallback` comes through only as the route
+      // said it.
+      const data: unknown = await res.json();
+      const read = asConceptSummary(data);
+      if (!read || !(data as { title?: unknown }).title) throw new Error("empty concept");
+      return { ...read, description: read.description || describeFallback(prompt) };
     } catch {
       // The same deterministic concept the route falls back to, so a
-      // build started offline still carries a real parts list.
+      // build started offline still carries a real parts list — marked as
+      // the stand-in it is.
       return fallbackConcept(prompt);
     }
   });
@@ -105,7 +105,9 @@ export function summarizeConcept(
   // never opens the dialog — a dismissed gate — asked the model the same
   // question twice for the same concept, once to read it back and once to
   // file the build under it. The answer is filed here, where it is made.
-  void request.then((concept) => summaryCache.set(turnId, concept));
+  void request.then((concept) => {
+    if (!concept.fallback) summaryCache.set(turnId, concept);
+  });
   request.finally(() => pendingSummaries.delete(turnId));
   return request;
 }
@@ -159,8 +161,9 @@ export function ConfirmBuildDialog({
   React.useEffect(() => {
     if (!open || !turnId || summaryCache.has(turnId)) return;
     let live = true;
+    // summarizeConcept files a real reading itself, and a stand-in must not
+    // be filed at all — so this only shows what came back.
     summarizeConcept(turnId, conceptPrompt).then((result) => {
-      summaryCache.set(turnId, result);
       if (!live) return;
       setResolved({ turnId, concept: result });
     });
@@ -235,8 +238,9 @@ export function ConfirmBuildDialog({
 
         {specLines.length > 0 && (
           <ul role="list" aria-label="What each product will be" className="flex flex-col gap-[6px]">
-            {specLines.map((line) => (
-              <li key={line} className="text-sm leading-relaxed text-text-primary">
+            {/* By position: two products can read the same line. */}
+            {specLines.map((line, i) => (
+              <li key={i} className="text-sm leading-relaxed text-text-primary">
                 {line}
               </li>
             ))}

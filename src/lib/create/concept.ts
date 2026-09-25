@@ -48,6 +48,10 @@ export type ConceptSummary = {
    *  it is used. Checked on arrival; absent when the model gave nothing
    *  usable, and then the spec's rules decide. */
   hints?: AiHints;
+  /** The model didn't answer, so these are `fallbackConcept`'s generic parts
+   *  standing in. Kept on the turn so the card can say so, but never taken
+   *  as the reading: the next caller asks again. */
+  fallback?: true;
 };
 
 /** What to say about a product when no model did. It repeats the maker's own
@@ -130,7 +134,8 @@ export function firstNoun(prompt: string): string {
 
 // What we return when the model is unreachable or answers with
 // something we can't parse: a real, buildable four-part concept rather
-// than an empty shell.
+// than an empty shell. Every use of it stands in for a model answer, so it
+// is marked as one here rather than at each caller.
 export function fallbackConcept(prompt: string): ConceptSummary {
   const noun = firstNoun(prompt);
   const parts: ConceptPart[] = [
@@ -160,6 +165,7 @@ export function fallbackConcept(prompt: string): ConceptSummary {
     summary: summaryFromParts(parts),
     description: describeFallback(prompt),
     parts,
+    fallback: true,
   };
 }
 

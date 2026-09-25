@@ -61,11 +61,19 @@ export type SpecCard = {
   /** Absent on a chat from before the setup question — it has nowhere to keep
    *  an edit, so the spec shows and cannot change. */
   onChange?: (edits: SpecEdits) => void;
+  /** The model didn't answer this concept, so the parts are the generic
+   *  stand-in — the spec is worked out from them, and the card says so. */
+  fallback?: boolean;
+  /** A reading of this concept is out now. */
+  rereading?: boolean;
+  /** Reads this concept again now, instead of waiting for the next visit. */
+  onReread?: () => void;
 };
 
 export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
   const { spec, open, productId } = card;
   const panelId = `spec-${productId}-panel`;
+  const toggleId = `spec-${productId}-toggle`;
   if (!spec) {
     return (
       <p role="status" className="text-sm text-text-tertiary motion-safe:animate-pulse">
@@ -77,9 +85,39 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
   const conflict = blocksBuild(spec);
   return (
     <section aria-label={`${what} spec`} className="flex flex-col gap-[8px]">
+      {/* Generic parts shown as this product's would be a claim nobody
+          checked — the facts under this line are the stand-in's. Flowing
+          text, not a flex row: the sentence wraps on a card, and as a flex
+          item it pushed Read again onto a line of its own. */}
+      {card.fallback && (
+        <p role="status" className="text-sm text-text-tertiary">
+          {card.rereading ? (
+            <span className="motion-safe:animate-pulse">Reading again…</span>
+          ) : (
+            <>
+              Stand-in parts — the model didn&apos;t answer, so these are generic.{" "}
+              {card.onReread && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    card.onReread?.();
+                    // The button goes while the reading is out; the Spec
+                    // toggle stays through it and whatever comes back.
+                    focusSoon(toggleId);
+                  }}
+                  className="inline-flex min-h-[24px] items-center rounded-sm px-[4px] align-baseline font-semibold text-text-secondary underline-offset-2 outline-none hover:text-text-primary hover:underline focus-visible:ring-2 focus-visible:ring-border-focus"
+                >
+                  Read again
+                </button>
+              )}
+            </>
+          )}
+        </p>
+      )}
       <div className="flex items-center gap-[8px]">
         <SpecFacts spec={spec} parts={card.parts} />
         <button
+          id={toggleId}
           type="button"
           aria-expanded={open}
           aria-controls={panelId}
