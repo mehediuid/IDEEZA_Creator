@@ -350,15 +350,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // What the page's announcer says for the sheet: a docked one opening beside
   // the canvas moves no focus, so it is said instead.
   const [sheetNote, setSheetNote] = React.useState<{ text: string; n: number } | null>(null);
-  // Counts the sends the composer held — nothing selected to change — while
-  // its line under the box says so (PromptBar's HELD_MS, 6 s, or the next
-  // keystroke). A second send restarts the clock, as it does the line.
-  const [held, setHeld] = React.useState(0);
-  React.useEffect(() => {
-    if (!held) return;
-    const timer = window.setTimeout(() => setHeld(0), 6_000);
-    return () => window.clearTimeout(timer);
-  }, [held]);
+  // While the composer's line under the box says why a send was held —
+  // nothing selected to change — as PromptBar reports it (onHeldChange).
+  const [heldShows, setHeldShows] = React.useState(false);
   const handleSpecChange = React.useCallback(
     (productId: string, edits: SpecEdits) => {
       if (!chat) return;
@@ -1678,24 +1672,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           />
         </div>
         <div className="border-t border-solid border-border">
-          <div
-            className="w-full px-[14px] py-[14px]"
-            // The composer clears its held line on the next keystroke; the
-            // hint under it comes back with it.
-            onKeyDown={(e) => {
-              if (!held || (e.key === "Enter" && !e.shiftKey)) return;
-              if (!["Shift", "Control", "Alt", "Meta"].includes(e.key)) setHeld(0);
-            }}
-          >
+          <div className="w-full px-[14px] py-[14px]">
           <PromptBar
             onSubmit={(text) => {
-              if (!handleUserSubmit(text)) {
-                // The composer says why under the box (heldMessage); the
-                // hint below would say it again, so it steps aside.
-                if (target.kind === "none") setHeld((n) => n + 1);
-                return false;
-              }
-              setHeld(0);
+              if (!handleUserSubmit(text)) return false;
               // On a phone the answer appears on the other tab.
               setPane("work");
             }}
@@ -1714,6 +1694,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                 ? "Pick a product above first — or name a new one to add it"
                 : undefined
             }
+            // That line says why under the box; the hint below would say it
+            // again, so it steps aside exactly while the line shows.
+            onHeldChange={setHeldShows}
             enhanceMode={target.kind === "refine" ? "change" : "brief"}
             placeholder={
               target.kind === "refine"
@@ -1723,7 +1706,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                   : undefined
             }
           />
-          {!(held && target.kind === "none") && (
+          {!heldShows && (
           <p className="mt-[8px] text-center text-sm font-regular text-text-tertiary">
             {!canRender
               ? "You are out of credits — top them up to draw another concept."

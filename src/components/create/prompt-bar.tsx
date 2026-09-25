@@ -34,6 +34,7 @@ export function PromptBar({
   canRender = true,
   blockedReason,
   heldMessage,
+  onHeldChange,
   enhanceMode = "brief",
 }: {
   /** Return false to keep the draft — the host couldn't act on it (nothing
@@ -43,6 +44,11 @@ export function PromptBar({
    *  the send arrow look ready, so a send that does nothing has to say why
    *  or it reads as broken. */
   heldMessage?: string;
+  /** Told true when that line appears under the box and false when it
+   *  clears — its clock, a keystroke, dictation, a send that goes, or the
+   *  listening view taking the bar — so a hint beside the composer that
+   *  would say the same can step aside exactly while it shows. */
+  onHeldChange?: (held: boolean) => void;
   placeholder?: string;
   /** False when the balance cannot cover one concept render. The send is
    *  shut with that as its reason rather than letting a submit start a
@@ -76,6 +82,13 @@ export function PromptBar({
     },
   });
   const listening = voice.status === "listening";
+
+  // The line is on screen while a send is held and the bar isn't the
+  // listening view.
+  const heldShows = held !== null && !listening;
+  React.useEffect(() => {
+    onHeldChange?.(heldShows);
+  }, [heldShows, onHeldChange]);
 
   // Auto-grow the textarea up to ~5 lines. `listening` is in the deps
   // because Cancel leaves the draft exactly as it was: the textarea
