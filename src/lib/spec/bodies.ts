@@ -24,7 +24,7 @@ const b = (l: number, w: number, h: number, at: Placement, mA: number): Body => 
 const RULES: [RegExp, Body][] = [
   [/l298/, b(43, 43, 27, "board", 20)],
   [/tb6612|drv88\d\d|l9110|l293|motor driver|h-?bridge/, b(20, 20, 3, "board", 5)],
-  [/tp4056|charg/, b(26, 17, 4, "board", 2)],
+  [/tp4056|charger|charging (?:module|board|ic)/, b(26, 17, 4, "board", 2)],
   [/mp1584|lm2596|mt3608|buck|boost/, b(22, 17, 4, "board", 5)],
   [/ams1117|lm1117|ap2112|\bldo\b|regulator/, b(7, 6.5, 1.8, "board", 5)],
   [/esp32-?c3/, b(16.6, 13.2, 2.4, "board", 50)],
@@ -50,6 +50,10 @@ const RULES: [RegExp, Body][] = [
   [/ds18b20/, b(5, 5, 5, "board", 1)],
   [/camera|ov2640|ov5640/, b(24, 24, 10, "board", 100)],
   [/microphone|\bmic\b|inmp441/, b(14, 12, 3, "board", 1)],
+  // A "motor mount" or a "servo bracket" is the hardware that holds the
+  // motor or servo, not the part itself — ahead of both, so it never reads
+  // as extra current draw or an extra case body.
+  [/\b(?:mount|bracket)\b/, b(0, 0, 0, "outside", 0)],
   [/mg99\d/, b(40, 20, 43, "case", 300)],
   [/servo|sg90|mg90/, b(23, 12, 29, "case", 100)],
   [/\bn20\b/, b(34, 12, 10, "case", 60)],

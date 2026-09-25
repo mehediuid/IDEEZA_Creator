@@ -21,6 +21,7 @@ import { Select } from "@/components/ideeza/select";
 import { TextInput } from "@/components/ideeza/text-input";
 import type { ConceptPart } from "@/lib/create/concept";
 import { BATTERIES, batteryOf } from "@/lib/spec/batteries";
+import { blocksBuild } from "@/lib/spec/derive";
 import { FAB_PROFILE, boardLabel, ioOf, powerLabel, radioOf } from "@/lib/spec/format";
 import { MM_MAX, MM_MIN, asMm3 } from "@/lib/spec/hints";
 import {
@@ -30,7 +31,7 @@ import {
   type ResolvedSpec,
   type SpecEdits,
 } from "@/lib/spec/types";
-import { mm3, runtimeLabel } from "@/lib/spec/units";
+import { currentLabel, mm3, runtimeLabel } from "@/lib/spec/units";
 import { OUTLINE_BUTTON } from "./buttons";
 
 export const specSizeInputId = (productId: string) => `spec-${productId}-size`;
@@ -41,8 +42,9 @@ export const specSizeInputId = (productId: string) => `spec-${productId}-size`;
 const focusSoon = (id: string) =>
   requestAnimationFrame(() => document.getElementById(id)?.focus());
 
-const DECIDED: Record<"you" | "ai" | "rule" | "calc", string> = {
+const DECIDED: Record<"you" | "concept" | "ai" | "rule" | "calc", string> = {
   you: "you",
+  concept: "from concept",
   ai: "AI",
   rule: "rule",
   calc: "calculated",
@@ -72,7 +74,7 @@ export function SpecPanel({ card, what }: { card: SpecCard; what: string }) {
     );
   }
   const change = card.onChange;
-  const conflict = !spec.fits && !spec.draftAtSize;
+  const conflict = blocksBuild(spec);
   return (
     <section aria-label={`${what} spec`} className="flex flex-col gap-[8px]">
       <div className="flex items-center gap-[8px]">
@@ -415,10 +417,10 @@ function PowerField({
       )}
       <p className={["mt-[4px] text-sm", over ? "text-text-error" : "text-text-tertiary"].join(" ")}>
         {over
-          ? `Draws about ${spec.drawMa} mA — more than ${supply} gives (${spec.budgetMa} mA).`
+          ? `Draws about ${currentLabel(spec.drawMa)} — more than ${supply} gives (${currentLabel(spec.budgetMa)}).`
           : spec.battery === "none"
-            ? `Draws about ${spec.drawMa} mA of the ${spec.budgetMa} mA USB gives.`
-            : `${powerLabel(spec)} · draws about ${spec.drawMa} mA`}
+            ? `Draws about ${currentLabel(spec.drawMa)} of the ${currentLabel(spec.budgetMa)} USB gives.`
+            : `${powerLabel(spec)} · draws about ${currentLabel(spec.drawMa)}`}
       </p>
     </Field>
   );

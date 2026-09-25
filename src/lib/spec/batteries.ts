@@ -36,7 +36,7 @@ export function batteryOf(key: BatteryKey): BatteryInfo {
 // never counted twice. Chargers, gauges and protection boards are not packs,
 // and a "cell" outside power and mechanics is a load cell, not a battery.
 const PACK = /batter|li-?po|li-?ion|18650|\bcells?\b|\baaa?\b/i;
-const NOT_PACK = /charg|gauge|monitor|protect|\bbms\b/i;
+const NOT_PACK = /charg|gauge|monitor|protect|\bbms\b|connector|level|indicator|solar|photo/i;
 
 export function isBatteryPart(part: ConceptPart): boolean {
   if (part.category !== "Power Management" && part.category !== "Connector & mech") {

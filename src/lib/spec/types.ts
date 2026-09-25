@@ -55,7 +55,9 @@ export type ResolvedSpec = {
   /** Null when no part sits on a board — a case, a strap. */
   board: { w: number; h: number; parts: number; layers: 2 } | null;
   battery: BatteryKey;
-  batterySource: "you" | "ai" | "rule";
+  /** "concept" is the pack the parts themselves name — ranked above the AI's
+   *  hint, since the maker already told the model what battery it has. */
+  batterySource: "you" | "concept" | "ai" | "rule";
   drawMa: number;
   budgetMa: number;
   runtimeH: number | null;

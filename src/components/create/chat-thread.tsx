@@ -24,7 +24,7 @@ import {
   type SetupAnswer,
 } from "@/lib/create/history";
 import { buildCost, CONCEPT_COST, useCredits } from "@/lib/create/credits";
-import { deriveSpec, specKey } from "@/lib/spec/derive";
+import { blocksBuild, deriveSpec, specKey } from "@/lib/spec/derive";
 import { cleanEdits } from "@/lib/spec/hints";
 import type { ResolvedSpec, SpecEdits } from "@/lib/spec/types";
 import { OUTLINE_BUTTON, OUTLINE_BUTTON_OFF } from "./buttons";
@@ -200,7 +200,7 @@ export function ChatThread({
   // not agreed to build as Draft, holds the build (spec S3).
   const specBlock = selected.find((t) => {
     const s = specs.get(t.id);
-    return s && !s.fits && !s.draftAtSize;
+    return s && blocksBuild(s);
   });
 
   // Every card is titled with the product it is a drawing of — the name the

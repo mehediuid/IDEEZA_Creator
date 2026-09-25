@@ -158,15 +158,22 @@ export function listedBattery(parts: ConceptPart[]): BatteryKey | null {
 }
 
 /** Without a hint: the pack the concept lists, when it names one we can place;
- *  otherwise USB power for a product that has a USB port, no pack and
- *  nothing that moves; otherwise the smallest Li pack that can supply it and
- *  lasts the goal (an hour when nobody said). */
-export function ruleBattery(parts: ConceptPart[], goalH: number = RUNTIME_GOAL_H): BatteryKey {
+ *  otherwise USB power for a product that has a USB port, no pack, nothing
+ *  that moves and nothing the maker carries; otherwise the smallest Li pack
+ *  that can supply it and lasts the goal (an hour when nobody said). */
+export function ruleBattery(
+  parts: ConceptPart[],
+  goalH: number = RUNTIME_GOAL_H,
+  useCase: UseCase[] = [],
+): BatteryKey {
   const listed = listedBattery(parts);
   if (listed) return listed;
   const list = placedParts(parts);
   const moving = parts.some((p) => MOVES.test(p.name));
-  if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving) return "none";
+  // A cord to the wall is a fine answer for something that sits on a desk;
+  // it is not an answer for something worn, carried or left outdoors.
+  const carried = useCase.some((u) => u === "handheld" || u === "wearable" || u === "outdoor");
+  if (hasUsb(parts) && !parts.some(isBatteryPart) && !moving && !carried) return "none";
   const draw = drawOf(list);
   const packs = BATTERIES.filter((b) => b.key.startsWith("li-")).sort((a, b) => a.mAh - b.mAh);
   const enough = packs.find(
@@ -189,7 +196,11 @@ export function deriveSpec(
   const list = placedParts(parts);
   const board = boardFor(list);
   const stack = stackOf(list);
-  const battery = edits.battery ?? hints.battery ?? ruleBattery(parts, hints.runtimeGoalH);
+  // The pack the parts themselves name outranks the AI's hint — the maker
+  // already told the model what battery is in the thing.
+  const listed = listedBattery(parts);
+  const battery =
+    edits.battery ?? listed ?? hints.battery ?? ruleBattery(parts, hints.runtimeGoalH, hints.useCase);
   const minWith = (key: BatteryKey) => minSizeFor(board, stack, caseBodies(list, key));
   const minSize = minWith(battery);
   const size = edits.size ?? minSize;
@@ -197,12 +208,14 @@ export function deriveSpec(
   const drawMa = drawOf(list);
 
   // Largest capacity first, so the fix gives up as little runtime as it can.
-  // USB power is offered only where there is a port and it can carry the draw.
+  // USB power is offered only where there is a port and it can carry the
+  // draw; every other pack is held to the same rule — a pack whose maxMa
+  // can't supply the draw is not a fix, it is a new problem.
   let smallerBattery: ResolvedSpec["smallerBattery"] = null;
   if (!fits) {
     const usbOk = hasUsb(parts) && drawMa <= USB_BUDGET_MA;
     const tries = BATTERIES
-      .filter((p) => p.key !== battery && (p.key !== "none" || usbOk))
+      .filter((p) => p.key !== battery && p.maxMa >= drawMa && (p.key !== "none" || usbOk))
       .sort((a, b) => b.mAh - a.mAh);
     for (const pack of tries) {
       const need = minWith(pack.key);
@@ -221,7 +234,7 @@ export function deriveSpec(
     draftAtSize: !fits && edits.draftAtSize === true,
     board: board ? { ...board, layers: 2 as const } : null,
     battery,
-    batterySource: edits.battery ? "you" : hints.battery ? "ai" : "rule",
+    batterySource: edits.battery ? "you" : listed ? "concept" : hints.battery ? "ai" : "rule",
     drawMa,
     budgetMa: budgetOf(battery),
     runtimeH: runtimeOf(battery, drawMa),
@@ -246,7 +259,17 @@ export function partsForBuild(parts: ConceptPart[], battery: BatteryKey): Concep
 }
 
 /** What the maker decided, as one comparable string — a build is out of date
- *  when this differs from the snapshot it was booked with. */
+ *  when this differs from the snapshot it was booked with. A calculated size
+ *  moves every time a part does, so it is compared only when the maker typed
+ *  it themselves; otherwise the key just says "auto", and a part added or
+ *  dropped shows up as a concept change, not a spec one. */
 export function specKey(s: ResolvedSpec): string {
-  return [s.size.l, s.size.w, s.size.h, s.battery, s.material, s.draftAtSize].join("|");
+  const size = s.sizeSource === "you" ? `${s.size.l}x${s.size.w}x${s.size.h}` : "auto";
+  return [size, s.battery, s.material, s.draftAtSize].join("|");
+}
+
+/** A product whose size its parts can't fit, and that the maker hasn't
+ *  agreed to build as Draft, holds the build (spec S3). */
+export function blocksBuild(spec: ResolvedSpec): boolean {
+  return !spec.fits && !spec.draftAtSize;
 }

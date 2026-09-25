@@ -3,6 +3,7 @@
 // once. The rule is the network map's: a value that isn't one of ours is
 // dropped, never bent into the nearest one, and the rules fill the gap.
 
+import { CONCEPT_CATEGORIES, type ConceptPart, type ConceptSummary } from "../create/concept";
 import {
   BATTERY_KEYS,
   MATERIALS,
@@ -71,6 +72,10 @@ function asBox(raw: unknown): Mm3 | undefined {
 
 const decidedBy = (v: unknown): "you" | "ai" | "rule" => (v === "you" || v === "ai" ? v : "rule");
 
+/** `batterySource` alone has a fourth value — the pack the concept names. */
+const batteryDecidedBy = (v: unknown): "you" | "concept" | "ai" | "rule" =>
+  v === "you" || v === "concept" || v === "ai" ? v : "rule";
+
 /** A build's snapshot as stored. Anything that isn't a whole spec is no spec,
  *  and the reader falls back to working one out from the parts. */
 export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
@@ -111,7 +116,7 @@ export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
         ? { w: board.w, h: board.h, parts: board.parts, layers: 2 }
         : null,
     battery,
-    batterySource: decidedBy(s.batterySource),
+    batterySource: batteryDecidedBy(s.batterySource),
     drawMa,
     budgetMa,
     runtimeH: isNum(s.runtimeH) ? s.runtimeH : null,
@@ -130,4 +135,38 @@ export function asResolvedSpec(raw: unknown): ResolvedSpec | undefined {
           }
         : null,
   };
+}
+
+/** A turn's `concept` as read back from localStorage: the client's own
+ *  write, but from a session or two ago, so it gets no more trust than a
+ *  build's snapshot does. A part with no name or a category we don't know
+ *  is dropped rather than kept half-wrong; with nothing usable left, the
+ *  whole thing is undefined and the caller reads the concept fresh instead. */
+export function asConceptSummary(raw: unknown): ConceptSummary | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const o = raw as Record<string, unknown>;
+  const parts: ConceptPart[] = [];
+  if (Array.isArray(o.parts)) {
+    for (const entry of o.parts) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const p = entry as Record<string, unknown>;
+      const name = typeof p.name === "string" ? p.name.trim() : "";
+      if (!name || !isOne(CONCEPT_CATEGORIES, p.category)) continue;
+      parts.push({ name, role: typeof p.role === "string" ? p.role : "", category: p.category });
+    }
+  }
+  if (!parts.length) return undefined;
+  const str = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
+  const hints = parseHints(o.hints);
+  // `fallback` isn't declared on ConceptSummary at the point this lands
+  // (I1 adds it); the intersection reads it now without waiting on that.
+  const summary: ConceptSummary & { fallback?: true } = {
+    title: str(o.title, "Untitled concept"),
+    summary: str(o.summary, ""),
+    description: str(o.description, ""),
+    parts,
+    ...(hints ? { hints } : {}),
+    ...(o.fallback === true ? { fallback: true } : {}),
+  };
+  return summary;
 }
