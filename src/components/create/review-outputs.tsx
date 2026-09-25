@@ -503,7 +503,7 @@ function ReviewPanel({
                   Saved to {saved.name}. Add a brief to sell, give or keep it
                   private — or open the project to keep editing.
                 </p>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-6">
                   <LeaveButton
                     tone="primary"
                     busy={leaving === "brief"}
@@ -535,12 +535,12 @@ function ReviewPanel({
                     ? "Save it to the project you chose, or open it in the editor."
                     : "Save it as a project, or open it in the editor."}
                 </p>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-6">
                   <button
                     type="button"
                     onClick={saveProject}
                     disabled={leaving !== null}
-                    className="inline-flex h-[40px] items-center gap-4 rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:opacity-60"
+                    className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:opacity-60"
                   >
                     <Icon icon={FloppyDiskIcon} size={18} />
                     Save Project
@@ -738,7 +738,7 @@ function LeaveButton({
   children: React.ReactNode;
 }) {
   const base =
-    "inline-flex h-[40px] items-center gap-4 rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
+    "inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
   const paint =
     tone === "primary"
       ? "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover"
