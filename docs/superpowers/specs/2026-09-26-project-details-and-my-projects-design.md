@@ -2,8 +2,9 @@
 
 The final design for the two pages a saved project lives on. It merges the
 owner's old Figma requirements with the new research, and it is the contract
-the implementation plan builds from. The owner questions in §10 each carry a
-default; work proceeds on the defaults unless the owner answers otherwise.
+the implementation plan builds from. The owner answered the eight questions
+on 2026-09-26; the answers are final, recorded in §10, and folded in throughout
+(§2 O5–O12).
 
 Branch `feat/project-details`, read at main `0a5d4f4`.
 
@@ -59,7 +60,8 @@ designed. It asks for:
 
 Also binding from the same file and its Part 4 addendum
 (`IDEEZA-Part4-AI-Flow-Spec-v1.1.md`): Part 4.1's outcomes (Private ·
-Showcase · Give · Sell), §4.7 (the project overview lists every product; each
+Showcase · Give · Sell — owner decision O5 makes Showcase an action on any
+outcome rather than an outcome of its own), §4.7 (the project overview lists every product; each
 product opens into its own tabs; the project level carries all badges, the
 combined BOM, compatibility results and assembly docs), §4.4.9 (the headline
 badge is the lowest tier) and §4.8 (a second generation from the same concept
@@ -91,7 +93,7 @@ every cross-file resolution this spec makes.
 
 **The phases.**
 - **NOW** — real in the Creator today, or cheap to add honestly, including the
-  small model additions owner decisions 2 and 4 require.
+  small model additions owner decisions O2, O4, O5 and O9 require.
 - **NEXT** — needs a new local store or model field.
 - **LATER** — needs auth, a chain, payments or a backend.
 
@@ -105,6 +107,14 @@ every cross-file resolution this spec makes.
 | O2 | **Rebuild → v2.** The same chat rebuilt and saved again becomes the **same project, version 2**; older versions are kept. | Consolidation decision 2 (final) | A version is a saved build of one chat lineage (COR-39). The fork that made a same-named twin project is fixed at save (§5.1.8). A build from a *different* chat that joins the project starts its own lineage at version 1. The Part 4 addendum's §4.8 agrees; the PDF's line 498 ("a new AI build means a new project") still holds for a new chat. |
 | O3 | **Real now, plus a roadmap.** Build what is real now; everything else goes on the roadmap, with no fake data. Marketplace and NFT surfaces come back only when the Brief/mint data is real. Contributors and comments need auth and a backend. | Consolidation decision 3 | NOW (§5) builds only what the local stores answer. A tab, row or control with nothing real behind it is **absent**, never empty, disabled for no reason, or "coming soon". NEXT and LATER (§6) name the store or service each item waits for. |
 | O4 | **Progress from real data.** Editor progress is derived from the project's own editor documents, not from a flag. | Consolidation decision 4 | `flowState` is no longer read for progress (COR-64). The Editor block shows facts such as "42 objects · 12 on the board" (COR-60), never "Done", "Not started" or "n of 7". |
+| O5 | **Showcase is an action, not a Brief intent.** It can be taken after any save (Private, Give or Sell) from a CTA on the Brief's success step, and from its own option on the project page; it can be undone. | Owner decisions of 2026-09-26, answer 1 (§10) | The status is the outcome — **Draft · Private · Given · Listed · Minted**. Showcase is a separate flag on the project, `showcasedAt` (COR-105), shown as a **Showcase** badge beside the status chip and as the **Showcase** tab of My projects (LST-10, LST-65). Its two entry points: the Brief's success step (COM-56) and the Showcase row of the rail's Outcome block (COM-55), each with **Stop showcasing** / **Undo**. The Brief keeps its three intents. |
+| O6 | **"Listed" is the word for a minted sale**, kept honest by its subline. | answer 2 | The chip, tab and status word are **Listed**, always with *"Goes on sale when the marketplace opens"* until a marketplace exists (§4). |
+| O7 | **Network is its own tab**: Products · Media · Network. | answer 3 | COR-19, COR-45; §3.3, §3.6. |
+| O8 | **Each product has its own product page.** | answer 4 | `/projects/[id]/products/[productId]` (COR-30…41, §3.4). |
+| O9 | **A product a rebuild drops stays in the current list, and the project keeps a version history.** | answer 5 | The dropped product stays on the Products tab, marked *"Not in version 2 · from version 1"*, and its page opens at version 1 (COR-108). A **Versions** block in the rail is the one version history: each version's date, its chat and build, the products it added, dropped and changed, its piece count, and a link to each of its products (COR-106, COR-107). The product page's version select reads the same list (COR-41). |
+| O10 | **Delete is blocked while someone else is an owner, or while the project is for sale on the marketplace or sold.** | answer 6 | NOW a **Listed** project can't be deleted: the Delete control stays, with the reason beside it (COR-67, COR-70). LATER the same block covers co-owners, contributors holding a share and a sold project (§4.2, PPL-22, COR-83). A deletable project keeps the recommended friction: the typed name only when something can't be rebuilt (COR-69). |
+| O11 | **"New project" is a header button on My projects that goes to Home.** | answer 7 | LST-2. |
+| O12 | **The buyer view shows previews only** — 3D, PCB, wiring and the parts list; firmware source and downloads come after purchase. | answer 8 | PPL-7, and Preview as buyer NOW. |
 
 **The build-lock rule, already shipped** (owner, 2026-09-25: *"jokhon build
 hoye jabe tokhon spec ekhane ar change kora jabena"*; product spec sheet design
@@ -124,7 +134,7 @@ means here:
 and the eleven must-not-undo decisions in `research/history.md` — among them
 H-1 both pages read live state, H-2 no fabricated ownership, wallet, mint or
 legal rows, H-5 a skipped deliverable is not a link, H-6 Network has one
-home, H-7 the description shown is the concept's, frozen before any edit.
+home (the Network tab, O7), H-7 the description shown is the concept's, frozen before any edit.
 
 ---
 
@@ -161,20 +171,20 @@ slot beside the title (NEXT).
 │ Every project you've saved — from an AI build or started by hand.                                                │
 │ They're stored in this browser.                                                                                  │
 │                                                                                                                  │
-│ ( All 38 )( Draft 31 )( Private 3 )( Showcase 1 )( Given 1 )( Ready to sell 2 ) ┆LATER: Contributed · Purchased┆ │
+│ ( All 38 )( Draft 31 )( Private 4 )( Given 1 )( Listed 2 ) ┊ ( Showcase 2 ) ┆LATER: Contributed · Purchased┆     │
 │ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────── │
 │ [⌕ Search projects and products        × ]                 [ Source: Any source ▾ ] [ Sort: Recently updated ▾ ] │
 │ 38 projects                                                         facet chips appear here when one isn't "Any" │
 │ ┌──────────────────────────────────┐ ┌──────────────────────────────────┐ ┌──────────────────────────────────┐   │
-│ │                        [○ Draft] │ │                [# Ready to sell] │ │                        [○ Draft] │   │
+│ │                        [○ Draft] │ │          [◉ Showcase] [# Listed] │ │                        [○ Draft] │   │
 │ │                                  │ │                                  │ │                                  │   │
 │ │       cover 16:10                │ │       cover 16:10                │ │    placeholder tile              │   │
 │ │                                  │ │                                  │ │                                  │   │
 │ ├──────────────────────────────────┤ ├──────────────────────────────────┤ ├──────────────────────────────────┤   │
 │ │ Car          ┆NEXT: Prototype┆   │ │ Plant Soil Monitor               │ │ Garden Weather Station           │   │
 │ │ 4 products · RC Car              │ │ 1 product · Soil Probe           │ │ 1 product · not named yet        │   │
-│ │ Controller, Remote Contr… +2     │ │ Minted Sep 22 · on sale when     │ │ Not briefed yet                  │   │
-│ │ Not briefed yet                  │ │ the marketplace opens            │ │ By hand · Created Aug 3          │   │
+│ │ Controller, Remote Contr… +2     │ │ Minted Sep 22 · goes on sale     │ │ Not briefed yet                  │   │
+│ │ Not briefed yet                  │ │ when the marketplace opens       │ │ By hand · Created Aug 3          │   │
 │ │ AI build · Saved 4:12 PM ·       │ │ AI build · Saved Sep 20          │ │                                  │   │
 │ │ Version 2                        │ │                                  │ │                                  │   │
 │ │ [         Add Brief          ]   │ │ [       Open in editor       ]   │ │ [       Open in editor       ]   │   │
@@ -183,10 +193,17 @@ slot beside the title (NEXT).
 └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The card, top to bottom: the cover with the status chip; the title (the card's
-link, h3) with the stage pill (NEXT); the product line; the status line; the
-meta row (source · date · version); the next-action button. There is no ⋮, no
-stats row and no carousel dots.
+The card, top to bottom: the cover with the status chip, and the Showcase
+badge to its left when the project is showcased; the title (the card's link,
+h3) with the stage pill (NEXT); the product line; the status line; the meta
+row (source · date · version); the next-action button. There is no ⋮, no stats
+row and no carousel dots.
+
+The tabs are the four outcome tabs after All, then a hairline divider (┊) and
+**Showcase**. Every project sits in exactly one of Draft · Private · Given ·
+Listed (38 = 31 + 4 + 1 + 2); Showcase is membership, not a state, so its
+projects are also counted in their outcome tab — here one Private and one
+Listed project (LST-4, LST-10).
 
 **Phone, 400.** Below a 560 px content box each card becomes a row.
 
@@ -197,8 +214,8 @@ stats row and no carousel dots.
 │ an AI build or started by hand.      │
 │ They're stored in this browser.      │
 │ ( All 38 )( Draft 31 )               │   tabs wrap
-│ ( Private 3 )( Showcase 1 )          │
-│ ( Given 1 )( Ready to sell 2 )       │
+│ ( Private 4 )( Given 1 )             │
+│ ( Listed 2 ) ┊ ( Showcase 2 )        │
 │ [⌕ Search projects and products ]    │   search takes a full row
 │ [ Source ▾      ] [ Sort ▾      ]    │   Source and Sort share a row
 │ 38 projects                          │
@@ -217,7 +234,8 @@ stats row and no carousel dots.
 ### 3.3 Project details
 
 **Desktop, 1440 (owner, NOW; NEXT and LATER slots dashed).** Example: "Car",
-four products, version 2, not briefed. Two columns when the page container is
+version 2 of one chat, not briefed. Version 2 dropped Battery Charger and added
+Spare Battery Pack; Battery Charger stays in the list from version 1 (O9). Two columns when the page container is
 at least 1024 px: a fluid main column (`min-width: 0`) and a 360 px rail, 28 px
 apart, both top-aligned under the breadcrumb. The rail is not sticky; it is
 taller than the viewport.
@@ -238,7 +256,7 @@ My projects › Car
 │  Products   Media   Network    ┆LATER: Contributors · Customers┆                      │  │ PCB Design        42 objects · 12 on › │
 │  ▔▔▔▔▔▔▔▔                                                                             │  │                   the board            │
 │ Products                                                                              │  │ Code                                 › │
-│ 4 products · 20 of 20 pieces ready · Build check: Draft ⓘ                             │  │ 3D Module        AI model generated  › │
+│ 4 products · 15 of 15 pieces ready in version 2 · Build check: Draft ⓘ                │  │ 3D Module        AI model generated  › │
 │ ┌────────────────────────────────────────┐ ┌────────────────────────────────────────┐ │  │ Assembly         8 of 12 parts       › │
 │ │ [ concept image 16:10 ]                │ │ [ concept image 16:10 ]                │ │  │                  checked               │
 │ │ RC Car Controller                      │ │ Remote Controller                      │ │  │ Peripheral Wiring  6 parts · 9 wires › │
@@ -249,19 +267,22 @@ My projects › Car
 │ │                                        │ │ Radio  nRF24L01                        │ │  │ ────────────────────────────────────── │
 │ │                                        │ │ Built with your part changes: added    │ │  │ Details                                │
 │ │                                        │ │ HC-SR04 ultrasonic sensor              │ │  │ Source      AI build                   │
-│ └────────────────────────────────────────┘ └────────────────────────────────────────┘ │  │ Built in    Chat “Car” ↗               │
-│ ┌────────────────────────────────────────┐ ┌────────────────────────────────────────┐ │  │ Created     Sep 22, 2026               │
-│ │ Battery Charger …                      │ │ Spare Battery Pack …                   │ │  │ Stored      In this browser            │
-│ └────────────────────────────────────────┘ └────────────────────────────────────────┘ │  │ ────────────────────────────────────── │
-│ ┆NEXT  All parts across 4 products — 31 unique, 58 units                          ▸ ┆ │  │ Project log                          ▴ │
-│ ┆NEXT  Compatibility — 1 note between Remote Controller and RC Car Controller     ▸ ┆ │  │ Saved version 2                        │
-│ ┆NEXT  [ + Add a product ]                                                          ┆ │  │ Sep 26, 2026 · 4:12 PM                 │
-└───────────────────────────────────────────────────────────────────────────────────────┘  │ Built version 2 · 20 pieces            │
-                                                                                           │ Sep 26, 2026 · 4:10 PM                 │
-                                                                                           │ Saved version 1                        │
-                                                                                           │ Sep 22, 2026 · 9:02 AM                 │
-                                                                                           │ Built version 1 · 20 pieces            │
-                                                                                           │ Sep 22, 2026 · 9:00 AM                 │
+│ └────────────────────────────────────────┘ └────────────────────────────────────────┘ │  │ Created     Sep 22, 2026               │
+│ ┌────────────────────────────────────────┐ ┌────────────────────────────────────────┐ │  │ Stored      In this browser            │
+│ │ Battery Charger                        │ │ Spare Battery Pack                     │ │  │ ────────────────────────────────────── │
+│ │ Not in version 2 · from version 1 …    │ │ Build check: Draft · v2 · Sep 26 …     │ │  │ Versions                             ▴ │
+│ └────────────────────────────────────────┘ └────────────────────────────────────────┘ │  │ Chat “Car” ↗                           │
+│ ┆NEXT  All parts across 4 products — 31 unique, 58 units                          ▸ ┆ │  │ Version 2 · current                    │
+│ ┆NEXT  Compatibility — 1 note between Remote Controller and RC Car Controller     ▸ ┆ │  │ Saved Sep 26, 2026 · 4:12 PM           │
+│ ┆NEXT  [ + Add a product ]                                                          ┆ │  │ 15 of 15 pieces ready · Open build ↗   │
+└───────────────────────────────────────────────────────────────────────────────────────┘  │ Added    Spare Battery Pack            │
+                                                                                           │ Dropped  Battery Charger               │
+                                                                                           │ Changed  Remote Controller             │
+                                                                                           │ Version 1                              │
+                                                                                           │ Saved Sep 22, 2026 · 9:02 AM           │
+                                                                                           │ 15 of 15 pieces ready · Open build ↗   │
+                                                                                           │ Products RC Car Controller, Remote     │
+                                                                                           │          Controller, Battery Charger   │
                                                                                            │ ────────────────────────────────────── │
                                                                                            │ Manage                                 │
                                                                                            │ [ Delete project… ]     danger · quiet │
@@ -270,8 +291,8 @@ My projects › Car
 
 The header, in order: the h1 with its rename pencil, the Activity chip (NEXT)
 and, on the right, the action pair and **Preview as buyer**, which wrap under
-the title when the name is long; the status chip with the status line; the meta
-line; the description, clamped to 5 lines, with its editor; the Open in editor
+the title when the name is long; the status chip, the **Showcase** badge when
+the project is showcased, and the status line; the meta line; the description, clamped to 5 lines, with its editor; the Open in editor
 hint. Then the pending-version banner, only while a newer build of the chat
 waits. Then the tab strip, and the tab panel. The Media and Network panels
 replace the Products panel under the same strip:
@@ -280,6 +301,14 @@ replace the Products panel under the same strip:
 - **Network** — the shipped `NetworkSection`: its empty state with
   **Create Network** (quiet), or the summary, connections and role chips with
   **View Network**.
+
+In the rail, **Versions** is the project's one version history (COR-107): the
+chat each lineage came from, then every saved version with its date, pieces,
+build link and what it added, dropped and changed, each product name a link to
+that product at that version. Details no longer carries "Built in" (the chat
+link heads its lineage in Versions), and the **Project log** is absent here: a
+built, unminted project has no event that isn't a version (COR-52). A minted
+project's Outcome block holds the **Showcase** row (§3.8).
 
 **Phone, 400.** One column. The rail blocks follow the tab panel in rail order,
 each collapsible and closed by default; the header's status line carries the
@@ -312,8 +341,8 @@ outcome at every width, so the Outcome block needs no second copy near the top.
 │ Products  Media  Network       ›     │   one row that scrolls; never wraps
 │ ▔▔▔▔▔▔▔▔                             │
 │ Products                             │
-│ 4 products · 20 of 20 pieces         │
-│ ready · Build check: Draft ⓘ         │
+│ 4 products · 15 of 15 pieces ready   │
+│ in version 2 · Build check: Draft ⓘ  │
 │ ┌──────────────────────────────────┐ │   1 column
 │ │ [ concept image 16:10 ]          │ │
 │ │ RC Car Controller                │ │
@@ -328,7 +357,7 @@ outcome at every width, so the Outcome block needs no second copy near the top.
 │ ┆Business plan         NEXT   ▸┆     │   Outcome holds "Minted details"
 │ Editor                         ▸     │
 │ Details                        ▸     │
-│ Project log                    ▸     │
+│ Versions                       ▸     │   Project log: once it has an event
 │ Manage                               │
 │ ┌──────────────────────────────────┐ │
 │ │ Delete project…           danger │ │   last thing on the page
@@ -390,6 +419,15 @@ My projects › Car › Remote Controller
 └──────────────────────────────────┘
 ```
 
+**A product a later version dropped** — Battery Charger in the Car example —
+opens at the last version that had it: the select reads "Version 1 of 2" and
+the notice reads *"Version 2 doesn't include Battery Charger — this is version
+1, the last one that did."*, with no **Back to latest**, because no later copy
+exists. The select lists every version of the lineage from `versionsOf()`; a
+version without this product reads "Version 2 · not in this version" and opens
+the *"Not in version 2"* notice (COR-41, COR-108). The rail's Versions block
+links each product name to this page at that version.
+
 ### 3.5 Per-state actions
 
 One shared `nextAction()` chooses the pair; the My projects card shows its first
@@ -403,7 +441,7 @@ one violet (★) per page; minted projects have none. Both buttons use
 | Draft, Brief in progress / started | ★ **Continue Brief** · Open in editor | Continue Brief | the primary |
 | Draft, from a build, not briefed | ★ **Add Brief** · Open in editor | Add Brief | the primary |
 | Draft, by hand, not briefed | ★ **Open in editor** · Add Brief | Open in editor | the secondary |
-| Private · Showcase · Given · Ready to sell | Open in editor · View brief (both quiet) | Open in editor | View brief |
+| Private · Given · Listed (showcased or not) | Open in editor · View brief (both quiet) | Open in editor | View brief |
 | Minted, record unreadable | Open in editor (quiet) | Open in editor | — |
 | Any minted state with a newer version waiting | as above; the pending-version banner carries a quiet **Review version {n}** | Open in editor | View brief |
 | Preview as buyer | none | — | — |
@@ -411,16 +449,20 @@ one violet (★) per page; minted projects have none. Both buttons use
 **Open in editor** resumes the step opened last ("Open in editor · PCB Design"
 once one is recorded), falling back to PCB. **Preview as buyer** is the header's
 last control, quiet, after the pair; it is absent for a minted Private project
-(nobody will see the page) and inside the preview itself.
+that isn't showcased (nobody will see the page) and inside the preview itself.
+**Showcase** is never in the header: its one home on the page is the Outcome
+block (§3.8), so showcasing never changes the pair or the card.
 
-### 3.6 Activity, Network, Editor, Manage and the right rail
+### 3.6 Activity, Network, Editor, Versions, Manage and the right rail
 
 **Three words, three homes** (COR-50):
 - **Activity** is the maker's journey: the header chip "Activity {n} ›" and its
   "?" open the Activity History drawer (NEXT, with the journey store).
 - **Stage** is a derived label: "· Stage {short}" in the meta line (NEXT), plain
   text, never a second door to the drawer.
-- **Project log** is system events: a rail block (NOW, derived).
+- **Project log** is system events: a rail block (NOW, derived). It holds the
+  events that aren't versions — created by hand, minted, showcased; every saved
+  version and its build is in the **Versions** block instead.
 
 ```
 ┌─ project page ───────────────────────┐  ┌─ drawer · 550 px · right-docked · full height ───────┐
@@ -447,7 +489,8 @@ The drawer is 550 px, right-docked, full height, over one scrim, with the page
 layer is open at a time. Add and Edit open inside the drawer and replace the
 list; a ‹ returns to it and × closes the drawer.
 
-**Network** is a tab (Products · Media · Network). It hosts `NetworkSection`
+**Network** is its own tab (Products · Media · Network; owner decision O7),
+never a section under another tab. It hosts `NetworkSection`
 with unchanged behaviour: one control per state, **Create Network** or **View
 Network**, both quiet on this page. There is no second entry anywhere (D10, H-6).
 
@@ -456,23 +499,49 @@ Assembly · Peripheral Wiring · Product Preview — each a link to its step wit
 derived fact and no status word. The Brief is not a row; its door is the
 header.
 
+**Versions** is a rail block after Details and the project's one version
+history (owner decision O9, COR-107): one group per lineage, headed by its chat
+link, then each saved version newest first — "Version {n}" (· current on the
+newest), its saved date, "{ready} of {total} pieces ready" and **Open build**,
+and what it **Added**, **Dropped** and **Changed** against the version before;
+version 1 lists its products. Every product name links to that product's page
+at that version. Five versions show, then **Show all ({n})** in place. It is
+absent for a hand-made project with no build, and in Preview as buyer.
+
 **Manage** is the rail's last block and holds one control, **Delete project…**,
 quiet in the danger tone and apart from everything else. At 400 px it is the
-last thing on the page.
+last thing on the page. On a **Listed** project the control stays where it is,
+`aria-disabled`, with the reason beside it (owner decision O10, COR-70):
+
+```
+┌─ rail · Manage, a Listed project ──────┐
+│ Manage                                 │
+│ [ Delete project… ]      aria-disabled │
+│ A listed project can’t be deleted.     │
+│ There’s no way to withdraw a listing   │
+│ yet — that comes with the marketplace. │
+└────────────────────────────────────────┘
+```
+
+The button stays in the tab order and names the reason through
+`aria-describedby`; pressing it opens nothing. The second line says honestly
+that no route out exists yet — the Brief can't withdraw a listing — rather than
+pointing at one.
 
 **The rail, in order.**
 
 | Phase | Blocks |
 |---|---|
-| NOW | Outcome · Editor · Details · Project log · Manage |
-| NEXT | Outcome · **Business plan** · Editor · Details · Project log · Manage |
-| LATER | **People** ("You · Creator · 60 %") · Outcome grown into **Marketplace** (NFT-type tabs, listing operations) · Business plan · Editor · Details · Project log · Manage |
+| NOW | Outcome · Editor · Details · **Versions** · Project log · Manage |
+| NEXT | Outcome · **Business plan** · Editor · Details · Versions · Project log · Manage |
+| LATER | **People** ("You · Creator · 60 %") · Outcome grown into **Marketplace** (NFT-type tabs, listing operations) · Business plan · Editor · Details · Versions · Project log · Manage |
 
 One rail surface with hairline dividers between blocks (no card in a card);
-each block has an h2.
+each block has an h2. A block with nothing to say is absent (the Project log of
+a built, unminted project; Versions of a hand-made one).
 
 **LATER, the same frame gains:** **Share** in the header (one sheet: copy link,
-native share, social, Innovations); "Created by" / "Owned by" in the meta line
+native share, social targets — the Innovations post stays Showcase's, COM-57); "Created by" / "Owned by" in the meta line
 with person cards; the wallet row in the header identity block; the stats row
 and the Comments drawer (public projects only); the **Contributors** and
 **Customers** tabs, appended after Network so that no existing tab moves.
@@ -485,18 +554,19 @@ and the Comments drawer (public projects only); the **Contributors** and
 | Visibility pill, "Mint Status: …" | the one status chip | NOW |
 | ⋮ → Edit Project; the "Update Description" coachmark | inline rename and description, with "Draft from products" | NOW |
 | ⋮ → Add Network; the IoT Network tab | the **Network** tab | NOW |
-| ⋮ → Delete Project | rail **Manage** | NOW |
+| ⋮ → Delete Project | rail **Manage** (blocked, with its reason, for a Listed project) | NOW |
 | Product tab; card → Product Details | **Products** tab → the product page | NOW |
 | Media tab | **Media** tab | NOW |
 | Basic Information | rail **Details** + the Outcome facts | NOW |
-| Activity Log | rail **Project log** | NOW |
+| Activity Log | rail **Project log**; saved versions and builds in rail **Versions** | NOW |
 | Marketplace card (Main / Physical / Virtual, Add To Marketplace) | rail **Outcome** now; **Marketplace** LATER; terms and mint stay in the Brief | NOW / LATER |
 | ⋮ → Generate Business Plan; the business-plan chip | rail **Business plan** card | NEXT |
 | Activity chip and "?" | header chip → drawer | NEXT |
 | "Activity · Idea ▾" stage row | "· Stage {short}" in the meta line | NEXT |
 | Add New Product card | "Add a product", the grid's last tile | NEXT |
 | Legal Information | Outcome rows, "As stated by you — not verified." | NEXT |
-| Share to Newsfeed; ⋮ → Share To Social Media | header **Share** | LATER |
+| Share to Newsfeed ("Share to feed or Marketplace") | **Showcase**: the Outcome block's Showcase row, and the Brief's success step (§3.8) | NOW (a local flag); the feed post LATER |
+| ⋮ → Share To Social Media | header **Share** | LATER |
 | Wallet chip and copy | header identity block | LATER |
 | Created by / Owned by, person card | meta line | LATER |
 | Stats row → Comments | stats row → Comments drawer | LATER |
@@ -504,6 +574,128 @@ and the Comments drawer (public projects only); the **Contributors** and
 | Premium Parts tab | a group inside a product's Parts tab | LATER |
 | ⋮ → Add App, Send To Manufacture, Send To Freelancer | absent until each has a destination | LATER |
 | Gear and "Level 1" badges; card ⋮; image dots; pagination | not built (§9) | — |
+
+### 3.8 Showcase: two entry points, one home on the page
+
+Showcase is an action on a project, not an outcome and not a status (owner
+decision O5). It can be taken on any minted project — Private, Given, Listed,
+and the Minted record that can't be read — and undone at any time. It is absent
+on a Draft: the Brief promises that minting keeps the maker's name on a design
+before it is shared (*"Minting keeps your name on it — you can share or sell it
+later."*), and a Draft has no mint.
+
+**What it does NOW.** It sets `showcasedAt` on the project record, in this
+browser (COR-105). The project gets the **Showcase** badge beside its status
+chip, on the details header and on the My projects card (LST-65), and joins the
+**Showcase** tab (LST-10); a Private project becomes one others are meant to
+see, so Preview as buyer is offered (PPL-9). **Nothing is posted.** Innovations
+(`/innovations`) is a sample feed of 36 made-up projects with no write path
+(`lib/feed.ts`), so no surface says "posted", "live" or "on Innovations", and
+nothing links to `/innovations/<slug>`, which renders the sample fallback.
+
+**What it does LATER.** Showcasing publishes a real Innovations post, confirmed
+first because it goes public (CNT-46), and Stop showcasing takes the post down
+(COM-57, public); NEXT, a local feed reads the flag first (COM-27). The feed
+shows video cards, so a post needs a preview clip — the Brief's own rule, *"An
+Innovations post needs a preview clip"* — and a project without one is sent to
+the Brief's preview step, the one generator (CNT-28).
+
+**Entry point 1 — the Brief's success step** (the owner's "success modal",
+`step-4-success.tsx`), after every intent — Save as Private, Give or Sell — and
+while a clip still renders (COM-56).
+
+```
+┌─ /build/<id>/brief · the success step · any intent ──┐
+│                          ✓                           │
+│                  Listing is minted                   │
+│   Your listing is minted. It goes on sale when the   │
+│   marketplace opens.                                 │
+│   … the storyboard card, when the Brief made one …   │
+│ ┌──────────────────────────────────────────────────┐ │
+│ │ Go to My Projects                         violet │ │
+│ └──────────────────────────────────────────────────┘ │
+│ ┌──────────────────────────────────────────────────┐ │
+│ │ ◉ Showcase this project                    quiet │ │
+│ └──────────────────────────────────────────────────┘ │
+│ It goes under Showcase in My projects now. Nothing   │
+│ is posted until Innovations opens.                   │
+│                    Back to home                      │
+└──────────────────────────────────────────────────────┘
+
+after the press, or on arrival when Share to Innovations was ticked,
+the button and its line give way to one status row (focus moves to Undo):
+│ ◉ Showcased — it’s on your Showcase tab.        Undo │
+```
+
+**Entry point 2 — the project page: the Showcase row of the Outcome block**
+(COM-55). The row sits in the Outcome facts, after the terms and before the
+footnote; its one control is quiet.
+
+```
+┌─ Outcome · Listed, showcased ──────────┐   ┌─ Outcome · Private, not showcased ─────┐
+│ Outcome                                │   │ Outcome                                │
+│ Minted. It goes on sale when the       │   │ Minted and kept. Only you can see it.  │
+│ marketplace opens.                     │   │ Minted      Sep 22, 2026 · 9:09 PM     │
+│ Minted      Sep 22, 2026 · 9:09 PM     │   │ Network     Base Sepolia (Testnet)     │
+│ Network     Base Sepolia (Testnet)     │   │ Collection  Garden Sensors             │
+│ Collection  Garden Sensors             │   │ Showcase    Not showcased              │
+│ Price       0.05 ETH · Buy now         │   │             Showcasing lists it under  │
+│ Royalties   10 % on resales            │   │             Showcase in My projects.   │
+│ Showcase    Showcased since Sep 26     │   │             Nothing is posted until    │
+│             Nothing is posted — the    │   │             Innovations opens.         │
+│             Innovations feed isn’t     │   │             [ Showcase project ]       │
+│             open yet.                  │   │ Recorded in this browser only —        │
+│             [ Stop showcasing ]        │   │ nothing is written to a blockchain     │
+│ Recorded in this browser only —        │   │ yet.                                   │
+│ nothing is written to a blockchain     │   └────────────────────────────────────────┘
+│ yet.                                   │
+└────────────────────────────────────────┘
+```
+
+```
+┌─ the header of the same Listed project ───────────────────────────────────────────────┐
+│ Plant Soil Monitor ✎         [ Open in editor ] [ View brief ] [ Preview as buyer ]   │
+│ # Listed  ◉ Showcase · Minted Sep 22, 2026 · goes on sale when the marketplace opens  │
+│ 1 product · Saved Sep 20, 2026                                                        │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+```
+┌─ 400 px · rail blocks ───────────┐
+│ Outcome · Listed · Showcased   ▸ │
+│ Editor                         ▸ │
+└──────────────────────────────────┘
+```
+
+Stop showcasing and Undo take effect at once, with no dialog: NOW nothing is
+public, and pressing Showcase again restores it. Each announces politely
+("Showcased {name}", "Stopped showcasing {name}"). At 400 px the Outcome
+block's collapsed summary names the state ("Outcome · Listed · Showcased"), so
+the row can be found without opening it.
+
+**Why the Outcome block, and not a header secondary.**
+1. **The control sits beside the fact it changes.** The Outcome block is where
+   the page says what became of the project and who it is for ("Only you can
+   see it"); Showcase changes exactly that. Rename sits beside the h1 for the
+   same reason.
+2. **The header pair is the next step, and it is shared with the card.**
+   `nextAction()` feeds both the header and the My projects card (COR-11,
+   LST-32). A Showcase button in the header would either break "the card equals
+   the header" or put Showcase on every card — and it isn't the next step in
+   making the project.
+3. **The header is already full on a minted project** — Open in editor · View
+   brief · Preview as buyer. At 400 px those stack full width; a fourth button
+   pushes the tabs off the first screen.
+4. **One control, one home.** The badge beside the chip shows the state
+   everywhere and is not a control; the Outcome row is the only place on the
+   page that changes it. The success step is a separate home, in the Brief, at
+   the moment the outcome is chosen.
+
+**The Brief's "Share to Innovations" tick** stays in the Brief with its story
+and its clip lock, and it now writes the same flag: a mint with the tick checked
+sets `showcasedAt` to the mint time, so the success step opens already
+showcased (§7 X37). The flag is written, never read back from the Brief: Stop
+showcasing clears it whatever the tick said.
 
 ---
 
@@ -514,39 +706,54 @@ One derivation decides the state (`projectView()` → `projectSummary()` and
 button. "Status line" is the same string on the My projects card and under the
 details chip. The Outcome card never carries a chip of its own.
 
+**The state is the outcome** — Draft · Private · Given · Listed · Minted — and
+**Showcase is not a state** (owner decision O5): it is the `showcasedAt` flag,
+shown as its own badge and as membership of the Showcase tab, on any minted
+row (the Showcased modifier below).
+
 **Chip icons** (one table, text plus icon, sentence case, never violet): Draft
-○ circle (neutral) · Private lock · Showcase eye · Given hand-heart · Ready to
-sell tag · Minted hexagon (all success tone).
+○ circle (neutral) · Private lock · Given hand-heart · Listed tag · Minted
+hexagon (all success tone). **The Showcase badge**: eye icon and the word
+"Showcase", info tone, beside the chip — the only other badge.
 
 ### 4.1 NOW
 
 | # | State | Derived from | Chip | Status line | Primary action · secondary | My projects tab | Outcome card (subline · facts) | Delete |
 |---|---|---|---|---|---|---|---|---|
 | 1 | **Draft** — a newer version waiting | not minted, and `pendingVersionsOf()` has a ready build | Draft | "Version {n} is ready to save" | ★ Review version {n} · Open in editor | Draft | the sub-state's subline (rows 2–5) · no facts | plain, or typed (§5.10) |
-| 2 | **Draft** — Brief in progress | a brief draft with `intent`, `mintedAt === null` | Draft | "Brief in progress · {Ready to sell / Give to community / Save as Private} · {Idea / Preview} step" (the step is omitted at the form step, whose name is the intent's) | ★ Continue Brief · Open in editor | Draft | "You chose {Sell / Give / Save}. The Brief is at the {step} step — nothing is minted until you finish it." · none | plain / typed |
+| 2 | **Draft** — Brief in progress | a brief draft with `intent`, `mintedAt === null` | Draft | "Brief in progress · {to sell / to give / to keep} · {Idea / Preview} step" (the step is omitted at the form step) | ★ Continue Brief · Open in editor | Draft | "You chose {Sell / Give / Save}. The Brief is at the {step} step — nothing is minted until you finish it." · none | plain / typed |
 | 3 | **Draft** — Brief started | a draft, `intent === null` | Draft | "Brief started" | ★ Continue Brief · Open in editor | Draft | "The Brief is open — no outcome chosen yet." · none | plain / typed |
 | 4 | **Draft** — from a build, not briefed (also when the build is gone) | build refs, no draft | Draft | "Not briefed yet" | ★ Add Brief · Open in editor | Draft | "Nothing decided yet. The Brief is where you keep it, give it away or sell it." · none | plain / typed |
 | 5 | **Draft** — by hand, not briefed | no build refs, no draft | Draft | "Not briefed yet" | ★ Open in editor · Add Brief | Draft | as row 4 | plain / typed |
-| 6 | **Private** | `mintedAt` + `intent: "save"`, no share | Private | "Minted {date} · kept private" | Open in editor · View brief (no violet) | Private | "Minted and kept. Only you can see it." · Minted, Network, Collection | allowed, with the mint line |
-| 7 | **Showcase** | `mintedAt` + `save` + `shareToNewsfeed` | Showcase | "Minted {date} · Innovations requested — not published yet" | Open in editor · View brief | Showcase | "Minted and kept. Not on Innovations yet — posting isn't connected." · + "Innovations: requested — not published yet." | allowed, with the mint line |
-| 8 | **Given** | `mintedAt` + `give` | Given | "Minted {date} · given to the community under {licence}" | Open in editor · View brief | Given | "Minted under {licence}. This can't be undone." · + Licence | allowed, with the mint line |
-| 9 | **Ready to sell** | `mintedAt` + `sell` | Ready to sell | "Minted {date} · on sale when the marketplace opens" | Open in editor · View brief | Ready to sell | "Minted. It goes on sale when the marketplace opens." · + Price or Auction line, Royalties; a passed auction end adds "This end date passed before the marketplace opened — nothing was sold." | allowed, with the mint line |
-| 10 | **Minted** — record unreadable | `status === "completed"`, draft missing or corrupt | Minted | "Minted · the brief record isn't in this browser" | Open in editor (quiet) | All only | "The brief record can't be read in this browser, so its terms aren't shown." · none | allowed |
+| 6 | **Private** | `mintedAt` + `intent: "save"` | Private | "Minted {date} · kept private"; showcased: "Minted {date} · kept by you" | Open in editor · View brief (no violet) | Private | "Minted and kept. Only you can see it."; showcased: "Minted and kept by you — not given away or for sale." · Minted, Network, Collection, Showcase | allowed, with the mint line |
+| 7 | **Given** | `mintedAt` + `give` | Given | "Minted {date} · given to the community under {licence}" | Open in editor · View brief | Given | "Minted under {licence}. This can't be undone." · + Licence, Showcase | allowed, with the mint line |
+| 8 | **Listed** | `mintedAt` + `sell` | Listed | "Minted {date} · goes on sale when the marketplace opens" | Open in editor · View brief | Listed | "Minted. It goes on sale when the marketplace opens." · + Price or Auction line, Royalties, Showcase; a passed auction end adds "This end date passed before the marketplace opened — nothing was sold." | **blocked**: the control stays, `aria-disabled`, with "A listed project can't be deleted." (COR-70) |
+| 9 | **Minted** — record unreadable | `status === "completed"`, draft missing or corrupt | Minted | "Minted · the brief record isn't in this browser" | Open in editor (quiet) | All only | "The brief record can't be read in this browser, so its terms aren't shown." · Showcase | allowed — its outcome can't be read, so it isn't known to be listed |
+
+**Listed is honest now.** Nothing is on a marketplace yet — there is no
+marketplace — so the word never appears without its subline: the status line
+and the Outcome subline both say it goes on sale when the marketplace opens.
 
 **Modifiers (NOW)**
 
 | Modifier | Derived from | What changes |
 |---|---|---|
-| Preview clip still rendering (rows 6–9) | the draft's `videoJobId` names a job not `done` or `failed` | Status line "Minted {date} · preview clip still rendering"; the subline adds "The preview clip is still rendering — {n} %, about {eta} left". A failed job adds "The preview clip failed — regenerate it from the Brief." |
-| A newer version waiting (rows 6–10) | minted, and `pendingVersionsOf()` has a ready build | The pair is unchanged; the pending banner "Version {n} of {lineage} is ready to save." carries a quiet **Review version {n}**. The card is unchanged (LST-43). A later save leaves the Outcome as it was minted. |
-| Build gone / chat gone | a ref whose job is not in this browser; its chat missing | Details → Source "AI build · not in this browser"; product cards are not links and say why; no "Built in" link, no part-changes line. |
-| Every minted state | rows 6–10 | The Outcome card's footnote: "Recorded in this browser only — nothing is written to a blockchain yet." Delete adds "It was minted in this browser only — nothing on a blockchain changes." |
-| Preview as buyer (a view, not a state) | `?view=buyer` | The pair, the pencil, the description editor, the Editor and Manage blocks, Outcome, Built in and Stored are absent; a sticky "Previewing as a buyer" banner with **Exit preview**. Absent for row 6. |
+| **Showcased** (rows 6–9) | `project.showcasedAt` is a number | The **Showcase** badge beside the chip, on the header and the card; the project is also under the **Showcase** tab; the Outcome block's Showcase row reads "Showcased since {date}" with **Stop showcasing** (COM-55); on row 6 the status line and subline take their showcased forms and Preview as buyer is offered (PPL-9); the pair and the card button don't change. Never on rows 1–5. |
+| Preview clip still rendering (rows 6–8) | the draft's `videoJobId` names a job not `done` or `failed` | Status line "Minted {date} · preview clip still rendering"; the subline adds "The preview clip is still rendering — {n} %, about {eta} left". A failed job adds "The preview clip failed — regenerate it from the Brief." |
+| A newer version waiting (rows 6–9) | minted, and `pendingVersionsOf()` has a ready build | The pair is unchanged; the pending banner "Version {n} of {lineage} is ready to save." carries a quiet **Review version {n}**. The card is unchanged (LST-43). A later save leaves the Outcome as it was minted. |
+| A product a later version dropped (any row) | a product row whose source is an older version of its lineage (COR-108) | The product stays on the Products tab, marked "Not in version {m} · from version {n}"; its page opens at version {n}; the Versions block lists it under "Dropped". |
+| Build gone / chat gone | a ref whose job is not in this browser; its chat missing | Details → Source "AI build · not in this browser"; product cards are not links and say why; the Versions entry reads "build not in this browser" and its lineage heading is plain text; no part-changes line. |
+| Every minted state | rows 6–9 | The Outcome card's footnote: "Recorded in this browser only — nothing is written to a blockchain yet." Delete, where allowed, adds "It was minted in this browser only — nothing on a blockchain changes." |
+| Preview as buyer (a view, not a state) | `?view=buyer` | The pair, the pencil, the description editor, the Editor, Versions and Manage blocks, Outcome (with its Showcase row) and Stored are absent; the Showcase badge stays; a sticky "Previewing as a buyer" banner with **Exit preview**. Absent for row 6 unless showcased. |
 
-**Transitions that change controls.** Minting (rows 2–5 → 6–9) removes the
-violet. Saving a waiting version (1 → 4) moves the primary to Add Brief. A new
-build of the chat finishing (4 → 1) moves the primary to Review version {n}.
-Deleting (any row) leaves the page for My projects.
+**Transitions that change controls.** Minting (rows 2–5 → 6–8) removes the
+violet and brings the Outcome block's Showcase row; a mint with Share to
+Innovations ticked lands showcased. Minting to sell (→ 8) blocks Delete.
+Showcasing or stopping (rows 6–9) changes the badge, the Showcase tab and, on
+row 6, Preview as buyer — never the pair. Saving a waiting version (1 → 4)
+moves the primary to Add Brief. A new build of the chat finishing (4 → 1) moves
+the primary to Review version {n}. Deleting (any row but 8) leaves the page for
+My projects.
 
 ### 4.2 LATER
 
@@ -554,26 +761,30 @@ These render nothing now (COR-79); each has its slot.
 
 | # | State | Derived from | Chip | Status line / banner | Primary action | Delete |
 |---|---|---|---|---|---|---|
-| 11 | **Lazy minted** | a signed voucher | Lazy minted | "Signed · minted on chain at first sale" | ★ Add to marketplace (Marketplace card) | replaced by its reason; archive takes its place (COR-70) |
-| 12 | **Minted on chain** | a token id | Minted | "On {chain} · token {id}"; Change wallet locks | ★ Add to marketplace | replaced by its reason; archive takes its place |
-| 13 | **Listed** (Buy now) / **Auction** | a live listing | Listed / Auction · ends {time} | price · share for sale, or the current bid | none in the header; operations (Edit, Remove, Close auction, Pause) in the Marketplace card | replaced by "Listed projects can't be deleted — remove the listing first." |
-| 14 | **Paused** | an owner pause | Paused | "Paused {date} — resume from the Marketplace card" | ★ Resume, in the Marketplace card; the rest of the page stays usable | blocked, with its reason |
-| 15 | **Sold** (per slot) | a verified purchase | Sold; "Sold out" when every slot is | banner "Sold on {date} to {buyer}"; the My projects card opens this page | none | blocked, with its reason |
+| 10 | **Lazy minted** | a signed voucher | Lazy minted | "Signed · minted on chain at first sale" | ★ Add to marketplace (Marketplace card) | replaced by its reason; archive takes its place (COR-70) |
+| 11 | **Minted on chain** | a token id | Minted | "On {chain} · token {id}"; Change wallet locks | ★ Add to marketplace | replaced by its reason; archive takes its place |
+| 12 | **Listed, on sale** (Buy now) / **Auction** | a live listing on a real marketplace | Listed / Auction · ends {time} | the subline "Goes on sale when the marketplace opens" gives way to the price and share for sale, or the current bid | none in the header; operations (Edit, Remove, Close auction, Pause) in the Marketplace card | blocked, and now with a route out: "A listed project can't be deleted — remove the listing first." |
+| 13 | **Paused** | an owner pause | Paused | "Paused {date} — resume from the Marketplace card" | ★ Resume, in the Marketplace card; the rest of the page stays usable | blocked, with its reason |
+| 14 | **Sold** (per slot) | a verified purchase | Sold; "Sold out" when every slot is | banner "Sold on {date} to {buyer}"; the My projects card opens this page | none | blocked: "A sold project can't be deleted." |
 | M1 | **Utility NFT** (modifier) | a benefit NFT | + Utility NFT ▾ → Granted benefits, "Active until {date}" | — | inherits | inherits |
 | M2 | **Restricted** (modifier) | moderation, on the account or the project | + Restricted | one banner: what is blocked, until when, why, Contact support | every write `aria-disabled`, with the reason | blocked |
 | M3 | **In manufacture** (modifier) | a manufacturing flag | — | the meta fact "In manufacture" | inherits | blocked |
 
-LATER, a project with more than one owner or a fractionalized share can't be
-deleted either ("Projects with more than one owner can't be deleted.", PPL-22);
-the Manage button shows the first reason that applies.
+LATER, owner decision O10's block also covers people: a project in which anyone
+else holds ownership — a co-owner, a contributor with a share, a fractional
+holder — can't be deleted ("Someone else owns part of this project, so it can't
+be deleted.", PPL-22). The Manage block shows the first reason that applies, in
+the order sold · listed · other owners · restricted · in manufacture.
 
 ---
 
 ## 5. NOW, in full
 
 This is what the implementation plan builds. Every requirement id below exists
-in its area file; where this spec amends one, the amendment is written into the
-row and the reason is in §7.
+in its area file, except the ids this spec adds for the owner's answers —
+COR-105, COR-106, COR-107, COR-108, LST-65, COM-55 and COM-56 NOW, and COM-57
+LATER — each marked **(new)**. Where this spec amends an id, the amendment is
+written into the row and the reason is in §7.
 
 **Build order.** Each step leaves the app working.
 1. `normalizeProjects` keeps the new fields and gives legacy products ids
@@ -581,13 +792,16 @@ row and the reason is in §7.
 2. `productsOf` carries the primary's description (COR-90); the pure readers in
    `project-read.ts`, `project-summary.ts` and the Brief read (§5.1), with unit
    tests on six fixtures: a 4-product build, a legacy hand-made project, a
-   project minted to sell, a hand-made project a build joined, a project whose
-   build was purged, and a chat rebuilt twice.
+   project minted to sell and showcased, a hand-made project a build joined, a
+   project whose build was purged, and a chat rebuilt twice whose second
+   version drops a product.
 3. The writers: `attach()`, `attachBuild()`, `projectFromBuild(job, lineage)`
-   and the Brief's Step 1 (COR-88, COR-89, COR-95). Verified by reload: rebuild
-   a chat, press Save, and there is one project at version 2.
-4. Quota-aware writes (COR-93), `lastOpened` (COR-91), `deleteProject` and its
-   dialog (COR-67…71, COR-92).
+   and the Brief's Step 1 (COR-88, COR-89, COR-95), and `setShowcase()` with
+   the Brief's commit (COR-105). Verified by reload: rebuild a chat, press
+   Save, and there is one project at version 2, with a product version 2
+   dropped still in the list.
+4. Quota-aware writes (COR-93), `lastOpened` (COR-91), `deleteProject`, its
+   dialog and the Listed block (COR-67…71, COR-92).
 5. My projects (§5.2).
 6. The project page: shell, header, tabs, Products, the product page, Media,
    Network, the rail, Preview as buyer (§5.3–§5.11).
@@ -602,7 +816,10 @@ row and the reason is in §7.
 | COR-88 | **One writer for "a build joins a project":** `attachBuild()`, idempotent by build id, used by Save, Open in editor and the Brief's Step 1. The Brief's second merge algorithm (`brief-app.tsx:847-877`) goes. |
 | COR-89 | **Rebuild = v2 at save** (§5.1.8). Before creating a project, `projectFromBuild` attaches the build to the live project another build of the same chat was saved into. The Brief's Step 1 defaults its project choice to that project. |
 | COR-39 | **What a version is:** a saved build of one chat lineage inside the project. The next Save from the same chat attaches as version n+1 of the same project; older versions stay attached and viewable; versions are never renumbered or reused. A build from a different chat starts its own lineage at version 1. |
-| COR-42 | **Only the current version** of each lineage fills the Products grid and the meta line; older versions never mix in. |
+| COR-42 | **The current version fills the Products grid** (amended, owner decision O9): each lineage's current version, plus the products a later version dropped, each once and marked (COR-108). An older version's copy of a product the current version still has never shows. The meta line's version is the current one. |
+| COR-108 | **(new) A dropped product stays in the current list** (owner decision O9). `attach()` keeps a same-lineage row the new version doesn't contain, with its `source` still the last version that had it (§5.1.8). `productsOfProject()` marks it `dropped: { lastIn, current }`. Its card reads *"Not in version {current} · from version {lastIn}"* and stays a link; its page opens at version {lastIn} (COR-41). A later version that brings it back re-attaches the same row, id and all. Nothing leaves the list silently. |
+| COR-106 | **(new) The version history, derived:** `versionsOf(refs, lineages, products)` (§5.1.2) returns, per lineage, every saved version in order with its saved date, its build (or "not in this browser"), its piece count ("{ready} of {total} pieces ready" or "needs a retry"), its products — each tied to its project row where one matches — and what it **added**, **dropped** and **changed** against the version before (v1: its products). Matching is `attach()`'s: product id, then normalized name. "Changed" means a matched product whose name, booked spec or parts (name and quantity) differ. A version whose build is gone lists no products and says so. It feeds the Versions block (COR-107) and the product page's version select (COR-41), so the two can't disagree. |
+| COR-105 | **(new) Showcase is a flag on the project** (owner decision O5): `ManualProject.showcasedAt?: number \| null` — a time = showcased since then; `null` = the maker stopped showcasing; absent = never recorded. `normalizeProjects` keeps a finite number or `null`. `setShowcase(id, on)` writes it (`on` → `Date.now()`, off → `null`) and bumps `updatedAt`. It is written from three places only: the Outcome block's Showcase row (COM-55), the Brief's success step (COM-56), and the Brief's `commit()` when Share to Innovations is ticked (`showcasedAt = mintedAt`). A project minted before this ships, with the tick and no `showcasedAt`, gets it once, from the first read of its draft; `null` is never overwritten. No surface reads `shareToNewsfeed` to decide Showcase. Only a minted project can be showcased (`can(viewer, "project.showcase")` is false on a Draft). |
 | COR-43 | **Old twins are not merged.** Two same-named projects the old fork made stay separate. Nothing merges data silently. |
 | COR-90 | **`productsOf()` carries the primary's description** (`history.tsx:396-411` drops `job.description`). |
 | COR-91 | **`lastOpened`** is written when an editor step opens, never touches `updatedAt`, and is the only resume signal. |
@@ -611,9 +828,9 @@ row and the reason is in §7.
 | COR-95 | **Headline and list stay in step.** Renaming the headline product in the editor chrome (`product-name-field.tsx:43`) also renames `products[0]` when it held the same name. The Brief's product count counts products, not builds (`brief-app.tsx:748-755`). |
 | COR-96 | **`coverOf()`**, read only: the newest saved version's primary image → any product image → `null`. |
 | COR-64 | **`flowState` is no longer read** for progress by either page. The field stays in storage for old readers; `firstIncompleteStep` gives way to `resumeStepOf()`. |
-| COR-74 | **One derivation feeds the page.** `projectView()` returns the refs, lineages, products, pending versions, log, summary and commerce. No section derives state on its own. |
-| LST-32 | **One shared derivation for the card and the page.** `projectSummary()` returns the status word, status line, products, source tag, next action, date, version and cover. A test renders the card and the details header for the six fixtures above and asserts the strings are identical. |
-| LST-5 | **How status is derived** (amended, §7): from the project's brief draft — no `mintedAt` → Draft; `mintedAt` + `save` → Private, or **Showcase** with `shareToNewsfeed`; + `give` → Given; + `sell` → **Ready to sell**; `status: "completed"` with no readable draft → Minted. `ManualProject.status` is never read on its own. |
+| COR-74 | **One derivation feeds the page.** `projectView()` returns the refs, lineages, products, versions, pending versions, log, summary and commerce. No section derives state on its own. |
+| LST-32 | **One shared derivation for the card and the page.** `projectSummary()` returns the status word, status line, the Showcase flag, products, source tag, next action, date, version and cover. A test renders the card and the details header for the six fixtures above and asserts the strings are identical. |
+| LST-5 | **How status is derived** (amended, §7; owner decisions O5, O6): the status is the outcome, from the project's brief draft — no `mintedAt` → Draft; `mintedAt` + `save` → Private; + `give` → Given; + `sell` → **Listed**; `status: "completed"` with no readable draft → Minted. Showcase is not a status: it is `showcasedAt` (COR-105), read from the project record, never from the draft. `ManualProject.status` is never read on its own. |
 | LST-61 | **What the list reads:** project records, builds, video jobs and one brief draft per project — never journey or log keys. Drafts are read after hydration, on window focus and on `storage` events; a corrupt draft reads as `null`. |
 | COM-1 | **One Brief read.** `useProjectBrief(projectId)` parses `ideeza:brief:draft:<id>`, runs `normalizeBrief(parsed.state)`, keeps `parsed.step`, runs in an effect after hydration, and returns `undefined` until read. My projects uses the same parser (`readBriefDraft`), so the two surfaces can't disagree. |
 | COM-2 | **One commerce derivation.** A pure `commerceOf(project, draft, jobs, now)` returns the outcome and every Outcome fact (§5.1.4). |
@@ -663,6 +880,9 @@ export type ManualProject = {
   builds?: ProjectBuildRef[];
   /** The editor step last opened. Open in editor's resume target — never a progress signal. */
   lastOpened?: { step: ProjectStep; at: number };
+  /** Showcase (COR-105): a time = showcased since then; null = the maker stopped; absent = never recorded.
+   *  A flag on the project, orthogonal to the outcome — never derived from the Brief's shareToNewsfeed. */
+  showcasedAt?: number | null;
 };
 
 // Ctx (projects.tsx:173-194): changed and new members
@@ -671,7 +891,8 @@ type Ctx = {
   /** `lineage` = the OTHER builds of job.chatId (the caller has the builds store; this provider sits outside it). */
   projectFromBuild: (job: BuildJob, lineage?: BuildJob[]) => ManualProject;
   attachBuild: (projectId: string, job: BuildJob, lineage?: BuildJob[], opts?: { origin?: boolean }) => ManualProject | null;
-  deleteProject: (id: string) => void;
+  deleteProject: (id: string) => void;                     // callers check deleteBlockOf() first (COR-70)
+  setShowcase: (id: string, on: boolean) => void;           // COR-105: on → Date.now(), off → null; bumps updatedAt
   touchOpened: (id: string, step: ProjectStep) => void;   // no updatedAt bump; ≤ 1 write per 60 s per step
   writeError: { at: number; key: string } | null;          // the last failed localStorage write
 };
@@ -738,6 +959,8 @@ export type ProjectProduct = {
   built: { ref: BuildRef; product: BuildProduct } | null;
   state: "built" | "build-gone" | "unmatched" | "hand";
   version: { current: number; count: number } | null;   // within its lineage
+  /** COR-108: its lineage's current version doesn't include it — "Not in version {current} · from version {lastIn}". */
+  dropped: { lastIn: number; current: number } | null;
 };
 
 export function productsOfProject(p: ManualProject, refs: BuildRef[]): ProjectProduct[] {
@@ -751,10 +974,26 @@ export function productsOfProject(p: ManualProject, refs: BuildRef[]): ProjectPr
     const state = built ? "built"
       : row.source || (refs.length && !anyJob) ? "build-gone"
       : refs.length ? "unmatched" : "hand";
+    const count = built && lineage ? Math.max(...lineage.map((r) => r.version)) : 0;
     return { id: row.id, name: row.name, description: row.description, built, state,
-      version: built && lineage ? { current: built.ref.version, count: Math.max(...lineage.map((r) => r.version)) } : null };
+      version: built && lineage ? { current: built.ref.version, count } : null,
+      dropped: built && built.ref.version < count ? { lastIn: built.ref.version, current: count } : null };
   });
 }
+
+/** One saved version of one lineage, with what it changed (COR-106). */
+export type ProjectVersion = {
+  chatId: string | null; lineage: string;               // the chat title, as lineagesOf() names it
+  version: number; current: boolean;                     // current = the lineage's newest saved version
+  buildId: string; job: BuildJob | null;                 // job null → "build not in this browser"
+  savedAt: number | null;
+  pieces: { ready: number; total: number; retry: boolean } | null;
+  products: { rowId: string | null; productId: string; name: string }[];   // [] when the build is gone
+  diff: { added: string[]; dropped: string[]; changed: string[] } | null;  // row ids (or names); null for version 1
+};
+export function versionsOf(refs: BuildRef[], lineages: Lineage[], rows: ManualProduct[]): ProjectVersion[][];
+// per lineage, newest first; products tied to rows by attach()'s rule (source, then product id, then name);
+// changed = matched in both versions and its name, BuildProduct.spec or parts (name + quantity) differ
 
 /** A newer build of a lineage that isn't saved anywhere yet (COR-18). */
 export function pendingVersionsOf(refs: BuildRef[], all: BuildJob[]):
@@ -771,13 +1010,13 @@ export function lineageProjectOf(job: BuildJob, all: BuildJob[], projects: Manua
   return sib ? live.get(sib.projectId!)! : null;
 }
 
+/** The events that aren't versions — saves and builds are in versionsOf() (COR-52, COR-107). */
 export type ProjectLogEntry =
   | { kind: "created"; at: number }                                                // hand-made only
-  | { kind: "saved"; at: number; version: number; lineage: string; buildId: string }
-  | { kind: "built"; at: number; version: number; lineage: string; status: BuildStatus; pieces: number }
-  | { kind: "minted"; at: number; intent: Intent; network: Network };
-export function projectLogOf(p: ManualProject, refs: BuildRef[], lineages: Lineage[], brief: BriefState | null): ProjectLogEntry[];
-// saved ← refs[].savedAt (null → omitted, never guessed); built ← job.endedAt + statusOf(job); minted ← brief.mintedAt; newest first
+  | { kind: "minted"; at: number; intent: Intent; network: Network }
+  | { kind: "showcased"; at: number };                                             // while showcasedAt is a time
+export function projectLogOf(p: ManualProject, brief: BriefState | null): ProjectLogEntry[];
+// created ← p.createdAt when there is no build ref; minted ← brief.mintedAt; showcased ← p.showcasedAt; newest first
 
 export function coverOf(p: ManualProject, refs: BuildRef[]): string | null;   // COR-96
 export function resumeStepOf(p: ManualProject): ProjectStep { return p.lastOpened?.step ?? "pcb"; }
@@ -785,6 +1024,7 @@ export function resumeStepOf(p: ManualProject): ProjectStep { return p.lastOpene
 /** The one derivation every section reads (COR-74). */
 export type ProjectView = {
   refs: BuildRef[]; lineages: Lineage[]; products: ProjectProduct[];
+  versions: ProjectVersion[][];   // COR-106 — the Versions block and the product page's select
   pending: ReturnType<typeof pendingVersionsOf>;
   log: ProjectLogEntry[];
   summary: ProjectSummary;      // §5.1.3 — the same object the My projects card renders
@@ -812,26 +1052,36 @@ export function projectView(p: ManualProject, ctx: {
 #### 5.1.3 The shared summary — `src/lib/manual/project-summary.ts` (new, pure)
 
 ```ts
-export type ProjectStatus = "draft" | "private" | "showcase" | "given" | "readyToSell" | "minted";
-// LATER: | "lazyMinted" | "listed" | "auction" | "paused" | "sold"
+/** The status is the outcome (owner decisions O5, O6). Showcase is not one of them. */
+export type ProjectStatus = "draft" | "private" | "given" | "listed" | "minted";
+// LATER: | "lazyMinted" | "auction" | "paused" | "sold" — a live Buy-now listing stays "listed", with live facts
 
 /** One table. Changing a word here changes the list tab, the card chip and the details chip together. */
 export const STATUS_WORD: Record<ProjectStatus, string> = {
-  draft: "Draft", private: "Private", showcase: "Showcase", given: "Given",
-  readyToSell: "Ready to sell", minted: "Minted",
+  draft: "Draft", private: "Private", given: "Given", listed: "Listed", minted: "Minted",
 };
 export const STATUS_ICON: Record<ProjectStatus, IconName> = {
-  draft: "circle", private: "lock", showcase: "eye", given: "hand-heart", readyToSell: "tag", minted: "hexagon",
+  draft: "circle", private: "lock", given: "hand-heart", listed: "tag", minted: "hexagon",
 };
+/** "Listed" never stands alone before a marketplace exists (§4.1). */
+export const LISTED_SUBLINE = "Goes on sale when the marketplace opens";
+
+/** The Showcase badge: its own word and icon, info tone, beside the chip (LST-65, COR-9). */
+export const SHOWCASE_BADGE = { word: "Showcase", icon: "eye" as IconName };
 
 export function projectStatus(p: ManualProject, draft: StoredDraft | null): ProjectStatus {
   const b = draft?.state;
   if (b?.mintedAt != null) {
-    if (b.intent === "sell") return "readyToSell";
+    if (b.intent === "sell") return "listed";
     if (b.intent === "give") return "given";
-    return b.shareToNewsfeed ? "showcase" : "private";
+    return "private";
   }
   return p.status === "completed" ? "minted" : "draft";   // "minted" = the record is unreadable (LST-9)
+}
+
+/** Showcase, from the project record only (COR-105). Null on a Draft, whatever the record holds. */
+export function showcaseOf(p: ManualProject, status: ProjectStatus): { at: number } | null {
+  return status !== "draft" && typeof p.showcasedAt === "number" ? { at: p.showcasedAt } : null;
 }
 
 export type ProjectSource =
@@ -855,7 +1105,8 @@ export type ProjectSummary = {
   status: ProjectStatus;
   statusWord: string;                     // STATUS_WORD[status]
   statusLine: string;                     // §4.1
-  products: { id: string; name: string; description: string }[];   // current version only
+  showcase: { at: number } | null;        // showcaseOf() — the badge and the Showcase tab
+  products: { id: string; name: string; description: string }[];   // the current version + products a later version dropped (COR-42)
   productCount: number;                   // products.length — never a count of builds
   source: ProjectSource;
   next: ActionPair;
@@ -877,7 +1128,7 @@ export function matchProject(s: ProjectSummary, description: string, q: string):
 
 /** List view state in the URL (LST-28): written with `replace`, defaults left out. */
 export type ListQuery = {
-  tab: "all" | "draft" | "private" | "showcase" | "given" | "ready-to-sell";
+  tab: "all" | "draft" | "private" | "given" | "listed" | "showcase";   // showcase = membership (LST-10)
   q: string;
   sort: "updated" | "newest" | "oldest" | "name";
   source: "any" | "build" | "hand";
@@ -897,7 +1148,7 @@ export function readBriefDraft(projectId: string): StoredDraft | null;    // pur
 export function useProjectBrief(projectId: string): StoredDraft | null | undefined; // undefined = not read yet
 
 export type Outcome =
-  | "none" | "briefing" | "private" | "showcase" | "given" | "readyToSell"
+  | "none" | "briefing" | "private" | "given" | "listed"
   | "mintedUnreadable";                                                  // status completed, draft unreadable
 export type MintStatus = "notMinted" | "minted";                         // LATER: "lazyMinted" | "mintedOnChain"
 export type SaleTerms =
@@ -915,12 +1166,12 @@ export type ProjectCommerce = {
   sale?: SaleTerms;                          // sell + minted only
   royaltiesPct?: number;                     // sell only, 2–10
   license?: { id: License; label: string; info: string };   // give only
-  innovations: "notRequested" | "requested"; // never "published" until a real feed exists
+  // No Innovations field: Showcase is the project's own flag (summary.showcase, COR-105), not a Brief term.
   clip: { state: "none" | "rendering" | "ready" | "failed"; progress?: number; eta?: string };
 };
 export function commerceOf(p: ManualProject, d: StoredDraft | null, jobs: VideoJob[], now: number): ProjectCommerce;
-// none: no draft or intent null · briefing: intent, mintedAt null · private / showcase / given / readyToSell: minted
-// by intent (+ shareToNewsfeed for showcase) · mintedUnreadable: p.status "completed" and d null.
+// none: no draft or intent null · briefing: intent, mintedAt null · private / given / listed: minted, by intent
+// · mintedUnreadable: p.status "completed" and d null.
 // projectStatus() maps none|briefing → draft and mintedUnreadable → minted; a test asserts they agree.
 ```
 
@@ -933,10 +1184,10 @@ export type Viewer =
 
 export type Action =
   | "project.rename" | "project.editDescription" | "project.delete"
-  | "project.openEditor" | "project.brief"
+  | "project.openEditor" | "project.brief" | "project.showcase"   // showcase: minted projects only
   | "product.add" | "product.edit" | "network.manage" | "app.manage"
   | "activity.write" | "activity.seeListedMarker"
-  | "facts.seeOwnerOnly"                               // Outcome, Built in, Stored, part changes
+  | "facts.seeOwnerOnly"                               // Outcome, Versions, Stored, part changes
   | "deliverables.download"
   | "preview.enter"
   // LATER, declared now so controls already call them:
@@ -947,8 +1198,13 @@ export type Action =
 export function can(viewer: Viewer, action: Action, ctx?: CanContext): boolean;
 // local-owner → every creator action except the people ones (no data yet); owner-preview → the visitor set only
 
-/** Is there an audience at all? Gates Preview as buyer (PPL-9). False only for Private: minted `save` without share. */
-export function hasAudience(status: ProjectStatus): boolean;
+/** Is there an audience at all? Gates Preview as buyer (PPL-9). False only for a Private project that isn't showcased. */
+export function hasAudience(status: ProjectStatus, showcase: { at: number } | null): boolean;
+
+/** Why Delete is blocked, or null (COR-70). NOW: "listed". LATER: "sold" | "otherOwners" | "restricted" | "inManufacture". */
+export function deleteBlockOf(status: ProjectStatus): { reason: string; detail: string } | null;
+// listed → { reason: "A listed project can't be deleted.",
+//            detail: "There's no way to withdraw a listing yet — that comes with the marketplace." }
 ```
 
 `ManualProject` gets **no** people fields NOW: `ownerId: "me"` or
@@ -987,7 +1243,11 @@ export function editorWorkOf(projectId: string): EditorWork;
 | Headline rename in the editor chrome | also renames `products[0]` when its name equals the old `productName`, and stamps its `updatedAt` | `product-name-field.tsx:42-45` |
 | Step opened | `touchOpened(project.id, step)` once the workspace gate passes (`hydrated && activeProjectId === project.id`); skipped when the same step was stamped < 60 s ago; never bumps `updatedAt` | `project-workspace.tsx:87-94` |
 | Rename / description | `updateProject(id, { name })` / `{ description }` (exists, `projects.tsx:260-271`); new callers on this page. `ProjectInfoModal` stops overwriting an existing project's description (CNT-6) | `project-info-modal.tsx:115` |
-| Delete | `deleteProject(id)`: `setProjects(arr => arr.filter(p => p.id !== id))`; if `activeProjectId === id` → `setActiveProjectId(null)`; delete the `builtFrom` entries holding this id (`:210`); sweep §5.1.9; `deleteNetwork(id)` (`network/store.ts:87`, which also notifies). Every `build.projectId` is kept | new Ctx member |
+| Showcase | `setShowcase(id, on)`: `updateProject(id, { showcasedAt: on ? Date.now() : null })`; its callers pass only a minted project | new Ctx member; the Outcome row (COM-55) and the success step (COM-56) |
+| The Brief's mint | `commit()` also calls `setShowcase(scopeProjectId, true)` with the mint time when `state.shareToNewsfeed` is ticked, beside `setStatus(…, "completed")` | `brief-app.tsx:1009-1036` |
+| Showcase, once for older mints | where a draft is first read (`useProjectBrief`, and the list's `readBriefDraft` pass): a minted draft with `shareToNewsfeed`, on a project whose `showcasedAt` is absent, writes `showcasedAt = mintedAt`; `null` (stopped) is never overwritten | `project-brief.ts`; `my-projects.tsx` |
+| The success step | `Step4Success` gains `projectId` and reads `showcasedAt` through `useManualProjects()`; its Showcase button and Undo call `setShowcase` | `step-4-success.tsx` |
+| Delete | refused before the dialog when `deleteBlockOf(status)` names a reason (COR-70). `deleteProject(id)`: `setProjects(arr => arr.filter(p => p.id !== id))`; if `activeProjectId === id` → `setActiveProjectId(null)`; delete the `builtFrom` entries holding this id (`:210`); sweep §5.1.9; `deleteNetwork(id)` (`network/store.ts:87`, which also notifies). Every `build.projectId` is kept | new Ctx member |
 | Write failures | `saveJSON` returns `boolean` in both stores; the save effects set `writeError` on `false` | `projects.tsx:93-98`, `:227-230`; `history.tsx:365-370` |
 | Network parts | `networkProducts(project, refs: BuildRef[])` resolves parts through `sourceOf`; ids stay `p-<slug(name)>`. Callers pass `buildsOf(project, builds)`; the review card passes `[{ buildId: job.id, chatId: job.chatId, version: 1, savedAt: null, job }]` for an unsaved build | `network/products.ts:22-47`; `network-section.tsx:28-31`; `add-network-dialog.tsx:113`; `connection-map-page.tsx:59-67`; `network-action.tsx:23` |
 | The page | `:73-77` → `projectView()`; `:102-105` → `resumeStepOf`; `:132-277` → the header and tabs; `:280-309` → the rail; `:317-384` (`Deliverables`) → the product page; `:422-440` (`StatusBadge`) → the shared chip; `:459-507` (`EmptyNote`, `NotFound`) → `StateCard`; `conceptOf` (`:524-542`) moves to `project-read.ts` | `components/projects/project-details.tsx` |
@@ -1057,7 +1317,7 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
     }
     // Same lineage: this version replaces the row — matched by product id, then by name.
     const m = take((x) => x.bp.id === row.source?.productId) ?? take((x) => norm(x.name) === norm(row.name));
-    if (!m) continue;                        // not in this version: it leaves the current list and stays in its version
+    if (!m) { next.push(row); continue; }    // not in this version: it stays listed, its source still the last version that had it (COR-108)
     // Keep the maker's own words; take the model's new words only where the row still holds the previous version's.
     const before = prior.flatMap((j) => productsOf(j).map((bp) => ({ bp, j })))
       .find(({ bp, j }) => (row.source ? bp.id === row.source.productId : norm(modelName(bp, j)) === norm(row.name)));
@@ -1073,9 +1333,11 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
       source: { buildId: job.id, productId: x.bp.id }, updatedAt: now });
 
   const headMoved = !p.productName.trim() || p.productName === rows[0]?.name;
+  // The headline is never a dropped row: skip rows still pointing at an older version of this lineage.
+  const head = next.find((r) => !(r.source && priorIds.has(r.source.buildId))) ?? next[0];
   return {
     ...p, builds, products: next,
-    ...(headMoved && next[0] ? { productName: next[0].name } : null),
+    ...(headMoved && head ? { productName: head.name } : null),
     ...(opts.origin && !p.buildId ? { buildId: job.id } : null), // only the project this build CREATES records it as origin
     updatedAt: now,
   };
@@ -1087,8 +1349,14 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 - A re-save of the same build is a no-op (the first line); it replaces today's
   case-insensitive name dedupe as the guard against double-adding.
 - `buildId` stays "origin only": a join never stamps it.
-- A product that version 1 had and version 2 dropped leaves the current list
-  and stays viewable in version 1 (owner question 5).
+- A product that version 1 had and version 2 dropped **stays in the current
+  list** (owner decision O9, COR-108): its row keeps its id, its text and its
+  `source`, which still names the version 1 build, so the card can say "Not in
+  version 2 · from version 1" and its page opens at version 1. A version 3 that
+  has it again matches the same row (by product id, then name) and moves its
+  source forward.
+- The headline product (`productName`) follows the current version: a dropped
+  headline hands the name to the first row the new version holds.
 
 #### 5.1.9 Storage keys and the delete sweep
 
@@ -1117,6 +1385,8 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 | Project name | trimmed, 1–80 characters (CNT-2). |
 | Description | trimmed, 0–1,000 characters; a counter from 800 (CNT-5). |
 | Delete, typed confirmation | an exact match of the trimmed project name, case-sensitive, only when COR-69 applies. |
+| `showcasedAt` | a finite number (ms) or `null`; written only by `setShowcase` and the Brief's `commit()`; a Draft is never showcased. |
+| Versions shown | the Versions block shows 5 per project, then **Show all ({n})**; `versionsOf()` itself is never capped. |
 | Record size | each ref ≈ 90 characters, each product source ≈ 95; no blobs or URLs are copied into the record. |
 
 ### 5.2 My projects (`/projects`)
@@ -1124,14 +1394,14 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 | ID | Requirement |
 |---|---|
 | LST-1 | **Header.** h1 "My projects"; an intro of at most 62ch: *"Every project you've saved — from an AI build or started by hand. They're stored in this browser."*; `document.title` "My projects · IDEEZA". |
-| LST-2 | **"New project"** — a secondary button, right-aligned in the header, that links to Home (`/`), where creation lives. No creation flow runs on this page. |
+| LST-2 | **"New project"** (owner decision O11) — a secondary button, right-aligned in the header, that links to Home (`/`), where creation lives. No creation flow runs on this page. |
 | LST-3 | **Gutters and width.** 16 px below a 640 px viewport, 32 px from 640; content capped at 1280 px and centred; nothing scrolls sideways at 400 px. |
-| LST-4 | **The tab set** (amended, §7): exactly **All · Draft · Private · Showcase · Given · Ready to sell**, one selected, each with a live count. Every project is in exactly one state tab, so their counts add up to All — except LST-9. |
+| LST-4 | **The tab set** (amended, §7; owner decisions O5, O6): exactly **All · Draft · Private · Given · Listed · Showcase**, one selected, each with a live count. Draft · Private · Given · Listed are the outcome tabs: every project is in exactly one, so their counts add up to All — except LST-9. **Showcase** is a membership tab, last, after a hairline divider: its projects are also counted in their outcome tab, and its count is outside that sum. |
 | LST-6 | **Removed tabs.** Completed and Utility NFT are removed (they held the same set). All is the landing tab. "Utility NFT" is kept free for real benefit NFTs (LATER). |
 | LST-7 | **Counts** read "—" until the projects and every brief draft have been read; they are read again on window focus and on `storage` events, so a mint in another tab moves the card. |
 | LST-8 | **Tab semantics.** A real ARIA tablist: one Tab stop, ← → Home End, `aria-controls` on one tabpanel, accessible names that carry the count ("Draft, 9 projects"). Changing tab resets the page to 1 and keeps the search and facets. |
-| LST-9 | **Brief record missing.** `status: "completed"` with a missing or corrupt draft shows the chip **Minted**, under All only — never under a guessed tab. |
-| LST-10 | **The Showcase tab** (amended: NOW, under owner question 1's default), between Private and Given, labelled **Showcase** — the chip's word. Derived from Save + Share to Innovations. |
+| LST-9 | **Brief record missing.** `status: "completed"` with a missing or corrupt draft shows the chip **Minted**, under All only among the outcome tabs — never under a guessed one. When showcased it is also under Showcase, which reads the project record, not the draft. |
+| LST-10 | **The Showcase tab** (amended, owner decision O5): the projects whose `showcasedAt` is a time (COR-105), on any outcome, labelled **Showcase** — the badge's word. It reads the project record, never the brief draft, and its order and search follow the rest of the list. A project leaves it the moment the maker stops showcasing. |
 | LST-13 | **What search matches:** the project name, every product name (`products[].name`, falling back to `productName`), the description and every product description. Case- and accent-insensitive, trimmed; with several words all must match. "remote" finds Car's Remote Controller. |
 | LST-14 | **Which product matched.** When the only match is in a product other than the first, the product line reads "… · matches Remote Controller". |
 | LST-15 | **Search controls.** Enabled on every tab. Placeholder *"Search projects and products"*; a clear (×) control; "/" focuses search unless focus is in another field (⌘K stays with the command palette); Esc clears it while focused. |
@@ -1143,7 +1413,8 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 | LST-28 | **View state in the URL** (`ListQuery`, §5.1.3), written with `replace`, defaults left out; Back from a project returns the same view at the same scroll position. |
 | LST-31 | **After a delete** (amended: NOW, because delete ships NOW): the project leaves the list and the counts at once; a page left empty shows the previous page. |
 | LST-33 | **Cover**, 16:10: `coverOf()`, else a neutral placeholder tile. No carousel dots. A failed image shows the caption *"Image didn't load"* on the placeholder. `loading="lazy" decoding="async"`. |
-| LST-35 | **Status chip**, top-right over the cover (beside the title on row cards): word + icon from §4, sentence case, 12 px semibold; Draft neutral, the minted words success; the same word as the details chip; never violet. |
+| LST-35 | **Status chip**, top-right over the cover (beside the title on row cards): word + icon from §4 (Draft · Private · Given · Listed · Minted), sentence case, 12 px semibold; Draft neutral, the minted words success; the same word as the details chip; never violet. |
+| LST-65 | **(new) The Showcase badge** on the card, when `summary.showcase` is set: the eye icon and "Showcase", info tone, 12 px semibold, to the left of the status chip over the cover (beside the chip on row cards, wrapping under the title when narrow); the same badge as the details header (COR-9); never violet; not a control. Its accessible name is "Showcased". |
 | LST-36 | **Title:** the project name as an h3, 16 px, up to 2 lines, the full name as a tooltip; the card's link to `/projects/<id>`, stretched over the cover and title. The small "Details" pill is removed. |
 | LST-37 | **Product line:** "4 products · RC Car Controller, Remote Controller +2"; "1 product" in the singular; an unnamed product reads "not named yet", never "Untitled product". The count comes from the shared selector: products, not builds. |
 | LST-38 | **Source tag** in the meta row: **"AI build"**, **"By hand"** or **"AI build · not in this browser"**, the last with the tooltip *"The build this project came from isn't stored in this browser any more. Its products are still listed."* The same words as the details Source row. |
@@ -1169,9 +1440,9 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 |---|---|---|
 | Draft | No drafts | "Every project here has been minted. A build you save starts as a draft." |
 | Private | Nothing saved as private yet | "In a project's brief, choose Save as Private and mint. Only you can see it." |
-| Showcase | Nothing showcased yet | "In a project's brief, choose Save as Private, tick Share to Innovations and mint. It shows on Innovations once the feed opens." |
-| Given | Nothing given to the community yet | "In a project's brief, choose Give to community and mint." |
-| Ready to sell | Nothing ready to sell yet | "In a project's brief, choose Ready to sell and mint. It goes on sale when the marketplace opens." |
+| Given | Nothing given to the community yet | "In a project's brief, choose Give to Community and mint." |
+| Listed | Nothing listed yet | "In a project's brief, choose Sell Your Idea and mint. It goes on sale when the marketplace opens." |
+| Showcase | Nothing showcased yet | "Showcase a minted project from its page, or when its brief finishes. Nothing is posted until Innovations opens." |
 
 **Keyboard order:** New project → the tablist (one stop) → search → Source →
 Sort → per card, the title link then the button → pagination.
@@ -1189,17 +1460,17 @@ Sort → per card, the title link then the button → pagination.
 | COR-6 | **Tokens and type.** No arbitrary px and no raw palette (`bg-violet-600` at `:143`, `:501`); body ≥ 14 px, meta ≥ 12 px; status words in sentence case, never 10 px uppercase pills; status tones neutral or semantic, never violet. |
 | COR-7 | **Route focus and history.** On arrival, focus moves to the h1 (`tabIndex=-1`) and a polite live region announces "{project}". The page tab, the product page's version and its deliverable tab are URL state, so Back restores them. |
 | COR-75 | **Draft sub-states** are told by the status line — "Not briefed yet" · "Brief in progress · …" · "Brief started" — never by more chips. |
-| COR-76 | **Minted states** (simulated): Private · Showcase · Given · Ready to sell, from `intent` + `mintedAt` (+ `shareToNewsfeed` for Showcase). "Lazy minted" and "Listed" never appear now. |
+| COR-76 | **Minted states** (simulated; amended, owner decisions O5, O6): Private · Given · Listed, from `intent` + `mintedAt`. Showcase is not among them: it is the `showcasedAt` flag on any of them (COR-105). "Listed" never appears without its subline *"Goes on sale when the marketplace opens"*; "Lazy minted" never appears now. |
 | COR-77 | **Unreadable record.** `status === "completed"` with a missing or corrupt draft reads "Minted" and says why (COM-15). |
-| COR-78 | **Orphans.** Build gone: Source reads "AI build · not in this browser", product cards aren't links, products stay listed. Chat gone: no part-changes line, no "Built in" link; the booked specs stay. The page never contradicts itself (today "Built manually" sits beside "the build is gone", `:295-306`). |
-| COR-79 | **LATER states render nothing now:** lazy minted, listed, paused, sold, Utility NFT, restricted, in manufacture. Each has its slot in §4.2. |
+| COR-78 | **Orphans.** Build gone: Source reads "AI build · not in this browser", product cards aren't links, products stay listed. Chat gone: no part-changes line, and the lineage's heading in Versions is plain text, not a link; the booked specs stay. A gone build's Versions entry reads "build not in this browser". The page never contradicts itself (today "Built manually" sits beside "the build is gone", `:295-306`). |
+| COR-79 | **LATER states render nothing now:** lazy minted, minted on chain, a live listing (Listed on sale, Auction), paused, sold, Utility NFT, restricted, in manufacture. Each has its slot in §4.2. |
 
 ### 5.4 The header
 
 | ID | Requirement |
 |---|---|
 | COR-8 | **Header content, in order:** the h1 with its rename pencil — one line, truncated with the full name on hover and focus (ACT-7); the status chip and status line; the meta line; the description, clamped to 5 lines with "Show more" / "Show less" (ACT-9), and its editor. The Figma's gear and "Level 1 ▾" badges are not built. |
-| COR-9 | **One status chip**, beside the status line: the word and icon from §4 (Draft · Private · Showcase · Given · Ready to sell · Minted). It replaces the Figma's visibility pill *and* "Mint Status: …". The Outcome card carries no second chip. |
+| COR-9 | **One status chip**, beside the status line: the word and icon from §4 (Draft · Private · Given · Listed · Minted). It replaces the Figma's visibility pill *and* "Mint Status: …". The Outcome card carries no second chip. When the project is showcased, the **Showcase badge** (LST-65's badge) sits between the chip and the status line — a second fact, not a second state, and not a control. |
 | COR-10 | **Meta line.** Built: "{n} products · Version {v} · Saved {date}" ("Version {v}" only with one lineage of more than one version; several lineages read "{k} builds"). Hand-made: "{n} product(s) · Made by hand · Created {date}". Build gone adds "· build not in this browser". Dates use the one formatter inside `<time>`. It replaces the "Product: X" line and the rail's Product and Last updated rows. |
 | COR-11 | **The action pair:** at most one violet primary and one quiet secondary, from `nextAction()` (§3.5), so the card and the header can't differ. Both use `LeaveButton`'s press state ("Opening…", blocks its sibling; `review-outputs.tsx:635`). At 400 px they stack full width, primary first. |
 | COR-12 | **Open in editor** resumes `lastOpened.step` (fallback PCB), not `firstIncompleteStep` (which always returns PCB, `projects.tsx:479-484`). Label "Open in editor", or "Open in editor · {step}" once a step is recorded. For a project with a build, a visible hint under the header, also the pair's `aria-describedby`: *"The editor starts from a sample board — your build's parts aren't in it yet."* It stays until sub-project B makes the editor load the build (§11). |
@@ -1220,7 +1491,7 @@ Sort → per card, the title link then the button → pagination.
 
 | ID | Requirement |
 |---|---|
-| COR-19 | **The tab set:** **Products · Media · Network** now. LATER, Contributors · Customers are appended after Network. No Premium Parts tab. The strip lists only tabs with a real home. |
+| COR-19 | **The tab set** (owner decision O7): **Products · Media · Network** now — Network is its own tab, never a section. LATER, Contributors · Customers are appended after Network. No Premium Parts tab. The strip lists only tabs with a real home. |
 | COR-20 | **Tab mechanics:** an ARIA tablist with roving tabindex and ←/→/Home/End through the shared `moveTab` (extracted from `review-outputs.tsx:592`); one `tabpanel`; the selected style is neutral subtle; state in `?tab=media` or `?tab=network` (Products is the default and is omitted); a tab change `router.push`es, so Back returns to the previous tab; height ≥ 36 px (44 px on touch). |
 | COR-21 | **Tabs at 400 px:** one row, never wrapped, horizontally scrollable, the selected tab scrolled into view; labels never truncate. |
 
@@ -1228,9 +1499,9 @@ Sort → per card, the title link then the button → pagination.
 
 | ID | Requirement |
 |---|---|
-| COR-22 | **Heading row:** h2 "Products", then "{n} products · {ready} of {total} pieces ready", then the project headline **"Build check: {weakest tier}"** (`checkBuild().headline`, `confidence.ts:305-343`). The badge is a disclosure holding `TIER_MEANING` / `DRAFT_UNCHECKED_MEANING` and `DRAFT_CREDIT_NOTE`, which must be on screen wherever "Draft" is. |
-| COR-23 | **Product cards**, one per current product in `products[]` order; 1 column below a 520 px container, 2 from 520, 3 from 880. A card shows its own concept image (16:10, space reserved, lazy, and *"Image didn't load"* on error); the name as an h3 (2 lines, full name on focus); "Build check: {tier}"; labelled facts **Size · Board · Power** (+ **Radio**), a missing fact omitted (never "None" or "0 × 0"); "{k} of {m} pieces ready" only when not all are; "v{n} · {date}" only when its lineage has more than one version; one line of part changes (owner only). The whole card is one link to the product page. No ⋮, no stats, no dots, no stage pill. |
-| COR-24 | **Card states.** Built → a link. Build gone → name and description kept, *"Its build isn't in this browser any more."*, not a link. Unmatched → *"Its build can't be matched to this name."*, not a link. Hand-made → *"Made by hand — its work is in the editor."*, not a link. An unnamed product reads *"Not named yet"*. |
+| COR-22 | **Heading row:** h2 "Products", then "{n} products · {ready} of {total} pieces ready" ({n} counts every card, dropped ones included; the pieces count the current version, and read "… in version {v}" when a dropped product is listed), then the project headline **"Build check: {weakest tier}"** (`checkBuild().headline`, `confidence.ts:305-343`). The badge is a disclosure holding `TIER_MEANING` / `DRAFT_UNCHECKED_MEANING` and `DRAFT_CREDIT_NOTE`, which must be on screen wherever "Draft" is. |
+| COR-23 | **Product cards**, one per product in the list (COR-42: the current version, plus products a later version dropped), in `products[]` order; 1 column below a 520 px container, 2 from 520, 3 from 880. A card shows its own concept image (16:10, space reserved, lazy, and *"Image didn't load"* on error); the name as an h3 (2 lines, full name on focus); "Build check: {tier}"; labelled facts **Size · Board · Power** (+ **Radio**), a missing fact omitted (never "None" or "0 × 0"); "{k} of {m} pieces ready" only when not all are; "v{n} · {date}" only when its lineage has more than one version; one line of part changes (owner only). The whole card is one link to the product page. No ⋮, no stats, no dots, no stage pill. |
+| COR-24 | **Card states.** Built → a link. Dropped (COR-108) → a link, with *"Not in version {current} · from version {lastIn}"* in place of "v{n} · {date}", its facts from version {lastIn}, and the link opening that version. Build gone → name and description kept, *"Its build isn't in this browser any more."*, not a link. Unmatched → *"Its build can't be matched to this name."*, not a link. Hand-made → *"Made by hand — its work is in the editor."*, not a link. An unnamed product reads *"Not named yet"*. |
 | COR-25 | **No pagination.** Every product shows. |
 
 ### 5.7 The product page and versions
@@ -1244,7 +1515,7 @@ Sort → per card, the title link then the button → pagination.
 | COR-34 | **Keyboard-reachable previews.** The scroll container around the PCB and wiring previews has `tabIndex=0` and a name ("PCB layout, scrollable"); each preview sits under its own h3. |
 | COR-36 | **No review controls:** no Retry, Save, Add Network, Refine, spec edit or Open in editor on the product page. |
 | COR-37 | **Preview carries through.** `?view=buyer` survives navigation into the product page, where PPL-6 and PPL-7 apply: previews only, the Firmware code tab and downloads hidden. |
-| COR-41 | **Version switcher**, only when the lineage has more than one version: "Version {v} of {n} ▾", a listbox of "Version {n} · {date}" with "current" on the newest. Choosing an older one pushes `?v={n}` and shows *"You're viewing version {n} ({date}). The project now uses version {m}."* with **Back to latest**. A product absent from that version reads *"Not in version {n}"*. |
+| COR-41 | **Version switcher** (amended, owner decision O9), only when the lineage has more than one version: "Version {v} of {n} ▾", a listbox read from `versionsOf()` (COR-106) — "Version {n} · {date}", "current" on the newest, and "not in this version" on a version without this product. Choosing an older one pushes `?v={n}` and shows *"You're viewing version {n} ({date}). The project now uses version {m}."* with **Back to latest**. Choosing a version without the product shows *"Not in version {n}"* with a link to the nearest version that has it. A **dropped** product opens, with no `?v`, at the last version that had it, under *"Version {m} doesn't include {product} — this is version {n}, the last one that did."* and no Back to latest. The rail's Versions block links here with `?v`. |
 
 ### 5.8 The Media tab
 
@@ -1262,8 +1533,8 @@ Sort → per card, the title link then the button → pagination.
 | CNT-31 | **Quality stays as the Creator has it:** Low · 480p · 10 s and High · 720p · 10 s. |
 | CNT-32 | **No invented quotas:** no "AI Video n/m", "Token Use n/3", "(4/4)", "3 daily prompts" or "Upgrade" gate anywhere on either page. The AI text helpers are free. |
 | CNT-38 | **Leaving never stops a render.** No "Do you want to logout?" guard; the Creator's rule stands: *"You can leave — the render keeps running."* |
-| CNT-40 | **Sharing stays in the Brief:** its "Share to Innovations" checkbox and 500-character story, and its locks (*"An Innovations post needs a preview clip"*, *"A listing needs a preview clip"*). The page has no Share to Newsfeed button while the feed is mock data. |
-| CNT-41 | **Honest share copy.** Neither page says "Shared to Innovations" or "Live on the marketplace". A requested post is the Outcome row *"Innovations: requested — not published yet."* (COM-12, one home for the fact). |
+| CNT-40 | **The Brief keeps its share controls** (amended, owner decision O5): its "Share to Innovations" checkbox and 500-character story, and its locks (*"An Innovations post needs a preview clip"*, *"A listing needs a preview clip"*). The tick now also sets the project's Showcase flag at mint (COR-105). The page's one feed control is **Showcase**, in the Outcome block (COM-55); it posts nothing while the feed is sample data. |
+| CNT-41 | **Honest share copy.** Neither page says "Shared to Innovations", "Posted", "Live on Innovations" or "Live on the marketplace". The Showcase state is said once, in the Outcome block's Showcase row (COM-12): *"Showcased since {date}"* over *"Nothing is posted — the Innovations feed isn't open yet."* |
 | CNT-49 | **Nothing to share yet:** no share menu, kebab or copy-link on the page — a link would resolve only in this browser. |
 | CNT-62 | **No Premium Parts tab.** No Creator part has a creator, verification, licence or price; the bill of materials lives in each product's Parts tab. |
 
@@ -1283,14 +1554,14 @@ Sort → per card, the title link then the button → pagination.
 
 | ID | Requirement |
 |---|---|
-| COR-54 | **Rail order (desktop):** Outcome · Editor · Details · Project log · Manage (Business plan joins under Outcome, NEXT). One rail surface with hairline dividers, no card in a card; an h2 per block; not sticky. |
+| COR-54 | **Rail order (desktop):** Outcome · Editor · Details · Versions · Project log · Manage (Business plan joins under Outcome, NEXT). One rail surface with hairline dividers, no card in a card; an h2 per block; not sticky. A block with nothing real in it is absent. |
 | COR-56 | **Below a 1024 px page container** (amended, §7) the rail dissolves: its blocks follow the tab panel in rail order, each collapsible — open on desktop, closed at 400 px. The header's status line carries the outcome, so the Outcome block needs no second copy near the top. |
 
-**Outcome** — the Brief's result, read-only.
+**Outcome** — the Brief's result, read-only, and the project's Showcase row.
 
 | ID | Requirement |
 |---|---|
-| COM-3 | **The Outcome card**, titled **"Outcome"** (not "Marketplace", which doesn't exist), first in the rail: a subline and a facts list, **no buttons, pickers or price fields**, and no chip of its own. |
+| COM-3 | **The Outcome card**, titled **"Outcome"** (not "Marketplace", which doesn't exist), first in the rail: a subline and a facts list, **no Brief controls — no buttons that choose an outcome, pickers or price fields** — and no chip of its own. Its one control is the Showcase row's (COM-55; amended, owner decision O5): Showcase is a project action, not a Brief term. |
 | COM-4 | **No outcome yet.** No draft: *"Nothing decided yet. The Brief is where you keep it, give it away or sell it."* An opened, unchosen draft: *"The Brief is open — no outcome chosen yet."* No facts rows. |
 | COM-5 | **Brief in progress:** *"You chose {Sell / Give / Save}. The Brief is at the {step} step — nothing is minted until you finish it."* Typed but uncommitted terms (price, collection, licence) are not shown. |
 | COM-6 | **Mint status fact.** A minted card's first row is **Minted**, with its own tone and icon so the word isn't the only signal. "Lazy minted" is never shown: nothing is signed. |
@@ -1298,18 +1569,19 @@ Sort → per card, the title link then the button → pagination.
 | COM-8 | **Network and collection**, only once minted: the network's `NETWORKS` label ("Base Sepolia (Testnet)") and the collection name stored in the Brief — one source for the Figma's three collection strings. No NFT ID, no File Size: there is no token. |
 | COM-9 | **Sale terms** (minted `sell`): "Price 0.05 ETH · Buy now"; or "Auction · from 0.02 ETH · buy now 0.10 ETH · ends Oct 3, 2026 · 2:30 PM" (buy-now omitted when empty); "Royalties 10 % on resales"; a passed `expiresAt` adds *"This end date passed before the marketplace opened — nothing was sold."* |
 | COM-10 | **Give terms** (minted `give`): the licence label with its one-line `info`; the subline *"Minted under {licence}. This can't be undone."* Nothing claims the community "can claim it". |
-| COM-11 | **Private and Showcase** (minted `save`): without share *"Minted and kept. Only you can see it."*; with share *"Minted and kept. Not on Innovations yet — posting isn't connected."* |
-| COM-12 | **Innovations row** on any minted intent with `shareToNewsfeed`: *"Innovations: requested — not published yet."* Never "posted", and never a link to `/innovations/<slug>`, which renders the mock fallback. |
+| COM-11 | **Private** (minted `save`; amended, owner decision O5): not showcased *"Minted and kept. Only you can see it."*; showcased *"Minted and kept by you — not given away or for sale."* |
+| COM-12 | **The Showcase row** (amended, owner decision O5 — it replaces the Innovations row), on every minted project, after the terms and before the footnote, labelled "Showcase". Not showcased: *"Not showcased"* over *"Showcasing lists it under Showcase in My projects. Nothing is posted until Innovations opens."* Showcased: *"Showcased since {date}"* over *"Nothing is posted — the Innovations feed isn't open yet."* It reads `showcasedAt` (COR-105), never `shareToNewsfeed`. Never "posted", "live" or "on Innovations", and never a link to `/innovations/<slug>`, which renders the sample fallback. |
+| COM-55 | **(new) The Showcase control** — the page's one home for it (owner decision O5; §3.8 says why here and not in the header): one quiet button in the Showcase row, **Showcase project** or **Stop showcasing**, from `can(viewer, "project.showcase")`: minted projects only, absent on a Draft and in Preview as buyer. It calls `setShowcase` and takes effect at once, with no dialog (nothing is public NOW, and it can be pressed again); focus stays on the button as its label flips; a polite *"Showcased {name}"* / *"Stopped showcasing {name}"*. The badge (COR-9), the Showcase tab (LST-10) and, on a Private project, Preview as buyer (PPL-9) follow at once. No other control on the page, the card or the header showcases. Stacked below 1024 px, the Outcome block's collapsed summary names the state ("Outcome · Listed · Showcased"). |
 | COM-13 | **Clip still rendering:** a job not `done` or `failed` adds *"The preview clip is still rendering — {n} %, about {eta} left"* (`progressOf`, `etaLabel`); a failed one *"The preview clip failed — regenerate it from the Brief."* |
 | COM-14 | **Honesty footnote** on every minted state: *"Recorded in this browser only — nothing is written to a blockchain yet."* |
 | COM-15 | **Unreadable record:** *"The brief record can't be read in this browser, so its terms aren't shown."* Never falls back to "not minted". |
 | COM-16 | **Money:** every amount carries its token; no zero padding; at most 6 decimals, trailing zeros trimmed; thousands separators; one token per listing; no dollar figure for test tokens. |
 | COM-17 | **Not shown now:** the wallet row and Change Wallet; NFT-type tabs and Add To Marketplace; Create Physical/Virtual NFT and "NFTs Sold x/y"; NFT ID, File Size and Legal Information; the price lock and price pills; Pause/Undo, Sold, Purchased Summary, Upgrade; bidding; Utility benefits. |
-| COM-18 | **One home:** choosing the outcome, setting terms and minting happen only in the Brief. The page's one door is the header (Add Brief / Continue Brief / View brief). No outcome picker or price field exists anywhere on the page. |
-| COM-19 | **One vocabulary** (amended, §7): the card, the header chip and the My projects chip use §4's words — Draft · Private · Showcase · Given · Ready to sell · Minted — with their tones and icons; none violet. |
-| COM-22 | **Accessibility and width:** a `<section aria-labelledby>` with a `<dl>`; ≥ 4.5:1; no hover-only content; stacked (below 1024 px), labels sit over values and the facts collapse under a native `<details>` "Minted details" (≥ 24 px); before hydration the rows keep their height with "—". |
+| COM-18 | **One home:** choosing the outcome, setting terms and minting happen only in the Brief. The page's one door is the header (Add Brief / Continue Brief / View brief). No outcome picker or price field exists anywhere on the page. Showcase is not an outcome, so its control (COM-55) doesn't break this. |
+| COM-19 | **One vocabulary** (amended, §7; owner decisions O5, O6): the card, the header chip and the My projects chip use §4's words — Draft · Private · Given · Listed · Minted — with their tones and icons; the Showcase badge is its own word and icon; none violet. "Listed" always carries *"Goes on sale when the marketplace opens"* until a marketplace exists. |
+| COM-22 | **Accessibility and width:** a `<section aria-labelledby>` with a `<dl>`; ≥ 4.5:1; no hover-only content; stacked (below 1024 px), labels sit over values and the facts collapse under a native `<details>` "Minted details" (≥ 24 px), the Showcase row with them; before hydration the rows keep their height with "—". |
 
-**Editor** — progress from real data (owner decision 4).
+**Editor** — progress from real data (owner decision O4).
 
 | ID | Requirement |
 |---|---|
@@ -1318,22 +1590,23 @@ Sort → per card, the title link then the button → pagination.
 | COR-61 | **Reads are cheap and passive:** parsed once per visit in an idle callback after first paint; "—" until then; the reader never writes. |
 | COR-65 | **"How far along"** reads only real stores: pieces ready (COR-22), the Brief outcome, the editor facts. No progress bar, no percentage. |
 
-**Details** and **Project log**
+**Details**, **Versions** and **Project log**
 
 | ID | Requirement |
 |---|---|
-| COR-55 | **Details block:** **Source** "AI build" / "By hand" / "AI build · not in this browser"; **Built in** one link per lineage, "Chat “{title}” ↗" → `/chat/<chatId>`, omitted when the chat is gone; **Created**, shown when it differs from the meta line's date; **Stored** "In this browser". Dropped: Status, Product, Last updated, Address. |
+| COR-55 | **Details block:** **Source** "AI build" / "By hand" / "AI build · not in this browser"; **Created**, shown when it differs from the meta line's date; **Stored** "In this browser". Dropped: Status, Product, Last updated, Address. **Built in** moves to the Versions block (amended, owner decision O9), where each lineage is headed by its chat link. |
+| COR-107 | **(new) The Versions block** (owner decision O9), after Details — the project's one version history, from `versionsOf()` (COR-106). One group per lineage, headed by its chat link "Chat “{title}” ↗" → `/chat/<chatId>` (plain text when the chat is gone). Under it each saved version, newest first: "Version {n}" (+ "· current" on the newest), "Saved {date}" in the one formatter inside `<time>` (omitted when unknown), "{ready} of {total} pieces ready" or "needs a retry", and **Open build** ↗ → `/build/<id>` (absent when the build is gone, which reads "build not in this browser"); then **Added**, **Dropped** and **Changed** lines against the version before, version 1 listing its products. Every product name is a link to `/projects/[id]/products/[productId]?v={n}` (a dropped name to the version before); a name with no row is plain text. Five versions, then **Show all ({n})** in place — no inner scroller. Collapsible: open on desktop, closed at 400 px. Absent for a hand-made project with no build, and in Preview as buyer. Pending builds stay in the COR-18 banner, not here. |
 | COR-50 | **Three words, three homes:** Activity = the journey (header chip → drawer, NEXT); Project log = system events (rail); Stage = a derived label (meta line, NEXT). No other surface says "Activity". |
-| COR-52 | **Project log**, newest first, derived only NOW: "Created by hand" · "Saved version {n}" · "Built version {n} · {k} pieces" or "Built version {n} · needs a retry" · "Minted · {outcome} · {network}", each over its date in the one formatter ("Sep 26, 2026 · 9:09 PM") in `<time>`. Six entries, then **Show all ({n})** expanding in place — no inner scroller. Collapsible; open on desktop, closed at 400 px. |
+| COR-52 | **Project log** (amended, owner decision O9), newest first, derived only NOW, and only the events that aren't versions: "Created by hand" · "Minted · {outcome} · {network}" · "Showcased", each over its date in the one formatter ("Sep 26, 2026 · 9:09 PM") in `<time>`. Saved versions and their builds are in the Versions block (COR-107), never repeated here. Six entries, then **Show all ({n})** expanding in place — no inner scroller. Absent when it has no entry. Collapsible; open on desktop, closed at 400 px. |
 
-**Manage** — delete.
+**Manage** — delete, and when it is blocked.
 
 | ID | Requirement |
 |---|---|
-| COR-67 | **Delete's home:** "Delete project…", the only control in the rail's last block, **Manage** — quiet, danger tone, apart from everything else, ≥ 44 px on touch; owner only (`can()`); absent in preview. |
-| COR-68 | **The dialog** (one `ConfirmDialog`, danger tone, promoted from `components/network/dialogs.tsx:115` to `components/ideeza`): title *"Delete “{name}”?"*; a computed list of what goes ("The PCB board — 42 objects", "Wiring — 9 wires", "Assembly checks", "The 3D AI model", "The brief — Ready to sell, minted Sep 22", "The network — 3 links"); what stays: *"Its {k} builds and the chat stay in History — you can save them as a project again."*; **Cancel** has initial focus; the destructive button reads **Delete project**. |
+| COR-67 | **Delete's home:** "Delete project…", the only control in the rail's last block, **Manage** — quiet, danger tone, apart from everything else, ≥ 44 px on touch; owner only (`can()`); absent in preview. When `deleteBlockOf()` names a reason (COR-70) the control **stays**, `aria-disabled="true"`, in the tab order, with the reason in text beside it and named by `aria-describedby`; pressing it opens nothing. |
+| COR-68 | **The dialog** (one `ConfirmDialog`, danger tone, promoted from `components/network/dialogs.tsx:115` to `components/ideeza`): title *"Delete “{name}”?"*; a computed list of what goes ("The PCB board — 42 objects", "Wiring — 9 wires", "Assembly checks", "The 3D AI model", "The brief — given under MIT, minted Sep 22", "The network — 3 links", "Showcase — it leaves your Showcase tab"); what stays: *"Its {k} builds and the chat stay in History — you can save them as a project again."*; **Cancel** has initial focus; the destructive button reads **Delete project**. |
 | COR-69 | **Typed confirmation only when something can't be rebuilt** (editor work, a mint record or a network): a labelled field "Type the project name to confirm"; the button enables on an exact trimmed match; a mismatch says *"That doesn't match “{name}”."*; the placeholder is never the answer. Otherwise the plain confirm. |
-| COR-70 | **Delete by state.** NOW allowed in every state; a minted project's dialog adds *"It was minted in this browser only — nothing on a blockchain changes."* (LATER rules in §4.2.) |
+| COR-70 | **Delete by state** (amended, owner decision O10). NOW a **Listed** project can't be deleted: the Manage block reads *"A listed project can't be deleted."* and, because no way out exists yet, *"There's no way to withdraw a listing yet — that comes with the marketplace."* Every other state is deletable; a minted project's dialog adds *"It was minted in this browser only — nothing on a blockchain changes."* The Minted record that can't be read stays deletable: its outcome isn't known to be a listing. LATER the same block covers anyone else holding ownership — co-owners, contributors with a share (PPL-22) — and a sold project (COR-83); a live listing gains its route out, *"remove the listing first"* (§4.2). |
 | COR-71 | **After delete:** navigate to `/projects`; a polite *"Deleted {name}"*. Builds keep their dangling `projectId`, so History drops the link (`history-page.tsx:106-108`), the attention bell stays quiet (`history.tsx:1802`) and the build's review offers Save again. |
 
 ### 5.11 Preview as buyer
@@ -1342,22 +1615,24 @@ Sort → per card, the title link then the button → pagination.
 |---|---|
 | PPL-4 | **Entry:** one quiet button, **"Preview as buyer"** (eye icon), the header's last control; not violet; ≥ 44 px tall; the only entry (the My projects card has none). |
 | PPL-5 | **State and exit:** it pushes `?view=buyer` — a reload keeps it, Back leaves it. A sticky info `Banner` at the top of the content: *"Previewing as a buyer"* / *"This is your page without your editing controls. Nothing is published — it's saved only in this browser."* / **Exit preview** (quiet; the `Banner` atom gains an action slot). Focus moves to the banner on entry and back to the button on exit; the banner is a polite live region; closing any layer doesn't exit; nothing is stored. |
-| PPL-6 | **Read-only page:** in preview `can()` returns the visitor set and every write or authoring control is **absent**, not disabled — the pair, the pencil and description editor, Create / View Network, the Editor block, Manage, the preview-clip note's Open Brief, and every later Add product tile or "Use as cover". Network shows a read-only summary, or nothing. No violet on the page. |
-| PPL-7 | **Owner-only facts hidden:** the rail drops Outcome, Built in and Stored; the product view drops "Built with your part changes"; it keeps the name, description, products with their facts and Build check, the chip, the product count and the dates, and the previews owner question 8 makes public (default: 3D, PCB, Wiring, Parts; Firmware code and downloads hidden). |
+| PPL-6 | **Read-only page:** in preview `can()` returns the visitor set and every write or authoring control is **absent**, not disabled — the pair, the pencil and description editor, Create / View Network, the Editor block, Manage, the Showcase control, the preview-clip note's Open Brief, and every later Add product tile or "Use as cover". Network shows a read-only summary, or nothing. No violet on the page. |
+| PPL-7 | **Owner-only facts hidden:** the rail drops Outcome (with its Showcase row), Versions (its chat and build links) and Stored; the product view drops "Built with your part changes"; it keeps the name, description, products with their facts and Build check, the chip and the Showcase badge, the product count and the dates, and the previews owner decision O12 makes public: **3D, PCB, Wiring and Parts**. The Firmware code tab and every download are hidden — they come after purchase. |
 | PPL-8 | **Nothing invented for the buyer:** no price, Buy button, wallet chip, creator line or card, social counts, or placeholder for any of them; no empty state has a call to action. |
-| PPL-9 | **Not offered when nobody will see the page:** absent for a minted **Private** project (amended: a Showcase project has an audience, so it keeps the button). |
+| PPL-9 | **Not offered when nobody will see the page** (amended, owner decision O5): absent for a minted **Private** project that isn't showcased — `hasAudience(status, showcase)`. Showcasing a Private project brings the button back; every other minted outcome keeps it. |
 
 ### 5.12 Outside the two pages
 
 | ID | Requirement |
 |---|---|
 | COR-40 | **Save says where it lands.** The review footer, unsaved: *"Save it as version {n} of {project}."* when a lineage project exists, else today's copy. After saving: *"Saved to {project} as version {n}."* with the project name linking to `/projects/<id>`. The footer's **Open Project** is relabelled **Open in editor** (it opens the editor). Save keeps the maker on the review, as today. |
-| COM-21 | **Brief copy fixes:** Step 4's *"Your post is up on Innovations."* becomes *"Your Innovations post is saved for when the feed opens."*; Give's *"Your community can claim it."* is dropped. The page never repeats either old claim. |
+| COM-21 | **Brief copy fixes** (amended, owner decision O5): the success step's *"Your post is up on Innovations."* is dropped, and so are the pending lines' promises of a post (*"We'll post it to Innovations the moment the video finishes."*, *"The Innovations post goes up with it."*, *"Your Innovations post goes up as soon as …"*) — the Showcase row under the buttons says what really happened (COM-56). Give's *"Your community can claim it."* is dropped. The page never repeats any of the old claims. |
+| COM-56 | **(new) Showcase on the Brief's success step** (owner decision O5; `step-4-success.tsx`, the owner's "success modal"), after every intent — Save as Private, Give, Sell — and while a clip still renders: under **Go to My Projects** (the step's violet), one quiet **Showcase this project** with the line *"It goes under Showcase in My projects now. Nothing is posted until Innovations opens."* Pressing it calls `setShowcase(scopeProjectId, true)`; the button and its line give way to one status row, *"Showcased — it's on your Showcase tab."* (the tab of My projects), with a quiet **Undo** that stops showcasing; focus moves to Undo and the change is announced politely. A mint with Share to Innovations ticked opens on that status row, already showcased. No other copy on the step claims a post. |
 | CNT-6 | **One home for the description:** `ProjectInfoModal` stops overwriting an existing project's description when Build manually picks that project (`project-info-modal.tsx:115`). |
 
 The Brief's Step 1 default (COR-89), its attach (COR-88), its product count and
-the editor chrome's headline rename (COR-95), and `touchOpened` in the editor
-workspace (COR-91) are writers in §5.1.7.
+the editor chrome's headline rename (COR-95), `touchOpened` in the editor
+workspace (COR-91), and the mint's Showcase write (COR-105) are writers in
+§5.1.7.
 
 ### 5.13 Accessibility and performance
 
@@ -1371,12 +1646,17 @@ workspace (COR-91) are writers in §5.1.7.
 
 **Verification for NOW** (each by reload, in light and dark, at 1440 and 400):
 rebuild a chat and Save → one project, "Version 2", both versions on the
-product page; a legacy project with no `builds` → the same page as before, with
-ids given once; delete a project with editor work → the typed confirmation, then
-every per-project key gone and the build back to "Save"; mint to sell in another
-tab → the card moves to Ready to sell without a reload; Preview as buyer → no
-write control anywhere, and Exit returns focus; the six-fixture summary test
-passes.
+product page and in the Versions block; rebuild it so version 2 drops a product
+→ that product stays on the Products tab, "Not in version 2 · from version 1",
+its page opens at version 1, and Versions lists it under Dropped; a legacy
+project with no `builds` → the same page as before, with ids given once; delete
+a project with editor work → the typed confirmation, then every per-project key
+gone and the build back to "Save"; mint to sell in another tab → the card moves
+to Listed without a reload, and its Delete is blocked with the reason; press
+Showcase on the success step → the badge on the card and the header, the
+project under the Showcase tab, and Undo reverses all three; Stop showcasing a
+Private project → Preview as buyer disappears; Preview as buyer → no write
+control anywhere, and Exit returns focus; the six-fixture summary test passes.
 
 ---
 
@@ -1425,7 +1705,7 @@ passes.
 | COR-35 | A Files tab: BOM CSV, firmware `.ino`, netlist CSV, the primary's GLB; no Gerber, STL or STEP | none |
 | COR-44 | A version saved after a mint leaves the Outcome as minted; the log shows the order | mint |
 | COR-51 | The drawer: 550 px, right-docked, a full-screen sheet below 640 px, one layer, the page inert | journey |
-| COR-53 | Stored log events (briefed, renamed, network, editor edit windows), capped and coalesced | log |
+| COR-53 | Stored log events (briefed, renamed, network, editor edit windows, showcase on and off), capped and coalesced | log |
 | COR-57 | The Business plan card in the rail, under Outcome | plan |
 | COR-62 | "Edited 2 h ago" per editor step, from real model changes only | edits |
 | COR-97 | Both providers re-read on `storage` events, so a stale tab can't drop another's `builds[]` append | none |
@@ -1455,8 +1735,8 @@ passes.
 | COM-23 | `commit()` writes an immutable mint record; the page reads it first | mint |
 | COM-24 | The record keeps the version it minted: "Covers v1", *"v2 isn't minted — this mint covers v1."* | mint |
 | COM-25 | "Briefed" and "Minted" events in the project log | log |
-| COM-26 | "Sell or give it" from a minted Private or Showcase record, in the Brief | mint |
-| COM-27 | Showcase becomes true: "On Innovations since {date}" with a link | feed |
+| COM-26 | "Sell or give it" from a minted Private record (showcased or not), in the Brief | mint |
+| COM-27 | A showcased project posts to a local Innovations feed; the Showcase row reads "On Innovations since {date}" with a link; a post needs a preview clip | feed |
 | COM-28 | Licence editions in the Brief's Sell form: up to four rows, supply, Regular and Extended | brief |
 | COM-29 | The Outcome card's "Licence editions" table, *"On sale when the marketplace opens. Nothing is minted until a buyer pays."* | brief |
 | COM-30 | Legal facts typed in the Brief, shown *"As stated by you — not verified."* | brief |
@@ -1542,7 +1822,7 @@ case: no pricing blocks.
 | ACT-77 | A PDF, DOC or DOCX tile downloads the file |
 | ACT-78 | A link card asks *"Open this link in a new tab?"*, shows the URL and *"It leaves IDEEZA — only open links you trust."*; only **Open link** opens it, with `noopener` |
 
-### 6.2 LATER — 127 requirements
+### 6.2 LATER — 128 requirements
 
 **Core (11)**
 
@@ -1553,9 +1833,9 @@ case: no pricing blocks.
 | COR-58 | The LATER rail: the People block first, Outcome grown into Marketplace | auth, chain |
 | COR-73 | No "Temporarily removed from marketplace" confirm: a change becomes the next version and the listing stays on the minted one | chain, backend |
 | COR-80 | "Lazy minted" and on-chain "Minted" as chip words, with the wallet row in the header | chain |
-| COR-81 | The "Listed" / "Auction · ends {time}" chip; the Marketplace card operates it; no header primary | chain, backend |
+| COR-81 | A listing goes live: "Listed" drops its "Goes on sale when the marketplace opens" subline for the price and share for sale; the "Auction · ends {time}" chip; the Marketplace card operates it; no header primary | chain, backend |
 | COR-82 | "Paused"; **Resume** with its checklist in the Marketplace card; the page stays usable | backend |
-| COR-83 | "Sold" per slot, "Sold out", the banner *"Sold on {date} to {buyer}"* (COM-44's words); the list opens this page | payments, chain |
+| COR-83 | "Sold" per slot, "Sold out", the banner *"Sold on {date} to {buyer}"* (COM-44's words); the list opens this page; a sold project can't be deleted (*"A sold project can't be deleted."*, owner decision O10) | payments, chain |
 | COR-84 | The "Utility NFT" chip modifier with its benefits popover | chain |
 | COR-85 | "Restricted": one banner, every write `aria-disabled` with its reason | moderation, auth |
 | COR-98 | Projects, builds, versions and logs on a server keyed by user; `buildsOf()` becomes a query | backend, auth |
@@ -1594,7 +1874,7 @@ case: no pricing blocks.
 | PPL-19 | The ownership split bar with labelled segments, totalling 100 % | chain |
 | PPL-20 | The Creator tag moves at 51 %, with a warning first | chain |
 | PPL-21 | Co-owners sell only their own share ("List my share") | chain, payments |
-| PPL-22 | Delete blocked for multi-owner or fractionalized projects, with the reason | chain |
+| PPL-22 | Delete blocked while anyone else holds ownership — a co-owner, a contributor with a share, a fractional holder — with the reason in Manage (owner decision O10) | chain |
 | PPL-23 | Members see the roster; visitors a "Team" credit | auth |
 | PPL-24 | The Contributors tab after Network, with one **Invite contributor** | auth |
 | PPL-25 | Empty: *"Just you so far. Invite people to view, edit or co-own this project."* | auth |
@@ -1631,7 +1911,7 @@ case: no pricing blocks.
 | PPL-56 | Claiming this browser's projects on first sign-in | auth, backend |
 | PPL-57 | Identity checks on the server; wallets compared case-insensitively | auth, chain |
 
-**Commerce (23)**
+**Commerce (24)**
 
 | ID | One line | Waits for |
 |---|---|---|
@@ -1658,6 +1938,7 @@ case: no pricing blocks.
 | COM-52 | Utility NFT: Granted benefits, "Active until {date}" | chain |
 | COM-53 | Contributor role gates on the Marketplace card | auth |
 | COM-54 | Prices in activity entries are a read-only snapshot of the live listing, never typed | chain |
+| COM-57 | **(new)** Showcase publishes a real, public Innovations post — confirmed first (CNT-46), readiness-checked for its clip (CNT-42), previewed (CNT-44) — and Stop showcasing takes it down; the row reads "On Innovations since {date}" with the post's link | public, video |
 
 **Content (30)**
 
@@ -1673,10 +1954,10 @@ case: no pricing blocks.
 | CNT-39 | A failed render refunds and offers **Try again**; a queued one can be cancelled | video, payments |
 | CNT-42 | The share readiness dialog: each product's clip status | public, video |
 | CNT-43 | A partial share: "Share 2 of 3 products" | public |
-| CNT-44 | A post preview before **Post to Innovations** | public |
+| CNT-44 | A post preview before a showcase posts to Innovations | public |
 | CNT-45 | Add to marketplace uses the readiness dialog | chain, video |
 | CNT-46 | Going public is confirmed first | public |
-| CNT-47 | One header **Share**: copy link, native share, labelled social targets, Innovations | public |
+| CNT-47 | One header **Share**: copy link, native share, labelled social targets; the Innovations post is Showcase's (COM-57), not a Share target | public |
 | CNT-48 | Open Graph link previews on the production domain | public |
 | CNT-50 | A share or listing restriction banner | moderation |
 | CNT-51 | A comment restriction replaces the composer; replies blocked too | moderation |
@@ -1721,21 +2002,21 @@ ACT-93…95 also COM-38). The other 17 ACT ids the Figma draws differently are i
 
 | # | Conflict | Resolution | Why |
 |---|---|---|---|
-| X1 | **Status words.** COM-19: Not minted · Brief in progress · Private · Showcase · Given to community · Ready to sell. `list.md` `STATUS_WORD`: Draft · Private · Given · Listed · Minted. | **Draft · Private · Showcase · Given · Ready to sell · Minted**, one table (§4), used by the list tabs, the card chip and the details chip (core K-30). | "Draft" is the PDF's word and today's tab. "Ready to sell" is the Brief's own `BRIEF_FORM_LABEL` and true before a marketplace; "Listed" would claim a listing. "Brief in progress" is a status line, not a state. |
+| X1 | **Status words.** COM-19: Not minted · Brief in progress · Private · Showcase · Given to community · Ready to sell. `list.md` `STATUS_WORD`: Draft · Private · Given · Listed · Minted. This spec's first version chose Draft · Private · Showcase · Given · Ready to sell · Minted. | **Draft · Private · Given · Listed · Minted**, one table (§4), used by the list tabs, the card chip and the details chip (core K-30); Showcase is a badge, not a word in this table. | Owner decisions O5 and O6. "Draft" is the PDF's word and today's tab. "Listed" is the owner's word; its subline, *"Goes on sale when the marketplace opens"*, keeps it true before a marketplace exists. The Brief's own form heading (`BRIEF_FORM_LABEL.sell`) is a Brief label, not a status word, and is left alone. "Brief in progress" is a status line, not a state. |
 | X2 | **Two chips for one state.** The Outcome card's anatomy starts with its own chip (commerce §4.2); the header has the chip (COR-9). | The header chip is the only chip; the Outcome card starts with its subline (core K-31). | One state, one chip. |
-| X3 | **Showcase on My projects.** LST-10 adds a "Showcased" tab only if the Brief gains a Showcase intent (NEXT); COM-2 and COM-11 derive Showcase from Save + Share to Innovations NOW; COR-76 names it. | Under owner question 1's default, a **Showcase** tab ships NOW, labelled with the chip's word; LST-5's derivation gains it. | Every card must sit in the tab whose word its chip shows. A Showcase card inside "Private" says two different things. |
+| X3 | **Showcase on My projects.** LST-10 adds a "Showcased" tab only if the Brief gains a Showcase intent (NEXT); COM-2 and COM-11 derived Showcase from Save + Share to Innovations; COR-76 named it a minted state; this spec's first version shipped it as a state tab. | Owner decision O5: Showcase is an action and a flag (`showcasedAt`, COR-105) on any minted outcome. The **Showcase** tab ships NOW as a membership tab, last, outside the outcome tabs' sum (LST-4, LST-10); the card and header show its badge (LST-65, COR-9). | A showcased Listed project is both Listed and showcased; a tab per fact lets it sit in both without a card saying two things. |
 | X4 | **The "Utility NFT" tab.** COM-20 renames it "Minted"; LST-6 removes it, and Completed, for the outcome tabs. | LST-6. COM-20 is not built; its goal — freeing the word "Utility NFT" — holds. "Minted" appears only as LST-9's chip under All. | The outcome tabs already split every minted project by what the maker chose; a "Minted" tab would be the union of four others. |
 | X5 | **Status line and Outcome subline.** Core puts a status line under the chip and moves the Outcome state line under the header below the breakpoint (COR-56, commerce §4.1), which stacks two sentences for one state. | The header shows the chip and the status line at every width; stacked, the Outcome block goes with the other rail blocks after the tab panel. | Two sentences for one state side by side read as a stutter. The short line is the one the card also shows (LST-32). |
 | X6 | **Rail breakpoint.** COR-5 and COR-56: a 1100 px container. Commerce §4.1: 1024 px. | **1024 px, measured on the page container** (`main`). | At 1366 with the sidebar open the container is 1086 px: 1100 would drop the rail on the most common laptop width, with a 634 px main column still available. |
 | X7 | **Business plan card.** CNT-65: a card in the main column. COR-57: the rail. | The rail, under Outcome (core K-32). | The main column is the tab panel: above the tabs it pushes Products down on every visit, inside a tab it disappears. |
-| X8 | **`builds[]` phase and shape.** `list.md`: NEXT, `{ buildId, version, savedAt }`. COR-86: NOW, `ProjectBuildRef` with `chatId`. | COR-86's shape, NOW. LST-42 and LST-43 move to NOW with it (core K-33). | Owner decision 2 needs the lineage id; the list reads the same refs. |
+| X8 | **`builds[]` phase and shape.** `list.md`: NEXT, `{ buildId, version, savedAt }`. COR-86: NOW, `ProjectBuildRef` with `chatId`. | COR-86's shape, NOW. LST-42 and LST-43 move to NOW with it (core K-33). | Owner decision O2 needs the lineage id; the list reads the same refs. |
 | X9 | **Per-step fields.** `list.md`: `steps?: { openedAt, editedAt }`. Core: `lastOpened` NOW, `steps.editedAt` NEXT. | Core's. | Resuming needs only the last step opened; edit times need the touch event (COR-62). |
 | X10 | **The cover field.** `list.md` `cover?: { buildId, productId }`; core NEXT `cover?: ProductSource`; content `ProjectCover` with `kind`. | Content's `ProjectCover`; a stored `{ buildId, productId }` without `kind` reads as `kind: "concept"`. | An upload can be the cover (content question 5, closed on its default). |
 | X11 | **Default cover order.** CNT-14: the origin build's image first. LST-33 and COR-96: the newest saved version's first. | Newest first; CNT-14 amended. | With "same chat rebuilt = v2", the newest version is what the project is now. |
 | X12 | **The card's date.** LST-41: "Updated {time}" from `updatedAt`. COR-10 and core K-22: "Saved {date}" / "Created {date}". | Both surfaces show the meta-line fact, the card in LST-41's short form. "Updated" returns with LST-24 (NEXT). | `updatedAt` moves on every Brief keystroke and never on editor work, so "Updated" would mislead; LST-32 needs the same fact on both. |
 | X13 | **Version wording.** LST-42 "{n} versions"; COR-10 "Version {v}" / "{k} builds"; CNT-9 "build v{n}". | COR-10's words on the card and the meta line; "v{n}" in card facts and captions. | One vocabulary for one fact. |
 | X14 | **A minted project with a newer build waiting.** Core §4.6 adds a quiet "Review version {n}" first in the pair; LST-43 says never on a minted card; COR-11 allows one primary and one secondary, and the card equals the header. | The pair and the card don't change; the COR-18 banner carries a quiet **Review version {n}** for minted projects only. | It keeps View brief, keeps the card equal to the header, and saving v2 never changes the mint (COR-44). |
-| X15 | **Innovations copy.** CNT-41: "Innovations post requested at mint — the feed isn't live yet." COM-12: "Innovations: requested — not published yet." | COM-12's sentence, in the Outcome card. | One fact, one home, one sentence. |
+| X15 | **Innovations copy.** CNT-41: "Innovations post requested at mint — the feed isn't live yet." COM-12: "Innovations: requested — not published yet." | The Showcase row replaces the Innovations row (COM-12, amended): *"Showcased since {date}"* over *"Nothing is posted — the Innovations feed isn't open yet."* | One fact, one home, one sentence — and with Showcase a flag, the fact is the flag, not the Brief's request. |
 | X16 | **The Given line.** `list.md`: "Minted {date} · given to the community". Core: "… under {licence}". | Core's. | The licence is the one term a give decides. |
 | X17 | **Button case.** LST-40 "Continue brief"; COR-11 and COM-18 "Continue Brief". | "Continue Brief". | It pairs with "Add Brief". |
 | X18 | **Where Save lands.** LST-30 assumes Save navigates to `/projects?saved=<id>`. The review keeps the maker on the review (`review-outputs.tsx:235-238`) and COR-40 links the project from its footer. | LST-30 is not built. | Its premise isn't how Save works. The owner's "it goes to My projects" is met: the project appears there at once. |
@@ -1743,20 +2024,25 @@ ACT-93…95 also COM-38). The other 17 ACT ids the Figma draws differently are i
 | X20 | **Contributors and Customers.** PPL-24: main-column sections after Network. COR-19: tabs. | Tabs, appended after Network, LATER. | A tab strip exists; tabs a maker has learned never move. |
 | X21 | **The rail's contents.** The PPL §4.2 sketch: Status · Outcome · Products · Created · Updated · Built in · Stored, with Network, Editor and Manage in the main column. | COR-54 and COR-55 (core K-34); PPL-6 and PPL-7's hide rules apply to the new blocks unchanged. | Each fact once: the chip is the status, the meta line the products and date. |
 | X22 | **The log and the stage.** ACT-21: a fixed 267 px scrolling log. ACT-31: a stage row that opens the drawer. | COR-52's expanding list; COR-17's plain "Stage" text (core K-35). | A nested scroller traps wheel and keyboard; one door to the drawer. |
-| X23 | **Hidden LATER tabs** vs `/ui-ux-pro-max` `empty-nav-state` ("explain why instead of hiding"). | Owner decision 3 wins: a destination that doesn't exist is not shown (core K-36). | Nothing is hidden that ever existed. |
-| X24 | **Chip icons.** `list.md`: lock, hand-heart, tag, hexagon. COM-19: lock, eye, people, tag. | One table (§4): Draft circle, Private lock, Showcase eye, Given hand-heart, Ready to sell tag, Minted hexagon. | The rename pencil sits beside the chip, so Draft can't be a pencil. |
+| X23 | **Hidden LATER tabs** vs `/ui-ux-pro-max` `empty-nav-state` ("explain why instead of hiding"). | Owner decision O3 wins: a destination that doesn't exist is not shown (core K-36). | Nothing is hidden that ever existed. |
+| X24 | **Chip icons.** `list.md`: lock, hand-heart, tag, hexagon. COM-19: lock, eye, people, tag. | One table (§4): Draft circle, Private lock, Given hand-heart, Listed tag, Minted hexagon; the Showcase badge keeps the eye. | The rename pencil sits beside the chip, so Draft can't be a pencil; the eye says "shown", which is what Showcase means. |
 | X25 | **Prices in activity entries.** ACT-64…68: typed in the Add Activity form. COM-54 (commerce CX-8): a read-only snapshot. | COM-54. | A price has one home, the listing. |
-| X26 | **Who has an audience.** PPL-9's `hasAudience` is false for any minted Save. Showcase is a minted Save that asked for Innovations. | False only for Private. | A Showcase project is meant to be seen. |
+| X26 | **Who has an audience.** PPL-9's `hasAudience` is false for any minted Save. The first version of this spec made it false only for Private, with Showcase a state. | False only for a Private project that isn't showcased (`hasAudience(status, showcase)`). | Owner decision O5: a showcased project is meant to be seen, whatever its outcome. |
 | X27 | **Deleting media and activities.** CNT-17: an Undo toast. ACT-72: a confirm dialog. | Both stand. | An upload is one file and reversible; an activity entry takes several files and links with it. |
-| X28 | **Deleting after a real mint.** Core §4.6 rows 11–12: allowed until listed. COR-70: blocked once a mint, listing or sale is real. | COR-70. | The requirement row wins over its table; a real token can't be un-minted. |
+| X28 | **Deleting after a mint.** Core §4.6 rows 11–12: allowed until listed. COR-70 (first version): allowed in every state NOW; blocked once a mint, listing or sale is real. | Owner decision O10: NOW a **Listed** project can't be deleted; LATER the block covers other owners and a sold project; rows 10–11 (a real token) keep COR-70's "archive takes its place". | The owner's rule is about who else has a claim — a buyer, a co-owner, a listing. A real token can't be un-minted, so COR-70's own rule for it stays. |
 | X29 | **The PCB autosave on delete.** COR-92 cancels a pending autosave through COR-94's event; COR-94 moves to sub-project B. | Not needed NOW. | The autosave is debounced 300 ms; no path reaches the delete button that fast. |
 | X30 | **The Open in editor hint.** COR-12: dropped when COR-66 ships. COR-66 moves to sub-project B. | Dropped when sub-project B ships. | The hint is true until the editor loads the build. |
 | X31 | **"Payment due".** LST-21 and LST-47 keep a LATER slot for it; commerce CX-29 drops it until defined. | The slot stays LATER and ships only once the owner defines it. | An undefined state can't be derived honestly. |
-| X32 | **Tabs or stacked sections** (core K-1). The Figma: tabs everywhere. The shipped page and `actions-ia`: stacked sections, with Network approved as a section. | Tabs: Products · Media · Network. | Owner question 3. |
-| X33 | **How a product is viewed** (core K-2). The Figma: a sub-page per product. `actions-ia` and `mobile`: an inline switcher. | Its own page. | Owner question 4. |
-| X34 | **Rebuild semantics** (core K-24). PDF line 498: a new AI build is a new project. PDF §4.8: a second generation is a new version. | Owner decision 2: the same chat → the next version; a new chat → a new lineage. | The owner decided. |
+| X32 | **Tabs or stacked sections** (core K-1). The Figma: tabs everywhere. The shipped page and `actions-ia`: stacked sections, with Network approved as a section. | Tabs: Products · Media · Network. | Owner decision O7. |
+| X33 | **How a product is viewed** (core K-2). The Figma: a sub-page per product. `actions-ia` and `mobile`: an inline switcher. | Its own page. | Owner decision O8. |
+| X34 | **Rebuild semantics** (core K-24). PDF line 498: a new AI build is a new project. PDF §4.8: a second generation is a new version. | Owner decision O2: the same chat → the next version; a new chat → a new lineage. | The owner decided. |
 | X35 | **Where the primary lives** (core K-10). The Figma: the rail's Add To Marketplace. The research: a header pair. | The header pair, state-driven. | The next step is about the whole project, and the top-left is where makers look first. |
 | X36 | **"Draft" means four things** (core K-18, list C-3). | The chip keeps "Draft"; the confidence tier is always "Build check: Draft" on the details page; the list card never shows the tier. | One word, one meaning per surface. |
+| X37 | **The Brief's "Share to Innovations" tick and Showcase.** Owner decision O5 makes Showcase a flag set from the success step and the project page; the Brief already asks "Share to Innovations" on every intent. Two flags for one fact would disagree the first time a maker unshowcases. | The tick writes the same flag: `commit()` sets `showcasedAt = mintedAt` when it is checked, so the success step opens already showcased; a project minted with it before this ships gets the flag once (COR-105). Nothing reads `shareToNewsfeed` for Showcase afterwards. | One fact, one flag. LATER Showcase *is* the Innovations post, so the Brief's request and the project's flag are the same intention; making the maker press Showcase after ticking Share would ask twice. |
+| X38 | **Showcase's home on the project page.** The Outcome block, or a header secondary. | The Outcome block's Showcase row (COM-55). | §3.8: the control sits beside the fact it changes; the header pair is `nextAction()`, shared with the card; the header already holds three controls on a minted project. |
+| X39 | **The version history and the facts it repeats.** Owner decision O9 asks for a version history; the Project log listed "Saved version {n}" and "Built version {n}", and Details listed "Built in". §9 ruled out a "Builds" section. | The **Versions** block (COR-107) holds every version, its build and its chat; the Project log keeps only the events that aren't versions (COR-52); "Built in" becomes each lineage's heading in Versions (COR-55). §9's "Builds" row is amended. | Each fact once. A history the owner asked for, in one block, instead of the same saves in two. |
+| X40 | **A product a rebuild drops.** §5.1.8's first version: it leaves the current list and stays viewable in version 1. | Owner decision O9: it stays in the list, marked, and opens at version 1 (COR-108, COR-42 amended). | The owner decided; nothing leaves the list silently. |
+| X41 | **Showcase on a Draft.** The owner's answer names the success step "after any save" and "an option" on the page, without a state. | Showcase needs a mint: absent on a Draft (COR-105, COM-55). | The Brief's own promise is that minting keeps the maker's name on a design before it is shared; a Draft has no mint and no outcome to show. |
 
 ---
 
@@ -1831,12 +2117,13 @@ The build corrects these; none is reproduced.
 | Public, Contributed and visibility tabs now; the Completed and Utility NFT tabs | No field answers them; the outcome tabs do (LST-6). |
 | COM-20's "Minted" tab | Superseded by LST-6 (§7 X4). |
 | LST-30's arrival highlight on `/projects?saved=` | Save doesn't navigate there (§7 X18). |
-| The `_AddProjectCard` grid tile | A header "New project" link to Home (LST-2; owner question 7). |
+| The `_AddProjectCard` grid tile | A header "New project" link to Home (LST-2; owner decision O11). |
 | Bulk actions on the list | One home per action: the details page. |
 | The Sold popup over the list | A chip on the card and a banner on the details page, LATER. |
-| "Resume — {step}", "Next:", a 0/7 step bar, "Done", "Not started", "n of 7" | `flowState` is never set by any editor; progress is derived facts (owner decision 4). |
-| "Lazy minted", "Listed", "Live", "Posted", "claim", "Untitled product", "Address" | Nothing backs them now. |
-| A "Builds" section | Versions live on the product page, the cards and the log (core K-25). |
+| "Resume — {step}", "Next:", a 0/7 step bar, "Done", "Not started", "n of 7" | `flowState` is never set by any editor; progress is derived facts (owner decision O4). |
+| "Lazy minted", "Live", "Posted", "On Innovations", "claim", "Untitled product", "Address"; "Listed" without its subline | Nothing backs them now; "Listed" is true only with *"Goes on sale when the marketplace opens"* (owner decision O6). |
+| A Showcase button in the header, on the My projects card, or as a fourth Brief intent | Showcase has one home on the page, the Outcome row (COM-55), and one in the Brief, its success step (COM-56); the Brief keeps three intents (owner decision O5, §7 X38). |
+| A separate "Builds" section | The rail's **Versions** block is the one version history (COR-107, owner decision O9); a list of raw builds beside it would repeat it (core K-25). |
 | Gerber, STL and STEP downloads | They need the editor's real board, not the build's preview. |
 | A price column in the combined parts list | No BOM cost exists anywhere. |
 | An AI "rebuild this project" action | PDF line 498: a new AI build happens in a chat; its Save becomes the next version. |
@@ -1850,29 +2137,32 @@ The build corrects these; none is reproduced.
 
 ---
 
-## 10. Owner questions
+## 10. Owner decisions (2026-09-26)
 
-Eight genuine either/or questions, deduplicated across the six files. Each has a
-recommended default (◆); work proceeds on the default unless the owner answers
-otherwise.
+The eight questions this spec put to the owner, deduplicated across the six
+area files, were answered on 2026-09-26. **The answers are final.** Each row
+records the answer, what the design now does, and — as history — the default
+the spec had proposed. Where the owner wrote in Banglish, the words are quoted
+and translated.
 
-| # | Question | Options | Default, and why |
-|---|---|---|---|
-| 1 | **Showcase: the Brief's three intents, or four?** PDF Part 4.1 lists four outcomes (Private off-chain · Showcase · Give · Sell); the shipped Brief has three intents (save · give · sell), and all three mint. | ◆ **Keep three intents.** Showcase = Save as Private + "Share to Innovations", derived, with no new control; Save as Private keeps minting. / **Add a fourth "Showcase" card** to the Brief and make Save as Private off-chain, as Part 4.1 reads. | **Three intents, Showcase derived.** The Brief already asks "Share to Innovations" on every intent; a fourth card would give that choice two homes, and "off-chain" is already what every Draft project is. Showcase is then a status word and a My projects tab NOW. Choosing four changes one line in `projectStatus()`; the tabs and words stay. |
-| 2 | **The word for a minted sale.** | ◆ **"Ready to sell"** / "Listed" | **"Ready to sell"**, the Brief's own label. Nothing is listed until a marketplace exists; "Listed" returns LATER for a live listing. |
-| 3 | **Network: a tab or a stacked section?** The shipped page stacks it; the Figma draws a tab; this was never asked. | ◆ **Its own tab** (Products · Media · Network) / a section below the tabs | **A tab.** It is a parallel view of the project, like Media; a section under a tab panel would move with every tab. Its one control is unchanged. |
-| 4 | **How does a maker open a product's deliverables?** | ◆ **Each product card opens its own page** with the deliverable tabs (the Figma, PDF §4.7) / an inline product switcher on the project page (the research) | **Its own page.** No tabs inside tabs, a deep link per product and version, and one focused home for the heavy 3D viewer. |
-| 5 | **A rebuild leaves out a product version 1 had** (version 2 has no charger). | ◆ **It leaves the current list and stays viewable in version 1** / it stays in the current list beside version 2's products | **It leaves.** Version 2 is the system as rebuilt, and nothing is lost: version 1 stays on the product page. |
-| 6 | **How much friction on delete?** | ◆ **One dialog listing what goes and what stays; type the project's name only when editor work, a mint or a network would be lost** / always type "delete my project" (the Figma) | **Conditional, with the name.** Friction matches the loss — builds stay in History and can be saved again — and a project's own name proves intent for that project. |
-| 7 | **The "New project" entry on My projects.** | ◆ **A header link to Home** / the Figma's first-cell grid tile | **The header link.** The tile takes a grid slot, vanishes on page 2 and in filtered tabs, reads as a project to a screen reader, and isn't drawn in any of the 11 verified frames. |
-| 8 | **What does a buyer see before buying** — which also sets what Preview as buyer shows now? | ◆ **Previews only:** the 3D, PCB and wiring views and the parts list; firmware source and downloads after purchase / everything, firmware source and downloads included | **Previews only.** Showing firmware source before a sale gives the product away. |
+| # | Question | The owner's answer | What the design does | The default it had proposed (history) |
+|---|---|---|---|---|
+| 1 | **Showcase: the Brief's three intents, or four?** PDF Part 4.1 lists four outcomes (Private off-chain · Showcase · Give · Sell); the shipped Brief has three intents, and all three mint. | *"Showcase ta koyek vabe aste pare. jemon jokhon jekono type er save er porei success modal a CTA thakte pare. echara ekta option ee thakte pare showcase korar jonno"* — Showcase can come about in several ways: for example a CTA in the success modal right after any kind of save, and besides that its own option to showcase. **Showcase is an action, not a Brief intent.** | O5. The status is the outcome — Draft · Private · Given · Listed · Minted. Showcase is the flag `showcasedAt` on the project (COR-105), with its own badge (LST-65, COR-9) and the **Showcase** tab of showcased projects (LST-4, LST-10). Entry points: the Brief's success step after any save (COM-56), and the Showcase row of the rail's Outcome block (COM-55), chosen over a header secondary (§3.8, X38). Both can be undone. The Brief's Share to Innovations tick writes the same flag (X37). NOW a local flag, a badge and a tab; LATER a real Innovations post (COM-57). The Brief keeps three intents. | "Three intents, Showcase derived" from Save as Private + Share to Innovations, as a status word and a state tab. |
+| 2 | **The word for a minted sale.** | **"Listed"**, kept honest with a subline. | O6. **Listed** everywhere a status word appears — the chip, the tab, the status line, the state matrix — always with *"Goes on sale when the marketplace opens"* until a marketplace exists (§4.1, COR-76, COM-19). LATER a live listing keeps the word and trades the subline for its price (COR-81). | "Ready to sell", the Brief's form heading. |
+| 3 | **Network: a tab or a stacked section?** | **Its own tab**, confirmed. | O7. Products · Media · Network (COR-19, COR-45, §3.6). | The same. |
+| 4 | **How does a maker open a product's deliverables?** | **Each product has its own product page**, confirmed. | O8. `/projects/[id]/products/[productId]` with the deliverable tabs (§3.4, COR-30…41). | The same. |
+| 5 | **A rebuild leaves out a product version 1 had.** | *"Current list thakbe. ar Project er version history maintain korte hobe."* — It stays in the current list, and the project's version history must be kept. | O9. The dropped product stays on the Products tab, marked *"Not in version 2 · from version 1"*, and its page opens at version 1 (COR-108, COR-42, COR-24, COR-41). A **Versions** block in the rail is the version history: each version's date, chat and build, what it added, dropped and changed, its piece count, and a link to each of its products (COR-106, COR-107). The product page's version select reads the same list (COR-41). | "It leaves the current list and stays viewable in version 1". |
+| 6 | **How much friction on delete?** | *"Onno keo owner ba marketplace a sell hole delete korte parbena."* — If someone else is an owner, or it is being sold on the marketplace, it can't be deleted. | O10. NOW a **Listed** project can't be deleted: Delete stays in Manage, `aria-disabled`, with *"A listed project can't be deleted."* and the honest line that no route out exists yet (COR-67, COR-70, §3.6). LATER the block covers co-owners and contributors holding a share (PPL-22) and a sold project (COR-83); a live listing gains the route *"remove the listing first"* (§4.2). Deletable projects keep the recommended friction: one dialog, the typed name only when something can't be rebuilt (COR-68, COR-69). | Conditional friction with the project's name — kept; delete allowed in every state NOW. |
+| 7 | **The "New project" entry on My projects.** | **A header button that goes to Home**, confirmed. | O11. LST-2. | The same. |
+| 8 | **What does a buyer see before buying**, and so what Preview as buyer shows now? | **Previews only** — 3D, PCB, wiring and the parts list; firmware source and downloads after purchase. Confirmed. | O12. PPL-7; Preview as buyer NOW. | The same. |
 
 **Closed on their defaults (not asked).** Each area file's other questions are
-either decided by a rule already in force or low-stakes enough to proceed:
+either decided by a rule already in force or low-stakes enough to proceed; the
+owner's decisions above override any of them they touch:
 
 | From | Question | Default |
 |---|---|---|
-| core Q4 | Delete a project minted in this browser? | Allowed now; blocked once a mint, listing or sale is real (COR-70). |
+| core Q4 | Delete a project minted in this browser? | Decided by owner decision O10: allowed now except a **Listed** project; LATER blocked while anyone else owns a share, once sold, and once a real token exists (COR-70). |
 | core Q6 | Delete's home? | Rail **Manage** — D10 already rules out a ⋮. |
 | core Q7 | The primary while a newer build waits? | **Review version {n}** (LST-43). |
 | core Q8 | Add a product from the project page? | The "Add a product" tile, NEXT (COR-28). |
@@ -1929,13 +2219,23 @@ depend on it (§7 X29).
 
 | Area | NOW | NEXT | LATER | Elsewhere |
 |---|---|---|---|---|
-| COR | 77 | 12 | 11 | 4 in sub-project B |
-| LST | 42 | 7 | 14 | 1 not built (LST-30) |
+| COR | 81 | 12 | 11 | 4 in sub-project B |
+| LST | 43 | 7 | 14 | 1 not built (LST-30) |
 | PPL | 9 | 1 | 47 | — |
-| COM | 21 | 9 | 23 | 1 not built (COM-20) |
+| COM | 23 | 9 | 24 | 1 not built (COM-20) |
 | CNT | 23 | 30 | 30 | — |
 | ACT | 1 | 38 | 2 | 40 carried by another requirement, 17 not built |
-| **Total** | **173** | **97** | **127** | 63 |
+| **Total** | **180** | **97** | **128** | 63 |
 
-All 460 ids in the six files are accounted for. Moved between phases by this
-spec: LST-10, LST-31, LST-42 and LST-43 from NEXT to NOW (§7 X3, X8, X19).
+All 460 ids in the six files are accounted for, and so are the eight this spec
+adds for the owner's decisions of 2026-09-26 — COR-105 (the Showcase flag),
+COR-106 (the version history), COR-107 (the Versions block), COR-108 (a dropped
+product stays), LST-65 (the Showcase badge), COM-55 (the Showcase control),
+COM-56 (Showcase on the Brief's success step), all NOW, and COM-57 (the real
+Innovations post), LATER: 468 in all. Moved between phases by this spec: LST-10,
+LST-31, LST-42 and LST-43 from NEXT to NOW (§7 X3, X8, X19). Amended in place by
+the owner's decisions, ids and phases unchanged: LST-2, LST-4, LST-5, LST-9,
+LST-10, LST-35; COR-9, COR-19, COR-22, COR-23, COR-24, COR-41, COR-42, COR-52,
+COR-53, COR-54, COR-55, COR-67, COR-68, COR-70, COR-76, COR-78, COR-79, COR-81,
+COR-83; COM-3, COM-11, COM-12, COM-18, COM-19, COM-21, COM-22, COM-26, COM-27;
+CNT-40, CNT-41, CNT-44, CNT-47; PPL-6, PPL-7, PPL-9, PPL-22.
