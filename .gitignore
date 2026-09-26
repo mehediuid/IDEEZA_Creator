@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# node:test harness output (tests/projects/tsconfig.json)
+/.tmp-test/
 
 # next.js
 /.next/

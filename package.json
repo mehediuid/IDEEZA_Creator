@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:projects": "rm -rf .tmp-test && tsc -p tests/projects/tsconfig.json && node --test \"tests/projects/*.test.mjs\""
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.2.0",

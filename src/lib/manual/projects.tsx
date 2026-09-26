@@ -19,7 +19,7 @@
 // active selection.
 
 import * as React from "react";
-import type { BuildJob } from "@/lib/create/history";
+import type { BuildJob } from "../create/history";
 
 export type ManualProjectStatus = "draft" | "completed";
 
@@ -43,12 +43,40 @@ export const EMPTY_FLOW_STATE: ManualFlowState = {
   brief: false,
 };
 
+/** The build product a project product was last built from: the build, and the product inside it —
+ *  "primary" or the companion's BuildProduct.id. A reference, never a copy. */
+export type ProductSource = { buildId: string; productId: string };
+
 /** One product inside a project — the name and the sentence the model wrote
  *  for it, which is what the Brief shows and what My projects counts. */
 export type ManualProduct = {
+  /** Stable key for /projects/[id]/products/[productId]. New rows: `prd_` + 8 base-36 chars.
+   *  Legacy rows get `p<n>` (1-based position, deduped) once, in normalizeProjects. Never reused. */
+  id: string;
   name: string;
   description: string;
+  /** Absent on a hand-made product, and on a legacy row until a version attaches to it. */
+  source?: ProductSource;
+  /** The last change to THIS row: a version attached to it, or its text edited. Absent = never recorded. */
+  updatedAt?: number;
 };
+
+/** A product row as a writer hands it over. Without an id, keepProductIds gives it the id of the
+ *  row it replaces. */
+export type ManualProductInput = Omit<ManualProduct, "id"> & { id?: string };
+
+/** One build the project holds. */
+export type ProjectBuildRef = {
+  buildId: string;
+  /** The chat it came from: its lineage. Null only for a build gone before this was recorded. */
+  chatId: string | null;
+  /** 1-based within its lineage (same chatId), in save order. Never renumbered or reused. */
+  version: number;
+  /** When it joined this project. Null = joined before this field existed (the page says nothing). */
+  savedAt: number | null;
+};
+
+export type ProjectStep = keyof ManualFlowState;
 
 export type ManualProject = {
   id: string;
@@ -72,10 +100,32 @@ export type ManualProject = {
   createdAt: number;
   updatedAt: number;
   flowState: ManualFlowState;
-  // The AI build this project was created from (Save Project / Advance
-  // Edit on the review surface). Absent for a hand-made project.
+  /** The build this project was CREATED from (Save Project / Advance Edit on the review surface).
+   *  Provenance; never the only read (COR-86). Absent for a hand-made project. */
   buildId?: string;
+  /** Every build the project holds, in attach order. Written from now on; legacy projects are read by buildsOf(). */
+  builds?: ProjectBuildRef[];
+  /** The editor step last opened. Open in editor's resume target — never a progress signal. */
+  lastOpened?: { step: ProjectStep; at: number };
+  /** Showcase (COR-105): a time = showcased since then; null = the maker stopped; absent = never recorded.
+   *  A flag on the project, orthogonal to the outcome — never derived from the Brief's shareToNewsfeed. */
+  showcasedAt?: number | null;
+  /** The cover the maker chose ("Use as cover", CNT-15): the build product whose image is the project's
+   *  cover, winning over coverOf()'s default (LST-34). null = the maker stopped using it, so the default
+   *  applies again; absent = never chosen. A reference, never an image URL (§5.1.10). A later ProjectCover
+   *  with a `kind` reads this shape as kind "concept" (§7 X10). */
+  cover?: ProductSource | null;
 };
+
+/** What updateProject takes. Its product rows may come without ids (the Brief's Step 1 writes
+ *  `{ name, description }`); keepProductIds gives each the id of the row it replaces. */
+export type ProjectPatch = Partial<Omit<ManualProject, "id" | "products">> & {
+  products?: ManualProductInput[];
+};
+
+export const PROJECT_NAME_MAX = 80; // CNT-2: trimmed, 1–80 characters
+export const PROJECT_DESC_MAX = 1000; // CNT-5: trimmed, 0–1,000 characters…
+export const PROJECT_DESC_COUNTER_FROM = 800; // …with a counter from 800
 
 const PROJECTS_KEY = "ideeza:manual:projects";
 const ACTIVE_KEY = "ideeza:manual:active";
@@ -138,36 +188,250 @@ function uniqueSlug(name: string, existing: ManualProject[]): string {
   return `${base}-${n}`;
 }
 
-// Normalize projects loaded from storage: backfill slugs (unique within the
-// batch) and default productName for projects saved before those fields
-// existed. Returns the same reference when nothing changed so React skips
-// needless re-renders.
-function normalizeProjects(list: ManualProject[]): ManualProject[] {
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+const isTime = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v);
+const norm = (s: string) => s.trim().toLowerCase();
+
+const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/** A new product row's id (§5.1.10): `prd_` + 8 random base-36 characters,
+ *  so an id is never reused after its product leaves. */
+export function newProductId(): string {
+  let id = "prd_";
+  for (const b of crypto.getRandomValues(new Uint8Array(8))) id += BASE36[b % 36];
+  return id;
+}
+
+function sourceIn(v: unknown): ProductSource | undefined {
+  return isRecord(v) && typeof v.buildId === "string" && typeof v.productId === "string"
+    ? { buildId: v.buildId, productId: v.productId }
+    : undefined;
+}
+
+// Whether a stored row already is its normalized form, key for key.
+function sameRow(x: Record<string, unknown>, row: ManualProduct): boolean {
+  const s = x.source;
+  return (
+    Object.keys(x).length === Object.keys(row).length &&
+    x.id === row.id &&
+    x.name === row.name &&
+    x.description === row.description &&
+    x.updatedAt === row.updatedAt &&
+    (row.source
+      ? isRecord(s) &&
+        Object.keys(s).length === 2 &&
+        s.buildId === row.source.buildId &&
+        s.productId === row.source.productId
+      : s === undefined)
+  );
+}
+
+// COR-87 — a project's product rows: identity, text and provenance. A stored
+// id is kept when it is a non-empty string no earlier row holds; a row without
+// one takes the first free `p<n>` counting up from its own 1-based position —
+// once, because the save effect persists it. A source is kept when both its
+// fields are strings, updatedAt when it is finite; a row without a string name
+// is dropped. Returns `raw` itself when every row is already in this form, and
+// undefined when no row is left.
+function productsIn(raw: unknown): ManualProduct[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const rows = raw.filter(
+    (x): x is Record<string, unknown> & { name: string } =>
+      isRecord(x) && typeof x.name === "string",
+  );
+  if (!rows.length) return undefined;
   const taken = new Set<string>();
-  return list.map((p) => {
+  const stored = rows.map((x) => {
+    const id = typeof x.id === "string" && x.id && !taken.has(x.id) ? x.id : null;
+    if (id) taken.add(id);
+    return id;
+  });
+  let same = rows.length === raw.length;
+  const out = rows.map((x, i): ManualProduct => {
+    let id = stored[i];
+    if (id === null) {
+      let n = i + 1;
+      while (taken.has(`p${n}`)) n++;
+      id = `p${n}`;
+      taken.add(id);
+    }
+    const source = sourceIn(x.source);
+    const row: ManualProduct = {
+      id,
+      name: x.name,
+      description: String(x.description ?? ""),
+      ...(source ? { source } : null),
+      ...(isTime(x.updatedAt) ? { updatedAt: x.updatedAt } : null),
+    };
+    if (!sameRow(x, row)) same = false;
+    return row;
+  });
+  return same ? (raw as ManualProduct[]) : out;
+}
+
+const isBuildRef = (r: unknown): r is ProjectBuildRef =>
+  isRecord(r) &&
+  typeof r.buildId === "string" &&
+  r.buildId !== "" &&
+  (typeof r.chatId === "string" || r.chatId === null) &&
+  typeof r.version === "number" &&
+  Number.isInteger(r.version) &&
+  r.version >= 1 &&
+  (isTime(r.savedAt) || r.savedAt === null);
+
+// COR-86 — the build refs: a string buildId, a chatId that is a string or
+// null, an integer version ≥ 1 and a savedAt that is a number or null; a
+// build's first ref wins. Never backfilled here — that needs the builds store,
+// so buildsOf() reads the legacy links at read time and attach() freezes a
+// lineage when it writes.
+function buildsIn(raw: unknown): ProjectBuildRef[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const seen = new Set<string>();
+  const out: ProjectBuildRef[] = [];
+  for (const r of raw) {
+    if (!isBuildRef(r) || seen.has(r.buildId)) continue;
+    seen.add(r.buildId);
+    out.push({ buildId: r.buildId, chatId: r.chatId, version: r.version, savedAt: r.savedAt });
+  }
+  if (!out.length) return undefined;
+  const same = out.length === raw.length && raw.every((r) => Object.keys(r).length === 4);
+  return same ? (raw as ProjectBuildRef[]) : out;
+}
+
+// COR-91 — kept when its step is one of FLOW_STEPS and its time is finite.
+function lastOpenedIn(raw: unknown): ManualProject["lastOpened"] {
+  if (!isRecord(raw)) return undefined;
+  const step = FLOW_STEPS.find((s) => s === raw.step);
+  const at = raw.at;
+  if (!step || !isTime(at)) return undefined;
+  return Object.keys(raw).length === 2
+    ? (raw as ManualProject["lastOpened"])
+    : { step, at };
+}
+
+// COR-105 — a time, or null once the maker stopped. Anything else reads as
+// never recorded: absent, never null, so the one-time backfill from an older
+// mint (project-brief.ts) can still tell "never" from "stopped".
+function showcasedIn(raw: unknown): number | null | undefined {
+  return isTime(raw) || raw === null ? raw : undefined;
+}
+
+// LST-34 — the chosen cover: a product source (both fields strings), or null
+// once the maker stopped using it. Anything else reads as never chosen.
+function coverIn(raw: unknown): ProductSource | null | undefined {
+  if (raw === null) return null;
+  const source = sourceIn(raw);
+  if (!source) return undefined;
+  return isRecord(raw) && Object.keys(raw).length === 2
+    ? (raw as ProductSource)
+    : source;
+}
+
+// Normalize projects loaded from storage: backfill slugs (unique within the
+// batch), productName and every flow step for projects saved before those
+// existed, and keep the fields added since — product ids, sources and times,
+// build refs, lastOpened, showcasedAt, cover — dropping whatever doesn't parse
+// (COR-87). Returns the same reference when nothing changed so React skips
+// needless re-renders; a project that did change is written back by the save
+// effect, so a legacy row gets its id exactly once.
+export function normalizeProjects(list: unknown): ManualProject[] {
+  if (!Array.isArray(list)) return [];
+  const taken = new Set<string>();
+  return list.filter(isRecord).map((raw) => {
+    const p = raw as ManualProject;
     let slug = p.slug || slugify(p.name);
     const base = slug;
     let n = 2;
     while (taken.has(slug)) slug = `${base}-${n++}`;
     taken.add(slug);
-    const productName = p.productName ?? "";
-    const products = Array.isArray(p.products)
-      ? p.products
-          .filter((x): x is ManualProduct => !!x && typeof x.name === "string")
-          .map((x) => ({ name: x.name, description: String(x.description ?? "") }))
-      : undefined;
+    const products = productsIn(p.products);
+    const builds = buildsIn(p.builds);
+    const lastOpened = lastOpenedIn(p.lastOpened);
+    const showcasedAt = showcasedIn(p.showcasedAt);
+    const cover = coverIn(p.cover);
     // Backfill steps added after a project was saved (e.g. `assembly`,
     // UIUX-80) so flowState always carries every step key.
     const flowOk = p.flowState && FLOW_STEPS.every((s) => s in p.flowState);
-    if (p.slug === slug && p.productName !== undefined && flowOk) return p;
-    return {
+    if (
+      p.slug === slug &&
+      p.productName !== undefined &&
+      flowOk &&
+      products === p.products &&
+      builds === p.builds &&
+      lastOpened === p.lastOpened &&
+      showcasedAt === p.showcasedAt &&
+      cover === p.cover
+    )
+      return p;
+    const out: ManualProject = {
       ...p,
       slug,
-      productName,
-      ...(products?.length ? { products } : null),
+      productName: p.productName ?? "",
       flowState: { ...EMPTY_FLOW_STATE, ...(p.flowState ?? {}) },
     };
+    if (products) out.products = products;
+    else delete out.products;
+    if (builds) out.builds = builds;
+    else delete out.builds;
+    if (lastOpened) out.lastOpened = lastOpened;
+    else delete out.lastOpened;
+    if (showcasedAt !== undefined) out.showcasedAt = showcasedAt;
+    else delete out.showcasedAt;
+    if (cover !== undefined) out.cover = cover;
+    else delete out.cover;
+    return out;
   });
+}
+
+// A write's product rows, each with an id (COR-87). A row carrying an id no
+// earlier row holds keeps it. A row without one is the held row it lines up
+// with — by position when the list keeps its length, else by name — and takes
+// that row's id, source and updatedAt; with no free match it is a new product
+// with a new id. No held id goes to two rows. This is what stops the Brief's
+// `{ name, description }` writes stripping identity.
+export function keepProductIds(
+  rows: ManualProductInput[],
+  held: ManualProduct[],
+): ManualProduct[] {
+  const taken = new Set<string>();
+  const own = rows.map((r) => {
+    const id = r.id && !taken.has(r.id) ? r.id : null;
+    if (id) taken.add(id);
+    return id;
+  });
+  const free = (x: ManualProduct | undefined) =>
+    x && !taken.has(x.id) ? x : undefined;
+  const byPosition = rows.length === held.length;
+  return rows.map((r, i): ManualProduct => {
+    let id = own[i];
+    let match: ManualProduct | undefined;
+    if (id === null) {
+      match =
+        (byPosition ? free(held[i]) : undefined) ??
+        held.find((x) => free(x) && norm(x.name) === norm(r.name));
+      id = match?.id ?? newProductId();
+      taken.add(id);
+    }
+    const source = r.source ?? match?.source;
+    const updatedAt = r.updatedAt ?? match?.updatedAt;
+    return {
+      id,
+      name: r.name,
+      description: r.description,
+      ...(source ? { source } : null),
+      ...(updatedAt !== undefined ? { updatedAt } : null),
+    };
+  });
+}
+
+// The rows a project holds. One without a list — hand-made, or saved before
+// lists — holds its headline product, which productsOfProject() calls "p1".
+function heldProducts(p: ManualProject): ManualProduct[] {
+  return p.products?.length
+    ? p.products
+    : [{ id: "p1", name: p.productName, description: p.description }];
 }
 
 type Ctx = {
@@ -187,7 +451,10 @@ type Ctx = {
   // back rather than a second copy of itself.
   projectFromBuild: (job: BuildJob) => ManualProject;
   selectProject: (id: string) => void;
-  updateProject: (id: string, patch: Partial<Omit<ManualProject, "id">>) => void;
+  updateProject: (id: string, patch: ProjectPatch) => void;
+  // "Use as cover" / "Stop using as cover" (CNT-15): a product source, or
+  // null to go back to coverOf()'s default. Bumps updatedAt.
+  setCover: (id: string, cover: ProductSource | null) => void;
   markStepCompleted: (id: string, step: keyof ManualFlowState) => void;
   setStatus: (id: string, status: ManualProjectStatus) => void;
   clearActive: () => void;
@@ -210,7 +477,11 @@ export function ManualProjectsProvider({
   const builtFrom = React.useRef(new Map<string, ManualProject>());
 
   React.useEffect(() => {
-    const stored = normalizeProjects(loadJSON<ManualProject[]>(PROJECTS_KEY, []));
+    const stored = normalizeProjects(loadJSON<unknown>(PROJECTS_KEY, []));
+    // Reading localStorage in the state initialiser would render different
+    // markup on the server and the client — so the store hydrates here, once,
+    // after mount, on purpose.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProjects(stored);
     const active = loadActiveId();
     // Don't carry a stale id forward — clear if the project no longer
@@ -257,17 +528,34 @@ export function ManualProjectsProvider({
     setActiveProjectId(id);
   }, []);
 
+  // A patch's product rows keep their identity: a row written without an id
+  // (the Brief's Step 1 writes `{ name, description }`) takes the id of the
+  // row it replaces — see keepProductIds.
   const updateProject = React.useCallback(
-    (id: string, patch: Partial<Omit<ManualProject, "id">>) => {
+    (id: string, patch: ProjectPatch) => {
+      const { products, ...rest } = patch;
       setProjects((arr) =>
         arr.map((p) =>
           p.id === id
-            ? { ...p, ...patch, updatedAt: Date.now() }
+            ? {
+                ...p,
+                ...rest,
+                ...(products
+                  ? { products: keepProductIds(products, heldProducts(p)) }
+                  : null),
+                updatedAt: Date.now(),
+              }
             : p,
         ),
       );
     },
     [],
+  );
+
+  // The same write as a rename — through updateProject, so it bumps updatedAt.
+  const setCover = React.useCallback(
+    (id: string, cover: ProductSource | null) => updateProject(id, { cover }),
+    [updateProject],
   );
 
   // The project a finished build becomes — the one the maker already chose.
@@ -293,10 +581,12 @@ export function ManualProjectsProvider({
 
       const built: ManualProduct[] = [
         {
+          id: newProductId(),
           name: job.title,
           description: (job.description || job.summary || "").trim(),
         },
         ...(job.companions ?? []).map((c) => ({
+          id: newProductId(),
           name: (c.name || c.title).trim(),
           description: (c.description || c.summary || "").trim(),
         })),
@@ -311,7 +601,7 @@ export function ManualProjectsProvider({
         const held: ManualProduct[] =
           chosen.products ??
           (chosen.productName.trim()
-            ? [{ name: chosen.productName, description: chosen.description }]
+            ? [{ id: "p1", name: chosen.productName, description: chosen.description }]
             : []);
         const names = new Set(held.map((x) => x.name.trim().toLowerCase()));
         const products = [
@@ -397,6 +687,7 @@ export function ManualProjectsProvider({
     projectFromBuild,
     selectProject,
     updateProject,
+    setCover,
     markStepCompleted,
     setStatus,
     clearActive,
