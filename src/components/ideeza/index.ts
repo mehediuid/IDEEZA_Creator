@@ -28,3 +28,5 @@ export { ProgressBar } from "./progress-bar";
 export { Divider } from "./divider";
 export { StateCard } from "./state-card";
 export { ModalFrame, ConfirmDialog, type ModalFrameProps, type ConfirmDialogProps } from "./dialog";
+// T20: the Activity History drawer's atom — a right-docked ModalFrame sibling.
+export { Drawer, type DrawerProps } from "./drawer";

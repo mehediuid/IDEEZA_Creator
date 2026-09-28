@@ -18,6 +18,7 @@ import type { ProductVersionView } from "@/lib/manual/product-page";
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { ProductCustomers } from "./product-customers";
+import { ProductActivityChip } from "../details/activity-chip";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -47,9 +48,17 @@ function CustomersSlot(props: ProductSlotProps) {
   return <ProductCustomers {...props} />;
 }
 
+// T20's wiring: the Activity chip (P2-TABS-5), scoped to this product.
+function ActivitySlot(props: ProductSlotProps) {
+  return <ProductActivityChip {...props} />;
+}
+
 export const PRODUCT_SLOTS: ProductSlots = {
   panels: {
     customers: CustomersSlot,
   },
   rail: {},
+  headerParts: {
+    titleRow: [ActivitySlot],
+  },
 };
