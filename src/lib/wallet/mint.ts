@@ -124,6 +124,8 @@ export function mintTypeOptions(ctx: {
   network: Network;
   locked?: boolean;
   address?: string;
+  /** The type the locked listing was made with; the locked title names it. */
+  value?: "lazy" | "instant";
 }): MintTypeOptionsResult {
   const gasCost = chargeText(mintChargeOf("instant", ctx.network)!);
   const lazy: MintTypeOption = { type: "lazy", title: "Lazy mint", sub: SUB.lazy[ctx.intent], cost: "Free now" };
@@ -148,11 +150,12 @@ export function mintTypeOptions(ctx: {
     };
   }
   if (ctx.locked) {
+    const value = ctx.value ?? "lazy";
     return {
       locked: true,
-      value: "lazy",
+      value,
       options: [lazy, instant],
-      lockedText: { title: lazy.title, note: "Can't be changed after listing." },
+      lockedText: { title: value === "instant" ? instant.title : lazy.title, note: "Can't be changed after listing." },
     };
   }
   if (ctx.current === "lazyMinted") {
@@ -481,11 +484,17 @@ export type MintProofRow = { key: "mint" | "token" | "signature" | "tx" | "walle
 
 const text = (t: string): MetaPart => ({ kind: "text", text: t });
 
-const LAZY_NOTE: Record<Intent, string> = {
-  sell: "Signed with Demo account 1. The token is minted on chain at its first sale.",
-  give: "Signed with Demo account 1. The token is minted on chain the first time someone takes it.",
-  save: "Signed. Nothing is on chain until you list it.",
-};
+/** The lazy note names the account that actually signed. */
+function lazyNote(intent: Intent, accountLabel: string): string {
+  switch (intent) {
+    case "sell":
+      return `Signed with ${accountLabel}. The token is minted on chain at its first sale.`;
+    case "give":
+      return `Signed with ${accountLabel}. The token is minted on chain the first time someone takes it.`;
+    default:
+      return "Signed. Nothing is on chain until you list it.";
+  }
+}
 
 export function mintProofRows(rec: MintRecord, o: { owner: boolean }, intent?: Intent): MintProofRow[] {
   const account = DEMO_ACCOUNTS.find((a) => a.index === rec.wallet.account) ?? DEMO_ACCOUNTS[0];
@@ -514,7 +523,7 @@ export function mintProofRows(rec: MintRecord, o: { owner: boolean }, intent?: I
     key: "mint",
     label: "Mint",
     value: [text(`Lazy minted · ${formatDateTime(rec.signedAt ?? rec.at)}`)],
-    note: intent ? LAZY_NOTE[intent] : "Signed. The token is minted on chain at its first sale.",
+    note: intent ? lazyNote(intent, account.label) : "Signed. The token is minted on chain at its first sale.",
   });
   rows.push({
     key: "token",
