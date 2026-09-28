@@ -55,8 +55,11 @@ export function AssemblyApp() {
   const [done, setDone] = React.useState<Record<string, boolean>>({});
 
   // The doc lives in localStorage (written by the PCB editor), so read it on
-  // mount — this module opens after the board work, not alongside it.
+  // mount — this module opens after the board work, not alongside it. The
+  // server has no storage, so reading it during render would hydrate
+  // different markup; the read happens here, once per project, on purpose.
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setParts(readParts(projectId));
     setDone(readProgress(projectId));
   }, [projectId]);
