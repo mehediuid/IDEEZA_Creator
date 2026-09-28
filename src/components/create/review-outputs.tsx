@@ -17,6 +17,7 @@
 // than from a page of its own.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight02Icon,
@@ -30,7 +31,7 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { deriveAssembly } from "@/lib/three/assembly";
-import { ModelPanel } from "./model-panel/model-panel";
+import { ModelPanelLazy } from "./model-panel/model-panel-lazy";
 import {
   ITEM_LABELS,
   ITEM_KINDS,
@@ -41,6 +42,8 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { stepHref, useManualProjects } from "@/lib/manual/projects";
+import { buildsOf, lineageProjectOf } from "@/lib/manual/project-read";
+import { nextVersionOf } from "@/lib/create/save-footer";
 import { isSampleModel, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
@@ -211,6 +214,30 @@ function ReviewPanel({
     () => (job.projectId ? projects.find((p) => p.id === job.projectId) ?? null : null),
     [job.projectId, projects],
   );
+
+  // COR-40 — the footer's own copy. Unsaved: the version this press of
+  // Save Project would give the build, when a sibling build of the same
+  // chat already lives in a project (lineageProjectOf — the same project
+  // Save would attach to, COR-89). Saved: the version this build already
+  // got.
+  const lineageProject = React.useMemo(
+    () => (saved ? null : lineageProjectOf(job, builds, projects)),
+    [saved, job, builds, projects],
+  );
+  const nextVersion = React.useMemo(
+    () => (lineageProject ? nextVersionOf(job, buildsOf(lineageProject, builds)) : null),
+    [lineageProject, job, builds],
+  );
+  const savedVersion = React.useMemo(
+    () => (saved ? (buildsOf(saved, builds).find((r) => r.buildId === job.id)?.version ?? null) : null),
+    [saved, job, builds],
+  );
+  const unsavedCopy =
+    lineageProject && nextVersion != null
+      ? `Save it as version ${nextVersion} of ${lineageProject.name}.`
+      : job.projectChoiceName?.trim() || job.projectChoiceId
+        ? "Save it to the project you chose, or open it in the editor."
+        : "Save it as a project, or open it in the editor.";
 
   // What the card is about. The project the maker named, which is what the
   // rail beside it already calls this work; then the project it was saved
@@ -438,7 +465,7 @@ function ReviewPanel({
               aria-labelledby={`review-tab-${shown}`}
               className="px-10 pb-10"
             >
-              <ModelPanel
+              <ModelPanelLazy
                 key={product.id}
                 assembly={assembly}
                 shellNote={shellNote}
@@ -526,14 +553,24 @@ function ReviewPanel({
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
             {saved ? (
               <>
-                <p className="inline-flex items-center gap-4 text-sm text-text-secondary">
+                <p role="status" className="inline-flex items-center gap-4 text-sm text-text-secondary">
                   <Icon
                     icon={CheckmarkCircle02Icon}
                     size={16}
                     className="shrink-0 text-text-success"
                   />
-                  Saved to {saved.name}. Add a brief to sell, give or keep it
-                  private — or open the project to keep editing.
+                  <span>
+                    Saved to{" "}
+                    <Link
+                      href={`/projects/${saved.id}`}
+                      className="rounded-sm font-semibold text-text-primary underline decoration-dotted underline-offset-2 outline-none ring-offset-background transition-colors duration-fast hover:text-text-brand focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus"
+                    >
+                      {saved.name}
+                    </Link>
+                    {savedVersion != null ? ` as version ${savedVersion}.` : "."} Add a
+                    brief to sell, give or keep it private — or open the
+                    project to keep editing.
+                  </span>
                 </p>
                 <div className="flex flex-wrap items-center gap-6">
                   <LeaveButton
@@ -553,7 +590,7 @@ function ReviewPanel({
                     onClick={openInEditor}
                     icon={PencilEdit02Icon}
                   >
-                    Open Project
+                    Open in editor
                   </LeaveButton>
                 </div>
               </>
@@ -563,16 +600,14 @@ function ReviewPanel({
                   {pieceCount === ITEM_KINDS.length
                     ? "All five pieces are ready."
                     : `All ${pieceCount} pieces are ready.`}{" "}
-                  {job.projectChoiceName?.trim() || job.projectChoiceId
-                    ? "Save it to the project you chose, or open it in the editor."
-                    : "Save it as a project, or open it in the editor."}
+                  {unsavedCopy}
                 </p>
                 <div className="flex flex-wrap items-center gap-6">
                   <button
                     type="button"
                     onClick={saveProject}
                     disabled={leaving !== null}
-                    className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:opacity-60"
+                    className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none ring-offset-background transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus disabled:opacity-60"
                   >
                     <Icon icon={FloppyDiskIcon} size={18} />
                     Save Project

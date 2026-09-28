@@ -30,8 +30,10 @@ ideeza-creator-panel/
    │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
-   │  │   ├─ projects/[id]/           "/projects" — My projects + details
-   │  │   │   └─ network/             "/projects/<id>/network" — the Connection Map
+   │  │   ├─ projects/                    "/projects" — My projects (index)
+   │  │   │   └─ [id]/                    "/projects/<id>" — Project details
+   │  │   │       ├─ network/             "/projects/<id>/network" — the Connection Map
+   │  │   │       └─ products/[productId]/  "/projects/<id>/products/<productId>" — the product page
    │  │   ├─ history/                 "/history"  — past generations
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
@@ -55,7 +57,7 @@ ideeza-creator-panel/
    │  │                      confirmation, and the chrome both editors share
    │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
-   │  ├─ projects/           my-projects, project-details
+   │  ├─ projects/           my-projects, project-details, and the product page (deliverable tabs, version switcher — see CLAUDE.md §5)
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
    │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,
@@ -104,10 +106,16 @@ ideeza-creator-panel/
    │  │                      bodies, derive, hints, catalog, edits, facts, format).
    │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
    │  │                      the wizard and the rail both read — + the stored-draft
-   │  │                      migration), gas.ts, wallet.ts, video-prompt.ts, qr.ts
+   │  │                      migration), project-brief.ts (the Brief read + the Outcome
+   │  │                      card's derivation — see CLAUDE.md §5), success-copy.ts (Step
+   │  │                      4's pure copy), gas.ts, wallet.ts, video-prompt.ts, qr.ts
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
-   │  ├─ manual/             projects.tsx (manual project store)
+   │  ├─ manual/             projects.tsx (manual project store), project-read.ts
+   │  │                      (backward-compatible pure readers — versions, sourceOf,
+   │  │                      coverOf), project-summary.ts (the one card/details
+   │  │                      derivation), permissions.ts (can/deleteBlockOf), editor-work.ts
+   │  │                      (editor progress facts)
    │  ├─ wiring/             types.ts
    │  ├─ feed.ts · feed-image-manifest.ts   community-feed data
    │  └─ utils.ts            shared helpers (cn, etc.)
@@ -135,6 +143,9 @@ src/lib/pcb/
 ├─ suture-vias.ts       Stitching-via lattice planner (dialog preview + placement share it)
 ├─ pour.ts              Copper pour — region outline minus other-net copper (boolean)
 ├─ route-path.ts        Track path planner — corner style + obstacle policy
+├─ board-parts.ts        Board's placed parts, shared by Assembly and the Editor
+│                        rail's PCB fact (`boardPartsOf(doc)` — designator + footprint,
+│                        top/bottom side)
 ├─ inspector-schema.ts  Schema-driven Properties inspector (panels + typed fields)
 ├─ icons.tsx · hicons.ts  DsIcon + Hugeicon/raw-SVG dictionaries
 ├─ part-catalog.ts      Parts + Agile-Module catalogue; rail queries, favourites/recents,
