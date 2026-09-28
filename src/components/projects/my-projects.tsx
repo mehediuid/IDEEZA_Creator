@@ -415,7 +415,7 @@ export function MyProjects() {
               <ul
                 role="list"
                 aria-hidden
-                className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
+                className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-3"
               >
                 {Array.from({ length: 6 }).map((_, i) => (
                   <li key={i}>
@@ -428,17 +428,35 @@ export function MyProjects() {
               // own count is zero; otherwise the search or the Source filter
               // emptied it (LST-54), and the state names which one to undo.
               view.tab === "all" || result.counts[view.tab] > 0 ? (
+                // Each way out removes the button that was pressed, so focus
+                // goes to the search box rather than falling to the body.
                 <NoMatchState
                   query={view.q}
                   tabLabel={tabLabel}
                   onClearSearch={() => {
                     setText("");
                     write({ ...view, q: "", page: 1 });
+                    searchRef.current?.focus();
                   }}
-                  onSearchAll={view.tab !== "all" && view.q.trim() ? () => changeView({ tab: "all" }) : undefined}
+                  // The same words over every project: the tab and the Source
+                  // filter both go, whichever of them narrowed the list.
+                  onSearchAll={
+                    view.q.trim() && (view.tab !== "all" || view.source !== "any")
+                      ? () => {
+                          changeView({ tab: "all", source: "any" });
+                          searchRef.current?.focus();
+                        }
+                      : undefined
+                  }
                   source={
                     view.source !== "any"
-                      ? { label: sourceLabel, onClear: () => changeView({ source: "any" }) }
+                      ? {
+                          label: sourceLabel,
+                          onClear: () => {
+                            changeView({ source: "any" });
+                            searchRef.current?.focus();
+                          },
+                        }
                       : undefined
                   }
                 />
@@ -449,7 +467,7 @@ export function MyProjects() {
               <>
                 <ul
                   role="list"
-                  className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
+                  className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-3"
                 >
                   {result.rows.map((row) => (
                     <li key={row.project.id}>

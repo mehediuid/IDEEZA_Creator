@@ -17,7 +17,6 @@ import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProjectBrief } from "@/lib/brief/project-brief";
-import type { BuildJob } from "@/lib/create/history";
 import { useCreateHistory } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { projectView } from "@/lib/manual/project-read";
@@ -27,6 +26,7 @@ import {
   type ProjectTabId,
 } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
+import { BUYER_VIEW, VIEW_PARAM } from "@/lib/manual/buyer-preview";
 import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "./buyer-preview";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
@@ -42,10 +42,10 @@ import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 
-// C5's wiring (task-C1.md's Hand-off): the page renders only after every
-// store is read, so `hydrated` is always true here.
+// C5's wiring (task-C1.md's Hand-off). The page renders only after every
+// store is read, so the tab has no loading state of its own.
 function MediaSlot({ project, view, brief, viewer }: SlotProps) {
-  return <MediaTab project={project} refs={view.refs} hydrated draft={brief} viewer={viewer} />;
+  return <MediaTab project={project} refs={view.refs} draft={brief} viewer={viewer} />;
 }
 
 // C2's wiring: the header's own data props are `{ project, view, viewer }`
@@ -57,7 +57,10 @@ function HeaderSlot({ project, view, viewer, titleRef, announce }: HeaderSlotPro
 }
 
 // C3's wiring (task-C1.md hand-off): ProductsTab takes its own props, not
-// SlotProps, so it mounts through this one-line adapter.
+// SlotProps, so it mounts through this one-line adapter. In Preview as buyer
+// every card keeps `?view=buyer`, so the product page opens as the buyer
+// sees it too (COR-37).
+const BUYER_QUERY = `?${VIEW_PARAM}=${BUYER_VIEW}`;
 function ProductsSlot({ project, view, viewer, now }: SlotProps) {
   const { chats } = useCreateHistory();
   return (
@@ -67,28 +70,25 @@ function ProductsSlot({ project, view, viewer, now }: SlotProps) {
       chats={chats}
       showOwnerOnlyFacts={can(viewer, "facts.seeOwnerOnly")}
       now={now}
+      linkQuery={isBuyerPreview(viewer) ? BUYER_QUERY : ""}
     />
   );
 }
 
 // C7's two rail blocks take their own props; they mount through these, as the
 // slot contract asks. The other four rail blocks are SlotProps components.
-function OutcomeSlot({ view, brief, viewer }: SlotProps) {
-  return <RailOutcome summary={view.summary} commerce={view.commerce} draft={brief} viewer={viewer} />;
+// Showcase speaks through the shell's one live region (COR-101).
+function OutcomeSlot({ view, viewer, announce }: SlotProps) {
+  return <RailOutcome summary={view.summary} commerce={view.commerce} viewer={viewer} announce={announce} />;
 }
 function DetailsSlot({ project, view, viewer }: SlotProps) {
   return <RailDetails project={project} summary={view.summary} viewer={viewer} />;
 }
 
-// C6's wiring (task-C1.md hand-off): NetworkTab takes one build today
-// (COR-48 later moves it to every ref) — the newest one this project still
-// has in this browser, the same rule legacy.tsx used.
+// C6's wiring (task-C1.md hand-off). Every build the project holds, so each
+// product's parts come from the build that product is in (COR-48).
 function NetworkSlot({ project, view, viewer }: SlotProps) {
-  const build = view.refs.reduce<BuildJob | null>(
-    (newest, r) => (r.job && (!newest || r.job.createdAt > newest.createdAt) ? r.job : newest),
-    null,
-  );
-  return <NetworkTab project={project} build={build} viewer={viewer} />;
+  return <NetworkTab project={project} refs={view.refs} viewer={viewer} />;
 }
 function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
@@ -152,8 +152,10 @@ function ProjectPageInner({ id }: { id: string }) {
   const now = useMinuteClock();
 
   const viewer = useViewer();
-  // COR-49: no Network tab in preview until there's a network to read.
-  const networkShown = useNetworkTabVisible(project?.id ?? "", viewer);
+  // COR-49: no Network tab in preview until there's a network to read. The
+  // skeleton waits for the network store too, so `?tab=network&view=buyer`
+  // opens on Network rather than on Products for a frame.
+  const network = useNetworkTabVisible(project?.id ?? "", viewer);
 
   const view = React.useMemo(
     () =>
@@ -163,7 +165,7 @@ function ProjectPageInner({ id }: { id: string }) {
     [project, brief, builds, chats, videoJobs, now],
   );
 
-  if (!hydrated || !historyHydrated || !videoHydrated) return <ProjectSkeleton />;
+  if (!hydrated || !historyHydrated || !videoHydrated || !network.hydrated) return <ProjectSkeleton />;
   if (!project) return <ProjectNotFound id={id} />;
   // The Brief draft is read one render after the stores. Until then the page
   // keeps its skeleton rather than flash a Draft it may not be.
@@ -177,7 +179,7 @@ function ProjectPageInner({ id }: { id: string }) {
       brief={brief}
       now={now}
       asked={parseProjectTab(search.get("tab"))}
-      hiddenTabs={networkShown ? NO_HIDDEN_TABS : NETWORK_HIDDEN}
+      hiddenTabs={network.shown ? NO_HIDDEN_TABS : NETWORK_HIDDEN}
       slots={SLOTS}
     />
   );

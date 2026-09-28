@@ -11,7 +11,7 @@ import Link from "next/link";
 import { ArrowRight01Icon, ConnectIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
-import type { BuildJob } from "@/lib/create/history";
+import type { BuildRef } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { protocolInfo } from "@/lib/network/catalog";
 import { linkTitle, nodeName, rolesOf } from "@/lib/network/derive";
@@ -24,11 +24,11 @@ import { RoleChip, SectionTitle, btn } from "./ui";
 
 export const networkHref = (projectId: string) => `/projects/${projectId}/network`;
 
-export function NetworkSection({ project, build }: { project: ManualProject; build: BuildJob | null }) {
+export function NetworkSection({ project, refs }: { project: ManualProject; refs: BuildRef[] }) {
   const router = useRouter();
   const { hydrated, network } = useProjectNetwork(project.id);
   const [open, setOpen] = React.useState(false);
-  const products = React.useMemo(() => networkProducts(project, build), [project, build]);
+  const products = React.useMemo(() => networkProducts(project, refs), [project, refs]);
 
   return (
     <section aria-labelledby="network-heading">
@@ -54,7 +54,7 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
       {open && (
         <AddNetworkDialog
           project={project}
-          build={build}
+          refs={refs}
           onClose={() => setOpen(false)}
           onViewNetwork={() => router.push(networkHref(project.id))}
         />
@@ -74,7 +74,9 @@ export function NetworkSummary({
   products: ReturnType<typeof networkProducts>;
   /** Preview as buyer (COR-49): the summary without View Network, its one
    *  write control — connections, products and roles are facts, so they
-   *  still show. */
+   *  still show. The summary carries no violet in either mode: the page
+   *  keeps its one violet for its primary action, and a buyer's page has
+   *  none (PPL-6). */
   readOnly?: boolean;
 }) {
   const members = products.filter((p) => network.productIds.includes(p.id));
@@ -104,7 +106,7 @@ export function NetworkSummary({
                 <p className="truncate text-sm font-medium text-text-primary">{linkTitle(l, name)}</p>
                 <p className="truncate text-xs text-text-secondary">{l.label}</p>
               </div>
-              <span className="shrink-0 text-xs font-semibold text-text-brand">
+              <span className="shrink-0 text-xs font-semibold text-text-secondary">
                 {l.from === "app" || l.to === "app" ? "Cloud" : protocolInfo(l.protocol).name}
               </span>
             </li>
@@ -117,7 +119,7 @@ export function NetworkSummary({
           {members.map((p) => (
             <li key={p.id} className={row}>
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">{p.name}</span>
-              <RoleChip role={roles[p.id] ?? "Standby"} />
+              <RoleChip role={roles[p.id] ?? "Standby"} quiet />
             </li>
           ))}
         </ul>

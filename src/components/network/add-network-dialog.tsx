@@ -24,7 +24,7 @@ import { Checkbox, Radio } from "@/components/ideeza/checkbox";
 import { SelectMenu } from "@/components/ideeza/select-menu";
 import { TextInput } from "@/components/ideeza/text-input";
 import { cn } from "@/lib/utils";
-import type { BuildJob } from "@/lib/create/history";
+import type { BuildRef } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import {
   CARRIES,
@@ -101,16 +101,17 @@ const compact = (s: string) => s.replace(/[^A-Za-z0-9]+/g, "");
 
 export function AddNetworkDialog({
   project,
-  build,
+  refs,
   onClose,
   onViewNetwork,
 }: {
   project: ManualProject;
-  build: BuildJob | null;
+  /** Every build the project holds — each product's parts come from its own (COR-48). */
+  refs: BuildRef[];
   onClose: () => void;
   onViewNetwork: () => void;
 }) {
-  const products = React.useMemo(() => networkProducts(project, build), [project, build]);
+  const products = React.useMemo(() => networkProducts(project, refs), [project, refs]);
 
   const [step, setStep] = React.useState<Step>("setup");
   const [intent, setIntent] = React.useState<Intent>("ctrl");

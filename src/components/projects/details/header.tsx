@@ -6,9 +6,11 @@
 // Showcase badge when the project is showcased, and the status line; the meta
 // line; the description and its editor; the action pair and Preview as buyer;
 // the Open in editor hint; then one notice per newer build of a chat that
-// isn't saved yet. From a 640 px header the pair and Preview as buyer move up
+// isn't saved yet. From a 520 px header the pair and Preview as buyer move up
 // beside the title, and wrap under it when the name is long; below that they
-// stack full width after the description, primary first.
+// stack full width after the description, primary first. (520, not 640: the
+// main column beside the rail is ~634 px at 1366 with the sidebar open, and
+// a desktop must not get the phone's full-width buttons.)
 //
 // Every string above the description is `headerText()`'s (project-summary.ts)
 // and the pair is its `pair` — `nextAction()`'s, the same object the My
@@ -34,10 +36,9 @@ import { headerText, type NextAction } from "@/lib/manual/project-summary";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { can, hasAudience, type Viewer } from "@/lib/manual/permissions";
 import { EDITOR_HINT, pendingNoticesOf, type PendingNotice } from "@/lib/manual/project-header";
+import { isBuyerPreview, useEnterPreview, useFocusAfterPreview } from "./buyer-preview";
 import { ProjectDescription } from "./description-editor";
 import { ProjectTitle } from "./title-editor";
-
-export { PROJECT_TITLE_ID } from "./title-editor";
 
 /** Preview as buyer's id: Exit preview hands focus back to it (PPL-5). */
 export const PREVIEW_TRIGGER_ID = "preview-as-buyer-trigger";
@@ -52,8 +53,8 @@ const ACTION_ICON: Record<NextAction["kind"], IconValue> = {
   "open-editor": CpuIcon,
 };
 
-/** Full width and 44 px at phone width (COR-11, PPL-4); their own width from a 640 px header. */
-const HEADER_BUTTON = "h-[44px] w-full justify-center [@container(min-width:640px)]:w-auto";
+/** Full width and 44 px at phone width (COR-11, PPL-4); their own width from a 520 px header. */
+const HEADER_BUTTON = "h-[44px] w-full justify-center [@container(min-width:520px)]:w-auto";
 
 export function ProjectHeader({
   project,
@@ -103,11 +104,10 @@ export function ProjectHeader({
     if (href.startsWith("/project/")) selectProject(project.id);
     router.push(href);
   };
-  const enterPreview = () => {
-    const q = new URLSearchParams(window.location.search);
-    q.set("view", "buyer");
-    router.push(`${window.location.pathname}?${q.toString()}`, { scroll: false });
-  };
+  const enterPreview = useEnterPreview();
+  // PPL-5: Exit preview hands focus back to this button — or to the h1 when
+  // the project offers no preview button of its own (a bare ?view=buyer link).
+  useFocusAfterPreview(!isBuyerPreview(viewer), () => document.getElementById(PREVIEW_TRIGGER_ID) ?? titleRef.current);
   const actionButton = (a: NextAction, key: "first" | "second", primary: boolean) => (
     <LeaveButton
       tone={primary ? "primary" : "quiet"}
@@ -124,8 +124,8 @@ export function ProjectHeader({
 
   return (
     <header className="flex flex-col gap-8 [container-type:inline-size]">
-      <div className="flex flex-col gap-6 [@container(min-width:640px)]:flex-row [@container(min-width:640px)]:flex-wrap [@container(min-width:640px)]:items-center [@container(min-width:640px)]:gap-x-8 [@container(min-width:640px)]:gap-y-4">
-        <div className="min-w-0 [@container(min-width:640px)]:order-1 [@container(min-width:640px)]:flex-auto">
+      <div className="flex flex-col gap-6 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center [@container(min-width:520px)]:gap-x-8 [@container(min-width:520px)]:gap-y-4">
+        <div className="min-w-0 [@container(min-width:520px)]:order-1 [@container(min-width:520px)]:flex-auto">
           <ProjectTitle
             project={project}
             canRename={can(viewer, "project.rename")}
@@ -134,7 +134,7 @@ export function ProjectHeader({
           />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 [@container(min-width:640px)]:order-3 [@container(min-width:640px)]:basis-full">
+        <div className="flex min-w-0 flex-col gap-3 [@container(min-width:520px)]:order-3 [@container(min-width:520px)]:basis-full">
           <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
             <StatusChip status={summary.status} word={text.chip.word} />
             {text.chip.badge && <ShowcaseChip />}
@@ -165,7 +165,7 @@ export function ProjectHeader({
         </div>
 
         {(pair || preview) && (
-          <div className="flex flex-col gap-4 [@container(min-width:640px)]:order-2 [@container(min-width:640px)]:flex-none [@container(min-width:640px)]:flex-row [@container(min-width:640px)]:flex-wrap [@container(min-width:640px)]:items-center">
+          <div className="flex max-w-full flex-col gap-4 [@container(min-width:520px)]:order-2 [@container(min-width:520px)]:flex-none [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center">
             {pair && actionButton(pair.first, "first", pair.violet)}
             {second && actionButton(second, "second", false)}
             {preview && (
@@ -187,7 +187,7 @@ export function ProjectHeader({
         {hint && (
           <p
             id={EDITOR_HINT_ID}
-            className="text-sm text-text-secondary [@container(min-width:640px)]:order-4 [@container(min-width:640px)]:basis-full"
+            className="text-sm text-text-secondary [@container(min-width:520px)]:order-4 [@container(min-width:520px)]:basis-full"
           >
             {EDITOR_HINT}
           </p>
@@ -238,7 +238,7 @@ function PendingBanner({
             blocked={blocked}
             onClick={() => onLeave(action.href)}
             icon={action.kind === "chat" ? BubbleChatIcon : ArrowRight02Icon}
-            className="h-[44px] [@container(min-width:640px)]:h-[40px]"
+            className="h-[44px] [@container(min-width:520px)]:h-[40px]"
           >
             {action.label}
           </LeaveButton>

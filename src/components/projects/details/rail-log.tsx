@@ -4,17 +4,21 @@
 // aren't versions — created by hand, minted, showcased — newest first, each
 // over its date. Every saved version and its build is the Versions block's
 // (§7 X39), so no save is said twice. Derived only; nothing here is stored.
-// A project with no such event has no block (a built, unminted one).
+// A project with no such event has no block (a built, unminted one). In
+// Preview as buyer a mint doesn't name its chain: Outcome, which does, is
+// owner-only (PPL-7).
 
 import * as React from "react";
+import { can } from "@/lib/manual/permissions";
 import { LOG_SHOWN, logLinesOf, type LogLine } from "@/lib/manual/rail-rows";
 import { cn } from "@/lib/utils";
 import { RailBlock, RailValue, useRailStacked } from "./rail-block";
 import { SHOW_ALL } from "./rail-versions";
 import type { SlotProps } from "./slots";
 
-export function RailLog({ view }: SlotProps) {
-  const lines = React.useMemo(() => logLinesOf(view.log), [view.log]);
+export function RailLog({ view, viewer }: SlotProps) {
+  const owner = can(viewer, "facts.seeOwnerOnly");
+  const lines = React.useMemo(() => logLinesOf(view.log, { network: owner }), [view.log, owner]);
   if (lines.length === 0) return null;
   return (
     <RailBlock title="Project log">

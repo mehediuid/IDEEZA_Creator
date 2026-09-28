@@ -40,7 +40,9 @@ import { cardText, type ProjectSummary, type CardText, type ListQuery } from "@/
  *  segment is already the exact display text `cardText()` computed; the
  *  source segment (index 0) alone carries `sourceTip` ("AI build · not in
  *  this browser" gets a tooltip explaining why). A `time` segment renders as
- *  a real `<time>`, its title the unconditional full date. */
+ *  a real `<time>`, its title the unconditional full date. The titled
+ *  segments are `relative`, so they sit above the title link's stretched
+ *  hit area and their own tooltips show (LST-41). */
 function MetaRow({ text }: { text: CardText }) {
   return (
     <>
@@ -48,11 +50,16 @@ function MetaRow({ text }: { text: CardText }) {
         <React.Fragment key={i}>
           {i > 0 && <span aria-hidden>·</span>}
           {part.kind === "time" ? (
-            <time dateTime={part.time.dateTime} title={part.time.title}>
+            <time dateTime={part.time.dateTime} title={part.time.title} className="relative">
               {part.time.text}
             </time>
           ) : (
-            <span title={i === 0 ? (text.sourceTip ?? undefined) : undefined}>{part.text}</span>
+            <span
+              title={i === 0 ? (text.sourceTip ?? undefined) : undefined}
+              className={i === 0 && text.sourceTip ? "relative" : undefined}
+            >
+              {part.text}
+            </span>
           )}
         </React.Fragment>
       ))}
@@ -153,7 +160,7 @@ export function ProjectCard({
 
         <div className="min-w-0 flex-1 [@container(min-width:560px)]:px-[14px] [@container(min-width:560px)]:pt-[12px]">
           <div className="flex flex-wrap items-start justify-between gap-[6px]">
-            <h3 className="line-clamp-2 min-w-0 text-md font-medium text-text-primary">
+            <h3 className="line-clamp-2 min-w-0 text-lg font-medium text-text-primary">
               <Link
                 href={`/projects/${summary.id}`}
                 title={summary.name}
@@ -169,12 +176,12 @@ export function ProjectCard({
             </span>
           </div>
 
-          <p className="mt-[4px] truncate text-sm text-text-tertiary">
+          <p className="mt-[4px] truncate text-md text-text-tertiary">
             {text.productLine}
             {matchedProductName && <span> · matches {matchedProductName}</span>}
           </p>
-          <p className="mt-[2px] line-clamp-2 text-sm text-text-secondary">{summary.statusLine}</p>
-          <p className="mt-[4px] flex flex-wrap items-center gap-x-[6px] text-2xs font-medium text-text-tertiary">
+          <p className="mt-[2px] line-clamp-2 text-md text-text-secondary">{summary.statusLine}</p>
+          <p className="mt-[4px] flex flex-wrap items-center gap-x-[6px] text-sm font-medium text-text-tertiary">
             <MetaRow text={text} />
           </p>
         </div>

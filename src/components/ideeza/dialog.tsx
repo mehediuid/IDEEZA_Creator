@@ -174,7 +174,7 @@ export function ConfirmDialog({
             aria-disabled={confirmUnavailable || undefined}
             className={cn(
               tap,
-              "focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface aria-disabled:cursor-not-allowed aria-disabled:opacity-60",
+              "aria-disabled:cursor-not-allowed aria-disabled:opacity-60",
             )}
             onClick={onConfirm}
           >

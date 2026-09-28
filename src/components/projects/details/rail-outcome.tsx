@@ -6,12 +6,14 @@
 // Brief, whose one door on this page is the header (COM-18). Its one control
 // is Showcase, a flag on the project rather than a Brief term (owner
 // decision O5), and this row is that control's only home on the page.
-// Owner-only: a buyer's preview drops the whole block (PPL-7).
+// Owner-only: a buyer's preview drops the whole block (PPL-7). The page shows
+// its skeleton until the Brief draft is read, so this block never waits.
+// What Showcase changes is said in the page's one live region (COR-101).
 
 import * as React from "react";
 import { ArrowDown01Icon, EyeIcon, EyeOffIcon, HexagonIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import type { ProjectCommerce, StoredDraft } from "@/lib/brief/project-brief";
+import type { ProjectCommerce } from "@/lib/brief/project-brief";
 import { can, type Viewer } from "@/lib/manual/permissions";
 import type { ProjectSummary } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -23,23 +25,16 @@ import { RailBlock, RailFact, RailFacts, RailValue, useRailStacked } from "./rai
 export function RailOutcome({
   summary,
   commerce,
-  draft,
   viewer,
+  announce,
 }: {
   summary: ProjectSummary;
   commerce: ProjectCommerce;
-  /** The project's brief draft, the shell's one useProjectBrief read: undefined until read, null when none. */
-  draft: StoredDraft | null | undefined;
   viewer: Viewer;
+  /** The shell's one polite live region (SlotProps.announce). */
+  announce: (message: string) => void;
 }) {
   if (!can(viewer, "facts.seeOwnerOnly")) return null;
-  if (draft === undefined) {
-    return (
-      <RailBlock title="Outcome" busy>
-        <p className="m-0 text-md text-text-tertiary">—</p>
-      </RailBlock>
-    );
-  }
   const view = outcomeView(commerce, summary);
   return (
     <RailBlock title="Outcome" meta={view.meta}>
@@ -48,6 +43,7 @@ export function RailOutcome({
         projectId={summary.id}
         name={summary.name}
         canShowcase={can(viewer, "project.showcase", { status: summary.status })}
+        announce={announce}
       />
     </RailBlock>
   );
@@ -58,11 +54,13 @@ function OutcomeBody({
   projectId,
   name,
   canShowcase,
+  announce,
 }: {
   view: OutcomeView;
   projectId: string;
   name: string;
   canShowcase: boolean;
+  announce: (message: string) => void;
 }) {
   const stacked = useRailStacked();
   const minted = view.minted;
@@ -71,7 +69,7 @@ function OutcomeBody({
       {minted.rows.map((row) => (
         <OutcomeFact key={row.key} row={row} />
       ))}
-      <ShowcaseFact copy={minted.showcase} projectId={projectId} name={name} allowed={canShowcase} />
+      <ShowcaseFact copy={minted.showcase} projectId={projectId} name={name} allowed={canShowcase} announce={announce} />
     </RailFacts>
   ) : null;
   return (
@@ -113,26 +111,27 @@ function OutcomeFact({ row }: { row: OutcomeRow }) {
 }
 
 /** COM-12's row with COM-55's control. The button stays the same element as its label flips,
- *  so focus stays on it; the change is said politely in the row's own status region. */
+ *  so focus stays on it; the change is said politely in the page's one live region. */
 function ShowcaseFact({
   copy,
   projectId,
   name,
   allowed,
+  announce,
 }: {
   copy: ShowcaseRowCopy;
   projectId: string;
   name: string;
   allowed: boolean;
+  announce: (message: string) => void;
 }) {
   const { setShowcase } = useManualProjects();
   const stacked = useRailStacked();
-  const [said, setSaid] = React.useState("");
   const noteId = React.useId();
   const press = () => {
     const next = !copy.on;
     setShowcase(projectId, next);
-    setSaid(showcaseAnnouncement(next, name));
+    announce(showcaseAnnouncement(next, name));
   };
   return (
     <RailFact label={copy.label} icon={EyeIcon}>
@@ -156,9 +155,6 @@ function ShowcaseFact({
           {copy.action}
         </button>
       )}
-      <span role="status" className="sr-only">
-        {said}
-      </span>
     </RailFact>
   );
 }

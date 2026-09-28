@@ -62,6 +62,7 @@ export function ProductsTab({
   chats,
   showOwnerOnlyFacts,
   now,
+  linkQuery = "",
 }: {
   projectId: string;
   /** `productsOfProject(project, buildsOf(project, builds))` — computed
@@ -76,6 +77,9 @@ export function ProductsTab({
   /** SlotProps.now — the minute clock `view` was derived at. Passed
    *  through to `formatShortDate`, which A3 requires (not optional). */
   now: number;
+  /** Appended to every card's href: `?view=buyer` in Preview as buyer, so
+   *  the preview carries into the product page (COR-37). */
+  linkQuery?: string;
 }) {
   const heading = React.useMemo(() => {
     const rows: HeadingRow[] = products.map((pp) => ({
@@ -108,18 +112,18 @@ export function ProductsTab({
 
   return (
     <div className="[container-type:inline-size]">
-      <div className="mb-[16px] flex flex-col gap-[4px]">
+      <div className="mb-8 flex flex-col gap-2">
         <h2 className="text-lg font-bold text-text-primary">Products</h2>
         {/* A `<p>` here would be invalid HTML: ConfidenceBadge's open panel
             (ConfidenceIssuesPanel) renders block content — div/section/ul —
             and a <p> can't contain block children (breaks hydration). */}
-        <div className="flex flex-wrap items-center gap-[6px] text-sm text-text-secondary">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
           <span>
             {countLabel(heading.count)}
             {piecesLine ? ` · ${piecesLine}` : ""}
           </span>
           {headlineConfidence && (
-            <span className="inline-flex flex-wrap items-center gap-[6px]">
+            <span className="inline-flex flex-wrap items-center gap-3">
               <span aria-hidden>·</span>
               Build check:
               <ConfidenceBadge confidence={headlineConfidence} />
@@ -132,7 +136,7 @@ export function ProductsTab({
         <ul
           role="list"
           aria-label="Products"
-          className="grid grid-cols-1 gap-[16px] [@container(min-width:520px)]:grid-cols-2 [@container(min-width:880px)]:grid-cols-3"
+          className="grid grid-cols-1 gap-8 [@container(min-width:520px)]:grid-cols-2 [@container(min-width:880px)]:grid-cols-3"
         >
           {products.map((pp) => (
             <ProductCard
@@ -142,6 +146,7 @@ export function ProductsTab({
               projectId={projectId}
               showOwnerOnlyFacts={showOwnerOnlyFacts}
               now={now}
+              linkQuery={linkQuery}
             />
           ))}
         </ul>
@@ -156,18 +161,20 @@ function ProductCard({
   projectId,
   showOwnerOnlyFacts,
   now,
+  linkQuery,
 }: {
   pp: ProjectProduct;
   chats: ChatSession[];
   projectId: string;
   showOwnerOnlyFacts: boolean;
   now: number;
+  linkQuery: string;
 }) {
   const name = displayProductName(pp.name);
   const built = pp.built;
   const job = built?.ref.job ?? null;
   const isLink = pp.state === "built";
-  const href = `/projects/${projectId}/products/${pp.id}`;
+  const href = `/projects/${projectId}/products/${pp.id}${linkQuery}`;
 
   const confidence = React.useMemo(() => {
     if (!job || !built) return null;
@@ -213,14 +220,14 @@ function ProductCard({
           : null;
 
   const cardClass = [
-    "group flex h-full flex-col overflow-hidden rounded-[12px] border border-solid border-border bg-bg-surface text-left outline-none transition-colors duration-fast",
+    "group flex h-full flex-col overflow-hidden rounded-xl border border-solid border-border bg-bg-surface text-left outline-none transition-colors duration-normal ease-decelerate motion-reduce:transition-none",
     isLink ? "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus" : "",
   ].join(" ");
 
   const body = (
     <>
       <ProductImage url={built?.product.conceptImageUrl ?? null} name={name} />
-      <div className="flex flex-1 flex-col gap-[8px] p-[14px]">
+      <div className="flex flex-1 flex-col gap-4 p-7">
         <h3 title={name} className="line-clamp-2 text-md font-semibold text-text-primary">
           {name}
         </h3>
@@ -230,12 +237,12 @@ function ProductCard({
           <p className="line-clamp-3 text-sm text-text-tertiary">{pp.description}</p>
         )}
         {facts.length > 0 && (
-          <dl className="mt-[2px] flex flex-col gap-[2px] text-sm">
+          <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
             {facts.map((f) => (
-              <div key={f.label} className="flex gap-[6px]">
-                <dt className="w-[44px] shrink-0 font-medium text-text-tertiary">{f.label}</dt>
+              <React.Fragment key={f.label}>
+                <dt className="font-medium text-text-tertiary">{f.label}</dt>
                 <dd className="min-w-0 text-text-secondary">{f.value}</dd>
-              </div>
+              </React.Fragment>
             ))}
           </dl>
         )}
@@ -262,7 +269,7 @@ function BuildCheckPill({ tier }: { tier: Tier }) {
   return (
     <span
       className={[
-        "inline-flex h-[22px] w-fit items-center rounded-full px-[8px] text-xs font-semibold",
+        "inline-flex w-fit items-center rounded-full px-4 py-1 text-sm font-semibold leading-sm",
         draft ? "bg-bg-subtle text-text-secondary" : "bg-bg-success-subtle text-text-success",
       ].join(" ")}
     >
@@ -289,10 +296,10 @@ function ProductImage({ url, name }: { url: string | null; name: string }) {
       ) : (
         <div
           aria-hidden={!broken}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-[4px] text-text-tertiary"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-text-tertiary"
         >
           <Icon icon={broken ? ImageNotFound02Icon : Image02Icon} size={22} />
-          {broken && <span className="text-2xs">Image didn&apos;t load</span>}
+          {broken && <span className="text-sm">Image didn&apos;t load</span>}
         </div>
       )}
     </div>

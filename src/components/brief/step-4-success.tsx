@@ -11,6 +11,7 @@
 // open yet, so nothing claims buyers can see it).
 
 import * as React from "react";
+import Link from "next/link";
 import { EyeIcon } from "@hugeicons/core-free-icons";
 import { type BriefState, type Intent } from "./brief-app";
 import {
@@ -207,12 +208,12 @@ export function Step4Success({
         {projectId && <SuccessShowcase projectId={projectId} state={state} />}
 
         <div className="flex items-center justify-center">
-          <a
-            onClick={() => onBrowse("/")}
-            className="cursor-pointer rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline"
+          <Link
+            href="/"
+            className="rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             Back to home
-          </a>
+          </Link>
         </div>
       </div>
 

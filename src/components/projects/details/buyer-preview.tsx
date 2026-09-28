@@ -6,23 +6,24 @@
 // drawer never exits preview and nothing needs cleaning up on unmount
 // (PPL-5: "closing any layer doesn't exit; nothing is stored").
 //
-// Every other NOW task reads `isBuyerPreview(viewer)` (or `can(viewer, …)`
-// once permissions.ts lands) to hide its own write controls — the pair and
-// the pencil (header), Editor/Versions/Manage/the Showcase control (rail),
-// the Firmware tab and downloads (product page, COR-37) — the same way
-// `network-tab.tsx` already hides Network's Create/View controls.
+// Every other task reads `can(viewer, …)` (or `isBuyerPreview(viewer)`) to
+// hide its own write controls — the pair and the pencil (header),
+// Editor/Versions/Manage/the Showcase control (rail), the Firmware tab and
+// downloads (product page, COR-37) — the same way `network-tab.tsx` hides
+// Network's Create/View controls.
 //
-// PREVIEW_TRIGGER_ID (plan amendment): the header task (C2) owns the id the
-// "Preview as buyer" button carries, so Exit preview can hand focus back to
-// it without a ref crossing from the banner into the header. This file
-// imports it from there rather than declaring its own.
+// Entering and leaving preview is Next's router-integrated pushState, the
+// tab strip's own (shell.tsx): a query-only change, so useSearchParams
+// follows at once with no server round trip, and Back leaves preview
+// (PPL-5). Exit's focus return is the returning page's: the header focuses
+// its Preview as buyer button once it is back on screen, the product page
+// its h1 (useFocusAfterPreview).
 
 import * as React from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Banner } from "@/components/ideeza/banner";
 import type { Viewer } from "@/lib/manual/permissions";
 import { VIEW_PARAM, viewerFromParam, withView } from "@/lib/manual/buyer-preview";
-import { PREVIEW_TRIGGER_ID } from "./header";
 
 export { isBuyerPreview } from "@/lib/manual/buyer-preview";
 
@@ -34,40 +35,61 @@ export function useViewer(): Viewer {
   return viewerFromParam(searchParams.get(VIEW_PARAM));
 }
 
-/** The href the header's button pushes to enter preview (PPL-5), keeping
- *  every other query param (e.g. `?tab=`) as it is. The header still gates
- *  *whether* to render that button with `hasAudience(status, showcase)`
- *  (PPL-9) — this hook only builds the URL. */
-export function useEnterPreviewHref(): string {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const qs = withView(searchParams.toString(), "buyer");
-  return qs ? `${pathname}?${qs}` : pathname;
+// Set by Exit preview, spent by the first owner view that mounts its focus
+// target after it (useFocusAfterPreview). Module state, not React state:
+// the page that exits (the buyer tree) and the one that takes the focus
+// (the owner tree) are different renders of the same route.
+let focusOnReturn = false;
+
+/** Adds or drops `view=buyer` as a history entry, keeping every other param
+ *  (`?tab=`, `?v=`). */
+function pushView(pathname: string, search: string, view: "buyer" | null) {
+  const qs = withView(search, view);
+  window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
 }
 
-/** Drops `view` alone, keeps the rest, then returns focus to the button
- *  that opened preview (PPL-5). A page without that button (the product
- *  page) hands focus to its h1 instead, so it never falls to the body. */
+/** Preview as buyer's entry (PPL-5): pushes `?view=buyer`; the banner takes
+ *  the focus as it mounts. The header gates *whether* to offer it
+ *  (`hasAudience`, PPL-9). */
+export function useEnterPreview(): () => void {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return React.useCallback(() => pushView(pathname, searchParams.toString(), "buyer"), [pathname, searchParams]);
+}
+
+/** Drops `view` alone and keeps the rest. Focus goes back to the button
+ *  that opened preview once the owner view is on screen again (PPL-5). */
 export function useExitPreview(): () => void {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   return React.useCallback(() => {
-    const qs = withView(searchParams.toString(), null);
-    router.push(qs ? `${pathname}?${qs}` : pathname);
-    requestAnimationFrame(() => {
-      const target =
-        document.getElementById(PREVIEW_TRIGGER_ID) ??
-        document.querySelector<HTMLElement>("main h1[tabindex]");
-      target?.focus();
-    });
-  }, [router, pathname, searchParams]);
+    focusOnReturn = true;
+    pushView(pathname, searchParams.toString(), null);
+  }, [pathname, searchParams]);
 }
 
-/** PPL-5's sticky banner. `Banner` is already a polite live region
- *  (`role="status" aria-live="polite"`); the focusable wrapper around it
- *  is what lets focus land here on entry without adding a stop to the
- *  normal tab order (`tabIndex={-1}`, focused imperatively on mount). */
+/** After Exit preview: focuses `target()` the first time `ready` — the owner
+ *  view is back and its target is in the DOM. A page without a Preview as
+ *  buyer button passes its h1, so focus never falls to the body. */
+export function useFocusAfterPreview(ready: boolean, target: () => HTMLElement | null) {
+  const focusTarget = React.useEffectEvent(() => {
+    const el = target();
+    if (!el) return;
+    focusOnReturn = false;
+    el.focus();
+  });
+  React.useEffect(() => {
+    if (ready && focusOnReturn) focusTarget();
+  }, [ready]);
+}
+
+/** PPL-5's sticky banner, at the top of the scrolling `main`. `Banner` is
+ *  already a polite live region (`role="status" aria-live="polite"`); the
+ *  focusable wrapper around it is what lets focus land here on entry
+ *  without adding a stop to the normal tab order (`tabIndex={-1}`, focused
+ *  imperatively on mount). The wrapper reaches up into the content's top
+ *  padding with the page's own fill, so what scrolls under it never shows
+ *  above it. */
 export function BuyerPreviewBanner() {
   const exit = useExitPreview();
   const ref = React.useRef<HTMLDivElement>(null);
@@ -85,7 +107,7 @@ export function BuyerPreviewBanner() {
     return () => cancelAnimationFrame(raf);
   }, []);
   return (
-    <div ref={ref} tabIndex={-1} className="mb-[20px] outline-none">
+    <div ref={ref} tabIndex={-1} className="sticky top-0 z-sticky -mt-4 mb-10 bg-bg-page pt-4 outline-none">
       <Banner
         tone="info"
         title="Previewing as a buyer"
@@ -93,7 +115,7 @@ export function BuyerPreviewBanner() {
           <button
             type="button"
             onClick={exit}
-            className="inline-flex h-[44px] shrink-0 items-center gap-[8px] rounded-lg border border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-border bg-bg-surface px-8 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
           >
             Exit preview
           </button>

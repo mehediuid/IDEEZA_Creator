@@ -65,7 +65,7 @@ export function DeleteProjectControl(props: DeleteProjectControlProps) {
         aria-describedby={block ? reasonId : undefined}
         aria-haspopup="dialog"
         className={cn(
-          "inline-flex min-h-[40px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)]",
+          "inline-flex min-h-[40px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
           unavailable
             ? "cursor-not-allowed text-text-disabled"
             : "text-text-error hover:border-border-error hover:bg-bg-error-subtle",
