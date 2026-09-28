@@ -48,7 +48,7 @@ import { BusinessPlanChip } from "./business-plan-chip";
 // C5's wiring. The page renders only after every store is read, so the tab
 // has no loading state of its own.
 function MediaSlot({ project, view, brief, viewer }: SlotProps) {
-  return <MediaTab project={project} refs={view.refs} draft={brief} viewer={viewer} />;
+  return <MediaTab project={project} refs={view.refs} draft={brief} viewer={viewer} canCtx={view.canCtx} />;
 }
 
 // The header renders the page's own headerParts and actions in its rows (§3.10).

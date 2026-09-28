@@ -160,8 +160,11 @@ export function productVideoStatus(
   }
 
   // No established take yet: the latest attempt decides the product's state.
-  if (latest.readyAt) return { state: "ready", take: latest };
+  // A failure wins over `readyAt`: a lost take keeps its ready time, but its
+  // file is gone, so the product has no video (P2-VIDEO-9, P2-VIDEO-19).
+  if (latest.failure?.kind === "lost") return { state: "none" };
   if (latest.failure) return { state: "failed", take: latest, failure: latest.failure.kind };
+  if (latest.readyAt) return { state: "ready", take: latest };
   const info = renderInfoOf(latest, jobs, now);
   if (info) return { state: "rendering", take: latest, stage: info.stage, progress: info.progress, eta: info.eta };
   // No ready time, no failure record, no job: interrupted (P2-VIDEO-3).

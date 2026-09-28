@@ -20,6 +20,7 @@ import type { ManualProject } from "@/lib/manual/projects";
 import { ProductCustomers } from "./product-customers";
 import { ProductActivityChip } from "../details/activity-chip";
 import { ProductContributorsPanel } from "./product-contributors";
+import { ProductMediaPanel } from "./product-media";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -62,6 +63,7 @@ function ContributorsSlot(props: ProductSlotProps) {
 
 export const PRODUCT_SLOTS: ProductSlots = {
   panels: {
+    media: ProductMediaPanel,
     contributors: ContributorsSlot,
     customers: CustomersSlot,
   },

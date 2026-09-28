@@ -59,7 +59,7 @@ export const STAGE_LABELS: Record<VideoJobStage, string> = {
   queued: "Queued",
   drafting: "Drafting visual sequences",
   rendering: "Rendering frames",
-  audio: "Synthesizing audio",
+  audio: "Composing the clip", // the local clip is silent; no audio is made
   encoding: "Encoding & finalising",
   done: "Ready",
   failed: "Failed",
