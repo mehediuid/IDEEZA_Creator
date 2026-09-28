@@ -152,7 +152,9 @@ export function SelectMenu<V extends string = string>({
     setOpen(false);
     setPos(null);
     setTip(-1);
-    if (restoreFocus) triggerRef.current?.focus();
+    // preventScroll: a trigger scrolled out of view mustn't pull the page back
+    // to it after a choice (the My projects list keeps its own scroll).
+    if (restoreFocus) triggerRef.current?.focus({ preventScroll: true });
   }, []);
 
   const choose = (i: number) => {
