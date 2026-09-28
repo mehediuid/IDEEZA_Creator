@@ -57,7 +57,7 @@ ideeza-creator-panel/
    │  │                      confirmation, and the chrome both editors share
    │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
-   │  ├─ projects/           my-projects, project-details, and the product page (deliverable tabs, version switcher — see CLAUDE.md §5)
+   │  ├─ projects/           my-projects + project-card, details/ (the project page: shell, SLOTS, header, tabs, rail), product/ (the product page — see CLAUDE.md §5)
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
    │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,
