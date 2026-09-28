@@ -12,6 +12,7 @@ import { addAmounts, toMicros } from "../wallet/money";
 import { FEE_LABEL, IDEEZA_FEE_BPS, ideezaFeeOf, payoutOf } from "./fee";
 import type { EditionTrack, Listing, Sale, SaleItem, UtilityBenefit } from "./types";
 import { randomId } from "./sales";
+import { demoHex } from "../wallet/demo-wallet";
 
 // ───────────────────────── the quote ─────────────────────────
 
@@ -113,31 +114,6 @@ export type MakeSaleCtx = {
   ownership: { creatorPct: number };
   now: number;
 };
-
-/** A pure, deterministic stand-in for the demo wallet's future `demoHex`
- *  (owned by T02, `wallet/demo-wallet.ts`, not yet landed): an FNV-1a hash
- *  of `seed` seeds a small xorshift32 PRNG, expanded to `len` hex
- *  characters. Same seed → same hex, always — no `Math.random`, no crypto
- *  randomness. Once T02 lands, callers can switch to its canonical
- *  `demoHex` without changing any `Sale.txHash` this produced meaning. */
-function demoHex(seed: string, len: number): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  let state = (h >>> 0) || 1;
-  let out = "";
-  while (out.length < len) {
-    state ^= state << 13;
-    state >>>= 0;
-    state ^= state >>> 17;
-    state ^= state << 5;
-    state >>>= 0;
-    out += state.toString(16).padStart(8, "0");
-  }
-  return out.slice(0, len);
-}
 
 /** The sale's `txHash`: deterministic for a given sale id, always
  *  "0x" + 64 hex — never a link (§3.1: nothing links to an explorer). */

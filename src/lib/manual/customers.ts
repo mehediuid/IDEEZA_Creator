@@ -6,6 +6,7 @@
 // Pure, relative imports only, so node:test loads the compiled module.
 
 import type { DemoBuyerId, MintType } from "../wallet/types";
+import { buyerLabel } from "../wallet/identities";
 import { formatAmount } from "../wallet/money";
 import { feePercentText } from "../market/fee";
 import type { EditionKind, EditionUse, Sale, UtilityBenefit } from "../market/types";
@@ -13,27 +14,9 @@ import { NETWORKS, type Network, type Token } from "../brief/types";
 import { formatDate, formatDateTime, type ProjectStatus } from "./project-summary";
 import type { ManualProject } from "./projects";
 
-// ─────────────────────────── buyer identity (temporary — see below) ───────────────────────────
-
-/**
- * CONTRACT GAP: the real `buyerLabel` ("Mira (demo buyer)") lives in T02's
- * `wallet/identities.ts`, alongside `DEMO_BUYERS`. T05 depends only on T01
- * (tasks.md), and T02 is a parallel W0b task, so that file isn't in this
- * tree yet and can't be imported (rule 3: earlier waves or owned files
- * only). This mirrors the documented format exactly (spec §3.5.3) from the
- * one piece of T02's shape that's already public — `DemoBuyerId`'s three
- * literals — so it is a drop-in replacement once T02 merges: delete this
- * block and import the real `buyerLabel` from `../wallet/identities`.
- * `ownership.ts` imports it from here for the same reason.
- */
-const DEMO_BUYER_NAME: Record<DemoBuyerId, string> = {
-  "buyer-mira": "Mira",
-  "buyer-leo": "Leo",
-  "buyer-sam": "Sam",
-};
-export function buyerLabel(id: DemoBuyerId): string {
-  return `${DEMO_BUYER_NAME[id]} (demo buyer)`;
-}
+// The buyer's label ("Mira (demo buyer)") is the wallet identities' own
+// (spec §3.5.3); re-exported so ownership.ts and the panels keep one import.
+export { buyerLabel };
 
 // ─────────────────────────── the derivation ───────────────────────────
 
