@@ -11,6 +11,7 @@ import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
 import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
+import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -109,6 +110,7 @@ export default function RootLayout({
                               page. Renders nothing. */}
                           <BuildSimulator />
                           <GlobalRenderIndicator />
+                          <PlanRunner />
                         </CreateHistoryProvider>
                       </CreditsProvider>
                     </CreatePlanProvider>

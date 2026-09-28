@@ -40,6 +40,7 @@ import { RailOutcome } from "./rail-outcome";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
+import { BusinessPlanChip } from "./business-plan-chip";
 
 // C5's wiring (task-C1.md's Hand-off). The page renders only after every
 // store is read, so the tab has no loading state of its own.
@@ -96,6 +97,11 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
 const SLOTS: ProjectSlots = {
   banner: PreviewBannerSlot,
   header: HeaderSlot,
+  headerParts: {
+    // T21's business-plan chip (P2-TABS-13). T12/T20 add their own entries to
+    // this same array; this task only appends its one.
+    titleRow: [BusinessPlanChip],
+  },
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
