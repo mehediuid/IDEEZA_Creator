@@ -1,15 +1,17 @@
 "use client";
 
 // The product page's states around its content: the loading shape (COR-2),
-// "This product isn't in {project}" (COR-30), the note for a product no build
-// stands behind (COR-24's words), and the buyer-preview banner (PPL-5). An
-// unknown project is the project page's own ProjectNotFound (COR-1).
+// "This product isn't in {project}" (COR-30), and the note for a product no
+// build stands behind (COR-24's words). An unknown project is the project
+// page's own ProjectNotFound (COR-1). The buyer-preview banner (PPL-5) is
+// `BuyerPreviewBanner` (`../details/buyer-preview`), shared with the project
+// page rather than this page's own.
 
 import * as React from "react";
 import Link from "next/link";
 import { HelpCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner, Button, StateCard, buttonVariants } from "@/components/ideeza";
+import { StateCard, buttonVariants } from "@/components/ideeza";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { cn } from "@/lib/utils";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
@@ -93,25 +95,5 @@ export function UnbuiltNote({ state }: { state: ProjectProduct["state"] }) {
     <p className="rounded-xl border border-dashed border-border px-10 py-12 text-center text-md text-text-secondary">
       {UNBUILT[state]}
     </p>
-  );
-}
-
-/** PPL-5 — the preview's banner, sticky at the top of the content, with the
- *  way out. The preview carries through from the project page (COR-37). */
-export function PreviewBanner({ onExit }: { onExit: () => void }) {
-  return (
-    <div className="sticky top-0 z-sticky flex flex-col gap-4 bg-bg-page py-4 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:items-center">
-      <Banner tone="info" title="Previewing as a buyer" className="min-w-0 flex-1">
-        This is your page without your editing controls. Nothing is published — it&apos;s saved only in this browser.
-      </Banner>
-      <Button
-        hierarchy="secondary"
-        size="md"
-        onClick={onExit}
-        className="shrink-0 [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
-      >
-        Exit preview
-      </Button>
-    </div>
   );
 }

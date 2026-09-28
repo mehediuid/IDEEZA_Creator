@@ -17,8 +17,9 @@ import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProjectBrief } from "@/lib/brief/project-brief";
+import type { BuildJob } from "@/lib/create/history";
 import { useCreateHistory } from "@/lib/create/history";
-import { can, type Viewer } from "@/lib/manual/permissions";
+import { can } from "@/lib/manual/permissions";
 import { projectView } from "@/lib/manual/project-read";
 import {
   parseProjectTab,
@@ -26,9 +27,10 @@ import {
   type ProjectTabId,
 } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
+import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "./buyer-preview";
 import { ProjectHeader } from "./header";
-import { LegacyNetwork } from "./legacy";
 import { MediaTab } from "./media-tab";
+import { NetworkTab, useNetworkTabVisible } from "./network-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProductsTab } from "./products-tab";
 import { RailDetails } from "./rail-details";
@@ -78,12 +80,27 @@ function DetailsSlot({ project, view, viewer }: SlotProps) {
   return <RailDetails project={project} summary={view.summary} viewer={viewer} />;
 }
 
+// C6's wiring (task-C1.md hand-off): NetworkTab takes one build today
+// (COR-48 later moves it to every ref) — the newest one this project still
+// has in this browser, the same rule legacy.tsx used.
+function NetworkSlot({ project, view, viewer }: SlotProps) {
+  const build = view.refs.reduce<BuildJob | null>(
+    (newest, r) => (r.job && (!newest || r.job.createdAt > newest.createdAt) ? r.job : newest),
+    null,
+  );
+  return <NetworkTab project={project} build={build} viewer={viewer} />;
+}
+function PreviewBannerSlot({ viewer }: SlotProps) {
+  return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
+}
+
 const SLOTS: ProjectSlots = {
+  banner: PreviewBannerSlot,
   header: HeaderSlot,
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
-    network: LegacyNetwork,
+    network: NetworkSlot,
   },
   rail: {
     outcome: OutcomeSlot,
@@ -96,6 +113,7 @@ const SLOTS: ProjectSlots = {
 };
 
 const NO_HIDDEN_TABS: readonly ProjectTabId[] = [];
+const NETWORK_HIDDEN: readonly ProjectTabId[] = ["network"];
 
 export function ProjectPage({ id }: { id: string }) {
   // useSearchParams needs a boundary so the route can still be pre-rendered.
@@ -133,12 +151,9 @@ function ProjectPageInner({ id }: { id: string }) {
   const brief = useProjectBrief(project?.id ?? "");
   const now = useMinuteClock();
 
-  // Preview as buyer's own hook (C6's useViewer) replaces these two lines.
-  const buyer = search.get("view") === "buyer";
-  const viewer = React.useMemo<Viewer>(
-    () => (buyer ? { kind: "owner-preview" } : { kind: "local-owner" }),
-    [buyer],
-  );
+  const viewer = useViewer();
+  // COR-49: no Network tab in preview until there's a network to read.
+  const networkShown = useNetworkTabVisible(project?.id ?? "", viewer);
 
   const view = React.useMemo(
     () =>
@@ -162,7 +177,7 @@ function ProjectPageInner({ id }: { id: string }) {
       brief={brief}
       now={now}
       asked={parseProjectTab(search.get("tab"))}
-      hiddenTabs={NO_HIDDEN_TABS}
+      hiddenTabs={networkShown ? NO_HIDDEN_TABS : NETWORK_HIDDEN}
       slots={SLOTS}
     />
   );
