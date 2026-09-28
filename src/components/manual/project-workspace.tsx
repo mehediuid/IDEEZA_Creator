@@ -80,7 +80,7 @@ export function ProjectWorkspace({
   step: keyof ManualFlowState;
 }) {
   const router = useRouter();
-  const { hydrated, findBySlug, activeProjectId, selectProject } =
+  const { hydrated, findBySlug, activeProjectId, selectProject, touchOpened } =
     useManualProjects();
   const project = findBySlug(slug);
 
@@ -92,6 +92,16 @@ export function ProjectWorkspace({
     }
     if (activeProjectId !== project.id) selectProject(project.id);
   }, [hydrated, project, activeProjectId, selectProject, router]);
+
+  // COR-91 — once the gate passes, this step is where Open in editor resumes.
+  // The Brief isn't an editor step (its door is the page header), so opening
+  // it leaves the last editor step in place.
+  const openedId =
+    hydrated && project && activeProjectId === project.id ? project.id : null;
+  React.useEffect(() => {
+    if (!openedId || step === "brief") return;
+    touchOpened(openedId, step);
+  }, [openedId, step, touchOpened]);
 
   if (!hydrated) return <BlankShell label="Loading project…" />;
   if (!project) return <BlankShell label="Returning to projects…" />;

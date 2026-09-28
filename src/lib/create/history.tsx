@@ -13,6 +13,7 @@
 // `useCreateHistory()`.
 
 import * as React from "react";
+import { reportWrite } from "../storage-status";
 import type { Companion } from "./companions";
 import {
   BRIEF_CHANGES,
@@ -362,11 +363,15 @@ function loadJSON<T>(key: string, fallback: T): T {
   }
 }
 
-function saveJSON<T>(key: string, value: T) {
-  if (typeof window === "undefined") return;
+/** Writes one key; false when the browser refused it — storage full (COR-93). */
+function saveJSON<T>(key: string, value: T): boolean {
+  if (typeof window === "undefined") return true;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ─────────────────────────── helpers ───────────────────────────────
@@ -831,14 +836,15 @@ export function CreateHistoryProvider({
     setHydrated(true);
   }, []);
 
-  // Persist on every change post-hydration so a refresh keeps state.
+  // Persist on every change post-hydration so a refresh keeps state. A write
+  // the browser refuses is reported, so the page can say so (COR-93).
   React.useEffect(() => {
     if (!hydrated) return;
-    saveJSON(CHATS_KEY, chats);
+    reportWrite(CHATS_KEY, saveJSON(CHATS_KEY, chats));
   }, [chats, hydrated]);
   React.useEffect(() => {
     if (!hydrated) return;
-    saveJSON(BUILDS_KEY, builds);
+    reportWrite(BUILDS_KEY, saveJSON(BUILDS_KEY, builds));
   }, [builds, hydrated]);
 
   // ── Chat ops ──────────────────────────────────────────────────

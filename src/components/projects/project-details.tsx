@@ -47,11 +47,12 @@ import {
 import { specLine } from "@/lib/spec/format";
 import { asConceptSummary } from "@/lib/spec/hints";
 import { NetworkSection } from "@/components/network/network-section";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
+import { resumeStepOf } from "@/lib/manual/project-read";
 import {
   FLOW_STEPS,
   STEP_LABELS,
   completedCount,
-  firstIncompleteStep,
   productLabel,
   stepHref,
   useManualProjects,
@@ -101,11 +102,12 @@ export function ProjectDetails({ id }: { id: string }) {
 
   const open = () => {
     selectProject(project.id);
-    router.push(stepHref(project, firstIncompleteStep(project)));
+    router.push(stepHref(project, resumeStepOf(project)));
   };
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-[32px] py-[28px]">
+      <StorageErrorBanner className="mb-[16px]" />
       {/* Breadcrumb. The primary action sits on the title row below it,
           clear of the shell's floating profile button. */}
       <nav
