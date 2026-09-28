@@ -18,6 +18,7 @@ import {
   useManualProjects,
   type ManualFlowState,
 } from "@/lib/manual/projects";
+import { productRowsOf } from "@/lib/manual/project-read";
 
 function BlankShell({ label }: { label: string }) {
   return (
@@ -95,13 +96,16 @@ export function ProjectWorkspace({
 
   // COR-91 — once the gate passes, this step is where Open in editor resumes.
   // The Brief isn't an editor step (its door is the page header), so opening
-  // it leaves the last editor step in place.
+  // it leaves the last editor step in place. Until the editor opens a product
+  // (T15), this route edits the project's first row, so that is the row
+  // stamped (P2-EDITOR-7).
   const openedId =
     hydrated && project && activeProjectId === project.id ? project.id : null;
+  const firstRowId = project ? productRowsOf(project)[0]?.id : undefined;
   React.useEffect(() => {
-    if (!openedId || step === "brief") return;
-    touchOpened(openedId, step);
-  }, [openedId, step, touchOpened]);
+    if (!openedId || !firstRowId || step === "brief") return;
+    touchOpened(openedId, firstRowId, step);
+  }, [openedId, firstRowId, step, touchOpened]);
 
   if (!hydrated) return <BlankShell label="Loading project…" />;
   if (!project) return <BlankShell label="Returning to projects…" />;

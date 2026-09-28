@@ -26,15 +26,35 @@ import {
   subscribeWriteError,
   type WriteError,
 } from "../storage-status";
-import { stampOpened, sweepProjectKeys } from "./project-storage";
+import { sweepProjectKeys } from "./project-storage";
 import { productsOf, type BuildJob, type BuildProduct } from "../create/history";
 // A runtime cycle: project-read.ts takes only types from this file, but it
 // loads project-summary.ts and ../brief/project-brief, and both load this file.
 // It is safe only because no module in it uses another's exports while
-// loading — only from inside functions.
+// loading — only from inside functions. editor-scope.ts, contributors.ts and
+// ../wallet/mint.ts join the same cycle on the same terms.
 import { lineageProjectOf, modelNameOf } from "./project-read";
+import { renameProduct as renameProductPatch, stampEditorOpened } from "./editor-scope";
+import {
+  CONTRIBUTOR_NAME_MAX,
+  CONTRIBUTORS_MAX,
+  contributorsIn,
+  newContributorId,
+  withContributor,
+  withoutContributor,
+} from "./contributors";
+import { normalizeLegal } from "./legal";
+import { dispatchProjectDeleted } from "./events";
+import { normalizeMintRecord } from "../wallet/mint";
 import type { MintRecord } from "../wallet/types";
-import type { Contributor, DescriptionHint, EditorStep, ProjectLegal } from "./p2-types";
+import type {
+  Contributor,
+  ContributorRole,
+  DescriptionHint,
+  EditorScope,
+  EditorStep,
+  ProjectLegal,
+} from "./p2-types";
 
 export type ManualProjectStatus = "draft" | "completed";
 
@@ -225,8 +245,10 @@ function slugify(name: string): string {
   );
 }
 
-// Slug that doesn't collide with any existing project. Appends -2, -3, …
-function uniqueSlug(name: string, existing: ManualProject[]): string {
+/** A slug that doesn't collide with any existing project: appends -2, -3, …
+ *  Exported for `saveRecord`'s ids (the provider picks them, so the pure core
+ *  stays deterministic). */
+export function uniqueSlug(name: string, existing: readonly ManualProject[]): string {
   const base = slugify(name);
   const taken = new Set(existing.map((p) => p.slug).filter(Boolean));
   if (!taken.has(base)) return base;
@@ -347,15 +369,93 @@ function buildsIn(raw: unknown): ProjectBuildRef[] | undefined {
   return same ? (raw as ProjectBuildRef[]) : out;
 }
 
-// COR-91 — kept when its step is one of FLOW_STEPS and its time is finite.
+// Whether two JSON values are the same, key order aside — so a normalizer
+// that always builds a fresh object can still hand the stored one back.
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a))
+    return Array.isArray(b) && a.length === b.length && a.every((x, i) => sameJson(x, b[i]));
+  if (!isRecord(a) || !isRecord(b)) return false;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJson(a[k], b[k]))
+  );
+}
+/** `clean` (a normalizer's answer), or `raw` itself when that is what it already was. */
+function keepSame<T>(raw: unknown, clean: T | undefined): T | undefined {
+  return clean !== undefined && sameJson(raw, clean) ? (raw as T) : clean;
+}
+
+// Row ids hold no ":" (§3.1), and a key built from one mustn't either.
+const isRowId = (v: unknown): v is string => typeof v === "string" && v !== "" && !v.includes(":");
+
+// COR-91 — kept when its step is one of FLOW_STEPS and its time is finite; a
+// `productId` (P2-EDITOR-7) is kept when it is a row id, else dropped on its
+// own. No productId = the first row's record (EDITOR §3.1).
 function lastOpenedIn(raw: unknown): ManualProject["lastOpened"] {
   if (!isRecord(raw)) return undefined;
   const step = FLOW_STEPS.find((s) => s === raw.step);
   const at = raw.at;
   if (!step || !isTime(at)) return undefined;
-  return Object.keys(raw).length === 2
+  const productId = isRowId(raw.productId) ? raw.productId : undefined;
+  return Object.keys(raw).length === (productId ? 3 : 2) && (productId || !("productId" in raw))
     ? (raw as ManualProject["lastOpened"])
-    : { step, at };
+    : { step, at, ...(productId ? { productId } : null) };
+}
+
+// P2-EDITOR-7 — an entry is kept when its key is a row id, its step an editor
+// step and its time finite; the rest are dropped. No entry left = none.
+function editorOpenedIn(raw: unknown): ManualProject["editorOpened"] {
+  if (!isRecord(raw)) return undefined;
+  const entries = Object.entries(raw);
+  let same = true;
+  const kept: [string, { step: EditorStep; at: number }][] = [];
+  for (const [rowId, v] of entries) {
+    const step = isRecord(v)
+      ? FLOW_STEPS.find((s): s is EditorStep => s !== "brief" && s === v.step)
+      : undefined;
+    if (!isRowId(rowId) || !isRecord(v) || !step || !isTime(v.at)) {
+      same = false;
+      continue;
+    }
+    if (Object.keys(v).length !== 2) same = false;
+    kept.push([rowId, { step, at: v.at }]);
+  }
+  if (!kept.length) return undefined;
+  return same ? (raw as ManualProject["editorOpened"]) : Object.fromEntries(kept);
+}
+
+// P2-MINT-8 — through normalizeMintRecord; an invalid one (a string tokenId,
+// say) is dropped and the project reads by its Brief again.
+function mintIn(raw: unknown): MintRecord | undefined {
+  return raw === undefined ? undefined : keepSame(raw, normalizeMintRecord(raw));
+}
+
+// P2-CONTRIB-6 — through contributorsIn. `[]` is kept: it means everyone was
+// removed, where absent means nobody was ever added.
+function contributorsListIn(raw: unknown): Contributor[] | undefined {
+  return Array.isArray(raw) && raw.length === 0 ? (raw as Contributor[]) : contributorsIn(raw);
+}
+
+// VIDEO — sanitized like showcasedAt: a finite time, else never confirmed.
+function ownerConfirmedIn(raw: unknown): number | undefined {
+  return isTime(raw) ? raw : undefined;
+}
+
+// P2-TABS-23 — through normalizeLegal: an all-empty record reads as never set.
+function legalIn(raw: unknown): ProjectLegal | undefined {
+  return raw === undefined ? undefined : keepSame(raw, normalizeLegal(raw));
+}
+
+// P2-TABS-22 — a finite dismissal time and a whole product count ≥ 0.
+function descriptionHintIn(raw: unknown): DescriptionHint | undefined {
+  if (!isRecord(raw) || !isTime(raw.dismissedAt)) return undefined;
+  const n = raw.productCount;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 0) return undefined;
+  return Object.keys(raw).length === 2
+    ? (raw as DescriptionHint)
+    : { dismissedAt: raw.dismissedAt, productCount: n };
 }
 
 // COR-105 — a time, or null once the maker stopped. Anything else reads as
@@ -376,13 +476,31 @@ function coverIn(raw: unknown): ProductSource | null | undefined {
     : source;
 }
 
+// The optional fields normalizeProjects keeps, each through its own normalizer.
+// Absent (undefined) = the key is dropped.
+const KEPT_FIELDS = {
+  products: productsIn,
+  builds: buildsIn,
+  lastOpened: lastOpenedIn,
+  editorOpened: editorOpenedIn,
+  showcasedAt: showcasedIn,
+  cover: coverIn,
+  mint: mintIn,
+  contributors: contributorsListIn,
+  ownerConfirmedAt: ownerConfirmedIn,
+  legal: legalIn,
+  descriptionHint: descriptionHintIn,
+} satisfies { [K in keyof ManualProject]?: (raw: unknown) => ManualProject[K] };
+
 // Normalize projects loaded from storage: backfill slugs (unique within the
 // batch), productName and every flow step for projects saved before those
 // existed, and keep the fields added since — product ids, sources and times,
-// build refs, lastOpened, showcasedAt, cover — dropping whatever doesn't parse
-// (COR-87). Returns the same reference when nothing changed so React skips
-// needless re-renders; a project that did change is written back by the save
-// effect, so a legacy row gets its id exactly once.
+// build refs, lastOpened, showcasedAt, cover, and Phase 2's editorOpened,
+// mint, contributors, ownerConfirmedAt, legal and descriptionHint (§3.3.5) —
+// dropping whatever doesn't parse (COR-87). Returns the same reference when
+// nothing changed so React skips needless re-renders; a project that did
+// change is written back by the save effect, so a legacy row gets its id
+// exactly once.
 export function normalizeProjects(list: unknown): ManualProject[] {
   if (!Array.isArray(list)) return [];
   const taken = new Set<string>();
@@ -397,11 +515,9 @@ export function normalizeProjects(list: unknown): ManualProject[] {
     let n = 2;
     while (taken.has(slug)) slug = `${base}-${n++}`;
     taken.add(slug);
-    const products = productsIn(p.products);
-    const builds = buildsIn(p.builds);
-    const lastOpened = lastOpenedIn(p.lastOpened);
-    const showcasedAt = showcasedIn(p.showcasedAt);
-    const cover = coverIn(p.cover);
+    const kept = Object.entries(KEPT_FIELDS).map(
+      ([key, keep]) => [key, (keep as (v: unknown) => unknown)(raw[key])] as const,
+    );
     // Backfill steps added after a project was saved (e.g. `assembly`,
     // UIUX-80) so flowState always carries every step key. One that isn't an
     // object at all reads as no steps done.
@@ -412,31 +528,21 @@ export function normalizeProjects(list: unknown): ManualProject[] {
       p.slug === slug &&
       p.productName !== undefined &&
       flowOk &&
-      products === p.products &&
-      builds === p.builds &&
-      lastOpened === p.lastOpened &&
-      showcasedAt === p.showcasedAt &&
-      cover === p.cover
+      kept.every(([key, v]) => v === raw[key])
     )
       return p;
-    const out: ManualProject = {
+    const out: Record<string, unknown> = {
       ...p,
       name,
       slug,
       productName: p.productName ?? "",
       flowState: { ...EMPTY_FLOW_STATE, ...(flow ?? {}) },
     };
-    if (products) out.products = products;
-    else delete out.products;
-    if (builds) out.builds = builds;
-    else delete out.builds;
-    if (lastOpened) out.lastOpened = lastOpened;
-    else delete out.lastOpened;
-    if (showcasedAt !== undefined) out.showcasedAt = showcasedAt;
-    else delete out.showcasedAt;
-    if (cover !== undefined) out.cover = cover;
-    else delete out.cover;
-    return out;
+    for (const [key, v] of kept) {
+      if (v !== undefined) out[key] = v;
+      else delete out[key];
+    }
+    return out as ManualProject;
   });
 }
 
@@ -569,9 +675,12 @@ export function attach(
     name: modelNameOf(bp, job),
     description: modelDescOf(bp),
   }));
+  // A hand-made project's virtual row "p1" becomes a stored row when it has a
+  // name, or editor work under its id even without one (EDITOR §3.1) —
+  // dropping it would orphan every `…:<id>:p1` document.
   const rows: ManualProduct[] = p.products?.length
     ? p.products
-    : p.productName.trim()
+    : p.productName.trim() || p.editorOpened?.p1
       ? [{ id: "p1", name: p.productName, description: p.description }]
       : [];
 
@@ -693,6 +802,73 @@ export function saveTargetOf(
   return chosen ? { project: chosen, via: "chosen" } : null;
 }
 
+/** What the save step (P2-SAVE-2…6) hands Save: the new project's words, or
+ *  the project a join or a version goes into. */
+export type SaveInput =
+  | { kind: "new"; name: string; description: string; cover: ProductSource | null }
+  | { kind: "join"; projectId: string }
+  | { kind: "version"; projectId: string };
+
+// The live project that already holds this build: job.projectId, else one whose
+// origin or builds[] names it (a save whose builds-store write failed, P2-SAVE-15).
+// save-step.ts's holderOf() answers the same question for the dialog.
+function holderIn(job: BuildJob, projects: readonly ManualProject[]): ManualProject | null {
+  return (
+    (job.projectId ? projects.find((p) => p.id === job.projectId) : undefined) ??
+    projects.find((p) => p.buildId === job.id || (p.builds ?? []).some((r) => r.buildId === job.id)) ??
+    null
+  );
+}
+
+/**
+ * The one record Save writes (P2-SAVE-3/5/6/15) — the pure core of the
+ * provider's `saveBuild`. `before` is the stored record it replaces, null for
+ * a new one.
+ * - `new`: the record `createProject` builds, under `ids`, then
+ *   `attach(…, { origin: true })`. `cover` is written only when the maker
+ *   picked an image other than this build's primary — the primary is the
+ *   default cover already.
+ * - `join` / `version`: `attach(target, job, lineage, now)`.
+ * - A build a live project already holds comes back as that project, with
+ *   `next === before`: nothing to write, and never a twin.
+ * Null when a join or version target isn't in `projects` any more (another
+ * tab deleted it): the dialog says so and switches to new mode (P2-SAVE-15).
+ */
+export function saveRecord(
+  input: SaveInput,
+  job: BuildJob,
+  lineage: BuildJob[],
+  projects: readonly ManualProject[],
+  now: number,
+  ids: { id: string; slug: string },
+): { next: ManualProject; before: ManualProject | null } | null {
+  const holder = holderIn(job, projects);
+  if (holder) return { next: holder, before: holder };
+  if (input.kind === "new") {
+    const created: ManualProject = {
+      id: ids.id,
+      slug: ids.slug,
+      name: input.name.trim(),
+      productName: "",
+      description: input.description.trim(),
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+      flowState: { ...EMPTY_FLOW_STATE },
+    };
+    const next = attach(created, job, [], now, { origin: true });
+    const c = input.cover;
+    const cover = c && !(c.buildId === job.id && c.productId === "primary") ? c : null;
+    return {
+      next: cover ? { ...next, cover: { buildId: cover.buildId, productId: cover.productId } } : next,
+      before: null,
+    };
+  }
+  const target = projects.find((p) => p.id === input.projectId);
+  if (!target) return null;
+  return { next: attach(target, job, lineage, now), before: target };
+}
+
 /** Words for one product, typed in the Brief's Step 1. `rowId` ties it to a
  *  row outright; without one it is matched by position or name. */
 export type ProductEdit = { name: string; description: string; rowId?: string };
@@ -761,6 +937,138 @@ export function renameHeadline(
   };
 }
 
+/** A patch laid over a stored record, as `updateProject` writes it: product
+ *  rows keep their identity (keepProductIds), and `updatedAt` is `now`. */
+export function applyPatch(p: ManualProject, patch: ProjectPatch, now: number): ManualProject {
+  const { products, ...rest } = patch;
+  return {
+    ...p,
+    ...rest,
+    ...(products ? { products: keepProductIds(products, heldProducts(p)) } : null),
+    updatedAt: now,
+  };
+}
+
+// ─────────────── The contributor writers' pure core (P2-CONTRIB-5/6) ───────────────
+
+/** What the Contributor dialog hands a writer, after `checkContributor`. */
+export type ContributorValue = Pick<Contributor, "name" | "role" | "share">;
+/** Why a writer refused. `over100`: the co-owners plus the sold shares would
+ *  pass 100 % (the ownership invariant). */
+export type ContributorRefusal = "missing" | "invalid" | "duplicate" | "full" | "over100";
+export type ContributorWrite =
+  | { ok: true; project: ManualProject; contributor: Contributor }
+  | { ok: false; reason: ContributorRefusal };
+/** `soldPct`: the Main shares already sold (Σ `sharePct`, from the market
+ *  store the provider can't read). `id`: the new contributor's id, so the
+ *  provider can apply one add twice and get one row. */
+export type ContributorOpts = { soldPct?: number; id?: string };
+
+const ROLES: readonly ContributorRole[] = ["viewer", "editor", "coOwner"];
+
+// The stored form of a value, or null when it can't be stored: a trimmed
+// 1–60-character name, a known role, and a whole 1–100 share for a co-owner —
+// 0 for everyone else, whatever was passed.
+function contributorValueOf(v: ContributorValue): ContributorValue | null {
+  const name = typeof v?.name === "string" ? v.name.trim() : "";
+  if (!name || Array.from(name).length > CONTRIBUTOR_NAME_MAX) return null;
+  if (!ROLES.includes(v.role)) return null;
+  if (v.role !== "coOwner") return { name, role: v.role, share: 0 };
+  return Number.isInteger(v.share) && v.share >= 1 && v.share <= 100
+    ? { name, role: "coOwner", share: v.share }
+    : null;
+}
+
+const sameName = (a: string, b: string) => norm(a) === norm(b);
+const coOwnedPct = (list: readonly Contributor[]) =>
+  list.reduce((sum, c) => sum + (c.role === "coOwner" ? c.share : 0), 0);
+
+// The invariant (P2-CONTRIB-5): every co-owner share plus every sold share is
+// 100 or less. A write that breaks it is refused — unless the record was
+// already past 100 (a hand-edited one) and this write doesn't raise it, so the
+// maker can still fix such a record one row at a time.
+function breaksInvariant(
+  before: readonly Contributor[],
+  after: readonly Contributor[],
+  soldPct: number | undefined,
+): boolean {
+  const sold = soldPct !== undefined && Number.isFinite(soldPct) ? Math.max(0, soldPct) : 0;
+  const total = coOwnedPct(after) + sold;
+  return total > 100 && total > coOwnedPct(before) + sold;
+}
+
+/** Adds a contributor (P2-CONTRIB-6). Refuses an invalid value, a name already
+ *  on the project, a 51st row and a total past 100. Bumps `updatedAt`. */
+export function addContributorTo(
+  p: ManualProject,
+  value: ContributorValue,
+  now: number,
+  opts: ContributorOpts = {},
+): ContributorWrite {
+  const clean = contributorValueOf(value);
+  if (!clean) return { ok: false, reason: "invalid" };
+  const list = p.contributors ?? [];
+  if (list.length >= CONTRIBUTORS_MAX) return { ok: false, reason: "full" };
+  if (list.some((c) => sameName(c.name, clean.name))) return { ok: false, reason: "duplicate" };
+  const free = (id: string | undefined): id is string => !!id && !list.some((c) => c.id === id);
+  let id = free(opts.id) ? opts.id : newContributorId();
+  while (!free(id)) id = newContributorId();
+  const contributor: Contributor = { id, ...clean, addedAt: now };
+  const next = [...list, contributor];
+  if (breaksInvariant(list, next, opts.soldPct)) return { ok: false, reason: "over100" };
+  return { ok: true, project: { ...p, contributors: next, updatedAt: now }, contributor };
+}
+
+/** Edits one contributor: its name, role and share. Leaving Co-owner gives the
+ *  share back (it becomes 0). The same refusals as an add, minus `full`. */
+export function updateContributorIn(
+  p: ManualProject,
+  contributorId: string,
+  value: ContributorValue,
+  now: number,
+  opts: Pick<ContributorOpts, "soldPct"> = {},
+): ContributorWrite {
+  const list = p.contributors ?? [];
+  if (!list.some((c) => c.id === contributorId)) return { ok: false, reason: "missing" };
+  const clean = contributorValueOf(value);
+  if (!clean) return { ok: false, reason: "invalid" };
+  if (list.some((c) => c.id !== contributorId && sameName(c.name, clean.name)))
+    return { ok: false, reason: "duplicate" };
+  const next = withContributor(list, clean, now, contributorId);
+  if (breaksInvariant(list, next, opts.soldPct)) return { ok: false, reason: "over100" };
+  const contributor = next.find((c) => c.id === contributorId) as Contributor;
+  return { ok: true, project: { ...p, contributors: next, updatedAt: now }, contributor };
+}
+
+/** Removes one contributor; a co-owner's share comes back to the maker. The
+ *  answer carries the row as it was, for "… removed — their 30% came back". */
+export function removeContributorFrom(
+  p: ManualProject,
+  contributorId: string,
+  now: number,
+): ContributorWrite {
+  const list = p.contributors ?? [];
+  const contributor = list.find((c) => c.id === contributorId);
+  if (!contributor) return { ok: false, reason: "missing" };
+  return {
+    ok: true,
+    project: { ...p, contributors: withoutContributor(list, contributorId), updatedAt: now },
+    contributor,
+  };
+}
+
+/** Every product row id a project's browser keys can be under, for the delete
+ *  sweep: its rows (a dropped row stays listed, O9), every row it stamped in
+ *  the editor, and the virtual "p1" — a hand project's `:p1` documents
+ *  outlive the row when a build joined before the p1 rule kept it. */
+export function sweepRowIdsOf(p: ManualProject): string[] {
+  const ids = new Set<string>(heldProducts(p).map((r) => r.id));
+  for (const id of Object.keys(p.editorOpened ?? {})) ids.add(id);
+  if (p.lastOpened?.productId) ids.add(p.lastOpened.productId);
+  ids.add("p1");
+  return [...ids];
+}
+
 type Ctx = {
   hydrated: boolean;
   projects: ManualProject[];
@@ -773,11 +1081,23 @@ type Ctx = {
   // create that also switched the active project moved every editor route
   // out from under the user as a side effect of saving something.
   createProject: (input: { name: string; description: string }) => ManualProject;
-  // The project a finished AI build becomes (§5.1.8): the project it is
-  // already in; else the one another build of its chat was saved into, as that
-  // chat's next version (COR-89); else the one chosen at the setup question;
-  // else a new one. `lineage` = the OTHER builds of job.chatId — the caller
-  // has the builds store; this provider sits outside it (app/layout.tsx).
+  /** Save (P2-SAVE-15): `saveRecord` applied in ONE setProjects write.
+   *  `revert` puts the list back as it was — removes a new record, or
+   *  restores `before` — and drops the in-session builtFrom entry, for when
+   *  the browser refuses the write (`projectWriteRefused`). A build already
+   *  saved (in a live project, or earlier this session) comes back as that
+   *  project with a no-op `revert`. Null when a join or version target is
+   *  gone. `lineage` = the OTHER builds of job.chatId. */
+  saveBuild: (
+    job: BuildJob,
+    lineage: BuildJob[],
+    input: SaveInput,
+  ) => { project: ManualProject; revert: () => void } | null;
+  /** @deprecated Use `saveBuild` with the save step's `SaveInput` (T16 removes this).
+   *  The project a finished AI build becomes (§5.1.8): the project it is
+   *  already in; else the one another build of its chat was saved into, as that
+   *  chat's next version (COR-89); else the one chosen at the setup question;
+   *  else a new one, named by the setup answer. Now a wrapper over saveBuild. */
   projectFromBuild: (job: BuildJob, lineage?: BuildJob[]) => ManualProject;
   // A build joins a project (COR-88): attach() on the stored record,
   // idempotent by build id — the one writer Save, Open in editor and the
@@ -809,14 +1129,54 @@ type Ctx = {
    *  made. Called with `showcaseBackfillOf()`'s answer (lib/brief/project-brief). */
   backfillShowcase: (id: string, at: number) => void;
   clearActive: () => void;
-  /** COR-91: stamps the editor step last opened — Open in editor's resume
-   *  target. Never bumps updatedAt; at most one write per step per minute. */
-  touchOpened: (id: string, step: ProjectStep) => void;
+  /** P2-EDITOR-1: the product the editor is working on — the active project
+   *  (as `selectProject`) plus `activeProductId`. In memory only; the URL and
+   *  `lastOpened` carry the resume. */
+  selectEditorScope: (projectId: string, productId: string) => void;
+  /** The editor's product row in the active project, or null (no scope, or
+   *  a scope for another project or a row it doesn't hold). */
+  activeProductId: string | null;
+  /** P2-EDITOR-7 (COR-91): stamps where product `productId` was left —
+   *  `editorOpened[productId]` and `lastOpened`. Never bumps updatedAt; at
+   *  most one write per (product, step) per minute; a row the project doesn't
+   *  hold is ignored. */
+  touchOpened: (id: string, productId: string, step: EditorStep) => void;
+  /** P2-EDITOR-6: renames one row (`editor-scope.ts`'s renameProduct — the
+   *  virtual "p1" writes productName; the first row carries the headline
+   *  while they agree). False, and no write, for an empty name or an unknown
+   *  row. Bumps updatedAt. */
+  renameProduct: (id: string, rowId: string, name: string) => boolean;
+  /** P2-MINT-8: the demo mint record — only the mint and listing commits call
+   *  this. Stored as normalizeMintRecord reads it; false, and no write, for a
+   *  record that doesn't parse or a project that isn't here. Bumps updatedAt. */
+  setMint: (id: string, record: MintRecord) => boolean;
+  /** P2-CONTRIB-6. Each re-checks the value and the ownership invariant —
+   *  co-owners plus `soldPct` (the Main shares sold) at most 100 — and
+   *  refuses with a reason instead of writing. Each bumps updatedAt. */
+  addContributor: (projectId: string, value: ContributorValue, opts?: { soldPct?: number }) => ContributorWrite;
+  updateContributor: (
+    projectId: string,
+    contributorId: string,
+    value: ContributorValue,
+    opts?: { soldPct?: number },
+  ) => ContributorWrite;
+  removeContributor: (projectId: string, contributorId: string) => ContributorWrite;
+  /** VIDEO: "I confirm I am the rightful owner of this idea" ticked at `at`. Bumps updatedAt. */
+  setOwnerConfirmed: (id: string, at: number) => void;
+  /** P2-TABS-23: the Legal block's details, through normalizeLegal — an
+   *  all-empty one (or null) clears them. Bumps updatedAt. */
+  setLegal: (id: string, legal: ProjectLegal | null) => void;
+  /** P2-TABS-22: the description coachmark's "Not now". A dismissal, not an
+   *  edit, so it never bumps updatedAt. */
+  setDescriptionHint: (id: string, hint: DescriptionHint) => void;
   /** COR-93: the newest browser write that failed and hasn't saved since,
    *  from this store or the create-history store; null when all went through. */
   writeError: WriteError | null;
   /** COR-92: removes the record and everything the project keeps in this
-   *  browser (§5.1.9). Callers check deleteBlockOf() first (COR-70). */
+   *  browser (§5.1.9): sweeps `projectStorageKeys(id, rowIds)`, removes the
+   *  network, then dispatches `ideeza:project-deleted` so the market, video
+   *  and journey stores purge their own records. Callers check
+   *  deleteBlockOf() first (COR-70). */
   deleteProject: (id: string) => void;
 };
 
@@ -832,8 +1192,10 @@ export function ManualProjectsProvider({
     null,
   );
   const [hydrated, setHydrated] = React.useState(false);
-  // Projects made from an AI build in this session, by build id — see
-  // projectFromBuild.
+  // The editor's product (P2-EDITOR-1). In memory only.
+  const [scope, setScope] = React.useState<EditorScope | null>(null);
+  // Projects made or joined from an AI build in this session, by build id —
+  // see saveBuild.
   const builtFrom = React.useRef(new Map<string, ManualProject>());
   const writeError = React.useSyncExternalStore(
     subscribeWriteError,
@@ -908,23 +1270,17 @@ export function ManualProjectsProvider({
   // row it replaces — see keepProductIds.
   const updateProject = React.useCallback(
     (id: string, patch: ProjectPatch) => {
-      const { products, ...rest } = patch;
-      setProjects((arr) =>
-        arr.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                ...rest,
-                ...(products
-                  ? { products: keepProductIds(products, heldProducts(p)) }
-                  : null),
-                updatedAt: Date.now(),
-              }
-            : p,
-        ),
-      );
+      const now = Date.now();
+      setProjects((arr) => arr.map((p) => (p.id === id ? applyPatch(p, patch, now) : p)));
     },
     [],
+  );
+
+  // The record as this event sees it: the rendered list, else one created
+  // earlier in the same event and not rendered yet.
+  const recordOf = React.useCallback(
+    (id: string) => projects.find((p) => p.id === id) ?? made.current.get(id) ?? null,
+    [projects],
   );
 
   // The same write as a rename — through updateProject, so it bumps updatedAt.
@@ -973,43 +1329,84 @@ export function ManualProjectsProvider({
     [projects],
   );
 
-  // The project a finished build becomes (§5.1.8), in order:
-  //   1. the project the build is already in, unchanged;
-  //   2. the one this session already made or joined for it;
-  //   3. the project another build of its chat was saved into — a rebuild is
-  //      that project's next version, never a second project of the same
-  //      name (COR-89);
-  //   4. the project the maker chose at the setup question;
-  //   5. else a new one, named as the setup answer named it.
-  // Every join and every new project goes through attachBuild, so a build
-  // lands with all of its products, each tied to the build product it is.
-  // Making the record is all this does — the caller decides whether the
-  // editor should switch to it.
-  const projectFromBuild = React.useCallback(
-    (job: BuildJob, lineage: BuildJob[] = []) => {
-      const target = saveTargetOf(job, lineage, projects);
-      if (target?.via === "saved") return target.project;
+  // Save (P2-SAVE-15): saveRecord on the list as this event sees it, in one
+  // setProjects write. Making the record is all this does — the caller
+  // decides whether the editor should switch to it, and calls setBuildProject
+  // only once the write has settled.
+  const saveBuild = React.useCallback(
+    (
+      job: BuildJob,
+      lineage: BuildJob[],
+      input: SaveInput,
+    ): { project: ManualProject; revert: () => void } | null => {
+      const noop = () => {};
       // `projects` is React state, so two presses inside one tick would both
       // read the list from before the first one and attach — or create —
       // twice. This is what keeps one build to one project.
       const already = builtFrom.current.get(job.id);
-      if (already) return already;
-      let project: ManualProject;
-      if (target) {
-        project = attachBuild(target.project.id, job, lineage) ?? target.project;
+      if (already) return { project: already, revert: noop };
+      const unrendered = [...made.current.values()].filter(
+        (m) => !projects.some((p) => p.id === m.id),
+      );
+      const list = unrendered.length ? [...unrendered, ...projects] : projects;
+      const now = Date.now();
+      const name = input.kind === "new" ? input.name.trim() : "";
+      const result = saveRecord(input, job, lineage, list, now, {
+        id: makeId(),
+        slug: uniqueSlug(name, list),
+      });
+      if (!result) return null;
+      const { next, before } = result;
+      if (next === before) return { project: next, revert: noop };
+      if (before === null) {
+        made.current.set(next.id, next);
+        setProjects((arr) => [next, ...arr]);
       } else {
-        const created = createProject({
-          name: job.projectChoiceName?.trim() || job.title,
-          description: (job.description || job.conceptPrompt).trim(),
-        });
-        // Its origin: `buildId`, the headline, version 1, and every product
-        // with the build product it came from.
-        project = attachBuild(created.id, job, [], { origin: true }) ?? created;
+        // The record computed is the one stored. Only a record another write
+        // in this same event already changed is attached again, onto that
+        // newer copy.
+        setProjects((arr) =>
+          arr.map((p) =>
+            p.id !== next.id ? p : p === before ? next : attach(p, job, lineage, now),
+          ),
+        );
       }
-      builtFrom.current.set(job.id, project);
-      return project;
+      builtFrom.current.set(job.id, next);
+      const revert = () => {
+        if (builtFrom.current.get(job.id) === next) builtFrom.current.delete(job.id);
+        if (before === null) {
+          made.current.delete(next.id);
+          setProjects((arr) => arr.filter((p) => p.id !== next.id));
+        } else {
+          setProjects((arr) => arr.map((p) => (p.id === before.id ? before : p)));
+        }
+      };
+      return { project: next, revert };
     },
-    [projects, createProject, attachBuild],
+    [projects],
+  );
+
+  // @deprecated — saveBuild with the SaveInput v1's one-click Save implied
+  // (§5.1.8): the project the build is already in, unchanged; the one this
+  // session made or joined for it; the chat's project as its next version
+  // (COR-89); the setup question's choice; else a new one named by the setup
+  // answer. T16 moves its callers to saveBuild and removes it.
+  const projectFromBuild = React.useCallback(
+    (job: BuildJob, lineage: BuildJob[] = []) => {
+      const target = saveTargetOf(job, lineage, projects);
+      if (target?.via === "saved") return target.project;
+      const input: SaveInput = target
+        ? { kind: target.via === "lineage" ? "version" : "join", projectId: target.project.id }
+        : {
+            kind: "new",
+            name: job.projectChoiceName?.trim() || job.title,
+            description: (job.description || job.conceptPrompt).trim(),
+            cover: null,
+          };
+      // A target read from `projects` is always there, so null can't come back.
+      return saveBuild(job, lineage, input)?.project ?? (target as { project: ManualProject }).project;
+    },
+    [projects, saveBuild],
   );
 
   const markStepCompleted = React.useCallback(
@@ -1053,17 +1450,31 @@ export function ManualProjectsProvider({
 
   const clearActive = React.useCallback(() => {
     setActiveProjectId(null);
+    setScope(null);
   }, []);
 
-  // COR-91 — the editor step last opened, the one resume signal. Opening a
-  // step changes nothing in the project, so updatedAt stays; a step already
-  // stamped in the last minute isn't written again (§5.1.10).
-  const touchOpened = React.useCallback((id: string, step: ProjectStep) => {
+  // P2-EDITOR-1 — the editor opens a product: the project becomes the active
+  // one, and the row is held beside it.
+  const selectEditorScope = React.useCallback((projectId: string, productId: string) => {
+    setActiveProjectId(projectId);
+    setScope((cur) =>
+      cur && cur.projectId === projectId && cur.productId === productId
+        ? cur
+        : { projectId, productId },
+    );
+  }, []);
+
+  // P2-EDITOR-7 (COR-91) — where each product was left, the one resume
+  // signal. Opening a step changes nothing in the project, so updatedAt stays;
+  // a (product, step) already stamped in the last minute isn't written again.
+  // The Brief is the project's, not a product step, so it never stamps.
+  const touchOpened = React.useCallback((id: string, productId: string, step: EditorStep) => {
+    if ((step as ProjectStep) === "brief") return;
     const now = Date.now();
     setProjects((arr) => {
       const i = arr.findIndex((p) => p.id === id);
-      if (i < 0) return arr;
-      const next = stampOpened(arr[i], step, now);
+      if (i < 0 || !heldProducts(arr[i]).some((r) => r.id === productId)) return arr;
+      const next = stampEditorOpened(arr[i], productId, step, now);
       if (next === arr[i]) return arr;
       const out = arr.slice();
       out[i] = next;
@@ -1071,29 +1482,168 @@ export function ManualProjectsProvider({
     });
   }, []);
 
-  // COR-92 — the record, the active selection, this session's build guard
-  // and every key the project keeps in this browser (§5.1.9). Builds keep
-  // their now-dangling projectId, so History drops the link and the build's
-  // review offers Save again (COR-71).
-  const deleteProject = React.useCallback((id: string) => {
-    setProjects((arr) => arr.filter((p) => p.id !== id));
-    setActiveProjectId((cur) => (cur === id ? null : cur));
-    for (const [buildId, made] of builtFrom.current) {
-      if (made.id === id) builtFrom.current.delete(buildId);
-    }
-    if (typeof window === "undefined") return;
-    try {
-      sweepProjectKeys(id, window.localStorage);
-    } catch {
-      // Storage itself is unreachable (blocked site data): nothing to sweep.
-    }
-    deleteNetwork(id);
+  // P2-EDITOR-6 — the pure rename, applied to the record as it stands when the
+  // write lands, so a write earlier in the same event isn't overwritten.
+  const renameProduct = React.useCallback(
+    (id: string, rowId: string, name: string) => {
+      const base = recordOf(id);
+      const now = Date.now();
+      if (!base || !Object.keys(renameProductPatch(base, rowId, name, now)).length) return false;
+      setProjects((arr) =>
+        arr.map((p) => {
+          if (p.id !== id) return p;
+          const patch = renameProductPatch(p, rowId, name, now);
+          return Object.keys(patch).length ? applyPatch(p, patch, now) : p;
+        }),
+      );
+      return true;
+    },
+    [recordOf],
+  );
+
+  // P2-MINT-8 — the mint record, stored exactly as a reload will read it.
+  const setMint = React.useCallback(
+    (id: string, record: MintRecord) => {
+      const clean = normalizeMintRecord(record);
+      if (!clean || !recordOf(id)) return false;
+      const now = Date.now();
+      setProjects((arr) =>
+        arr.map((p) => (p.id === id ? { ...p, mint: clean, updatedAt: now } : p)),
+      );
+      return true;
+    },
+    [recordOf],
+  );
+
+  // P2-CONTRIB-6 — one contributor write: computed on the record this event
+  // sees, so the caller learns at once whether it was refused and which row
+  // it wrote; applied again only onto a copy another write already changed.
+  const contributorWrite = React.useCallback(
+    (projectId: string, run: (p: ManualProject, now: number) => ContributorWrite): ContributorWrite => {
+      const base = recordOf(projectId);
+      if (!base) return { ok: false, reason: "missing" };
+      const now = Date.now();
+      const result = run(base, now);
+      if (!result.ok) return result;
+      setProjects((arr) =>
+        arr.map((p) => {
+          if (p.id !== projectId) return p;
+          if (p === base) return result.project;
+          const again = run(p, now);
+          return again.ok ? again.project : p;
+        }),
+      );
+      return result;
+    },
+    [recordOf],
+  );
+  const addContributor = React.useCallback(
+    (projectId: string, value: ContributorValue, opts: { soldPct?: number } = {}) => {
+      const id = newContributorId();
+      return contributorWrite(projectId, (p, now) =>
+        addContributorTo(p, value, now, { soldPct: opts.soldPct, id }),
+      );
+    },
+    [contributorWrite],
+  );
+  const updateContributor = React.useCallback(
+    (projectId: string, contributorId: string, value: ContributorValue, opts: { soldPct?: number } = {}) =>
+      contributorWrite(projectId, (p, now) =>
+        updateContributorIn(p, contributorId, value, now, { soldPct: opts.soldPct }),
+      ),
+    [contributorWrite],
+  );
+  const removeContributor = React.useCallback(
+    (projectId: string, contributorId: string) =>
+      contributorWrite(projectId, (p, now) => removeContributorFrom(p, contributorId, now)),
+    [contributorWrite],
+  );
+
+  // VIDEO — the owner's confirmation, a maker's act like Showcase.
+  const setOwnerConfirmed = React.useCallback(
+    (id: string, at: number) => {
+      if (!isTime(at)) return;
+      updateProject(id, { ownerConfirmedAt: at });
+    },
+    [updateProject],
+  );
+
+  // P2-TABS-23 — what normalizeLegal keeps; nothing left clears the block.
+  // Saving the details as they already are (its own time aside) writes nothing.
+  const setLegal = React.useCallback((id: string, legal: ProjectLegal | null) => {
+    const clean = legal === null ? undefined : normalizeLegal(legal);
+    const bare = (l: ProjectLegal | undefined) => (l ? { ...l, updatedAt: 0 } : undefined);
+    const now = Date.now();
+    setProjects((arr) =>
+      arr.map((p) => {
+        if (p.id !== id || sameJson(bare(p.legal), bare(clean))) return p;
+        const next: ManualProject = { ...p, updatedAt: now };
+        if (clean) next.legal = clean;
+        else delete next.legal;
+        return next;
+      }),
+    );
   }, []);
+
+  // P2-TABS-22 — "Not now" on the coachmark: a dismissal, so updatedAt stays,
+  // and the same dismissal again writes nothing.
+  const setDescriptionHint = React.useCallback((id: string, hint: DescriptionHint) => {
+    const clean = descriptionHintIn(hint);
+    if (!clean) return;
+    setProjects((arr) => {
+      const i = arr.findIndex((p) => p.id === id);
+      if (i < 0 || sameJson(arr[i].descriptionHint, clean)) return arr;
+      const out = arr.slice();
+      out[i] = { ...arr[i], descriptionHint: { dismissedAt: clean.dismissedAt, productCount: clean.productCount } };
+      return out;
+    });
+  }, []);
+
+  // COR-92 — the record, the active selection, this session's build guard
+  // and every key the project keeps in this browser (§5.1.9, P2 §3.4): the
+  // exact per-product editor keys of every row it held, then the network, then
+  // the `ideeza:project-deleted` event, on which the market, video and journey
+  // stores purge their own records. Builds keep their now-dangling projectId,
+  // so History drops the link and the build's review offers Save again (COR-71).
+  const deleteProject = React.useCallback(
+    (id: string) => {
+      const record = recordOf(id);
+      const rowIds = record ? sweepRowIdsOf(record) : ["p1"];
+      setProjects((arr) => arr.filter((p) => p.id !== id));
+      setActiveProjectId((cur) => (cur === id ? null : cur));
+      setScope((cur) => (cur?.projectId === id ? null : cur));
+      made.current.delete(id);
+      for (const [buildId, held] of builtFrom.current) {
+        if (held.id === id) builtFrom.current.delete(buildId);
+      }
+      if (typeof window === "undefined") return;
+      // The root PcbProvider (v1, until P2-EDITOR-4) saves under
+      // `ideeza:pcb:doc:<ideeza:manual:active>` when its debounce fires, so a
+      // save already pending would re-create the swept document. Clearing the
+      // stored active id now — not in the save effect after the next render —
+      // sends that save to its "default" key instead.
+      if (loadActiveId() === id) saveActiveId(null);
+      try {
+        sweepProjectKeys(id, rowIds, window.localStorage);
+      } catch {
+        // Storage itself is unreachable (blocked site data): nothing to sweep.
+      }
+      deleteNetwork(id);
+      dispatchProjectDeleted(id);
+    },
+    [recordOf],
+  );
 
   const activeProject =
     activeProjectId === null
       ? null
       : (projects.find((p) => p.id === activeProjectId) ?? null);
+  const activeProductId =
+    activeProject &&
+    scope?.projectId === activeProject.id &&
+    heldProducts(activeProject).some((r) => r.id === scope.productId)
+      ? scope.productId
+      : null;
 
   const findBySlug = React.useCallback(
     (slug: string) => projects.find((p) => p.slug === slug) ?? null,
@@ -1107,6 +1657,7 @@ export function ManualProjectsProvider({
     activeProject,
     findBySlug,
     createProject,
+    saveBuild,
     projectFromBuild,
     attachBuild,
     selectProject,
@@ -1117,7 +1668,17 @@ export function ManualProjectsProvider({
     setStatus,
     backfillShowcase,
     clearActive,
+    selectEditorScope,
+    activeProductId,
     touchOpened,
+    renameProduct,
+    setMint,
+    addContributor,
+    updateContributor,
+    removeContributor,
+    setOwnerConfirmed,
+    setLegal,
+    setDescriptionHint,
     writeError,
     deleteProject,
   };

@@ -5,10 +5,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  addContributorTo,
+  applyPatch,
   attach,
   mergeProductEdits,
+  removeContributorFrom,
   renameHeadline,
   saveTargetOf,
+  sweepRowIdsOf,
+  updateContributorIn,
 } from "../../.tmp-test/lib/manual/projects.js";
 import { buildsOf, productsOfProject } from "../../.tmp-test/lib/manual/project-read.js";
 
@@ -339,4 +344,129 @@ test("renaming the headline renames the first product while they agree", () => {
   assert.deepEqual(renameHeadline(p, "", 7), { productName: "" });
   // A hand-made project with no list has nothing else to rename.
   assert.deepEqual(renameHeadline(project("proj_hand", { productName: "Lamp" }), "Desk lamp", 7), { productName: "Desk lamp" });
+});
+
+// ── T09: attach() keeps the virtual "p1" once it has editor work (EDITOR §3.1) ─────
+
+test("a hand project with editor work on p1 keeps p1 when a build joins, even with no product name", () => {
+  const hand = project("proj_hand", { name: "Garden", productName: "", editorOpened: { p1: { step: "pcb", at: 5 } } });
+  const b = build({ id: "bj", chatId: "chat_plant", createdAt: 100, title: "Plant waterer", projectChoiceName: "" });
+  const next = attach(hand, b, [], 1000);
+  assert.deepEqual(next.products[0], { id: "p1", name: "", description: "" });
+  assert.equal(next.products[1].name, "Plant waterer");
+  assert.deepEqual(next.products[1].source, { buildId: "bj", productId: "primary" });
+  // Without a name and without editor work there is no p1 to keep: the build's rows are all.
+  const bare = attach(project("proj_bare", { productName: "" }), b, [], 1000);
+  assert.deepEqual(bare.products.map((r) => r.name), ["Plant waterer"]);
+  assert.notEqual(bare.products[0].id, "p1");
+});
+
+// ── T09: the contributor writers (P2-CONTRIB-5 invariant, P2-CONTRIB-6) ─────
+
+const ana = { name: "Ana Silva", role: "coOwner", share: 30 };
+const lee = { name: "Lee Park", role: "viewer", share: 0 };
+
+test("addContributor writes a ctb_ row with addedAt and bumps updatedAt", () => {
+  const p = project("proj_car");
+  const r = addContributorTo(p, { ...ana, name: " Ana Silva " }, 5000);
+  assert.equal(r.ok, true);
+  assert.match(r.contributor.id, /^ctb_[0-9a-z]{8}$/);
+  assert.deepEqual(r.project.contributors, [{ id: r.contributor.id, name: "Ana Silva", role: "coOwner", share: 30, addedAt: 5000 }]);
+  assert.equal(r.project.updatedAt, 5000);
+  // A given id is used, so applying one add twice gives one row id.
+  const again = addContributorTo(p, lee, 5000, { id: "ctb_fixed001" });
+  assert.equal(again.contributor.id, "ctb_fixed001");
+  // A viewer's share is always 0, whatever was passed.
+  assert.equal(addContributorTo(p, { ...lee, share: 40 }, 5000).contributor.share, 0);
+});
+
+test("the writers refuse a total over 100 — co-owners plus the sold shares", () => {
+  let p = project("proj_car");
+  p = addContributorTo(p, ana, 1).project; // 30
+  assert.deepEqual(addContributorTo(p, { name: "Kofi Mensah", role: "coOwner", share: 71 }, 2), { ok: false, reason: "over100" });
+  assert.equal(addContributorTo(p, { name: "Kofi Mensah", role: "coOwner", share: 70 }, 2).ok, true);
+  // 20 % already sold: 30 + 51 + 20 > 100.
+  assert.deepEqual(
+    addContributorTo(p, { name: "Kofi Mensah", role: "coOwner", share: 51 }, 2, { soldPct: 20 }),
+    { ok: false, reason: "over100" },
+  );
+  // An edit that raises the total past 100 is refused too; the record is untouched.
+  const id = p.contributors[0].id;
+  assert.deepEqual(updateContributorIn(p, id, { ...ana, share: 90 }, 3, { soldPct: 20 }), { ok: false, reason: "over100" });
+  assert.equal(p.contributors[0].share, 30);
+  assert.equal(updateContributorIn(p, id, { ...ana, share: 80 }, 3, { soldPct: 20 }).ok, true);
+});
+
+test("a hand-edited record already past 100 can still be lowered, never raised", () => {
+  const p = project("proj_over", {
+    contributors: [
+      { id: "ctb_a0000001", name: "A", role: "coOwner", share: 70, addedAt: 1 },
+      { id: "ctb_b0000001", name: "B", role: "coOwner", share: 50, addedAt: 1 },
+    ],
+  });
+  assert.equal(updateContributorIn(p, "ctb_b0000001", { name: "B", role: "coOwner", share: 40 }, 2).ok, true);
+  assert.equal(updateContributorIn(p, "ctb_b0000001", { name: "Bea", role: "coOwner", share: 50 }, 2).ok, true); // a rename
+  assert.deepEqual(updateContributorIn(p, "ctb_b0000001", { name: "B", role: "coOwner", share: 51 }, 2), { ok: false, reason: "over100" });
+  assert.equal(addContributorTo(p, lee, 2).ok, true); // no share, no rise
+  assert.equal(removeContributorFrom(p, "ctb_a0000001", 2).ok, true);
+});
+
+test("the writers refuse what the store couldn't hold: bad values, a repeated name, a 51st row", () => {
+  const p = addContributorTo(project("proj_car"), ana, 1).project;
+  for (const bad of [
+    { name: "  ", role: "viewer", share: 0 },
+    { name: "x".repeat(61), role: "viewer", share: 0 },
+    { name: "Kofi", role: "owner", share: 0 },
+    { name: "Kofi", role: "coOwner", share: 0 },
+    { name: "Kofi", role: "coOwner", share: 12.5 },
+    { name: "Kofi", role: "coOwner", share: 101 },
+  ]) {
+    assert.deepEqual(addContributorTo(p, bad, 2), { ok: false, reason: "invalid" }, JSON.stringify(bad));
+  }
+  assert.deepEqual(addContributorTo(p, { ...lee, name: "ana silva " }, 2), { ok: false, reason: "duplicate" });
+  const full = project("proj_full", {
+    contributors: Array.from({ length: 50 }, (_, i) => ({
+      id: `ctb_${String(i).padStart(8, "0")}`, name: `P${i}`, role: "viewer", share: 0, addedAt: 1,
+    })),
+  });
+  assert.deepEqual(addContributorTo(full, lee, 2), { ok: false, reason: "full" });
+  assert.deepEqual(updateContributorIn(p, "ctb_nobody00", lee, 2), { ok: false, reason: "missing" });
+  assert.deepEqual(removeContributorFrom(p, "ctb_nobody00", 2), { ok: false, reason: "missing" });
+});
+
+test("updateContributor: leaving Co-owner gives the share back; its own name isn't a duplicate", () => {
+  const added = addContributorTo(project("proj_car"), ana, 1);
+  const r = updateContributorIn(added.project, added.contributor.id, { name: "Ana Silva", role: "viewer", share: 30 }, 9);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.contributor, { ...added.contributor, role: "viewer", share: 0, updatedAt: 9 });
+  assert.equal(r.project.updatedAt, 9);
+});
+
+test("removeContributor hands back the row as it was, and leaves [] once everyone is gone", () => {
+  const added = addContributorTo(project("proj_car"), ana, 1);
+  const r = removeContributorFrom(added.project, added.contributor.id, 9);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.contributor, added.contributor);
+  assert.deepEqual(r.project.contributors, []);
+  assert.equal(r.project.updatedAt, 9);
+});
+
+// ── T09: applyPatch and the delete sweep's row ids ─────
+
+test("applyPatch keeps product ids and stamps updatedAt, as updateProject writes", () => {
+  const p = project("proj_car", { products: [{ id: "prd_a", name: "A", description: "" }] });
+  const next = applyPatch(p, { name: "Car 2", products: [{ name: "A2", description: "x" }] }, 42);
+  assert.equal(next.name, "Car 2");
+  assert.deepEqual(next.products, [{ id: "prd_a", name: "A2", description: "x" }]);
+  assert.equal(next.updatedAt, 42);
+});
+
+test("sweepRowIdsOf: every row, every stamped row and p1, once each", () => {
+  const p = project("proj_car", {
+    products: [{ id: "prd_a", name: "A", description: "" }, { id: "prd_b", name: "B", description: "" }],
+    editorOpened: { prd_b: { step: "pcb", at: 1 }, prd_old: { step: "code", at: 1 } },
+    lastOpened: { step: "pcb", at: 1, productId: "prd_last" },
+  });
+  assert.deepEqual(sweepRowIdsOf(p), ["prd_a", "prd_b", "prd_old", "prd_last", "p1"]);
+  assert.deepEqual(sweepRowIdsOf(project("proj_hand", { productName: "Lamp" })), ["p1"]);
 });
