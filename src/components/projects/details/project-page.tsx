@@ -43,6 +43,9 @@ import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
 import { BusinessPlanChip } from "./business-plan-chip";
 import { BuyerRail } from "@/components/marketplace/buyer-rail";
+import { ListingFlow } from "@/components/projects/listing/listing-flow";
+import { UtilityPill } from "@/components/projects/listing/utility-pill";
+import { RailMarketplace } from "./rail-marketplace";
 
 // ─────────────────────────── the slot adapters ───────────────────────────
 
@@ -142,11 +145,12 @@ function ContributorsSlot(props: SlotProps) {
   return <ContributorsTab {...props} />;
 }
 
-// T23's wiring (P2-MARKETPLACE-10, P2-LISTING-21): every viewer but the owner reads
-// the Marketplace block as the read-only buyer rail — facts and "Open in Explore
-// marketplace", never a Buy or Bid button. The owner's card is T22's branch.
-function MarketplaceBuyerSlot(props: SlotProps) {
-  return props.viewer.kind === "local-owner" ? null : <BuyerRail {...props} />;
+// The rail Marketplace block, one slot for every viewer: the owner's card and its
+// listing operations (T22: P2-LISTING-1, -2, -8…16), and for everyone else the
+// read-only buyer rail — facts and "Open in Explore marketplace", never a Buy or
+// Bid button (T23: P2-MARKETPLACE-10, P2-LISTING-21).
+function MarketplaceSlot(props: SlotProps) {
+  return can(props.viewer, "facts.seeOwnerOnly") ? <RailMarketplace {...props} /> : <BuyerRail {...props} />;
 }
 
 // ─────────────────────────── the page's composition ───────────────────────────
@@ -165,9 +169,13 @@ export const SLOTS: ProjectSlots = {
       BusinessPlanChip,
     ],
     statusRow: [
+      UtilityPill,
     ],
     afterDescription: [
     ],
+  },
+  actions: {
+    "add-to-marketplace": ListingFlow,
   },
   tabs: {
     products: ProductsSlot,
@@ -177,7 +185,7 @@ export const SLOTS: ProjectSlots = {
     customers: CustomersSlot,
   },
   rail: {
-    marketplace: MarketplaceBuyerSlot,
+    marketplace: MarketplaceSlot,
     outcome: OutcomeSlot,
     details: DetailsSlot,
     legal: RailLegal,

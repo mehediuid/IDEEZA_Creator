@@ -236,7 +236,7 @@ function EditPauseDialogOpen({ onCancel, onConfirm, error }: EditPauseDialogProp
         </p>
         <Banner tone="attention">
           The listing is paused while you make changes. Relist it from the Marketplace block once every product has
-          its video and image.
+          its video.
         </Banner>
         <button
           ref={boxRef}
