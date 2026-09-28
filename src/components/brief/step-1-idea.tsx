@@ -96,7 +96,7 @@ export function Step1Idea({
   projectChoice: string;
   newProjectName: string;
   newProjectDescription: string;
-  /** Products already inside a project — the project's own + its builds. */
+  /** Products already inside a project — its product rows, one per product. */
   productCount: (projectId: string) => number;
   productName: string;
   productDescription: string;
