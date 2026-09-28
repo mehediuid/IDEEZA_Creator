@@ -22,6 +22,11 @@ import { specKey } from "../spec/derive";
 import { asConceptSummary } from "../spec/hints";
 import type { ResolvedSpec } from "../spec/types";
 import type { ManualProduct, ManualProject, ProjectBuildRef, ProjectStep } from "./projects";
+import { commerceOf, type ProjectCommerce, type StoredDraft } from "../brief/project-brief";
+import type { VideoJob } from "../video/jobs";
+// project-summary.ts reads this module too. The cycle is safe: neither side
+// calls the other while the modules load, only from inside functions.
+import { projectSummary, type ProjectSummary } from "./project-summary";
 
 /** A build the project holds, with the job itself — null once the build is
  *  no longer in this browser. */
@@ -467,4 +472,41 @@ export function conceptOf(
     if (product.conceptImageUrl && t.imageUrl === product.conceptImageUrl) drawn = asConceptSummary(t.concept);
   }
   return drawn;
+}
+
+// ───────────────────────── the page's one derivation ─────────────────────────
+
+/** Everything the project page reads, derived once (COR-74). No section
+ *  derives state on its own; the product page reads `products` and
+ *  `versions` from the same object. */
+export type ProjectView = {
+  refs: BuildRef[];
+  lineages: Lineage[];
+  products: ProjectProduct[];
+  /** COR-106 — the Versions block and the product page's version select. */
+  versions: ProjectVersion[][];
+  pending: PendingBuild[];
+  log: ProjectLogEntry[];
+  /** §5.1.3 — the same object the My projects card renders. */
+  summary: ProjectSummary;
+  /** §5.1.4 — the Outcome block. */
+  commerce: ProjectCommerce;
+};
+
+export function projectView(
+  p: ManualProject,
+  ctx: { builds: BuildJob[]; chats: ChatSession[]; brief: StoredDraft | null; videoJobs: VideoJob[]; now: number },
+): ProjectView {
+  const refs = buildsOf(p, ctx.builds);
+  const lineages = lineagesOf(refs, ctx.chats);
+  return {
+    refs,
+    lineages,
+    products: productsOfProject(p, refs),
+    versions: versionsOf(refs, lineages, productRowsOf(p)),
+    pending: pendingVersionsOf(refs, ctx.builds),
+    log: projectLogOf(p, ctx.brief?.state ?? null),
+    summary: projectSummary(p, { builds: ctx.builds, brief: ctx.brief, videoJobs: ctx.videoJobs, now: ctx.now }),
+    commerce: commerceOf(p, ctx.brief, ctx.videoJobs, ctx.now),
+  };
 }
