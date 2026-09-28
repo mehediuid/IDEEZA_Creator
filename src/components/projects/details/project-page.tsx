@@ -34,6 +34,7 @@ import { NetworkTab, useNetworkTabVisible } from "./network-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProductsTab } from "./products-tab";
 import { RailDetails } from "./rail-details";
+import { RailLegal } from "./rail-legal";
 import { RailLog } from "./rail-log";
 import { RailManage } from "./rail-manage";
 import { RailOutcome } from "./rail-outcome";
@@ -104,6 +105,7 @@ const SLOTS: ProjectSlots = {
   rail: {
     outcome: OutcomeSlot,
     details: DetailsSlot,
+    legal: RailLegal,
     versions: RailVersions,
     log: RailLog,
     manage: RailManage,
