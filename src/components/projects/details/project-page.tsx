@@ -18,6 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
+import { can } from "@/lib/manual/permissions";
 import type { Viewer } from "@/lib/manual/permissions";
 import { projectView } from "@/lib/manual/project-read";
 import {
@@ -32,16 +33,31 @@ import {
   LegacyHeader,
   LegacyManageBlock,
   LegacyNetwork,
-  LegacyProducts,
 } from "./legacy";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
+import { ProductsTab } from "./products-tab";
 import { ProjectShell } from "./shell";
-import type { ProjectSlots } from "./slots";
+import type { ProjectSlots, SlotProps } from "./slots";
+
+// C3's wiring (task-C1.md hand-off): ProductsTab takes its own props, not
+// SlotProps, so it mounts through this one-line adapter.
+function ProductsSlot({ project, view, viewer, now }: SlotProps) {
+  const { chats } = useCreateHistory();
+  return (
+    <ProductsTab
+      projectId={project.id}
+      products={view.products}
+      chats={chats}
+      showOwnerOnlyFacts={can(viewer, "facts.seeOwnerOnly")}
+      now={now}
+    />
+  );
+}
 
 const SLOTS: ProjectSlots = {
   header: LegacyHeader,
   tabs: {
-    products: LegacyProducts,
+    products: ProductsSlot,
     network: LegacyNetwork,
   },
   rail: {
