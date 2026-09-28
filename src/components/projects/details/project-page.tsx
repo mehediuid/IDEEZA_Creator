@@ -34,14 +34,22 @@ import {
   LegacyNetwork,
   LegacyProducts,
 } from "./legacy";
+import { MediaTab } from "./media-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProjectShell } from "./shell";
-import type { ProjectSlots } from "./slots";
+import type { ProjectSlots, SlotProps } from "./slots";
+
+// C5's wiring (task-C1.md's Hand-off): the page renders only after every
+// store is read, so `hydrated` is always true here.
+function MediaSlot({ project, view, brief, viewer }: SlotProps) {
+  return <MediaTab project={project} refs={view.refs} hydrated draft={brief} viewer={viewer} />;
+}
 
 const SLOTS: ProjectSlots = {
   header: LegacyHeader,
   tabs: {
     products: LegacyProducts,
+    media: MediaSlot,
     network: LegacyNetwork,
   },
   rail: {
