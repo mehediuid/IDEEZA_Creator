@@ -752,6 +752,11 @@ type Ctx = {
   // "Use as cover" / "Stop using as cover" (CNT-15): a product source, or
   // null to go back to coverOf()'s default. Bumps updatedAt.
   setCover: (id: string, cover: ProductSource | null) => void;
+  /** Showcase's one control (COM-55, COR-105): on writes Date.now(), off
+   *  writes null. Through updateProject, so it bumps updatedAt like any
+   *  other maker's edit — unlike backfillShowcase, which records an old fact
+   *  rather than one made now. */
+  setShowcase: (id: string, on: boolean) => void;
   markStepCompleted: (id: string, step: keyof ManualFlowState) => void;
   setStatus: (id: string, status: ManualProjectStatus) => void;
   /** COR-105's one-time backfill: a project minted with Share to Innovations
@@ -882,6 +887,12 @@ export function ManualProjectsProvider({
   // The same write as a rename — through updateProject, so it bumps updatedAt.
   const setCover = React.useCallback(
     (id: string, cover: ProductSource | null) => updateProject(id, { cover }),
+    [updateProject],
+  );
+
+  // Showcase's one control: on is Date.now(), off is null (COM-55).
+  const setShowcase = React.useCallback(
+    (id: string, on: boolean) => updateProject(id, { showcasedAt: on ? Date.now() : null }),
     [updateProject],
   );
 
@@ -1057,6 +1068,7 @@ export function ManualProjectsProvider({
     selectProject,
     updateProject,
     setCover,
+    setShowcase,
     markStepCompleted,
     setStatus,
     backfillShowcase,

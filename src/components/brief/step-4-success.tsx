@@ -11,6 +11,7 @@
 // open yet, so nothing claims buyers can see it).
 
 import * as React from "react";
+import { EyeIcon } from "@hugeicons/core-free-icons";
 import { type BriefState, type Intent } from "./brief-app";
 import {
   useVideoJobs,
@@ -18,6 +19,12 @@ import {
   etaLabel,
   STAGE_LABELS,
 } from "@/components/video-jobs/video-jobs-provider";
+import { Icon } from "@/components/dashboard/icon";
+import { liveSubline, pendingCardLine, pendingSubline } from "@/lib/brief/success-copy";
+import { can } from "@/lib/manual/permissions";
+import { projectStatus } from "@/lib/manual/project-summary";
+import { useManualProjects } from "@/lib/manual/projects";
+import { SUCCESS_SHOWCASE, showcaseAnnouncement } from "@/lib/manual/showcase-copy";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   sell: "Listing is minted",
@@ -25,67 +32,17 @@ const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   save: "Saved",
 };
 
-/** The Innovations post is its own outcome — it happens on any of the three. */
-const POSTED = " Your post is up on Innovations.";
-
-/**
- * What the mint produced, read against the sequence this brief really ran: a
- * give or a save only makes a clip when it also posts to Innovations, so the
- * video is named only where there is one to name.
- */
-function liveSubline(intent: Intent, hasClip: boolean, share: boolean): string {
-  const base =
-    intent === "sell"
-      ? hasClip
-        ? "Your video is final and your listing is minted. It goes on sale when the marketplace opens."
-        : "Your listing is minted. It goes on sale when the marketplace opens."
-      : intent === "give"
-        ? hasClip
-          ? "Your video is final and the drop is open. Your community can claim it."
-          : "The drop is open. Your community can claim it."
-        : "Stored in your library. Pick it up any time.";
-  return share ? base + POSTED : base;
-}
-
-/** Minted, with the render still running — what happens without you. */
-function pendingSubline(intent: Intent, share: boolean): string {
-  const base =
-    intent === "sell"
-      ? "Your listing is minted. It goes on sale, with the video, when the marketplace opens."
-      : intent === "give"
-        ? "We’ll open the drop the moment the video finishes — no extra action needed."
-        : "Stored in your library. Pick it up any time.";
-  return share
-    ? intent === "save"
-      ? "Stored in your library. We’ll post it to Innovations the moment the video finishes."
-      : base + " The Innovations post goes up with it."
-    : base;
-}
-
-/**
- * The line under the storyboard, while the render is still running. It has to
- * agree with `pendingSubline` above it — a save that is already stored isn't
- * waiting to "go live" — and it must not name a numbered step: the steps have
- * names now, and the reminder email is set on the render card itself, not on
- * the form.
- */
-function pendingCardLine(intent: Intent, share: boolean, quality: string): string {
-  const clip = `your ${quality} 10s video`;
-  if (intent === "sell") return `Your listing is minted — its video lands as soon as ${clip} finishes.`;
-  if (intent === "give") return `The drop opens as soon as ${clip} finishes.`;
-  return share
-    ? `Your Innovations post goes up as soon as ${clip} finishes.`
-    : `It is replaced by ${clip} as soon as that finishes.`;
-}
-
 export function Step4Success({
   state,
   onBrowse,
   projectName,
+  projectId,
 }: {
   state: BriefState;
   onBrowse: (href: string) => void;
   projectName: string;
+  /** The project this brief minted — what Showcase flags (COM-56). Null only before Step 1 attached one. */
+  projectId: string | null;
 }) {
   const { jobs } = useVideoJobs();
   const intent = (state.intent || "sell") as Intent;
@@ -101,8 +58,8 @@ export function Step4Success({
     ? HEADING_LIVE_BY_INTENT[intent]
     : "Mint complete";
   const subline = isLive
-    ? liveSubline(intent, willRenderVideo || !!state.arClip, state.shareToNewsfeed)
-    : pendingSubline(intent, state.shareToNewsfeed);
+    ? liveSubline(intent, willRenderVideo || !!state.arClip)
+    : pendingSubline(intent);
 
   return (
     <div className="flex w-full max-w-[560px] flex-col items-center gap-[24px] text-center">
@@ -218,11 +175,7 @@ export function Step4Success({
               </svg>
               <span>
                 Storyboard is your private preview for now.{" "}
-                {pendingCardLine(
-                  intent,
-                  state.shareToNewsfeed,
-                  state.quality === "low" ? "480p" : "720p",
-                )}{" "}
+                {pendingCardLine(intent, state.quality === "low" ? "480p" : "720p")}{" "}
                 We&rsquo;ll tell you here when it lands — and email you, if you
                 asked for that when the render started.
               </span>
@@ -251,6 +204,8 @@ export function Step4Success({
           Go to My Projects
         </button>
 
+        {projectId && <SuccessShowcase projectId={projectId} state={state} />}
+
         <div className="flex items-center justify-center">
           <a
             onClick={() => onBrowse("/")}
@@ -265,6 +220,87 @@ export function Step4Success({
         @keyframes ix-s4-pulse-kf { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
         .ix-s4-pulse { animation: ix-s4-pulse-kf 1.4s ease-in-out infinite; }
       `}</style>
+    </div>
+  );
+}
+
+/**
+ * Showcase, offered the moment the outcome is chosen (COM-56): after any of
+ * the three intents, and while a clip still renders. It flags the project
+ * (COR-105) — the Showcase badge and the Showcase tab of My projects follow
+ * it — and posts nothing, because the Innovations feed isn't open. A mint
+ * with Share to Innovations ticked arrives already showcased (the Brief's
+ * commit writes the same flag), so the step opens on the status row and
+ * nothing takes focus until a press.
+ */
+function SuccessShowcase({ projectId, state }: { projectId: string; state: BriefState }) {
+  const { projects, setShowcase } = useManualProjects();
+  const project = projects.find((p) => p.id === projectId) ?? null;
+  const on = typeof project?.showcasedAt === "number";
+  const [said, setSaid] = React.useState("");
+  const lineId = React.useId();
+  const doneId = React.useId();
+  const showRef = React.useRef<HTMLButtonElement>(null);
+  const undoRef = React.useRef<HTMLButtonElement>(null);
+  // The control that replaces the one just pressed takes focus once it has rendered.
+  const focusNext = React.useRef<"show" | "undo" | null>(null);
+  React.useEffect(() => {
+    const target =
+      focusNext.current === "undo" ? undoRef.current : focusNext.current === "show" ? showRef.current : null;
+    focusNext.current = null;
+    target?.focus();
+  }, [on]);
+
+  if (!project) return null;
+  const status = projectStatus(project, { state, step: "success" });
+  if (!can({ kind: "local-owner" }, "project.showcase", { status })) return null;
+
+  const flip = (next: boolean) => {
+    focusNext.current = next ? "undo" : "show";
+    setShowcase(project.id, next);
+    setSaid(showcaseAnnouncement(next, project.name));
+  };
+
+  return (
+    <div className="flex w-full flex-col items-stretch gap-3">
+      {on ? (
+        <div className="flex min-h-[44px] items-center gap-4 rounded-3xl border border-solid border-border-subtle bg-bg-surface py-2 pl-10 pr-2 text-left">
+          <span aria-hidden className="inline-flex shrink-0 text-[color:var(--color-icon-info)]">
+            <Icon icon={EyeIcon} size={18} />
+          </span>
+          <p id={doneId} className="m-0 min-w-0 flex-1 text-md text-text-primary">
+            {SUCCESS_SHOWCASE.done}
+          </p>
+          <button
+            ref={undoRef}
+            type="button"
+            onClick={() => flip(false)}
+            aria-describedby={doneId}
+            className="inline-flex min-h-[44px] shrink-0 items-center rounded-3xl px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            {SUCCESS_SHOWCASE.undo}
+          </button>
+        </div>
+      ) : (
+        <>
+          <button
+            ref={showRef}
+            type="button"
+            onClick={() => flip(true)}
+            aria-describedby={lineId}
+            className="inline-flex min-h-[44px] items-center justify-center gap-4 rounded-3xl border border-solid border-border bg-bg-surface px-12 py-6 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={EyeIcon} size={16} />
+            {SUCCESS_SHOWCASE.action}
+          </button>
+          <p id={lineId} className="m-0 text-sm text-text-secondary">
+            {SUCCESS_SHOWCASE.line}
+          </p>
+        </>
+      )}
+      <p role="status" className="sr-only">
+        {said}
+      </p>
     </div>
   );
 }
