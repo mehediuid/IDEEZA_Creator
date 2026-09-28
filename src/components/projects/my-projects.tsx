@@ -21,18 +21,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  CpuIcon,
-  Search01Icon,
-  ArrowLeft01Icon,
-  ArrowRight01Icon,
-  Cancel01Icon,
-  CheckmarkBadge01Icon,
-  PencilEdit01Icon,
-  File01Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
-import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { ArrowLeft01Icon, ArrowRight01Icon, Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { ProjectNotice } from "@/components/projects/project-notice";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { SearchInput, SelectMenu, buttonVariants } from "@/components/ideeza";
@@ -57,19 +47,9 @@ import {
   type ListItem,
   type ListTab,
 } from "@/lib/manual/project-list";
-import { resumeStepOf } from "@/lib/manual/project-read";
-import {
-  FLOW_STEPS,
-  STEP_LABELS,
-  completedCount,
-  productLabel,
-  stepHref,
-  useManualProjects,
-  type ManualProject,
-} from "@/lib/manual/projects";
-import { cn, formatRelativeTime } from "@/lib/utils";
-
-const TOTAL_STEPS = FLOW_STEPS.length;
+import { useManualProjects } from "@/lib/manual/projects";
+import { cn } from "@/lib/utils";
+import { ProjectCard, ProjectCardSkeleton, NoProjectsState, NoMatchState, EmptyTabState } from "./project-card";
 
 const PANEL_ID = "projects-panel";
 const SOURCE_ID = "projects-source";
@@ -311,11 +291,6 @@ export function MyProjects() {
     headingRef.current?.focus({ preventScroll: true });
   };
 
-  const open = (project: ManualProject) => {
-    selectProject(project.id);
-    router.push(stepHref(project, resumeStepOf(project)));
-  };
-
   const tabLabel = LIST_TABS.find((t) => t.id === view.tab)?.label ?? "All";
   const sourceLabel = SOURCE_OPTIONS.find((o) => o.value === view.source)?.label ?? "";
   const noProjects = result !== null && result.total === 0;
@@ -353,7 +328,7 @@ export function MyProjects() {
       </header>
 
       {noProjects ? (
-        <NoProjectsState />
+        <NoProjectsState onGoHome={() => router.push("/")} />
       ) : (
         <>
           <ProjectTabs tab={view.tab} counts={result?.counts ?? null} onChange={(tab) => changeView({ tab })} />
@@ -435,27 +410,51 @@ export function MyProjects() {
             </div>
 
             {!result ? (
-              <p className="mt-[24px] text-md text-text-tertiary">Loading…</p>
+              // LST-51: six skeleton cards, the tab/search/sort chrome above
+              // still present (counts read "—" until it too has hydrated).
+              <ul
+                role="list"
+                aria-hidden
+                className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
+              >
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <li key={i}>
+                    <ProjectCardSkeleton />
+                  </li>
+                ))}
+              </ul>
             ) : result.rows.length === 0 ? (
-              <NoMatchState
-                onClear={() => {
-                  setText("");
-                  write({ ...view, tab: "all", q: "", source: "any", page: 1 });
-                }}
-              />
+              // LST-54 (a typed search came back empty) takes priority over
+              // LST-53 (the outcome tab itself is empty); on the All tab a
+              // narrowed-to-zero result (the Source facet alone, with no
+              // search text) has no tab of its own to name, so it also reads
+              // as a "no match" rather than throwing on EmptyTabState's
+              // Exclude<"all">.
+              view.q.trim() || view.tab === "all" ? (
+                <NoMatchState
+                  query={view.q}
+                  tabLabel={tabLabel}
+                  onClearSearch={() => {
+                    setText("");
+                    write({ ...view, q: "", page: 1 });
+                  }}
+                  onSearchAll={view.tab !== "all" ? () => changeView({ tab: "all" }) : undefined}
+                />
+              ) : (
+                <EmptyTabState tab={view.tab as Exclude<ListTab, "all">} />
+              )
             ) : (
               <>
                 <ul
                   role="list"
-                  className="mt-[16px] grid grid-cols-1 gap-[24px] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
+                  className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] min-[640px]:grid-cols-2 min-[1100px]:grid-cols-3"
                 >
                   {result.rows.map((row) => (
                     <li key={row.project.id}>
                       <ProjectCard
-                        project={row.project}
-                        image={row.summary.cover ?? undefined}
-                        via={row.via}
-                        onOpen={() => open(row.project)}
+                        summary={row.summary}
+                        matchedProductName={row.via}
+                        onBeforeNavigate={() => selectProject(row.project.id)}
                       />
                     </li>
                   ))}
@@ -559,123 +558,6 @@ function ProjectTabs({
   );
 }
 
-// ───────────────────────── project card ─────────────────────────
-
-function ProjectCard({
-  project,
-  image,
-  via,
-  onOpen,
-}: {
-  project: ManualProject;
-  image?: string;
-  /** The product the search matched when it isn't the first (LST-14). */
-  via?: string;
-  onOpen: () => void;
-}) {
-  const [imgOk, setImgOk] = React.useState(true);
-  const done = completedCount(project);
-  const next = resumeStepOf(project);
-  const completed = project.status === "completed";
-
-  return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[12px] border border-border bg-bg-surface">
-      <div className="group/thumb relative aspect-[16/10] overflow-hidden bg-bg-surface-raised">
-        {image && imgOk ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image}
-            alt={`Concept image for ${project.name}`}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgOk(false)}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover/thumb:scale-105 motion-reduce:transition-none"
-          />
-        ) : (
-          <div
-            aria-hidden
-            className="absolute inset-0 flex items-center justify-center bg-bg-surface-raised text-text-tertiary"
-          >
-            <Icon icon={CpuIcon} size={28} strokeWidth={1.4} />
-          </div>
-        )}
-
-        <span
-          className={[
-            "absolute left-[10px] top-[10px] inline-flex h-[24px] items-center gap-[6px] rounded-full px-[10px] text-2xs font-bold",
-            completed
-              ? "bg-bg-success-subtle text-text-success"
-              : "bg-bg-brand-subtle text-text-brand",
-          ].join(" ")}
-        >
-          <Icon
-            icon={completed ? CheckmarkBadge01Icon : PencilEdit01Icon}
-            size={12}
-          />
-          {completed ? "Completed" : "Draft"}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-[10px] p-[14px]">
-        <div className="flex items-start justify-between gap-[10px]">
-          <div className="min-w-0">
-            <p className="truncate text-md font-medium text-text-primary">
-              {project.name}
-            </p>
-            <p className="mt-[2px] truncate text-sm text-text-tertiary">
-              {productLabel(project)}
-              {via ? ` · matches ${via}` : null}
-            </p>
-          </div>
-          <Link
-            href={`/projects/${project.id}`}
-            className="inline-flex h-[28px] shrink-0 items-center rounded-full px-[10px] text-sm font-semibold text-text-brand outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            Details
-          </Link>
-        </div>
-
-        {/* Progress across the editor's seven steps — the one number the
-            model really carries about how far the project has got. */}
-        <div
-          role="progressbar"
-          aria-label={`${project.name} progress`}
-          aria-valuenow={done}
-          aria-valuemin={0}
-          aria-valuemax={TOTAL_STEPS}
-          className="h-[4px] w-full overflow-hidden rounded-full bg-bg-surface-raised"
-        >
-          <div
-            className="h-full rounded-full bg-violet-500 transition-[width] duration-normal ease-decelerate"
-            style={{ width: `${(done / TOTAL_STEPS) * 100}%` }}
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-[14px] gap-y-[4px] text-2xs font-medium text-text-tertiary">
-          <span className="inline-flex items-center gap-[5px] tabular-nums">
-            <Icon icon={File01Icon} size={13} strokeWidth={1.6} />
-            {done}/{TOTAL_STEPS} steps
-          </span>
-          {!completed && (
-            <span className="truncate">Next: {STEP_LABELS[next]}</span>
-          )}
-          <span className="ml-auto shrink-0">
-            Updated {formatRelativeTime(project.updatedAt)}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={onOpen}
-          className="mt-auto inline-flex h-[36px] w-full items-center justify-center rounded-lg border border-border bg-bg-surface text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          {completed ? "Open in editor" : `Resume — ${STEP_LABELS[next]}`}
-        </button>
-      </div>
-    </article>
-  );
-}
-
 // ───────────────────────── pagination ─────────────────────────
 
 // LST-27: ‹ 1 … n-1 n n+1 … last ›, the current page marked. Below a 480 px
@@ -755,69 +637,3 @@ function Pagination({
   );
 }
 
-// ───────────────────────── empty states ─────────────────────────
-
-function EmptyShell({
-  icon,
-  title,
-  children,
-}: {
-  icon: IconValue;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mt-[24px] flex flex-col items-center gap-[10px] rounded-[12px] border border-border bg-bg-surface px-[24px] py-[48px] text-center">
-      <span
-        aria-hidden
-        className="inline-flex h-[48px] w-[48px] items-center justify-center rounded-full bg-bg-brand-subtle text-text-brand"
-      >
-        <Icon icon={icon} size={20} />
-      </span>
-      <p className="text-md font-semibold text-text-primary">{title}</p>
-      {children}
-    </div>
-  );
-}
-
-function NoProjectsState() {
-  return (
-    <EmptyShell icon={File01Icon} title="No projects yet">
-      <p className="max-w-[460px] text-sm text-text-secondary">
-        A project starts on Home. Describe an idea and{" "}
-        <strong className="font-semibold text-text-primary">
-          Generate with AI
-        </strong>
-        , then press <strong className="font-semibold text-text-primary">Save
-        Project</strong> on the finished build — or pick{" "}
-        <strong className="font-semibold text-text-primary">
-          Build manually
-        </strong>{" "}
-        to start from an empty board. Either way it lands here.
-      </p>
-      <Link
-        href="/"
-        className="mt-[8px] inline-flex h-[36px] items-center rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        Go to Home
-      </Link>
-    </EmptyShell>
-  );
-}
-
-function NoMatchState({ onClear }: { onClear: () => void }) {
-  return (
-    <EmptyShell icon={Search01Icon} title="Nothing in this view">
-      <p className="max-w-[420px] text-sm text-text-secondary">
-        No project matches this tab and search.
-      </p>
-      <button
-        type="button"
-        onClick={onClear}
-        className="mt-[8px] inline-flex h-[36px] items-center rounded-lg border border-border bg-bg-surface px-[16px] text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        Show all projects
-      </button>
-    </EmptyShell>
-  );
-}
