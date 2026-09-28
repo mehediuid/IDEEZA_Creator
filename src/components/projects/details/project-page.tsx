@@ -27,6 +27,7 @@ import {
 } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { BUYER_VIEW, VIEW_PARAM } from "@/lib/manual/buyer-preview";
+import { ProjectActivityChip } from "./activity-chip";
 import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "./buyer-preview";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
@@ -93,9 +94,17 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
+// T20's wiring: the Activity chip (P2-TABS-5), in the title row.
+function ActivitySlot(props: SlotProps) {
+  return <ProjectActivityChip {...props} />;
+}
+
 const SLOTS: ProjectSlots = {
   banner: PreviewBannerSlot,
   header: HeaderSlot,
+  headerParts: {
+    titleRow: [ActivitySlot],
+  },
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
