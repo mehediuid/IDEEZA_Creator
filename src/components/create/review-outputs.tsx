@@ -54,6 +54,7 @@ import {
   WiringPreview,
 } from "./deliverable-previews";
 import { OPEN_IN_EDITOR_ID } from "./anchors";
+import { moveTab } from "@/lib/ui/tab-keys";
 
 export function ReviewOutputs({
   job,
@@ -593,31 +594,6 @@ function ReviewPanel({
         </>
       )}
     </section>
-  );
-}
-
-/** The tab pattern a tablist announces: one Tab stop (the selected tab), the
- *  arrows move the selection and focus with it, Home and End jump to the
- *  ends. Every tab used to be its own Tab stop and the arrows did nothing. */
-function moveTab(
-  e: React.KeyboardEvent<HTMLElement>,
-  ids: string[],
-  current: string,
-  select: (id: string) => void,
-) {
-  const at = ids.indexOf(current);
-  let next = -1;
-  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (at + 1) % ids.length;
-  else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
-    next = (at - 1 + ids.length) % ids.length;
-  else if (e.key === "Home") next = 0;
-  else if (e.key === "End") next = ids.length - 1;
-  if (next < 0) return;
-  e.preventDefault();
-  const list = e.currentTarget;
-  select(ids[next]);
-  requestAnimationFrame(() =>
-    list.querySelector<HTMLElement>(`[data-tab="${ids[next]}"]`)?.focus(),
   );
 }
 
