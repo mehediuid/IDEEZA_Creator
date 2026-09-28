@@ -19,6 +19,14 @@
 // active selection.
 
 import * as React from "react";
+import { deleteNetwork } from "../network/store";
+import {
+  currentWriteError,
+  reportWrite,
+  subscribeWriteError,
+  type WriteError,
+} from "../storage-status";
+import { stampOpened, sweepProjectKeys } from "./project-storage";
 import { productsOf, type BuildJob, type BuildProduct } from "../create/history";
 // project-read.ts imports only types from this file, so this is no runtime cycle.
 import { lineageProjectOf, modelNameOf } from "./project-read";
@@ -142,11 +150,15 @@ function loadJSON<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-function saveJSON<T>(key: string, v: T) {
-  if (typeof window === "undefined") return;
+/** Writes one key; false when the browser refused it — storage full (COR-93). */
+function saveJSON<T>(key: string, v: T): boolean {
+  if (typeof window === "undefined") return true;
   try {
     window.localStorage.setItem(key, JSON.stringify(v));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }
 function loadActiveId(): string | null {
   if (typeof window === "undefined") return null;
@@ -156,13 +168,19 @@ function loadActiveId(): string | null {
     return null;
   }
 }
-function saveActiveId(id: string | null) {
-  if (typeof window === "undefined") return;
+function saveActiveId(id: string | null): boolean {
+  if (typeof window === "undefined") return true;
   try {
     if (id === null) window.localStorage.removeItem(ACTIVE_KEY);
     else window.localStorage.setItem(ACTIVE_KEY, id);
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }
+
+// useSyncExternalStore's server snapshot: nothing has failed before hydration.
+const NO_WRITE_ERROR = (): WriteError | null => null;
 
 function makeId(): string {
   return `proj_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
@@ -743,6 +761,15 @@ type Ctx = {
    *  made. Called with `showcaseBackfillOf()`'s answer (lib/brief/project-brief). */
   backfillShowcase: (id: string, at: number) => void;
   clearActive: () => void;
+  /** COR-91: stamps the editor step last opened — Open in editor's resume
+   *  target. Never bumps updatedAt; at most one write per step per minute. */
+  touchOpened: (id: string, step: ProjectStep) => void;
+  /** COR-93: the newest browser write that failed and hasn't saved since,
+   *  from this store or the create-history store; null when all went through. */
+  writeError: WriteError | null;
+  /** COR-92: removes the record and everything the project keeps in this
+   *  browser (§5.1.9). Callers check deleteBlockOf() first (COR-70). */
+  deleteProject: (id: string) => void;
 };
 
 const ManualProjectsContext = React.createContext<Ctx | null>(null);
@@ -760,6 +787,11 @@ export function ManualProjectsProvider({
   // Projects made from an AI build in this session, by build id — see
   // projectFromBuild.
   const builtFrom = React.useRef(new Map<string, ManualProject>());
+  const writeError = React.useSyncExternalStore(
+    subscribeWriteError,
+    currentWriteError,
+    NO_WRITE_ERROR,
+  );
   // Projects created in the current event, by id, until `projects` holds them:
   // the Brief creates a project and attaches its build in one press, and
   // `projects` is still the list from before the create.
@@ -784,13 +816,14 @@ export function ManualProjectsProvider({
     setHydrated(true);
   }, []);
 
+  // A write the browser refuses is reported, so the page can say so (COR-93).
   React.useEffect(() => {
     if (!hydrated) return;
-    saveJSON(PROJECTS_KEY, projects);
+    reportWrite(PROJECTS_KEY, saveJSON(PROJECTS_KEY, projects));
   }, [projects, hydrated]);
   React.useEffect(() => {
     if (!hydrated) return;
-    saveActiveId(activeProjectId);
+    reportWrite(ACTIVE_KEY, saveActiveId(activeProjectId));
   }, [activeProjectId, hydrated]);
   // Once a render holds them, the projects made above are read from `projects`.
   React.useEffect(() => {
@@ -967,6 +1000,41 @@ export function ManualProjectsProvider({
     setActiveProjectId(null);
   }, []);
 
+  // COR-91 — the editor step last opened, the one resume signal. Opening a
+  // step changes nothing in the project, so updatedAt stays; a step already
+  // stamped in the last minute isn't written again (§5.1.10).
+  const touchOpened = React.useCallback((id: string, step: ProjectStep) => {
+    const now = Date.now();
+    setProjects((arr) => {
+      const i = arr.findIndex((p) => p.id === id);
+      if (i < 0) return arr;
+      const next = stampOpened(arr[i], step, now);
+      if (next === arr[i]) return arr;
+      const out = arr.slice();
+      out[i] = next;
+      return out;
+    });
+  }, []);
+
+  // COR-92 — the record, the active selection, this session's build guard
+  // and every key the project keeps in this browser (§5.1.9). Builds keep
+  // their now-dangling projectId, so History drops the link and the build's
+  // review offers Save again (COR-71).
+  const deleteProject = React.useCallback((id: string) => {
+    setProjects((arr) => arr.filter((p) => p.id !== id));
+    setActiveProjectId((cur) => (cur === id ? null : cur));
+    for (const [buildId, made] of builtFrom.current) {
+      if (made.id === id) builtFrom.current.delete(buildId);
+    }
+    if (typeof window === "undefined") return;
+    try {
+      sweepProjectKeys(id, window.localStorage);
+    } catch {
+      // Storage itself is unreachable (blocked site data): nothing to sweep.
+    }
+    deleteNetwork(id);
+  }, []);
+
   const activeProject =
     activeProjectId === null
       ? null
@@ -993,6 +1061,9 @@ export function ManualProjectsProvider({
     setStatus,
     backfillShowcase,
     clearActive,
+    touchOpened,
+    writeError,
+    deleteProject,
   };
 
   return (

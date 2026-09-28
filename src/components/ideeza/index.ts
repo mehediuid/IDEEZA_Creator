@@ -26,3 +26,4 @@ export { Spinner } from "./spinner";
 export { ProgressBar } from "./progress-bar";
 export { Divider } from "./divider";
 export { StateCard } from "./state-card";
+export { ModalFrame, ConfirmDialog, type ModalFrameProps, type ConfirmDialogProps } from "./dialog";

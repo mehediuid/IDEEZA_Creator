@@ -30,12 +30,14 @@ import {
   Hexagon01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { ProjectNotice } from "@/components/projects/project-notice";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useCreateHistory } from "@/lib/create/history";
+import { resumeStepOf } from "@/lib/manual/project-read";
 import {
   FLOW_STEPS,
   STEP_LABELS,
   completedCount,
-  firstIncompleteStep,
   productLabel,
   stepHref,
   useManualProjects,
@@ -181,11 +183,13 @@ export function MyProjects() {
 
   const open = (project: ManualProject) => {
     selectProject(project.id);
-    router.push(stepHref(project, firstIncompleteStep(project)));
+    router.push(stepHref(project, resumeStepOf(project)));
   };
 
   return (
     <div className="w-full px-[32px] py-[28px]">
+      <StorageErrorBanner className="mb-[16px]" />
+      <ProjectNotice className="mb-[16px]" />
       <header className="mb-[20px]">
         <h1 className="text-xl font-bold tracking-tight text-text-primary">
           My projects
@@ -346,7 +350,7 @@ function ProjectCard({
 }) {
   const [imgOk, setImgOk] = React.useState(true);
   const done = completedCount(project);
-  const next = firstIncompleteStep(project);
+  const next = resumeStepOf(project);
   const completed = project.status === "completed";
 
   return (

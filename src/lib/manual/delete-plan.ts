@@ -1,0 +1,126 @@
+// What deleting a project takes and what it keeps, in the words the delete
+// dialog shows (COR-68, COR-69, COR-70). Pure: the dialog reads the stores
+// when it opens and passes the facts in, so every line and the typed-name rule
+// are unit-tested. Value imports stay relative — node runs this in the tests.
+
+import type { StoredDraft } from "../brief/project-brief";
+import { LICENSES, type Intent } from "../brief/types";
+import type { EditorWork, StepFact } from "./editor-work";
+import { countLabel, formatDate, type ProjectStatus } from "./project-summary";
+
+export type DeletePlanInput = {
+  status: ProjectStatus;
+  /** The project's own brief draft as read; null when there is none or it can't be read. */
+  draft: StoredDraft | null;
+  /** How many products the project lists (summary.productCount). */
+  products: number;
+  /** editorWorkOf(id), read when the dialog opens. */
+  work: EditorWork;
+  /** The project's network, when it has one. */
+  network: { links: number } | null;
+  /** summary.showcase !== null */
+  showcased: boolean;
+  /** The project's builds still in this browser, and how many of their chats still are. */
+  builds: number;
+  chats: number;
+};
+
+export type DeletePlan = {
+  /** "What goes", one line per thing, the project record first. */
+  goes: string[];
+  /** "What stays". */
+  stays: string[];
+  /** COR-70's line for a project minted in this browser; null otherwise. */
+  minted: string | null;
+  /** COR-69: ask for the typed name — only when editor work, a mint record or a network would be lost. */
+  typed: boolean;
+};
+
+export const MINTED_NOTE = "It was minted in this browser only — nothing on a blockchain changes.";
+export const SHARED_STORES_NOTE =
+  "Code, 3D shapes and Preview aren't touched — every project in this browser shares them for now.";
+
+const AIM: Record<Intent, string> = { sell: "to sell", give: "to give away", save: "to keep" };
+
+/** The fact's text when the store holds something. editorWorkOf writes a
+ *  leading 0 for a store that exists but holds nothing yet ("0 objects · 0 on
+ *  the board", "0 of 2 parts checked"): nothing is lost, so it isn't listed
+ *  and doesn't ask for the name. */
+function lost(f: StepFact): string | null {
+  return f.state === "work" && !/^0\b/.test(f.text) ? f.text : null;
+}
+
+export function deletePlanOf(input: DeletePlanInput): DeletePlan {
+  const { status, draft, work, network } = input;
+  const goes = [`The project — its name, description and ${countLabel(input.products)}`];
+
+  const pcb = lost(work.pcb);
+  const wiring = lost(work.wiring);
+  const assembly = lost(work.assembly);
+  const three = lost(work.three);
+  if (pcb) goes.push(`The PCB board — ${pcb}`);
+  else if (work.pcb.state === "sample") goes.push("The PCB board — the sample circuit only");
+  if (wiring) goes.push(`Wiring — ${wiring}`);
+  if (assembly) goes.push(`Assembly checks — ${assembly}`);
+  if (three) goes.push("The 3D AI model");
+
+  const brief = draft?.state ?? null;
+  const mintedAt = brief?.mintedAt ?? null;
+  if (brief && mintedAt !== null) {
+    const on = formatDate(mintedAt);
+    if (brief.intent === "give") {
+      const licence = LICENSES.find((l) => l.value === brief.license)?.label;
+      goes.push(
+        licence
+          ? `The brief — given under ${licence}, minted ${on}`
+          : `The brief — given away, minted ${on}`,
+      );
+    } else if (brief.intent === "sell") {
+      goes.push(`The brief — listed to sell, minted ${on}`);
+    } else {
+      goes.push(`The brief — kept private, minted ${on}`);
+    }
+  } else if (brief) {
+    goes.push(
+      brief.intent
+        ? `The brief — in progress, ${AIM[brief.intent]}`
+        : "The brief — started, no outcome chosen",
+    );
+  } else if (status === "minted") {
+    goes.push("The mint record — its brief can't be read in this browser");
+  }
+
+  if (network) {
+    goes.push(
+      network.links > 0
+        ? `The network — ${network.links} ${network.links === 1 ? "link" : "links"}`
+        : "The network — no links drawn yet",
+    );
+  }
+  if (input.showcased) goes.push("Showcase — it leaves your Showcase tab");
+
+  const stays = [
+    ...(input.builds > 0 ? [buildsLine(input.builds, input.chats)] : []),
+    SHARED_STORES_NOTE,
+  ];
+  const mintRecord = mintedAt !== null || status === "minted";
+  return {
+    goes,
+    stays,
+    minted: mintRecord ? MINTED_NOTE : null,
+    typed: Boolean(pcb || wiring || assembly || three) || mintRecord || network !== null,
+  };
+}
+
+/** "Its 2 builds and the chat stay in History — you can save them as a project again." */
+function buildsLine(builds: number, chats: number): string {
+  const what = builds === 1 ? "Its build" : `Its ${builds} builds`;
+  const withChats = chats === 0 ? "" : chats === 1 ? " and the chat" : ` and their ${chats} chats`;
+  const verb = builds === 1 && chats === 0 ? "stays" : "stay";
+  return `${what}${withChats} ${verb} in History — you can save ${builds === 1 ? "it" : "them"} as a project again.`;
+}
+
+/** §5.1.10: the trimmed entry equals the trimmed project name, case and all. */
+export function matchesTypedName(entry: string, name: string): boolean {
+  return entry.trim() === name.trim();
+}

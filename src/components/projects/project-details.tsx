@@ -47,11 +47,16 @@ import {
 import { specLine } from "@/lib/spec/format";
 import { asConceptSummary } from "@/lib/spec/hints";
 import { NetworkSection } from "@/components/network/network-section";
+import { DeleteProjectControl } from "@/components/projects/delete-project-dialog";
+import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
+import { useProjectBrief } from "@/lib/brief/project-brief";
+import type { Viewer } from "@/lib/manual/permissions";
+import { buildsOf, productsOfProject, resumeStepOf } from "@/lib/manual/project-read";
+import { projectStatus, showcaseOf } from "@/lib/manual/project-summary";
 import {
   FLOW_STEPS,
   STEP_LABELS,
   completedCount,
-  firstIncompleteStep,
   productLabel,
   stepHref,
   useManualProjects,
@@ -101,11 +106,12 @@ export function ProjectDetails({ id }: { id: string }) {
 
   const open = () => {
     selectProject(project.id);
-    router.push(stepHref(project, firstIncompleteStep(project)));
+    router.push(stepHref(project, resumeStepOf(project)));
   };
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-[32px] py-[28px]">
+      <StorageErrorBanner className="mb-[16px]" />
       {/* Breadcrumb. The primary action sits on the title row below it,
           clear of the shell's floating profile button. */}
       <nav
@@ -306,6 +312,7 @@ export function ProjectDetails({ id }: { id: string }) {
               )}
             </Row>
           </dl>
+          <ManageBlock project={project} />
         </aside>
       </div>
     </div>
@@ -453,6 +460,36 @@ function Row({
         {children}
       </dd>
     </div>
+  );
+}
+
+// The rail's last block (COR-67). Interim home: the rail task (§5.10) rebuilds
+// the rail around projectView() and renders DeleteProjectControl in its own
+// Manage block from view.summary; this wrapper goes then.
+const OWNER: Viewer = { kind: "local-owner" };
+
+function ManageBlock({ project }: { project: ManualProject }) {
+  const { builds } = useCreateHistory();
+  const draft = useProjectBrief(project.id);
+  const refs = React.useMemo(() => buildsOf(project, builds), [project, builds]);
+  const status = draft === undefined ? undefined : projectStatus(project, draft);
+  return (
+    <section aria-labelledby="manage-heading" className="mt-[20px] border-t border-border pt-[20px]">
+      <h2 id="manage-heading" className="text-lg font-bold text-text-primary">
+        Manage
+      </h2>
+      <div className="mt-[12px]">
+        <DeleteProjectControl
+          project={project}
+          viewer={OWNER}
+          status={status}
+          draft={draft ?? null}
+          showcased={status !== undefined && showcaseOf(project, status) !== null}
+          productCount={productsOfProject(project, refs).length}
+          refs={refs}
+        />
+      </div>
+    </section>
   );
 }
 
