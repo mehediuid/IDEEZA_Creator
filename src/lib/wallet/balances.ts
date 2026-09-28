@@ -87,6 +87,8 @@ export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number })
   if (id.startsWith("maker-")) return held; // only buyers bid
   for (const listing of ctx.market.listings) {
     if (!isLiveAuction(listing, ctx.now)) continue;
+    // An auction sold through Buy now is over: its bids no longer hold funds.
+    if (ctx.market.sales.some((s) => s.listingId === listing.id)) continue;
     const bids = ctx.market.bids.filter((b) => b.listingId === listing.id);
     const top = topBidOf(bids);
     if (top && top.bidderId === id) credit(held, listing.token, listing.network, top.amount);

@@ -120,6 +120,17 @@ test("Mira's live top bid of 0.04 lowers availableOf by 0.04", () => {
   assert.equal(held.native.mumbai.MATIC, "0.04");
 });
 
+test("an auction sold through Buy now releases its bidders' holds", () => {
+  const market = {
+    ...EMPTY_MARKET,
+    listings: [liveAuction()],
+    bids: [{ id: "bid_1", listingId: "lst_auction", bidderId: "buyer-leo", amount: "0.06", token: "MATIC", at: NOW - 2000 }],
+    sales: [{ id: "sale_1", listingId: "lst_auction", projectId: "proj_2", at: NOW - 1000, buyerId: "buyer-mira" }],
+  };
+  const held = heldBy("buyer-leo", { market, now: NOW });
+  assert.equal(held.native.mumbai?.MATIC ?? "0", "0");
+});
+
 test("an outbid bidder holds nothing", () => {
   const market = {
     ...EMPTY_MARKET,
