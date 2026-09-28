@@ -1218,6 +1218,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                 state={state}
                 onBrowse={(href) => router.push(href)}
                 projectName={scopeProject?.name ?? ""}
+                projectId={scopeProjectId}
               />
             )}
       </Crossfade>
