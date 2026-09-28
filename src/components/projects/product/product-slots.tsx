@@ -19,6 +19,7 @@ import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { ProductCustomers } from "./product-customers";
 import { ProductActivityChip } from "../details/activity-chip";
+import { ProductContributorsPanel } from "./product-contributors";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -53,8 +54,15 @@ function ActivitySlot(props: ProductSlotProps) {
   return <ProductActivityChip {...props} />;
 }
 
+// T17's wiring (P2-CONTRIB-15, P2-TABS-4): the product page's read-only
+// contributors credit.
+function ContributorsSlot(props: ProductSlotProps) {
+  return <ProductContributorsPanel {...props} />;
+}
+
 export const PRODUCT_SLOTS: ProductSlots = {
   panels: {
+    contributors: ContributorsSlot,
     customers: CustomersSlot,
   },
   rail: {},

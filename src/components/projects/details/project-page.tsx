@@ -25,6 +25,8 @@ import { productsTabView } from "@/lib/manual/products-tab-view";
 import { BuyerPreviewBanner, isBuyerPreview, previewQuery } from "./buyer-preview";
 import { CustomersPanel } from "./customers-tab";
 import { ProjectActivityChip } from "./activity-chip";
+import { ContributorPreviewBanner } from "./contributor-preview-banner";
+import { ContributorsTab } from "./contributors-tab";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { NetworkTab } from "./network-tab";
@@ -125,6 +127,18 @@ function ActivitySlot(props: SlotProps) {
   return <ProjectActivityChip {...props} />;
 }
 
+// T17's wiring (P2-CONTRIB-12): the contributor-preview banner is its own
+// entry in `banners`, after the buyer-preview banner.
+function ContributorPreviewBannerSlot({ viewer }: SlotProps) {
+  return viewer.kind === "contributor-preview" ? <ContributorPreviewBanner viewer={viewer} /> : null;
+}
+
+// T17's wiring (P2-CONTRIB-1…13): the roster, its dialog and removal all live
+// in ContributorsTab, fed by `view.ownership` and `view.canCtx` (COR-74).
+function ContributorsSlot(props: SlotProps) {
+  return <ContributorsTab {...props} />;
+}
+
 // ─────────────────────────── the page's composition ───────────────────────────
 
 /** Exported for its `banners`, which the product page shows too, so a preview reads the same
@@ -132,6 +146,7 @@ function ActivitySlot(props: SlotProps) {
 export const SLOTS: ProjectSlots = {
   banners: [
     PreviewBannerSlot,
+    ContributorPreviewBannerSlot,
   ],
   header: HeaderSlot,
   headerParts: {
@@ -148,6 +163,7 @@ export const SLOTS: ProjectSlots = {
     products: ProductsSlot,
     media: MediaSlot,
     network: NetworkSlot,
+    contributors: ContributorsSlot,
     customers: CustomersSlot,
   },
   rail: {
