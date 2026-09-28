@@ -1,11 +1,13 @@
 "use client";
 
-// The product page's deliverable tabs (COR-32…34, COR-37): 3D model · PCB ·
-// Firmware code · Wiring · Parts, in the app's order and with its labels, one
-// panel at a time. Each panel is the build review's own preview component
-// over this product at this version, with the review's "What this covers"
-// aside beside it (artifact + a 260 px aside from a 640 px page), so the two
-// surfaces say the same thing about the same product.
+// The product page's five piece panels (COR-32…34, COR-37; P2-EDITOR-16):
+// 3D model · PCB · Firmware code · Wiring · Parts. The strip that picks one
+// is the page's own (product-tabs.tsx), so this file draws one panel's body:
+// the build review's own preview component over this product at this
+// version, with the review's "What this covers" aside beside it (artifact +
+// a 260 px aside from a 640 px page), so the two surfaces say the same thing
+// about the same product. Each panel starts with its own (visually hidden)
+// h2, the tab's name (COR-99).
 //
 // No review controls live here (COR-36): no Retry, Save, Refine or spec edit.
 // A failed piece says where it can be retried and links to the chat. The 3D
@@ -27,35 +29,18 @@ import {
 import { ModelPanelLazy } from "@/components/create/model-panel/model-panel-lazy";
 import { Button, buttonVariants } from "@/components/ideeza";
 import { isSampleModel } from "@/lib/create/build-artifacts";
-import {
-  ITEM_KINDS,
-  ITEM_LABELS,
-  type BuildItem,
-  type BuildItemKind,
-  type BuildJob,
-  type BuildProduct,
-} from "@/lib/create/history";
-import { deliverableTabs, pickTab } from "@/lib/manual/product-page";
+import { ITEM_LABELS, type BuildItem, type BuildItemKind, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import { deriveAssembly } from "@/lib/three/assembly";
-import { moveTab, revealDelta } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
 import { ConceptImage } from "./product-identity";
 
-/** Each preview under its own h3, in a named scroll region the keyboard can
- *  reach (COR-34). The Parts table carries its own h3. */
-const PREVIEW: Record<Exclude<BuildItemKind, "3d">, { heading: string | null; region: string }> = {
-  pcb: { heading: "PCB layout", region: "PCB layout, scrollable" },
-  code: { heading: "Firmware code", region: "Firmware code, scrollable" },
-  wiring: { heading: "Wiring map", region: "Wiring map, scrollable" },
-  parts: { heading: null, region: "Parts list, scrollable" },
+/** Each preview in a named scroll region the keyboard can reach (COR-34). */
+const REGION: Record<Exclude<BuildItemKind, "3d">, string> = {
+  pcb: "PCB layout, scrollable",
+  code: "Firmware code, scrollable",
+  wiring: "Wiring map, scrollable",
+  parts: "Parts list, scrollable",
 };
-
-// The project page's tab look (C1's TabStrip): neutral, the subtle fill plus
-// a text-primary underline — never violet; 44 px on touch.
-const TAB =
-  "inline-flex h-[36px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-8 text-md font-semibold leading-md outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:h-[var(--touch-min)]";
-const TAB_ON = "border-text-primary bg-bg-subtle text-text-primary";
-const TAB_OFF = "border-transparent text-text-secondary hover:bg-bg-subtle hover:text-text-primary";
 
 // A link dressed as the quiet button; the hover keeps the button's text colour.
 const LINK_BUTTON = cn(
@@ -63,114 +48,39 @@ const LINK_BUTTON = cn(
   "hover:text-[color:var(--color-button-secondary-text)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
 );
 
-export function ProductDeliverables({
+/** One piece's panel. The page shows the tab only when the piece is in the build (H-5). */
+export function ProductPiecePanel({
   job,
   product,
-  firmware,
+  kind,
   chatHref,
-  tab,
-  onTab,
 }: {
   /** The build of the version on screen. */
   job: BuildJob;
   /** This product inside it. */
   product: BuildProduct;
-  /** False in the buyer preview: the firmware source comes after purchase (PPL-7). */
-  firmware: boolean;
-  /** The chat a failed piece is retried in; null in the preview or when the chat is gone. */
+  kind: BuildItemKind;
+  /** The chat a failed piece is retried in; null in a preview or when the chat is gone. */
   chatHref: string | null;
-  /** `?tab=` as the URL has it. */
-  tab: string | null;
-  /** Writes `?tab=` (replace, not push — COR-32). */
-  onTab: (kind: BuildItemKind) => void;
 }) {
-  const tabs = React.useMemo(
-    () => deliverableTabs(product.items, ITEM_KINDS, { firmware }),
-    [product.items, firmware],
-  );
-  // The pick shows at once; the URL follows it by replace. The parent keys
-  // this component by version and product, so a new version starts over.
-  const [picked, setPicked] = React.useState<BuildItemKind | null>(null);
-  const shown = pickTab(tabs, picked ?? tab);
-  const item = tabs.find((i) => i.kind === shown) ?? null;
-  const uid = React.useId();
-  const tabId = (kind: BuildItemKind) => `${uid}-tab-${kind}`;
-  const panelId = `${uid}-panel`;
-  const listRef = React.useRef<HTMLDivElement>(null);
-
-  const select = (kind: BuildItemKind) => {
-    setPicked(kind);
-    onTab(kind);
-  };
-
-  // At phone width the strip is one row that scrolls sideways (COR-21): keep
-  // the selected tab in view — only the strip moves, never the page.
-  React.useEffect(() => {
-    const list = listRef.current;
-    const el = shown ? list?.querySelector<HTMLElement>(`[data-tab="${shown}"]`) : null;
-    if (!list || !el) return;
-    const delta = revealDelta(el.getBoundingClientRect(), list.getBoundingClientRect(), 8);
-    if (delta === 0) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    list.scrollBy({ left: delta, behavior: still ? "auto" : "smooth" });
-  }, [shown]);
-
-  if (!shown || !item) {
-    return (
-      <p className="rounded-xl border border-dashed border-border px-10 py-12 text-center text-md text-text-secondary">
-        This build made no deliverables for this product.
-      </p>
-    );
-  }
-
+  const item = product.items.find((i) => i.kind === kind) ?? null;
   return (
-    <section aria-labelledby={`${uid}-heading`} className="flex flex-col gap-8">
-      <h2 id={`${uid}-heading`} className="sr-only">
-        Deliverables
-      </h2>
-      <div
-        ref={listRef}
-        role="tablist"
-        aria-label="Deliverables"
-        onKeyDown={(e) => moveTab(e, tabs.map((i) => i.kind), shown, select)}
-        className="flex flex-nowrap items-end gap-2 overflow-x-auto overflow-y-hidden border-b border-solid border-border"
-      >
-        {tabs.map((i) => {
-          const on = i.kind === shown;
-          return (
-            <button
-              key={i.kind}
-              id={tabId(i.kind)}
-              role="tab"
-              type="button"
-              data-tab={i.kind}
-              aria-selected={on}
-              aria-controls={panelId}
-              tabIndex={on ? 0 : -1}
-              onClick={() => select(i.kind)}
-              className={cn(TAB, on ? TAB_ON : TAB_OFF)}
-            >
-              {ITEM_LABELS[i.kind]}
-            </button>
-          );
-        })}
-      </div>
-      <div id={panelId} role="tabpanel" aria-labelledby={tabId(shown)}>
-        {item.status !== "ready" ? (
-          <Split
-            artifact={<PieceNotReady item={item} chatHref={chatHref} />}
-            aside={<Covers kind={item.kind} job={job} product={product} />}
-          />
-        ) : item.kind === "3d" ? (
-          <ModelTab job={job} product={product} />
-        ) : (
-          <Split
-            artifact={<Preview kind={item.kind} product={product} />}
-            aside={<Covers kind={item.kind} job={job} product={product} />}
-          />
-        )}
-      </div>
-    </section>
+    <>
+      <h2 className="sr-only">{ITEM_LABELS[kind]}</h2>
+      {!item ? null : item.status !== "ready" ? (
+        <Split
+          artifact={<PieceNotReady item={item} chatHref={chatHref} />}
+          aside={<Covers kind={kind} job={job} product={product} />}
+        />
+      ) : kind === "3d" ? (
+        <ModelTab job={job} product={product} />
+      ) : (
+        <Split
+          artifact={<Preview kind={kind} product={product} />}
+          aside={<Covers kind={kind} job={job} product={product} />}
+        />
+      )}
+    </>
   );
 }
 
@@ -188,22 +98,18 @@ function Split({ artifact, aside }: { artifact: React.ReactNode; aside: React.Re
 }
 
 function Preview({ kind, product }: { kind: Exclude<BuildItemKind, "3d">; product: BuildProduct }) {
-  const { heading, region } = PREVIEW[kind];
   return (
-    <>
-      {heading && <h3 className="sr-only">{heading}</h3>}
-      <div
-        role="region"
-        aria-label={region}
-        tabIndex={0}
-        className="max-h-[520px] overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        {kind === "pcb" && <PcbPreview job={product} />}
-        {kind === "code" && <FirmwarePreview job={product} />}
-        {kind === "wiring" && <WiringPreview job={product} />}
-        {kind === "parts" && <PartsPreview job={product} />}
-      </div>
-    </>
+    <div
+      role="region"
+      aria-label={REGION[kind]}
+      tabIndex={0}
+      className="max-h-[520px] overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+    >
+      {kind === "pcb" && <PcbPreview job={product} />}
+      {kind === "code" && <FirmwarePreview job={product} />}
+      {kind === "wiring" && <WiringPreview job={product} />}
+      {kind === "parts" && <PartsPreview job={product} />}
+    </div>
   );
 }
 
@@ -284,7 +190,6 @@ function ModelTab({ job, product }: { job: BuildJob; product: BuildProduct }) {
       <Split
         artifact={
           <div className="flex flex-col items-start gap-6">
-            <h3 className="sr-only">3D model</h3>
             {product.conceptImageUrl ? (
               <ConceptImage
                 key={product.conceptImageUrl}
@@ -315,7 +220,6 @@ function ModelTab({ job, product }: { job: BuildJob; product: BuildProduct }) {
   return (
     <div className="flex flex-col gap-10">
       <div ref={viewerRef} tabIndex={-1} role="region" aria-label={`3D model of ${product.name}`} className="outline-none">
-        <h3 className="sr-only">3D model</h3>
         <ModelPanelLazy key={product.id} assembly={assembly} shellNote={shellNote} />
       </div>
       <Covers kind="3d" job={job} product={product} />

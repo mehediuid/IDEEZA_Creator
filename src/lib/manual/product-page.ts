@@ -1,8 +1,8 @@
 // The product page's pure readers — /projects/[id]/products/[productId]
 // (spec §3.4, §5.7). Which saved version of one product the page shows, what
 // its version select lists and which notice sits above it (COR-41, COR-108),
-// which deliverable tabs it has (COR-32, COR-37), how many of its pieces are
-// ready (COR-31), and its URL with one key changed. The booked facts are the
+// which tabs its one strip has (COR-32, COR-37, P2-EDITOR-16), how many of
+// its pieces are ready (COR-31), and its URL with one key changed. The booked facts are the
 // Products tab's own `productFacts()` (products-tab-view.ts), so the card and
 // this page word them the same way.
 //
@@ -163,44 +163,6 @@ export function productVersionView(
 export function productPiecesOf(items: BuildItem[]): { ready: number; total: number } {
   const live = items.filter((i) => i.status !== "skipped");
   return { ready: live.filter((i) => i.status === "ready").length, total: live.length };
-}
-
-// ───────────────────────────── tabs ─────────────────────────────
-
-/** The deliverable tabs, in the app's order (`ITEM_KINDS`, passed in). A
- *  piece this build never made has no tab (H-5); the firmware source is kept
- *  back when `firmware` is false — the buyer preview, where it comes after
- *  purchase (PPL-7, COR-37).
- *
- *  @deprecated Replaced by `productTabsOf` below (P2-EDITOR-16, C2): the
- *  product page's tab strip is now one flat strip — Media · the build's
- *  pieces · Contributors · Customers — instead of the deliverable panel
- *  owning its own. Kept, unchanged, only because `product-deliverables.tsx`
- *  (T12 rewrites it) still calls it. */
-export function deliverableTabs(
-  items: BuildItem[],
-  order: readonly BuildItemKind[],
-  opts: { firmware: boolean },
-): BuildItem[] {
-  return order
-    .map((kind) => items.find((i) => i.kind === kind))
-    .filter(
-      (i): i is BuildItem =>
-        !!i && i.status !== "skipped" && (opts.firmware || i.kind !== "code"),
-    );
-}
-
-/** The tab on screen: the one `?tab=` names when it is there, else the first
- *  finished piece, else the first tab. Null when there is no tab at all.
- *
- *  @deprecated Replaced by `pickProductTab` below. See `deliverableTabs`. */
-export function pickTab(tabs: BuildItem[], asked: string | null): BuildItemKind | null {
-  return (
-    tabs.find((i) => i.kind === asked)?.kind ??
-    tabs.find((i) => i.status === "ready")?.kind ??
-    tabs[0]?.kind ??
-    null
-  );
 }
 
 // ───────────────── the product page's tab strip (P2-EDITOR-16) ─────────────────
