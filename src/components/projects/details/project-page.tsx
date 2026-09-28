@@ -85,9 +85,11 @@ function ProductsSlot({ project, view, viewer, now }: SlotProps) {
 
 // C7's two rail blocks take their own props; they mount through these, as the
 // slot contract asks. The other four rail blocks are SlotProps components.
-// Showcase speaks through the shell's one live region (COR-101).
+// Showcase speaks through the shell's one live region (COR-101). T24 also
+// reads `view` itself: its precomputed `videos.readiness.showcase` gates the
+// Showcase toggle, and the same `view` feeds the readiness dialog it opens.
 function OutcomeSlot({ view, viewer, announce }: SlotProps) {
-  return <RailOutcome summary={view.summary} commerce={view.commerce} viewer={viewer} announce={announce} />;
+  return <RailOutcome summary={view.summary} commerce={view.commerce} viewer={viewer} view={view} announce={announce} />;
 }
 function DetailsSlot({ project, view, viewer }: SlotProps) {
   return <RailDetails project={project} summary={view.summary} viewer={viewer} />;

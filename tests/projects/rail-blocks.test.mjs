@@ -8,9 +8,11 @@ import { readFileSync } from "node:fs";
 const read = (name) =>
   readFileSync(new URL(`../../src/components/projects/details/${name}`, import.meta.url), "utf8");
 
-test("the Outcome block has no link and no door: no href, no Innovations URL, no Brief tick (COM-12, COM-18, COR-105)", () => {
+test("the Outcome block still has no door to Innovations or the Brief — its only link is P2-VIDEO-15's one-missing-product line (COM-12, COM-18, COR-105)", () => {
   const src = read("rail-outcome.tsx");
-  assert.doesNotMatch(src, /href=/);
+  const hrefs = src.match(/href=/g) ?? [];
+  assert.equal(hrefs.length, 1, "the Showcase note's product-page link is the block's only href");
+  assert.match(src, /href=\{link\.href\}/);
   assert.doesNotMatch(src, /\/innovations/);
   assert.doesNotMatch(src, /shareToNewsfeed/);
 });
@@ -19,7 +21,10 @@ test("Showcase and the owner-only facts ask the one permission source (PPL-1, CO
   const outcome = read("rail-outcome.tsx");
   assert.match(outcome, /can\(viewer, "facts\.seeOwnerOnly"\)/);
   assert.match(outcome, /can\(viewer, "project\.showcase", \{ status: summary\.status \}\)/);
-  assert.match(outcome, /setShowcase\(projectId, next\)/);
+  // P2-VIDEO-15: "Stop showcasing" is never gated; "Showcase project" flips at once only once
+  // `readinessOf` passes, so the single v1 toggle is now these two explicit calls.
+  assert.match(outcome, /setShowcase\(projectId, true\)/);
+  assert.match(outcome, /setShowcase\(projectId, false\)/);
   assert.match(read("rail-details.tsx"), /can\(viewer, "facts\.seeOwnerOnly"\)/);
 });
 
