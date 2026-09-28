@@ -17,6 +17,7 @@ import type { Viewer } from "@/lib/manual/permissions";
 import type { ProductVersionView } from "@/lib/manual/product-page";
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
+import { ProductMediaPanel } from "./product-media";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -41,6 +42,8 @@ export type ProductSlots = {
 };
 
 export const PRODUCT_SLOTS: ProductSlots = {
-  panels: {},
+  panels: {
+    media: ProductMediaPanel,
+  },
   rail: {},
 };
