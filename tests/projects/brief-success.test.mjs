@@ -44,3 +44,16 @@ test("Showcase comes from the shared copy, asks can(), and writes the project's 
 test("the Brief hands the success step the project it minted", () => {
   assert.match(read("brief-app.tsx"), /projectId=\{scopeProjectId\}/);
 });
+
+test("the mint showcases at the mint time itself: one clock read for mintedAt and showcasedAt (COR-105)", () => {
+  const src = read("brief-app.tsx");
+  const commit = src.slice(src.indexOf("const commit = () => {"), src.indexOf("const goNext = () => {"));
+  assert.ok(commit.length > 0, "commit() not found");
+  assert.equal(commit.match(/Date\.now\(\)/g)?.length, 1, "commit() reads the clock once");
+  assert.match(commit, /const at = Date\.now\(\);/);
+  assert.match(commit, /setShowcase\(scopeProjectId, true, at\)/);
+  assert.match(commit, /mintedAt: at\b/);
+  // The store writes the time it is handed; a press with none is stamped now.
+  const store = readFileSync(new URL("../../src/lib/manual/projects.tsx", import.meta.url), "utf8");
+  assert.match(store, /\(id: string, on: boolean, at\?: number\) =>\s*updateProject\(id, \{ showcasedAt: on \? \(at \?\? Date\.now\(\)\) : null \}\)/);
+});

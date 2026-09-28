@@ -9,14 +9,14 @@
 // in it (CNT-5) instead of closing on a change this browser never kept.
 
 import * as React from "react";
-import { useManualProjects } from "@/lib/manual/projects";
+import { projectWriteRefused, useManualProjects } from "@/lib/manual/projects";
 
 const SETTLE_MS = 250;
 
 export type StoreWrite = {
   /** From start() until the write settles or fails. */
   saving: boolean;
-  /** The store refused a localStorage write after start(). Cleared by start() and reset(). */
+  /** The store refused its localStorage write of the projects after start(). Cleared by start() and reset(). */
   failed: boolean;
   /** Call right before `updateProject`. */
   start: () => void;
@@ -28,9 +28,11 @@ export function useStoreWrite(applied: boolean, onSaved: () => void): StoreWrite
   const { writeError } = useManualProjects();
   const [since, setSince] = React.useState<number | null>(null);
   const [failed, setFailed] = React.useState(false);
-  // A refused write after start() ends the save: stored from this render on,
-  // so a later successful write elsewhere can't turn it back into "saved".
-  if (since !== null && writeError !== null && writeError.at >= since) {
+  // A refused write of the projects after start() ends the save: stored from
+  // this render on, so a later successful write elsewhere can't turn it back
+  // into "saved". Another key refused (the create store's chats or builds)
+  // isn't this edit failing — its own write may have gone through.
+  if (since !== null && projectWriteRefused(writeError, since)) {
     setSince(null);
     setFailed(true);
   }

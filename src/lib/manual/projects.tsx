@@ -28,7 +28,10 @@ import {
 } from "../storage-status";
 import { stampOpened, sweepProjectKeys } from "./project-storage";
 import { productsOf, type BuildJob, type BuildProduct } from "../create/history";
-// project-read.ts imports only types from this file, so this is no runtime cycle.
+// A runtime cycle: project-read.ts takes only types from this file, but it
+// loads project-summary.ts and ../brief/project-brief, and both load this file.
+// It is safe only because no module in it uses another's exports while
+// loading — only from inside functions.
 import { lineageProjectOf, modelNameOf } from "./project-read";
 
 export type ManualProjectStatus = "draft" | "completed";
@@ -137,8 +140,17 @@ export const PROJECT_NAME_MAX = 80; // CNT-2: trimmed, 1–80 characters
 export const PROJECT_DESC_MAX = 1000; // CNT-5: trimmed, 0–1,000 characters…
 export const PROJECT_DESC_COUNTER_FROM = 800; // …with a counter from 800
 
-const PROJECTS_KEY = "ideeza:manual:projects";
+/** The key this store writes its projects to — and reports a refused write under (COR-93). */
+export const PROJECTS_KEY = "ideeza:manual:projects";
 const ACTIVE_KEY = "ideeza:manual:active";
+
+/** Whether this store's own write of the projects was refused at or after
+ *  `since` — what an inline edit started then has to treat as its failure.
+ *  A refused write of another key (the create store's chats or builds) isn't
+ *  one: the edit may well have saved. */
+export function projectWriteRefused(err: WriteError | null, since: number): boolean {
+  return err !== null && err.key === PROJECTS_KEY && err.at >= since;
+}
 
 function loadJSON<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -361,7 +373,11 @@ export function normalizeProjects(list: unknown): ManualProject[] {
   const taken = new Set<string>();
   return list.filter(isRecord).map((raw) => {
     const p = raw as ManualProject;
-    let slug = p.slug || slugify(p.name);
+    // A name that isn't a string reads as none, rather than throwing here or
+    // on every surface that trims it.
+    const nameOk = typeof p.name === "string";
+    const name = nameOk ? p.name : "";
+    let slug = p.slug || slugify(name);
     const base = slug;
     let n = 2;
     while (taken.has(slug)) slug = `${base}-${n++}`;
@@ -372,9 +388,12 @@ export function normalizeProjects(list: unknown): ManualProject[] {
     const showcasedAt = showcasedIn(p.showcasedAt);
     const cover = coverIn(p.cover);
     // Backfill steps added after a project was saved (e.g. `assembly`,
-    // UIUX-80) so flowState always carries every step key.
-    const flowOk = p.flowState && FLOW_STEPS.every((s) => s in p.flowState);
+    // UIUX-80) so flowState always carries every step key. One that isn't an
+    // object at all reads as no steps done.
+    const flow = isRecord(p.flowState) ? p.flowState : null;
+    const flowOk = flow !== null && FLOW_STEPS.every((s) => s in flow);
     if (
+      nameOk &&
       p.slug === slug &&
       p.productName !== undefined &&
       flowOk &&
@@ -387,9 +406,10 @@ export function normalizeProjects(list: unknown): ManualProject[] {
       return p;
     const out: ManualProject = {
       ...p,
+      name,
       slug,
       productName: p.productName ?? "",
-      flowState: { ...EMPTY_FLOW_STATE, ...(p.flowState ?? {}) },
+      flowState: { ...EMPTY_FLOW_STATE, ...(flow ?? {}) },
     };
     if (products) out.products = products;
     else delete out.products;
@@ -471,11 +491,12 @@ function modelDescOf(bp: BuildProduct): string {
  *
  * `lineage` is the OTHER builds of `job.chatId`. The build is recorded as the
  * next version of its chat inside this project; its products replace the rows
- * the lineage's earlier version made (matched by product id, then by name), a
- * row this version doesn't have stays listed with its old source (COR-108), and
- * every product the project didn't have yet becomes a new row. The maker's own
- * words on a row survive: the model's new words land only where the row still
- * holds the previous version's. Rows from another chat, and hand-made rows, are
+ * the lineage's earlier version made (matched by product id — for a legacy row,
+ * the one it was in that earlier build — then by name), a row this version
+ * doesn't have stays listed with its old source (COR-108), and every product
+ * the project didn't have yet becomes a new row. The maker's own words on a
+ * row survive: the model's new words land only where the row still holds the
+ * previous version's. Rows from another chat, and hand-made rows, are
  * left alone — except that a hand-made row named like one of this build's
  * products adopts it, which is a build joining a hand-made project.
  */
@@ -487,8 +508,12 @@ export function attach(
   opts: { origin?: boolean } = {},
 ): ManualProject {
   const refs0 = p.builds ?? [];
-  // One build, one attach: saving the same build again changes nothing.
-  if (refs0.some((r) => r.buildId === job.id)) return p;
+  // One build, one attach: saving the same build again changes nothing. That
+  // includes a build held by a legacy link — the project's origin, or a build
+  // whose projectId names it: buildsOf() already numbers it, and freezing its
+  // lineage around it here would renumber the versions and lose its save time.
+  if (refs0.some((r) => r.buildId === job.id) || job.id === p.buildId || job.projectId === p.id)
+    return p;
 
   // Freeze this lineage's legacy links first — builds that joined before
   // `builds` was recorded — numbered by age after the refs already stored, the
@@ -573,8 +598,10 @@ export function attach(
       continue;
     }
     // Same lineage: this version replaces the row — by product id, then name.
+    // A legacy row has no stored id, so it goes by the product it was in the
+    // earlier build: a rebuild that renames the primary still replaces its row.
     const m =
-      take((x) => x.bp.id === row.source?.productId) ??
+      take((x) => x.bp.id === (row.source?.productId ?? earlier(row)?.bp.id)) ??
       take((x) => norm(x.name) === norm(row.name));
     if (!m) {
       // Not in this version: it stays listed, its source still the last
@@ -752,11 +779,12 @@ type Ctx = {
   // "Use as cover" / "Stop using as cover" (CNT-15): a product source, or
   // null to go back to coverOf()'s default. Bumps updatedAt.
   setCover: (id: string, cover: ProductSource | null) => void;
-  /** Showcase's one control (COM-55, COR-105): on writes Date.now(), off
-   *  writes null. Through updateProject, so it bumps updatedAt like any
-   *  other maker's edit — unlike backfillShowcase, which records an old fact
-   *  rather than one made now. */
-  setShowcase: (id: string, on: boolean) => void;
+  /** Showcase's one control (COM-55, COR-105): on writes `at` — the Brief's
+   *  commit passes its mint time, so the two are one moment — else
+   *  Date.now(); off writes null. Through updateProject, so it bumps
+   *  updatedAt like any other maker's edit — unlike backfillShowcase, which
+   *  records an old fact rather than one made now. */
+  setShowcase: (id: string, on: boolean, at?: number) => void;
   markStepCompleted: (id: string, step: keyof ManualFlowState) => void;
   setStatus: (id: string, status: ManualProjectStatus) => void;
   /** COR-105's one-time backfill: a project minted with Share to Innovations
@@ -890,9 +918,10 @@ export function ManualProjectsProvider({
     [updateProject],
   );
 
-  // Showcase's one control: on is Date.now(), off is null (COM-55).
+  // Showcase's one control: on is the time handed in, else now; off is null (COM-55).
   const setShowcase = React.useCallback(
-    (id: string, on: boolean) => updateProject(id, { showcasedAt: on ? Date.now() : null }),
+    (id: string, on: boolean, at?: number) =>
+      updateProject(id, { showcasedAt: on ? (at ?? Date.now()) : null }),
     [updateProject],
   );
 
