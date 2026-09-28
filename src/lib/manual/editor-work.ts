@@ -131,8 +131,8 @@ function previewFact(scope: EditorScope, headRowId: string): StepFact {
  *  @deprecated The 1-arg, project-only form reads the pre-P2 per-project
  *  keys (via the legacy fallback, at the virtual first row "p1") and reports
  *  "none" for Code/3D shapes/Preview, matching v1's behaviour exactly — kept
- *  for the two call sites (`rail-editor.tsx`, `delete-project-dialog.tsx`)
- *  that haven't moved to the scoped form yet. Prefer the 2-arg form. */
+ *  for `delete-project-dialog.tsx`, which hasn't moved to the scoped form
+ *  yet (T19). Prefer the 2-arg form. */
 export function editorWorkOf(projectId: string): EditorWork;
 export function editorWorkOf(scope: EditorScope, headRowId: string): EditorWork;
 export function editorWorkOf(scopeOrProjectId: EditorScope | string, headRowId?: string): EditorWork {
@@ -150,12 +150,3 @@ export function editorWorkOf(scopeOrProjectId: EditorScope | string, headRowId?:
     preview: previewFact(scope, head),
   };
 }
-
-/** The rail's shared-stores caption, shown while Code, 3D shapes and Preview
- *  had no per-project store (v1). Removed in P2 (§3.5.8): every step now has
- *  a real per-product fact (P2-EDITOR-8).
- *
- *  @deprecated Kept, unchanged, only because `rail-editor.tsx` (T12 deletes
- *  it) still renders it; not used by any P2 surface. */
-export const EDITOR_GLOBAL_NOTE =
-  "Code, 3D shapes and Preview are shared by every project in this browser for now, so they show no progress here.";

@@ -1,15 +1,15 @@
 "use client";
 
 // The product page's states around its content: the loading shape (COR-2),
-// "This product isn't in {project}" (COR-30), and the note for a product no
-// build stands behind (COR-24's words). An unknown project is the project
-// page's own ProjectNotFound (COR-1). The buyer-preview banner (PPL-5) is
-// `BuyerPreviewBanner` (`../details/buyer-preview`), shared with the project
-// page rather than this page's own.
+// "This product isn't in {project}" (COR-30, the unknown product), the lock
+// line of a project sold in full (§3.8.5), and the source line of a product
+// no build stands behind (P2-EDITOR-9's table). An unknown project is the
+// project page's own ProjectNotFound (COR-1). The preview banners (PPL-5) are
+// the project page's, shared rather than this page's own.
 
 import * as React from "react";
 import Link from "next/link";
-import { HelpCircleIcon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
 import type { ProjectProduct } from "@/lib/manual/project-read";
@@ -20,7 +20,7 @@ function Bone({ className }: { className: string }) {
   return <span aria-hidden className={cn("block rounded-md bg-bg-subtle motion-safe:animate-pulse", className)} />;
 }
 
-/** The page's final shape while the two stores hydrate — crumbs, the h1 and
+/** The page's final shape while the stores hydrate — crumbs, the h1 and
  *  its meta, the identity row, the tab strip, a panel — so no state flashes a
  *  not-found before its read completes. Also the Suspense fallback. */
 export function ProductLoading() {
@@ -87,13 +87,23 @@ const UNBUILT: Record<Exclude<ProjectProduct["state"], "built">, string> = {
   hand: "Made by hand — its work is in the editor.",
 };
 
-/** A product no build stands behind has no version and no deliverables — the
- *  card's own words say why (COR-24), where the tabs would be. */
+/** A product no build stands behind has no version and no pieces: one line under
+ *  the header says why, in the card's own words (COR-24, P2-EDITOR-9). Its page
+ *  still has Media, Contributors and Customers. */
 export function UnbuiltNote({ state }: { state: ProjectProduct["state"] }) {
   if (state === "built") return null;
+  return <p className="text-md text-text-secondary">{UNBUILT[state]}</p>;
+}
+
+/** §3.8.5's owner line on a project sold in full, under the status line of both pages:
+ *  everything is read-only, so the product page has no Open in editor and no Editor block. */
+export function LockLine({ line }: { line: string }) {
   return (
-    <p className="rounded-xl border border-dashed border-border px-10 py-12 text-center text-md text-text-secondary">
-      {UNBUILT[state]}
+    <p className="flex min-w-0 items-start gap-3 text-md font-medium text-text-primary">
+      <span aria-hidden className="inline-flex pt-[2px] text-text-secondary">
+        <Icon icon={LockIcon} size={16} />
+      </span>
+      <span className="min-w-0">{line}</span>
     </p>
   );
 }

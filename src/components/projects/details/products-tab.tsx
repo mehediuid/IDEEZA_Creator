@@ -1,41 +1,38 @@
 "use client";
 
-// The Products tab — spec §5.6 (COR-22…25). One derivation feeds it
-// (COR-74): the project page computes `productsOfProject()` once and
-// passes the result down as `products`, so this component only ever
-// renders what it is given — it never re-derives project state on its
-// own.
+// The Products tab — spec §5.6 (COR-22…25); Phase 2 P2-EDITOR-10, P2-VIDEO-12,
+// P2-TABS-10 and P2-TABS-29. One derivation feeds it (COR-74): the project
+// page computes `productsOfProject()` and `productsTabView()` once and passes
+// the results down, so this component only renders what it is given.
 //
-// A built product's Build check is shown twice, on purpose, in two
-// different shapes. The header's is the one real disclosure
-// (`ConfidenceBadge`, reused as-is) holding TIER_MEANING, the "not
-// checked yet" reading and the credit note (COR-22) — because the whole
-// tab is a grid of link cards, and a `<button>` disclosure inside a card
-// that is itself an `<a>` would nest interactive content inside
-// interactive content, which is invalid and breaks keyboard/AT behaviour.
-// Each card's own "Build check: {tier}" is therefore a plain,
-// non-interactive label (`BuildCheckPill`); the header's disclosure
-// already satisfies "must be on screen wherever Draft is" for the tab as
-// a whole.
+// - Every card is a stretched link to its product page: the h3's link is the
+//   card's hit area through an `::after` overlay, so its accessible name is
+//   the product's name alone. A hand-made, build-gone or unmatched product
+//   has a page too (Media · Contributors · Customers), and its card keeps its
+//   note as a line (P2-EDITOR-10 as changed). There is no "Open in editor" on
+//   a card: it lives in the product page's header, one click away (C16).
+// - The owner's card carries its video line — "No video yet", "Rendering ·
+//   40 %", "Video ready", "Render failed" — as text, never a control
+//   (P2-VIDEO-12), and any card its stage pill, "Stage: {label}" to a screen
+//   reader (P2-TABS-10).
+// - The owner's first tile is "Add a product": a link to `/?addTo={id}`
+//   (SAVE takes it from there). A live Buy-now listing asks to pause first;
+//   a running auction refuses, with its reason (`guard("addProduct")`,
+//   P2-LISTING-13). The lock hides it: `can("product.add")` is false.
 //
-// Deviation from the task brief: project-read.ts (A2) already exports a
-// job-wide `piecesOf(job)`. Per the plan's C3 amendment, this file's own
-// per-product counter is named `piecesOfItems` instead of `piecesOf`, to
-// avoid clashing with that name — C4's `productPiecesOf` didn't exist in
-// this tree at the time this landed, so `piecesOfItems` stays as written.
-//
-// Also deviates from the brief's "assumed signatures" note: A3's actual
-// `countLabel(n)` takes no singular/plural args, and `formatShortDate(at,
-// now)` requires `now` — a bare `Date.now()` at the call site trips the
-// react-hooks/purity rule (an impure call during render), so `now` is
-// threaded down from the page's own minute clock (SlotProps.now) as an
-// extra prop instead, the same value every other slot renders from.
+// A built product's Build check is shown twice, on purpose, in two shapes.
+// The heading's is the one real disclosure (`ConfidenceBadge`) holding
+// TIER_MEANING and the credit note (COR-22); each card's own "Build check:
+// {tier}" is a plain label (`BuildCheckPill`), because a disclosure button
+// inside a link card would nest interactive content.
 
 import * as React from "react";
 import Link from "next/link";
-import { Image02Icon, ImageNotFound02Icon } from "@hugeicons/core-free-icons";
+import { useRouter } from "next/navigation";
+import { Image02Icon, ImageNotFound02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ConfidenceBadge } from "@/components/create/confidence-badge";
+import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import {
   checkBuild,
   TIER_LABEL,
@@ -54,32 +51,49 @@ import {
   productFacts,
   productsHeadingOf,
   type HeadingRow,
+  type ProductCardView,
 } from "@/lib/manual/products-tab-view";
+import { cn } from "@/lib/utils";
+
+const NO_CARD: ProductCardView = { video: null, stage: null };
+
+const UNBUILT_NOTE: Record<Exclude<ProjectProduct["state"], "built">, string> = {
+  "build-gone": "Its build isn't in this browser any more.",
+  unmatched: "Its build can't be matched to this name.",
+  hand: "Made by hand — its work is in the editor.",
+};
+
+const CARD =
+  "relative flex h-full flex-col overflow-hidden rounded-xl border border-solid border-border bg-bg-surface text-left transition-colors duration-normal ease-decelerate hover:border-border-strong has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-border-focus motion-reduce:transition-none";
 
 export function ProductsTab({
   projectId,
+  projectName,
   products,
+  cards,
   chats,
   showOwnerOnlyFacts,
+  canAddProduct,
   now,
-  linkQuery = "",
+  productHref,
 }: {
   projectId: string;
-  /** `productsOfProject(project, buildsOf(project, builds))` — computed
-   *  once by the project page (COR-74), current version plus any product
-   *  a later version dropped (COR-42), in `products[]` order (COR-23). */
+  projectName: string;
+  /** `view.products` — current version plus any product a later version
+   *  dropped (COR-42), in `products[]` order (COR-23). */
   products: ProjectProduct[];
+  /** `productsTabView(view, …)` by row id: each card's video line and stage pill. */
+  cards: Record<string, ProductCardView>;
   /** For the part-changes line's `conceptOf()` lookup. */
   chats: ChatSession[];
-  /** `can(viewer, "facts.seeOwnerOnly")` — decided by the page, not here
-   *  (PPL-7): the only owner-only fact on this tab is part changes. */
+  /** `can(viewer, "facts.seeOwnerOnly")` — the only owner-only fact on a card is part changes (PPL-7). */
   showOwnerOnlyFacts: boolean;
-  /** SlotProps.now — the minute clock `view` was derived at. Passed
-   *  through to `formatShortDate`, which A3 requires (not optional). */
+  /** `can(viewer, "product.add", view.canCtx)`: the "Add a product" tile (P2-TABS-29). */
+  canAddProduct: boolean;
+  /** SlotProps.now — the minute clock `view` was derived at. */
   now: number;
-  /** Appended to every card's href: `?view=buyer` in Preview as buyer, so
-   *  the preview carries into the product page (COR-37). */
-  linkQuery?: string;
+  /** A product page's address, with the viewer's preview carried (COR-37). */
+  productHref: (productId: string) => string;
 }) {
   const heading = React.useMemo(() => {
     const rows: HeadingRow[] = products.map((pp) => ({
@@ -132,21 +146,22 @@ export function ProductsTab({
         </div>
       </div>
 
-      {products.length > 0 && (
+      {(canAddProduct || products.length > 0) && (
         <ul
           role="list"
           aria-label="Products"
           className="grid grid-cols-1 gap-8 [@container(min-width:520px)]:grid-cols-2 [@container(min-width:880px)]:grid-cols-3"
         >
+          {canAddProduct && <AddProductTile projectId={projectId} projectName={projectName} />}
           {products.map((pp) => (
             <ProductCard
               key={pp.id}
               pp={pp}
+              card={cards[pp.id] ?? NO_CARD}
               chats={chats}
-              projectId={projectId}
+              href={productHref(pp.id)}
               showOwnerOnlyFacts={showOwnerOnlyFacts}
               now={now}
-              linkQuery={linkQuery}
             />
           ))}
         </ul>
@@ -155,26 +170,86 @@ export function ProductsTab({
   );
 }
 
+/** P2-TABS-29: the grid's first tile. Its link name is "Add a product"; the sub-line describes it. */
+function AddProductTile({ projectId, projectName }: { projectId: string; projectName: string }) {
+  const router = useRouter();
+  const gate = useProjectEditGate(projectId);
+  const reason = gate.reasonOf("addProduct");
+  const [refused, setRefused] = React.useState<string | null>(null);
+  const [leaving, setLeaving] = React.useState(false);
+  const subId = React.useId();
+  const reasonId = React.useId();
+  const href = `/?addTo=${encodeURIComponent(projectId)}`;
+  const shown = reason ?? refused;
+
+  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // A modified click opens a tab and leaves this page as it was; Save still runs the gate.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    if (leaving) return;
+    const out = gate.guard("addProduct", () => {
+      setLeaving(true);
+      router.push(href);
+    });
+    setRefused(out.kind === "refused" ? out.reason : null);
+  };
+
+  return (
+    <li>
+      <div
+        className={cn(
+          CARD,
+          "min-h-[160px] items-center justify-center gap-3 border-dashed p-7 text-center",
+          shown && "hover:border-border",
+        )}
+      >
+        <span aria-hidden className="inline-flex size-[40px] items-center justify-center rounded-full bg-bg-subtle text-text-secondary">
+          <Icon icon={PlusSignIcon} size={20} />
+        </span>
+        <h3 className="text-md font-semibold text-text-primary">
+          <Link
+            href={href}
+            onClick={onClick}
+            aria-disabled={shown ? true : undefined}
+            aria-busy={leaving || undefined}
+            aria-describedby={shown ? `${subId} ${reasonId}` : subId}
+            className="rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-0 [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:items-center"
+          >
+            {leaving ? "Opening…" : "Add a product"}
+          </Link>
+        </h3>
+        <p id={subId} className="text-sm text-text-secondary">
+          Describe it in a new chat — its build joins {projectName}.
+        </p>
+        {shown && (
+          <p id={reasonId} className="text-sm font-medium text-text-primary">
+            {shown}
+          </p>
+        )}
+      </div>
+      {gate.dialog}
+    </li>
+  );
+}
+
 function ProductCard({
   pp,
+  card,
   chats,
-  projectId,
+  href,
   showOwnerOnlyFacts,
   now,
-  linkQuery,
 }: {
   pp: ProjectProduct;
+  card: ProductCardView;
   chats: ChatSession[];
-  projectId: string;
+  href: string;
   showOwnerOnlyFacts: boolean;
   now: number;
-  linkQuery: string;
 }) {
   const name = displayProductName(pp.name);
   const built = pp.built;
   const job = built?.ref.job ?? null;
-  const isLink = pp.state === "built";
-  const href = `/projects/${projectId}/products/${pp.id}${linkQuery}`;
 
   const confidence = React.useMemo(() => {
     if (!job || !built) return null;
@@ -210,58 +285,60 @@ function ProductCard({
           }`
         : null;
 
-  const note =
-    pp.state === "build-gone"
-      ? "Its build isn't in this browser any more."
-      : pp.state === "unmatched"
-        ? "Its build can't be matched to this name."
-        : pp.state === "hand"
-          ? "Made by hand — its work is in the editor."
-          : null;
+  const note = pp.state === "built" ? null : UNBUILT_NOTE[pp.state];
 
-  const cardClass = [
-    "group flex h-full flex-col overflow-hidden rounded-xl border border-solid border-border bg-bg-surface text-left outline-none transition-colors duration-normal ease-decelerate motion-reduce:transition-none",
-    isLink ? "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus" : "",
-  ].join(" ");
-
-  const body = (
-    <>
-      <ProductImage url={built?.product.conceptImageUrl ?? null} name={name} />
-      <div className="flex flex-1 flex-col gap-4 p-7">
-        <h3 title={name} className="line-clamp-2 text-md font-semibold text-text-primary">
-          {name}
-        </h3>
-        {confidence && <BuildCheckPill tier={confidence.tier} />}
-        {note && <p className="text-sm text-text-secondary">{note}</p>}
-        {!built && pp.description && (
-          <p className="line-clamp-3 text-sm text-text-tertiary">{pp.description}</p>
-        )}
-        {facts.length > 0 && (
-          <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
-            {facts.map((f) => (
-              <React.Fragment key={f.label}>
-                <dt className="font-medium text-text-tertiary">{f.label}</dt>
-                <dd className="min-w-0 text-text-secondary">{f.value}</dd>
-              </React.Fragment>
-            ))}
-          </dl>
-        )}
-        {pieces && pieces.ready < pieces.total && (
-          <p className="text-sm text-text-secondary">
-            {pieces.ready} of {pieces.total} pieces ready
-          </p>
-        )}
-        {versionLine && <p className="text-sm text-text-tertiary">{versionLine}</p>}
-        {partChangesLine && (
-          <p className="text-sm text-text-secondary">
-            Built with your part changes: {partChangesLine}
-          </p>
-        )}
+  return (
+    <li>
+      <div className={CARD}>
+        <ProductImage url={built?.product.conceptImageUrl ?? null} name={name} />
+        <div className="flex flex-1 flex-col gap-4 p-7">
+          <div className="flex min-w-0 items-start gap-4">
+            <h3 title={name} className="line-clamp-2 min-w-0 flex-1 text-md font-semibold text-text-primary">
+              <Link
+                href={href}
+                className="rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-0"
+              >
+                {name}
+              </Link>
+            </h3>
+            {card.stage && (
+              <span className="inline-flex shrink-0 items-center rounded-full bg-bg-subtle px-4 py-1 text-sm font-medium leading-sm text-text-secondary">
+                <span aria-hidden>{card.stage.short}</span>
+                <span className="sr-only">{card.stage.ariaLabel}</span>
+              </span>
+            )}
+          </div>
+          {confidence && <BuildCheckPill tier={confidence.tier} />}
+          {note && <p className="text-sm text-text-secondary">{note}</p>}
+          {!built && pp.description && (
+            <p className="line-clamp-3 text-sm text-text-tertiary">{pp.description}</p>
+          )}
+          {facts.length > 0 && (
+            <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+              {facts.map((f) => (
+                <React.Fragment key={f.label}>
+                  <dt className="font-medium text-text-tertiary">{f.label}</dt>
+                  <dd className="min-w-0 text-text-secondary">{f.value}</dd>
+                </React.Fragment>
+              ))}
+            </dl>
+          )}
+          {pieces && pieces.ready < pieces.total && (
+            <p className="text-sm text-text-secondary">
+              {pieces.ready} of {pieces.total} pieces ready
+            </p>
+          )}
+          {card.video && <p className="text-sm text-text-secondary">{card.video}</p>}
+          {versionLine && <p className="text-sm text-text-tertiary">{versionLine}</p>}
+          {partChangesLine && (
+            <p className="text-sm text-text-secondary">
+              Built with your part changes: {partChangesLine}
+            </p>
+          )}
+        </div>
       </div>
-    </>
+    </li>
   );
-
-  return <li>{isLink ? <Link href={href} className={cardClass}>{body}</Link> : <div className={cardClass}>{body}</div>}</li>;
 }
 
 function BuildCheckPill({ tier }: { tier: Tier }) {

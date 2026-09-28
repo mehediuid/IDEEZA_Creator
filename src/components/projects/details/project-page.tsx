@@ -1,36 +1,31 @@
 "use client";
 
-// ProjectPage is /projects/[id] (spec §5.3).
-// - It reads the four stores the page derives from: projects, history, video
-//   jobs and the project's Brief draft.
-// - It resolves the address to a project, by id and then by slug.
+// ProjectPage is /projects/[id] (spec §5.3; Phase 2 §2.2, §3.10).
+// - Every store read and the one derivation are `useProjectPageData`'s: the
+//   projects, the builds, video jobs, the Brief draft, the market, the product
+//   videos, the journey, the editions, the business plan and the network, and
+//   who is looking (`?view=buyer`, `?view=contributor&as=<id>`).
 // - It shows one of three states: the skeleton until every read is in
 //   (COR-2), not found (COR-1), or the shell with SLOTS.
-// - `?tab=` and `?view=buyer` are URL state, so a reload and Back keep them
+// - `?tab=` and `?view=` are URL state, so a reload and Back keep them
 //   (COR-7, PPL-5).
 //
-// SLOTS is the one place the page is composed. Each later page task swaps its
-// entry for the real section (see task-C1.md, "Hand-off"). A section written
-// with its own props mounts through a one-line adapter component here.
+// SLOTS is the one place the page is composed, and a merge point (spec
+// §3.10): a task adds its import, one adapter named `<Area>Slot` directly
+// above SLOTS, and its key(s) — one per line — and never reorders or edits
+// another entry.
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
-import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
-import { projectView } from "@/lib/manual/project-read";
-import {
-  parseProjectTab,
-  resolveProject,
-  type ProjectTabId,
-} from "@/lib/manual/project-route";
-import { useManualProjects } from "@/lib/manual/projects";
-import { BUYER_VIEW, VIEW_PARAM } from "@/lib/manual/buyer-preview";
-import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "./buyer-preview";
+import { parseProjectTab } from "@/lib/manual/project-route";
+import { useJourney } from "@/lib/manual/journey-store";
+import { productsTabView } from "@/lib/manual/products-tab-view";
+import { BuyerPreviewBanner, isBuyerPreview, previewQuery } from "./buyer-preview";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
-import { NetworkTab, useNetworkTabVisible } from "./network-tab";
+import { NetworkTab } from "./network-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProductsTab } from "./products-tab";
 import { RailDetails } from "./rail-details";
@@ -40,36 +35,44 @@ import { RailOutcome } from "./rail-outcome";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
+import { useProjectPageData } from "./use-project-page-data";
 
-// C5's wiring (task-C1.md's Hand-off). The page renders only after every
-// store is read, so the tab has no loading state of its own.
+// ─────────────────────────── the slot adapters ───────────────────────────
+
+// C5's wiring. The page renders only after every store is read, so the tab
+// has no loading state of its own.
 function MediaSlot({ project, view, brief, viewer }: SlotProps) {
   return <MediaTab project={project} refs={view.refs} draft={brief} viewer={viewer} />;
 }
 
-// C2's wiring: the header's own data props are `{ project, view, viewer }`
-// (task-C2.md); this adapter is what satisfies HeaderSlotProps, threading
-// the shell's arrival-focus ref and its one live region announcer down to
-// ProjectHeader (which forwards `titleRef` on to ProjectTitle).
-function HeaderSlot({ project, view, viewer, titleRef, announce }: HeaderSlotProps) {
-  return <ProjectHeader project={project} view={view} viewer={viewer} titleRef={titleRef} announce={announce} />;
+// The header renders the page's own headerParts and actions in its rows (§3.10).
+function HeaderSlot(props: HeaderSlotProps) {
+  return <ProjectHeader {...props} parts={SLOTS.headerParts} actions={SLOTS.actions} />;
 }
 
-// C3's wiring (task-C1.md hand-off): ProductsTab takes its own props, not
-// SlotProps, so it mounts through this one-line adapter. In Preview as buyer
-// every card keeps `?view=buyer`, so the product page opens as the buyer
-// sees it too (COR-37).
-const BUYER_QUERY = `?${VIEW_PARAM}=${BUYER_VIEW}`;
+// C3's wiring. Every card links to its product page with the preview carried
+// (COR-37); the video line and the stage pill come from `productsTabView`
+// over the page's own derivation (P2-VIDEO-12, P2-TABS-10).
 function ProductsSlot({ project, view, viewer, now }: SlotProps) {
   const { chats } = useCreateHistory();
+  const { record: journey } = useJourney(project.id);
+  const owner = can(viewer, "facts.seeOwnerOnly");
+  const cards = React.useMemo(
+    () => productsTabView(view, { owner, activities: journey.activities }),
+    [view, owner, journey.activities],
+  );
+  const query = previewQuery(viewer);
   return (
     <ProductsTab
       projectId={project.id}
+      projectName={project.name}
       products={view.products}
+      cards={cards}
       chats={chats}
-      showOwnerOnlyFacts={can(viewer, "facts.seeOwnerOnly")}
+      showOwnerOnlyFacts={owner}
+      canAddProduct={can(viewer, "product.add", view.canCtx)}
       now={now}
-      linkQuery={isBuyerPreview(viewer) ? BUYER_QUERY : ""}
+      productHref={(productId) => `/projects/${project.id}/products/${productId}${query}`}
     />
   );
 }
@@ -84,18 +87,34 @@ function DetailsSlot({ project, view, viewer }: SlotProps) {
   return <RailDetails project={project} summary={view.summary} viewer={viewer} />;
 }
 
-// C6's wiring (task-C1.md hand-off). Every build the project holds, so each
-// product's parts come from the build that product is in (COR-48).
+// C6's wiring. Every build the project holds, so each product's parts come
+// from the build that product is in (COR-48).
 function NetworkSlot({ project, view, viewer }: SlotProps) {
-  return <NetworkTab project={project} refs={view.refs} viewer={viewer} />;
+  return <NetworkTab project={project} refs={view.refs} viewer={viewer} canCtx={view.canCtx} />;
 }
+
+// The one `isBuyerPreview` caller left (§3.8.1): which banner Preview as buyer shows.
 function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
-const SLOTS: ProjectSlots = {
-  banner: PreviewBannerSlot,
+// ─────────────────────────── the page's composition ───────────────────────────
+
+/** Exported for its `banners`, which the product page shows too, so a preview reads the same
+ *  on both pages (P2-CONTRIB-13). */
+export const SLOTS: ProjectSlots = {
+  banners: [
+    PreviewBannerSlot,
+  ],
   header: HeaderSlot,
+  headerParts: {
+    titleRow: [
+    ],
+    statusRow: [
+    ],
+    afterDescription: [
+    ],
+  },
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
@@ -110,9 +129,6 @@ const SLOTS: ProjectSlots = {
   },
 };
 
-const NO_HIDDEN_TABS: readonly ProjectTabId[] = [];
-const NETWORK_HIDDEN: readonly ProjectTabId[] = ["network"];
-
 export function ProjectPage({ id }: { id: string }) {
   // useSearchParams needs a boundary so the route can still be pre-rendered.
   // Its fallback is the same skeleton, so nothing changes shape at hydration.
@@ -123,61 +139,21 @@ export function ProjectPage({ id }: { id: string }) {
   );
 }
 
-const MINUTE = 60_000;
-
-/** The wall clock to the minute, read through useSyncExternalStore (the
- *  pattern of step-3-mint.tsx): an auction end or a clip ETA that passes while
- *  the page is open moves on its own, and render stays pure. */
-function useMinuteClock(): number {
-  const subscribe = React.useCallback((onChange: () => void) => {
-    const timer = window.setInterval(onChange, MINUTE);
-    return () => window.clearInterval(timer);
-  }, []);
-  return React.useSyncExternalStore(
-    subscribe,
-    () => Math.floor(Date.now() / MINUTE) * MINUTE,
-    () => 0,
-  );
-}
-
 function ProjectPageInner({ id }: { id: string }) {
   const search = useSearchParams();
-  const { hydrated, projects } = useManualProjects();
-  const { hydrated: historyHydrated, builds, chats } = useCreateHistory();
-  const { hydrated: videoHydrated, jobs: videoJobs } = useVideoJobs();
-  const project = resolveProject(projects, id);
-  const brief = useProjectBrief(project?.id ?? "");
-  const now = useMinuteClock();
+  const data = useProjectPageData(id, "project");
 
-  const viewer = useViewer();
-  // COR-49: no Network tab in preview until there's a network to read. The
-  // skeleton waits for the network store too, so `?tab=network&view=buyer`
-  // opens on Network rather than on Products for a frame.
-  const network = useNetworkTabVisible(project?.id ?? "", viewer);
-
-  const view = React.useMemo(
-    () =>
-      project && brief !== undefined
-        ? projectView(project, { builds, chats, brief, videoJobs, now, projects })
-        : null,
-    [project, brief, builds, chats, videoJobs, now, projects],
-  );
-
-  if (!hydrated || !historyHydrated || !videoHydrated || !network.hydrated) return <ProjectSkeleton />;
-  if (!project) return <ProjectNotFound id={id} />;
-  // The Brief draft is read one render after the stores. Until then the page
-  // keeps its skeleton rather than flash a Draft it may not be.
-  if (!view || brief === undefined) return <ProjectSkeleton />;
-
+  if (data.state === "loading") return <ProjectSkeleton />;
+  if (data.state === "missing") return <ProjectNotFound id={id} />;
   return (
     <ProjectShell
-      project={project}
-      view={view}
-      viewer={viewer}
-      brief={brief}
-      now={now}
+      project={data.project}
+      view={data.view}
+      viewer={data.viewer}
+      brief={data.brief}
+      now={data.now}
       asked={parseProjectTab(search.get("tab"))}
-      hiddenTabs={network.shown ? NO_HIDDEN_TABS : NETWORK_HIDDEN}
+      networkReadable={data.networkReadable}
       slots={SLOTS}
     />
   );

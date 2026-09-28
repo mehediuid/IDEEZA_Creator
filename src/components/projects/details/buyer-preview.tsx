@@ -6,11 +6,13 @@
 // drawer never exits preview and nothing needs cleaning up on unmount
 // (PPL-5: "closing any layer doesn't exit; nothing is stored").
 //
-// Every other task reads `can(viewer, …)` (or `isBuyerPreview(viewer)`) to
-// hide its own write controls — the pair and the pencil (header),
-// Editor/Versions/Manage/the Showcase control (rail), the Firmware tab and
-// downloads (product page, COR-37) — the same way `network-tab.tsx` hides
-// Network's Create/View controls.
+// Every other surface asks `can(viewer, …, view.canCtx)` to hide its own
+// write controls — the pair and the pencil (header), Versions/Manage/the
+// Showcase control (rail), Open in editor, the Firmware tab and downloads
+// (product page, COR-37), Network's Create/View controls. The buyer-only
+// test survives for one thing: choosing the Preview-as-buyer banner (spec
+// §3.8.1). A contributor preview (`?view=contributor&as=<id>`) resolves here
+// too, against the project's own contributors (P2-CONTRIB-12).
 //
 // Entering and leaving preview is Next's router-integrated pushState, the
 // tab strip's own (shell.tsx): a query-only change, so useSearchParams
@@ -23,16 +25,36 @@ import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Banner } from "@/components/ideeza/banner";
 import type { Viewer } from "@/lib/manual/permissions";
-import { VIEW_PARAM, viewerFromParam, withView } from "@/lib/manual/buyer-preview";
+import type { Contributor } from "@/lib/manual/p2-types";
+import { AS_PARAM, VIEW_PARAM, viewerFromParams, withView } from "@/lib/manual/buyer-preview";
 
-export { isBuyerPreview } from "@/lib/manual/buyer-preview";
+export { isBuyerPreview, isPreview } from "@/lib/manual/buyer-preview";
 
-/** `?view=buyer` → the visitor Viewer; everything else → the local owner.
+const NO_CONTRIBUTORS: readonly Contributor[] = [];
+
+/** `?view=buyer` → the visitor Viewer; `?view=contributor&as=<id>` → that
+ *  contributor's preview, when `id` is one of `contributors`; everything
+ *  else (an unknown `as` included) → the local owner (P2-CONTRIB-12).
  *  Needs a Suspense boundary above it (`useSearchParams`) — see this
  *  route's `page.tsx`. */
-export function useViewer(): Viewer {
+export function useViewer(contributors: readonly Contributor[] = NO_CONTRIBUTORS): Viewer {
   const searchParams = useSearchParams();
-  return viewerFromParam(searchParams.get(VIEW_PARAM));
+  const view = searchParams.get(VIEW_PARAM);
+  const as = searchParams.get(AS_PARAM);
+  return React.useMemo(() => viewerFromParams(view, as, contributors), [view, as, contributors]);
+}
+
+/** The preview a link carries onto the other page of the same project, so it
+ *  opens as this viewer sees it too (COR-37, P2-CONTRIB-13): "?view=buyer",
+ *  "?view=contributor&as=<id>", or "" for the owner. */
+export function previewQuery(viewer: Viewer): string {
+  const qs =
+    viewer.kind === "owner-preview"
+      ? withView("", "buyer")
+      : viewer.kind === "contributor-preview"
+        ? withView("", { contributor: viewer.contributorId })
+        : "";
+  return qs ? `?${qs}` : "";
 }
 
 // Set by Exit preview, spent by the first owner view that mounts its focus

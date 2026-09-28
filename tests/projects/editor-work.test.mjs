@@ -36,7 +36,7 @@ function setStorage(entries) {
   globalThis.window = { localStorage: new FakeStorage(store) };
 }
 
-const { editorWorkOf, EDITOR_GLOBAL_NOTE } = await import("../../.tmp-test/lib/manual/editor-work.js");
+const { editorWorkOf } = await import("../../.tmp-test/lib/manual/editor-work.js");
 
 const PID = "proj_test1";
 
@@ -112,15 +112,11 @@ test("corrupt PCB and wiring JSON degrade to not-opened instead of throwing", ()
   assert.deepEqual(work.wiring, { state: "not-opened" });
 });
 
-test("Code and Preview never carry a fact through the deprecated 1-arg form (no legacy key to adopt), and the old note string is unchanged", () => {
+test("Code and Preview never carry a fact through the deprecated 1-arg form (no legacy key to adopt)", () => {
   setStorage({});
   const work = editorWorkOf(PID);
   assert.deepEqual(work.code, { state: "none" });
   assert.deepEqual(work.preview, { state: "none" });
-  assert.equal(
-    EDITOR_GLOBAL_NOTE,
-    "Code, 3D shapes and Preview are shared by every project in this browser for now, so they show no progress here.",
-  );
 });
 
 // ───────────────────── the scoped 2-arg form (P2-EDITOR-8) ─────────────────────

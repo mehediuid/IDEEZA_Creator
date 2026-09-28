@@ -1,108 +1,118 @@
 "use client";
 
-// ProductPage — /projects/[id]/products/[productId] (spec §3.4, §5.7). One
-// product of one project, at one saved version: the breadcrumb, the header
-// with its Build check, the version select and the one notice above the
-// content (COR-31, COR-41, COR-108), the identity row — the image, the
-// frozen description, the part changes (owner only) and the booked facts —
-// and the deliverable tabs (COR-32…34).
+// ProductPage — /projects/[id]/products/[productId] (spec §3.4, §5.7; Phase 2
+// §2.3, P2-EDITOR-9, 16…19, P2-TABS-2, 3). One product of one project, at one
+// saved version, in the project page's frame (`ProjectFrame`):
+// - main: the breadcrumb; the header — the h1 and `headerParts.titleRow` (the
+//   Activity chip), the Build check, the version select, ★ Open in editor (the
+//   page's one violet, C16), the lock line, the version notice or the source
+//   line; the identity row; then the tab strip and its panel (product-tabs.tsx);
+// - the rail: the Marketplace block (T27), then the Editor block
+//   (product-rail.tsx), right of the tabs from a 1024 px page container.
 //
-// Everything on it is the booked snapshot the build was made from (the
-// build-lock rule), so nothing here edits a thing: the page has no action
-// buttons (COR-36). Open in editor, the Brief door and Network live on the
-// project page. `?v=`, `?tab=` and `?view=buyer` are URL state (COR-7).
+// Every read is `useProjectPageData`'s — the project page's own derivation —
+// so the two pages can't disagree (COR-74), and every `can()` passes
+// `view.canCtx`. The build's snapshot is read-only (the build-lock rule); the
+// only way to change a product is its editor, and a project sold in full has
+// none (§3.8.5). `?v=`, `?tab=` and the preview's `?view=` are URL state.
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CpuIcon } from "@hugeicons/core-free-icons";
 import { ConfidenceBadge, ConfidenceIssuesPanel } from "@/components/create/confidence-badge";
+import { LeaveButton } from "@/components/create/leave-button";
 import { partChangesOf, partChangesText } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { productsOf, useCreateHistory } from "@/lib/create/history";
+import { openInEditorOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
-import { productPiecesOf, productVersionView, withQuery } from "@/lib/manual/product-page";
+import { productPiecesOf, productVersionView, withQuery, type ProductVersionView } from "@/lib/manual/product-page";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import {
-  buildsOf,
-  conceptOf,
-  lineagesOf,
-  productRowsOf,
-  productsOfProject,
-  versionsOf,
-} from "@/lib/manual/project-read";
-import { productDocTitle, resolveProject } from "@/lib/manual/project-route";
+import { conceptOf } from "@/lib/manual/project-read";
+import { productDocTitle } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { LiveRegion, usePageArrival } from "../details/arrival";
-import { Breadcrumb } from "../details/breadcrumb";
-import { BuyerPreviewBanner, isBuyerPreview, useFocusAfterPreview, useViewer } from "../details/buyer-preview";
-import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
+import { Breadcrumb, type Crumb } from "../details/breadcrumb";
+import { isPreview, previewQuery, useFocusAfterPreview } from "../details/buyer-preview";
+import { ProjectFrame } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
-import { ProductDeliverables } from "./product-deliverables";
+import { SLOTS as PROJECT_SLOTS } from "../details/project-page";
+import { useProjectPageData, type ProjectPageContext } from "../details/use-project-page-data";
 import { ProductIdentity } from "./product-identity";
-import { ProductLoading, ProductMissing, UnbuiltNote } from "./product-states";
+import { ProductRail } from "./product-rail";
+import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
+import { LockLine, ProductLoading, ProductMissing, UnbuiltNote } from "./product-states";
+import { ProductTabs } from "./product-tabs";
 import { VersionNoticeBlock, VersionSelect } from "./product-version";
 import { When } from "./when";
 
-export function ProductPage({ id, productId }: { id: string; productId: string }) {
+/** A product no build stands behind has no version: an empty view keeps ProductSlotProps total
+ *  (no options, no build, `productId` null — the same shape as a version whose build is gone). */
+const NO_VERSION: ProductVersionView = {
+  options: [],
+  latest: 0,
+  home: 0,
+  shown: 0,
+  build: { buildId: "", job: null },
+  productId: null,
+  notice: null,
+};
+
+export function ProductPage({
+  id,
+  productId,
+  context = "project",
+}: {
+  id: string;
+  productId: string;
+  /** "market" on Explore marketplace's buyer view (P2-MARKETPLACE-8): its breadcrumb and links. */
+  context?: ProjectPageContext;
+}) {
   // useSearchParams needs a boundary so the route can still be pre-rendered.
   // The body renders only once the stores hydrate in the browser, so the
   // fallback is the loading shape itself.
   return (
     <React.Suspense fallback={<ProductLoading />}>
-      <ProductPageBody id={id} productId={productId} />
+      <ProductPageBody id={id} productId={productId} context={context} />
     </React.Suspense>
   );
 }
 
-function ProductPageBody({ id, productId }: { id: string; productId: string }) {
+function ProductPageBody({ id, productId, context }: { id: string; productId: string; context: ProjectPageContext }) {
   const router = useRouter();
   const pathname = usePathname();
   const query = useSearchParams();
   const search = query.toString();
-  const { hydrated, projects } = useManualProjects();
-  const { hydrated: buildsHydrated, builds, chats } = useCreateHistory();
+  const data = useProjectPageData(id, context);
+  const { chats } = useCreateHistory();
+  const { selectEditorScope } = useManualProjects();
+  const [leaving, setLeaving] = React.useState(false);
 
-  // The one permission source (PPL-1): the preview is the owner looking with
-  // a visitor's permissions (PPL-2). C6's useViewer() reads the same
-  // ?view=buyer the project page does, so the two pages can't disagree.
-  const viewer = useViewer();
-  const buyer = isBuyerPreview(viewer);
-  const ownerFacts = can(viewer, "facts.seeOwnerOnly");
-  // The firmware source and every download come after purchase (PPL-7).
-  const firmware = can(viewer, "deliverables.download");
-
-  // By id, then by slug — the project page's own rule (COR-1).
-  const project = resolveProject(projects, id);
-
-  const derived = React.useMemo(() => {
-    if (!project) return null;
-    const refs = buildsOf(project, builds);
-    return {
-      products: productsOfProject(project, refs),
-      versions: versionsOf(refs, lineagesOf(refs, chats), productRowsOf(project)),
-    };
-  }, [project, builds, chats]);
-
-  const product = derived?.products.find((p) => p.id === productId) ?? null;
-  // The buyer sees the product as the project has it now: older versions are
-  // the owner's history, like the rail's Versions block (PPL-7).
-  const asked = buyer ? null : query.get("v");
-  const view = React.useMemo(
-    () => (product && derived ? productVersionView(product, derived.versions, asked) : null),
-    [product, derived, asked],
+  const ready = data.state === "ready" ? data : null;
+  const project = ready?.project ?? null;
+  const view = ready?.view ?? null;
+  const viewer = ready?.viewer ?? null;
+  const product = view?.products.find((p) => p.id === productId) ?? null;
+  // The owner's history — older versions and part changes — is for the owner (PPL-7).
+  const ownerFacts = viewer ? can(viewer, "facts.seeOwnerOnly") : false;
+  const asked = ownerFacts ? query.get("v") : null;
+  const version = React.useMemo(
+    () => (product && view ? productVersionView(product, view.versions, asked) : null),
+    [product, view, asked],
   );
-  const job = view?.build.job ?? null;
-  const shownId = view?.productId ?? null;
+  const job = version?.build.job ?? null;
+  const shownId = version?.productId ?? null;
   const bp = React.useMemo(
-    () => (job && shownId ? productsOf(job).find((x) => x.id === shownId) ?? null : null),
+    () => (job && shownId ? (productsOf(job).find((x) => x.id === shownId) ?? null) : null),
     [job, shownId],
   );
 
   // §4.4.9 — this product's own tier, from the build it belongs to.
   const confidence = React.useMemo(
-    () => (job && bp ? confidenceFor(job, productsOf(job)).byProduct.find((c) => c.productId === bp.id) ?? null : null),
+    () => (job && bp ? (confidenceFor(job, productsOf(job)).byProduct.find((c) => c.productId === bp.id) ?? null) : null),
     [job, bp],
   );
-  const issuesKey = `${view?.build.buildId ?? ""}:${bp?.id ?? ""}`;
+  const issuesKey = `${version?.build.buildId ?? ""}:${bp?.id ?? ""}`;
   const [issues, setIssues] = React.useState({ key: "", open: false });
   const issuesOpen = issues.key === issuesKey && issues.open;
 
@@ -119,104 +129,150 @@ function ProductPageBody({ id, productId }: { id: string; productId: string }) {
   // COR-7 — focus to the h1 and a polite "{product}" on arrival, once per
   // product (a version or tab change keeps focus where the maker put it);
   // COR-3 — the document title.
-  const { titleRef, live } = usePageArrival(
+  const { titleRef, live, announce } = usePageArrival(
     project && product ? `${project.id}/${product.id}` : "",
     name,
     project && product ? productDocTitle(name, project.name) : "",
   );
   // PPL-5: this page has no Preview as buyer button, so Exit preview hands
   // focus to the h1 once the owner view is back.
-  useFocusAfterPreview(!buyer, () => titleRef.current);
+  useFocusAfterPreview(viewer !== null && !isPreview(viewer), () => titleRef.current);
 
-  if (!hydrated || !buildsHydrated) return <ProductLoading />;
-  if (!project) return <ProjectNotFound id={id} />;
-  const projectHref = `/projects/${project.id}${buyer ? "?view=buyer" : ""}`;
+  if (data.state === "loading") return <ProductLoading />;
+  if (data.state === "missing" || !ready || !project || !view || !viewer) return <ProjectNotFound id={id} />;
+
+  const market = context === "market";
+  const projectHref = market ? `/marketplace/${project.id}` : `/projects/${project.id}${previewQuery(viewer)}`;
   if (!product) return <ProductMissing projectName={project.name} href={projectHref} />;
 
-  const home = view?.home ?? 1;
+  const slot: ProductSlotProps = { project, view, product, version: version ?? NO_VERSION, viewer, now: ready.now, announce };
+  const trail: Crumb[] = market
+    ? [
+        { label: "Explore marketplace", href: "/marketplace" },
+        { label: project.name, href: projectHref },
+        { label: name },
+      ]
+    : [
+        { label: "My projects", href: "/projects" },
+        { label: project.name, href: projectHref },
+        { label: name },
+      ];
+
+  const home = version?.home ?? 1;
   const hrefFor = (n: number) => `${pathname}${withQuery(search, { v: n === home ? null : String(n) })}`;
   const pieces = bp ? productPiecesOf(bp.items) : null;
   const description = bp?.description?.trim() || product.description.trim();
+  // P2-EDITOR-9 (as changed): the page's violet in every state, absent when the viewer may not
+  // open the editor — every preview, and a project sold in full.
+  const editor = can(viewer, "product.openEditor", view.canCtx) ? openInEditorOf(project, product.id) : null;
+  const lockLine = ownerFacts ? (view.lock?.line ?? null) : null;
+  const TitleParts = PRODUCT_SLOTS.headerParts?.titleRow ?? [];
 
   return (
-    <div className={PAGE_CONTAINER}>
-      <div className={`${PAGE_CONTENT} flex flex-col gap-10`}>
-        {buyer && <BuyerPreviewBanner />}
-
-        <Breadcrumb
-          trail={[
-            { label: "My projects", href: "/projects" },
-            { label: project.name, href: projectHref },
-            { label: name },
-          ]}
-        />
-
-        <header className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-x-10 gap-y-4">
-            <h1
-              ref={titleRef}
-              tabIndex={-1}
-              className="min-w-0 break-words text-3xl font-bold tracking-tight text-text-primary outline-none"
-            >
-              {name}
-            </h1>
-            {confidence && (
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="text-sm text-text-secondary">Build check</span>
-                <ConfidenceBadge
-                  confidence={confidence}
-                  open={issuesOpen}
-                  onOpenChange={(open) => setIssues({ key: issuesKey, open })}
-                />
+    <>
+      <ProjectFrame
+        // The project page's own banners, each null unless it applies (buyer, contributor).
+        banner={PROJECT_SLOTS.banners?.map((B, i) => (
+          <B key={i} project={project} view={view} viewer={viewer} brief={ready.brief} now={ready.now} announce={announce} />
+        ))}
+        breadcrumb={<Breadcrumb trail={trail} />}
+        main={
+          <div className="flex flex-col gap-10">
+            <header className="flex flex-col gap-6 [container-type:inline-size]">
+              <div className="flex flex-wrap items-center justify-between gap-x-10 gap-y-4">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
+                  <h1
+                    ref={titleRef}
+                    tabIndex={-1}
+                    className="min-w-0 break-words text-3xl font-bold tracking-tight text-text-primary outline-none"
+                  >
+                    {name}
+                  </h1>
+                  {TitleParts.map((Part, i) => (
+                    <Part key={i} {...slot} />
+                  ))}
+                </div>
+                {confidence && (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className="text-sm text-text-secondary">Build check</span>
+                    <ConfidenceBadge
+                      confidence={confidence}
+                      open={issuesOpen}
+                      onOpenChange={(open) => setIssues({ key: issuesKey, open })}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          {/* The disclosure's text — what Draft means and the credit note —
-              gets the header's full width, not the badge's corner (L1). */}
-          {issuesOpen && confidence?.tier === "draft" && <ConfidenceIssuesPanel confidence={confidence} />}
+              {/* The disclosure's text — what Draft means and the credit note —
+                  gets the header's full width, not the badge's corner (L1). */}
+              {issuesOpen && confidence?.tier === "draft" && <ConfidenceIssuesPanel confidence={confidence} />}
 
-          {view && (
-            <div className="flex flex-col gap-4 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:flex-wrap [@container(min-width:560px)]:items-center">
-              {!buyer && view.options.length > 1 && (
-                <VersionSelect view={view} onPick={(n) => router.push(hrefFor(n), { scroll: false })} />
+              {version && (
+                <div className="flex flex-col gap-4 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:flex-wrap [@container(min-width:560px)]:items-center">
+                  {ownerFacts && version.options.length > 1 && (
+                    <VersionSelect view={version} onPick={(n) => router.push(hrefFor(n), { scroll: false })} />
+                  )}
+                  {job && pieces && (
+                    <p className="text-sm text-text-secondary">
+                      Built <When at={job.endedAt ?? job.createdAt} /> · Concept {job.conceptNumber} ·{" "}
+                      {pieces.ready} of {pieces.total} pieces ready
+                    </p>
+                  )}
+                </div>
               )}
-              {job && pieces && (
-                <p className="text-sm text-text-secondary">
-                  Built <When at={job.endedAt ?? job.createdAt} /> · Concept {job.conceptNumber} ·{" "}
-                  {pieces.ready} of {pieces.total} pieces ready
-                </p>
-              )}
-            </div>
-          )}
-          {view?.notice && (
-            <VersionNoticeBlock notice={view.notice} name={name} home={home} hrefFor={hrefFor} />
-          )}
-        </header>
 
-        {!view ? (
-          <UnbuiltNote state={product.state} />
-        ) : job && bp ? (
-          <>
-            <ProductIdentity
-              product={bp}
-              name={name}
-              description={description}
-              version={view.shown}
-              partChanges={partChanges}
-            />
-            <ProductDeliverables
-              key={`${job.id}:${bp.id}`}
+              {editor && (
+                <div>
+                  <LeaveButton
+                    tone="primary"
+                    busy={leaving}
+                    blocked={leaving}
+                    onClick={() => {
+                      setLeaving(true);
+                      // The editor opens this product; choosing it first skips "Opening product…".
+                      selectEditorScope(project.id, product.id);
+                      router.push(editor.href);
+                    }}
+                    icon={CpuIcon}
+                    className="h-[44px] w-full justify-center [@container(min-width:520px)]:w-auto"
+                  >
+                    {editor.label}
+                  </LeaveButton>
+                </div>
+              )}
+              {lockLine && <LockLine line={lockLine} />}
+              {version?.notice && (
+                <VersionNoticeBlock notice={version.notice} name={name} home={home} hrefFor={hrefFor} />
+              )}
+              <UnbuiltNote state={product.state} />
+            </header>
+
+            {job && bp ? (
+              <ProductIdentity
+                product={bp}
+                name={name}
+                description={description}
+                version={version?.shown ?? home}
+                partChanges={partChanges}
+              />
+            ) : description ? (
+              <p className="max-w-[68ch] text-md leading-relaxed text-text-primary">{description}</p>
+            ) : null}
+
+            <ProductTabs
+              key={`${product.id}:${version?.shown ?? 0}`}
+              slot={slot}
               job={job}
-              product={bp}
-              firmware={firmware}
-              chatHref={ownerFacts && chats.some((c) => c.id === job.chatId) ? `/chat/${job.chatId}` : null}
-              tab={query.get("tab")}
-              onTab={(kind) => router.replace(`${pathname}${withQuery(search, { tab: kind })}`, { scroll: false })}
+              bp={bp}
+              chatHref={ownerFacts && job && chats.some((c) => c.id === job.chatId) ? `/chat/${job.chatId}` : null}
+              asked={query.get("tab")}
+              onTab={(tab) => router.replace(`${pathname}${withQuery(search, { tab })}`, { scroll: false })}
             />
-          </>
-        ) : null}
-        <LiveRegion text={live} />
-      </div>
-    </div>
+          </div>
+        }
+        rail={<ProductRail slot={slot} />}
+      />
+      <LiveRegion text={live} />
+    </>
   );
 }

@@ -1,49 +1,57 @@
 "use client";
 
-// ProjectHeader — the top of /projects/[id] (spec §5.4, §3.3, §3.5).
+// ProjectHeader — the top of /projects/[id] (spec §5.4; Phase 2 §2.2). In
+// reading order, at every width:
+// 1. the title row: the h1 and its rename pencil, then `headerParts.titleRow`
+//    (the Activity chip and its "?", the Business plan chip, right-aligned);
+// 2. the status row: the status chip, the Showcase badge,
+//    `headerParts.statusRow` (the Utility NFT pill) and, in a contributor
+//    preview, the role chip (P2-CONTRIB-13);
+// 3. the status line — in the owner's Sold line the buyer is a link to their
+//    Customers row — then the lock line once the project is sold in full;
+// 4. the meta line: [Created by you · Owned by X] · … · Stage {short};
+// 5. the description, then `headerParts.afterDescription` (its coachmark);
+// 6. the action pair, then Preview as buyer (quiet, last); then one notice
+//    per newer build of a chat that isn't saved yet.
+// The pair sits after the description at every width now: the title row
+// holds the chips, and the one next step reads last, just before the tabs.
 //
-// In reading order: the h1 and its rename pencil; the status chip, the
-// Showcase badge when the project is showcased, and the status line; the meta
-// line; the description and its editor; the action pair and Preview as buyer;
-// the Open in editor hint; then one notice per newer build of a chat that
-// isn't saved yet. From a 520 px header the pair and Preview as buyer move up
-// beside the title, and wrap under it when the name is long; below that they
-// stack full width after the description, primary first. (520, not 640: the
-// main column beside the rail is ~634 px at 1366 with the sidebar open, and
-// a desktop must not get the phone's full-width buttons.)
-//
-// Every string above the description is `headerText()`'s (project-summary.ts)
-// and the pair is its `pair` — `nextAction()`'s, the same object the My
-// projects card shows the first of (COR-11, LST-32). Nothing here derives a
-// status, a line or an action of its own. There is no ⋮ and no Share (COR-14),
-// and no wallet, owner, stats or people row (COR-15, PPL-3). Showcase is not
-// here: its one control on the page is the rail's Outcome block (§3.8, X38).
+// Every string here is `headerText()`'s (project-summary.ts) and the pair is
+// its `pair` — `nextAction()`'s, the same object the My projects card shows
+// (COR-11, LST-32). Nothing here derives a status, a line or an action of its
+// own. Every `can()` passes `view.canCtx`, so the 100 % lock refuses rename,
+// description and the listing start here as everywhere (§3.8.5). There is no
+// ⋮ and no Share (COR-14, P2-TABS-30), and no Open in editor: it lives on the
+// product page (P2-EDITOR-12). "Add to marketplace" / "List another share" is
+// `actions["add-to-marketplace"]` (T22), rendered in the pair's place with
+// the pair's tone; with no such entry it renders nothing.
 //
 // The h1's arrival focus (COR-7) and the page's one polite live region
 // (COR-101) are the shell's (usePageArrival, shell.tsx): `titleRef` and
-// `announce` arrive from there through the header slot, and this file adds
-// no live region of its own.
+// `announce` arrive from there through the header slot.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { ArrowRight02Icon, BubbleChatIcon, EyeIcon, Tag01Icon } from "@hugeicons/core-free-icons";
-import type { IconValue } from "@/components/dashboard/icon";
-import { Banner } from "@/components/ideeza";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight02Icon, BubbleChatIcon, EyeIcon, Tag01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { Badge, Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
 import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
-import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { LockLine } from "@/components/projects/product/product-states";
+import { roleChipOf } from "@/lib/manual/contributors";
+import { useManualProjects } from "@/lib/manual/projects";
 import { headerText, type NextAction } from "@/lib/manual/project-summary";
-import type { ProjectView } from "@/lib/manual/project-read";
-import { can, hasAudience, type Viewer } from "@/lib/manual/permissions";
-import { EDITOR_HINT, pendingNoticesOf, type PendingNotice } from "@/lib/manual/project-header";
-import { isBuyerPreview, useEnterPreview, useFocusAfterPreview } from "./buyer-preview";
+import { withTab } from "@/lib/manual/project-route";
+import { can, hasAudience } from "@/lib/manual/permissions";
+import { pendingNoticesOf, type PendingNotice } from "@/lib/manual/project-header";
+import { isPreview, useEnterPreview, useFocusAfterPreview } from "./buyer-preview";
 import { ProjectDescription } from "./description-editor";
+import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
 
 /** Preview as buyer's id: Exit preview hands focus back to it (PPL-5). */
 export const PREVIEW_TRIGGER_ID = "preview-as-buyer-trigger";
-
-const EDITOR_HINT_ID = "project-editor-hint";
 
 const ACTION_ICON: Record<NextAction["kind"], IconValue> = {
   "review-version": ArrowRight02Icon,
@@ -56,144 +64,217 @@ const ACTION_ICON: Record<NextAction["kind"], IconValue> = {
 /** Full width and 44 px at phone width (COR-11, PPL-4); their own width from a 520 px header. */
 const HEADER_BUTTON = "h-[44px] w-full justify-center [@container(min-width:520px)]:w-auto";
 
+const INLINE_LINK =
+  "rounded-sm font-medium text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
+
 export function ProjectHeader({
   project,
   view,
   viewer,
+  brief,
+  now,
   titleRef,
   announce,
-}: {
-  project: ManualProject;
-  /** `projectView()` — the page's one derivation (COR-74). */
-  view: ProjectView;
-  viewer: Viewer;
+  parts,
+  actions,
+  context = "project",
+}: SlotProps & {
   /** The shell's h1 ref (COR-7), forwarded to ProjectTitle. */
   titleRef: React.RefObject<HTMLHeadingElement | null>;
-  /** The page's one polite live region (COR-101). */
-  announce: (message: string) => void;
+  /** The page's `headerParts` (§3.10): each renders from the same SlotProps. */
+  parts?: ProjectSlots["headerParts"];
+  /** The page's `actions` (§3.10): the listing start, T22. */
+  actions?: ProjectSlots["actions"];
+  /** "market" on Explore marketplace's buyer view: the meta line leads with "Created by you · Listed {date}". */
+  context?: "project" | "market";
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
   const { selectProject } = useManualProjects();
   // Which control is taking the maker off the page. Never cleared: the navigation unmounts it.
   const [leaving, setLeaving] = React.useState<string | null>(null);
 
-  const { summary } = view;
-  const text = headerText(summary);
+  const slotProps: SlotProps = { project, view, viewer, brief, now, announce };
+  const { summary, canCtx } = view;
+  const text = headerText(summary, { viewer, stage: view.stage, context });
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const allowed = (a: NextAction) =>
-    a.kind === "review-version" ? can(viewer, "product.openEditor") : can(viewer, "project.brief");
-  // Preview as buyer has no pair (§3.5); the header never shows half of one.
-  // An unreadable mint has no pair at all (Phase 2 §2.2: `first` is null).
+
+  // The pair shows only what this viewer may do (PPL-6: absent, not disabled).
+  const allowed = (a: NextAction) => {
+    switch (a.kind) {
+      case "review-version":
+        return can(viewer, "product.add", canCtx);
+      case "add-to-marketplace":
+        // A blocked start (co-owners hold everything) still shows, aria-disabled with its reason.
+        return a.blocked ? can(viewer, "facts.seeOwnerOnly") : can(viewer, "listing.create", canCtx);
+      default:
+        return can(viewer, "project.brief", canCtx);
+    }
+  };
   const first = text.pair.first && allowed(text.pair.first) ? text.pair.first : null;
-  const pair = first ? { ...text.pair, first } : null;
-  const second = pair?.second && allowed(pair.second) ? pair.second : null;
+  const second = first && text.pair.second && allowed(text.pair.second) ? text.pair.second : null;
   const preview = can(viewer, "preview.enter") && hasAudience(summary.status, summary.showcase);
-  // COR-12: a project with a build opens on a sample board all the same.
-  // The sample-board hint described the header's Open in editor, which Phase 2
-  // moved to the product page (P2-EDITOR); T12/TB2 delete it outright.
-  const hint = false;
   // A Draft's line is the maker's own workflow ("Brief in progress · …"); a buyer sees the chip alone.
   // A minted line stays — "Listed" never stands without its subline (COR-76).
   const showLine = owner || summary.status !== "draft";
+  const role = roleChipOf(viewer);
   // A2's PendingBuild ↔ A3's PendingVersion: the header's primary opens `pendingVersion.buildId`.
   const reviewedInHeader =
-    pair?.first.kind === "review-version" ? (summary.pendingVersion?.buildId ?? null) : null;
+    first?.kind === "review-version" ? (summary.pendingVersion?.buildId ?? null) : null;
   const notices = owner ? pendingNoticesOf(view.pending, view.lineages, reviewedInHeader) : [];
 
   const leave = (key: string, href: string) => {
     setLeaving(key);
-    // The editor works on the active project; choosing it first skips the workspace's "Opening project…" frame.
+    // The Brief works on the active project; choosing it first skips the workspace's "Opening project…" frame.
     if (href.startsWith("/project/")) selectProject(project.id);
     router.push(href);
   };
   const enterPreview = useEnterPreview();
   // PPL-5: Exit preview hands focus back to this button — or to the h1 when
   // the project offers no preview button of its own (a bare ?view=buyer link).
-  useFocusAfterPreview(!isBuyerPreview(viewer), () => document.getElementById(PREVIEW_TRIGGER_ID) ?? titleRef.current);
-  const actionButton = (a: NextAction, key: "first" | "second", primary: boolean) => (
-    <LeaveButton
-      tone={primary ? "primary" : "quiet"}
-      busy={leaving === key}
-      blocked={leaving !== null}
-      onClick={() => leave(key, a.href)}
-      icon={ACTION_ICON[a.kind]}
-      className={HEADER_BUTTON}
-    >
-      {a.label}
-    </LeaveButton>
-  );
+  useFocusAfterPreview(!isPreview(viewer), () => document.getElementById(PREVIEW_TRIGGER_ID) ?? titleRef.current);
+
+  const Action = actions?.["add-to-marketplace"];
+  const actionButton = (a: NextAction, key: "first" | "second", primary: boolean) => {
+    if (a.kind === "add-to-marketplace") {
+      return Action ? <Action key={key} {...slotProps} action={a} violet={primary} className={HEADER_BUTTON} /> : null;
+    }
+    return (
+      <LeaveButton
+        key={key}
+        tone={primary ? "primary" : "quiet"}
+        busy={leaving === key}
+        blocked={leaving !== null}
+        onClick={() => leave(key, a.href)}
+        icon={ACTION_ICON[a.kind]}
+        className={HEADER_BUTTON}
+      >
+        {a.label}
+      </LeaveButton>
+    );
+  };
+  const pairButtons = [
+    first ? actionButton(first, "first", text.pair.violet) : null,
+    second ? actionButton(second, "second", false) : null,
+  ].filter((b) => b !== null);
+
+  // P2-CONTRIB-10: "Created by you · Owned by Ana Silva" — the name a link to the roster when the
+  // viewer may see it. On Explore marketplace: "Created by you · Listed Sep 28, 2026" (§2.4).
+  const tabHref = (tab: "contributors") => {
+    const qs = withTab(search.toString(), tab);
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+  const lead: React.ReactNode[] = [];
+  if (text.createdBy) lead.push(text.createdBy);
+  else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
+  if (text.ownedBy) {
+    lead.push(
+      <>
+        Owned by{" "}
+        {text.ownedBy.linkTab ? (
+          <Link href={tabHref(text.ownedBy.linkTab)} scroll={false} className={INLINE_LINK}>
+            {text.ownedBy.ownedBy}
+          </Link>
+        ) : (
+          text.ownedBy.ownedBy
+        )}
+      </>,
+    );
+  }
 
   return (
     <header className="flex flex-col gap-8 [container-type:inline-size]">
-      <div className="flex flex-col gap-6 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center [@container(min-width:520px)]:gap-x-8 [@container(min-width:520px)]:gap-y-4">
-        <div className="min-w-0 [@container(min-width:520px)]:order-1 [@container(min-width:520px)]:flex-auto">
-          <ProjectTitle
-            project={project}
-            canRename={can(viewer, "project.rename")}
-            announce={announce}
-            titleRef={titleRef}
-          />
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-3 [@container(min-width:520px)]:order-3 [@container(min-width:520px)]:basis-full">
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
-            <StatusChip status={summary.status} word={text.chip.word} />
-            {text.chip.badge && <ShowcaseChip />}
-            {showLine && (
-              <>
-                <span aria-hidden className="text-text-tertiary">
-                  ·
-                </span>
-                <span className="min-w-0">{text.chip.line}</span>
-              </>
-            )}
-          </p>
-          <p className="text-sm text-text-secondary">
-            {text.meta.map((m, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && " · "}
-                {m.kind === "time" ? (
-                  <time dateTime={m.time.dateTime} title={m.time.title}>
-                    {m.time.text}
-                  </time>
-                ) : (
-                  m.text
-                )}
-              </React.Fragment>
-            ))}
-          </p>
-          <ProjectDescription project={project} canEdit={can(viewer, "project.editDescription")} announce={announce} />
-        </div>
-
-        {(pair || preview) && (
-          <div className="flex max-w-full flex-col gap-4 [@container(min-width:520px)]:order-2 [@container(min-width:520px)]:flex-none [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center">
-            {pair && actionButton(pair.first, "first", pair.violet)}
-            {second && actionButton(second, "second", false)}
-            {preview && (
-              <LeaveButton
-                id={PREVIEW_TRIGGER_ID}
-                tone="quiet"
-                busy={false}
-                blocked={leaving !== null}
-                onClick={enterPreview}
-                icon={EyeIcon}
-                className={HEADER_BUTTON}
-              >
-                Preview as buyer
-              </LeaveButton>
-            )}
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="min-w-0 max-w-full">
+            <ProjectTitle
+              project={project}
+              canRename={can(viewer, "project.rename", canCtx)}
+              announce={announce}
+              titleRef={titleRef}
+            />
           </div>
-        )}
+          {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
+        </div>
 
-        {hint && (
-          <p
-            id={EDITOR_HINT_ID}
-            className="text-sm text-text-secondary [@container(min-width:520px)]:order-4 [@container(min-width:520px)]:basis-full"
-          >
-            {EDITOR_HINT}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
+          <StatusChip status={summary.status} word={text.chip.word} />
+          {text.chip.badge && <ShowcaseChip />}
+          {parts?.statusRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
+          {role && (
+            <Badge tone="neutral" icon={<Icon icon={UserIcon} size={12} />}>
+              {role}
+            </Badge>
+          )}
+        </div>
+
+        {showLine && (
+          <p className="min-w-0 text-md text-text-secondary">
+            {text.soldBuyerLink ? (
+              <>
+                {text.soldBuyerLink.before}
+                <Link href={text.soldBuyerLink.href} scroll={false} className={INLINE_LINK}>
+                  {text.soldBuyerLink.label}
+                </Link>
+                {text.soldBuyerLink.after}
+              </>
+            ) : (
+              text.chip.line
+            )}
           </p>
         )}
+        {text.lockLine && <LockLine line={text.lockLine} />}
+
+        <p className="text-sm text-text-secondary">
+          {[
+            ...lead,
+            ...text.meta.map((m, i) =>
+              m.kind === "time" ? (
+                <time key={`t${i}`} dateTime={m.time.dateTime} title={m.time.title}>
+                  {m.time.text}
+                </time>
+              ) : (
+                m.text
+              ),
+            ),
+          ].map((part, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && " · "}
+              {part}
+            </React.Fragment>
+          ))}
+        </p>
+
+        <ProjectDescription
+          project={project}
+          canEdit={can(viewer, "project.editDescription", canCtx)}
+          announce={announce}
+        />
+        {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
       </div>
+
+      {(pairButtons.length > 0 || preview) && (
+        <div
+          data-header-actions
+          className="flex max-w-full flex-col gap-4 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center"
+        >
+          {pairButtons}
+          {preview && (
+            <LeaveButton
+              id={PREVIEW_TRIGGER_ID}
+              tone="quiet"
+              busy={false}
+              blocked={leaving !== null}
+              onClick={enterPreview}
+              icon={EyeIcon}
+              className={HEADER_BUTTON}
+            >
+              Preview as buyer
+            </LeaveButton>
+          )}
+        </div>
+      )}
 
       {notices.length > 0 && (
         <div className="flex flex-col gap-4">
