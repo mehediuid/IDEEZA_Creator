@@ -17,6 +17,7 @@ import type { Viewer } from "@/lib/manual/permissions";
 import type { ProductVersionView } from "@/lib/manual/product-page";
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
+import { ProductCustomers } from "./product-customers";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -40,7 +41,15 @@ export type ProductSlots = {
   headerParts?: { titleRow?: React.ComponentType<ProductSlotProps>[] };
 };
 
+// T18's adapter: ProductCustomers already takes ProductSlotProps exactly, so
+// this only keeps the merge point's one-adapter-per-task shape.
+function CustomersSlot(props: ProductSlotProps) {
+  return <ProductCustomers {...props} />;
+}
+
 export const PRODUCT_SLOTS: ProductSlots = {
-  panels: {},
+  panels: {
+    customers: CustomersSlot,
+  },
   rail: {},
 };

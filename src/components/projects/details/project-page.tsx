@@ -28,6 +28,7 @@ import {
 import { useManualProjects } from "@/lib/manual/projects";
 import { BUYER_VIEW, VIEW_PARAM } from "@/lib/manual/buyer-preview";
 import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "./buyer-preview";
+import { CustomersPanel } from "./customers-tab";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { NetworkTab, useNetworkTabVisible } from "./network-tab";
@@ -93,6 +94,24 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
+// T18's wiring: the project-scoped Customers panel (P2-CUSTOMERS-1…11, 18).
+// `view.customers` is already the project-scope `customersOf` (project-summary.ts);
+// `view.marketUnreadable` is the sales store's own read.
+function CustomersSlot({ project, view, now, announce }: SlotProps) {
+  return (
+    <CustomersPanel
+      customers={view.customers}
+      scope={{ kind: "project" }}
+      projectId={project.id}
+      projectName={project.name}
+      status={view.summary.status}
+      unreadable={view.marketUnreadable}
+      now={now}
+      announce={announce}
+    />
+  );
+}
+
 const SLOTS: ProjectSlots = {
   banner: PreviewBannerSlot,
   header: HeaderSlot,
@@ -100,6 +119,7 @@ const SLOTS: ProjectSlots = {
     products: ProductsSlot,
     media: MediaSlot,
     network: NetworkSlot,
+    customers: CustomersSlot,
   },
   rail: {
     outcome: OutcomeSlot,
