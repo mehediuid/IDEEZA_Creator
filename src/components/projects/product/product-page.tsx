@@ -3,8 +3,9 @@
 // ProductPage — /projects/[id]/products/[productId] (spec §3.4, §5.7). One
 // product of one project, at one saved version: the breadcrumb, the header
 // with its Build check, the version select and the one notice above the
-// content (COR-31, COR-41, COR-108), and the identity row — the image, the
-// frozen description, the part changes (owner only) and the booked facts.
+// content (COR-31, COR-41, COR-108), the identity row — the image, the
+// frozen description, the part changes (owner only) and the booked facts —
+// and the deliverable tabs (COR-32…34).
 //
 // Everything on it is the booked snapshot the build was made from (the
 // build-lock rule), so nothing here edits a thing: the page has no action
@@ -34,6 +35,7 @@ import { LiveRegion, usePageArrival } from "../details/arrival";
 import { Breadcrumb } from "../details/breadcrumb";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
+import { ProductDeliverables } from "./product-deliverables";
 import { ProductIdentity } from "./product-identity";
 import { PreviewBanner, ProductLoading, ProductMissing, UnbuiltNote } from "./product-states";
 import { VersionNoticeBlock, VersionSelect } from "./product-version";
@@ -63,6 +65,8 @@ function ProductPageBody({ id, productId }: { id: string; productId: string }) {
   const buyer = query.get("view") === "buyer";
   const viewer: Viewer = buyer ? { kind: "owner-preview" } : { kind: "local-owner" };
   const ownerFacts = can(viewer, "facts.seeOwnerOnly");
+  // The firmware source and every download come after purchase (PPL-7).
+  const firmware = can(viewer, "deliverables.download");
 
   // By id, then by slug — the project page's own rule (COR-1).
   const project = resolveProject(projects, id);
@@ -195,13 +199,24 @@ function ProductPageBody({ id, productId }: { id: string; productId: string }) {
         {!view ? (
           <UnbuiltNote state={product.state} />
         ) : job && bp ? (
-          <ProductIdentity
-            product={bp}
-            name={name}
-            description={description}
-            version={view.shown}
-            partChanges={partChanges}
-          />
+          <>
+            <ProductIdentity
+              product={bp}
+              name={name}
+              description={description}
+              version={view.shown}
+              partChanges={partChanges}
+            />
+            <ProductDeliverables
+              key={`${job.id}:${bp.id}`}
+              job={job}
+              product={bp}
+              firmware={firmware}
+              chatHref={ownerFacts && chats.some((c) => c.id === job.chatId) ? `/chat/${job.chatId}` : null}
+              tab={query.get("tab")}
+              onTab={(kind) => router.replace(`${pathname}${withQuery(search, { tab: kind })}`, { scroll: false })}
+            />
+          </>
         ) : null}
         <LiveRegion text={live} />
       </div>
