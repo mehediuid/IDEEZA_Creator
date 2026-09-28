@@ -23,7 +23,7 @@ const buttonVariants = cva(
         primary:
           "bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
         secondary:
-          "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border border-[var(--color-button-secondary-border)] hover:bg-[var(--color-bg-subtle)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border border-solid border-[var(--color-button-secondary-border)] hover:bg-[var(--color-bg-subtle)] disabled:text-[color:var(--color-button-disabled-text)]",
         ghost:
           "bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
         danger:
