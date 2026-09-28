@@ -19,7 +19,9 @@
 // active selection.
 
 import * as React from "react";
-import type { BuildJob } from "../create/history";
+import { productsOf, type BuildJob, type BuildProduct } from "../create/history";
+// project-read.ts imports only types from this file, so this is no runtime cycle.
+import { lineageProjectOf, modelNameOf } from "./project-read";
 
 export type ManualProjectStatus = "draft" | "completed";
 
@@ -434,6 +436,271 @@ function heldProducts(p: ManualProject): ManualProduct[] {
     : [{ id: "p1", name: p.productName, description: p.description }];
 }
 
+// ─────────────── The writers' pure core (§5.1.7, §5.1.8) ───────────────
+//
+// No hooks and no storage in here: the provider below applies these to its
+// state, and the node:test harness runs them exactly as they are.
+
+/** The sentence the model wrote for a build product — its description, else
+ *  its parts line. modelNameOf() (project-read.ts) is the name beside it. */
+function modelDescOf(bp: BuildProduct): string {
+  return (bp.description || bp.summary || "").trim();
+}
+
+/**
+ * A build joins a project — the one merge (§5.1.8). Pure: the provider's
+ * `attachBuild` runs it on the stored record, and so does every test.
+ *
+ * `lineage` is the OTHER builds of `job.chatId`. The build is recorded as the
+ * next version of its chat inside this project; its products replace the rows
+ * the lineage's earlier version made (matched by product id, then by name), a
+ * row this version doesn't have stays listed with its old source (COR-108), and
+ * every product the project didn't have yet becomes a new row. The maker's own
+ * words on a row survive: the model's new words land only where the row still
+ * holds the previous version's. Rows from another chat, and hand-made rows, are
+ * left alone — except that a hand-made row named like one of this build's
+ * products adopts it, which is a build joining a hand-made project.
+ */
+export function attach(
+  p: ManualProject,
+  job: BuildJob,
+  lineage: BuildJob[],
+  now: number,
+  opts: { origin?: boolean } = {},
+): ManualProject {
+  const refs0 = p.builds ?? [];
+  // One build, one attach: saving the same build again changes nothing.
+  if (refs0.some((r) => r.buildId === job.id)) return p;
+
+  // Freeze this lineage's legacy links first — builds that joined before
+  // `builds` was recorded — numbered by age after the refs already stored, the
+  // way buildsOf() numbers them, so the numbering can never shift later.
+  const frozenJobs = lineage
+    .filter(
+      (b) =>
+        b.id !== job.id &&
+        b.chatId === job.chatId &&
+        (b.projectId === p.id || b.id === p.buildId) &&
+        !refs0.some((r) => r.buildId === b.id),
+    )
+    .sort((a, b) => a.createdAt - b.createdAt);
+  let v = Math.max(0, ...refs0.filter((r) => r.chatId === job.chatId).map((r) => r.version));
+  const frozen: ProjectBuildRef[] = frozenJobs.map((b) => ({
+    buildId: b.id,
+    chatId: b.chatId,
+    version: ++v,
+    // The origin build and its project were written in the same call, so that
+    // time is true; any other legacy join time was never recorded.
+    savedAt: b.id === p.buildId ? p.createdAt : null,
+  }));
+  const builds: ProjectBuildRef[] = [
+    ...refs0,
+    ...frozen,
+    { buildId: job.id, chatId: job.chatId, version: ++v, savedAt: now },
+  ];
+
+  // The builds of this lineage the project already held, newest first.
+  const priorIds = new Set(
+    builds.filter((r) => r.chatId === job.chatId && r.buildId !== job.id).map((r) => r.buildId),
+  );
+  const prior = lineage
+    .filter((b) => priorIds.has(b.id))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const incoming = productsOf(job).map((bp) => ({
+    bp,
+    name: modelNameOf(bp, job),
+    description: modelDescOf(bp),
+  }));
+  const rows: ManualProduct[] = p.products?.length
+    ? p.products
+    : p.productName.trim()
+      ? [{ id: "p1", name: p.productName, description: p.description }]
+      : [];
+
+  const used = new Set<string>();
+  const take = (pred: (x: (typeof incoming)[number]) => boolean) => {
+    const m = incoming.find((x) => !used.has(x.bp.id) && pred(x));
+    if (m) used.add(m.bp.id);
+    return m;
+  };
+  // The build product a row last came from, inside the earlier build that made
+  // it: its stored source, else (a legacy row) the newest earlier build naming it.
+  const earlier = (row: ManualProduct): { bp: BuildProduct; j: BuildJob } | null => {
+    const src = row.source;
+    if (src) {
+      const j = prior.find((b) => b.id === src.buildId);
+      const bp = j ? productsOf(j).find((x) => x.id === src.productId) : undefined;
+      return j && bp ? { bp, j } : null;
+    }
+    for (const j of prior) {
+      const bp = productsOf(j).find((x) => norm(modelNameOf(x, j)) === norm(row.name));
+      if (bp) return { bp, j };
+    }
+    return null;
+  };
+
+  const next: ManualProduct[] = [];
+  const dropped = new Set<string>();
+  for (const row of rows) {
+    const inLineage = row.source ? priorIds.has(row.source.buildId) : earlier(row) !== null;
+    if (!inLineage) {
+      // Another lineage's product, or a hand-made one. A sourceless row named
+      // like one of this build's products adopts it — only while this chat
+      // has no earlier version here, so a rebuild never steals a row.
+      const m =
+        !row.source && priorIds.size === 0
+          ? take((x) => norm(x.name) === norm(row.name))
+          : undefined;
+      next.push(m ? { ...row, source: { buildId: job.id, productId: m.bp.id }, updatedAt: now } : row);
+      continue;
+    }
+    // Same lineage: this version replaces the row — by product id, then name.
+    const m =
+      take((x) => x.bp.id === row.source?.productId) ??
+      take((x) => norm(x.name) === norm(row.name));
+    if (!m) {
+      // Not in this version: it stays listed, its source still the last
+      // version that had it (COR-108).
+      dropped.add(row.id);
+      next.push(row);
+      continue;
+    }
+    // Keep the maker's own words; take the model's new words only where the
+    // row still holds the previous version's.
+    const before = earlier(row);
+    const keepName = !before || row.name !== modelNameOf(before.bp, before.j);
+    const keepDesc = !before || row.description !== modelDescOf(before.bp);
+    next.push({
+      ...row,
+      name: keepName ? row.name : m.name,
+      description: keepDesc ? row.description : m.description,
+      source: { buildId: job.id, productId: m.bp.id },
+      updatedAt: now,
+    });
+  }
+  // A new row's id is never one the project already holds.
+  const taken = new Set(rows.map((r) => r.id));
+  for (const x of incoming) {
+    if (used.has(x.bp.id)) continue;
+    let id = newProductId();
+    while (taken.has(id)) id = newProductId();
+    taken.add(id);
+    next.push({
+      id,
+      name: x.name,
+      description: x.description,
+      source: { buildId: job.id, productId: x.bp.id },
+      updatedAt: now,
+    });
+  }
+
+  // The headline follows the current version, and is never a dropped row: a
+  // headline this version left out hands the name to the first row still in.
+  const headMoved = !p.productName.trim() || p.productName === rows[0]?.name;
+  const head = next.find((r) => !dropped.has(r.id)) ?? next[0];
+  return {
+    ...p,
+    builds,
+    products: next,
+    ...(headMoved && head ? { productName: head.name } : null),
+    // Only the project this build CREATES records it as its origin; a join
+    // never stamps it.
+    ...(opts.origin && !p.buildId ? { buildId: job.id } : null),
+    updatedAt: now,
+  };
+}
+
+/**
+ * Where Save puts a build (§5.1.8 steps 1, 3 and 4), read from the list alone:
+ * the live project the build is already in — returned as it is; else the live
+ * project another build of its chat was saved into, which this build joins as
+ * the next version (COR-89); else the live project the maker chose at the setup
+ * question. Null: nothing to join, so a new project is made. The provider's
+ * in-session guard (step 2) sits between the first answer and the other two.
+ */
+export function saveTargetOf(
+  job: BuildJob,
+  lineage: BuildJob[],
+  projects: ManualProject[],
+): { project: ManualProject; via: "saved" | "lineage" | "chosen" } | null {
+  const live = (id: string | undefined) =>
+    id ? (projects.find((p) => p.id === id) ?? null) : null;
+  const saved = live(job.projectId);
+  if (saved) return { project: saved, via: "saved" };
+  const sibling = lineageProjectOf(job, lineage, projects);
+  if (sibling) return { project: sibling, via: "lineage" };
+  const chosen = live(job.projectChoiceId);
+  return chosen ? { project: chosen, via: "chosen" } : null;
+}
+
+/** Words for one product, typed in the Brief's Step 1. `rowId` ties it to a
+ *  row outright; without one it is matched by position or name. */
+export type ProductEdit = { name: string; description: string; rowId?: string };
+
+/**
+ * Step 1's words laid over a project's rows (§5.1.7, "Brief text edits"). An
+ * edit that names its row goes there; the rest go by position when the two
+ * lists are the same length, else by normalized name. Each row keeps its id and
+ * source, a row whose text really changed is stamped `updatedAt`, and no row is
+ * ever added or dropped — attach() decides the rows, the Brief only words them.
+ * An empty name keeps the row's own: a product always has one.
+ */
+export function mergeProductEdits(
+  prev: ManualProduct[],
+  edits: ProductEdit[],
+  now: number,
+): ManualProduct[] {
+  const byRow = new Map<number, ProductEdit>();
+  const placed = new Set<number>();
+  const place = (row: number, edit: number) => {
+    byRow.set(row, edits[edit]);
+    placed.add(edit);
+  };
+  edits.forEach((e, j) => {
+    if (!e.rowId) return;
+    const i = prev.findIndex((r) => r.id === e.rowId);
+    if (i >= 0 && !byRow.has(i)) place(i, j);
+  });
+  const loose = edits.flatMap((e, j) => (e.rowId ? [] : [j]));
+  if (edits.length === prev.length) {
+    for (const j of loose) if (!byRow.has(j)) place(j, j);
+  }
+  for (const j of loose) {
+    if (placed.has(j)) continue;
+    const i = prev.findIndex((r, n) => !byRow.has(n) && norm(r.name) === norm(edits[j].name));
+    if (i >= 0) place(i, j);
+  }
+  return prev.map((row, i) => {
+    const e = byRow.get(i);
+    if (!e) return row;
+    const name = e.name.trim() || row.name;
+    const description = e.description.trim();
+    return name === row.name && description === row.description
+      ? row
+      : { ...row, name, description, updatedAt: now };
+  });
+}
+
+/** The editor chrome's headline rename (COR-95): the new `productName`, and
+ *  the first product renamed with it while that row still carried the old
+ *  headline — they are one product, so the list must not go on calling it by
+ *  its old name. An empty name clears the headline ("Untitled product") and
+ *  leaves the row named. */
+export function renameHeadline(
+  p: ManualProject,
+  name: string,
+  now: number,
+): Pick<ManualProject, "productName"> & Partial<Pick<ManualProject, "products">> {
+  const clean = name.trim();
+  const first = p.products?.[0];
+  if (!p.products || !first || !clean || first.name !== p.productName || first.name === clean)
+    return { productName: clean };
+  return {
+    productName: clean,
+    products: [{ ...first, name: clean, updatedAt: now }, ...p.products.slice(1)],
+  };
+}
+
 type Ctx = {
   hydrated: boolean;
   projects: ManualProject[];
@@ -446,10 +713,22 @@ type Ctx = {
   // create that also switched the active project moved every editor route
   // out from under the user as a side effect of saving something.
   createProject: (input: { name: string; description: string }) => ManualProject;
-  // The project a finished AI build becomes. One project per build: a
-  // build that already carries a live `projectId` gets that project
-  // back rather than a second copy of itself.
-  projectFromBuild: (job: BuildJob) => ManualProject;
+  // The project a finished AI build becomes (§5.1.8): the project it is
+  // already in; else the one another build of its chat was saved into, as that
+  // chat's next version (COR-89); else the one chosen at the setup question;
+  // else a new one. `lineage` = the OTHER builds of job.chatId — the caller
+  // has the builds store; this provider sits outside it (app/layout.tsx).
+  projectFromBuild: (job: BuildJob, lineage?: BuildJob[]) => ManualProject;
+  // A build joins a project (COR-88): attach() on the stored record,
+  // idempotent by build id — the one writer Save, Open in editor and the
+  // Brief's Step 1 share. `origin` only for the project this build creates.
+  // Null when there is no such project.
+  attachBuild: (
+    projectId: string,
+    job: BuildJob,
+    lineage?: BuildJob[],
+    opts?: { origin?: boolean },
+  ) => ManualProject | null;
   selectProject: (id: string) => void;
   updateProject: (id: string, patch: ProjectPatch) => void;
   // "Use as cover" / "Stop using as cover" (CNT-15): a product source, or
@@ -475,6 +754,10 @@ export function ManualProjectsProvider({
   // Projects made from an AI build in this session, by build id — see
   // projectFromBuild.
   const builtFrom = React.useRef(new Map<string, ManualProject>());
+  // Projects created in the current event, by id, until `projects` holds them:
+  // the Brief creates a project and attaches its build in one press, and
+  // `projects` is still the list from before the create.
+  const made = React.useRef(new Map<string, ManualProject>());
 
   React.useEffect(() => {
     const stored = normalizeProjects(loadJSON<unknown>(PROJECTS_KEY, []));
@@ -503,6 +786,10 @@ export function ManualProjectsProvider({
     if (!hydrated) return;
     saveActiveId(activeProjectId);
   }, [activeProjectId, hydrated]);
+  // Once a render holds them, the projects made above are read from `projects`.
+  React.useEffect(() => {
+    made.current.clear();
+  }, [projects]);
 
   const createProject = React.useCallback(
     (input: { name: string; description: string }) => {
@@ -518,6 +805,7 @@ export function ManualProjectsProvider({
         updatedAt: now,
         flowState: { ...EMPTY_FLOW_STATE },
       };
+      made.current.set(project.id, project);
       setProjects((arr) => [project, ...arr]);
       return project;
     },
@@ -558,81 +846,76 @@ export function ManualProjectsProvider({
     [updateProject],
   );
 
-  // The project a finished build becomes — the one the maker already chose.
-  // The setup question asked it before anything was drawn: an existing
-  // project for a single product, or a name for the new one every system
-  // gets. Save honours that answer instead of inventing a project from the
-  // build's title, and it records every product the build made with the
-  // sentence the model wrote for it, which is what the Brief and My projects
-  // read. One project per build: a build that already has one gets it back.
+  // A build joins a project — attach() on the record as it stands, written
+  // back to the list. Idempotent by build id: a build already in the project
+  // hands the record back unchanged and writes nothing.
+  const attachBuild = React.useCallback(
+    (
+      projectId: string,
+      job: BuildJob,
+      lineage: BuildJob[] = [],
+      opts: { origin?: boolean } = {},
+    ): ManualProject | null => {
+      const base =
+        projects.find((p) => p.id === projectId) ?? made.current.get(projectId);
+      if (!base) return null;
+      const now = Date.now();
+      const next = attach(base, job, lineage, now, opts);
+      if (next === base) return base;
+      // The record this computed is the one stored, product ids and all. Only a
+      // record another write in this same event already changed is merged
+      // again, onto that newer copy.
+      setProjects((arr) =>
+        arr.map((p) =>
+          p.id !== projectId
+            ? p
+            : p === base
+              ? next
+              : attach(p, job, lineage, now, opts),
+        ),
+      );
+      return next;
+    },
+    [projects],
+  );
+
+  // The project a finished build becomes (§5.1.8), in order:
+  //   1. the project the build is already in, unchanged;
+  //   2. the one this session already made or joined for it;
+  //   3. the project another build of its chat was saved into — a rebuild is
+  //      that project's next version, never a second project of the same
+  //      name (COR-89);
+  //   4. the project the maker chose at the setup question;
+  //   5. else a new one, named as the setup answer named it.
+  // Every join and every new project goes through attachBuild, so a build
+  // lands with all of its products, each tied to the build product it is.
   // Making the record is all this does — the caller decides whether the
   // editor should switch to it.
   const projectFromBuild = React.useCallback(
-    (job: BuildJob) => {
-      const existing = job.projectId
-        ? projects.find((p) => p.id === job.projectId)
-        : undefined;
-      if (existing) return existing;
-      // `projects` is React state, so two presses inside one tick would
-      // both read the list from before the first one and make the build
-      // two projects. This is what keeps one build to one project.
+    (job: BuildJob, lineage: BuildJob[] = []) => {
+      const target = saveTargetOf(job, lineage, projects);
+      if (target?.via === "saved") return target.project;
+      // `projects` is React state, so two presses inside one tick would both
+      // read the list from before the first one and attach — or create —
+      // twice. This is what keeps one build to one project.
       const already = builtFrom.current.get(job.id);
       if (already) return already;
-
-      const built: ManualProduct[] = [
-        {
-          id: newProductId(),
-          name: job.title,
-          description: (job.description || job.summary || "").trim(),
-        },
-        ...(job.companions ?? []).map((c) => ({
-          id: newProductId(),
-          name: (c.name || c.title).trim(),
-          description: (c.description || c.summary || "").trim(),
-        })),
-      ];
-
-      const chosen = job.projectChoiceId
-        ? projects.find((p) => p.id === job.projectChoiceId)
-        : undefined;
-      if (chosen) {
-        // Joining a project that already exists: its headline stays its own,
-        // and this build's products are added to what it already holds.
-        const held: ManualProduct[] =
-          chosen.products ??
-          (chosen.productName.trim()
-            ? [{ id: "p1", name: chosen.productName, description: chosen.description }]
-            : []);
-        const names = new Set(held.map((x) => x.name.trim().toLowerCase()));
-        const products = [
-          ...held,
-          ...built.filter((x) => !names.has(x.name.trim().toLowerCase())),
-        ];
-        const patch = {
-          products,
-          ...(chosen.productName.trim() ? null : { productName: job.title }),
-        };
-        updateProject(chosen.id, patch);
-        const project = { ...chosen, ...patch };
-        builtFrom.current.set(job.id, project);
-        return project;
+      let project: ManualProject;
+      if (target) {
+        project = attachBuild(target.project.id, job, lineage) ?? target.project;
+      } else {
+        const created = createProject({
+          name: job.projectChoiceName?.trim() || job.title,
+          description: (job.description || job.conceptPrompt).trim(),
+        });
+        // Its origin: `buildId`, the headline, version 1, and every product
+        // with the build product it came from.
+        project = attachBuild(created.id, job, [], { origin: true }) ?? created;
       }
-
-      const created = createProject({
-        name: job.projectChoiceName?.trim() || job.title,
-        description: (job.description || job.conceptPrompt).trim(),
-      });
-      const patch = {
-        productName: job.title,
-        buildId: job.id,
-        products: built,
-      };
-      updateProject(created.id, patch);
-      const project = { ...created, ...patch };
       builtFrom.current.set(job.id, project);
       return project;
     },
-    [projects, createProject, updateProject],
+    [projects, createProject, attachBuild],
   );
 
   const markStepCompleted = React.useCallback(
@@ -685,6 +968,7 @@ export function ManualProjectsProvider({
     findBySlug,
     createProject,
     projectFromBuild,
+    attachBuild,
     selectProject,
     updateProject,
     setCover,
