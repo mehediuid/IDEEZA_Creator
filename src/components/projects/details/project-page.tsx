@@ -42,6 +42,9 @@ import { ProjectShell } from "./shell";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
 import { BusinessPlanChip } from "./business-plan-chip";
+import { ListingFlow } from "@/components/projects/listing/listing-flow";
+import { UtilityPill } from "@/components/projects/listing/utility-pill";
+import { RailMarketplace } from "./rail-marketplace";
 
 // ─────────────────────────── the slot adapters ───────────────────────────
 
@@ -139,6 +142,12 @@ function ContributorsSlot(props: SlotProps) {
   return <ContributorsTab {...props} />;
 }
 
+// T22's wiring (P2-LISTING-1, -2, -8…16): the rail Marketplace block's owner
+// branch. Every other viewer's branch is T23's (the read-only buyer rail).
+function MarketplaceSlot(props: SlotProps) {
+  return can(props.viewer, "facts.seeOwnerOnly") ? <RailMarketplace {...props} /> : null;
+}
+
 // ─────────────────────────── the page's composition ───────────────────────────
 
 /** Exported for its `banners`, which the product page shows too, so a preview reads the same
@@ -155,9 +164,13 @@ export const SLOTS: ProjectSlots = {
       BusinessPlanChip,
     ],
     statusRow: [
+      UtilityPill,
     ],
     afterDescription: [
     ],
+  },
+  actions: {
+    "add-to-marketplace": ListingFlow,
   },
   tabs: {
     products: ProductsSlot,
@@ -167,6 +180,7 @@ export const SLOTS: ProjectSlots = {
     customers: CustomersSlot,
   },
   rail: {
+    marketplace: MarketplaceSlot,
     outcome: OutcomeSlot,
     details: DetailsSlot,
     legal: RailLegal,
