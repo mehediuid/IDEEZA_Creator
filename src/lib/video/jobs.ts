@@ -6,6 +6,8 @@
 // `components/video-jobs/video-jobs-provider.tsx`, which re-exports all of
 // this, so its importers are unchanged.
 
+import type { OnScreenLines } from "./types";
+
 export type VideoJobStage =
   | "queued"
   | "drafting"
@@ -25,12 +27,21 @@ export type VideoJob = {
   stageStartedAt: number;
   emailReminder: string | null;
   browserNotify: boolean;
-  acknowledged: boolean;
+  // Optional so a v1 job, which always set this, and a fresh Phase 2 job
+  // that hasn't been acknowledged yet, both read as falsy the same way.
+  acknowledged?: boolean;
   // True once the brief that owns this job completes its mint step. Once
   // minted, the user's regenerate flow takes a different path: in-place modal
   // (no /brief navigation) since the brief is "done" and they're just swapping
   // the listing's video.
   minted: boolean;
+  // Phase 2 (spec §3.3.3, VIDEO §3): which product and project this render
+  // belongs to, and what it draws. A legacy (v1) job has none of these — it
+  // reads as null, never undefined, so a reader can `??` it without an
+  // `in` check.
+  projectId?: string | null;
+  productId?: string | null;
+  render?: { lines: OnScreenLines; imageUrl: string | null; productName: string } | null;
 };
 
 export const STAGE_BUDGETS_SEC: Record<
