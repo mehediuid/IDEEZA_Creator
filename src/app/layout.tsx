@@ -11,6 +11,7 @@ import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
 import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
+import { WalletProvider } from "@/components/wallet/wallet-provider";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -102,7 +103,10 @@ export default function RootLayout({
                     <CreatePlanProvider>
                       <CreditsProvider>
                         <CreateHistoryProvider>
-                          {children}
+                          {/* WalletProvider: the one Demo wallet dialog and
+                              useWalletRequest(), inside the projects and
+                              market stores its requests write to. */}
+                          <WalletProvider>{children}</WalletProvider>
                           {/* A build is a background job: it has to keep
                               running whatever page the user is on, so the
                               worker lives here rather than on the build

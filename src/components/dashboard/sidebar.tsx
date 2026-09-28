@@ -51,6 +51,7 @@ import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
 import { Icon, type IconValue } from "./icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
+import { WalletMenuEntry } from "@/components/wallet/wallet-menu-entry";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -62,7 +63,7 @@ const NAV: NavItem[] = [
   { label: "History", href: "/history", icon: HistoryIcon },
   { label: "My projects", href: "/projects", icon: Folder01Icon },
   { label: "Parts & agile module", href: "/parts", icon: CpuIcon },
-  { label: "Explore marketplace", href: null, icon: ShoppingBag01Icon },
+  { label: "Explore marketplace", href: "/marketplace", icon: ShoppingBag01Icon },
   { label: "Innovations", href: "/innovations", icon: News01Icon },
   { label: "Messages", href: null, icon: Mail01Icon },
   { label: "Blog", href: null, icon: BookOpen01Icon },
@@ -202,7 +203,7 @@ function SidebarBody({
         </ul>
       </nav>
 
-      <Footer collapsed={collapsed} />
+      <Footer collapsed={collapsed} onLeave={onClose} />
     </>
   );
 }
@@ -477,12 +478,12 @@ function NavRow({
   );
 }
 
-function Footer({ collapsed }: { collapsed: boolean }) {
+function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
   return (
     <div className="border-t border-border p-[12px]">
       <UpgradeButton collapsed={collapsed} />
       <SupportBlock collapsed={collapsed} />
-      <ProfileRow collapsed={collapsed} />
+      <ProfileRow collapsed={collapsed} onLeave={onLeave} />
     </div>
   );
 }
@@ -613,7 +614,15 @@ function SupportAction({
   );
 }
 
-function ProfileRow({ collapsed }: { collapsed: boolean }) {
+function ProfileRow({
+  collapsed,
+  onLeave,
+}: {
+  collapsed: boolean;
+  /** Present in the phone drawer: closes it, so a dialog opened from the
+   *  menu doesn't sit over a second focus trap. */
+  onLeave?: () => void;
+}) {
   // One panel open at a time — the account menu and the notification bell
   // both anchor to this row, and opening one must close the other rather
   // than let them stack on top of each other.
@@ -621,6 +630,17 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
     null,
   );
   const ref = React.useRef<HTMLDivElement>(null);
+  const accountButton = React.useRef<HTMLButtonElement>(null);
+
+  // The Demo wallet dialog opens from inside the account menu, which closes
+  // (P2-MINT-2). Focus goes to the account button first, so the dialog hands
+  // it back there when it closes — the entry itself is gone with the menu.
+  // In the drawer, the drawer closes too and hands focus to its menu button.
+  const openWallet = () => {
+    accountButton.current?.focus();
+    setOpenPanel(null);
+    onLeave?.();
+  };
 
   React.useEffect(() => {
     if (!openPanel) return;
@@ -643,6 +663,7 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
     <div ref={ref} className="relative border-t border-border pt-[12px]">
       <div className="flex items-center gap-[6px]">
         <button
+          ref={accountButton}
           type="button"
           onClick={() =>
             setOpenPanel((v) => (v === "menu" ? null : "menu"))
@@ -700,7 +721,11 @@ function ProfileRow({ collapsed }: { collapsed: boolean }) {
       </div>
 
       {openPanel === "menu" && (
-        <AccountMenu collapsed={collapsed} onClose={() => setOpenPanel(null)} />
+        <AccountMenu
+          collapsed={collapsed}
+          onClose={() => setOpenPanel(null)}
+          onOpenWallet={openWallet}
+        />
       )}
     </div>
   );
@@ -811,9 +836,12 @@ function NotificationBell({
 function AccountMenu({
   collapsed,
   onClose,
+  onOpenWallet,
 }: {
   collapsed: boolean;
   onClose: () => void;
+  /** Closes the menu before the Demo wallet dialog opens. */
+  onOpenWallet: () => void;
 }) {
   const [walletOpen, setWalletOpen] = React.useState(false);
   return (
@@ -868,10 +896,11 @@ function AccountMenu({
           </button>
           {walletOpen && (
             <ul role="menu" className="bg-bg-page py-[4px]">
-              <WalletSubRow
-                title="Connect wallet"
-                hint="Add an on-chain identity"
-              />
+              {/* The wallet's one standing home (P2-MINT-2): it opens the
+                  Demo wallet dialog, where every identity connects. */}
+              <li role="none">
+                <WalletMenuEntry variant="sidebar" onOpen={onOpenWallet} />
+              </li>
               <WalletSubRow
                 title="Earn IDZ tokens"
                 hint="Free tokens to start"
@@ -881,7 +910,7 @@ function AccountMenu({
                 hint="See pending claims"
               />
               <li className="px-[20px] py-[12px] text-xs text-text-tertiary">
-                Set up later — only needed when you sell.
+                Needed to mint or buy. Testnet demo — no real money.
               </li>
             </ul>
           )}
