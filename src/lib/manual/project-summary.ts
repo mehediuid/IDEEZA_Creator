@@ -425,3 +425,47 @@ export function headerText(s: ProjectSummary): HeaderText {
     pair: s.next,
   };
 }
+
+// ─────────────────────────── the list's search and view (B1) ───────────────────────────
+// The three names spec §5.1.3 keeps beside the summary. The list state only
+// /projects needs — the tabs, the order, the page and the URL codec — is
+// src/lib/manual/project-list.ts.
+
+/** Case- and accent-insensitive: NFKD splits "é" into "e" and a combining mark, which is dropped. */
+function fold(text: string): string {
+  return text.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/**
+ * Search (LST-13/14): NFKD, drop diacritics, lowercase; every whitespace token must be found in
+ * the name, a product name, the description or a product description. `via` names the product
+ * the match lies in when the name, the description and the first product don't hold every word
+ * and one other product does (LST-14, "the only match").
+ */
+export function matchProject(
+  s: ProjectSummary,
+  description: string,
+  q: string,
+): { hit: boolean; via?: string } {
+  const tokens = fold(q).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return { hit: true };
+  const [first, ...rest] = s.products;
+  const head = fold([s.name, description, first?.name ?? "", first?.description ?? ""].join("\n"));
+  const others = rest.map((x) => ({ name: x.name.trim(), text: fold(`${x.name}\n${x.description}`) }));
+  const everything = [head, ...others.map((o) => o.text)].join("\n");
+  if (!tokens.every((t) => everything.includes(t))) return { hit: false };
+  if (tokens.every((t) => head.includes(t))) return { hit: true };
+  const only = others.find((o) => o.name && tokens.every((t) => o.text.includes(t)));
+  return only ? { hit: true, via: only.name } : { hit: true };
+}
+
+/** List view state in the URL (LST-28): written with `replace`, defaults left out. */
+export type ListQuery = {
+  tab: "all" | "draft" | "private" | "given" | "listed" | "showcase"; // showcase = membership (LST-10)
+  q: string;
+  sort: "updated" | "newest" | "oldest" | "name";
+  source: "any" | "build" | "hand";
+  page: number; // 1-based
+};
+export const PAGE_SIZE = 12;
+// e.g. /projects?tab=draft&q=remote&sort=name&source=hand&page=2
