@@ -11,7 +11,7 @@ keeps its row: mil-precise nudges matter on copper, and that home keeps
 stays in both menus.
 
 **Change:** delete one row in `buildMenusSchematic` (`data.tsx`); revise the
-CLAUDE.md §5 Move entry.
+CLAUDE.md §5 Move entry (now in `docs/guides/features/pcb-board.md`).
 
 **Verification:** `tsc` + CDP — schematic Edit menu no longer lists the row
 ("Move" still there); the board's Edit menu still opens the working dialog.

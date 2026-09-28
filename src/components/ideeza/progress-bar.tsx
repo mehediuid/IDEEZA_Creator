@@ -1,5 +1,5 @@
 // IDEEZA Design System — A22 Progress Bar (Figma 45248:24676). The fill is
-// scaled, not resized (CLAUDE.md §7: animate transform, not width).
+// scaled, not resized (AGENTS.md UI/UX rules: animate transform, not width).
 import { cn } from "@/lib/utils";
 
 export function ProgressBar({ value, label, className }: { value: number; label: string; className?: string }) {

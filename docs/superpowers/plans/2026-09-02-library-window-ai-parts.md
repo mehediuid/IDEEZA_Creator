@@ -16,7 +16,7 @@
 - **PRD FR-4/5/6:** verification badge (green check kept; new low-weight amber icon for Not Verified) + a visually distinct AI badge (violet, brand accent) that can co-exist on one row; tooltips explain each state.
 - **PRD §11 out of scope:** AI generation flow, automated QA, changes to Public/Private/Price *logic* beyond adding the new controls beside them.
 - **Open question 9.1 — decided (flag in the mockup for Sohaib):** "Verified" leaves the top tab row, fully replaced by the Row-2 segmented control — the repo's one-home-per-control rule forbids the same filter in two rows. The other §9 answers to state in the review: 9.2 — no origin field exists; this plan adds `origin` + `verified` to the row model (schema addition). 9.3 — origin is immutable here. 9.4 — labeling/filtering only for now, no usage restriction.
-- Repo rules: tokens only, no stubs (the flyout's search/Price/tabs must actually filter — today they render `ALL_ROWS` unfiltered), `npx tsc --noEmit` must pass, browser-verify via CDP, update CLAUDE.md §5 in the same change.
+- Repo rules: tokens only, no stubs (the flyout's search/Price/tabs must actually filter — today they render `ALL_ROWS` unfiltered), `npx tsc --noEmit` must pass, browser-verify via CDP, update CLAUDE.md §5 (now `docs/guides/features/pcb-tools-menus-panels.md`) in the same change.
 - Per user workflow memory: push to main only after the user verifies.
 
 ---
@@ -198,10 +198,10 @@ const AI_SVG =
 
 ---
 
-### Task 5: Browser verification + CLAUDE.md + handoff
+### Task 5: Browser verification + features guide + handoff
 
 **Files:**
-- Modify: `CLAUDE.md` (§5, the "library window" entry)
+- Modify: `docs/guides/features/pcb-tools-menus-panels.md` (the "library window" entry; was `CLAUDE.md` §5)
 
 - [ ] **Step 1: Drive the real app over CDP** (seed `ideeza:manual:projects` + `ideeza:manual:active`, open `/project/verify-board/pcb`, Library tab → All Library). Assert, reading the DOM:
   1. Tabs read `All · Public · Private · AI-Generated`; default active = All; Verification control reads `All · Verified · Not Verified` with All active (FR-7).
@@ -211,7 +211,7 @@ const AI_SVG =
   5. Switch Schematic↔PCB view, reopen the Library panel → filter selections unchanged (FR-8).
   6. Screenshot light + dark for the report.
 
-- [ ] **Step 2: Update CLAUDE.md §5** — extend the library entry with one accurate sentence, e.g.: "**All Library filters are real** (PRD 2026-08-30): tabs All · Public · Private · AI-Generated + a Verification segmented control (All / Verified / Not Verified) + Price + search AND-combine over the rows; each row carries a verification badge (green check / amber clock) and a violet AI chip with explanatory tooltips; defaults are All/All, selections persist for the session."
+- [ ] **Step 2: Update CLAUDE.md §5 (now `docs/guides/features/pcb-tools-menus-panels.md`)** — extend the library entry with one accurate sentence, e.g.: "**All Library filters are real** (PRD 2026-08-30): tabs All · Public · Private · AI-Generated + a Verification segmented control (All / Verified / Not Verified) + Price + search AND-combine over the rows; each row carries a verification badge (green check / amber clock) and a violet AI chip with explanatory tooltips; defaults are All/All, selections persist for the session."
 
 - [ ] **Step 3: Commit:** `git commit -am "docs: CLAUDE.md §5 library filter redesign"`.
 

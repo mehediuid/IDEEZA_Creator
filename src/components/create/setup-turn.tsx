@@ -295,8 +295,8 @@ function AnsweredCard({
 
 // No card. The thread is already a column on a surface, and wrapping these
 // questions in a bordered panel — which then holds bordered rows — is a box
-// inside a box (CLAUDE.md §7). What separates this from the message above it
-// is space and one hairline, not another edge.
+// inside a box (AGENTS.md, UI/UX hard rules). What separates this from the
+// message above it is space and one hairline, not another edge.
 function Card({
   children,
   muted = false,

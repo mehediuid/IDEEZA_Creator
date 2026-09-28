@@ -22,7 +22,7 @@
   - Other sessions commit concurrently: `feat/spec-sheet` lives in the worktree `../IDEEZA_Creator-wt/spec-sheet`.
   - Stage only your own paths; never `git add -A`. Never commit `AGENTS.md`, `README.md` or `docs/agent-rules/`.
 - **Sequencing (D4).**
-  - **Part A (Tasks 1–2) runs now on `main`.** It touches only `tokens.css`, `tailwind-preset.ts`, `globals.css`, `components/ideeza/toggle.tsx`, `components/ideeza/slider.tsx` and CLAUDE.md, none of which the spec-sheet branch changes.
+  - **Part A (Tasks 1–2) runs now on `main`.** It touches only `tokens.css`, `tailwind-preset.ts`, `globals.css`, `components/ideeza/toggle.tsx`, `components/ideeza/slider.tsx` and CLAUDE.md (its §7 is now `docs/guides/ui-ux.md`), none of which the spec-sheet branch changes.
   - **Part B (Tasks 3–7) starts only after `feat/spec-sheet` is merged to `main`.** Check with `git log main --oneline -- src/lib/spec/derive.ts`, which must print a commit.
   - Before Part B, re-read `src/lib/spec/types.ts`, `derive.ts`, `bodies.ts` and `batteries.ts` on `main`, and the `BuildProduct.spec` / `BuildJob.spec` fields in `history.tsx`. If a signature used below changed, update this plan's Part B code first.
 - **Tokens only (docs/agent-rules/50).**
@@ -31,8 +31,8 @@
   - A Figma value with no DS variable is not approximated: it is left out and reported. Known cases:
     - the A19 tooltip shadow (a raw effect, `0 4 12 #00000026`);
     - the A11 value-bubble shadow (raw `0 2 6 rgba(0,0,0,.15)`).
-- **Line heights are mapped by value.** Figma `line/height/N` is offset from ours: Figma `4xl` = 32 px, which is our `leading-3xl` (CLAUDE.md §7 records the offset).
-- **Figma as drawn (D2).** Caps overlines and 10 px caps hints are used exactly as drawn. This is a recorded exception to CLAUDE.md §7 for this panel. Copy that claims something the build lacks follows the spec's *Copy* table instead.
+- **Line heights are mapped by value.** Figma `line/height/N` is offset from ours: Figma `4xl` = 32 px, which is our `leading-3xl` (CLAUDE.md §7, now `docs/guides/ui-ux.md`, records the offset).
+- **Figma as drawn (D2).** Caps overlines and 10 px caps hints are used exactly as drawn. This is a recorded exception to CLAUDE.md §7 (now `docs/guides/ui-ux.md`) for this panel. Copy that claims something the build lacks follows the spec's *Copy* table instead.
 - **Node ids in code** beside what they produced (`// Figma 47167:22019`).
 - **Every task ends with:**
   - `npx tsc --noEmit -p tsconfig.json` clean;
@@ -59,7 +59,7 @@
 **Files:**
 - Modify: `src/styles/tokens.css`. The light block `:root, [data-theme="light"]` starts at line 273; `[data-theme="dark"]` at 508; `@media (prefers-color-scheme: dark) :root:not([data-theme])` at 630; the mobile `@media (max-width: 767px)` at 237; letter spacing at 142–148; elevation at 494–497.
 - Modify: `src/styles/tailwind-preset.ts`. `letterSpacing` is at 53–58; colours `bg`, `text` and `border` start at 160, 185 and 202.
-- Modify: `CLAUDE.md` §7 (the `tracking-caps` line and the elevation note).
+- Modify: `CLAUDE.md` §7, now `docs/guides/ui-ux.md` (the `tracking-caps` line and the elevation note).
 
 **Interfaces:**
 - Produces:
@@ -229,7 +229,7 @@ Expected:
 
   Stop and report if a caps label now truncates or wraps (1.5 px of tracking adds about 1 px per letter). Fix by allowing that label to wrap where it is a sentence; never shrink the token back.
 
-- [ ] **Step 8: CLAUDE.md §7.** In the line starting `- **Line height pairs with font size**`, change the sentence *"**`tracking-caps`** for the uppercase micro-labels the panels are full of"* to:
+- [ ] **Step 8: CLAUDE.md §7 (now `docs/guides/ui-ux.md`).** In the line starting `- **Line height pairs with font size**`, change the sentence *"**`tracking-caps`** for the uppercase micro-labels the panels are full of"* to:
 
 ```
 **`tracking-caps`** (1.5px — the design system's own value; it was 0.5px) for the uppercase micro-labels the panels are full of, `tracking-slight` for a display heading a step under tight, `tracking-wider` for a value bubble
@@ -908,7 +908,7 @@ export function Spinner({ size = 32 }: { size?: number }) {
 ```tsx
 // progress-bar.tsx
 // IDEEZA Design System — A22 Progress Bar (Figma 45248:24676). The fill is
-// scaled, not resized (CLAUDE.md §7: animate transform, not width).
+// scaled, not resized (AGENTS.md UI/UX rules: animate transform, not width).
 import { cn } from "@/lib/utils";
 
 export function ProgressBar({ value, label, className }: { value: number; label: string; className?: string }) {
@@ -1262,7 +1262,7 @@ EOF
 
 **Files:**
 - Create: `scratchpad/p3d/matrix.mjs` (the browser matrix)
-- Modify: `CLAUDE.md` — replace the §5 3D-tab sentences in the review-card entries with one entry for the model panel; add the D2 exception to §7.
+- Modify: `CLAUDE.md` (§5 now `docs/guides/features/ai-create-flow.md`, §7 now `docs/guides/ui-ux.md`) — replace the §5 3D-tab sentences in the review-card entries with one entry for the model panel; add the D2 exception to §7.
 - Modify: `STRUCTURE.md` — add `src/lib/three/assembly.ts` and `src/components/create/model-panel/`.
 
 - [ ] **Browser matrix.** Relaunch Chrome with SwiftShader. On the Drone B1 build (`/chat/chat_bwyuf8a9_muf42028`, 3D tab) and on a single-product build, at 1440 × 900, drive each row below with real `Input.dispatchMouseEvent` / `Input.dispatchKeyEvent`, reading positions from `window.__ideezaAssembly`:
@@ -1280,4 +1280,4 @@ EOF
   12. Keyboard: Tab reaches the viewer; → moves the hover; Enter selects; Esc chain.
   13. A build whose `modelGlbUrl` is `/models/sample.glb` shows the sized shell, not the duck.
 - [ ] **Fidelity.** For frames 01, 02, 03, 04, 05, 06, 07, 08, 09, 11 and 12, a CDP screenshot of the panel beside `get_screenshot` of the frame's `panel / 3D model` node, at 1440, in light, with measured offsets for the toolbar, the explode card, the rail blocks and the overlays. Then dark screenshots for the same states (the Figma has no dark frames; check contrast instead), and 1700 and 400 px.
-- [ ] **Docs.** Update CLAUDE.md §5/§7 and STRUCTURE.md as listed. Commit, push, deploy (`npx vercel deploy --prod --yes`), and smoke-test production.
+- [ ] **Docs.** Update CLAUDE.md §5/§7 (now `docs/guides/features/ai-create-flow.md` / `docs/guides/ui-ux.md`) and STRUCTURE.md as listed. Commit, push, deploy (`npx vercel deploy --prod --yes`), and smoke-test production.
