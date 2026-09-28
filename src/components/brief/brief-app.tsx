@@ -576,6 +576,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     markStepCompleted,
     selectProject,
     setStatus,
+    setShowcase,
     updateProject,
     attachBuild,
   } = useManualProjects();
@@ -1097,6 +1098,13 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           // Terminal step done → flip the project Draft → Completed so it
           // reads as Completed in My Projects.
           setStatus(scopeProjectId, "completed");
+          // Share to Innovations ticked: the mint showcases the project
+          // (COR-105), so the success step opens on "Showcased" (COM-56). A
+          // project already showcased keeps the time it was first shown.
+          const scoped = projects.find((p) => p.id === scopeProjectId);
+          if (state.shareToNewsfeed && scoped && scoped.showcasedAt == null) {
+            setShowcase(scopeProjectId, true);
+          }
         }
         setState((s) => ({ ...s, mintedAt: Date.now() }));
         setStep("success");
