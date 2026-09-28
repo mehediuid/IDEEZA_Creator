@@ -7,6 +7,8 @@
 // pipeline (roadmap phase 3) without touching the UI.
 
 import * as React from "react";
+import { editorHref, parseEditorPath } from "@/lib/manual/editor-scope";
+import { SEGMENT_TO_STEP } from "@/lib/manual/projects";
 
 export type ChatContext = "blockly" | "code" | "pcb" | "3d" | "preview";
 export type AiModule = "pcb" | "code" | "3d" | "preview";
@@ -76,10 +78,15 @@ function goToModule(module: AiModule, carryText: string) {
   try {
     sessionStorage.setItem(HANDOFF_KEY, JSON.stringify({ module, text: carryText }));
   } catch { /* storage unavailable — navigation still works, message just won't carry */ }
-  const parts = window.location.pathname.split("/"); // /project/<slug>/<step>
-  if (parts[1] === "project" && parts[2]) {
-    window.location.href = `/project/${parts[2]}/${module}`;
-  }
+  // The jump keeps the product the editor is on (P2-EDITOR-2): the product
+  // route's own product, else the project's address, which resumes one.
+  const here = parseEditorPath(window.location.pathname);
+  if (!here) return;
+  const step = SEGMENT_TO_STEP[module];
+  if (!step || step === "brief") return;
+  window.location.href = here.productId
+    ? editorHref(here.slug, here.productId, step)
+    : `/project/${here.slug}/${module}`;
 }
 
 type Msg = {

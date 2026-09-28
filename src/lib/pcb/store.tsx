@@ -18,6 +18,10 @@ import { downloadBlob, downloadDataUrl } from "./exporters";
 import { dropImportedGroup, type ImportedModel } from "./gltf-import";
 import { delCategoryOf } from "./del-objects";
 import { defaultSchRulesConfig, type SchRulesConfig } from "./design-rules-data";
+import { DocSaveQueue, readEditorDoc, writeEditorDoc, type DocHandle } from "../manual/editor-docs";
+import { onProjectDeleted } from "../manual/events";
+import { editorDocKey } from "../manual/editor-scope";
+import type { EditorScope } from "../manual/p2-types";
 import { PANEL_LIMITS,
   AREA_KINDS,
   areaTool,
@@ -282,8 +286,26 @@ export interface PcbActions {
   ungroupSelection: () => void;
   /** Widen the selection to every object sharing a group with the current one. */
   selectGroupMembers: () => void;
-  /** Activate a manual project and open its PCB editor (Project ▸ Open Project). */
+  /** Open a manual project's PCB editor (Project ▸ Open Project): its
+   *  legacy `/project/<slug>/pcb` address resumes the product it was left on. */
   openManualProject: (id: string, slug: string, newWindow?: boolean) => void;
+  /**
+   * P2-EDITOR-4 — the product whose board this store holds. On a change, in
+   * order: the pending autosave is written to the key it was scheduled for;
+   * undo/redo, the selection and every open modal are cleared; the new
+   * product's document (or the initial one) is loaded and the id counter
+   * re-seeded past its `obj_` ids; then the scope is published
+   * (`usePcbDocScope`). Null holds no document. `headRowId` is the project's
+   * first row — the only one that may adopt the legacy per-project doc.
+   * The same scope again is a no-op.
+   */
+  setDocScope: (scope: EditorScope | null, headRowId?: string) => void;
+  /**
+   * P2-EDITOR-4 (BUILDLOAD C6) — Load / Restore: when this store holds
+   * `scope`, flush its pending save, then clear it, so an old in-memory board
+   * can't be saved over the documents about to be written. True when it did.
+   */
+  releaseScope: (scope: EditorScope) => boolean;
   /** Clear style props on the selection back to defaults. */
   resetObjectStyle: () => void;
   /** Add an empty custom property row to the primary selected object. */
@@ -417,6 +439,7 @@ export interface PcbActions {
 
 const StateCtx = React.createContext<PcbState | null>(null);
 const ActionsCtx = React.createContext<PcbActions | null>(null);
+const DocScopeCtx = React.createContext<EditorScope | null>(null);
 
 // Bounding-box centre of a set of placed objects (including wire endpoints).
 // This is the pivot for group rotate / flip — so a multi-selection turns and
@@ -497,18 +520,44 @@ function snap(s: PcbState): Snapshot {
 
 // ── Document persistence ────────────────────────────────────────────────
 // The user's actual work (placed objects, board dims, 2D/3D settings) is a
-// "document" persisted to localStorage, scoped per active manual project so
-// each project keeps its own board. UI flags (menus, panels, zoom) are not
-// part of the document and reset per session.
-const PCB_DOC_PREFIX = "ideeza:pcb:doc:";
-const ACTIVE_PROJECT_KEY = "ideeza:manual:active";
+// "document" persisted to localStorage, one per PRODUCT (P2-EDITOR-3):
+// `ideeza:pcb:doc:<projectId>:<productId>`, which the store learns from
+// `setDocScope` — never from `ideeza:manual:active`. This provider sits at
+// the app root and outlives every route, so it holds no document until an
+// editor route names one (P2-EDITOR-4, v1 COR-94/104), and each debounced
+// save carries the key it was made for. UI flags (menus, panels, zoom) are
+// not part of the document and reset with it.
 
-function pcbDocKey(): string {
-  let pid = "default";
+/** Debounce for the autosave. */
+const SAVE_DELAY_MS = 300;
+
+/** The browser's storage, or null where site data is blocked (reading the
+ *  accessor itself throws there). */
+function docStorage(): Storage | null {
   try {
-    pid = window.localStorage.getItem(ACTIVE_PROJECT_KEY) || "default";
-  } catch {}
-  return PCB_DOC_PREFIX + pid;
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const sameScope = (a: EditorScope | null, b: EditorScope | null) =>
+  a === b || (!!a && !!b && a.projectId === b.projectId && a.productId === b.productId);
+
+/** Project ▸ Open Project's list: the projects that exist, newest first. */
+function readRecentProjects(): PcbState["recentProjects"] {
+  try {
+    // Same key the manual-projects provider writes.
+    const arr = JSON.parse(window.localStorage.getItem("ideeza:manual:projects") || "null");
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((p): p is { id: string; slug: string; name: string; updatedAt?: number } =>
+        !!p && typeof p.id === "string" && typeof p.slug === "string" && typeof p.name === "string")
+      .map((p) => ({ id: p.id, slug: p.slug, name: p.name, updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : 0 }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
 }
 
 /** The only clock read in this module — save stamps. */
@@ -543,6 +592,21 @@ type PcbDoc = Pick<
   | "routingCorner"
   | "renderStyle"
 >;
+
+/** Every field the document is made of. */
+const DOC_FIELDS: readonly (keyof PcbDoc)[] = [
+  "objects", "pcbBoard", "twoD", "threeD", "gridSize", "gridType", "renderStyle", "unit",
+  "snapEnabled", "designRules", "pcbDrcConfig", "pcbLayers", "pcbNetClasses", "pcbEqualLength",
+  "pcbPadPairs", "pcbDiffPairs", "routingMode", "routingCorner", "pcbNets", "pcbDefaults",
+  "boardSettings", "panelSizes",
+];
+
+/** The document a state holds — what one save writes. */
+function docOf(s: PcbState): PcbDoc {
+  const doc = {} as Record<keyof PcbDoc, unknown>;
+  for (const k of DOC_FIELDS) doc[k] = s[k];
+  return doc as PcbDoc;
+}
 
 // Rebuild a safe document from persisted storage — stale or hand-edited data
 // must never crash the editor.
@@ -664,86 +728,60 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
   // as ONE history step (live translation uses plain merge, no per-frame history).
   const moveOrigRef = React.useRef<Snapshot | null>(null);
 
-  // Hydrate the persisted document once on mount (client only), then bump the
-  // id counter past any restored ids so new placements never collide. The
-  // project list (Project ▸ Open Project) is read in the same pass — one
-  // state write on mount instead of two.
-  const [docHydrated, setDocHydrated] = React.useState(false);
+  // ── The product this board belongs to (P2-EDITOR-4) ──────────────────
+  // `held` is where this board's saves land: the scope, and the key plus the
+  // legacy key its first write moves (adopt-once, P2-EDITOR-3). `docScope`
+  // publishes it, so the editor route mounts only once the store holds the
+  // product in its URL. `loaded` is the document as it was just read — its
+  // own "change" is not a save.
+  const heldRef = React.useRef<{ scope: EditorScope; handle: DocHandle } | null>(null);
+  const [docScope, setDocScopeState] = React.useState<EditorScope | null>(null);
+  const loadedRef = React.useRef<PcbDoc | null>(null);
+
+  // One debounced save, carrying the key it was made for: a flush after a
+  // switch writes the old board to the old product, never the new one.
+  const [saveQueue] = React.useState(
+    () =>
+      new DocSaveQueue<DocHandle, PcbDoc>(
+        SAVE_DELAY_MS,
+        (handle, doc) => {
+          const storage = docStorage();
+          return !!storage && writeEditorDoc(handle, JSON.stringify(doc), storage);
+        },
+        { set: (fn, ms) => window.setTimeout(fn, ms), clear: (t) => window.clearTimeout(t as number) },
+        (handle, ok) => {
+          // Only the board on screen reports its save; a flushed earlier
+          // product's has no chip left to update.
+          if (heldRef.current?.handle !== handle) return;
+          setState((s) => (ok ? { ...s, saveState: "saved", lastSavedAt: stamp() } : { ...s, saveState: "failed" }));
+        },
+      ),
+  );
+
+  // The project list (Project ▸ Open Project) is the one thing read on mount.
+  // No document is: until an editor route names a product there is none.
   React.useEffect(() => {
-    const patch: Partial<PcbState> = {};
-    try {
-      const raw = window.localStorage.getItem(pcbDocKey());
-      if (raw) {
-        const doc = sanitizePcbDoc(JSON.parse(raw));
-        if (doc) {
-          Object.assign(patch, doc);
-          let maxId = 0;
-          for (const o of doc.objects ?? []) {
-            const m = /^obj_(\d+)$/.exec(o.id);
-            if (m) maxId = Math.max(maxId, Number(m[1]));
-          }
-          objIdCounter.current = Math.max(objIdCounter.current, maxId + 1);
-        }
-      }
-    } catch {}
-    try {
-      // Same key the manual-projects provider writes, so the menu lists the
-      // projects that actually exist.
-      const arr = JSON.parse(window.localStorage.getItem("ideeza:manual:projects") || "null");
-      if (Array.isArray(arr)) {
-        const list = arr
-          .filter((p): p is { id: string; slug: string; name: string; updatedAt?: number } =>
-            !!p && typeof p.id === "string" && typeof p.slug === "string" && typeof p.name === "string")
-          .map((p) => ({ id: p.id, slug: p.slug, name: p.name, updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : 0 }))
-          .sort((a, b) => b.updatedAt - a.updatedAt);
-        if (list.length) patch.recentProjects = list;
-      }
-      patch.activeProjectId = window.localStorage.getItem(ACTIVE_PROJECT_KEY);
-    } catch {}
-    if (Object.keys(patch).length) setState((s) => ({ ...s, ...patch }));
-    setDocHydrated(true);
+    const recentProjects = readRecentProjects();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of an external store on mount
+    if (recentProjects.length) setState((s) => ({ ...s, recentProjects }));
   }, []);
 
   // Debounced save — placing/dragging mutates objects frequently; one write
   // per pause keeps localStorage churn (and JSON serialization) off the
-  // interaction path.
+  // interaction path. Nothing is saved without a held product, and the
+  // document as just loaded isn't saved back.
   React.useEffect(() => {
-    if (!docHydrated) return;
-    const t = window.setTimeout(() => {
-      try {
-        const doc: PcbDoc = {
-          objects: state.objects,
-          pcbBoard: state.pcbBoard,
-          twoD: state.twoD,
-          threeD: state.threeD,
-          gridSize: state.gridSize,
-          gridType: state.gridType,
-          renderStyle: state.renderStyle,
-          unit: state.unit,
-          snapEnabled: state.snapEnabled,
-          designRules: state.designRules,
-          pcbDrcConfig: state.pcbDrcConfig,
-          pcbLayers: state.pcbLayers,
-          pcbNetClasses: state.pcbNetClasses,
-          pcbEqualLength: state.pcbEqualLength,
-          pcbPadPairs: state.pcbPadPairs,
-          pcbDiffPairs: state.pcbDiffPairs,
-          routingMode: state.routingMode,
-          routingCorner: state.routingCorner,
-          pcbNets: state.pcbNets,
-          pcbDefaults: state.pcbDefaults,
-          boardSettings: state.boardSettings,
-          panelSizes: state.panelSizes,
-        };
-        window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
-        setState((s) => ({ ...s, saveState: "saved", lastSavedAt: stamp() }));
-      } catch {
-        setState((s) => ({ ...s, saveState: "failed" }));
-      }
-    }, 300);
-    return () => window.clearTimeout(t);
+    const held = heldRef.current;
+    if (!held || !docScope) return;
+    const doc = docOf(state);
+    const loaded = loadedRef.current;
+    if (loaded && DOC_FIELDS.every((k) => loaded[k] === doc[k])) return;
+    loadedRef.current = null;
+    saveQueue.schedule(held.handle, doc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the document fields, listed one by one
   }, [
-    docHydrated,
+    docScope,
+    saveQueue,
     state.objects,
     state.pcbNetClasses,
     state.pcbEqualLength,
@@ -767,6 +805,39 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
     state.boardSettings,
     state.panelSizes,
   ]);
+
+  // Leaving the page (a full navigation, a closed tab, a phone app switch)
+  // writes the pending save instead of dropping its last 300 ms.
+  React.useEffect(() => {
+    const flush = () => void saveQueue.flush();
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") saveQueue.flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHidden);
+      saveQueue.flush();
+    };
+  }, [saveQueue]);
+
+  // A deleted project's documents are gone (COR-92): a save still pending for
+  // it would re-create one, so it is dropped unwritten, and the board with it.
+  React.useEffect(
+    () =>
+      onProjectDeleted((id) => {
+        if (heldRef.current?.scope.projectId !== id) return;
+        saveQueue.cancel();
+        heldRef.current = null;
+        loadedRef.current = null;
+        historyRef.current = { past: [], future: [] };
+        moveOrigRef.current = null;
+        setState((s) => ({ ...initialState, recentProjects: s.recentProjects.filter((p) => p.id !== id) }));
+        setDocScopeState(null);
+      }),
+    [saveQueue],
+  );
 
   // Keys the persisted document is made of — a patch touching one of these means
   // a write is pending, which is how the save chip knows to say "Saving…".
@@ -1105,24 +1176,16 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         merge((s) => ({ panelSizes: { ...s.panelSizes, [which]: v } }));
       },
       saveDoc: () => {
-        try {
-          const s = stateRef.current;
-          const doc: PcbDoc = {
-            objects: s.objects, pcbBoard: s.pcbBoard, twoD: s.twoD, threeD: s.threeD,
-            gridSize: s.gridSize, gridType: s.gridType, renderStyle: s.renderStyle, unit: s.unit, snapEnabled: s.snapEnabled, designRules: s.designRules,
-            pcbDrcConfig: s.pcbDrcConfig, pcbLayers: s.pcbLayers, pcbNets: s.pcbNets,
-            pcbDefaults: s.pcbDefaults, boardSettings: s.boardSettings, panelSizes: s.panelSizes,
-            pcbNetClasses: s.pcbNetClasses, pcbEqualLength: s.pcbEqualLength,
-            pcbPadPairs: s.pcbPadPairs, pcbDiffPairs: s.pcbDiffPairs,
-            routingMode: s.routingMode, routingCorner: s.routingCorner,
-          };
-          window.localStorage.setItem(pcbDocKey(), JSON.stringify(doc));
-          merge({ saveState: "saved", lastSavedAt: stamp() });
-          actions.flashToast("Saved");
-        } catch {
-          merge({ saveState: "failed" });
-          actions.flashToast("Save failed");
+        const held = heldRef.current;
+        if (!held) {
+          actions.flashToast("Open a product to save its board");
+          return;
         }
+        saveQueue.cancel();
+        const storage = docStorage();
+        const ok = !!storage && writeEditorDoc(held.handle, JSON.stringify(docOf(stateRef.current)), storage);
+        merge(ok ? { saveState: "saved", lastSavedAt: stamp() } : { saveState: "failed" });
+        actions.flashToast(ok ? "Saved" : "Save failed");
       },
       toggleBoardFlip: () =>
         merge((s) => {
@@ -2092,12 +2155,57 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         actions.flashToast(`Selected ${ids.length} object${ids.length > 1 ? "s" : ""} in ${gids.size > 1 ? `${gids.size} groups` : "the group"}`);
       },
       openManualProject: (id, slug, newWindow) => {
-        // The doc is keyed by the active project, so switching it means a real
-        // navigation — the editor rehydrates that project's board on load.
-        try { window.localStorage.setItem(ACTIVE_PROJECT_KEY, id); } catch {}
+        void id; // the slug's legacy address resumes the product it was left on (P2-EDITOR-2)
+        // A full navigation: write the pending save first, not after the page is gone.
+        saveQueue.flush();
         const url = `/project/${slug}/pcb`;
         if (newWindow) window.open(url, "_blank");
         else window.location.href = url;
+      },
+      setDocScope: (next, headRowId) => {
+        if (sameScope(heldRef.current?.scope ?? null, next)) return;
+        // 1. The pending save lands on the product it was made in.
+        saveQueue.flush();
+        // 2. Nothing of the old board survives: history, selection, modals.
+        historyRef.current = { past: [], future: [] };
+        moveOrigRef.current = null;
+        let fresh: PcbState;
+        if (!next) {
+          heldRef.current = null;
+          loadedRef.current = null;
+          fresh = { ...initialState, recentProjects: stateRef.current.recentProjects };
+        } else {
+          // 3. The product's own document — or, on the first row, a legacy
+          //    per-project board the maker changed — else the initial one.
+          const storage = docStorage();
+          const read = storage
+            ? readEditorDoc("pcb", next, headRowId ?? "", storage)
+            : { key: editorDocKey("pcb", next), settle: null, raw: null };
+          let doc: Partial<PcbDoc> | null = null;
+          try {
+            doc = read.raw ? sanitizePcbDoc(JSON.parse(read.raw)) : null;
+          } catch {
+            doc = null;
+          }
+          let maxId = 0;
+          for (const o of doc?.objects ?? []) {
+            const m = /^obj_(\d+)$/.exec(o.id);
+            if (m) maxId = Math.max(maxId, Number(m[1]));
+          }
+          objIdCounter.current = maxId + 1;
+          fresh = { ...initialState, ...doc, recentProjects: readRecentProjects(), activeProjectId: next.projectId };
+          heldRef.current = { scope: next, handle: { key: read.key, settle: read.settle } };
+          loadedRef.current = docOf(fresh);
+        }
+        stateRef.current = fresh;
+        setState(fresh);
+        // 4. Published: the editor route may mount now.
+        setDocScopeState(next);
+      },
+      releaseScope: (scope) => {
+        if (!sameScope(heldRef.current?.scope ?? null, scope)) return false;
+        actions.setDocScope(null);
+        return true;
       },
       resetObjectStyle: () => {
         const ids = new Set(stateRef.current.selectedIds);
@@ -2996,13 +3104,21 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           return { objects: s.objects.map((o) => (ids.has(o.id) ? { ...o, rotation: r } : o)) };
         }),
     };
-  }, [merge, mergeWithHistory]);
+  }, [merge, mergeWithHistory, saveQueue]);
 
   return (
     <StateCtx.Provider value={state}>
-      <ActionsCtx.Provider value={actions}>{children}</ActionsCtx.Provider>
+      <ActionsCtx.Provider value={actions}>
+        <DocScopeCtx.Provider value={docScope}>{children}</DocScopeCtx.Provider>
+      </ActionsCtx.Provider>
     </StateCtx.Provider>
   );
+}
+
+/** The product whose board the store holds (P2-EDITOR-4), or null. The
+ *  editor route waits for it to match its URL before mounting an editor. */
+export function usePcbDocScope(): EditorScope | null {
+  return React.useContext(DocScopeCtx);
 }
 
 export function usePcbState(): PcbState {

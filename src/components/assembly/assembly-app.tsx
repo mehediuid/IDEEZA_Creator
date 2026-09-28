@@ -1,82 +1,73 @@
 "use client";
 
 // Assembly — the module between 3D Module and Peripheral Wiring (UIUX-80).
-// It reads the project's real PCB document and turns the board's placed parts
-// into an assembly checklist: designator + footprint per row, grouped by the
-// side of the board each part sits on, with check-off progress persisted per
-// project. The wider assembly workflow is still being scoped with the client;
-// what ships here is real — the list is the board, not a mock.
+// It reads the product's real PCB board — the live one the PCB store holds
+// for this product (P2-EDITOR-4), so an edit made a moment ago in PCB is
+// already here — and turns its placed parts into an assembly checklist:
+// designator + footprint per row, grouped by the side of the board each part
+// sits on, with check-off progress persisted per product. The wider assembly
+// workflow is still being scoped with the client; what ships here is real —
+// the list is the board, not a mock.
 
 import * as React from "react";
-import { useStepNav } from "@/components/manual/use-step-nav";
+import { useEditorScope, useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { LeftRail } from "@/components/pcb/left-rail";
 import { Button, Checkbox } from "@/components/ideeza";
 import { boardPartsOf, type BoardPart } from "@/lib/pcb/board-parts";
+import { usePcbState } from "@/lib/pcb/store";
+import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
 
 const TOP = 62; // TopBar height
 const LEFT_RAIL = 74;
 const BOTTOM = 36;
 
-const PCB_DOC_PREFIX = "ideeza:pcb:doc:";
-const PROGRESS_PREFIX = "ideeza:assembly:";
-
-// The board's parts, read from the project's PCB doc. `boardPartsOf` is the
-// one rule for what counts as a part "on the board" — shared with the rail's
-// Editor block (src/lib/manual/editor-work.ts) so the checklist and the
-// progress fact can't disagree.
-function readParts(projectId: string | null): BoardPart[] {
-  if (!projectId || typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(PCB_DOC_PREFIX + projectId);
-    if (!raw) return [];
-    return boardPartsOf(JSON.parse(raw) as { objects?: unknown });
-  } catch {
-    return [];
-  }
-}
-
-function readProgress(projectId: string | null): Record<string, boolean> {
-  if (!projectId || typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(PROGRESS_PREFIX + projectId);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
 export function AssemblyApp() {
-  const { go, activeProject } = useStepNav();
-  const projectId = activeProject?.id ?? null;
+  const { go } = useStepNav();
+  const editor = useEditorScope();
+  const scope = editor?.scope ?? null;
+  const headRowId = editor?.headRowId ?? "";
 
-  const [parts, setParts] = React.useState<BoardPart[]>([]);
+  // The board's parts. `boardPartsOf` is the one rule for what counts as a
+  // part "on the board" — shared with the product page's Editor block
+  // (src/lib/manual/editor-work.ts) so the checklist and the progress fact
+  // can't disagree.
+  const { objects } = usePcbState();
+  const parts = React.useMemo(() => boardPartsOf({ objects }), [objects]);
+
+  // Progress: this product's own key, else — on the first row — a legacy
+  // per-project checklist with something ticked. The server has no storage,
+  // so reading it during render would hydrate different markup; the read
+  // happens here, once per product, on purpose.
   const [done, setDone] = React.useState<Record<string, boolean>>({});
-
-  // The doc lives in localStorage (written by the PCB editor), so read it on
-  // mount — this module opens after the board work, not alongside it. The
-  // server has no storage, so reading it during render would hydrate
-  // different markup; the read happens here, once per project, on purpose.
+  const handleRef = React.useRef<DocHandle | null>(null);
   React.useEffect(() => {
+    if (!scope) return;
+    const read = readEditorDoc("assembly", scope, headRowId, window.localStorage);
+    handleRef.current = { key: read.key, settle: read.settle };
+    let progress: Record<string, boolean> = {};
+    try {
+      const v = read.raw ? JSON.parse(read.raw) : null;
+      if (v && typeof v === "object" && !Array.isArray(v)) progress = v as Record<string, boolean>;
+    } catch {}
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setParts(readParts(projectId));
-    setDone(readProgress(projectId));
-  }, [projectId]);
+    setDone(progress);
+  }, [scope, headRowId]);
 
   const toggle = (id: string) => {
-    setDone((d) => {
-      const next = { ...d, [id]: !d[id] };
-      try {
-        if (projectId) window.localStorage.setItem(PROGRESS_PREFIX + projectId, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+    const next = { ...done, [id]: !done[id] };
+    setDone(next);
+    if (handleRef.current) writeEditorDoc(handleRef.current, JSON.stringify(next), window.localStorage);
   };
   const resetProgress = () => {
     setDone({});
+    const handle = handleRef.current;
+    if (!handle) return;
     try {
-      if (projectId) window.localStorage.removeItem(PROGRESS_PREFIX + projectId);
+      window.localStorage.removeItem(handle.key);
+      if (handle.settle) window.localStorage.removeItem(handle.settle);
+      handle.settle = null;
     } catch {}
   };
 
@@ -105,7 +96,7 @@ export function AssemblyApp() {
             Assembly
           </h1>
           <div style={{ marginTop: "var(--spacing-2)", fontSize: "var(--font-size-sm)", color: "var(--color-text-tertiary)" }}>
-            Place the board&apos;s parts and check each one off — the list is read from this project&apos;s PCB.
+            Place the board&apos;s parts and check each one off — the list is read from this product&apos;s PCB.
           </div>
 
           {parts.length === 0 ? (

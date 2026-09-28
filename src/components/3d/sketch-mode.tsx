@@ -9,6 +9,8 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { editorDocKey } from "@/lib/manual/editor-scope";
 
 type SketchTool =
   | "select" | "point" | "line" | "polyline" | "circle" | "arc" | "ellipse"
@@ -47,11 +49,11 @@ const TOOLS: { id: SketchTool; title: string; path: string }[] = [
   { id: "dim",      title: "Dimension",   path: "M3 12h18 M5 8v8 M19 8v8" },
 ];
 
-const SKETCH_KEY = "ideeza:3d:sketches";
-
-function readSketchesFromStorage(): Sketch[] {
+/** The sketches are per product (`ideeza:3d:sketches:<projectId>:<productId>`,
+ *  P2-EDITOR-3). */
+function readSketchesFromStorage(key: string): Sketch[] {
   try {
-    const raw = window.localStorage.getItem(SKETCH_KEY);
+    const raw = window.localStorage.getItem(key);
     if (raw) return JSON.parse(raw) as Sketch[];
   } catch {}
   return [];
@@ -425,12 +427,18 @@ export function SketchMode({ topOffset = 132, onExit, onSave, leftWidth = 230, r
   const [snap, setSnap] = React.useState(false);
   const [hydrated, setHydrated] = React.useState(false);
 
+  const editor = useEditorScope();
+  const key = editor ? editorDocKey("three.sketches", editor.scope) : null;
   // Hydrate from localStorage after mount to keep SSR/CSR in sync.
-  React.useEffect(() => { setSketches(readSketchesFromStorage()); setHydrated(true); }, []);
   React.useEffect(() => {
-    if (!hydrated) return;
-    try { window.localStorage.setItem(SKETCH_KEY, JSON.stringify(sketches)); } catch {}
-  }, [sketches, hydrated]);
+    if (!key) return;
+    setSketches(readSketchesFromStorage(key));
+    setHydrated(true);
+  }, [key]);
+  React.useEffect(() => {
+    if (!hydrated || !key) return;
+    try { window.localStorage.setItem(key, JSON.stringify(sketches)); } catch {}
+  }, [sketches, hydrated, key]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

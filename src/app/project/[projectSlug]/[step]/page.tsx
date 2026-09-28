@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { ProjectWorkspace } from "@/components/manual/project-workspace";
 import type { ManualFlowState } from "@/lib/manual/projects";
 
+// /project/<slug>/<step>. The Brief lives here: it is the project's. Every
+// editor step here is a legacy address (P2-EDITOR-2): ProjectWorkspace, given
+// no product, replaces it with /project/<slug>/products/<productId>/<step>
+// for the product the project resumes.
+//
 // URL segment → flow step. Inlined here (rather than imported from the client
 // store module) so this server component stays out of the client bundle graph.
 const SEGMENT_TO_STEP: Record<string, keyof ManualFlowState> = {
@@ -41,7 +46,7 @@ export default async function ProjectStepPage({
   params: Promise<{ projectSlug: string; step: string }>;
 }) {
   const { projectSlug, step } = await params;
-  const flowStep = SEGMENT_TO_STEP[step];
+  const flowStep = Object.hasOwn(SEGMENT_TO_STEP, step) ? SEGMENT_TO_STEP[step] : undefined;
   if (!flowStep) notFound();
   return <ProjectWorkspace slug={projectSlug} step={flowStep} />;
 }
