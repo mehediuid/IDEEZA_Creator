@@ -170,7 +170,13 @@ export function productPiecesOf(items: BuildItem[]): { ready: number; total: num
 /** The deliverable tabs, in the app's order (`ITEM_KINDS`, passed in). A
  *  piece this build never made has no tab (H-5); the firmware source is kept
  *  back when `firmware` is false — the buyer preview, where it comes after
- *  purchase (PPL-7, COR-37). */
+ *  purchase (PPL-7, COR-37).
+ *
+ *  @deprecated Replaced by `productTabsOf` below (P2-EDITOR-16, C2): the
+ *  product page's tab strip is now one flat strip — Media · the build's
+ *  pieces · Contributors · Customers — instead of the deliverable panel
+ *  owning its own. Kept, unchanged, only because `product-deliverables.tsx`
+ *  (T12 rewrites it) still calls it. */
 export function deliverableTabs(
   items: BuildItem[],
   order: readonly BuildItemKind[],
@@ -185,7 +191,9 @@ export function deliverableTabs(
 }
 
 /** The tab on screen: the one `?tab=` names when it is there, else the first
- *  finished piece, else the first tab. Null when there is no tab at all. */
+ *  finished piece, else the first tab. Null when there is no tab at all.
+ *
+ *  @deprecated Replaced by `pickProductTab` below. See `deliverableTabs`. */
 export function pickTab(tabs: BuildItem[], asked: string | null): BuildItemKind | null {
   return (
     tabs.find((i) => i.kind === asked)?.kind ??
@@ -193,6 +201,72 @@ export function pickTab(tabs: BuildItem[], asked: string | null): BuildItemKind 
     tabs[0]?.kind ??
     null
   );
+}
+
+// ───────────────── the product page's tab strip (P2-EDITOR-16) ─────────────────
+
+/** Media · the build's pieces · Contributors · Customers, in spec §2.3's
+ *  order. Media is first because it is the one tab every product has —
+ *  built, hand, build-gone or unmatched alike — and it is never written to
+ *  `?tab=` (it's what an unknown or absent one reads as). */
+export const PRODUCT_TABS = [
+  "media",
+  "3d",
+  "pcb",
+  "code",
+  "wiring",
+  "parts",
+  "contributors",
+  "customers",
+] as const;
+export type ProductTabId = (typeof PRODUCT_TABS)[number];
+
+const PIECE_TABS: ReadonlyArray<{ kind: BuildItemKind; tab: ProductTabId }> = [
+  { kind: "3d", tab: "3d" },
+  { kind: "pcb", tab: "pcb" },
+  { kind: "code", tab: "code" },
+  { kind: "wiring", tab: "wiring" },
+  { kind: "parts", tab: "parts" },
+];
+
+/** The tabs one product page shows (P2-EDITOR-16, 17):
+ *  - Media always leads;
+ *  - a built product (dropped, COR-108, included — `dropped` is an overlay
+ *    on `state: "built"`, not its own state) adds the build's own pieces,
+ *    one tab per `items` kind that isn't skipped, in the fixed module
+ *    order, skipping Firmware code when `gates.firmware` is false (O12: no
+ *    firmware source before purchase). A hand, build-gone or unmatched
+ *    product gets none of these — P2-EDITOR-9's source line says why
+ *    instead;
+ *  - Contributors and Customers each show only when their own gate says so.
+ *    The caller decides that from the viewer and the counts (the owner
+ *    sees the roster; a buyer preview sees a team credit only with ≥ 1
+ *    contributor, and never Customers, P2-EDITOR-17) — this function only
+ *    places the tab where the gate is true. */
+export function productTabsOf(
+  product: ProjectProduct,
+  items: BuildItem[] | null,
+  gates: { firmware: boolean; contributors: boolean; customers: boolean },
+): ProductTabId[] {
+  const tabs: ProductTabId[] = ["media"];
+
+  if (product.state === "built" && items) {
+    for (const { kind, tab } of PIECE_TABS) {
+      if (tab === "code" && !gates.firmware) continue;
+      const item = items.find((i) => i.kind === kind);
+      if (item && item.status !== "skipped") tabs.push(tab);
+    }
+  }
+
+  if (gates.contributors) tabs.push("contributors");
+  if (gates.customers) tabs.push("customers");
+  return tabs;
+}
+
+/** The tab `?tab=` asks for, when the strip actually has it; Media otherwise
+ *  — an unknown or absent `?tab=` always reads as Media (P2-EDITOR-16). */
+export function pickProductTab(tabs: readonly ProductTabId[], asked: string | null): ProductTabId {
+  return tabs.includes(asked as ProductTabId) ? (asked as ProductTabId) : "media";
 }
 
 // ───────────────────────────── URL ─────────────────────────────
