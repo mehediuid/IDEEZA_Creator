@@ -23,6 +23,8 @@ import {
   LICENSES,
   LISTING_TYPES,
   NETWORKS,
+  ROYALTY_MAX,
+  ROYALTY_MIN,
   TOKENS_BY_NETWORK,
   stepsFor,
   type BriefState,
@@ -57,15 +59,6 @@ const MAX_STORY = 500;
 const NEW_COLLECTION = "__new__";
 /** The chain picker's placeholder — one string, all three forms. */
 const BLOCKCHAIN_PLACEHOLDER = "Choose your prefer blockchain";
-
-/**
- * What a royalty may be, in one place: the field's hint, its validation and the
- * reason under the CTA all read these, so the three can't disagree the way the
- * hint ("2 – 100"), the placeholder ("Maximum is 10%") and the clamp (100) did.
- * One decimal place, because 2.5% is a rate makers really set.
- */
-const ROYALTY_MIN = 2;
-const ROYALTY_MAX = 10;
 
 /** The note under the story, when a clip is still to come after this form. */
 const CLIP_NOTE = "Next you will make a short clip — Innovations posts need one.";

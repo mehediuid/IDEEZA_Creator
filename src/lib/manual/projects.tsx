@@ -457,6 +457,12 @@ type Ctx = {
   setCover: (id: string, cover: ProductSource | null) => void;
   markStepCompleted: (id: string, step: keyof ManualFlowState) => void;
   setStatus: (id: string, status: ManualProjectStatus) => void;
+  /** COR-105's one-time backfill: a project minted with Share to Innovations
+   *  before Showcase shipped gets `showcasedAt = at` — only while it has none
+   *  recorded (absent), so a `null` "stopped showcasing" is never overwritten.
+   *  Never bumps `updatedAt`: it records an old fact, not a change the maker
+   *  made. Called with `showcaseBackfillOf()`'s answer (lib/brief/project-brief). */
+  backfillShowcase: (id: string, at: number) => void;
   clearActive: () => void;
 };
 
@@ -663,6 +669,17 @@ export function ManualProjectsProvider({
     [],
   );
 
+  const backfillShowcase = React.useCallback((id: string, at: number) => {
+    if (!Number.isFinite(at)) return;
+    setProjects((arr) => {
+      const i = arr.findIndex((p) => p.id === id && p.showcasedAt === undefined);
+      if (i < 0) return arr; // already recorded, either way: nothing to write, no save
+      const next = arr.slice();
+      next[i] = { ...arr[i], showcasedAt: at };
+      return next;
+    });
+  }, []);
+
   const clearActive = React.useCallback(() => {
     setActiveProjectId(null);
   }, []);
@@ -690,6 +707,7 @@ export function ManualProjectsProvider({
     setCover,
     markStepCompleted,
     setStatus,
+    backfillShowcase,
     clearActive,
   };
 

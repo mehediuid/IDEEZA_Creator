@@ -14,6 +14,16 @@ export type Quality = "low" | "high";
 /** How long the "one line · what does it do?" answer may be. */
 export const BRIEF_DESC_MAX = 140;
 
+/**
+ * What a royalty may be, in one place: the form's hint, its validation, the
+ * reason under its CTA and the project page's Outcome read all use these, so
+ * none of them can disagree the way the hint ("2 – 100"), the placeholder
+ * ("Maximum is 10%") and the clamp (100) once did. One decimal place, because
+ * 2.5% is a rate makers really set.
+ */
+export const ROYALTY_MIN = 2;
+export const ROYALTY_MAX = 10;
+
 // ── Where a draft is stored ────────────────────────────────────────────────
 // A brief opened on a project is that project's, and is keyed by its id. A
 // brief opened on a finished AI build has no project yet — Step 1's chooser is
