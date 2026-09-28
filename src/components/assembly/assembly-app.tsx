@@ -13,6 +13,7 @@ import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { LeftRail } from "@/components/pcb/left-rail";
 import { Button, Checkbox } from "@/components/ideeza";
+import { boardPartsOf, type BoardPart } from "@/lib/pcb/board-parts";
 
 const TOP = 62; // TopBar height
 const LEFT_RAIL = 74;
@@ -21,38 +22,16 @@ const BOTTOM = 36;
 const PCB_DOC_PREFIX = "ideeza:pcb:doc:";
 const PROGRESS_PREFIX = "ideeza:assembly:";
 
-interface AssemblyPart {
-  id: string;
-  designator: string;
-  footprint: string;
-  side: "top" | "bottom";
-}
-
-// The board's parts: PCB-scoped objects that carry a designator and a land
-// pattern (converted footprints and picker-placed parts alike). Pads, vias,
-// tracks and regions are copper, not parts to place, so they stay out.
-function readParts(projectId: string | null): AssemblyPart[] {
+// The board's parts, read from the project's PCB doc. `boardPartsOf` is the
+// one rule for what counts as a part "on the board" — shared with the rail's
+// Editor block (src/lib/manual/editor-work.ts) so the checklist and the
+// progress fact can't disagree.
+function readParts(projectId: string | null): BoardPart[] {
   if (!projectId || typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(PCB_DOC_PREFIX + projectId);
     if (!raw) return [];
-    const doc = JSON.parse(raw) as { objects?: Array<Record<string, unknown>> };
-    if (!Array.isArray(doc.objects)) return [];
-    return doc.objects
-      .filter(
-        (o) =>
-          o.scope === "pcb" &&
-          typeof o.text === "string" &&
-          o.text &&
-          typeof o.footprint === "string" &&
-          o.footprint,
-      )
-      .map((o) => ({
-        id: String(o.id),
-        designator: String(o.text),
-        footprint: String(o.footprint),
-        side: o.side === "bottom" ? ("bottom" as const) : ("top" as const),
-      }));
+    return boardPartsOf(JSON.parse(raw) as { objects?: unknown });
   } catch {
     return [];
   }
@@ -72,7 +51,7 @@ export function AssemblyApp() {
   const { go, activeProject } = useStepNav();
   const projectId = activeProject?.id ?? null;
 
-  const [parts, setParts] = React.useState<AssemblyPart[]>([]);
+  const [parts, setParts] = React.useState<BoardPart[]>([]);
   const [done, setDone] = React.useState<Record<string, boolean>>({});
 
   // The doc lives in localStorage (written by the PCB editor), so read it on
@@ -233,7 +212,7 @@ function SideSection({
   onToggle,
 }: {
   title: string;
-  parts: AssemblyPart[];
+  parts: BoardPart[];
   done: Record<string, boolean>;
   onToggle: (id: string) => void;
 }) {

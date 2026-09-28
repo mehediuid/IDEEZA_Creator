@@ -1,0 +1,9 @@
+{
+  "objects": [
+    { "id": "sch-text-112-116", "kind": "text", "x": 112, "y": 116, "scope": "schematic", "text": "Vbus" },
+    { "id": "u1", "kind": "resistorBox", "x": 200, "y": 200, "scope": "schematic", "text": "R1" },
+    { "id": "fp-r1", "kind": "footprint", "x": 40, "y": 60, "scope": "pcb", "text": "R1", "footprint": "R_0603", "side": "top" },
+    { "id": "fp-u1", "kind": "footprint", "x": 80, "y": 60, "scope": "pcb", "text": "U1", "footprint": "SOIC-8" },
+    { "id": "trk-1", "kind": "track", "x": 10, "y": 10, "scope": "pcb", "net": "GND", "width": 10 }
+  ]
+}
