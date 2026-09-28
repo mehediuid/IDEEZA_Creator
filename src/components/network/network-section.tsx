@@ -31,7 +31,7 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
   const products = React.useMemo(() => networkProducts(project, build), [project, build]);
 
   return (
-    <section aria-labelledby="network-heading" className="mt-16">
+    <section aria-labelledby="network-heading">
       <h2 id="network-heading" className="text-lg font-bold text-text-primary">
         Network
       </h2>
@@ -44,7 +44,7 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
           <p className="max-w-[56ch] text-sm text-text-secondary">
             A network records which products in this project talk to each other, over which protocol, and what each one does.
           </p>
-          <button type="button" className={cn(btn.primary, "mt-2")} onClick={() => setOpen(true)}>
+          <button type="button" className={cn(btn.quiet, "mt-2")} onClick={() => setOpen(true)}>
             Create Network
           </button>
         </div>
@@ -63,14 +63,19 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
   );
 }
 
-function NetworkSummary({
+export function NetworkSummary({
   project,
   network,
   products,
+  readOnly = false,
 }: {
   project: ManualProject;
   network: NonNullable<ReturnType<typeof useProjectNetwork>["network"]>;
   products: ReturnType<typeof networkProducts>;
+  /** Preview as buyer (COR-49): the summary without View Network, its one
+   *  write control — connections, products and roles are facts, so they
+   *  still show. */
+  readOnly?: boolean;
 }) {
   const members = products.filter((p) => network.productIds.includes(p.id));
   const roles = rolesOf(network.productIds, network.links, network.masterId);
@@ -83,10 +88,12 @@ function NetworkSummary({
           <p className="truncate text-md font-semibold text-text-primary">{network.name || "Unnamed Network"}</p>
           <p className="mt-1 text-sm text-text-secondary">{networkMeta(network)}</p>
         </div>
-        <Link href={networkHref(project.id)} className={cn(btn.quiet, "no-underline")}>
-          View Network
-          <Icon icon={ArrowRight01Icon} size={16} />
-        </Link>
+        {!readOnly && (
+          <Link href={networkHref(project.id)} className={cn(btn.quiet, "no-underline")}>
+            View Network
+            <Icon icon={ArrowRight01Icon} size={16} />
+          </Link>
+        )}
       </div>
       <div className="flex flex-col gap-4">
         <SectionTitle>Connections</SectionTitle>

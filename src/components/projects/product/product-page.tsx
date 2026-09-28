@@ -18,7 +18,7 @@ import { ConfidenceBadge, ConfidenceIssuesPanel } from "@/components/create/conf
 import { partChangesOf, partChangesText } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { productsOf, useCreateHistory } from "@/lib/create/history";
-import { can, type Viewer } from "@/lib/manual/permissions";
+import { can } from "@/lib/manual/permissions";
 import { productPiecesOf, productVersionView, withQuery } from "@/lib/manual/product-page";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import {
@@ -33,11 +33,12 @@ import { productDocTitle, resolveProject } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { LiveRegion, usePageArrival } from "../details/arrival";
 import { Breadcrumb } from "../details/breadcrumb";
+import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "../details/buyer-preview";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
 import { ProductDeliverables } from "./product-deliverables";
 import { ProductIdentity } from "./product-identity";
-import { PreviewBanner, ProductLoading, ProductMissing, UnbuiltNote } from "./product-states";
+import { ProductLoading, ProductMissing, UnbuiltNote } from "./product-states";
 import { VersionNoticeBlock, VersionSelect } from "./product-version";
 import { When } from "./when";
 
@@ -61,9 +62,10 @@ function ProductPageBody({ id, productId }: { id: string; productId: string }) {
   const { hydrated: buildsHydrated, builds, chats } = useCreateHistory();
 
   // The one permission source (PPL-1): the preview is the owner looking with
-  // a visitor's permissions (PPL-2).
-  const buyer = query.get("view") === "buyer";
-  const viewer: Viewer = buyer ? { kind: "owner-preview" } : { kind: "local-owner" };
+  // a visitor's permissions (PPL-2). C6's useViewer() reads the same
+  // ?view=buyer the project page does, so the two pages can't disagree.
+  const viewer = useViewer();
+  const buyer = isBuyerPreview(viewer);
   const ownerFacts = can(viewer, "facts.seeOwnerOnly");
   // The firmware source and every download come after purchase (PPL-7).
   const firmware = can(viewer, "deliverables.download");
@@ -136,15 +138,7 @@ function ProductPageBody({ id, productId }: { id: string; productId: string }) {
   return (
     <div className={PAGE_CONTAINER}>
       <div className={`${PAGE_CONTENT} flex flex-col gap-10`}>
-        {buyer && (
-          <PreviewBanner
-            onExit={() => {
-              // The banner and its button leave with the preview; focus lands on the h1.
-              router.push(`${pathname}${withQuery(search, { view: null })}`);
-              titleRef.current?.focus({ preventScroll: true });
-            }}
-          />
-        )}
+        {buyer && <BuyerPreviewBanner />}
 
         <Breadcrumb
           trail={[
