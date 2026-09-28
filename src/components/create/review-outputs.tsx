@@ -12,7 +12,8 @@
 //   • Open in editor  — the same project, opened straight in the PCB editor.
 //
 // One project per build: `projectFromBuild` hands the same one back on every
-// later press. A piece that failed is retried from its own panel, here, rather
+// later press, and a rebuild of a chat already saved joins that project as its
+// next version. A piece that failed is retried from its own panel, here, rather
 // than from a page of its own.
 
 import * as React from "react";
@@ -98,9 +99,17 @@ function ReviewPanel({
 }) {
   const router = useRouter();
   const query = useSearchParams();
-  const { setBuildProject, retryBuildItem, setBuildModelFailed } =
+  const { builds, setBuildProject, retryBuildItem, setBuildModelFailed } =
     useCreateHistory();
   const { projects, projectFromBuild, selectProject } = useManualProjects();
+  // The other builds of this chat — its lineage. Save and Open in editor hand
+  // it over so a rebuild joins the project the chat already became, as its
+  // next version, instead of making a second project of the same name
+  // (COR-89).
+  const lineage = React.useMemo(
+    () => builds.filter((b) => b.chatId === job.chatId && b.id !== job.id),
+    [builds, job.chatId, job.id],
+  );
 
   // An artifact an older build never produced has nothing to review, so
   // it gets no tab — a deliverable panel for something that was never
@@ -223,19 +232,20 @@ function ReviewPanel({
 
   const openInEditor = React.useCallback(() => {
     setLeaving("editor");
-    const project = projectFromBuild(job);
+    const project = projectFromBuild(job, lineage);
     if (project.id !== job.projectId) setBuildProject(job.id, project.id);
     selectProject(project.id);
     router.push(stepHref(project, "pcb"));
-  }, [job, projectFromBuild, setBuildProject, selectProject, router]);
+  }, [job, lineage, projectFromBuild, setBuildProject, selectProject, router]);
 
   // Saving is the save — it used to open the Brief and ask "What's your idea?"
   // and "sell, give or keep private?" before anything was saved at all. Which
-  // project it lands in was answered at the setup question.
+  // project it lands in was answered at the setup question — or, for a
+  // rebuild, by the chat's earlier save: it becomes that project's next version.
   const saveProject = React.useCallback(() => {
-    const project = projectFromBuild(job);
+    const project = projectFromBuild(job, lineage);
     if (project.id !== job.projectId) setBuildProject(job.id, project.id);
-  }, [job, projectFromBuild, setBuildProject]);
+  }, [job, lineage, projectFromBuild, setBuildProject]);
 
   const openBrief = React.useCallback(() => {
     setLeaving("brief");

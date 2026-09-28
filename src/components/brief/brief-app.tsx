@@ -39,10 +39,14 @@ import { Step3Mint } from "./step-3-mint";
 import { Step4Success } from "./step-4-success";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import {
+  mergeProductEdits,
   stepHref,
   useManualProjects,
+  type ManualProduct,
   type ManualProject,
+  type ProductEdit,
 } from "@/lib/manual/projects";
+import { lineageProjectOf, productRowsOf } from "@/lib/manual/project-read";
 import {
   productsOf,
   useCreateHistory,
@@ -182,11 +186,9 @@ function seedFromBuild(
   job: BuildJob,
   stored: boolean,
   projects: ManualProject[],
+  builds: BuildJob[],
 ): BriefState {
-  // The description the model wrote, not the parts line. `summary` is
-  // "ATmega328P · GPS Receiver · IMU · ESC · LiPo Battery", which answered
-  // "one line · what does it do?" with an inventory.
-  const oneLine = (job.description || job.summary || job.conceptPrompt).trim();
+  const [head, ...others] = buildWords(job);
 
   // The project was already chosen, at the setup question, before a single
   // concept was drawn: an existing one by id, or a name for the new one every
@@ -194,13 +196,19 @@ function seedFromBuild(
   // the maker the same question a second time and threw the first answer
   // away. An id whose project is gone from this browser falls back to making
   // a new one under the same name rather than pointing at nothing.
+  // A rebuild of a chat that was already saved goes where that chat's builds
+  // went: it is that project's next version (COR-89), whatever the setup
+  // question answered before the first build existed.
+  const lineageProject = lineageProjectOf(job, builds, projects);
   const chosenExists =
     !!job.projectChoiceId && projects.some((p) => p.id === job.projectChoiceId);
-  const decided = chosenExists
-    ? job.projectChoiceId!
-    : job.projectChoiceName?.trim()
-      ? "new"
-      : "";
+  const decided =
+    lineageProject?.id ??
+    (chosenExists
+      ? job.projectChoiceId!
+      : job.projectChoiceName?.trim()
+        ? "new"
+        : "");
 
   return {
     ...s,
@@ -208,19 +216,69 @@ function seedFromBuild(
     newProjectName: s.newProjectName.trim()
       ? s.newProjectName
       : job.projectChoiceName?.trim() || job.title,
-    productName: s.productName.trim() ? s.productName : job.title,
+    productName: s.productName.trim() ? s.productName : head.name,
     productDescription: s.productDescription.trim()
       ? s.productDescription
-      : oneLine.slice(0, BRIEF_DESC_MAX),
+      : head.description,
     // Seeded once, then the maker's own. Their edits are the draft's, so a
     // reload or a step back does not put the model's wording back.
-    otherProducts: s.otherProducts.length
-      ? s.otherProducts
-      : (job.companions ?? []).map((x) => ({
-          name: (x.title || x.name).trim(),
-          description: (x.description || x.summary || "").trim(),
-        })),
+    otherProducts: s.otherProducts.length ? s.otherProducts : others,
   };
+}
+
+// The words Step 1 opens on for a build, in productsOf() order: the build's
+// title and the description the model wrote — not the parts line: `summary`
+// is "ATmega328P · GPS Receiver · IMU · ESC · LiPo Battery", which answered
+// "one line · what does it do?" with an inventory — then each companion.
+function buildWords(job: BuildJob): { name: string; description: string }[] {
+  return [
+    {
+      name: job.title,
+      description: (job.description || job.summary || job.conceptPrompt)
+        .trim()
+        .slice(0, BRIEF_DESC_MAX),
+    },
+    ...(job.companions ?? []).map((x) => ({
+      name: (x.title || x.name).trim(),
+      description: (x.description || x.summary || "").trim(),
+    })),
+  ];
+}
+
+// What the maker changed in Step 1, as edits to the rows the build was just
+// attached to (COR-88). Each product's words go to the row that product
+// became — tied by the row's source, not by name, so a companion the project
+// calls "Remote controller" and Step 1 shows by its concept title is still the
+// one row. Only a field the maker really changed travels: Step 1 opens on the
+// build's own words (buildWords), and writing those back would undo a name the
+// maker gave the row before this rebuild, which attach() kept for them.
+function buildEdits(
+  s: BriefState,
+  rows: ManualProduct[],
+  job: BuildJob,
+): ProductEdit[] {
+  const seeded = buildWords(job);
+  const typed = [
+    { name: s.productName, description: s.productDescription },
+    ...s.otherProducts,
+  ];
+  return productsOf(job).flatMap((bp, i) => {
+    const row = rows.find(
+      (r) => r.source?.buildId === job.id && r.source.productId === bp.id,
+    );
+    const words = typed[i];
+    if (!row || !words) return [];
+    const same = (a: string, b: string | undefined) => a.trim() === (b ?? "").trim();
+    return [
+      {
+        rowId: row.id,
+        name: same(words.name, seeded[i]?.name) ? row.name : words.name,
+        description: same(words.description, seeded[i]?.description)
+          ? row.description
+          : words.description,
+      },
+    ];
+  });
 }
 
 // Does a stored draft hold work of its own? Anything the user answered on Step
@@ -519,26 +577,21 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     selectProject,
     setStatus,
     updateProject,
+    attachBuild,
   } = useManualProjects();
   const { builds, getBuild, getChat, setBuildProject } = useCreateHistory();
   const job = buildId ? getBuild(buildId) : null;
   // The project this brief belongs to. On a build that is whichever project
   // Step 1 attached it to — nothing until then, which is the whole reason
   // build mode exists.
-  // Every product this build made, named and described by the model. The
-  // first is the headline one the Step 1 fields edit; the rest are shown
-  // beside them and saved onto the project with it — §4.4.8 puts a whole
-  // system in one project, and `productName` alone could record only the
-  // first of them.
-  const buildProducts = React.useMemo(
+  // The other builds of this build's chat — its lineage. A rebuild joins the
+  // project that chat already became, as its next version (COR-89).
+  const lineage = React.useMemo(
     () =>
       job
-        ? productsOf(job).map((x) => ({
-            name: (x.title || x.name).trim(),
-            description: (x.description || x.summary || "").trim(),
-          }))
+        ? builds.filter((b) => b.chatId === job.chatId && b.id !== job.id)
         : [],
-    [job],
+    [builds, job],
   );
 
   const scopeProjectId = buildId ? (job?.projectId ?? null) : activeProjectId;
@@ -606,7 +659,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // Unattached, this brief is the build's: fill in what the build already
     // knows rather than asking for it again.
     if (!scopeProjectId && job)
-      normalized = seedFromBuild(normalized, job, stored, projects);
+      normalized = seedFromBuild(normalized, job, stored, projects, builds);
     // A project that already records its products — a build saved in one
     // click does — opens its first brief on them, so Step 1 shows every
     // product with its description rather than the headline alone.
@@ -741,17 +794,13 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     }
   };
 
-  // Products already inside a project: its own, plus every AI build saved into
-  // it. A project always holds at least the one it was made for — and when the
-  // project WAS made from a build, that build is the project's own product, so
-  // counting it again would report two products where there is one.
+  // Products already inside a project — the list its page shows: every row it
+  // holds, a product a later version dropped included, each once (COR-95). It
+  // used to count builds, which said one for a build that made four products
+  // and two for a rebuild of one.
   const productCount = (projectId: string) => {
-    const originBuildId = projects.find((p) => p.id === projectId)?.buildId;
-    return (
-      1 +
-      builds.filter((b) => b.projectId === projectId && b.id !== originBuildId)
-        .length
-    );
+    const p = projects.find((x) => x.id === projectId);
+    return p ? productRowsOf(p).length : 0;
   };
 
   // Step 1's Continue. Where it lands is the intent's business: selling goes
@@ -806,27 +855,6 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       next = { ...next, projectId: targetId };
     }
 
-    // What the project should record. The COUNT comes from the job, which is
-    // the only thing that knows how many products this build really made;
-    // the maker's edits are laid over it where they exist. Reading the list
-    // straight off the draft meant that a press after the draft had been
-    // re-seeded wrote a one-product project over a three-product one.
-    // A project that already records its products is the list: its brief
-    // opened on them, so the maker's edits are laid over the project's own
-    // list rather than over this build's alone, which would drop whatever
-    // the project held before the build joined it.
-    const head = { name: next.productName, description: next.productDescription };
-    const productList = scopeProject?.products?.length
-      ? [head, ...next.otherProducts]
-      : buildProducts.length
-        ? [
-            head,
-            ...buildProducts
-              .slice(1)
-              .map((p, i) => next.otherProducts[i] ?? p),
-          ]
-        : null;
-
     // Where the brief opens on the other side: the step this intent runs after
     // the idea, so a seeded hand-off lands exactly where staying put would.
     const afterIdea =
@@ -845,17 +873,45 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     // project's draft now holds work, and the step was never written. The
     // button did nothing at all, twice over: no navigation, no advance.
     if (buildId && job?.projectId !== targetId) {
-      if (seedDraft(targetId, next, afterIdea, targetProductName)) {
+      // The build joins first, whichever way the brief goes (COR-88): as the
+      // next version of its chat in that project, with every product it made
+      // — the same writer Save uses. Only a project made here records it as
+      // its origin: stamping an existing one would claim it was this build's
+      // all along.
+      const attached = job
+        ? attachBuild(targetId, job, lineage, { origin: created })
+        : null;
+      // The maker's Step 1 edits over the rows the build became. The rows
+      // themselves are attach()'s: nothing is added or dropped here.
+      const products =
+        attached?.products?.length && job
+          ? mergeProductEdits(
+              attached.products,
+              buildEdits(next, attached.products, job),
+              Date.now(),
+            )
+          : null;
+      // From here the brief is the project's, so its draft opens on the
+      // project's own list — headline first, then every other row — exactly as
+      // the project's brief would have. Every later Continue then lines Step
+      // 1 up with the rows it shows.
+      const onProject: BriefState = products
+        ? {
+            ...next,
+            productDescription: products[0].description.slice(0, BRIEF_DESC_MAX),
+            otherProducts: products
+              .slice(1)
+              .map((r) => ({ name: r.name, description: r.description })),
+          }
+        : next;
+      if (seedDraft(targetId, onProject, afterIdea, targetProductName)) {
         updateProject(targetId, {
-          productName: next.productName,
-          // The whole system, not just its headline. The maker's own edits to
-          // the first product win over what the model called it; the rest are
-          // as the concepts named them.
-          ...(productList ? { products: productList } : null),
-          // Only a project made from this build carries it as its origin:
-          // stamping an existing project would claim it was this build's all
-          // along, and its product count would drop by one.
-          ...(created ? { buildId } : null),
+          // The headline the maker typed. Left as the build named it, a join
+          // keeps the headline attach() gave the project; a new project takes it.
+          ...(created || !job || next.productName.trim() !== job.title.trim()
+            ? { productName: next.productName }
+            : null),
+          ...(products ? { products } : null),
         });
       } else {
         // That project already has a brief in progress — it keeps it, and the
@@ -909,9 +965,24 @@ export function BriefApp({ buildId }: { buildId?: string }) {
 
     // The ordinary advance — and, for a build already attached, every press
     // after the first. An edit made on the way back belongs to the project.
+    // This brief opened on the project's own rows, headline first, so Step 1's
+    // words line up with them by position — or by name, once the list has
+    // grown under a draft saved before it did. No row comes or goes.
+    const rows = target.products ?? [];
     updateProject(targetId, {
       productName: next.productName,
-      ...(productList ? { products: productList } : null),
+      ...(rows.length
+        ? {
+            products: mergeProductEdits(
+              rows,
+              [
+                { name: next.productName, description: next.productDescription },
+                ...next.otherProducts,
+              ],
+              Date.now(),
+            ),
+          }
+        : null),
     });
     continuingRef.current = false;
     setContinuing(false);

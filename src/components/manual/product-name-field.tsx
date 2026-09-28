@@ -7,7 +7,11 @@
 // once. Used across all editor steps so the product name stays consistent.
 
 import * as React from "react";
-import { useManualProjects, productLabel } from "@/lib/manual/projects";
+import {
+  productLabel,
+  renameHeadline,
+  useManualProjects,
+} from "@/lib/manual/projects";
 
 export function ProductNameField({
   fontSize = 15,
@@ -40,7 +44,12 @@ export function ProductNameField({
     setEditing(true);
   };
   const commit = () => {
-    updateProject(activeProject.id, { productName: draft.trim() });
+    // The headline and the list's first product are one product, so renaming
+    // one renames the other while they still agree (COR-95).
+    updateProject(
+      activeProject.id,
+      renameHeadline(activeProject, draft.trim(), Date.now()),
+    );
     setEditing(false);
   };
 
