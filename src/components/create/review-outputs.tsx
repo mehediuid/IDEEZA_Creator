@@ -54,6 +54,7 @@ import {
   WiringPreview,
 } from "./deliverable-previews";
 import { OPEN_IN_EDITOR_ID } from "./anchors";
+import { LeaveButton } from "./leave-button";
 import { moveTab } from "@/lib/ui/tab-keys";
 
 export function ReviewOutputs({
@@ -613,56 +614,6 @@ function DeliverablePanel({
   if (kind === "parts") return <PartsPreview job={product} />;
   // The 3D tab is the model panel, which takes this panel's place above.
   return null;
-}
-
-/** A footer control that leaves this surface. It spins and says "Opening…"
- *  from the click, and every one of them is shut while any is under way —
- *  two navigations at once is not a thing the maker can have meant. */
-function LeaveButton({
-  id,
-  tone,
-  busy,
-  blocked,
-  onClick,
-  icon,
-  children,
-}: {
-  id?: string;
-  tone: "primary" | "quiet";
-  busy: boolean;
-  blocked: boolean;
-  onClick: () => void;
-  icon: IconValue;
-  children: React.ReactNode;
-}) {
-  const base =
-    "inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
-  const paint =
-    tone === "primary"
-      ? "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover"
-      : "border border-solid border-border bg-bg-surface text-text-primary hover:bg-bg-surface-raised";
-  return (
-    <button
-      id={id}
-      type="button"
-      onClick={onClick}
-      disabled={blocked}
-      aria-busy={busy}
-      className={[
-        base,
-        paint,
-        blocked ? (busy ? "cursor-wait opacity-80" : "opacity-60") : "",
-      ].join(" ")}
-    >
-      <span
-        aria-hidden
-        className={busy ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
-      >
-        <Icon icon={busy ? Refresh01Icon : icon} size={18} />
-      </span>
-      {busy ? "Opening…" : children}
-    </button>
-  );
 }
 
 /** A next step this project could take, offered from the card's own header.

@@ -26,7 +26,8 @@ import {
   type ProjectTabId,
 } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
-import { LegacyHeader, LegacyNetwork } from "./legacy";
+import { ProjectHeader } from "./header";
+import { LegacyNetwork } from "./legacy";
 import { MediaTab } from "./media-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProductsTab } from "./products-tab";
@@ -37,12 +38,20 @@ import { RailManage } from "./rail-manage";
 import { RailOutcome } from "./rail-outcome";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
-import type { ProjectSlots, SlotProps } from "./slots";
+import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 
 // C5's wiring (task-C1.md's Hand-off): the page renders only after every
 // store is read, so `hydrated` is always true here.
 function MediaSlot({ project, view, brief, viewer }: SlotProps) {
   return <MediaTab project={project} refs={view.refs} hydrated draft={brief} viewer={viewer} />;
+}
+
+// C2's wiring: the header's own data props are `{ project, view, viewer }`
+// (task-C2.md); this adapter is what satisfies HeaderSlotProps, threading
+// the shell's arrival-focus ref and its one live region announcer down to
+// ProjectHeader (which forwards `titleRef` on to ProjectTitle).
+function HeaderSlot({ project, view, viewer, titleRef, announce }: HeaderSlotProps) {
+  return <ProjectHeader project={project} view={view} viewer={viewer} titleRef={titleRef} announce={announce} />;
 }
 
 // C3's wiring (task-C1.md hand-off): ProductsTab takes its own props, not
@@ -70,7 +79,7 @@ function DetailsSlot({ project, view, viewer }: SlotProps) {
 }
 
 const SLOTS: ProjectSlots = {
-  header: LegacyHeader,
+  header: HeaderSlot,
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
