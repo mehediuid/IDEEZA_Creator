@@ -4,40 +4,51 @@
 // the user clicks "Create Project" from the manual-mode info panel.
 //
 // Two states, driven by the "Choose Project" dropdown:
-//   1. Existing project picked   → Name field hidden; Description
-//                                  pre-fills with that project's saved
-//                                  description, read-only (CNT-6 — its one
-//                                  home is the project's own inline editor
-//                                  now); submit sets it as the active
-//                                  project and routes to the next
-//                                  incomplete step.
-//   2. "Create New Project"      → Name field visible (required);
-//                                  Description optional; submit creates
-//                                  a draft project and routes to /pcb.
+//   1. Existing project picked   → no name field; the project's saved
+//                                  description shows read-only (CNT-6 — its
+//                                  one home is the project's own inline
+//                                  editor); submit makes it the active
+//                                  project and opens the editor on the
+//                                  product it resumes (P2-SAVE-14 as changed:
+//                                  `editorHref(p, resumeProductOf(p), step)`).
+//   2. "Create New Project"      → the shared ProjectDetailsFields (P2-SAVE-14):
+//                                  the save step's name and description, with
+//                                  its checks, limits and copy — 1–80
+//                                  characters with the duplicate note, 0–1,000
+//                                  with a counter from 800, errors on blur and
+//                                  on submit. No cover (a hand-made project
+//                                  has no image) and no "Update with AI" (no
+//                                  products yet). Submit makes a draft project
+//                                  and opens its first product's PCB
+//                                  (`editorHref(p, "p1", "pcb")`).
 //
-// Submit is disabled until a valid selection exists:
-//   • Existing project chosen, OR
-//   • "Create New Project" + a non-empty name.
+// Create Project is never silently disabled: a press that can't go ahead
+// says why, under the field that needs it, and focuses it.
 //
-// A11y: real <dialog>-style overlay with aria-modal, focus trap (focus
-// returns to the trigger on close), Esc + outside-click dismiss, and
-// every control reachable by Tab in visual order.
+// The frame is the shared ModalFrame: focus moves in and stays in, Esc and
+// the scrim close it, and focus goes back to the trigger.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowDown01Icon,
-  Cancel01Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "./icon";
+import { Button, ModalFrame } from "@/components/ideeza";
 import {
-  stepHref,
-  firstIncompleteStep,
+  ProjectDetailsFields,
+  type DetailsField,
+  type ProjectDetailsFieldsHandle,
+} from "@/components/projects/project-details-fields";
+import { editorHref, productResumeOf, resumeProductOf } from "@/lib/manual/editor-scope";
+import { checkDescription, checkProjectName } from "@/lib/manual/project-header";
+import {
+  PROJECT_DESC_COUNTER_FROM,
+  PROJECT_DESC_MAX,
+  PROJECT_NAME_MAX,
   useManualProjects,
-  type ManualProject,
 } from "@/lib/manual/projects";
 
 const NEW_SENTINEL = "__new__";
+const CHOOSE_FIRST = "Choose a project, or create a new one.";
 
 export function ProjectInfoModal({
   open,
@@ -46,232 +57,166 @@ export function ProjectInfoModal({
   open: boolean;
   onClose: () => void;
 }) {
+  // Mounted per open, so every open starts from an empty form.
+  if (!open) return null;
+  return <ProjectInfoDialog onClose={onClose} />;
+}
+
+function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { projects, createProject, selectProject } = useManualProjects();
 
-  // Default to "create new" on every open so the dropdown shows the
-  // empty-placeholder state when projects exist and the create-new
-  // state otherwise.
   const [choice, setChoice] = React.useState<string>("");
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [shown, setShown] = React.useState<Record<DetailsField, boolean>>({ name: false, description: false });
+  const [choiceError, setChoiceError] = React.useState(false);
+  const [leaving, setLeaving] = React.useState(false);
 
-  const firstFieldRef = React.useRef<HTMLSelectElement>(null);
-
-  // Reset form state whenever the modal opens.
-  React.useEffect(() => {
-    if (!open) return;
-    setChoice("");
-    setName("");
-    setDescription("");
-    requestAnimationFrame(() => firstFieldRef.current?.focus());
-  }, [open]);
-
-  // Esc dismiss.
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  // An existing project shows its own description, read-only, for context
-  // (CNT-6: its one home is the project page). New or nothing clears it.
-  React.useEffect(() => {
-    if (!choice || choice === NEW_SENTINEL) {
-      setDescription("");
-      return;
-    }
-    const existing = projects.find((p) => p.id === choice);
-    if (existing) setDescription(existing.description);
-  }, [choice, projects]);
-
-  if (!open) return null;
+  const selectRef = React.useRef<HTMLSelectElement>(null);
+  const fieldsRef = React.useRef<ProjectDetailsFieldsHandle>(null);
+  const choiceMsgId = React.useId();
 
   const isNew = choice === NEW_SENTINEL;
-  // Only a picked project's description is locked: before any choice the
-  // field is simply empty, not "from the project's own page".
-  const locked = choice !== "" && !isNew;
-  const canSubmit =
-    (isNew && name.trim().length > 0) ||
-    (!isNew && choice !== "" && projects.some((p) => p.id === choice));
+  const existing = !isNew && choice ? (projects.find((p) => p.id === choice) ?? null) : null;
+  const otherNames = React.useMemo(() => projects.map((p) => p.name), [projects]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
+  const submit = () => {
+    if (leaving) return;
     if (isNew) {
-      const project = createProject({
-        name: name.trim(),
-        description: description.trim(),
-      });
+      const nameCheck = checkProjectName(name, otherNames, PROJECT_NAME_MAX);
+      const descCheck = checkDescription(description, PROJECT_DESC_MAX, PROJECT_DESC_COUNTER_FROM);
+      if (nameCheck.error || descCheck.error) {
+        setShown({ name: true, description: true });
+        window.requestAnimationFrame(() => fieldsRef.current?.focusFirstInvalid());
+        return;
+      }
+      setLeaving(true);
+      const project = createProject({ name: nameCheck.value, description: descCheck.value });
       onClose();
-      router.push(stepHref(project, "pcb"));
+      router.push(editorHref(project, "p1", "pcb"));
       return;
     }
-    // Existing project: set it active and route to the next incomplete
-    // step so the user resumes where they left off. Its description is
-    // shown for context only (CNT-6, "One home for the description") — this
-    // modal picks or creates a project, it doesn't edit one, so it never
-    // writes over what the project's own inline editor holds (CNT-1…7).
-    const existing = projects.find((p) => p.id === choice);
-    if (!existing) return;
+    if (!existing) {
+      setChoiceError(true);
+      selectRef.current?.focus();
+      return;
+    }
+    // Existing project: make it the active one and open the product it
+    // resumes, at the step it was left on. Its description is shown for
+    // context only (CNT-6) — this modal picks or creates a project, it never
+    // writes over what the project's own inline editor holds.
+    setLeaving(true);
+    const row = resumeProductOf(existing);
     selectProject(existing.id);
     onClose();
-    router.push(stepHref(existing, firstIncompleteStep(existing)));
+    router.push(editorHref(existing, row, productResumeOf(existing, row).step));
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="project-info-title"
-      onClick={onClose}
-      className="fixed inset-0 z-modal flex items-center justify-center px-[16px] py-[24px]"
+    <ModalFrame
+      open
+      onClose={onClose}
+      size="sm"
+      title="Project Information"
+      initialFocus={selectRef}
+      footer={
+        <Button
+          type="button"
+          hierarchy="primary"
+          size="lg"
+          onClick={submit}
+          aria-busy={leaving || undefined}
+          className="min-h-[var(--touch-min)] w-full"
+        >
+          Create Project
+        </Button>
+      }
     >
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[color-mix(in_srgb,var(--color-bg-overlay)_62%,transparent)] backdrop-blur-sm"
-      />
-
       <form
-        onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
-        className="relative flex w-full max-w-[520px] flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-3"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        className="flex flex-col gap-10"
       >
-        <header className="flex items-start gap-[16px] border-b border-border px-[24px] py-[20px]">
-          <h2
-            id="project-info-title"
-            className="flex-1 text-xl font-bold tracking-tight text-text-primary"
-          >
-            Project Information
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            <Icon icon={Cancel01Icon} />
-          </button>
-        </header>
-
-        <div className="flex flex-col gap-[20px] px-[24px] py-[20px]">
-          {/* Choose Project */}
-          <FieldLabel label="Choose Project" htmlFor="project-choice">
-            <div className="relative">
-              <select
-                id="project-choice"
-                ref={firstFieldRef}
-                value={choice}
-                onChange={(e) => setChoice(e.target.value)}
-                className="h-[44px] w-full appearance-none rounded-lg border border-border bg-bg-page pl-[14px] pr-[40px] text-md text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus focus:bg-bg-surface"
-              >
-                <option value="" disabled>
-                  Choose Project
-                </option>
-                <option value={NEW_SENTINEL}>Create New Project</option>
-                {projects.length > 0 && (
-                  <optgroup label="Existing projects">
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {p.status === "draft" ? "· Draft" : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-              <span
-                aria-hidden
-                className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 text-text-tertiary"
-              >
-                <Icon icon={ArrowDown01Icon} />
-              </span>
-            </div>
-          </FieldLabel>
-
-          {/* Project Name — only when creating new */}
-          {isNew && (
-            <FieldLabel label="Project Name" htmlFor="project-name" required>
-              <input
-                id="project-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="eg. My Drone Project"
-                autoComplete="off"
-                aria-required
-                className="h-[44px] w-full rounded-lg border border-border bg-bg-page px-[14px] text-md text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus focus:bg-bg-surface placeholder:text-text-tertiary"
-              />
-            </FieldLabel>
-          )}
-
-          {/* Project Description */}
-          <FieldLabel
-            label="Project Description"
-            htmlFor="project-description"
-          >
-            <textarea
-              id="project-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              readOnly={locked}
-              aria-readonly={locked}
-              placeholder="Write description"
-              rows={4}
-              className={[
-                "w-full resize-y rounded-lg border border-border bg-bg-page px-[14px] py-[12px] text-md leading-relaxed text-text-primary outline-none transition-colors duration-fast placeholder:text-text-tertiary",
-                locked
-                  ? "cursor-not-allowed text-text-secondary"
-                  : "hover:border-border-strong focus:border-border-focus focus:bg-bg-surface",
-              ].join(" ")}
-            />
-            <p className="mt-[4px] text-sm text-text-tertiary">
-              {locked ? "From the project's own page — edit it there." : "Optional."}
+        <div className="flex flex-col gap-3">
+          <label htmlFor="project-choice" className="text-md font-semibold text-text-primary">
+            Choose Project
+          </label>
+          <div className="relative">
+            <select
+              id="project-choice"
+              ref={selectRef}
+              value={choice}
+              onChange={(e) => {
+                setChoice(e.target.value);
+                setChoiceError(false);
+              }}
+              aria-invalid={choiceError || undefined}
+              aria-describedby={choiceError ? choiceMsgId : undefined}
+              className="h-[44px] w-full appearance-none rounded-lg border border-border bg-bg-page pl-[14px] pr-[40px] text-md text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus focus:bg-bg-surface aria-invalid:border-border-error"
+            >
+              <option value="" disabled>
+                Choose Project
+              </option>
+              <option value={NEW_SENTINEL}>Create New Project</option>
+              {projects.length > 0 && (
+                <optgroup label="Existing projects">
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.status === "draft" ? "· Draft" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 text-text-tertiary"
+            >
+              <Icon icon={ArrowDown01Icon} />
+            </span>
+          </div>
+          {choiceError && (
+            <p id={choiceMsgId} className="text-sm text-text-error">
+              {CHOOSE_FIRST}
             </p>
-          </FieldLabel>
+          )}
         </div>
 
-        <footer className="border-t border-border px-[24px] py-[16px]">
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="inline-flex h-[44px] w-full items-center justify-center gap-[8px] rounded-lg bg-bg-brand text-md font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Create Project
-          </button>
-        </footer>
-      </form>
-    </div>
-  );
-}
-
-function FieldLabel({
-  label,
-  htmlFor,
-  required,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-[8px]">
-      <label
-        htmlFor={htmlFor}
-        className="text-md font-semibold text-text-primary"
-      >
-        {label}
-        {required && (
-          <span aria-hidden className="ml-[4px] text-text-error">
-            *
-          </span>
+        {isNew && (
+          <ProjectDetailsFields
+            ref={fieldsRef}
+            name={name}
+            description={description}
+            onNameChange={setName}
+            onDescriptionChange={setDescription}
+            otherNames={otherNames}
+            shown={shown}
+            onShow={(f) => setShown((s) => (s[f] ? s : { ...s, [f]: true }))}
+            onSubmit={submit}
+          />
         )}
-      </label>
-      {children}
-    </div>
+
+        {existing && (
+          <div className="flex flex-col gap-3">
+            <label htmlFor="project-description" className="text-md font-semibold text-text-primary">
+              Project Description
+            </label>
+            <textarea
+              id="project-description"
+              value={existing.description}
+              readOnly
+              aria-readonly
+              rows={4}
+              className="w-full cursor-not-allowed resize-none rounded-lg border border-border bg-bg-page px-[14px] py-[12px] text-md leading-relaxed text-text-secondary outline-none"
+            />
+            <p className="text-sm text-text-tertiary">From the project&apos;s own page — edit it there.</p>
+          </div>
+        )}
+      </form>
+    </ModalFrame>
   );
 }

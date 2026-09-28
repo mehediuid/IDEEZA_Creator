@@ -23,6 +23,7 @@ import {
   PROJECT_NAME_MAX,
   type ManualProject,
 } from "./projects";
+import { joinDescriptions, type DescribedProduct } from "./describe";
 import type { EditGate } from "./p2-types";
 import type { ProjectStatus } from "./project-summary";
 
@@ -93,26 +94,31 @@ function clip(s: string, max: number): string {
   return chars.length > max ? chars.slice(0, max).join("") : s;
 }
 
-/** "A, B and C" — the join sentence's own list (P2-SAVE-4), and the lock line's (edit-gate.ts has its own copy). */
-function joinNames(names: readonly string[]): string {
-  if (names.length === 0) return "";
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
 export type SaveDefaults = { name: string; description: string; coverProductId: "primary" };
+
+// The join sentence and the AI prompt (P2-SAVE-4, P2-SAVE-8) live in
+// describe.ts, a module with no client imports, so `/api/refine` can run the
+// same fallback on the server. Re-exported here, where the save step reads them.
+export { describableCount, describePromptOf, joinDescriptions, type DescribedProduct } from "./describe";
 
 /** P2-SAVE-4: only facts the build holds. `summary` is never used — it's a parts line. */
 export function saveDefaultsOf(job: BuildJob): SaveDefaults {
   const name = clip(job.projectChoiceName?.trim() || job.title.trim(), PROJECT_NAME_MAX);
   const products = productsOf(job);
   const primarySentence = (job.description || job.conceptPrompt).trim();
-  const description =
-    products.length <= 1
-      ? primarySentence
-      : `${primarySentence} Comes with ${joinNames(products.slice(1).map((p) => p.name))}.`;
-  return { name, description: clip(description, PROJECT_DESC_MAX), coverProductId: "primary" };
+  const description = joinDescriptions([
+    { name: job.title, description: primarySentence },
+    ...products.slice(1).map((p) => ({ name: p.name, description: "" })),
+  ]);
+  return { name, description, coverProductId: "primary" };
+}
+
+/** P2-SAVE-8 in the save step: a build's products, each with the sentence the model wrote. */
+export function describedProductsOf(job: BuildJob): DescribedProduct[] {
+  return productsOf(job).map((p) => ({
+    name: p.id === "primary" ? job.title : p.name,
+    description: (p.id === "primary" ? job.description || job.conceptPrompt : p.description || "").trim(),
+  }));
 }
 
 export type CoverChoice = { productId: string; name: string; imageUrl: string };

@@ -53,7 +53,7 @@ import {
   BUILD_ACTION_ID,
   BUILD_REVIEW_ID,
   CREDITS_NOTICE_ID,
-  OPEN_IN_EDITOR_ID,
+  REVIEW_PRIMARY_ID,
   SETUP_QUESTION_ID,
   productCardId,
   productRetryId,
@@ -63,6 +63,7 @@ import { ProjectRail, RailAnnouncer, useRailModel } from "./chat-rail";
 import { BuildStatus } from "./build-status";
 import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
+import { useSaveMode } from "./save-step";
 import { COMPOSER_INPUT_ID, PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
 import {
@@ -117,9 +118,10 @@ function landingOf(target: JumpTarget): { ring: string; focus: string; near?: bo
     case "add":
       return { ring: ADD_PRODUCT_ID, focus: ADD_PRODUCT_ID };
     case "editor":
-      // Until the build is ready the review has no Open in editor; the review
+      // The review's one primary — Save Project, or Open project once saved
+      // (P2-SAVE-11). Until the build is ready there is no footer; the review
       // takes the keyboard then.
-      return { ring: BUILD_REVIEW_ID, focus: OPEN_IN_EDITOR_ID, near: true };
+      return { ring: BUILD_REVIEW_ID, focus: REVIEW_PRIMARY_ID, near: true };
   }
 }
 
@@ -326,6 +328,12 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // always makes a new one (§4.4.8 puts a system in one project), so this
   // list is only ever offered for the single case.
   const { projects } = useManualProjects();
+  // A chat started from a project's "Add a product" (`/?addTo=`, P2-TABS-29)
+  // opens its question on that project.
+  const addTo = React.useMemo(() => {
+    const setup = chat?.turns.find((t) => t.role === "setup");
+    return setup?.role === "setup" ? (setup.addTo ?? null) : null;
+  }, [chat]);
   const setupProjects = React.useMemo(
     () =>
       projects.map((p) => {
@@ -336,9 +344,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           detail: `${n} product${n === 1 ? "" : "s"} · updated ${new Date(
             p.updatedAt,
           ).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+          ...(p.id === addTo ? { preselect: true } : null),
         };
       }),
-    [projects],
+    [projects, addTo],
   );
 
   const [confirmFor, setConfirmFor] = React.useState<{
@@ -482,7 +491,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   }, [activeBuild, projects]);
 
   // Everything the rail and the page's announcer say, worked out once.
-  const rail = useRailModel(chat ?? NO_CHAT, activeBuild, labels, projectName, savedName);
+  // Which save the ready build gets — the rail's next-step sentence says it
+  // the way the review's footer does (P2-SAVE-11).
+  const saveMode = useSaveMode(activeBuild ?? null)?.mode ?? null;
+  const rail = useRailModel(chat ?? NO_CHAT, activeBuild, labels, projectName, savedName, saveMode);
   React.useEffect(() => {
     projectNow.current = rail.state;
   }, [rail.state]);

@@ -103,6 +103,10 @@ export type ChatTurn =
       productName?: string;
       productSummary?: string;
       answer?: SetupAnswer;
+      /** The project this chat was started for, from its page's "Add a
+       *  product" (`/?addTo=<id>`, P2-TABS-29). The question opens on it, so
+       *  the build it makes joins that project when it's saved. */
+      addTo?: string;
       ts: number;
     }
   | {
@@ -684,7 +688,9 @@ type Ctx = {
   builds: BuildJob[];
 
   // Chat ops
-  createChat: (initialPrompt: string) => ChatSession;
+  /** `addTo`: the project Home's "Adding to {project}" names (P2-TABS-29) —
+   *  the setup question opens on it. */
+  createChat: (initialPrompt: string, opts?: { addTo?: string }) => ChatSession;
   appendUserTurn: (chatId: string, text: string) => void;
   appendAssistantTurn: (
     chatId: string,
@@ -848,8 +854,9 @@ export function CreateHistoryProvider({
   }, [builds, hydrated]);
 
   // ── Chat ops ──────────────────────────────────────────────────
-  const createChat = React.useCallback((initialPrompt: string) => {
+  const createChat = React.useCallback((initialPrompt: string, opts?: { addTo?: string }) => {
     const now = Date.now();
+    const addTo = opts?.addTo?.trim();
     const id = makeId("chat");
     const session: ChatSession = {
       id,
@@ -864,6 +871,7 @@ export function CreateHistoryProvider({
           prompt: initialPrompt,
           status: "loading",
           companions: [],
+          ...(addTo ? { addTo } : null),
           ts: now + 1,
         },
       ],

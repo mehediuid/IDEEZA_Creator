@@ -627,7 +627,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   const [promptHelpOpen, setPromptHelpOpen] = React.useState(false);
   // Step 1's hand-off is in flight: Continue has created/attached and the page
   // is navigating. The ref is what actually stops a second press (React state
-  // doesn't land inside the same tick — the same guard projectFromBuild uses
+  // doesn't land inside the same tick — the same guard the provider's saveBuild uses
   // to keep one build to one project); the flag is what greys the button.
   const continuingRef = React.useRef(false);
   const [continuing, setContinuing] = React.useState(false);

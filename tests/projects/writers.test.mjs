@@ -45,7 +45,7 @@ function project(id, { name = "Car", productName = "", description = "", created
     flowState: { ...FLOW }, ...rest };
 }
 
-// What Save does, without React: the provider's projectFromBuild (§5.1.8) over
+// What Save did in one click, without React (§5.1.8; saveRecord/saveBuild now) over
 // plain lists — minus its in-session double-press guard — followed by the
 // review's setBuildProject.
 function save(state, jobId, now) {

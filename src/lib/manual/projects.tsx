@@ -1093,12 +1093,6 @@ type Ctx = {
     lineage: BuildJob[],
     input: SaveInput,
   ) => { project: ManualProject; revert: () => void } | null;
-  /** @deprecated Use `saveBuild` with the save step's `SaveInput` (T16 removes this).
-   *  The project a finished AI build becomes (§5.1.8): the project it is
-   *  already in; else the one another build of its chat was saved into, as that
-   *  chat's next version (COR-89); else the one chosen at the setup question;
-   *  else a new one, named by the setup answer. Now a wrapper over saveBuild. */
-  projectFromBuild: (job: BuildJob, lineage?: BuildJob[]) => ManualProject;
   // A build joins a project (COR-88): attach() on the stored record,
   // idempotent by build id — the one writer Save, Open in editor and the
   // Brief's Step 1 share. `origin` only for the project this build creates.
@@ -1386,29 +1380,6 @@ export function ManualProjectsProvider({
     [projects],
   );
 
-  // @deprecated — saveBuild with the SaveInput v1's one-click Save implied
-  // (§5.1.8): the project the build is already in, unchanged; the one this
-  // session made or joined for it; the chat's project as its next version
-  // (COR-89); the setup question's choice; else a new one named by the setup
-  // answer. T16 moves its callers to saveBuild and removes it.
-  const projectFromBuild = React.useCallback(
-    (job: BuildJob, lineage: BuildJob[] = []) => {
-      const target = saveTargetOf(job, lineage, projects);
-      if (target?.via === "saved") return target.project;
-      const input: SaveInput = target
-        ? { kind: target.via === "lineage" ? "version" : "join", projectId: target.project.id }
-        : {
-            kind: "new",
-            name: job.projectChoiceName?.trim() || job.title,
-            description: (job.description || job.conceptPrompt).trim(),
-            cover: null,
-          };
-      // A target read from `projects` is always there, so null can't come back.
-      return saveBuild(job, lineage, input)?.project ?? (target as { project: ManualProject }).project;
-    },
-    [projects, saveBuild],
-  );
-
   const markStepCompleted = React.useCallback(
     (id: string, step: keyof ManualFlowState) => {
       setProjects((arr) =>
@@ -1658,7 +1629,6 @@ export function ManualProjectsProvider({
     findBySlug,
     createProject,
     saveBuild,
-    projectFromBuild,
     attachBuild,
     selectProject,
     updateProject,

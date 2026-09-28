@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import {
   AiMagicIcon,
   ArrowRight01Icon,
+  Cancel01Icon,
   CodeIcon,
   CpuIcon,
   CubeIcon,
@@ -33,6 +34,7 @@ import {
   type BuildItemKind,
 } from "@/lib/create/history";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
+import { useManualProjects } from "@/lib/manual/projects";
 import { useVoiceInput, voiceErrorMessage } from "@/lib/voice/use-voice-input";
 import { VoiceListening } from "@/components/voice/voice-listening";
 import { formatCount, PROJECTS, type Project } from "@/lib/feed";
@@ -66,9 +68,38 @@ const INSPIRATION: Project[] = PROJECTS.slice(0, 4);
 
 const AI_PLACEHOLDER = "Describe your electronics project...";
 
+// `/?addTo=<projectId>` — a project page's "Add a product" (P2-TABS-29). Read
+// from the address itself rather than useSearchParams, so the page needs no
+// Suspense boundary; the server has no address, so the chip appears once
+// the page is in the browser. Back and Forward re-read it.
+function subscribeLocation(onChange: () => void) {
+  window.addEventListener("popstate", onChange);
+  return () => window.removeEventListener("popstate", onChange);
+}
+function useAddToParam(): string | null {
+  return React.useSyncExternalStore(
+    subscribeLocation,
+    () => new URLSearchParams(window.location.search).get("addTo"),
+    () => null,
+  );
+}
+
 export function WorkspacePrompt() {
   const router = useRouter();
   const { createChat } = useCreateHistory();
+  // "Adding to {project}" (P2-TABS-29): the chat this sends starts its
+  // question on that project, so the build it makes joins it when saved. An
+  // id that names no project in this browser shows nothing and adds nowhere.
+  const addToId = useAddToParam();
+  const { hydrated: projectsHydrated, projects } = useManualProjects();
+  const [addToDropped, setAddToDropped] = React.useState(false);
+  const addTo =
+    !addToDropped && addToId && projectsHydrated ? (projects.find((p) => p.id === addToId) ?? null) : null;
+  const dropAddTo = () => {
+    setAddToDropped(true);
+    router.replace("/", { scroll: false });
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
   // The first concept costs a render like any other, so the send is shut
   // here rather than letting the chat open and fail its opening turn.
   // The rendered balance, not canAfford(): the provider refreshes that ref
@@ -107,7 +138,7 @@ export function WorkspacePrompt() {
     // if the push throws, the catch hands the control back.
     setSubmitting(true);
     try {
-      const session = createChat(trimmed);
+      const session = createChat(trimmed, addTo ? { addTo: addTo.id } : undefined);
       router.push(`/chat/${session.id}`);
     } catch {
       setSubmitting(false);
@@ -175,6 +206,23 @@ export function WorkspacePrompt() {
         </div>
 
         <div className="mt-[24px]">
+          {mode === "ai" && addTo && (
+            <div className="mb-[12px] flex justify-center">
+              <p className="inline-flex max-w-full items-center gap-[4px] rounded-full border border-solid border-border bg-bg-surface py-[2px] pl-[14px] pr-[2px] text-sm text-text-secondary">
+                <span className="min-w-0 truncate">
+                  Adding to <strong className="font-semibold text-text-primary">{addTo.name}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={dropAddTo}
+                  aria-label={`Stop adding to ${addTo.name}`}
+                  className="inline-flex size-[40px] shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[44px]"
+                >
+                  <Icon icon={Cancel01Icon} size={16} />
+                </button>
+              </p>
+            </div>
+          )}
           {mode === "ai" ? (
             <PromptCard
               ref={taRef}

@@ -39,6 +39,8 @@ import { RailManage } from "./rail-manage";
 import { RailOutcome } from "./rail-outcome";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
+import { SavedBanner } from "./saved-banner";
+import { DescriptionCoachmark } from "./description-coachmark";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 
 // C5's wiring (task-C1.md's Hand-off). The page renders only after every
@@ -95,7 +97,9 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
 
 const SLOTS: ProjectSlots = {
   banner: PreviewBannerSlot,
+  notice: SavedBanner,
   header: HeaderSlot,
+  headerParts: { afterDescription: [DescriptionCoachmark] },
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,

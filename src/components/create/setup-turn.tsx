@@ -35,6 +35,11 @@ export type SetupProject = {
   /** What tells two projects of the same name apart: what they hold and when
    *  they last changed. */
   detail?: string;
+  /** The project this chat was started for — its page's "Add a product"
+   *  (`/?addTo=`, P2-TABS-29). The question opens on it: the chooser holds
+   *  it and the companions start unticked, because a single product is what
+   *  can join a project (a system is always one new project, §4.4.8). */
+  preselect?: boolean;
 };
 
 /** The chooser's own value for "not one of these" — no project can carry it,
@@ -72,13 +77,21 @@ export function SetupTurn({
   // screen, and an effect that copied its list into state re-rendered to say
   // what could simply be read — so the default is computed and state holds
   // only what the maker has actually touched.
+  //
+  // A chat started from a project's "Add a product" is the exception: it
+  // exists to add ONE product to that project, so nothing starts ticked.
+  const addTo = projects.find((p) => p.preselect) ?? null;
+  const defaults = () => new Set(addTo ? [] : companions.map((c) => c.id));
   const [touched, setTouched] = React.useState<Set<string> | null>(null);
-  const picked = touched ?? new Set(companions.map((c) => c.id));
+  const picked = touched ?? defaults();
   const setPicked = (next: (was: Set<string>) => Set<string>) =>
-    setTouched((was) => next(was ?? new Set(companions.map((c) => c.id))));
+    setTouched((was) => next(was ?? defaults()));
   const [step, setStep] = React.useState<"products" | "project">("products");
-  const [projectId, setProjectId] = React.useState("");
+  // Derived like `picked`: the project store can land after this card, so the
+  // "Add a product" project is read, not copied into state on mount.
+  const [chosenId, setProjectId] = React.useState<string | null>(null);
   const [projectName, setProjectName] = React.useState("");
+  const projectId = chosenId ?? (projectName === "" ? (addTo?.id ?? "") : "");
 
   if (status === "loading") {
     return (
@@ -174,8 +187,12 @@ export function SetupTurn({
         ask={multi ? "What should the project be called?" : "Which project is this for?"}
         note={
           multi
-            ? `${extra.length + 1} products belong together, so they go in one new project.`
-            : "A single product can join a project you already have, or start a new one."
+            ? addTo
+              ? `${extra.length + 1} products belong together, so they go in one new project, not ${addTo.name}. Untick the others to add this one to ${addTo.name}.`
+              : `${extra.length + 1} products belong together, so they go in one new project.`
+            : addTo
+              ? `You're adding a product to ${addTo.name}. You can pick another project, or start a new one.`
+              : "A single product can join a project you already have, or start a new one."
         }
       >
         {multi ? (
