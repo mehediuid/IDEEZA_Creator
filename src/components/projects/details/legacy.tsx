@@ -4,33 +4,24 @@
 // moved here when the page became a shell with slots, so the page keeps
 // showing all it did while the real slots land. Each fills one slot in
 // project-page.tsx until its task replaces it, and that task deletes it here:
-//   LegacyHeader                           → the header task (§5.4)
-//   LegacyNetwork                          → the Network tab task (§5.9, C6)
-//   LegacyEditorBlock, LegacyDetailsBlock  → the rail task (§5.10)
-//   LegacyManageBlock                      → the rail task (§5.10, C8's Manage)
+//   LegacyHeader   → the header task (§5.4)
+//   LegacyNetwork  → the Network tab task (§5.9, C6)
 // The task that removes the last export deletes this file.
 // (LegacyProducts, Deliverables, ItemStatus and EmptyNote were removed here
-// by the Products tab task, §5.6 — see ./products-tab.tsx.)
+// by the Products tab task, §5.6 — see ./products-tab.tsx. LegacyEditorBlock,
+// LegacyDetailsBlock, LegacyManageBlock and Row were removed here by the rail
+// task, §5.10 — see ./rail-editor.tsx, ./rail-details.tsx and ./rail-manage.tsx.)
 //
 // Changes from the old page, each forced by the data layer:
 // - "the" build is the newest one the project holds; the old page read
 //   `project.buildId` alone (COR-86);
-// - Open in editor resumes `resumeStepOf()`;
-// - dates use the one formatter (A3's formatDateTime).
+// - Open in editor resumes `resumeStepOf()`.
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowUpRight01Icon,
-  CheckmarkBadge01Icon,
-  CpuIcon,
-  File01Icon,
-  PencilEdit01Icon,
-} from "@hugeicons/core-free-icons";
+import { CheckmarkBadge01Icon, CpuIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { NetworkSection } from "@/components/network/network-section";
-import { DeleteProjectControl } from "@/components/projects/delete-project-dialog";
 import {
   bookedSpec,
   partChangesOf,
@@ -43,18 +34,13 @@ import {
   type BuildJob,
 } from "@/lib/create/history";
 import { conceptOf, resumeStepOf, type ProjectView } from "@/lib/manual/project-read";
-import { formatDateTime } from "@/lib/manual/project-summary";
 import {
-  FLOW_STEPS,
-  STEP_LABELS,
-  completedCount,
   productLabel,
   stepHref,
   useManualProjects,
   type ManualProject,
 } from "@/lib/manual/projects";
 import { specLine } from "@/lib/spec/format";
-import { RailBlock } from "./frame";
 import type { HeaderSlotProps, SlotProps } from "./slots";
 
 /** The newest build this project holds that is still in this browser. */
@@ -169,91 +155,6 @@ export function LegacyNetwork({ project, view }: SlotProps) {
   return <NetworkSection project={project} build={legacyBuild(view)} />;
 }
 
-export function LegacyEditorBlock({ project }: SlotProps) {
-  const { selectProject } = useManualProjects();
-  const done = completedCount(project);
-  const summary = `${done} of ${FLOW_STEPS.length} steps complete`;
-  return (
-    <RailBlock id="editor" title="Editor progress" summary={summary}>
-      <p className="text-sm tabular-nums text-text-secondary">{summary}</p>
-      <ul role="list" className="mt-[14px] flex flex-col gap-[6px]">
-        {FLOW_STEPS.map((step) => {
-          const stepDone = project.flowState[step];
-          return (
-            <li key={step}>
-              <Link
-                href={stepHref(project, step)}
-                onClick={() => selectProject(project.id)}
-                className="flex items-center gap-[12px] rounded-lg border border-border bg-bg-surface px-[14px] py-[10px] outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <span aria-hidden className={stepDone ? "text-text-success" : "text-text-tertiary"}>
-                  <Icon icon={stepDone ? CheckmarkBadge01Icon : File01Icon} size={18} />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-md font-medium text-text-primary">
-                  {STEP_LABELS[step]}
-                </span>
-                <span className="shrink-0 text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-                  {stepDone ? "Done" : "Not started"}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </RailBlock>
-  );
-}
-
-export function LegacyDetailsBlock({ project, view }: SlotProps) {
-  const build = legacyBuild(view);
-  return (
-    <RailBlock id="details" title="Details">
-      <dl className="flex flex-col gap-[14px] text-sm">
-        <Row label="Status">{project.status === "completed" ? "Completed" : "Draft"}</Row>
-        <Row label="Product">{productLabel(project)}</Row>
-        <Row label="Created">{formatDateTime(project.createdAt)}</Row>
-        <Row label="Last updated">{formatDateTime(project.updatedAt)}</Row>
-        <Row label="Address">
-          <span className="font-mono text-xs">/{project.slug}</span>
-        </Row>
-        <Row label="Source">
-          {build ? (
-            <Link
-              href={`/build/${build.id}`}
-              className="inline-flex items-center gap-[4px] rounded-sm font-semibold text-text-brand no-underline outline-none transition-colors duration-fast hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              AI build
-              <Icon icon={ArrowUpRight01Icon} size={14} />
-            </Link>
-          ) : view.refs.length > 0 ? (
-            "AI build · not in this browser"
-          ) : (
-            "Built manually"
-          )}
-        </Row>
-      </dl>
-    </RailBlock>
-  );
-}
-
-// A7's interim Manage block (COR-67), moved from the old page. C8 renders
-// DeleteProjectControl in its own Manage block and deletes this one.
-export function LegacyManageBlock({ project, view, viewer, brief }: SlotProps) {
-  return (
-    <RailBlock id="manage" title="Manage" collapsible={false}>
-      <DeleteProjectControl
-        project={project}
-        viewer={viewer}
-        status={view.summary.status}
-        draft={brief}
-        showcased={view.summary.showcase !== null}
-        productCount={view.summary.productCount}
-        refs={view.refs}
-      />
-    </RailBlock>
-  );
-}
-
 // ───────────────────────── pieces ─────────────────────────
 
 function StatusBadge({ status }: { status: ManualProject["status"] }) {
@@ -268,14 +169,5 @@ function StatusBadge({ status }: { status: ManualProject["status"] }) {
       <Icon icon={completed ? CheckmarkBadge01Icon : PencilEdit01Icon} size={13} />
       {completed ? "Completed" : "Draft"}
     </span>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-[16px]">
-      <dt className="shrink-0 font-medium text-text-secondary">{label}</dt>
-      <dd className="min-w-0 break-words text-right font-medium text-text-primary">{children}</dd>
-    </div>
   );
 }

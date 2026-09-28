@@ -61,6 +61,7 @@ export function RailBlock({
   title,
   meta,
   busy = false,
+  collapsible = true,
   children,
 }: {
   /** The block's h2: "Outcome", "Details", … */
@@ -69,24 +70,28 @@ export function RailBlock({
   meta?: string;
   /** The block's own read hasn't finished; it shows "—" meanwhile (COM-22, COR-2). */
   busy?: boolean;
+  /** False keeps the block open once stacked, under a plain h2: Manage, whose
+   *  Delete is the last thing on the page at 400 px (§3.3, COR-67). */
+  collapsible?: boolean;
   children: React.ReactNode;
 }) {
   const { probe, stacked } = useStackedProbe();
   const [open, setOpen] = React.useState(false);
   const headingId = React.useId();
   const panelId = React.useId();
+  const folds = stacked && collapsible;
   return (
     <section
       aria-labelledby={headingId}
       aria-busy={busy || undefined}
-      className="relative flex flex-col gap-6 py-10"
+      className="relative flex flex-col gap-6 py-10 [@container(min-width:1024px)]:px-10"
     >
       <span
         ref={probe}
         aria-hidden
         className="pointer-events-none absolute left-0 top-0 h-0 w-px [@container(max-width:1023px)]:w-[2px]"
       />
-      {stacked ? (
+      {folds ? (
         <h2 id={headingId} className="m-0">
           <button
             type="button"
@@ -115,7 +120,7 @@ export function RailBlock({
           {title}
         </h2>
       )}
-      <div id={panelId} className={cn("flex flex-col gap-6", stacked && !open && "hidden")}>
+      <div id={panelId} className={cn("flex flex-col gap-6", folds && !open && "hidden")}>
         <StackedContext.Provider value={stacked}>{children}</StackedContext.Provider>
       </div>
     </section>
