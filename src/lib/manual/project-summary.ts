@@ -1,26 +1,40 @@
-// The shared summary (spec §5.1.3). One derivation of what a project is, so
-// the My projects card and the project page's header print the same words
-// (LST-32) and offer the same next step (COR-11, §3.5).
+// The shared summary (spec §5.1.3; Phase 2 spec §3.2, §3.6.3, §3.7). One
+// derivation of what a project is, so the My projects card and the project
+// page's header print the same words (LST-32) and offer the same next step
+// (COR-11, §3.5).
 //
 // Pure: no React, no storage and no clock of its own. The callers pass the
 // builds, the project's brief draft (`readBriefDraft` on the list,
-// `useProjectBrief` on the page), the video jobs and `now`.
+// `useProjectBrief` on the page), the marketplace records (`useMarket()`,
+// T11) and `now`.
 //
 // Value imports are relative, like src/lib/spec/*: tsc leaves `@/` as it is
 // in its output, and `node --test` loads the compiled module without a
-// bundler.
+// bundler. Several of the modules imported here import this one back (for
+// `formatDate` and the status types); every such use sits inside a function,
+// so the cycle never reads a binding while the modules load.
 
 import type { BuildJob, BuildStatus } from "../create/history";
 import { LICENSES, type BriefStepId, type Intent } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
+import type { ListingView, MarketData, Sale } from "../market/types";
+import { listingStatusLine, listingViewOf } from "../market/listing";
+import type { MintView } from "../wallet/types";
+import { mintPhrase, mintViewOf } from "../wallet/mint";
 import { stepHref, type ManualProject } from "./projects";
 import {
   buildsOf,
   coverOf,
+  listingMetadataOf,
   pendingVersionsOf,
   productsOfProject,
   type BuildRef,
 } from "./project-read";
+import { customersOf, joinSoldLine, soldLineOf, type Customers, type SoldLine } from "./customers";
+import { ownedBySegment, ownershipOf } from "./ownership";
+import { lockOf } from "./edit-gate";
+import { can, type Viewer } from "./permissions";
+import type { OwnershipSplit, ProjectLock } from "./p2-types";
 
 // ─────────────────────────── the status ───────────────────────────
 
@@ -54,23 +68,45 @@ export const STATUS_ICON: Record<ProjectStatus, IconName> = {
   minted: "hexagon",
 };
 
-/** "Listed" never stands alone before a marketplace exists (§4.1). */
-export const LISTED_SUBLINE = "Goes on sale when the marketplace opens";
-/** The same words mid-sentence, for the status line. */
-const LISTED_IN_LINE = LISTED_SUBLINE.charAt(0).toLowerCase() + LISTED_SUBLINE.slice(1);
+// v1's LISTED_SUBLINE is retired: a marketplace exists now, and "Listed" means
+// a live listing whose own line says how it sells (P2-LISTING-23).
 
 export type ShowcaseBadge = { word: string; icon: IconName; ariaLabel: string };
 /** The Showcase badge: its own word and icon, info tone, beside the chip
  *  (LST-65, COR-9). It is not a control; its accessible name is "Showcased". */
 export const SHOWCASE_BADGE: ShowcaseBadge = { word: "Showcase", icon: "eye", ariaLabel: "Showcased" };
 
-export function projectStatus(p: ManualProject, draft: StoredDraft | null): ProjectStatus {
-  const b = draft?.state;
-  if (b?.mintedAt != null) {
-    if (b.intent === "sell") return "listed";
-    if (b.intent === "give") return "given";
-    return "private";
-  }
+/** No marketplace record at all — what a caller that hasn't read the market store passes. */
+export const EMPTY_MARKET: MarketData = { listings: [], sales: [], bids: [], support: [], unreadable: false };
+
+const NO_LISTING: ListingView = { kind: "none" };
+
+/** The market facts the status reads (§3.2). Both are optional so a v1 caller still compiles;
+ *  without them a project is never Listed, Paused or Sold. */
+export type StatusFacts = { listing?: ListingView; sales?: readonly Sale[] };
+
+function hasMainSale(projectId: string, sales: readonly Sale[]): boolean {
+  return sales.some((s) => s.projectId === projectId && s.item.nft === "main");
+}
+
+/**
+ * §3.2's one precedence, first match wins:
+ * 1. the latest Main listing is live (Buy now, auction running, or ended and not closed) → listed;
+ * 2. it is paused → paused;
+ * 3. any Main sale exists → sold;
+ * 4. minted (`p.mint`, or the draft's `mintedAt`) with intent give → given;
+ * 5. minted otherwise (sell, save, only removed or closed listings) → private.
+ *    A v1 sell with no listing reads Private (P2-LISTING-24): nothing was ever on a marketplace;
+ * 6. `status: "completed"` with no readable mint → minted (unreadable, v1);
+ * 7. draft.
+ */
+export function projectStatus(p: ManualProject, draft: StoredDraft | null, facts: StatusFacts = {}): ProjectStatus {
+  const listing = facts.listing ?? NO_LISTING;
+  if (listing.kind === "live") return "listed";
+  if (listing.kind === "paused") return "paused";
+  if (listing.kind === "sold" || hasMainSale(p.id, facts.sales ?? [])) return "sold";
+  const minted = p.mint !== undefined || (draft?.state.mintedAt ?? null) !== null;
+  if (minted) return draft?.state.intent === "give" ? "given" : "private";
   return p.status === "completed" ? "minted" : "draft"; // "minted" = the record is unreadable (LST-9)
 }
 
@@ -125,19 +161,39 @@ export type ActionPair = { first: NextAction | null; second: NextAction | null; 
 /** A newer build of the project's chat, not saved anywhere yet (COR-18). */
 export type PendingVersion = { buildId: string; n: number; status: BuildStatus };
 
+/** §2.2: Add to marketplace on a project whose co-owners hold all of it. */
+export const NO_SHARE_TO_SELL = "You hold no share of this project to sell.";
+
 function pairOf(first: NextAction | null, second: NextAction | null, violet: boolean): ActionPair {
   return { first, second, violet, card: violet ? first : null };
 }
 
+/** The listing flow's entry (§3.6.3). On the project page the header renders
+ *  `slots.actions["add-to-marketplace"]` in the button's place and opens the flow there; the
+ *  card links here, and the page reads `?list=1` once on arrival. */
+export function listFlowHref(projectId: string): string {
+  return `/projects/${projectId}?list=1`;
+}
+
 /**
- * The one next-step chooser (§3.5, Phase 2 §3.6.3). The header shows the pair
- * and the card shows `card`, so the two can't differ (COR-11). Showcase never
- * changes it (§3.8). At most one violet, and none once minted.
+ * The one next-step chooser (§3.5, Phase 2 §2.2 and §3.6.3). The header shows
+ * the pair and the card shows `card`, so the two can't differ (COR-11).
+ * Showcase never changes it (§3.8). At most one violet.
  *
- * T01 keeps v1's facts and only reshapes the answer: a Draft's violet step is
- * Review version / Continue Brief / Add Brief (a build or by hand), a minted
- * project reads View brief (quiet), and an unreadable mint has no pair. T10
- * adds the listing facts and the Add to marketplace rows (§2.2).
+ * | status | first | second | violet |
+ * |---|---|---|---|
+ * | draft, a newer version ready | Review version n | — | ✓ |
+ * | draft, Brief started | Continue Brief | — | ✓ |
+ * | draft, no Brief (a build or by hand) | Add Brief | — | ✓ |
+ * | private (never listed, removed, closed with no bids) | Add to marketplace | View brief | ✓ |
+ * | private, the maker holds 0 % | Add to marketplace, `blocked` | View brief | — |
+ * | given · listed · paused | View brief | — | — |
+ * | sold, the maker still holds a share | List another share | View brief | — |
+ * | sold in full (locked) | View brief | — | — |
+ * | minted, record unreadable | — | — | — |
+ *
+ * The listing facts are optional so a v1 caller still compiles: without them
+ * the maker holds everything and nothing is locked.
  */
 export function nextAction(
   p: ManualProject,
@@ -146,23 +202,50 @@ export function nextAction(
     brief: StoredDraft | null;
     source: ProjectSource;
     pending: PendingVersion | null;
+    listing?: ListingView;
+    /** The maker's own share (`ownership.maker`). */
+    creatorPct?: number;
+    locked?: boolean;
   },
 ): ActionPair {
   const briefHref = stepHref(p, "brief");
+  const viewBrief: NextAction = { kind: "view-brief", label: "View brief", href: briefHref };
+  const creatorPct = facts.creatorPct ?? 100;
+  const locked = facts.locked ?? false;
 
-  if (facts.status === "minted") return pairOf(null, null, false);
-  if (facts.status !== "draft") {
-    return pairOf({ kind: "view-brief", label: "View brief", href: briefHref }, null, false);
+  switch (facts.status) {
+    case "minted":
+      return pairOf(null, null, false);
+    case "draft":
+      if (facts.pending?.status === "ready") {
+        return pairOf(
+          { kind: "review-version", label: `Review version ${facts.pending.n}`, href: `/build/${facts.pending.buildId}` },
+          null,
+          true,
+        );
+      }
+      if (facts.brief) return pairOf({ kind: "continue-brief", label: "Continue Brief", href: briefHref }, null, true);
+      return pairOf({ kind: "add-brief", label: "Add Brief", href: briefHref }, null, true);
+    case "private": {
+      if (locked) return pairOf(viewBrief, null, false);
+      const add: NextAction = { kind: "add-to-marketplace", label: "Add to marketplace", href: listFlowHref(p.id) };
+      if (creatorPct <= 0) return pairOf({ ...add, blocked: NO_SHARE_TO_SELL }, viewBrief, false);
+      return pairOf(add, viewBrief, true);
+    }
+    case "sold":
+      if (!locked && creatorPct > 0) {
+        return pairOf(
+          { kind: "add-to-marketplace", label: "List another share", href: listFlowHref(p.id) },
+          viewBrief,
+          false,
+        );
+      }
+      return pairOf(viewBrief, null, false);
+    case "given":
+    case "listed":
+    case "paused":
+      return pairOf(viewBrief, null, false);
   }
-  if (facts.pending?.status === "ready") {
-    return pairOf(
-      { kind: "review-version", label: `Review version ${facts.pending.n}`, href: `/build/${facts.pending.buildId}` },
-      null,
-      true,
-    );
-  }
-  if (facts.brief) return pairOf({ kind: "continue-brief", label: "Continue Brief", href: briefHref }, null, true);
-  return pairOf({ kind: "add-brief", label: "Add Brief", href: briefHref }, null, true);
 }
 
 // ─────────────────────────── the one date formatter ───────────────────────────
@@ -196,7 +279,7 @@ export function formatShortDate(at: number, now: number): string {
   return sameYear ? `${MONTHS[d.getMonth()]} ${d.getDate()}` : formatDate(at);
 }
 
-// ─────────────────────────── the status line (§4.1) ───────────────────────────
+// ─────────────────────────── the status line (§3.2) ───────────────────────────
 
 const INTENT_PHRASE: Record<Intent, string> = { sell: "to sell", give: "to give", save: "to keep" };
 /** The Brief step the line names. None at the form step (§4.1 row 2), nor at success. */
@@ -207,43 +290,111 @@ const STEP_PHRASE: Record<BriefStepId, string | null> = {
   success: null,
 };
 
-/** The part of a VideoJob (components/video-jobs/video-jobs-provider.tsx) this module reads.
- *  Structural, so a lib module never imports a component file; a VideoJob[] passes as it is. */
+/** The part of a VideoJob (components/video-jobs/video-jobs-provider.tsx) this module once read.
+ *  The status line's "· preview clip still rendering" is retired (P2-VIDEO-15); the type stays so
+ *  a caller passing its jobs still compiles. */
 export type ClipJob = { id: string; stage: string };
 
-function clipStillRendering(brief: StoredDraft | null, jobs: ClipJob[]): boolean {
-  const id = brief?.state.videoJobId;
-  const job = id ? jobs.find((j) => j.id === id) : undefined;
-  return !!job && job.stage !== "done" && job.stage !== "failed";
+/** When the mint the phrase names happened: the chain event for an on-chain record (its own
+ *  transaction, else the first sale that settled it), the signature for a lazy one, the Brief's
+ *  `mintedAt` for a v1 mint. */
+export function mintAtOf(mint: MintView, brief: StoredDraft | null): number | null {
+  const rec = mint.record;
+  if (rec) {
+    if (mint.status === "onChain") return rec.onChain?.at ?? mint.settled?.at ?? rec.at;
+    return rec.signedAt ?? rec.at;
+  }
+  return brief?.state.mintedAt ?? null;
 }
 
-function statusLineOf(
-  status: ProjectStatus,
-  f: { brief: StoredDraft | null; showcased: boolean; pending: PendingVersion | null; clip: boolean; now: number },
-): string {
-  if (status === "draft") {
-    if (f.pending?.status === "ready") return `Version ${f.pending.n} is ready to save`;
-    const brief = f.brief;
-    if (!brief) return "Not briefed yet";
-    const intent = brief.state.intent;
-    if (!intent) return "Brief started";
-    const step = STEP_PHRASE[brief.step];
-    return ["Brief in progress", INTENT_PHRASE[intent], ...(step ? [step] : [])].join(" · ");
-  }
-  if (status === "minted") return "Minted · the brief record isn't in this browser";
+/** Everything `statusLineOf` reads. The Phase 2 facts are optional: without them the line reads
+ *  as it did in v1 for a Draft, a Private and a Given project. */
+export type StatusLineFacts = {
+  brief: StoredDraft | null;
+  showcased: boolean;
+  pending: PendingVersion | null;
+  now: number;
+  mint?: MintView;
+  listing?: ListingView;
+  customers?: Pick<Customers, "mainSale" | "mainSaleCount" | "soldSharePct">;
+  /** Who reads a Sold line: the owner learns who and how much, a visitor only when (§3.2). */
+  audience?: "owner" | "visitor";
+};
 
-  const mintedAt = f.brief?.state.mintedAt ?? null;
-  const minted = mintedAt !== null ? `Minted ${formatShortDate(mintedAt, f.now)}` : "Minted";
-  const clip = f.clip ? " · preview clip still rendering" : "";
-  // "Listed" never stands without its subline (COR-76), so a rendering clip is added to it, not swapped in.
-  if (status === "listed") return `${minted} · ${LISTED_IN_LINE}${clip}`;
-  if (f.clip) return `${minted}${clip}`;
+const NO_MINT: MintView = { status: "notMinted", record: null, tokenId: null, settled: null };
+
+/** The Sold line's parts (§3.2): one sale names its percent and buyer, a 100 % sale drops the
+ *  percent, several roll up with the last one's short date; a visitor reads "Sold · {date}". */
+export function soldPartsOf(
+  customers: Pick<Customers, "mainSale" | "mainSaleCount" | "soldSharePct">,
+  audience: "owner" | "visitor",
+  now: number,
+): SoldLine | null {
+  const several = audience === "owner" && customers.mainSaleCount > 1;
+  return soldLineOf(customers, audience, (at) => (several ? formatShortDate(at, now) : formatDate(at)));
+}
+
+/**
+ * The status line (§3.2). Its first segment is the mint phrase (`mintPhrase`, T02) on a Private
+ * or Given project; a Listed, Paused or Sold project leads with its market fact, which
+ * `listingStatusLine` (T03) and `soldLineOf` (T05) word.
+ *
+ * | status | line |
+ * |---|---|
+ * | draft | v1: "Version 3 is ready to save" · "Brief in progress · to sell · Preview step" · … |
+ * | private | "{mint} · kept private" / "· kept by you" (showcased); removed: "{mint} · removed from the marketplace {d2}"; closed: "{mint} · auction ended with no bids"; a sell never listed: "{mint} · not on the marketplace yet" |
+ * | given | "{mint} · given to the community[ under {licence}]" |
+ * | listed | "Listed Sep 28, 2026 · Buy now · 0.05 MATIC" · "Auction · top bid 0.04 MATIC · 2h 14m left" · … |
+ * | paused | "Paused Sep 28, 2026 · relist it from the Marketplace block" |
+ * | sold | "Sold 10% to Mira (demo buyer) · Sep 28, 2026" · "Sold to …" · "Sold 30% in 3 sales · last Sep 28"; a visitor: "Sold · Sep 28, 2026" |
+ * | minted | v1: "Minted · the brief record isn't in this browser" |
+ */
+export function statusLineOf(status: ProjectStatus, f: StatusLineFacts): string {
+  const listing = f.listing ?? NO_LISTING;
+  switch (status) {
+    case "draft": {
+      if (f.pending?.status === "ready") return `Version ${f.pending.n} is ready to save`;
+      const brief = f.brief;
+      if (!brief) return "Not briefed yet";
+      const intent = brief.state.intent;
+      if (!intent) return "Brief started";
+      const step = STEP_PHRASE[brief.step];
+      return ["Brief in progress", INTENT_PHRASE[intent], ...(step ? [step] : [])].join(" · ");
+    }
+    case "minted":
+      return "Minted · the brief record isn't in this browser";
+    case "listed":
+      return listingStatusLine(listing, f.now) ?? STATUS_WORD.listed;
+    case "paused":
+      return listingStatusLine(listing, f.now) ?? STATUS_WORD.paused;
+    case "sold": {
+      const parts = f.customers ? soldPartsOf(f.customers, f.audience ?? "owner", f.now) : null;
+      return parts ? joinSoldLine(parts) : STATUS_WORD.sold;
+    }
+    case "given":
+    case "private":
+      break;
+  }
+
+  // A v1 caller passes no MintView: the Brief's own mintedAt is then the v1 ("legacy") mint.
+  const given = f.mint ?? NO_MINT;
+  const mint: MintView =
+    given.status === "notMinted" && (f.brief?.state.mintedAt ?? null) !== null ? { ...given, status: "legacy" } : given;
+  const phrase = mintPhrase(mint.status, mintAtOf(mint, f.brief), f.now) ?? "Minted";
+
   if (status === "given") {
     const license = f.brief?.state.license ?? null;
     const licence = license ? LICENSES.find((l) => l.value === license) : undefined;
-    return licence ? `${minted} · given to the community under ${licence.label}` : `${minted} · given to the community`;
+    return licence ? `${phrase} · given to the community under ${licence.label}` : `${phrase} · given to the community`;
   }
-  return f.showcased ? `${minted} · kept by you` : `${minted} · kept private`;
+  if (listing.kind === "ended") {
+    if (listing.why === "noBids") return `${phrase} · auction ended with no bids`;
+    const removed = listing.listing.events.filter((e) => e.kind === "removed").map((e) => e.at);
+    const at = listing.listing.endedAt ?? (removed.length ? Math.max(...removed) : listing.listing.updatedAt);
+    return `${phrase} · removed from the marketplace ${formatShortDate(at, f.now)}`;
+  }
+  if (listing.kind === "none" && f.brief?.state.intent === "sell") return `${phrase} · not on the marketplace yet`;
+  return f.showcased ? `${phrase} · kept by you` : `${phrase} · kept private`;
 }
 
 // ─────────────────────────── the summary ───────────────────────────
@@ -253,7 +404,7 @@ export type ProjectSummary = {
   name: string;
   status: ProjectStatus;
   statusWord: string; // STATUS_WORD[status]
-  statusLine: string; // §4.1
+  statusLine: string; // §3.2, as the owner reads it
   showcase: { at: number } | null; // showcaseOf() — the badge and the Showcase tab
   products: { id: string; name: string; description: string }[]; // the current version + products a later version dropped (COR-42)
   productCount: number; // products.length — never a count of builds
@@ -263,8 +414,22 @@ export type ProjectSummary = {
   version: { kind: "single"; v: number } | { kind: "builds"; k: number } | null; // "Version 2" | "3 builds" | none
   pendingVersion: PendingVersion | null;
   cover: string | null; // coverOf()
+  /** The Brief's v1 mint time; null for a record-only mint (`mint.record` holds that one). */
   mintedAt: number | null;
   sortKey: number; // "Recently updated": updatedAt NOW, lastActivityAt NEXT (LST-24)
+  // ── Phase 2 (§3.7): the facts the card and the header share ──
+  /** The mint axis (T02 `mintViewOf`). */
+  mint: MintView;
+  /** The Main listing, derived from the market records (T03 `listingViewOf`). */
+  listing: ListingView;
+  /** The split, from the contributors and the Main sales (T05 `ownershipOf`). */
+  ownership: OwnershipSplit;
+  /** Every sale of the project, as rows (T05 `customersOf`, project scope). */
+  customers: Customers;
+  /** The Sold line's parts for each audience; null unless a Main sale exists. */
+  sold: { owner: SoldLine; visitor: SoldLine } | null;
+  /** Decision 12: the maker sold everything (T08 `lockOf`). */
+  lock: ProjectLock | null;
 };
 
 function pendingOf(refs: BuildRef[], all: BuildJob[], projects?: ManualProject[]): PendingVersion | null {
@@ -293,18 +458,43 @@ export function projectSummary(
   ctx: {
     builds: BuildJob[];
     brief: StoredDraft | null;
+    /** Accepted for v1 callers; the status line no longer reads the clip (P2-VIDEO-15). */
     videoJobs: ClipJob[];
     now: number;
     /** The live projects, so a build saved into a deleted one reads as pending (pendingVersionsOf). */
     projects?: ManualProject[];
+    /** The marketplace records (`useMarket().data`, T11; T25 passes it on My projects).
+     *  Absent → none, so a v1 caller still compiles. */
+    market?: MarketData;
   },
 ): ProjectSummary {
+  const market = ctx.market ?? EMPTY_MARKET;
   const refs = buildsOf(p, ctx.builds);
-  const status = projectStatus(p, ctx.brief);
+  const rows = productsOfProject(p, refs);
+  const listing = listingViewOf(p.id, {
+    listings: market.listings,
+    sales: market.sales,
+    bids: market.bids,
+    now: ctx.now,
+    current: listingMetadataOf(p, rows, ctx.now),
+  });
+  const sales = market.sales.filter((s) => s.projectId === p.id);
+  const status = projectStatus(p, ctx.brief, { listing, sales });
   const showcase = showcaseOf(p, status);
   const source = projectSourceOf(refs);
   const pendingVersion = pendingOf(refs, ctx.builds, ctx.projects);
-  const products = productsOfProject(p, refs).map(({ id, name, description }) => ({ id, name, description }));
+  const products = rows.map(({ id, name, description }) => ({ id, name, description }));
+  const mint = mintViewOf(p, ctx.brief, sales);
+  const customers = customersOf(p, sales);
+  const ownership = ownershipOf({
+    createdAt: p.createdAt,
+    contributors: p.contributors ?? [],
+    sales,
+    listedPercent: listing.kind === "live" ? listing.listing.percentSelling : 0,
+  });
+  const lock = lockOf(ownership, sales);
+  const soldOwner = soldPartsOf(customers, "owner", ctx.now);
+  const soldVisitor = soldPartsOf(customers, "visitor", ctx.now);
   return {
     id: p.id,
     name: p.name,
@@ -314,20 +504,37 @@ export function projectSummary(
       brief: ctx.brief,
       showcased: showcase !== null,
       pending: pendingVersion,
-      clip: clipStillRendering(ctx.brief, ctx.videoJobs),
       now: ctx.now,
+      mint,
+      listing,
+      customers,
+      audience: "owner",
     }),
     showcase,
     products,
     productCount: products.length,
     source,
-    next: nextAction(p, { status, brief: ctx.brief, source, pending: pendingVersion }),
+    next: nextAction(p, {
+      status,
+      brief: ctx.brief,
+      source,
+      pending: pendingVersion,
+      listing,
+      creatorPct: ownership.maker,
+      locked: lock !== null,
+    }),
     when: whenOf(p, refs),
     version: versionOf(refs),
     pendingVersion,
     cover: coverOf(p, refs),
     mintedAt: ctx.brief?.state.mintedAt ?? null,
     sortKey: p.updatedAt,
+    mint,
+    listing,
+    ownership,
+    customers,
+    sold: soldOwner && soldVisitor ? { owner: soldOwner, visitor: soldVisitor } : null,
+    lock,
   };
 }
 
@@ -372,17 +579,45 @@ export type CardText = {
   action: (NextAction & { ariaLabel: string }) | null;
 };
 
+/** P2-CONTRIB-10's lead segment: "Created by you · Owned by Ana Silva". The name links to the
+ *  Contributors tab (`linkTab`) only when the viewer may see the roster. */
+export type OwnedByText = { created: "Created by you" | null; ownedBy: string; linkTab: "contributors" | null };
+
+/** §3.2: the owner's Sold line with the buyer as a link to their Customers row. */
+export type SoldBuyerLink = { before: string; label: string; href: string; after: string };
+
 export type HeaderText = {
   chip: ChipText;
   count: string;
-  meta: MetaPart[]; // COR-10: "4 products · Version 2 · Saved Sep 26, 2026"
+  meta: MetaPart[]; // COR-10: "4 products · Version 2 · Saved Sep 26, 2026[ · Stage Prototype]"
+  /** The whole meta line as it reads, the ownership lead first. */
   metaText: string;
   version: string | null;
   pair: ActionPair; // COR-11
+  // ── Phase 2 (§3.5.10) ──
+  /** P2-CONTRIB-10, rendered before `meta`; null unless someone else holds a majority. */
+  ownedBy: OwnedByText | null;
+  /** P2-TABS-10: "Stage Prototype" (also the last part of `meta`); null without a stage. */
+  stage: string | null;
+  /** §3.8.5: the owner's lock line under the status line; null when not locked or not the owner. */
+  lockLine: string | null;
+  /** §3.2: the owner's Sold line in parts, the buyer name a link; null otherwise. */
+  soldBuyerLink: SoldBuyerLink | null;
+  /** The Explore marketplace header (§2.4): "Created by you · Listed Sep 28, 2026"; null on the project page. */
+  createdBy: string | null;
 };
 
-function chipOf(s: ProjectSummary): ChipText {
-  return { word: s.statusWord, icon: STATUS_ICON[s.status], badge: s.showcase ? SHOWCASE_BADGE : null, line: s.statusLine };
+/** What the header knows beyond the summary. Every field is optional: a v1 caller reads the owner's header. */
+export type HeaderCtx = {
+  viewer?: Viewer;
+  /** `view.stage` (T08 `currentStage` over the journey). */
+  stage?: { short: string } | null;
+  /** "market" on `/marketplace/[id]`. */
+  context?: "project" | "market";
+};
+
+function chipOf(s: ProjectSummary, line = s.statusLine): ChipText {
+  return { word: s.statusWord, icon: STATUS_ICON[s.status], badge: s.showcase ? SHOWCASE_BADGE : null, line };
 }
 
 function timeOf(s: ProjectSummary, date: string): TimeText {
@@ -413,20 +648,57 @@ export function cardText(s: ProjectSummary, now: number): CardText {
   };
 }
 
-export function headerText(s: ProjectSummary): HeaderText {
+const LOCAL_OWNER: Viewer = { kind: "local-owner" };
+
+export function headerText(s: ProjectSummary, ctx: HeaderCtx = {}): HeaderText {
+  const viewer = ctx.viewer ?? LOCAL_OWNER;
   const version = versionLabel(s.version);
   const meta: MetaPart[] = [{ kind: "text", text: countLabel(s.productCount) }];
   if (s.source.kind === "hand") meta.push({ kind: "text", text: "Made by hand" });
   else if (version) meta.push({ kind: "text", text: version });
   meta.push({ kind: "time", time: timeOf(s, formatDate(s.when.at)) });
   if (s.source.kind === "build-gone") meta.push({ kind: "text", text: "build not in this browser" });
+  const stage = ctx.stage ? `Stage ${ctx.stage.short}` : null;
+  if (stage) meta.push({ kind: "text", text: stage });
+
+  const segment = ownedBySegment(s.ownership, viewer);
+  const ownedBy: OwnedByText | null = segment
+    ? { created: segment.created, ownedBy: segment.ownedBy, linkTab: segment.linked ? "contributors" : null }
+    : null;
+  const lead = ownedBy ? [...(ownedBy.created ? [ownedBy.created] : []), `Owned by ${ownedBy.ownedBy}`] : [];
+
+  // The Sold line names the buyer to the owner only; everyone else reads "Sold · {date}" (§3.2).
+  const seesBuyers = can(viewer, "customers.see");
+  const line = s.status === "sold" && s.sold && !seesBuyers ? joinSoldLine(s.sold.visitor) : s.statusLine;
+  const buyer = s.status === "sold" && seesBuyers ? (s.sold?.owner.buyer ?? null) : null;
+  const soldBuyerLink: SoldBuyerLink | null =
+    buyer && s.sold
+      ? {
+          before: s.sold.owner.before,
+          label: buyer.label,
+          href: `/projects/${s.id}?tab=customers&sale=${encodeURIComponent(buyer.saleId)}`,
+          after: s.sold.owner.after,
+        }
+      : null;
+
+  const listedAt = s.listing.kind === "none" ? null : s.listing.listing.listedAt;
   return {
-    chip: chipOf(s),
+    chip: chipOf(s, line),
     count: countLabel(s.productCount),
     meta,
-    metaText: metaTextOf(meta),
+    metaText: [...lead, metaTextOf(meta)].join(" · "),
     version,
     pair: s.next,
+    ownedBy,
+    stage,
+    lockLine: can(viewer, "facts.seeOwnerOnly") && s.lock ? s.lock.line : null,
+    soldBuyerLink,
+    createdBy:
+      ctx.context === "market"
+        ? listedAt !== null
+          ? `Created by you · Listed ${formatDate(listedAt)}`
+          : "Created by you"
+        : null,
   };
 }
 
@@ -465,7 +737,7 @@ export function matchProject(
 
 /** List view state in the URL (LST-28): written with `replace`, defaults left out. */
 export type ListQuery = {
-  tab: "all" | "draft" | "private" | "given" | "listed" | "showcase"; // showcase = membership (LST-10)
+  tab: "all" | "draft" | "private" | "given" | "listed" | "sold" | "showcase"; // showcase = membership (LST-10)
   q: string;
   sort: "updated" | "newest" | "oldest" | "name";
   source: "any" | "build" | "hand";

@@ -22,7 +22,7 @@ import {
 const D = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
 const FLOW = { pcb: false, code: false, three: false, assembly: false, wiring: false, preview: false, brief: false };
-const WORD = { draft: "Draft", private: "Private", given: "Given", listed: "Listed", minted: "Minted" };
+const WORD = { draft: "Draft", private: "Private", given: "Given", listed: "Listed", paused: "Paused", sold: "Sold", minted: "Minted" };
 
 /** A project record and the summary projectSummary() gives it. Only the fields the list reads vary. */
 function item({ id, name, status = "draft", showcase = null, source = { kind: "hand" }, products, description = "", createdAt, updatedAt }) {
@@ -103,18 +103,36 @@ const ids = (r) => r.rows.map((row) => row.project.id);
 
 test("LST-4 · the outcome tabs add up to All but for an unreadable mint; Showcase is membership", () => {
   const r = filterProjects(ITEMS, DEFAULT_LIST_QUERY);
-  assert.deepEqual(r.counts, { all: 8, draft: 4, private: 1, given: 1, listed: 1, showcase: 2 });
-  assert.equal(r.counts.draft + r.counts.private + r.counts.given + r.counts.listed, r.counts.all - 1);
+  assert.deepEqual(r.counts, { all: 8, draft: 4, private: 1, given: 1, listed: 1, sold: 0, showcase: 2 });
+  assert.equal(r.counts.draft + r.counts.private + r.counts.given + r.counts.listed + r.counts.sold, r.counts.all - 1);
   assert.equal(r.total, 8);
   assert.equal(r.matched, 8);
   assert.equal(r.narrowed, false);
   assert.equal(countLine(r), "8 projects");
 });
 
-test("LST-4 / LST-10 · the tab row: the outcome words, then Showcase after the divider", () => {
-  assert.deepEqual(LIST_TABS.map((t) => t.id), ["all", "draft", "private", "given", "listed", "showcase"]);
-  assert.deepEqual(LIST_TABS.map((t) => t.label), ["All", "Draft", "Private", "Given", "Listed", "Showcase"]);
+test("LST-4 / LST-10 · the tab row: the outcome words, Sold after Listed, then Showcase after the divider (P2-LISTING-18)", () => {
+  assert.deepEqual(LIST_TABS.map((t) => t.id), ["all", "draft", "private", "given", "listed", "sold", "showcase"]);
+  assert.deepEqual(LIST_TABS.map((t) => t.label), ["All", "Draft", "Private", "Given", "Listed", "Sold", "Showcase"]);
   assert.deepEqual(LIST_TABS.filter((t) => t.divider).map((t) => t.id), ["showcase"]);
+});
+
+test("P2-LISTING-18 / P2-CUSTOMERS-14 · Listed holds live and paused; Sold is its own tab; ?tab=sold survives a reload", () => {
+  const withMarket = [
+    ...ITEMS,
+    item({ id: "live", name: "Live One", status: "listed", createdAt: T0, updatedAt: T0, products: [{ name: "A" }] }),
+    item({ id: "held", name: "Paused One", status: "paused", createdAt: T0, updatedAt: T0, products: [{ name: "B" }] }),
+    item({ id: "gone", name: "Sold One", status: "sold", createdAt: T0, updatedAt: T0, products: [{ name: "C" }] }),
+  ];
+  const r = filterProjects(withMarket, DEFAULT_LIST_QUERY);
+  assert.equal(r.counts.listed, 3); // soil, live and the paused one
+  assert.equal(r.counts.sold, 1);
+  assert.deepEqual(ids(filterProjects(withMarket, view({ tab: "listed", sort: "name" }))), ["live", "held", "soil"]);
+  assert.deepEqual(ids(filterProjects(withMarket, view({ tab: "sold" }))), ["gone"]);
+  assert.ok(!ids(filterProjects(withMarket, view({ tab: "listed" }))).includes("gone"), "a sold project isn't under Listed");
+  assert.equal(listQueryString(view({ tab: "sold" })), "?tab=sold");
+  assert.equal(parseListQuery(new URLSearchParams("tab=sold")).tab, "sold");
+  assert.equal(parseListQuery(new URLSearchParams("tab=paused")).tab, "all", "there is no Paused tab");
 });
 
 test("LST-9 / LST-10 · a tab keeps its own projects; Showcase spans outcomes; an unreadable mint is under All only", () => {

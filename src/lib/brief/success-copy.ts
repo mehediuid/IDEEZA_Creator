@@ -7,10 +7,12 @@
 import type { Intent } from "./types";
 
 export function liveSubline(intent: Intent, hasClip: boolean): string {
+  // Until the Brief's Sell writes the listing itself (P2-LISTING-22, T26), a Sell mint reads
+  // Private on its page, where Add to marketplace lists it (P2-LISTING-24).
   return intent === "sell"
     ? hasClip
-      ? "Your video is final and your listing is minted. It goes on sale when the marketplace opens."
-      : "Your listing is minted. It goes on sale when the marketplace opens."
+      ? "Your video is final and your project is minted. Add it to Explore marketplace from its page."
+      : "Your project is minted. Add it to Explore marketplace from its page."
     : intent === "give"
       ? hasClip
         ? "Your video is final and the drop is open."
@@ -21,7 +23,7 @@ export function liveSubline(intent: Intent, hasClip: boolean): string {
 /** Minted, with the render still running — what happens without you. */
 export function pendingSubline(intent: Intent): string {
   return intent === "sell"
-    ? "Your listing is minted. It goes on sale, with the video, when the marketplace opens."
+    ? "Your project is minted. Add it to Explore marketplace from its page once its video finishes."
     : intent === "give"
       ? "We’ll open the drop the moment the video finishes — no extra action needed."
       : "Stored in your library. Pick it up any time.";
@@ -30,7 +32,7 @@ export function pendingSubline(intent: Intent): string {
 /** The line under the storyboard, while the render is still running. */
 export function pendingCardLine(intent: Intent, quality: string): string {
   const clip = `your ${quality} 10s video`;
-  if (intent === "sell") return `Your listing is minted — its video lands as soon as ${clip} finishes.`;
+  if (intent === "sell") return `Your project is minted — its video lands as soon as ${clip} finishes.`;
   if (intent === "give") return `The drop opens as soon as ${clip} finishes.`;
   return `It is replaced by ${clip} as soon as that finishes.`;
 }

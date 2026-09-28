@@ -178,3 +178,40 @@ test("only the owner can delete; Preview as buyer has no Delete (COR-67, PPL-6)"
   assert.equal(can({ kind: "local-owner" }, "project.delete"), true);
   assert.equal(can({ kind: "owner-preview" }, "project.delete"), false);
 });
+
+// ── Phase 2 (§3.5.10): contributors, activity files, ended listings, the on-chain note ──
+
+test("P2-CONTRIB-15 · the contributors list goes, right after the project line; it asks no typed name", () => {
+  const one = deletePlanOf(input({ contributors: 1 }));
+  assert.deepEqual(one.goes.slice(0, 2), ["The project — its name, description and 1 product", "The contributors list — 1 person"]);
+  assert.equal(one.typed, false);
+  assert.equal(deletePlanOf(input({ contributors: 2 })).goes[1], "The contributors list — 2 people");
+  assert.equal(deletePlanOf(input({ contributors: 0 })).goes.length, 1);
+});
+
+test("P2-TABS-9 · the activity history counts its entries and activity files", () => {
+  assert.ok(deletePlanOf(input({ activity: { entries: 3, files: 2 } })).goes.includes("The activity history — 3 entries and 2 activity files"));
+  assert.ok(deletePlanOf(input({ activity: { entries: 1, files: 1 } })).goes.includes("The activity history — 1 entry and 1 activity file"));
+  assert.ok(deletePlanOf(input({ activity: { entries: 2, files: 0 } })).goes.includes("The activity history — 2 entries"));
+  assert.equal(deletePlanOf(input({ activity: { entries: 0, files: 0 } })).goes.length, 1);
+});
+
+test("P2-LISTING-19 · a project with only ended listings lists its marketplace history", () => {
+  assert.ok(deletePlanOf(input({ status: "private", endedListings: 2 })).goes.includes("Its marketplace history — 2 ended listings"));
+  assert.ok(deletePlanOf(input({ status: "private", endedListings: 1 })).goes.includes("Its marketplace history — 1 ended listing"));
+});
+
+test("The mint record: a MintRecord asks for the typed name, and an on-chain one gets the testnet note", async () => {
+  const { ON_CHAIN_NOTE } = await import("../../.tmp-test/lib/manual/delete-plan.js");
+  const lazy = deletePlanOf(input({ status: "private", mint: "lazyMinted" }));
+  assert.ok(lazy.goes.includes("The mint record — lazy minted"));
+  assert.deepEqual([lazy.minted, lazy.typed], [MINTED_NOTE, true]);
+  const chain = deletePlanOf(input({ status: "private", mint: "onChain" }));
+  assert.ok(chain.goes.includes("The mint record — minted on chain"));
+  assert.equal(chain.minted, ON_CHAIN_NOTE);
+  assert.equal(ON_CHAIN_NOTE, "It was minted on chain as a testnet demo in this browser — nothing on a real blockchain changes.");
+  // A v1 Brief mint names its brief, as before; a sell no longer claims a listing.
+  const sell = deletePlanOf(input({ status: "private", draft: minted("sell"), mint: "legacy" }));
+  assert.ok(sell.goes.includes(`The brief — to sell, minted ${formatDate(MINTED_AT)}`));
+  assert.ok(!sell.goes.some((g) => /listed/.test(g)));
+});

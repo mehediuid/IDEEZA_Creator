@@ -305,8 +305,13 @@ const EMPTY_TAB_COPY: Record<Exclude<ListQuery["tab"], "all">, { title: string; 
   },
   listed: {
     title: "Nothing listed yet",
-    body: "In a project's brief, choose Sell Your Idea and mint. It goes on sale when the marketplace opens.",
+    body: "Open a minted project and press Add to marketplace — or choose Sell in a project's Brief.",
     icon: "tag",
+  },
+  sold: {
+    title: "Nothing sold yet",
+    body: "When a buyer buys one of your listings, the project moves here.",
+    icon: "badge-check",
   },
   showcase: {
     title: "Nothing showcased yet",

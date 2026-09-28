@@ -33,7 +33,7 @@ describe("projectView (COR-74)", () => {
       assert.deepEqual(view.pending, pendingVersionsOf(refs, fx.builds));
       assert.deepEqual(view.log, projectLogOf(p, fx.draft?.state ?? null));
       assert.deepEqual(view.summary, projectSummary(p, { builds: fx.builds, brief: fx.draft, videoJobs: [], now: NOW }));
-      assert.deepEqual(view.commerce, commerceOf(p, fx.draft, [], NOW));
+      assert.deepEqual(view.commerce, commerceOf(p, fx.draft));
     });
     it(`gives the card the page's products and cover — ${fx.name}`, () => {
       const view = projectView(fx.project, ctxOf(fx));
@@ -64,11 +64,34 @@ describe("projectView (COR-74)", () => {
     const kept = projectView(dropsOne.project, { ...ctx, projects: [dropsOne.project, { ...dropsOne.project, id: "p-deleted" }] });
     assert.deepEqual([kept.pending, kept.summary.pendingVersion], [[], null]);
   });
-  it("reads a project minted to sell as Listed and showcased, from its draft and its record", () => {
+  it("reads a v1 sell with no listing as Private and showcased, from its draft and its record (P2-LISTING-24)", () => {
     const view = projectView(mintedSell.project, ctxOf(mintedSell));
-    assert.equal(view.summary.status, "listed");
+    assert.equal(view.summary.status, "private");
     assert.deepEqual(view.summary.showcase, { at: MINT });
-    assert.equal(view.commerce.outcome, "listed");
+    assert.equal(view.commerce.outcome, "listed"); // the Brief's Sell; the status is the listing's fact
     assert.deepEqual(view.log.map((e) => e.kind), ["showcased", "minted"]);
+  });
+  it("gives a v1 caller the Phase 2 fields with empty defaults (§3.7)", () => {
+    for (const fx of ALL) {
+      const view = projectView(fx.project, ctxOf(fx));
+      assert.deepEqual(view.listing, { kind: "none" });
+      assert.deepEqual([view.sales, view.bids, view.editions], [[], [], []]);
+      assert.equal(view.ownership.maker, 100);
+      assert.equal(view.customers.saleCount, 0);
+      assert.equal(view.videos.record, null);
+      assert.deepEqual(Object.keys(view.videos.readiness), ["showcase", "sell", "give", "relist", "edition"]);
+      assert.deepEqual([view.stage, view.activityCount, view.lock, view.marketUnreadable], [null, 0, null, false]);
+      assert.deepEqual(view.deleteFacts, {
+        marketUnreadable: false,
+        sold: { sharePct: 0, editions: 0, buyers: 0 },
+        auction: null,
+        listed: false,
+        otherOwners: [],
+      });
+      assert.equal(view.canCtx.listing, "none");
+      assert.equal(view.canCtx.creatorPct, 100);
+      assert.equal(view.canCtx.locked, false);
+      assert.equal(view.canCtx.status, view.summary.status);
+    }
   });
 });

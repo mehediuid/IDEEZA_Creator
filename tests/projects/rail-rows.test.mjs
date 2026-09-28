@@ -75,16 +75,17 @@ test("logLinesOf: created, minted and showcased only, each over its date (COR-52
     { key: `showcased:${SEP26_1000}`, title: "Showcased", note: null, when: [time(SEP26_1000, "Sep 26, 2026 · 10:00 AM")] },
     {
       key: `minted:${SEP22_2109}`,
-      title: "Minted · Listed · Base Sepolia (Testnet)",
-      // "Listed" never stands alone before a marketplace exists (COM-19).
-      note: "Goes on sale when the marketplace opens.",
+      // A v1 Sell never reached a marketplace: it reads Private, as the chip does (P2-LISTING-24),
+      // and the retired Listed subline is gone (P2-LISTING-20).
+      title: "Minted · Private · Base Sepolia (Testnet)",
+      note: null,
       when: [time(SEP22_2109, "Sep 22, 2026 · 9:09 PM")],
     },
     { key: `created:${SEP20_1005}`, title: "Created by hand", note: null, when: [time(SEP20_1005, "Sep 20, 2026 · 10:05 AM")] },
   ]);
 });
 
-test("logLinesOf: each intent mints into its status word; only Listed carries a note", () => {
+test("logLinesOf: each intent mints into its status word, with no note", () => {
   const [give, save] = logLinesOf([
     { kind: "minted", at: 2, intent: "give", network: "mumbai" },
     { kind: "minted", at: 1, intent: "save", network: "baseSepolia" },
@@ -104,12 +105,109 @@ test("logLinesOf: network: false leaves the chain out of a mint (PPL-7, Preview 
     ],
     { network: false },
   );
-  assert.equal(minted.title, "Minted · Listed");
-  // The Listed subline stays: "Listed" never stands alone (COR-76).
-  assert.equal(minted.note, "Goes on sale when the marketplace opens.");
+  assert.equal(minted.title, "Minted · Private");
+  assert.equal(minted.note, null);
   assert.equal(showcased.title, "Showcased");
   // The default is the owner's line, chain included.
-  assert.equal(logLinesOf([{ kind: "minted", at: 2, intent: "sell", network: "baseSepolia" }])[0].title, "Minted · Listed · Base Sepolia (Testnet)");
+  assert.equal(logLinesOf([{ kind: "minted", at: 2, intent: "sell", network: "baseSepolia" }])[0].title, "Minted · Private · Base Sepolia (Testnet)");
+});
+
+test("logLinesOf · P2-MINT-12: lazy, instant, upgrade, settled and payout lines, and what a preview drops", () => {
+  const charge = { network: "baseSepolia", lines: [{ coin: "IDZ", amount: "4" }, { coin: "ETH", amount: "0.00104" }] };
+  const entries = [
+    { kind: "payoutChanged", at: 6, toLabel: "Demo account 2", toAddress: "0x2b10000000000000000000000000000000003c00" },
+    { kind: "mintedOnChain", at: 5, intent: "sell", network: "baseSepolia", tokenId: 1, via: "sale" },
+    { kind: "mintedOnChain", at: 4, intent: "sell", network: "baseSepolia", tokenId: 1, via: "upgrade", charge },
+    { kind: "mintedOnChain", at: 3, intent: "save", network: "mumbai", tokenId: 2, via: "instant", charge },
+    { kind: "lazyMinted", at: 2, intent: "sell", network: "baseSepolia", tokenId: 1 },
+    { kind: "lazyMinted", at: 1, intent: "save", network: "baseSepolia", tokenId: 3 },
+  ];
+  assert.deepEqual(
+    logLinesOf(entries).map((l) => [l.title, l.note]),
+    [
+      ["Payout wallet changed", "Now Demo account 2 · 0x2b10…3c00"],
+      ["Minted on chain at its first sale", "Token #1"],
+      ["Minted on chain", "Upgraded from the lazy mint · paid 4 IDZ + 0.00104 ETH"],
+      ["Minted on chain · Private · Mumbai Testnet (Polygon)", "Token #2 · paid 4 IDZ + 0.00104 ETH"],
+      ["Lazy minted · Listed · Base Sepolia (Testnet)", "Token #1 — minted on chain at its first sale."],
+      ["Lazy minted · Private · Base Sepolia (Testnet)", "Token #3 — nothing on chain until it's listed."],
+    ],
+  );
+  const preview = logLinesOf(entries, { network: false });
+  assert.deepEqual(preview.map((l) => [l.title, l.note]), [
+    ["Minted on chain at its first sale", "Token #1"],
+    ["Minted on chain", "Token #1"],
+    ["Minted on chain · Private", "Token #2"],
+    ["Lazy minted · Listed", "Token #1"],
+    ["Lazy minted · Private", "Token #3"],
+  ]);
+  for (const l of preview) assert.doesNotMatch(`${l.title} ${l.note}`, /Base Sepolia|paid|Payout/);
+});
+
+test("logLinesOf · P2-LISTING-20: the listing events, with their terms", () => {
+  const OCT3 = at(2026, 10, 3, 14, 30);
+  const buyNow = { type: "buyNow", token: "MATIC", price: "0.05" };
+  const lines = logLinesOf([
+    { kind: "listing", at: 7, event: { kind: "closed", at: 7 }, terms: { type: "auction", token: "ETH", endsAt: OCT3 } },
+    { kind: "listing", at: 6, event: { kind: "removed", at: 6 }, terms: buyNow },
+    { kind: "listing", at: 5, event: { kind: "relisted", at: 5 }, terms: buyNow },
+    { kind: "listing", at: 4, event: { kind: "paused", at: 4, changes: ["rename"] }, terms: buyNow },
+    { kind: "listing", at: 3, event: { kind: "updated", at: 3, price: "0.06" }, terms: buyNow },
+    { kind: "listing", at: 2, event: { kind: "listed", at: 2 }, terms: { type: "auction", token: "ETH", endsAt: OCT3 } },
+    { kind: "listing", at: 1, event: { kind: "listed", at: 1 }, terms: buyNow },
+    { kind: "listing", at: 0, event: { kind: "listed", at: 0 } },
+  ]);
+  assert.deepEqual(lines.map((l) => l.title), [
+    "Auction ended with no bids",
+    "Removed from the marketplace",
+    "Relisted",
+    "Paused from the marketplace · the name changed",
+    "Listing updated · 0.06 MATIC",
+    "Auction started · ends Oct 3, 2026 · 2:30 PM",
+    "Listed · Buy now · 0.05 MATIC",
+    "Listed on the marketplace",
+  ]);
+  assert.equal(new Set(lines.map((l) => l.key)).size, lines.length, "keys are unique");
+});
+
+test("logLinesOf · sales, support, editions and the business plan (P2-MARKETPLACE-16, -20, P2-TABS-12)", () => {
+  const sale = (over) => ({
+    id: "sale_a", listingId: "lst_a", projectId: "p", at: 9, buyerId: "buyer-mira", buyerAddress: "0x1", sellerAddress: "0x2",
+    item: { nft: "main", sharePct: 10 }, via: "buyNow", token: "MATIC", price: "0.05",
+    fees: { ideezaBps: 250, ideeza: "0.00125", network: { coin: "MATIC", amount: "0.021" } }, payout: "0.04875",
+    royaltiesPct: 10, mint: "lazy", mintedAtSale: true, tokenId: 1042, network: "mumbai", collection: "C", benefits: [],
+    txHash: "0xtx", demo: true, ...over,
+  });
+  const edition = {
+    nft: "physical", trackId: "ed_a", productId: "prd_a", productName: "Remote", use: "private", tier: "regular", serial: 1,
+  };
+  const entries = [
+    { kind: "support", at: 12, request: { id: "sup_a", saleId: "sale_a", projectId: "p", buyerId: "buyer-mira", message: "Where's the BOM?", at: 12 } },
+    { kind: "sold", at: 11, sale: sale({ id: "sale_c", item: edition, price: "0.01", buyerId: "buyer-sam" }) },
+    { kind: "sold", at: 10, sale: sale({ id: "sale_b", item: { nft: "main", sharePct: 100 }, buyerId: "buyer-leo", mintedAtSale: false }) },
+    { kind: "sold", at: 9, sale: sale({}) },
+    { kind: "editions", at: 3, productId: "prd_a", nft: "physical", use: "private", n: 10, event: "listed" },
+    { kind: "editions", at: 2, productId: "prd_a", nft: "virtual", use: "commercial", n: 1, event: "created" },
+    { kind: "businessPlan", at: 1 },
+  ];
+  const products = [{ id: "prd_a", name: "Remote" }];
+  assert.deepEqual(logLinesOf(entries, { products }).map((l) => [l.title, l.note]), [
+    ["Support request from Mira (demo buyer)", "Where's the BOM?"],
+    ["Sold a Physical NFT of Remote to Sam (demo buyer)", "0.01 MATIC · Private use"],
+    ["Sold to Leo (demo buyer)", "0.05 MATIC · token #1042"],
+    ["Sold 10% to Mira (demo buyer)", "0.05 MATIC · token #1042 minted on this sale"],
+    ["Private use Physical NFT listed", "Remote"],
+    ["1 Commercial use Virtual NFT created", "Remote"],
+    ["Business plan written", null],
+  ]);
+  // A preview never learns who bought, for how much, or what was asked.
+  assert.deepEqual(logLinesOf(entries, { network: false, products }).map((l) => [l.title, l.note]), [
+    ["Sold a Physical NFT of Remote", null],
+    ["Sold", null],
+    ["Sold", null],
+    ["Private use Physical NFT listed", "Remote"],
+    ["1 Commercial use Virtual NFT created", "Remote"],
+  ]);
 });
 
 test("productAtVersionHref: a product's page at one version (COR-41)", () => {

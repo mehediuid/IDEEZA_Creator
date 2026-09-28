@@ -1,19 +1,27 @@
-// What the rail's Outcome and Details blocks say (COM-3…16, COR-55), from the
-// one commerce read (commerceOf, §5.1.4) and the one summary (projectSummary,
-// §5.1.3). Pure: the blocks render these rows as they are, and
+// What the rail's Outcome and Details blocks say (COM-3…16, COR-55; Phase 2
+// P2-MINT-10, P2-LISTING-23, P2-CONTRIB-9, P2-VIDEO-15), from the one commerce
+// read (commerceOf, §5.1.4) and the one summary (projectSummary, §5.1.3).
+// Pure: the blocks render these rows as they are, and
 // tests/projects/rail-copy.test.mjs pins every sentence.
 //
 // Only committed terms are shown — nothing typed into an unfinished Brief
-// (COM-5) — and no line says a listing, drop or post is live anywhere:
-// nothing is, yet. Dates, status words, the Listed words and the Source words
-// are A3's, so the rail, the header and the My projects card say them alike.
+// (COM-5). The listing's price and royalties are the Marketplace block's, its
+// one home (P2-LISTING-23); the Outcome block holds the mint and its proof.
+// Dates, status words and the Source words are A3's, so the rail, the header
+// and the My projects card say them alike.
 //
 // Value imports are relative (see showcase-copy.ts).
 
-import type { ProjectCommerce, SaleTerms } from "../brief/project-brief";
+import type { ProjectCommerce } from "../brief/project-brief";
 import { BRIEF_FORM_LABEL, type BriefStepId, type Intent } from "../brief/types";
+import type { ListingView } from "../market/types";
+import { shortAddress } from "../wallet/demo-wallet";
+import { mintProofRows, type MintProofRow } from "../wallet/mint";
+import type { MintRecord, MintStatus } from "../wallet/types";
+import { ownershipRow } from "./ownership";
+import type { OwnershipSplit, Readiness } from "./p2-types";
+import type { Viewer } from "./permissions";
 import {
-  LISTED_SUBLINE,
   STATUS_WORD,
   formatDate,
   formatDateTime,
@@ -24,32 +32,46 @@ import {
 } from "./project-summary";
 import { showcaseRow, timePart, type ShowcaseRowCopy } from "./showcase-copy";
 
+/** One Outcome fact. The keys are P2-MINT-10's (`MintProofRow`'s five, T02) plus the v1 facts
+ *  that stay; v1's `minted`, `price` and `royalties` are retired. */
 export type OutcomeRow = {
-  key: "minted" | "network" | "collection" | "price" | "royalties" | "license";
+  key: MintProofRow["key"] | "network" | "collection" | "license";
   label: string;
   value: MetaPart[];
-  /** A second line under the value: the license's one-liner, a passed auction end. */
+  /** A second line under the value: the mint's note, the token's reservation, the license's one-liner. */
   note?: string;
+  /** The IconButton after a short hash or address (P2-MINT-10): its label and the full value it copies. */
+  copy?: { label: "Copy signature" | "Copy transaction hash" | "Copy address"; value: string };
 };
 
 export type OutcomeView = {
   subline: string;
-  /** COM-13, on a minted Private / Given / Listed project whose preview clip is rendering or failed. */
-  clipLine: string | null;
-  /** §4.1 rows 6–9: the facts, the Showcase row and the footnote. Null on a Draft (X41). */
+  /** Retired with the preview clip (P2-VIDEO-15): video status lives in Media, the product cards
+   *  and the Showcase note. Always null; kept so the block's v1 render still compiles. */
+  clipLine: null;
+  /** The mint rows, the Showcase row and the footnote. Null on a Draft (X41). */
   minted: { rows: OutcomeRow[]; showcase: ShowcaseRowCopy; footnote: string } | null;
+  /** The mint axis, for the Mint row's glyph and tone (outline and neutral when lazy, filled and
+   *  success on chain) and its Testnet demo badge, which every record-backed mint carries. */
+  mint: MintStatus;
+  demo: boolean;
   /** Said after "Outcome" on the stacked block's toggle: "Listed · Showcased" (COM-55). */
   meta: string;
 };
 
+/** v1's footnote, kept for a mint with no record (P2-MINT-10's legacy column). */
 export const MINTED_FOOTNOTE = "Recorded in this browser only — nothing is written to a blockchain yet.";
+/** P2-MINT-10: a record-backed mint's footnote. No hash is a link. */
+export const DEMO_MINT_FOOTNOTE =
+  "Testnet demo — the token, signature and transaction were made in this browser. Nothing is on a real blockchain, so there's no explorer page for them.";
 
 const NOTHING_YET = "Nothing decided yet. The Brief is where you keep it, give it away or sell it.";
 const BRIEF_OPEN = "The Brief is open — no outcome chosen yet.";
 const UNREADABLE = "The brief record can't be read in this browser, so its terms aren't shown.";
-const AUCTION_PASSED = "This end date passed before the marketplace opened — nothing was sold.";
-/** A3's Listed words, mid-sentence. */
-const LISTED_IN_LINE = LISTED_SUBLINE.charAt(0).toLowerCase() + LISTED_SUBLINE.slice(1);
+/** P2-LISTING-23: a sell or save mint that has a listing, of any status. */
+export const SALE_IN_MARKETPLACE = "Minted. Its sale is in the Marketplace block.";
+const SETTLED_NOTE = "At its first sale — the buyer's purchase paid the network fee.";
+const ON_CHAIN_WALLET_NOTE = "Locked — the token is on chain at this wallet.";
 
 const text = (t: string): MetaPart => ({ kind: "text", text: t });
 
@@ -78,38 +100,80 @@ export function formatAmount(raw: string | undefined, token: string): string | n
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(n)} ${token}`;
 }
 
-function saleRow(sale: SaleTerms): OutcomeRow | null {
-  if (sale.kind === "buyNow") {
-    const price = formatAmount(sale.price, sale.token);
-    return price ? { key: "price", label: "Price", value: [text(`${price} · Buy now`)] } : null;
-  }
-  const from = formatAmount(sale.minBid, sale.token);
-  if (!from) return null;
-  const buyNow = formatAmount(sale.buyNow, sale.token);
-  const head = `Auction · from ${from}${buyNow ? ` · buy now ${buyNow}` : ""}`;
-  const ends = Number.isFinite(sale.endsAt)
-    ? [text(" · ends "), timePart(sale.endsAt, formatDateTime(sale.endsAt))]
-    : [];
-  return {
-    key: "price",
-    label: "Price",
-    value: [text(head), ...ends],
-    ...(sale.ended ? { note: AUCTION_PASSED } : null),
-  };
+/** T02's proof rows for a record, with the full value each copy button copies — and, for a lazy
+ *  record its first Main sale settled (C12), the on-chain reading of the same rows. */
+function proofRowsOf(rec: MintRecord, c: ProjectCommerce): OutcomeRow[] {
+  const settled = !rec.onChain && c.settled ? c.settled : null;
+  const txHash = rec.onChain?.txHash ?? settled?.txHash ?? null;
+  return mintProofRows(rec, { owner: true }, c.intent ?? undefined).map((row): OutcomeRow => {
+    switch (row.key) {
+      case "mint":
+        return settled
+          ? { key: "mint", label: row.label, value: [text(`Minted on chain · ${formatDate(settled.at)}`)], note: SETTLED_NOTE }
+          : row;
+      case "token":
+        return settled ? { key: "token", label: row.label, value: row.value } : row;
+      case "signature":
+        if (settled) {
+          return {
+            key: "tx",
+            label: "Transaction",
+            value: [text(shortAddress(settled.txHash))],
+            copy: { label: "Copy transaction hash", value: settled.txHash },
+          };
+        }
+        return rec.signature ? { ...row, copy: { label: "Copy signature", value: rec.signature } } : row;
+      case "tx":
+        return txHash ? { ...row, copy: { label: "Copy transaction hash", value: txHash } } : row;
+      case "wallet":
+        return {
+          ...row,
+          ...(settled ? { note: ON_CHAIN_WALLET_NOTE } : null),
+          copy: { label: "Copy address", value: rec.wallet.address },
+        };
+    }
+  });
 }
 
-function clipLineOf(clip: ProjectCommerce["clip"]): string | null {
-  if (clip.state === "rendering") {
-    const eta = clip.eta ? `, ${clip.eta} left` : "";
-    return `The preview clip is still rendering — ${Math.round(clip.progress ?? 0)} %${eta}.`;
+/** Mint · Network · Collection · Token · Transaction or Signature · Payout wallet · License
+ *  (P2-MINT-10's order; Price and Royalties moved to the Marketplace block). */
+function mintedRows(c: ProjectCommerce): OutcomeRow[] {
+  const facts: OutcomeRow[] = [];
+  if (c.network) facts.push({ key: "network", label: "Network", value: [text(c.network.label)] });
+  const collection = c.collection?.trim();
+  if (collection) facts.push({ key: "collection", label: "Collection", value: [text(collection)] });
+
+  const rows: OutcomeRow[] = [];
+  if (c.record) {
+    const [mint, ...proof] = proofRowsOf(c.record, c);
+    rows.push(mint, ...facts, ...proof);
+  } else {
+    if (typeof c.mintedAt === "number") {
+      rows.push({ key: "mint", label: "Mint", value: [text("Minted · "), timePart(c.mintedAt, formatDateTime(c.mintedAt))] });
+    }
+    rows.push(...facts);
   }
-  return clip.state === "failed" ? "The preview clip failed — regenerate it from the Brief." : null;
+  if (c.outcome === "given" && c.license) {
+    rows.push({ key: "license", label: "License", value: [text(c.license.label)], note: c.license.info });
+  }
+  return rows;
 }
 
-/** The Outcome block, in words (§4.1's Outcome column). */
-export function outcomeView(c: ProjectCommerce, s: Pick<ProjectSummary, "status" | "showcase">): OutcomeView {
+/** What `outcomeView` reads beyond the commerce: the summary (a full `ProjectSummary` passes as
+ *  it is, and its `listing` and `id` are used when present) and the Showcase gate. */
+export type OutcomeSummary = Pick<ProjectSummary, "status" | "showcase"> & Partial<Pick<ProjectSummary, "id" | "listing">>;
+
+/** The Outcome block, in words (§4.1's Outcome column; P2-MINT-10, P2-LISTING-23, P2-VIDEO-15).
+ *  `showcaseGate` is `view.videos.readiness.showcase`: without it the Showcase row reads v1's notes. */
+export function outcomeView(c: ProjectCommerce, s: OutcomeSummary, showcaseGate?: Readiness): OutcomeView {
   const meta = [STATUS_WORD[s.status], ...(s.showcase ? ["Showcased"] : [])].join(" · ");
-  const undecided = (subline: string): OutcomeView => ({ subline, clipLine: null, minted: null, meta });
+  const demo = c.record !== null;
+  const undecided = (subline: string): OutcomeView => ({ subline, clipLine: null, minted: null, mint: c.mint, demo, meta });
+  const showcase = showcaseRow(
+    s.showcase,
+    showcaseGate && s.id ? { readiness: showcaseGate, projectId: s.id } : undefined,
+  );
+  const listing: ListingView["kind"] = s.listing?.kind ?? "none";
 
   switch (c.outcome) {
     case "none":
@@ -125,44 +189,30 @@ export function outcomeView(c: ProjectCommerce, s: Pick<ProjectSummary, "status"
       return {
         subline: UNREADABLE,
         clipLine: null,
-        minted: { rows: [], showcase: showcaseRow(s.showcase), footnote: MINTED_FOOTNOTE },
+        minted: { rows: [], showcase, footnote: MINTED_FOOTNOTE },
+        mint: c.mint,
+        demo,
         meta,
       };
     case "private":
     case "given":
     case "listed": {
-      const rows: OutcomeRow[] = [];
-      if (typeof c.mintedAt === "number") {
-        rows.push({ key: "minted", label: "Minted", value: [timePart(c.mintedAt, formatDateTime(c.mintedAt))] });
-      }
-      if (c.network) rows.push({ key: "network", label: "Network", value: [text(c.network.label)] });
-      const collection = c.collection?.trim();
-      if (collection) rows.push({ key: "collection", label: "Collection", value: [text(collection)] });
-      if (c.outcome === "listed") {
-        const sale = c.sale ? saleRow(c.sale) : null;
-        if (sale) rows.push(sale);
-        if (typeof c.royaltiesPct === "number" && Number.isFinite(c.royaltiesPct)) {
-          const pct = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(c.royaltiesPct);
-          rows.push({ key: "royalties", label: "Royalties", value: [text(`${pct} % on resales`)] });
-        }
-      }
-      if (c.outcome === "given" && c.license) {
-        rows.push({ key: "license", label: "License", value: [text(c.license.label)], note: c.license.info });
-      }
       const subline =
-        c.outcome === "listed"
-          ? `Minted. It ${LISTED_IN_LINE}.`
-          : c.outcome === "given"
-            ? c.license
-              ? `Minted under ${c.license.label}. This can't be undone.`
-              : "Minted to give away. This can't be undone."
+        c.outcome === "given"
+          ? c.license
+            ? `Minted under ${c.license.label}. This can't be undone.`
+            : "Minted to give away. This can't be undone."
+          : listing !== "none"
+            ? SALE_IN_MARKETPLACE
             : s.showcase
               ? "Minted and kept by you — not given away or for sale."
               : "Minted and kept. Only you can see it.";
       return {
         subline,
-        clipLine: clipLineOf(c.clip),
-        minted: { rows, showcase: showcaseRow(s.showcase), footnote: MINTED_FOOTNOTE },
+        clipLine: null,
+        minted: { rows: mintedRows(c), showcase, footnote: demo ? DEMO_MINT_FOOTNOTE : MINTED_FOOTNOTE },
+        mint: c.mint,
+        demo,
         meta,
       };
     }
@@ -170,24 +220,40 @@ export function outcomeView(c: ProjectCommerce, s: Pick<ProjectSummary, "status"
 }
 
 export type DetailRow = {
-  key: "source" | "created" | "stored";
+  key: "ownership" | "source" | "created" | "stored";
   label: string;
   value: MetaPart[];
   note?: string;
+  /** P2-CONTRIB-9: the Ownership row's quiet link, which selects the Contributors tab. */
+  link?: { label: "See contributors"; tab: "contributors" };
 };
 
-/** COR-55: Source · Created (only when it isn't the meta line's date) · Stored (owner only, PPL-7).
+/** COR-55: [Ownership | Your role] · Source · Created (only when it isn't the meta line's date) ·
+ *  Stored (owner only, PPL-7). The first row is P2-CONTRIB-9's (`ownershipRow`, T05): the owner's
+ *  split while anyone else holds a share, a contributor preview's own role, nothing for a buyer.
  *  Built in is not here: each lineage's chat heads its group in the Versions block (owner decision O9). */
 export function detailsRows(input: {
   source: ProjectSource;
   when: ProjectSummary["when"];
   createdAt: number;
   ownerFacts: boolean;
+  /** `view.ownership` and the viewer; without them there is no ownership row (v1). */
+  ownership?: OwnershipSplit;
+  viewer?: Viewer;
 }): DetailRow[] {
   const tag = sourceTag(input.source);
-  const rows: DetailRow[] = [
-    { key: "source", label: "Source", value: [text(tag.label)], ...(tag.tip && input.ownerFacts ? { note: tag.tip } : null) },
-  ];
+  const rows: DetailRow[] = [];
+  const own = input.ownership && input.viewer ? ownershipRow(input.ownership, input.viewer) : null;
+  if (own) {
+    rows.push({
+      key: "ownership",
+      label: own.label,
+      value: [text(own.value)],
+      ...(own.note ? { note: own.note } : null),
+      ...(own.link ? { link: { label: own.link, tab: "contributors" as const } } : null),
+    });
+  }
+  rows.push({ key: "source", label: "Source", value: [text(tag.label)], ...(tag.tip && input.ownerFacts ? { note: tag.tip } : null) });
   const created = formatDate(input.createdAt);
   if (input.when.label !== "Created" && created !== formatDate(input.when.at)) {
     rows.push({ key: "created", label: "Created", value: [timePart(input.createdAt, created)] });

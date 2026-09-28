@@ -336,15 +336,15 @@ test("the order: marketUnreadable > sold > auction > listed > otherOwners (C6)",
 
 // ── v1: the outcome and the status never disagree ──
 
-test("commerceOf's outcome and projectStatus() never disagree (§5.1.4)", () => {
+test("commerceOf's outcome and projectStatus() never disagree (§5.1.4; with no market records, Phase 2 §3.2)", () => {
   const MINTED = Date.UTC(2026, 8, 22, 21, 9);
-  const NOW = Date.UTC(2026, 8, 26, 12, 0);
   const EXPECTED = {
     none: "draft",
     briefing: "draft",
     private: "private",
     given: "given",
-    listed: "listed",
+    // "listed" is the Brief's Sell; with no listing it reads Private (P2-LISTING-24).
+    listed: "private",
     mintedUnreadable: "minted",
   };
   const project = (status = "draft") => ({
@@ -366,7 +366,7 @@ test("commerceOf's outcome and projectStatus() never disagree (§5.1.4)", () => 
     [project("completed"), draft({ intent: "give" }, "form")],
   ];
   for (const [p, d] of cases) {
-    const outcome = commerceOf(p, d, [], NOW).outcome;
+    const outcome = commerceOf(p, d, []).outcome;
     assert.equal(projectStatus(p, d), EXPECTED[outcome], `${p.status} · ${JSON.stringify(d?.state.intent)} · ${outcome}`);
   }
 });

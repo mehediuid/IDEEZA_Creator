@@ -7,10 +7,9 @@
 // draft reads as null". `commerceOf` is pure: the Outcome card, the status
 // line and the unit tests get the same facts from the same inputs.
 //
-// Nothing here says "live". The Brief's own word for "minted, and no clip still
-// rendering" is live; the project page states those two facts (`mint`,
-// `clip`) instead, because nothing is on a marketplace or on Innovations yet
-// (CNT-41, COM-12).
+// Nothing here says "live": whether the project is on Explore marketplace is
+// the listing's fact (`listingViewOf`, T03), and the videos are the product
+// pages' (P2-VIDEO-15). `commerceOf` states what the Brief and the mint made.
 //
 // Imports are relative, like `lib/create/history.tsx` and `lib/spec/*`, so the
 // node test build resolves them without the `@/` alias.
@@ -19,8 +18,6 @@ import * as React from "react";
 import {
   LICENSES,
   NETWORKS,
-  ROYALTY_MAX,
-  ROYALTY_MIN,
   briefDraftKey,
   normalizeBrief,
   normalizeStep,
@@ -29,11 +26,11 @@ import {
   type Intent,
   type License,
   type Network,
-  type Token,
 } from "./types";
 import { useManualProjects, type ManualProject } from "../manual/projects";
-import { etaLabel, progressOf, type VideoJob } from "../video/jobs";
-import type { MintStatus } from "../wallet/types";
+import type { Sale } from "../market/types";
+import type { MintRecord, MintStatus, MintView } from "../wallet/types";
+import { mintViewOf } from "../wallet/mint";
 
 // ── The read ─────────────────────────────────────────────────────────────────
 
@@ -139,15 +136,14 @@ export function useProjectBrief(projectId: string): StoredDraft | null | undefin
 
 // ── The Outcome ──────────────────────────────────────────────────────────────
 
+/** What the Brief and the mint made of the project. `"listed"` is a mint with intent sell — the
+ *  Brief's choice, not the status: whether it is on the marketplace is the listing's fact
+ *  (§3.2), so a sell mint with no listing reads Private (P2-LISTING-24). */
 export type Outcome =
   | "none" | "briefing" | "private" | "given" | "listed"
-  | "mintedUnreadable";                                                  // status completed, no mint in the draft
-/** The mint axis (Phase 2 spec §3.2), owned by `../wallet/types`. A v1 Brief mint, which has no
- *  MintRecord, reads "legacy" here until T10's `commerceOf` reads the record. */
+  | "mintedUnreadable";                                                  // status completed, no mint anywhere
+/** The mint axis (Phase 2 spec §3.2), owned by `../wallet/types`. */
 export type { MintStatus };
-export type SaleTerms =
-  | { kind: "buyNow"; token: Token; price: string }
-  | { kind: "auction"; token: Token; minBid: string; buyNow?: string; endsAt: number; ended: boolean };
 
 export type ProjectCommerce = {
   outcome: Outcome;
@@ -156,112 +152,68 @@ export type ProjectCommerce = {
    *  Brief was opened with no outcome chosen — which is how the Outcome card
    *  tells COM-4's two sublines apart (absent = no draft at all). */
   step?: BriefStepId;
+  /** `mintViewOf` (T02): "legacy" for a v1 Brief mint with no MintRecord. */
   mint: MintStatus;
+  /** The MintRecord behind a lazy or on-chain mint; null for a v1 mint or none. */
+  record: MintRecord | null;
+  /** A lazy mint settled at its first Main sale — derived from the sale, never written (C12). */
+  settled?: NonNullable<MintView["settled"]>;
+  /** The mint time: the record's, else the Brief's `mintedAt`. */
   mintedAt?: number;
   network?: { id: Network; label: string };  // the NETWORKS label, e.g. "Base Sepolia (Testnet)"
   collection?: string;
-  sale?: SaleTerms;                          // sell + minted only, and only when its amounts are set
-  royaltiesPct?: number;                     // sell only, ROYALTY_MIN–ROYALTY_MAX
   license?: { id: License; label: string; info: string };   // give only
+  // No sale terms (P2-LISTING-23): the price and royalties are the Marketplace block's, from the listing.
+  // No clip (P2-VIDEO-15): each product's video is its Media tab's.
   // No Innovations field: Showcase is the project's own flag (summary.showcase, COR-105), not a Brief term.
-  clip: { state: "none" | "rendering" | "ready" | "failed"; progress?: number; eta?: string };
 };
 
-/** A positive amount as it was typed, trimmed — the form's own test (`isAmount`, step-3-mint) — or null. */
-function amountOf(v: string): string | null {
-  const t = v.trim();
-  return t && Number(t) > 0 ? t : null;
-}
-
-/** The terms a minted sale was listed with; undefined when its amounts were never set. */
-function saleOf(s: BriefState, now: number): SaleTerms | undefined {
-  if (s.listingType === "auction") {
-    const minBid = amountOf(s.minBid);
-    // A datetime-local value: local wall-clock time, read the way the form reads it.
-    const endsAt = new Date(s.expiresAt).getTime();
-    if (!minBid || !Number.isFinite(endsAt)) return undefined;
-    const buyNow = amountOf(s.auctionBuyNow);
-    return {
-      kind: "auction",
-      token: s.token,
-      minBid,
-      ...(buyNow ? { buyNow } : null),
-      endsAt,
-      ended: now >= endsAt,
-    };
-  }
-  const price = amountOf(s.price);
-  return price ? { kind: "buyNow", token: s.token, price } : undefined;
-}
-
-/** The royalty rate, when it is one the form accepts. */
-function royaltiesOf(v: string): number | undefined {
-  const t = v.trim();
-  const n = t ? Number(t) : NaN;
-  return Number.isFinite(n) && n >= ROYALTY_MIN && n <= ROYALTY_MAX ? n : undefined;
-}
-
-/** The preview clip the draft started, as the render store has it now (COM-13). */
-function clipOf(jobId: string | null, jobs: VideoJob[], now: number): ProjectCommerce["clip"] {
-  const job = jobId ? jobs.find((j) => j.id === jobId) : undefined;
-  if (!job) return { state: "none" };
-  if (job.stage === "done") return { state: "ready" };
-  if (job.stage === "failed") return { state: "failed" };
-  const { total, etaSec } = progressOf(job, now);
-  return { state: "rendering", progress: Math.round(total), eta: etaLabel(etaSec) };
-}
-
 /**
- * What became of the project, and every fact the Outcome card shows (COM-2).
- * Pure. The first rule that matches wins:
- * - the draft holds a mint → "listed" / "given" / "private" by its intent, with
- *   the minted facts: network, collection, and the terms of that intent only;
- * - the project is "completed" with no mint in its draft (missing, corrupt, or
- *   re-seeded) → "mintedUnreadable": minted, and nothing else is claimed (COM-15);
+ * What became of the project, and every fact the Outcome card shows (COM-2;
+ * Phase 2 §3.5.10). Pure. The first rule that matches wins:
+ * - a MintRecord, or a draft holding a mint → "listed" / "given" / "private" by
+ *   the Brief's intent, with the mint axis and record (`mintViewOf`, which reads
+ *   `sales` for a lazy mint's settlement), network and collection — the record's
+ *   when there is one, else the draft's — and a Give's licence;
+ * - the project is "completed" with no mint anywhere (a missing, corrupt or
+ *   re-seeded draft) → "mintedUnreadable": minted, and nothing else is claimed (COM-15);
  * - a draft with an intent → "briefing", with its step; typed but uncommitted
  *   terms are not returned (COM-5);
  * - otherwise → "none" (with `step` when a Brief was opened).
- * `projectStatus()` maps none|briefing → draft and mintedUnreadable → minted;
- * a test asserts the two agree.
  */
-export function commerceOf(
-  p: ManualProject,
-  d: StoredDraft | null,
-  jobs: VideoJob[],
-  now: number,
-): ProjectCommerce {
+export function commerceOf(p: ManualProject, d: StoredDraft | null, sales: readonly Sale[] = []): ProjectCommerce {
   const s = d?.state ?? null;
-  if (s && s.mintedAt !== null) {
+  const view = mintViewOf(p, d, sales);
+  const rec = view.record;
+  if (rec || (s && s.mintedAt !== null)) {
+    const intent = s?.intent ?? null;
     // An unreadable intent on a minted draft reads as private — projectStatus()'s rule.
-    const outcome: Outcome =
-      s.intent === "sell" ? "listed" : s.intent === "give" ? "given" : "private";
-    const network = NETWORKS.find((n) => n.value === s.network);
-    const collection = s.collection.trim();
-    const sale = outcome === "listed" ? saleOf(s, now) : undefined;
-    const royaltiesPct = outcome === "listed" ? royaltiesOf(s.royalties) : undefined;
-    const license = outcome === "given" ? LICENSES.find((l) => l.value === s.license) : undefined;
+    const outcome: Outcome = intent === "sell" ? "listed" : intent === "give" ? "given" : "private";
+    const network = NETWORKS.find((n) => n.value === (rec?.network ?? s?.network));
+    const collection = (rec?.collection ?? s?.collection ?? "").trim();
+    const license = outcome === "given" ? LICENSES.find((l) => l.value === s?.license) : undefined;
+    const mintedAt = rec ? rec.at : (s?.mintedAt ?? undefined);
     return {
       outcome,
-      intent: s.intent,
-      mint: "legacy",
-      mintedAt: s.mintedAt,
+      intent,
+      mint: view.status,
+      record: rec,
+      ...(view.settled ? { settled: view.settled } : null),
+      ...(typeof mintedAt === "number" ? { mintedAt } : null),
       ...(network ? { network: { id: network.value, label: network.label } } : null),
       ...(collection ? { collection } : null),
-      ...(sale ? { sale } : null),
-      ...(royaltiesPct !== undefined ? { royaltiesPct } : null),
       ...(license ? { license: { id: license.value, label: license.label, info: license.info } } : null),
-      clip: clipOf(s.videoJobId, jobs, now),
     };
   }
   if (p.status === "completed") {
-    return { outcome: "mintedUnreadable", intent: null, mint: "legacy", clip: { state: "none" } };
+    return { outcome: "mintedUnreadable", intent: null, mint: "legacy", record: null };
   }
-  if (!d) return { outcome: "none", intent: null, mint: "notMinted", clip: { state: "none" } };
+  if (!d) return { outcome: "none", intent: null, mint: "notMinted", record: null };
   return {
     outcome: d.state.intent ? "briefing" : "none",
     intent: d.state.intent,
     step: d.step,
     mint: "notMinted",
-    clip: clipOf(d.state.videoJobId, jobs, now),
+    record: null,
   };
 }

@@ -20,6 +20,9 @@ import { needsNoPower, replacedNotRecharged } from "../spec/facts";
 import { radioOf } from "../spec/format";
 import { batteryOf } from "../spec/batteries";
 import { mm3, runtimeLabel } from "../spec/units";
+import type { ProductVideoStatus } from "../video/types";
+import { currentStage, type Activity } from "./journey";
+import type { ProductReadiness } from "./p2-types";
 
 /** "5 of 5 pieces ready" — every artifact that isn't `skipped` counts
  *  toward the total, and `ready` counts the ones that finished. The same
@@ -160,4 +163,52 @@ function uniqueBy<T>(list: T[], key: (item: T) => string): T[] {
     seen.add(k);
     return true;
   });
+}
+
+// ───────────────────── Phase 2: the card's video line and stage pill ─────────────────────
+
+/** P2-VIDEO-12: the card's one status line, P2-VIDEO-4's words. Text only, never a control. */
+export function videoLineOf(status: ProductVideoStatus): string {
+  switch (status.state) {
+    case "none":
+      return "No video yet";
+    case "rendering":
+      return `Rendering · ${Math.round(status.progress)} %`;
+    case "ready":
+      return "Video ready";
+    case "failed":
+      return "Render failed";
+  }
+}
+
+/** P2-TABS-10's pill: "{short}", named "Stage: {label}" for a screen reader. */
+export type StagePill = { short: string; ariaLabel: string };
+
+export type ProductCardView = {
+  /** P2-VIDEO-12: the owner's line on a current product; null on a dropped product and in a preview. */
+  video: string | null;
+  /** P2-TABS-10: the newest non-Others activity tagged to this product; null when there is none. */
+  stage: StagePill | null;
+};
+
+/**
+ * The Products tab's per-card Phase 2 facts, by row id (P2-VIDEO-12, P2-TABS-10). The video line
+ * reads the page's own readiness (`view.videos.readiness.showcase.products`, the current
+ * products only), so a dropped product has none; the stage reads the journey.
+ */
+export function productsTabView(
+  view: { products: readonly { id: string }[]; videos: { readiness: { showcase: { products: readonly ProductReadiness[] } } } },
+  ctx: { owner: boolean; activities: readonly Activity[] },
+): Record<string, ProductCardView> {
+  const videoOf = new Map(view.videos.readiness.showcase.products.map((p) => [p.productId, p.video]));
+  const out: Record<string, ProductCardView> = {};
+  for (const { id } of view.products) {
+    const status = ctx.owner ? videoOf.get(id) : undefined;
+    const stage = currentStage(ctx.activities, id);
+    out[id] = {
+      video: status ? videoLineOf(status) : null,
+      stage: stage ? { short: stage.short, ariaLabel: `Stage: ${stage.label}` } : null,
+    };
+  }
+  return out;
 }
