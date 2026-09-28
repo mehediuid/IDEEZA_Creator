@@ -9,6 +9,7 @@ import { CreateHistoryProvider } from "@/lib/create/history";
 import { CreatePlanProvider } from "@/lib/create/plan";
 import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
+import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
 
 export const metadata: Metadata = {
@@ -86,30 +87,34 @@ export default function RootLayout({
                 now a thin view over the active project's flowState, so
                 ManualProjectsProvider must sit OUTSIDE it. */}
             <ManualProjectsProvider>
-              <ProductFlowProvider>
-                <VideoJobsProvider>
-                  {/* CreateHistoryProvider sits at the root so the home
-                      hero (in the dashboard layout) can mint a new chat
-                      session and route to it, AND the (create) routes
-                      can read/mutate the same store. CreatePlanProvider
-                      powers the QuotaCard on /history; CreditsProvider
-                      powers the Credits card beside it and is where a
-                      full-product build charges/refunds credits. */}
-                  <CreatePlanProvider>
-                    <CreditsProvider>
-                      <CreateHistoryProvider>
-                        {children}
-                        {/* A build is a background job: it has to keep
-                            running whatever page the user is on, so the
-                            worker lives here rather than on the build
-                            page. Renders nothing. */}
-                        <BuildSimulator />
-                        <GlobalRenderIndicator />
-                      </CreateHistoryProvider>
-                    </CreditsProvider>
-                  </CreatePlanProvider>
-                </VideoJobsProvider>
-              </ProductFlowProvider>
+              {/* MarketProvider: listings, sales, bids and support, read by the
+                  project page, My projects and Explore marketplace alike. */}
+              <MarketProvider>
+                <ProductFlowProvider>
+                  <VideoJobsProvider>
+                    {/* CreateHistoryProvider sits at the root so the home
+                        hero (in the dashboard layout) can mint a new chat
+                        session and route to it, AND the (create) routes
+                        can read/mutate the same store. CreatePlanProvider
+                        powers the QuotaCard on /history; CreditsProvider
+                        powers the Credits card beside it and is where a
+                        full-product build charges/refunds credits. */}
+                    <CreatePlanProvider>
+                      <CreditsProvider>
+                        <CreateHistoryProvider>
+                          {children}
+                          {/* A build is a background job: it has to keep
+                              running whatever page the user is on, so the
+                              worker lives here rather than on the build
+                              page. Renders nothing. */}
+                          <BuildSimulator />
+                          <GlobalRenderIndicator />
+                        </CreateHistoryProvider>
+                      </CreditsProvider>
+                    </CreatePlanProvider>
+                  </VideoJobsProvider>
+                </ProductFlowProvider>
+              </MarketProvider>
             </ManualProjectsProvider>
           </PcbProvider>
         </ThemeProvider>
