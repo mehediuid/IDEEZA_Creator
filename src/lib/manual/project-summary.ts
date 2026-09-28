@@ -271,8 +271,8 @@ export type ProjectSummary = {
   sortKey: number; // "Recently updated": updatedAt NOW, lastActivityAt NEXT (LST-24)
 };
 
-function pendingOf(refs: BuildRef[], all: BuildJob[]): PendingVersion | null {
-  const waiting = pendingVersionsOf(refs, all);
+function pendingOf(refs: BuildRef[], all: BuildJob[], projects?: ManualProject[]): PendingVersion | null {
+  const waiting = pendingVersionsOf(refs, all, projects);
   const pick = waiting.find((w) => w.status === "ready") ?? waiting[0];
   return pick ? { buildId: pick.job.id, n: pick.version, status: pick.status } : null;
 }
@@ -294,13 +294,20 @@ function versionOf(refs: BuildRef[]): ProjectSummary["version"] {
 
 export function projectSummary(
   p: ManualProject,
-  ctx: { builds: BuildJob[]; brief: StoredDraft | null; videoJobs: ClipJob[]; now: number },
+  ctx: {
+    builds: BuildJob[];
+    brief: StoredDraft | null;
+    videoJobs: ClipJob[];
+    now: number;
+    /** The live projects, so a build saved into a deleted one reads as pending (pendingVersionsOf). */
+    projects?: ManualProject[];
+  },
 ): ProjectSummary {
   const refs = buildsOf(p, ctx.builds);
   const status = projectStatus(p, ctx.brief);
   const showcase = showcaseOf(p, status);
   const source = projectSourceOf(refs);
-  const pendingVersion = pendingOf(refs, ctx.builds);
+  const pendingVersion = pendingOf(refs, ctx.builds, ctx.projects);
   const products = productsOfProject(p, refs).map(({ id, name, description }) => ({ id, name, description }));
   return {
     id: p.id,

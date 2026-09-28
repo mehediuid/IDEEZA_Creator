@@ -366,8 +366,13 @@ export type PendingBuild = { chatId: string; job: BuildJob; version: number; sta
 
 /** Per lineage with a chat: its newest build with no project, made after the
  *  lineage's latest saved version — that version's build time, else its save
- *  time, else the newest build time the lineage still has. */
-export function pendingVersionsOf(refs: BuildRef[], all: BuildJob[]): PendingBuild[] {
+ *  time, else the newest build time the lineage still has. Given `projects`
+ *  (the live list), a build whose project was deleted has no project either:
+ *  Save would bring it here as this lineage's next version. Without the list
+ *  no project can be told gone, so any projectId counts as taken. */
+export function pendingVersionsOf(refs: BuildRef[], all: BuildJob[], projects?: ManualProject[]): PendingBuild[] {
+  const live = projects ? new Set(projects.map((p) => p.id)) : null;
+  const unsaved = (b: BuildJob) => !b.projectId || (live !== null && !live.has(b.projectId));
   const saved = new Set(refs.map((r) => r.buildId));
   const chatIds = [...new Set(refs.map((r) => r.chatId))].filter((c): c is string => c !== null);
   const out: PendingBuild[] = [];
@@ -377,7 +382,7 @@ export function pendingVersionsOf(refs: BuildRef[], all: BuildJob[]): PendingBui
     const known = mine.flatMap((r) => (r.job ? [r.job.createdAt] : []));
     const after = latest.job?.createdAt ?? latest.savedAt ?? (known.length ? Math.max(...known) : -Infinity);
     const next = all
-      .filter((b) => b.chatId === chatId && !b.projectId && !saved.has(b.id) && b.createdAt > after)
+      .filter((b) => b.chatId === chatId && unsaved(b) && !saved.has(b.id) && b.createdAt > after)
       .sort((a, b) => b.createdAt - a.createdAt)[0];
     if (next) out.push({ chatId, job: next, version: latest.version + 1, status: statusOf(next) });
   }
@@ -405,13 +410,16 @@ const LOG_RANK: Record<ProjectLogEntry["kind"], number> = { showcased: 2, minted
 
 /** Newest first; at the same moment Showcased sits above Minted (the Brief's
  *  commit sets both at the mint time). A project a build created has no
- *  "created" entry — its first save is version 1. A Draft is never showcased. */
+ *  "created" entry — its first save is version 1. A Draft is never showcased.
+ *  A mint is logged whenever mintedAt is set; one with no intent recorded
+ *  mints into Private, as projectStatus() reads it — which is what "save"
+ *  mints into, so the log's word is the chip's. */
 export function projectLogOf(p: ManualProject, brief: BriefState | null): ProjectLogEntry[] {
   const out: ProjectLogEntry[] = [];
   if (!p.buildId) out.push({ kind: "created", at: p.createdAt });
   const mintedAt = brief?.mintedAt ?? null;
-  if (mintedAt !== null && brief?.intent) {
-    out.push({ kind: "minted", at: mintedAt, intent: brief.intent, network: brief.network });
+  if (mintedAt !== null && brief) {
+    out.push({ kind: "minted", at: mintedAt, intent: brief.intent ?? "save", network: brief.network });
   }
   const minted = mintedAt !== null || p.status === "completed";
   if (minted && typeof p.showcasedAt === "number" && Number.isFinite(p.showcasedAt)) {
@@ -495,7 +503,15 @@ export type ProjectView = {
 
 export function projectView(
   p: ManualProject,
-  ctx: { builds: BuildJob[]; chats: ChatSession[]; brief: StoredDraft | null; videoJobs: VideoJob[]; now: number },
+  ctx: {
+    builds: BuildJob[];
+    chats: ChatSession[];
+    brief: StoredDraft | null;
+    videoJobs: VideoJob[];
+    now: number;
+    /** The live projects: a build saved into a deleted one is pending here (COR-18). */
+    projects?: ManualProject[];
+  },
 ): ProjectView {
   const refs = buildsOf(p, ctx.builds);
   const lineages = lineagesOf(refs, ctx.chats);
@@ -504,9 +520,15 @@ export function projectView(
     lineages,
     products: productsOfProject(p, refs),
     versions: versionsOf(refs, lineages, productRowsOf(p)),
-    pending: pendingVersionsOf(refs, ctx.builds),
+    pending: pendingVersionsOf(refs, ctx.builds, ctx.projects),
     log: projectLogOf(p, ctx.brief?.state ?? null),
-    summary: projectSummary(p, { builds: ctx.builds, brief: ctx.brief, videoJobs: ctx.videoJobs, now: ctx.now }),
+    summary: projectSummary(p, {
+      builds: ctx.builds,
+      brief: ctx.brief,
+      videoJobs: ctx.videoJobs,
+      now: ctx.now,
+      projects: ctx.projects,
+    }),
     commerce: commerceOf(p, ctx.brief, ctx.videoJobs, ctx.now),
   };
 }

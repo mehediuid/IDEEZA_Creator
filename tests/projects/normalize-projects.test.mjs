@@ -235,6 +235,23 @@ test("slugs, productName and flow steps are still backfilled", () => {
   assert.deepEqual(a.flowState, { ...EMPTY_FLOW_STATE, pcb: true });
 });
 
+test("a flowState that isn't an object, or a name that isn't a string, reads as empty instead of throwing", () => {
+  const list = [
+    legacy({ id: "a", slug: "", name: 42, flowState: "pcb" }),
+    legacy({ id: "b", flowState: 7 }),
+    legacy({ id: "c", slug: "", name: undefined, flowState: ["pcb"] }),
+    legacy({ id: "d", name: null }),
+  ];
+  const [a, b, c, d] = normalizeProjects(list);
+  assert.deepEqual([a.name, a.slug, a.flowState], ["", "project", EMPTY_FLOW_STATE]);
+  assert.deepEqual([b.name, b.slug, b.flowState], ["RC Car", "rc-car", EMPTY_FLOW_STATE]);
+  assert.deepEqual([c.name, c.slug, c.flowState], ["", "project-2", EMPTY_FLOW_STATE]);
+  assert.deepEqual([d.name, d.slug, d.flowState], ["", "rc-car-2", EMPTY_FLOW_STATE]);
+  // Once normalized, the next load hands back the same objects.
+  const again = normalizeProjects([a, b, c, d]);
+  again.forEach((p, i) => assert.equal(p, [a, b, c, d][i]));
+});
+
 test("storage that isn't a list of projects reads as no projects", () => {
   assert.deepEqual(normalizeProjects(null), []);
   assert.deepEqual(normalizeProjects({ id: "x" }), []);

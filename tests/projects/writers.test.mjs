@@ -207,6 +207,49 @@ test("a legacy project's first build is frozen as version 1 when its chat is reb
   ]);
 });
 
+// A project saved before rows carried a source: its rows are joined to the build products they
+// were in the earlier build, so a rebuild that renames the primary still replaces its row.
+test("a legacy project's rebuild with a new title carries every row forward: no duplicate primary, the headline stays", () => {
+  const v1 = build({ id: "b1", createdAt: 100, projectId: "proj_old", companions: [REMOTE] });
+  const old = project("proj_old", {
+    productName: "RC car",
+    buildId: "b1",
+    createdAt: 500,
+    products: [
+      { id: "p1", name: "RC car", description: "A small remote-controlled car." },
+      { id: "p2", name: "Remote controller", description: "Steers the car." },
+    ],
+  });
+  const v2 = build({ id: "b2", createdAt: 200, title: "RC racing car", description: "A faster car.", companions: [REMOTE] });
+  const s = save({ projects: [old], builds: [v1, v2] }, "b2", 2000);
+  const [p] = s.projects;
+  assert.deepEqual(p.products.map((r) => [r.id, r.name, r.description, r.source]), [
+    ["p1", "RC racing car", "A faster car.", { buildId: "b2", productId: "primary" }],
+    ["p2", "Remote controller", "Steers the car.", { buildId: "b2", productId: "remote" }],
+  ]);
+  assert.equal(p.productName, "RC racing car"); // the headline stays on the primary's row
+  const listed = productsOfProject(p, buildsOf(p, s.builds));
+  assert.ok(listed.every((x) => x.dropped === null && x.state === "built"));
+  // The maker's own words on a legacy row survive the rebuild too.
+  const edited = { ...old, products: [{ ...old.products[0], description: "My own words." }, old.products[1]] };
+  const kept = save({ projects: [edited], builds: [v1, v2] }, "b2", 2000).projects[0];
+  assert.deepEqual(kept.products.map((r) => [r.id, r.name, r.description]), [
+    ["p1", "RC racing car", "My own words."],
+    ["p2", "Remote controller", "Steers the car."],
+  ]);
+});
+
+test("a build a legacy project already holds attaches as nothing: its versions and save time stay", () => {
+  const v1 = build({ id: "b1", createdAt: 100, projectId: "proj_old", companions: [REMOTE] });
+  const v2 = build({ id: "b2", createdAt: 200, projectId: "proj_old", companions: [REMOTE] });
+  const old = project("proj_old", { productName: "RC car", buildId: "b1", createdAt: 500 });
+  // Its origin, and a build linked by its own projectId: already here, so nothing changes.
+  assert.equal(attach(old, v1, [v2], 9000), old);
+  assert.equal(attach(old, v2, [v1], 9000), old);
+  assert.equal(attach(old, { ...v1, projectId: undefined }, [v2], 9000), old);
+  assert.deepEqual(buildsOf(old, [v1, v2]).map((r) => [r.buildId, r.version, r.savedAt]), [["b1", 1, 500], ["b2", 2, null]]);
+});
+
 // ── joining an existing project ──────────────────────────────────────────────
 
 test("a build joining a hand-made project adopts the row it names, adds the rest, and keeps the headline", () => {

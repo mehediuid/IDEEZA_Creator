@@ -10,6 +10,7 @@ import {
   reportWrite,
   subscribeWriteError,
 } from "../../.tmp-test/lib/storage-status.js";
+import { PROJECTS_KEY, projectWriteRefused } from "../../.tmp-test/lib/manual/projects.js";
 
 const PROJECTS = "ideeza:manual:projects";
 const BUILDS = "ideeza:create:builds";
@@ -67,4 +68,16 @@ test("reportWrite notifies only when the failure set changes, with a stable snap
 
 test("the banner copy is the spec's (COR-93)", () => {
   assert.equal(WRITE_ERROR_MESSAGE, "This browser's storage is full — your last change wasn't saved.");
+});
+
+test("an inline edit fails only on the projects store's own refused write since it started", () => {
+  assert.equal(PROJECTS_KEY, PROJECTS);
+  assert.equal(projectWriteRefused({ key: PROJECTS, at: 20 }, 20), true);
+  assert.equal(projectWriteRefused({ key: PROJECTS, at: 25 }, 20), true);
+  // Before the edit started: an old failure, not this edit's.
+  assert.equal(projectWriteRefused({ key: PROJECTS, at: 19 }, 20), false);
+  // The create store's chats or builds: this edit's write may well have saved.
+  assert.equal(projectWriteRefused({ key: BUILDS, at: 25 }, 20), false);
+  assert.equal(projectWriteRefused({ key: "ideeza:create:chats", at: 25 }, 20), false);
+  assert.equal(projectWriteRefused(null, 20), false);
 });

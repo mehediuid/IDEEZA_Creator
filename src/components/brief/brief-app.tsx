@@ -1085,6 +1085,9 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       // finally a throw mid-write left `minting` true and the CTA disabled
       // for good, with no way on and no way back.
       try {
+        // The mint's one moment: mintedAt and a showcase it starts share it,
+        // so the log reads them as one event (COR-105).
+        const at = Date.now();
         if (state.videoJobId) markMinted(state.videoJobId);
         // Both writes name the project this BRIEF belongs to, not whichever
         // one the editor has open: a build's brief runs on its own project
@@ -1103,10 +1106,10 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           // project already showcased keeps the time it was first shown.
           const scoped = projects.find((p) => p.id === scopeProjectId);
           if (state.shareToNewsfeed && scoped && scoped.showcasedAt == null) {
-            setShowcase(scopeProjectId, true);
+            setShowcase(scopeProjectId, true, at);
           }
         }
-        setState((s) => ({ ...s, mintedAt: Date.now() }));
+        setState((s) => ({ ...s, mintedAt: at }));
         setStep("success");
       } finally {
         setMinting(false);
