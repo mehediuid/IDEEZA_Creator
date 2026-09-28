@@ -109,5 +109,5 @@ Design intent: the sidebar's **Parts & agile module** link. Page title "Parts & 
 
 - [ ] **Step 1: Page + component + `tab` query support in `review-outputs.tsx`.**
 - [ ] **Step 2: tsc + CDP**: with no builds → empty state; with a ready build → one card, table rows, link works.
-- [ ] **Step 3: Update CLAUDE.md §5** ("AI create & build flow": build states, toast, Review shell + Save/Advance Edit, five previews; "Platform & shell": `/parts`) and STRUCTURE.md; App map §3 add `/parts`.
+- [ ] **Step 3: Update CLAUDE.md §5** (now `docs/guides/features/ai-create-flow.md` and `docs/guides/features/platform-and-projects.md`; "AI create & build flow": build states, toast, Review shell + Save/Advance Edit, five previews; "Platform & shell": `/parts`) and STRUCTURE.md; App map §3 (now `docs/guides/app-map.md`) add `/parts`.
 - [ ] **Step 4: Commit** `feat(parts): Parts & agile module page over the builds' bills of materials; docs`.

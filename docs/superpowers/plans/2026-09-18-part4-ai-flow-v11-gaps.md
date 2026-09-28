@@ -13,7 +13,7 @@
 
 **Architecture:** Two subsystems and three smaller changes. **Companion products** (§4.4) branch the flow after a concept is accepted: a classifier decides whether the prompt describes a system, the user picks the other products, each gets its own concept in the same thread, and one build carries them all. **Confidence tiering** (§4.3) labels every product with what checking it passed, and the cross-product compatibility pass (§4.4.10) is the part of that which can really run today. The gate, the queued cancel and the overrun offer are the three smaller ones.
 
-**Tech Stack:** Next.js 16.2.9 App Router, React 19, TypeScript. No test runner in this repo: a change is done when `npx tsc --noEmit -p tsconfig.json` passes, `npm run lint` shows no new problems against the 54-problem baseline, and the behaviour is driven in headless Chrome over CDP (see `CLAUDE.md` §2).
+**Tech Stack:** Next.js 16.2.9 App Router, React 19, TypeScript. No test runner in this repo: a change is done when `npx tsc --noEmit -p tsconfig.json` passes, `npm run lint` shows no new problems against the 54-problem baseline, and the behaviour is driven in headless Chrome over CDP (see `CLAUDE.md` §2, now `AGENTS.md` › Running & verifying).
 
 ## Global Constraints
 
@@ -23,7 +23,7 @@
 - Never commit `AGENTS.md`, `README.md` or `docs/agent-rules/`.
 - Never push. Commit only; the user pushes.
 - Commit trailer: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`
-- Update `CLAUDE.md` §5 in the same commit as the feature it describes.
+- Update `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`) in the same commit as the feature it describes.
 - Spec copy is quoted verbatim where the spec gives wording (§4.5).
 
 ## What was built
@@ -58,7 +58,7 @@ So **`Checked` is unreachable today**: every product carries `Draft` for the spe
 | `src/lib/create/history.tsx` | `cancelBuild(buildId)` — removes a queued job; `isOverrunning(job, now)` — whether a running job has passed twice its estimate |
 | `src/components/create/build-status.tsx` | The Cancel action on a queued build, and the overrun offer on a running one |
 | `src/components/create/concept-chat.tsx` | Skips the gate when the preference says so |
-| `CLAUDE.md` | §5 inventory entries |
+| `CLAUDE.md` §5, now `docs/guides/features/ai-create-flow.md` | inventory entries |
 
 ---
 
@@ -70,7 +70,7 @@ Spec §4.5. The dialog currently carries the concept summary, the five deliverab
 - Create: `src/lib/create/gate-preference.ts`
 - Modify: `src/components/create/confirm-build-dialog.tsx`
 - Modify: `src/components/create/concept-chat.tsx`
-- Modify: `CLAUDE.md`
+- Modify: `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`)
 
 **Interfaces:**
 - Produces: `readGateDismissed(): boolean`, `writeGateDismissed(v: boolean): void`, `GATE_DISMISSED_KEY = "ideeza:create:gate-dismissed"` from `gate-preference.ts`.
@@ -169,7 +169,7 @@ Drive `/chat/<id>` over CDP with a concept ready:
 3. Return to the chat, press **Use this concept** on another concept — no dialog, the build starts.
 4. The concept card still shows `Cost: 4 credits`, because dismissal never hides the price.
 
-- [ ] **Step 6: `tsc`, lint, CLAUDE.md, commit**
+- [ ] **Step 6: `tsc`, lint, CLAUDE.md §5 (now the features guide), commit**
 
 ```
 npx tsc --noEmit -p tsconfig.json
@@ -187,7 +187,7 @@ Spec §4.6 — *"Cancellation: allowed only in `Queued` state, with full credit 
 **Files:**
 - Modify: `src/lib/create/history.tsx`
 - Modify: `src/components/create/build-status.tsx`
-- Modify: `CLAUDE.md`
+- Modify: `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`)
 
 **Interfaces:**
 - Produces: `cancelBuild(buildId: string): void` on the history context. Removes the job when, and only when, `statusOf(job) === "queued"`.
@@ -222,7 +222,7 @@ In `build-status.tsx`, the queued branch of `stateRowFor` already carries `foote
 
 Seed two builds so the second is queued, open `/build/<second>`, press Cancel: the job is gone from `ideeza:create:builds`, the balance is unchanged, and the page has navigated away. Then open a **running** build and confirm no Cancel is offered.
 
-- [ ] **Step 4: `tsc`, lint, CLAUDE.md, commit**
+- [ ] **Step 4: `tsc`, lint, CLAUDE.md §5 (now the features guide), commit**
 
 Commit subject: `feat(create): a queued build can be cancelled, and says why nothing is refunded`
 
@@ -235,7 +235,7 @@ Spec §4.6 — *"If the job exceeds roughly twice expected duration, the status 
 **Files:**
 - Modify: `src/lib/create/history.tsx`
 - Modify: `src/components/create/build-status.tsx`
-- Modify: `CLAUDE.md`
+- Modify: `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`)
 
 **Interfaces:**
 - Consumes: `cancelBuild` from Task 2, `elapsedMinutes(job, now)` and `BUILD_ESTIMATE_MIN` from `history.tsx`.
@@ -266,7 +266,7 @@ In `build-status.tsx`, when `isOverrunning(job, now)` the running row gains a ba
 
 Seed a running job with `startedAt` set to 25 minutes ago against a 10-minute estimate. The card shows the overrun banner. Press **Stop and refund**: the job reads as failed, and the balance is back up by `BUILD_COST`. Seed one at 12 minutes and confirm no banner.
 
-- [ ] **Step 5: `tsc`, lint, CLAUDE.md, commit**
+- [ ] **Step 5: `tsc`, lint, CLAUDE.md §5 (now the features guide), commit**
 
 Commit subject: `feat(create): a build past twice its estimate offers a stop with a refund`
 

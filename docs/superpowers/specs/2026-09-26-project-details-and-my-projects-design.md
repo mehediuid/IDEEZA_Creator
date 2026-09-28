@@ -118,7 +118,7 @@ every cross-file resolution this spec makes.
 
 **The build-lock rule, already shipped** (owner, 2026-09-25: *"jokhon build
 hoye jabe tokhon spec ekhane ar change kora jabena"*; product spec sheet design
-S8; `CLAUDE.md` §5 line 191). Once a product is built, its spec is read-only
+S8; `CLAUDE.md` §5 line 191, now the *Once a product is built* entry in `docs/guides/features/ai-create-flow.md`). Once a product is built, its spec is read-only
 and changes go through the editor. A product is locked while the chat's booked
 build includes it and that build is queued, running, ready or partial. What it
 means here:

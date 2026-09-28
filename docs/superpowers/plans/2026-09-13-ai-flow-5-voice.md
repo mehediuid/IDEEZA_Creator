@@ -40,5 +40,5 @@ Behaviour: mic click → `start()`; while listening the textarea + toolbar are r
 - [ ] **Step 1: Home prompt card.**
 - [ ] **Step 2: Chat `PromptBar` and refine overlay.**
 - [ ] **Step 3: tsc + CDP**: launch Chrome with `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream`; click mic → "Listening…" + 78 bar elements; Cancel restores; Stop & review returns the textarea (SpeechRecognition may be unavailable headless — assert the UI transitions and the `denied/unsupported` lines by stubbing `window.SpeechRecognition` in the page).
-- [ ] **Step 4: Update CLAUDE.md §5** ("AI create & build flow": voice listening state, shared hook) and STRUCTURE.md (`components/voice/`, `lib/voice/`).
+- [ ] **Step 4: Update CLAUDE.md §5** (now `docs/guides/features/ai-create-flow.md`; "AI create & build flow": voice listening state, shared hook) and STRUCTURE.md (`components/voice/`, `lib/voice/`).
 - [ ] **Step 5: Commit** `feat(voice): listening state in every composer (Ai-Flow Voice 2–4); docs`.

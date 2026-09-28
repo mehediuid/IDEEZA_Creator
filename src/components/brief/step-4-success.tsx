@@ -341,9 +341,9 @@ function SceneCard({
   scene: BriefState["scenes"][number];
   index: number;
 }) {
-  // Only the brand gradient tokens exist (CLAUDE.md §7 — an agent never mints
-  // a design token), so the three-tone poster art becomes an alternation of
-  // the two rather than a third invented ramp.
+  // Only the brand gradient tokens exist (AGENTS.md, UI/UX hard rules — an
+  // agent never mints a design token), so the three-tone poster art becomes an
+  // alternation of the two rather than a third invented ramp.
   const gradientClass =
     index % 2 === 0 ? "bg-[image:var(--gradient-brand)]" : "bg-[image:var(--gradient-ai)]";
   return (

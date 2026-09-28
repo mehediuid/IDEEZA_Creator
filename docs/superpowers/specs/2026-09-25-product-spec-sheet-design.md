@@ -440,7 +440,7 @@ Changed:
   caption
 - `src/lib/create/confidence.ts` — power budget and fit
 - `src/components/projects/project-details.tsx` — one line per product
-- `CLAUDE.md` §5, `STRUCTURE.md`
+- `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`), `STRUCTURE.md`
 
 ## Out of scope
 

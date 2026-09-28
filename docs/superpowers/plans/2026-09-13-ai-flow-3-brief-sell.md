@@ -166,5 +166,5 @@ Design: dark toast (`--color-bg-inverse` / `--color-text-on-inverse` — add tok
 
 - [ ] **Step 1: Restyle + copy.**
 - [ ] **Step 2: tsc + CDP**: seeded rendering job → toast text and position; ready job → REVIEW opens the modal.
-- [ ] **Step 3: Update CLAUDE.md §5 "Other editor modules ▸ Add Brief"** (Choose Project, Step 2 cards + Prompt Help + AR panel, Sell form details, SelectMenu, dark toast) and STRUCTURE.md (`lib/brief/*`, new components, `ideeza/select-menu.tsx`).
+- [ ] **Step 3: Update CLAUDE.md §5 (now `docs/guides/features/editor-modules.md`) "Other editor modules ▸ Add Brief"** (Choose Project, Step 2 cards + Prompt Help + AR panel, Sell form details, SelectMenu, dark toast) and STRUCTURE.md (`lib/brief/*`, new components, `ideeza/select-menu.tsx`).
 - [ ] **Step 4: Commit** `feat(brief): top-centre render toast; docs`.

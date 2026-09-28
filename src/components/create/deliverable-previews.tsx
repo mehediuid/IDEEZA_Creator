@@ -32,7 +32,7 @@ import { currentLabel, mm3 } from "@/lib/spec/units";
 // Read from the spec the build was booked with, so the numbers here are the
 // numbers the maker saw on the card and at the gate. No download or export
 // control lives on this panel, so no line names a file you could take away
-// (CLAUDE.md §6, "no promises without delivery").
+// (AGENTS.md, Coding conventions: "Real logic, never stubs").
 export function coversFor(
   kind: BuildItemKind,
   product: ArtifactSource,

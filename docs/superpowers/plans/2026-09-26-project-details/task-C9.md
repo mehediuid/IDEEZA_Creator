@@ -718,9 +718,9 @@ function SceneCard({
   scene: BriefState["scenes"][number];
   index: number;
 }) {
-  // Only the brand gradient tokens exist (CLAUDE.md §7 — an agent never mints
-  // a design token), so the three-tone poster art becomes an alternation of
-  // the two rather than a third invented ramp.
+  // Only the brand gradient tokens exist (AGENTS.md, UI/UX hard rules — an
+  // agent never mints a design token), so the three-tone poster art becomes an
+  // alternation of the two rather than a third invented ramp.
   const gradientClass =
     index % 2 === 0 ? "bg-[image:var(--gradient-brand)]" : "bg-[image:var(--gradient-ai)]";
   return (
@@ -1171,13 +1171,13 @@ git commit -m "fix(a11y): visible focus rings on filled buttons, lazy 3D panel, 
 
 ## Task C9c: Docs — CLAUDE.md and STRUCTURE.md
 
-**Requirements:** none of its own (CLAUDE.md §0's standing rule: "treat
+**Requirements:** none of its own (CLAUDE.md §0's standing rule, now `AGENTS.md` › Keeping docs current: "treat
 'update CLAUDE.md' as part of the definition of done"); written last, once
 every other NOW task in this plan is in and browser-verified, so every bullet
 below stays true to §0's "never list something that isn't actually working
 and browser-verified."
 
-**Files:** Modify `CLAUDE.md` (§3 `:84`; §5 `:171–172`, `:216`), `STRUCTURE.md`
+**Files:** Modify `CLAUDE.md` (§3 `:84`; §5 `:171–172`, `:216` — line numbers of the old file; now `docs/guides/app-map.md`, `docs/guides/features/ai-create-flow.md` and `docs/guides/features/platform-and-projects.md`), `STRUCTURE.md`
 (`:32–34`, `:58`, `:105–107`, `:110`, and the PCB tree `:139` area)
 
 **Interfaces:** none (prose only).
@@ -1190,7 +1190,7 @@ the finished app rather than an automated pass.
 
 ### Step 3: Implement
 
-**Modify `CLAUDE.md` §3** — replace the one stale line (`:84`):
+**Modify `CLAUDE.md` §3** (now `docs/guides/app-map.md`) — replace the one stale line (`:84`):
 ```
 - `/projects` — **My projects** (filters: All · Public · Contributed · Private · Draft · Utility NFT).
 ```
@@ -1201,7 +1201,7 @@ with three lines (the index, the details page, the new product page):
 - `/projects/[id]/products/[productId]` (`?tab=`, `?v=`) — **Product page**: one product's deliverables at a chosen version — **3D model · PCB · Firmware code · Wiring · Parts** — the booked, read-only snapshot (the build-lock rule); no action buttons.
 ```
 
-**Modify CLAUDE.md §5** — the review-outputs bullet's stale copy fragment
+**Modify CLAUDE.md §5** (now `docs/guides/features/ai-create-flow.md`) — the review-outputs bullet's stale copy fragment
 inside the long paragraph at `:171–172` (only the quoted fragment changes;
 leave the rest of that paragraph as is):
 - find: `*Saved to \`<name>\`. Add a brief to sell, give or keep it private — or open the project to keep editing.* over **Add Brief** (\`/build/<id>/brief\`, which then runs on the project's own draft and opens on its products) and **Open Project**`
@@ -1228,7 +1228,7 @@ with:
 
 The `components/projects` line (`:58`):
 ```
-   │  ├─ projects/           my-projects, project-details, and the product page (deliverable tabs, version switcher — see CLAUDE.md §5)
+   │  ├─ projects/           my-projects, project-details, and the product page (deliverable tabs, version switcher — see docs/guides/features/platform-and-projects.md)
 ```
 
 The `lib/brief` line (`:105–107`), add the new pure module:
@@ -1236,7 +1236,7 @@ The `lib/brief` line (`:105–107`), add the new pure module:
    │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
    │  │                      the wizard and the rail both read — + the stored-draft
    │  │                      migration), project-brief.ts (the Brief read + the Outcome
-   │  │                      card's derivation — see CLAUDE.md §5), success-copy.ts (Step
+   │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (Step
    │  │                      4's pure copy), gas.ts, wallet.ts, video-prompt.ts, qr.ts
 ```
 
@@ -1263,7 +1263,7 @@ The PCB module tree, after `route-path.ts` (in the `## ★ PCB module` section):
 Read every edited section back against the FINISHED app (once C9a, C9b and
 every My-projects/Project-details/product-page task have landed and passed
 their own browser checks): each bullet must describe real, working,
-browser-verified behaviour, per CLAUDE.md §0. If any bullet describes
+browser-verified behaviour, per CLAUDE.md §0 (now `AGENTS.md` › Keeping docs current). If any bullet describes
 something not yet true at the moment this task actually runs, cut it back to
 what is — never leave a "coming soon" bullet in §5 (§0's own rule).
 

@@ -54,7 +54,7 @@ consistent with the board's export dialogs:
 `exporters.ts` (capture extension + `buildSheetPdf`) · `schem-canvas.tsx`
 (`data-sheet-frame`) · `types.ts` (modal id) · `data.tsx` (menu IA) ·
 `store.tsx` (drop `exportSheetImage`) · `modals.tsx` (`SheetExportModal` + case)
-· CLAUDE.md §5 (feature inventory).
+· CLAUDE.md §5 (feature inventory; now `docs/guides/features/pcb-schematic.md`).
 
 ## Verification
 

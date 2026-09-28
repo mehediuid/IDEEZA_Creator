@@ -413,7 +413,7 @@ EOF
 - Delete `src/components/projects/project-details.tsx` (`:1-542`). Its sections move to `legacy.tsx`. Its private `conceptOf` (`:521-542`) is already exported from `project-read.ts` by A2.
 - Test: no new `node:test` file. This half is React components; its pure logic was tested in C1a. The red/green here is `tsc` (Steps 1–4), then the browser check (Step 5).
 
-`STRUCTURE.md` and `CLAUDE.md` are C9d's. That task's docs line should name `projects/details/`, the shell and its slots, in place of `project-details`.
+`STRUCTURE.md` and `CLAUDE.md` (§3/§5, now `docs/guides/app-map.md` and `docs/guides/features/platform-and-projects.md`) are C9d's. That task's docs line should name `projects/details/`, the shell and its slots, in place of `project-details`.
 
 **Interfaces:**
 - Consumes (exact):

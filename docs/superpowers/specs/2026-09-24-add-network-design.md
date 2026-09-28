@@ -81,4 +81,4 @@ New: `src/lib/network/{catalog,types,derive,planner,store}.ts`,
 `src/app/(create)/projects/[id]/network/page.tsx`,
 `src/components/network/*`.
 Edited: `src/components/create/review-outputs.tsx`,
-`src/components/projects/project-details.tsx`, `CLAUDE.md` §5, `STRUCTURE.md`.
+`src/components/projects/project-details.tsx`, `CLAUDE.md` §5 (now `docs/guides/features/platform-and-projects.md`), `STRUCTURE.md`.

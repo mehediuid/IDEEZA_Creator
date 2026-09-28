@@ -10,7 +10,7 @@ sheet (`2026-09-25-product-spec-sheet-design.md`), which gives each product
 the facts the rail now shows (see A6/A7 for what has moved since).
 
 
-Skills used: `/impeccable` (product register, critique heuristics, detector: 0 findings on `chat-rail.tsx` and `build-rail.tsx`) and `/ui-ux-pro-max` (a11y, touch, feedback, navigation rules). Rules applied: `40-ui-ux.md` (read from tag `backup-before-strip`, since the worktree has no `docs/agent-rules/`), CLAUDE.md §5 entries 167, 186–196 and §7.
+Skills used: `/impeccable` (product register, critique heuristics, detector: 0 findings on `chat-rail.tsx` and `build-rail.tsx`) and `/ui-ux-pro-max` (a11y, touch, feedback, navigation rules). Rules applied: `40-ui-ux.md` (read from tag `backup-before-strip`, since the worktree has no `docs/agent-rules/`), CLAUDE.md §5 entries 167, 186–196 and §7 (old line numbers; now `docs/guides/features/ai-create-flow.md` and `docs/guides/ui-ux.md`).
 
 ---
 
@@ -522,7 +522,7 @@ There is no entrance choreography and no staggered list reveal.
 
 ### Past decisions this touches (for the owner's veto)
 
-1. *"Nothing here is a control"* (rail header, CLAUDE §5 entry 189). **Rows become selectable and jump**, which is navigation, allowed by rule 4. No action control is added, so the reason behind the rule (every line's real surface is on the canvas) still holds, and the rail now points at that surface.
+1. *"Nothing here is a control"* (rail header, CLAUDE §5 entry 189, now in `docs/guides/features/ai-create-flow.md`). **Rows become selectable and jump**, which is navigation, allowed by rule 4. No action control is added, so the reason behind the rule (every line's real surface is on the canvas) still holds, and the rail now points at that surface.
 2. *The rail is `role="log"`* (entry 189). It is replaced by a list plus a root-level status announcer, because the log went unheard on phones.
 3. *The whole pipeline joins the rail, grouped under each product* (entries 167/168). The pipeline stays in the rail, merged into the product rows. It is fully expanded for 1–2 products, and for 3+ only the selected product's five pieces show, with every row showing `n of 5` from the start.
 4. *Plain "You" / "IDEEZA" attribution* (entry 189). "You" stays on the maker's own turns in Activity. "IDEEZA" is dropped, because the header now says whose account it is.
@@ -544,7 +544,7 @@ There is no entrance choreography and no staggered list reveal.
 | `src/components/create/build-rail.tsx` | `export` `PipelineRow` and `STATE_WORD`; `BuildRail` unchanged |
 | `src/components/create/chat-rail.tsx` | rewritten: `ChatRail({ model, focusedProduct, onSelectProduct, onJump })` with `RailHeader`, `Stepper`, `NextStepLine`, `ProductList` / `ProductRow`, `SuggestedLine`, `Activity`; export `RailAnnouncer({ model })` and `useRailModel(chat, job, labels, projectName, savedName)` |
 | `src/components/create/concept-chat.tsx` | build the rail model once; `selectProduct`, `jumpTo` (pane switch, scroll, arrival ring, focus rules of §4); render `RailAnnouncer` at the root; `BuildStatus statesOnly` goes into the rail's slot; stop rendering `BuildRail`; composer hint copy; `LoadingShell` rail shape |
-| `CLAUDE.md` §5 | rewrite the rail half of entry 189 and the "pipeline joins the rail" clause of entry 167 to describe the new rail (only once it is browser-verified) |
+| `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`) | rewrite the rail half of entry 189 and the "pipeline joins the rail" clause of entry 167 to describe the new rail (only once it is browser-verified) |
 
 ---
 
@@ -587,7 +587,7 @@ There is no entrance choreography and no staggered list reveal.
   - the announcer text changes when a render lands while the Canvas tab is shown;
   - computed contrast of rail text ≥ 4.5:1 in both themes;
   - `prefers-reduced-motion: reduce` gives instant scroll and no transitions.
-- Then `npx tsc --noEmit` and `npx eslint` on the touched files, and update CLAUDE.md §5.
+- Then `npx tsc --noEmit` and `npx eslint` on the touched files, and update CLAUDE.md §5 (now `docs/guides/features/ai-create-flow.md`).
 
 ---
 

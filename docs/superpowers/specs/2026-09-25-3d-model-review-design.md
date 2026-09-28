@@ -28,7 +28,7 @@ section *3D Module* (file `gb4w7Tq7nnqM6V72CWQWjO`, node `47167:21997`, read
   - C, waiting for a segmented-CAD provider: none exists.
 - **D2 — The Figma is followed as drawn**, including caps overlines on every
   rail section and 10 px caps hint lines. This is a deliberate exception to
-  CLAUDE.md §7 ("10px is for a micro-label") for this surface. It is
+  CLAUDE.md §7 ("10px is for a micro-label"; now `docs/guides/ui-ux.md`) for this surface. It is
   recorded in §7 when built. "As drawn" covers layout, style and wording. It
   does not cover a sentence that claims something the build lacks: those
   lines change (see *Copy*), because §0 forbids listing what doesn't exist.
@@ -286,7 +286,7 @@ task of their own, with before/after screenshots of the main surfaces.
 | `src/styles/tokens.css`, `tailwind-preset.ts` | changed | the token sync |
 | `src/components/create/review-outputs.tsx` | changed | the 3D tab renders `ModelPanel`, which brings its own rail in place of the aside |
 | `src/components/create/use-build-model.ts` | changed | ignore the demo sample; expose the mesh's progress |
-| `CLAUDE.md` §5 and §7, `STRUCTURE.md` | changed | inventory and the D2 exception |
+| `CLAUDE.md` §5 and §7 (now `docs/guides/features/ai-create-flow.md`, `docs/guides/ui-ux.md`), `STRUCTURE.md` | changed | inventory and the D2 exception |
 
 Companions get their own assembly from their own BOM and spec. The concept
 mesh stays the primary's; a companion's shell is always the sized one.
@@ -350,4 +350,4 @@ is approved and the spec sheet has landed. The shape:
 6. **Integration.** The 3D tab in `review-outputs`, per product;
    `use-build-model` changes.
 7. **Verification and docs.** The browser matrix, the fidelity pairs,
-   CLAUDE.md §5 and §7.
+   CLAUDE.md §5 and §7 (now `docs/guides/features/ai-create-flow.md`, `docs/guides/ui-ux.md`).

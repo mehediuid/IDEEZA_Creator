@@ -57,9 +57,9 @@
 
 ### Task R4: Browser matrix and docs
 
-**Files:** Modify `CLAUDE.md` (own hunk only — stage via `git show HEAD:CLAUDE.md` → edit → `git hash-object -w` → `git update-index --cacheinfo`; in the worktree the file has no one else's edits, so a plain edit + `git add CLAUDE.md` is fine there), plus fixes found by the matrix in the files above.
+**Files:** Modify `CLAUDE.md` §5 (now `docs/guides/features/ai-create-flow.md`) (own hunk only — stage via `git show HEAD:CLAUDE.md` → edit → `git hash-object -w` → `git update-index --cacheinfo`; in the worktree the file has no one else's edits, so a plain edit + `git add CLAUDE.md` is fine there), plus fixes found by the matrix in the files above.
 
 - [ ] **Step 1:** CDP matrix per spec §10 Task 4 (desktop 1440 and phone 400, dark and light; setup loading/asking; drawing, failed, failed-then-redrawn; conflict, draft, left out; short of credits; build queued, running with 1, 2 and 4 products, partial, ready, saved; changed after build) → `$SP/shots/rail-new-*.png`. Read the DOM for exact strings; check computed contrast ≥ 4.5:1; `prefers-reduced-motion: reduce` gives instant scroll and no transitions.
 - [ ] **Step 2:** Fix what the matrix finds (in scope: the files of R1–R3).
-- [ ] **Step 3:** CLAUDE.md §5: rewrite the rail half of the decision about the rail being a transcript / `role="log"` and the "pipeline joins the rail" clause to describe the new rail.
+- [ ] **Step 3:** CLAUDE.md §5 (now `docs/guides/features/ai-create-flow.md`): rewrite the rail half of the decision about the rail being a transcript / `role="log"` and the "pipeline joins the rail" clause to describe the new rail.
 - [ ] **Step 4:** tsc + eslint on all touched files + `npx next build`; commit `fix(create): the rail, checked across its states` (and `docs: …` for CLAUDE.md).

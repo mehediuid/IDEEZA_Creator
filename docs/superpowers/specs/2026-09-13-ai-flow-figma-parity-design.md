@@ -252,6 +252,6 @@ Files: `lib/voice/use-voice-input.ts`, new `components/voice/voice-listening.tsx
   with a reason.
 - `npx tsc --noEmit` passes and each sub-project is browser-verified over CDP
   (seed localStorage → drive the flow → read DOM/screenshot) before its commit.
-- CLAUDE.md §5 "AI create & build flow", "Projects, history & community" and
+- CLAUDE.md §5 (now `docs/guides/features/`) "AI create & build flow", "Projects, history & community" and
   "Other editor modules ▸ Add Brief" entries are revised in the same commits;
   STRUCTURE.md gains the new files.
