@@ -5,6 +5,7 @@
 
 import type { StoredDraft } from "../brief/project-brief";
 import { LICENSES, type Intent } from "../brief/types";
+import type { MintStatus } from "../wallet/types";
 import type { EditorWork, StepFact } from "./editor-work";
 import { countLabel, formatDate, type ProjectStatus } from "./project-summary";
 
@@ -23,6 +24,16 @@ export type DeletePlanInput = {
   /** The project's builds still in this browser, and how many of their chats still are. */
   builds: number;
   chats: number;
+  // ── Phase 2 (§3.5.10): optional, so the v1 dialog still compiles ──
+  /** P2-CONTRIB-15: how many people the contributors list holds. Delete is only offered once no
+   *  co-owner holds a share, so these are the share-less ones. */
+  contributors?: number;
+  /** P2-TABS-9: the activity history and the files attached to it (IndexedDB `ideeza-media`). */
+  activity?: { entries: number; files: number };
+  /** P2-LISTING-19: the removed or closed listings the sweep drops (`dropProjectListings`). */
+  endedListings?: number;
+  /** `view.mint.status`: a MintRecord mint is recorded too, and an on-chain one gets its own note. */
+  mint?: MintStatus;
 };
 
 export type DeletePlan = {
@@ -37,6 +48,8 @@ export type DeletePlan = {
 };
 
 export const MINTED_NOTE = "It was minted in this browser only — nothing on a blockchain changes.";
+/** The on-chain note: a testnet-demo token is made in this browser too (decision 1). */
+export const ON_CHAIN_NOTE = "It was minted on chain as a testnet demo in this browser — nothing on a real blockchain changes.";
 export const SHARED_STORES_NOTE =
   "Code, 3D shapes and Preview aren't touched — every project in this browser shares them for now.";
 
@@ -53,6 +66,8 @@ function lost(f: StepFact): string | null {
 export function deletePlanOf(input: DeletePlanInput): DeletePlan {
   const { status, draft, work, network } = input;
   const goes = [`The project — its name, description and ${countLabel(input.products)}`];
+  const people = input.contributors ?? 0;
+  if (people > 0) goes.push(`The contributors list — ${people} ${people === 1 ? "person" : "people"}`);
 
   const pcb = lost(work.pcb);
   const wiring = lost(work.wiring);
@@ -76,7 +91,7 @@ export function deletePlanOf(input: DeletePlanInput): DeletePlan {
           : `The brief — given away, minted ${on}`,
       );
     } else if (brief.intent === "sell") {
-      goes.push(`The brief — listed to sell, minted ${on}`);
+      goes.push(`The brief — to sell, minted ${on}`);
     } else {
       goes.push(`The brief — kept private, minted ${on}`);
     }
@@ -89,6 +104,17 @@ export function deletePlanOf(input: DeletePlanInput): DeletePlan {
   } else if (status === "minted") {
     goes.push("The mint record — its brief can't be read in this browser");
   }
+  const record = input.mint === "lazyMinted" || input.mint === "onChain";
+  if (record && mintedAt === null) {
+    goes.push(input.mint === "onChain" ? "The mint record — minted on chain" : "The mint record — lazy minted");
+  }
+
+  const activity = input.activity;
+  if (activity && activity.entries > 0) {
+    const entries = `${activity.entries} ${activity.entries === 1 ? "entry" : "entries"}`;
+    const files = activity.files > 0 ? ` and ${activity.files} activity ${activity.files === 1 ? "file" : "files"}` : "";
+    goes.push(`The activity history — ${entries}${files}`);
+  }
 
   if (network) {
     goes.push(
@@ -98,16 +124,18 @@ export function deletePlanOf(input: DeletePlanInput): DeletePlan {
     );
   }
   if (input.showcased) goes.push("Showcase — it leaves your Showcase tab");
+  const ended = input.endedListings ?? 0;
+  if (ended > 0) goes.push(`Its marketplace history — ${ended} ended ${ended === 1 ? "listing" : "listings"}`);
 
   const stays = [
     ...(input.builds > 0 ? [buildsLine(input.builds, input.chats)] : []),
     SHARED_STORES_NOTE,
   ];
-  const mintRecord = mintedAt !== null || status === "minted";
+  const mintRecord = mintedAt !== null || status === "minted" || record;
   return {
     goes,
     stays,
-    minted: mintRecord ? MINTED_NOTE : null,
+    minted: input.mint === "onChain" ? ON_CHAIN_NOTE : mintRecord ? MINTED_NOTE : null,
     typed: Boolean(pcb || wiring || assembly || three) || mintRecord || network !== null,
   };
 }

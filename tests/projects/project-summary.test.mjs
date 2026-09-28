@@ -5,7 +5,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BUILD_GONE_TIP,
-  LISTED_SUBLINE,
   SHOWCASE_BADGE,
   STATUS_ICON,
   STATUS_WORD,
@@ -275,11 +274,17 @@ const FIXTURES = [
     name: "a project minted to sell and showcased",
     p: listedShowcased,
     draft: soilDraft,
-    chip: { word: "Listed", icon: "tag", badge: SHOWCASE_BADGE, line: "Minted Sep 22 · goes on sale when the marketplace opens" },
+    // A v1 sell never reached a marketplace: it reads Private, and Add to marketplace lists it (P2-LISTING-24).
+    chip: { word: "Private", icon: "lock", badge: SHOWCASE_BADGE, line: "Minted Sep 22 · not on the marketplace yet" },
     productLine: "1 product · Soil Probe",
     card: "AI build · Saved Sep 20",
     header: "1 product · Saved Sep 20, 2026",
-    pair: quietPair(viewBrief("plant-soil-monitor")),
+    pair: {
+      first: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil?list=1" },
+      second: viewBrief("plant-soil-monitor"),
+      violet: true,
+      card: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil?list=1" },
+    },
     cover: "https://img.test/b_soil.png",
   },
   {
@@ -427,7 +432,9 @@ test("§4.1 row 6 · Private, and its showcased form; showcasing never changes t
   assert.equal(s.statusLine, "Minted Sep 22 · kept private");
   assert.equal(s.showcase, null);
   assert.equal(s.mintedAt, MINTED);
-  assert.deepEqual(s.next, quietPair(viewBrief("night-light")));
+  // Phase 2 §2.2: a Private project's violet step is Add to marketplace, with View brief beside it.
+  const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_lamp?list=1" };
+  assert.deepEqual(s.next, { first: add, second: viewBrief("night-light"), violet: true, card: add });
 
   const shown = sum({ ...minted, showcasedAt: NOW }, d);
   assert.deepEqual(shown.showcase, { at: NOW });
@@ -444,16 +451,16 @@ test("§4.1 row 7 · Given, under its licence", () => {
   assert.deepEqual(s.next, quietPair(viewBrief("night-light")));
 });
 
-test("§4.1 row 8 · Listed, never without its subline; the record's own status is never read alone (LST-5)", () => {
+test("§4.1 row 8 · a v1 sell with no listing reads Private, never Listed; the record's status is never read alone (LST-5, P2-LISTING-24)", () => {
   const s = sum(listedShowcased, soilDraft);
-  assert.equal(s.status, "listed");
-  assert.equal(s.statusWord, "Listed");
-  assert.equal(STATUS_ICON[s.status], "tag");
-  assert.equal(LISTED_SUBLINE, "Goes on sale when the marketplace opens");
-  assert.equal(s.statusLine, "Minted Sep 22 · goes on sale when the marketplace opens");
+  assert.equal(s.status, "private");
+  assert.equal(s.statusWord, "Private");
+  assert.equal(s.statusLine, "Minted Sep 22 · not on the marketplace yet");
+  assert.doesNotMatch(s.statusLine, /marketplace opens/);
   assert.deepEqual(s.showcase, { at: NOW - 60 * MIN });
-  assert.equal(s.next.violet, false);
-  assert.equal(sum({ ...listedShowcased, status: "draft" }, soilDraft).status, "listed");
+  assert.equal(s.next.first.kind, "add-to-marketplace");
+  assert.equal(s.next.violet, true);
+  assert.equal(sum({ ...listedShowcased, status: "draft" }, soilDraft).status, "private");
 });
 
 test("§4.1 row 9 · Minted, the brief record unreadable (LST-9) → no pair (Phase 2 §2.2)", () => {
@@ -477,18 +484,11 @@ test("Showcase is never on a Draft, and only a time counts (COR-105)", () => {
   assert.deepEqual(SHOWCASE_BADGE, { word: "Showcase", icon: "eye", ariaLabel: "Showcased" });
 });
 
-test("Modifier · preview clip still rendering (rows 6–8)", () => {
+test("The preview clip no longer modifies the line (P2-VIDEO-15: video status lives in Media and the cards)", () => {
   const d = draft({ intent: "save", mintedAt: MINTED, videoJobId: "vj_1" }, "success");
   const rendering = [{ id: "vj_1", stage: "rendering" }];
-  assert.equal(sum(minted, d, { videoJobs: rendering }).statusLine, "Minted Sep 22 · preview clip still rendering");
-  assert.equal(sum(minted, d, { videoJobs: [{ id: "vj_1", stage: "done" }] }).statusLine, "Minted Sep 22 · kept private");
-  assert.equal(sum(minted, d, { videoJobs: [{ id: "vj_1", stage: "failed" }] }).statusLine, "Minted Sep 22 · kept private");
+  assert.equal(sum(minted, d, { videoJobs: rendering }).statusLine, "Minted Sep 22 · kept private");
   assert.equal(sum(minted, d, { videoJobs: [] }).statusLine, "Minted Sep 22 · kept private");
-  const sell = draft({ intent: "sell", mintedAt: MINTED, videoJobId: "vj_1" }, "success");
-  assert.equal(
-    sum(listedShowcased, sell, { videoJobs: rendering }).statusLine,
-    "Minted Sep 22 · goes on sale when the marketplace opens · preview clip still rendering",
-  );
 });
 
 test("Modifier · a newer version waiting on a minted project changes neither the line nor the pair (X14)", () => {

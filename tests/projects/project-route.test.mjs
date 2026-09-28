@@ -9,25 +9,52 @@ import {
   resolveProject,
   projectDocTitle,
   productDocTitle,
+  marketDocTitle,
+  projectTabsFor,
 } from "../../.tmp-test/lib/manual/project-route.js";
 import { nextTabIndex, revealDelta } from "../../.tmp-test/lib/ui/tab-keys.js";
 
-test("the strip is Products · Media · Network, in that order (COR-19)", () => {
-  assert.deepEqual([...PROJECT_TABS], ["products", "media", "network"]);
+test("the strip is Products · Media · Network · Contributors · Customers, in that order (COR-19, P2-TABS-1)", () => {
+  assert.deepEqual([...PROJECT_TABS], ["products", "media", "network", "contributors", "customers"]);
   assert.deepEqual(
     PROJECT_TABS.map((id) => PROJECT_TAB_LABEL[id]),
-    ["Products", "Media", "Network"],
+    ["Products", "Media", "Network", "Contributors", "Customers"],
   );
 });
 
-test("?tab= reads media and network; anything else is Products (COR-20)", () => {
+test("?tab= reads every strip id; anything else is Products (COR-20)", () => {
   assert.equal(parseProjectTab("media"), "media");
   assert.equal(parseProjectTab("network"), "network");
+  assert.equal(parseProjectTab("contributors"), "contributors");
+  assert.equal(parseProjectTab("customers"), "customers");
   assert.equal(parseProjectTab("products"), "products");
   assert.equal(parseProjectTab(null), "products");
   assert.equal(parseProjectTab(""), "products");
   assert.equal(parseProjectTab("Network"), "products");
-  assert.equal(parseProjectTab("contributors"), "products");
+  assert.equal(parseProjectTab("premium"), "products");
+});
+
+test("projectTabsFor: the tabs each viewer sees, in strip order (P2-TABS-1 as changed, §2.2)", () => {
+  const owner = { kind: "local-owner" };
+  const buyerPreview = { kind: "owner-preview" };
+  const demoBuyer = { kind: "demo-buyer", buyerId: "buyer-mira" };
+  const member = { kind: "contributor-preview", contributorId: "ctb_a", name: "Ana", role: "editor", share: 0 };
+  const none = { networkReadable: false, contributors: 0 };
+  const full = { networkReadable: true, contributors: 2 };
+
+  // The owner: every tab, in every state.
+  assert.deepEqual(projectTabsFor(owner, none), ["products", "media", "network", "contributors", "customers"]);
+  assert.deepEqual(projectTabsFor(owner, full), ["products", "media", "network", "contributors", "customers"]);
+  // A buyer preview or a demo buyer: Network only once there is one to read, a team credit with ≥ 1
+  // contributor, and never Customers (C25).
+  for (const v of [buyerPreview, demoBuyer]) {
+    assert.deepEqual(projectTabsFor(v, none), ["products", "media"], v.kind);
+    assert.deepEqual(projectTabsFor(v, full), ["products", "media", "network", "contributors"], v.kind);
+    assert.deepEqual(projectTabsFor(v, { networkReadable: true, contributors: 0 }), ["products", "media", "network"], v.kind);
+  }
+  // A contributor preview: the roster read-only and Network always, no Customers.
+  assert.deepEqual(projectTabsFor(member, none), ["products", "media", "network", "contributors"]);
+  assert.deepEqual(projectTabsFor({ ...member, role: "coOwner", share: 30 }, full), ["products", "media", "network", "contributors"]);
 });
 
 test("a tab the strip doesn't list falls back to Products (COR-19, COR-49)", () => {
@@ -62,6 +89,7 @@ test("an address resolves by id first, then by slug (COR-1)", () => {
 test("document titles (COR-3)", () => {
   assert.equal(projectDocTitle("Car"), "Car · My projects · IDEEZA");
   assert.equal(productDocTitle("Remote Controller", "Car"), "Remote Controller · Car · IDEEZA");
+  assert.equal(marketDocTitle("Car"), "Car · Explore marketplace · IDEEZA");
 });
 
 test("arrows wrap, Home and End jump, other keys aren't the strip's (COR-20)", () => {

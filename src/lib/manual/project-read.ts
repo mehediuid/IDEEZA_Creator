@@ -24,11 +24,36 @@ import type { ResolvedSpec } from "../spec/types";
 import type { ManualProduct, ManualProject, ProjectBuildRef, ProjectStep } from "./projects";
 import { commerceOf, type ProjectCommerce, type StoredDraft } from "../brief/project-brief";
 import type { VideoJob } from "../video/jobs";
-import type { EditionKind, EditionUse, ListingEvent, Sale, SupportRequest } from "../market/types";
-import type { Charge } from "../wallet/types";
+import type { ProjectVideos } from "../video/types";
+import type {
+  Bid,
+  EditionKind,
+  EditionTrack,
+  EditionUse,
+  Listing,
+  ListingEvent,
+  ListingMetadata,
+  ListingView,
+  MarketData,
+  Sale,
+  SupportRequest,
+} from "../market/types";
+import { listingLogOf } from "../market/listing";
+import { marketLogOf } from "../market/market-log";
+import { holdingOf } from "../market/sales";
+import type { Amount, Charge, MintView } from "../wallet/types";
+import { DEMO_ACCOUNTS } from "../wallet/identities";
+import type { Token } from "../brief/types";
+import type { BusinessPlan } from "./business-plan";
+import { currentStage, type ProjectJourney, type StageDef } from "./journey";
+import type { Customers } from "./customers";
+import { otherOwnersOf } from "./ownership";
+import type { CanContext, Viewer } from "./permissions";
+import { readinessFactsOf, readinessOf } from "./readiness";
+import type { DeleteFacts, OwnershipSplit, ProjectLock, Readiness, ReadinessPurpose } from "./p2-types";
 // project-summary.ts reads this module too. The cycle is safe: neither side
 // calls the other while the modules load, only from inside functions.
-import { projectSummary, type ProjectSummary } from "./project-summary";
+import { EMPTY_MARKET, projectSummary, type ProjectSummary } from "./project-summary";
 
 /** A build the project holds, with the job itself — null once the build is
  *  no longer in this browser. */
@@ -402,8 +427,13 @@ export function lineageProjectOf(job: BuildJob, all: BuildJob[], projects: Manua
 
 // ───────────────────────── log, cover, resume ─────────────────────────
 
-/** One event of the rail's Project log (Phase 2 spec §3.3.5). T01 fixes the union; the
- *  producers of the Phase 2 kinds (mint, listing, market, editions, business plan) are T10's. */
+/** A listing's terms as the log names them ("Listed · Buy now · 0.05 MATIC", "Auction started ·
+ *  ends Oct 3, 2026 · 2:30 PM"). `projectLogOf` attaches them to each listing event; a listing
+ *  event built elsewhere (`listingLogOf` alone) has none and reads its generic line. */
+export type ListingTerms = { type: Listing["type"]; token: Token; price?: Amount; endsAt?: number };
+
+/** One event of the rail's Project log (Phase 2 spec §3.3.5). T01 fixed the union; T10 adds the
+ *  optional `terms` on a listing event (above) and produces every kind in `projectLogOf`. */
 export type ProjectLogEntry =
   | { kind: "created"; at: number } // made by hand
   | { kind: "minted"; at: number; intent: Intent; network: Network } // v1: a Brief mint with no MintRecord
@@ -421,7 +451,7 @@ export type ProjectLogEntry =
     }
   | { kind: "payoutChanged"; at: number; toLabel: string; toAddress: string }
   // LISTING
-  | { kind: "listing"; at: number; event: ListingEvent }
+  | { kind: "listing"; at: number; event: ListingEvent; terms?: ListingTerms }
   // MARKETPLACE
   | { kind: "sold"; at: number; sale: Sale }
   | { kind: "support"; at: number; request: SupportRequest }
@@ -429,38 +459,108 @@ export type ProjectLogEntry =
   | { kind: "editions"; at: number; productId: string; nft: EditionKind; use: EditionUse; n: number; event: "created" | "listed" }
   | { kind: "businessPlan"; at: number };
 
-/** At the same moment, a later step of one commit sits above an earlier one. */
+/** At the same moment, a later step of one commit sits above an earlier one: a Brief's showcase
+ *  above its v1 mint (COR-52); on chain above lazy above showcased (P2-MINT-12); the listing a
+ *  mint commit writes above the mint; a sale above the listing it ends. */
 const LOG_RANK: Record<ProjectLogEntry["kind"], number> = {
-  support: 5,
-  sold: 4,
-  listing: 3,
-  editions: 3,
-  payoutChanged: 3,
-  businessPlan: 3,
+  support: 8,
+  sold: 7,
+  listing: 6,
+  editions: 6,
+  businessPlan: 6,
+  payoutChanged: 5,
+  mintedOnChain: 4,
+  lazyMinted: 3,
   showcased: 2,
   minted: 1,
-  lazyMinted: 1,
-  mintedOnChain: 1,
   created: 0,
 };
 
-/** Newest first; at the same moment Showcased sits above Minted (the Brief's
- *  commit sets both at the mint time). A project a build created has no
- *  "created" entry — its first save is version 1. A Draft is never showcased.
- *  A mint is logged whenever mintedAt is set; one with no intent recorded
- *  mints into Private, as projectStatus() reads it — which is what "save"
- *  mints into, so the log's word is the chip's. */
-export function projectLogOf(p: ManualProject, brief: BriefState | null): ProjectLogEntry[] {
+/** What the Phase 2 entries come from. Every field is optional, so a v1 caller reads v1's log. */
+export type LogFacts = {
+  market?: MarketData;
+  editions?: readonly EditionTrack[];
+  plan?: BusinessPlan | null;
+  /** False on a preview and the buyer view: a support request is the owner's (P2-MARKETPLACE-20). */
+  owner?: boolean;
+};
+
+function accountLabelOf(address: string): string {
+  return DEMO_ACCOUNTS.find((a) => a.address.toLowerCase() === address.toLowerCase())?.label ?? "Another wallet";
+}
+
+/**
+ * Newest first; at the same moment the later step of a commit sits above the earlier one
+ * (LOG_RANK). A project a build created has no "created" entry — its first save is version 1. A
+ * Draft is never showcased.
+ *
+ * The mint entries come from `p.mint` (P2-MINT-12): a lazy signature, the on-chain event (an
+ * instant mint, an upgrade, or — derived, never written — the first Main sale that settled a lazy
+ * one, C12) and every payout-wallet change. Only a project with no record reads the Brief's v1
+ * `mintedAt`: a mint with no intent recorded mints into Private, as projectStatus() reads it.
+ * Then the listing events (`listingLogOf`, with their terms), the sales and support requests
+ * (`marketLogOf`), the edition tracks and each business-plan version.
+ */
+export function projectLogOf(p: ManualProject, brief: BriefState | null, facts: LogFacts = {}): ProjectLogEntry[] {
+  const market = facts.market ?? EMPTY_MARKET;
   const out: ProjectLogEntry[] = [];
   if (!p.buildId) out.push({ kind: "created", at: p.createdAt });
+
+  const rec = p.mint;
   const mintedAt = brief?.mintedAt ?? null;
-  if (mintedAt !== null && brief) {
+  if (rec) {
+    const base = { intent: brief?.intent ?? "save", network: rec.network, tokenId: rec.tokenId } as const;
+    if (rec.type === "lazy") out.push({ kind: "lazyMinted", at: rec.signedAt ?? rec.at, ...base });
+    if (rec.onChain) {
+      const { at, via, charge } = rec.onChain;
+      out.push({ kind: "mintedOnChain", at, ...base, via, ...(charge ? { charge } : null) });
+    } else {
+      const first = market.sales
+        .filter((s) => s.projectId === p.id && s.item.nft === "main")
+        .reduce<Sale | null>((a, s) => (!a || s.at < a.at ? s : a), null);
+      if (first) out.push({ kind: "mintedOnChain", at: first.at, ...base, via: "sale" });
+    }
+    for (const c of rec.walletChanges ?? []) {
+      out.push({ kind: "payoutChanged", at: c.at, toLabel: accountLabelOf(c.to), toAddress: c.to });
+    }
+  } else if (mintedAt !== null && brief) {
     out.push({ kind: "minted", at: mintedAt, intent: brief.intent ?? "save", network: brief.network });
   }
-  const minted = mintedAt !== null || p.status === "completed";
+  const minted = rec !== undefined || mintedAt !== null || p.status === "completed";
   if (minted && typeof p.showcasedAt === "number" && Number.isFinite(p.showcasedAt)) {
     out.push({ kind: "showcased", at: p.showcasedAt });
   }
+
+  // listingLogOf hands back each listing's own event objects, so they find their listing's terms.
+  const termsOf = new Map<ListingEvent, ListingTerms>();
+  for (const l of market.listings) {
+    if (l.projectId !== p.id) continue;
+    const terms: ListingTerms = {
+      type: l.type,
+      token: l.token,
+      ...(l.type === "buyNow" && l.price ? { price: l.price } : null),
+      ...(typeof l.endsAt === "number" ? { endsAt: l.endsAt } : null),
+    };
+    for (const e of l.events) termsOf.set(e, terms);
+  }
+  for (const e of listingLogOf(market.listings, p.id)) {
+    const terms = e.kind === "listing" ? termsOf.get(e.event) : undefined;
+    out.push(terms && e.kind === "listing" ? { ...e, terms } : e);
+  }
+  out.push(...marketLogOf(p.id, market.sales, market.support, { owner: facts.owner ?? true }));
+
+  for (const t of facts.editions ?? []) {
+    if (t.projectId !== p.id) continue;
+    const tag = { productId: t.productId, nft: t.kind, use: t.use } as const;
+    const added = t.supply.lastAdded;
+    out.push({ kind: "editions", at: t.createdAt, ...tag, n: t.supply.total - (added?.n ?? 0), event: "created" });
+    if (added) out.push({ kind: "editions", at: added.at, ...tag, n: added.n, event: "created" });
+    if (t.listing) out.push({ kind: "editions", at: t.listing.listedAt, ...tag, n: t.supply.total, event: "listed" });
+  }
+  if (facts.plan && facts.plan.projectId === p.id) {
+    for (const v of facts.plan.versions) out.push({ kind: "businessPlan", at: v.createdAt });
+  }
+
   return out.sort((a, b) => b.at - a.at || LOG_RANK[b.kind] - LOG_RANK[a.kind]);
 }
 
@@ -520,9 +620,25 @@ export function conceptOf(
 
 // ───────────────────────── the page's one derivation ─────────────────────────
 
-/** Everything the project page reads, derived once (COR-74). No section
- *  derives state on its own; the product page reads `products` and
- *  `versions` from the same object. */
+/** What a listing records about the project now (LISTING §3.1): the name, description, current
+ *  products and cover buyers see. `listingViewOf` diffs a paused listing against it
+ *  (`metadataDiff`), and the listing flow stamps a new or relisted listing with it. */
+export function listingMetadataOf(p: ManualProject, products: ProjectProduct[], now: number): ListingMetadata {
+  return {
+    name: p.name,
+    description: p.description,
+    products: products.filter((x) => x.dropped === null).map(({ id, name }) => ({ id, name })),
+    cover: p.cover ?? null,
+    at: now,
+  };
+}
+
+/** Every readiness purpose, in the rule table's order (P2-VIDEO-13). */
+export const READINESS_PURPOSES: readonly ReadinessPurpose[] = ["showcase", "sell", "give", "relist", "edition"];
+
+/** Everything the project page reads, derived once (COR-74; Phase 2 §3.7). No section
+ *  derives state on its own; the product page reads `products` and `versions` from the same
+ *  object, and every `can()` on the page passes `canCtx`. */
 export type ProjectView = {
   refs: BuildRef[];
   lineages: Lineage[];
@@ -535,7 +651,66 @@ export type ProjectView = {
   summary: ProjectSummary;
   /** §5.1.4 — the Outcome block. */
   commerce: ProjectCommerce;
+  // ── Phase 2 (§3.7) ──
+  mint: MintView;
+  listing: ListingView;
+  /** This project's sales (Main and editions) and the bids on its listings. */
+  sales: Sale[];
+  bids: Bid[];
+  ownership: OwnershipSplit;
+  customers: Customers;
+  /** `readiness.edition` reads no product here; an edition's own gate asks `readinessOf` with it. */
+  videos: { record: ProjectVideos | null; readiness: Record<ReadinessPurpose, Readiness> };
+  editions: EditionTrack[];
+  /** P2-TABS-10: the newest non-Others activity's stage, over the whole journey. */
+  stage: StageDef | null;
+  activityCount: number;
+  lock: ProjectLock | null;
+  /** A market key is present but unparsable (`MarketData.unreadable`): delete's first rule. */
+  marketUnreadable: boolean;
+  deleteFacts: DeleteFacts;
+  canCtx: CanContext;
 };
+
+/** §3.8.4's facts (errata #1: `sold.buyers` is the distinct Main buyers). An auction blocks while
+ *  it is live — running, or ended and not yet closed; a Buy-now listing while it is live or
+ *  paused. Edition listings are live only with Main, so Main's decides. */
+export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "ownership" | "marketUnreadable">): DeleteFacts {
+  const main = view.sales.filter((s) => s.item.nft === "main");
+  const listing = view.listing;
+  const live = listing.kind === "live" ? listing.listing : null;
+  return {
+    marketUnreadable: view.marketUnreadable,
+    sold: {
+      sharePct: main.reduce((sum, s) => sum + (s.item.nft === "main" ? s.item.sharePct : 0), 0),
+      editions: view.sales.length - main.length,
+      buyers: new Set(main.map((s) => s.buyerId)).size,
+    },
+    auction: live && live.type === "auction" ? { endsAt: live.endsAt ?? live.listedAt } : null,
+    listed: (live !== null && live.type === "buyNow") || listing.kind === "paused",
+    otherOwners: otherOwnersOf(view.ownership),
+  };
+}
+
+/** The one `CanContext` the page passes to every `can()` (§3.7). `holding` is true only for a
+ *  demo buyer who owns part of the Main NFT. */
+export function canCtxOf(
+  view: Pick<ProjectView, "summary" | "mint" | "listing" | "ownership" | "lock" | "sales">,
+  viewer?: Viewer,
+): CanContext {
+  const listing = view.listing;
+  const auction = listing.kind === "live" ? listing.auction?.phase : undefined;
+  return {
+    status: view.summary.status,
+    mint: view.mint.status,
+    listing: listing.kind,
+    ...(auction ? { auction } : null),
+    creatorPct: view.ownership.maker,
+    listingLive: listing.kind === "live",
+    holding: viewer?.kind === "demo-buyer" ? holdingOf(view.summary.id, viewer.buyerId, view.sales) !== null : false,
+    locked: view.lock !== null,
+  };
+}
 
 export function projectView(
   p: ManualProject,
@@ -547,24 +722,66 @@ export function projectView(
     now: number;
     /** The live projects: a build saved into a deleted one is pending here (COR-18). */
     projects?: ManualProject[];
+    // ── Phase 2 (§3.7): optional with empty defaults, so a v1 caller still compiles (T12 passes them) ──
+    market?: MarketData;
+    videos?: ProjectVideos | null;
+    journey?: ProjectJourney | null;
+    editions?: EditionTrack[];
+    /** The business plan, for its log entries (P2-TABS-12). */
+    plan?: BusinessPlan | null;
+    /** Who is looking: a demo buyer's `holding`, and whether support requests are logged. */
+    viewer?: Viewer;
   },
 ): ProjectView {
+  const market = ctx.market ?? EMPTY_MARKET;
   const refs = buildsOf(p, ctx.builds);
   const lineages = lineagesOf(refs, ctx.chats);
-  return {
+  const products = productsOfProject(p, refs);
+  const summary = projectSummary(p, {
+    builds: ctx.builds,
+    brief: ctx.brief,
+    videoJobs: ctx.videoJobs,
+    now: ctx.now,
+    projects: ctx.projects,
+    market,
+  });
+  const editions = (ctx.editions ?? []).filter((t) => t.projectId === p.id);
+  const owner = ctx.viewer === undefined || ctx.viewer.kind === "local-owner";
+  const base = {
     refs,
     lineages,
-    products: productsOfProject(p, refs),
+    products,
     versions: versionsOf(refs, lineages, productRowsOf(p)),
     pending: pendingVersionsOf(refs, ctx.builds, ctx.projects),
-    log: projectLogOf(p, ctx.brief?.state ?? null),
-    summary: projectSummary(p, {
-      builds: ctx.builds,
-      brief: ctx.brief,
-      videoJobs: ctx.videoJobs,
-      now: ctx.now,
-      projects: ctx.projects,
-    }),
-    commerce: commerceOf(p, ctx.brief, ctx.videoJobs, ctx.now),
+    log: projectLogOf(p, ctx.brief?.state ?? null, { market, editions, plan: ctx.plan ?? null, owner }),
+    summary,
+    commerce: commerceOf(p, ctx.brief, market.sales),
   };
+
+  const record = ctx.videos ?? null;
+  // readinessFactsOf reads the view's `products` and `summary` only, both already derived.
+  const facts = readinessFactsOf(p, base as ProjectView, ctx.brief, record, ctx.videoJobs, ctx.now);
+  const readiness = Object.fromEntries(READINESS_PURPOSES.map((purpose) => [purpose, readinessOf(facts, purpose)])) as Record<
+    ReadinessPurpose,
+    Readiness
+  >;
+  const listingIds = new Set(market.listings.filter((l) => l.projectId === p.id).map((l) => l.id));
+  const activities = ctx.journey?.activities ?? [];
+
+  const derived = {
+    ...base,
+    mint: summary.mint,
+    listing: summary.listing,
+    sales: market.sales.filter((s) => s.projectId === p.id),
+    bids: market.bids.filter((b) => listingIds.has(b.listingId)),
+    ownership: summary.ownership,
+    customers: summary.customers,
+    videos: { record, readiness },
+    editions,
+    stage: currentStage(activities),
+    activityCount: activities.length,
+    lock: summary.lock,
+    marketUnreadable: market.unreadable,
+  };
+  return { ...derived, deleteFacts: deleteFactsOf(derived), canCtx: canCtxOf(derived, ctx.viewer) };
 }

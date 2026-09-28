@@ -25,14 +25,17 @@ export type ListCounts = Record<ListTab, number>;
 
 export const DEFAULT_LIST_QUERY: ListQuery = { tab: "all", q: "", sort: "updated", source: "any", page: 1 };
 
-/** The tab row, in order (LST-4). The outcome tabs read the status table, so a word
- *  changed there changes the tab too. Showcase is membership and sits after the divider (LST-10). */
+/** The tab row, in order (LST-4; P2-LISTING-18, P2-CUSTOMERS-14): All · Draft · Private · Given ·
+ *  Listed · Sold │ Showcase. The outcome tabs read the status table, so a word changed there
+ *  changes the tab too. Showcase is membership and sits after the divider (LST-10). There is no
+ *  Paused tab: a paused listing waits under Listed, its chip saying so. */
 export const LIST_TABS: readonly { id: ListTab; label: string; divider: boolean }[] = [
   { id: "all", label: "All", divider: false },
   { id: "draft", label: STATUS_WORD.draft, divider: false },
   { id: "private", label: STATUS_WORD.private, divider: false },
   { id: "given", label: STATUS_WORD.given, divider: false },
   { id: "listed", label: STATUS_WORD.listed, divider: false },
+  { id: "sold", label: STATUS_WORD.sold, divider: false },
   { id: "showcase", label: SHOWCASE_BADGE.word, divider: true },
 ];
 
@@ -73,10 +76,14 @@ export type ListResult = {
   rows: ListRow[];
 };
 
-function inTab(s: ProjectSummary, tab: ListTab): boolean {
+/** Which tab a project sits under. Listed holds live and paused listings; Sold a Main sale with
+ *  no live listing (a relisted Sold project reads Listed again). An unreadable mint ("minted",
+ *  LST-9) is in no outcome tab. */
+export function inTab(s: Pick<ProjectSummary, "status" | "showcase">, tab: ListTab): boolean {
   if (tab === "all") return true;
   if (tab === "showcase") return s.showcase !== null;
-  return s.status === tab; // an unreadable mint ("minted", LST-9) is in no outcome tab
+  if (tab === "listed") return s.status === "listed" || s.status === "paused";
+  return s.status === tab;
 }
 
 function inSource(s: ProjectSummary, source: ListSource): boolean {
@@ -102,7 +109,7 @@ const ORDER: Record<ListSort, (a: ListRow, b: ListRow) => number> = {
 
 /** The list's one pass: tab counts, then the tab, the Source facet and the search, the order and the page. */
 export function filterProjects(items: ListItem[], q: ListQuery): ListResult {
-  const counts: ListCounts = { all: 0, draft: 0, private: 0, given: 0, listed: 0, showcase: 0 };
+  const counts: ListCounts = { all: 0, draft: 0, private: 0, given: 0, listed: 0, sold: 0, showcase: 0 };
   for (const { summary } of items) {
     for (const t of LIST_TABS) if (inTab(summary, t.id)) counts[t.id] += 1;
   }

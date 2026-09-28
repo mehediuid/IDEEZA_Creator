@@ -99,7 +99,7 @@ function OutcomeBody({
 }
 
 function OutcomeFact({ row }: { row: OutcomeRow }) {
-  const isMint = row.key === "minted";
+  const isMint = row.key === "mint";
   return (
     <RailFact label={row.label} icon={isMint ? HexagonIcon : undefined} tone={isMint ? "success" : "neutral"}>
       <span className="block">
