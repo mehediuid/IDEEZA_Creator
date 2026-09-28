@@ -277,7 +277,7 @@ function MediaTileCard({
           aria-label={`${isCover ? "Stop using as cover" : "Use as cover"} — ${caption}`}
           title={isCover ? "Stop using as cover" : "Use as cover"}
           onClick={onToggleCover}
-          className="absolute right-2 top-2 bg-bg-surface/90"
+          className="absolute right-2 top-2 bg-bg-surface/90 [@media(pointer:coarse)]:size-[var(--touch-min)]"
         />
       )}
     </li>
