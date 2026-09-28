@@ -10,6 +10,7 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import { AiChatPanel, AI_BOT_ICON, hasAiHandoff } from "./ai-chat";
 import { C } from "@/lib/pcb/colors";
+import { DEFAULT_FILES, langForFile, type FileEntry } from "@/lib/code/files";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
@@ -23,42 +24,8 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.
 
 const STORAGE_KEY = "ideeza:code:files";
 
-type FileEntry = { name: string; language: string; content: string };
-
-const DEFAULT_FILES: FileEntry[] = [
-  {
-    name: "bot.py",
-    language: "python",
-    content: `from discord.ext import commands
-
-bot = commands.Bot(">")
-
-
-@bot.command("ping")
-async def ping(ctx: commands.Context):
-    await ctx.send("pong")
-
-
-bot.run("TOKEN")
-`,
-  },
-  {
-    name: ".env",
-    language: "ini",
-    content: `# Discord bot env
-TOKEN=your_token_here
-PREFIX=>
-`,
-  },
-  {
-    name: "README.md",
-    language: "markdown",
-    content: `# Discord Bot
-
-Sample project — a tiny ping/pong command.
-`,
-  },
-];
+// FileEntry, DEFAULT_FILES and langForFile live in lib/code/files.ts, with
+// the build's firmware as a file (BUILDLOAD P2-BUILDLOAD-4).
 
 const MENU_DEFS: Record<string, { label: string; shortcut?: string; action: string }[]> = {
   File: [
@@ -276,17 +243,6 @@ function loadFiles(): FileEntry[] {
 function persistFiles(files: FileEntry[]) {
   if (typeof window === "undefined") return;
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(files)); } catch {}
-}
-
-function langForFile(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase();
-  return {
-    py: "python", js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
-    html: "html", htm: "html", css: "css", scss: "scss", json: "json",
-    md: "markdown", env: "ini", ini: "ini", yaml: "yaml", yml: "yaml",
-    java: "java", c: "c", cpp: "cpp", h: "c", rs: "rust", go: "go",
-    sh: "shell", txt: "plaintext",
-  }[ext || ""] || "plaintext";
 }
 
 type TerminalLine = { kind: "out" | "in"; text: string };

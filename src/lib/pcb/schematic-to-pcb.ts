@@ -8,7 +8,8 @@
 // KiCad pipeline — it runs entirely in-app.
 //
 // Pipeline:
-//   1. nets      — union-find over wire vertices.
+//   1. nets      — union-find over wire vertices; wire roots whose ends carry
+//                  same-named net labels are one net, as in computeNets.
 //   2. power     — nets touched by GND / +5V symbols (excluded from ratsnest).
 //   3. pins      — each part's schematic pins = wire vertices at its terminals,
 //                  each carrying the net (union-find root) it sits on.
@@ -46,6 +47,9 @@ const POWER: Record<string, string> = {
   vcc3v3: "+3V3",
   vcc: "VCC",
 };
+// Symbols that NAME the wire net they sit on — computeNets' label namers
+// (nets.ts NAMERS, priority 2). Two of these with one name are one net.
+const LABEL_KINDS = new Set(["netLabel", "globalLabel", "hierLabel", "net", "netBusLabel", "netFlag", "port"]);
 // Pad centre offsets (canvas px, relative to footprint centre) — must match the
 // land-pattern glyphs drawn in placed-objects.tsx so airwires land on pads.
 export const PAD_OFFSETS: Record<string, Pt[]> = {
@@ -59,6 +63,9 @@ export const PAD_OFFSETS: Record<string, Pt[]> = {
 };
 
 const ATTACH_R = 30; // px — how close a wire vertex must be to a part terminal
+// px — how close a net label must be to a wire to name it: ERC's own node
+// join (nets.ts CLUSTER_TOL), so Convert and ERC read one set of nets.
+const LABEL_R = 13;
 const key = (x: number, y: number) => `${Math.round(x)},${Math.round(y)}`;
 
 // Placement region (canvas coords). The editor board sits at (60,60) sized
@@ -217,12 +224,55 @@ export function convertSchematicToPcb(src: CanvasObject[]): ConvertResult {
     verts.push({ x: w.endX ?? w.x, y: w.endY ?? w.y });
   }
 
+  // 1b. net labels — a label names the wire it sits on (a wire end within
+  //     LABEL_R, else a point along the wire), and every wire root a name
+  //     reaches is one net. Without this a label-drawn sheet converted with
+  //     no airwires, although ERC's netlist joined the labels.
+  const firstOfName = new Map<string, string>(); // label name → a vertex key on it
+  const labelAt = (lb: CanvasObject): string | null => {
+    let best: string | null = null, bd = LABEL_R * LABEL_R;
+    for (const v of verts) {
+      const d = (v.x - lb.x) ** 2 + (v.y - lb.y) ** 2;
+      if (d <= bd) { bd = d; best = key(v.x, v.y); }
+    }
+    if (best) return best;
+    for (const w of wires) {
+      const ax = w.x, ay = w.y, bx = w.endX ?? w.x, by = w.endY ?? w.y;
+      const abx = bx - ax, aby = by - ay, L2 = abx * abx + aby * aby;
+      if (L2 < 1) continue;
+      const t = ((lb.x - ax) * abx + (lb.y - ay) * aby) / L2;
+      if (t < 0 || t > 1) continue;
+      if ((ax + t * abx - lb.x) ** 2 + (ay + t * aby - lb.y) ** 2 <= LABEL_R * LABEL_R) return key(ax, ay);
+    }
+    return null;
+  };
+  const labelled: Array<{ at: string; name: string }> = [];
+  for (const lb of sch) {
+    const name = LABEL_KINDS.has(lb.kind) ? (lb.text ?? "").trim() : "";
+    if (!name) continue;
+    const at = labelAt(lb);
+    if (!at) continue;
+    labelled.push({ at, name });
+    const first = firstOfName.get(name);
+    if (first === undefined) firstOfName.set(name, at);
+    else uf.union(at, first);
+  }
+  // Each net's name, once every label has joined its roots (first label wins).
+  const rootName = new Map<string, string>();
+  for (const { at, name } of labelled) {
+    const root = uf.find(at);
+    if (!rootName.has(root)) rootName.set(root, name);
+  }
+
   // 2. power nets — a root is power if a power symbol sits on one of its verts.
+  //    A supply's own text names it (a `vcc5v` reading "VBUS" is VBUS), as it
+  //    does in computeNets; a bare one is the symbol's default.
   const rootPower = new Map<string, string>();
   for (const ps of powerSyms) {
+    const name = (ps.text && ps.text.trim()) || POWER[ps.kind];
     for (const v of verts) {
       if ((v.x - ps.x) ** 2 + (v.y - ps.y) ** 2 <= ATTACH_R * ATTACH_R) {
-        rootPower.set(uf.find(key(v.x, v.y)), POWER[ps.kind]);
+        rootPower.set(uf.find(key(v.x, v.y)), name);
       }
     }
   }
@@ -310,11 +360,13 @@ export function convertSchematicToPcb(src: CanvasObject[]): ConvertResult {
       (netPads.get(root) ?? netPads.set(root, []).get(root)!).push(padAbs[i][k]);
     });
   });
-  let airwires = 0, netNo = 0;
+  // Airwires carry their net's label, else an automatic N1, N2… (counted
+  // over the unnamed nets only, so a label-free sheet reads as before).
+  let airwires = 0, netNo = 0, unnamed = 0;
   for (const [root, pts] of netPads) {
     if (pts.length < 2) continue;
     netNo++;
-    const netName = `N${netNo}`;
+    const netName = rootName.get(root) ?? `N${++unnamed}`;
     for (const [a, b] of mst(pts)) {
       out.push({
         id: `pcb-rats-${root}-${airwires}`,
