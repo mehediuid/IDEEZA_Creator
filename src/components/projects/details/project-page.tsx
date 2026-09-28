@@ -23,6 +23,7 @@ import { parseProjectTab } from "@/lib/manual/project-route";
 import { useJourney } from "@/lib/manual/journey-store";
 import { productsTabView } from "@/lib/manual/products-tab-view";
 import { BuyerPreviewBanner, isBuyerPreview, previewQuery } from "./buyer-preview";
+import { CustomersPanel } from "./customers-tab";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { NetworkTab } from "./network-tab";
@@ -98,6 +99,24 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
+// T18's wiring: the project-scoped Customers panel (P2-CUSTOMERS-1…11, 18).
+// `view.customers` is already the project-scope `customersOf` (project-summary.ts);
+// `view.marketUnreadable` is the sales store's own read.
+function CustomersSlot({ project, view, now, announce }: SlotProps) {
+  return (
+    <CustomersPanel
+      customers={view.customers}
+      scope={{ kind: "project" }}
+      projectId={project.id}
+      projectName={project.name}
+      status={view.summary.status}
+      unreadable={view.marketUnreadable}
+      now={now}
+      announce={announce}
+    />
+  );
+}
+
 // ─────────────────────────── the page's composition ───────────────────────────
 
 /** Exported for its `banners`, which the product page shows too, so a preview reads the same
@@ -119,6 +138,7 @@ export const SLOTS: ProjectSlots = {
     products: ProductsSlot,
     media: MediaSlot,
     network: NetworkSlot,
+    customers: CustomersSlot,
   },
   rail: {
     outcome: OutcomeSlot,
