@@ -46,7 +46,8 @@ export function useEnterPreviewHref(): string {
 }
 
 /** Drops `view` alone, keeps the rest, then returns focus to the button
- *  that opened preview (PPL-5). */
+ *  that opened preview (PPL-5). A page without that button (the product
+ *  page) hands focus to its h1 instead, so it never falls to the body. */
 export function useExitPreview(): () => void {
   const router = useRouter();
   const pathname = usePathname();
@@ -55,7 +56,10 @@ export function useExitPreview(): () => void {
     const qs = withView(searchParams.toString(), null);
     router.push(qs ? `${pathname}?${qs}` : pathname);
     requestAnimationFrame(() => {
-      document.getElementById(PREVIEW_TRIGGER_ID)?.focus();
+      const target =
+        document.getElementById(PREVIEW_TRIGGER_ID) ??
+        document.querySelector<HTMLElement>("main h1[tabindex]");
+      target?.focus();
     });
   }, [router, pathname, searchParams]);
 }
