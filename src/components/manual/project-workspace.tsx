@@ -13,9 +13,13 @@
 //      product silently, or the maker would edit the wrong one;
 //   6. the scope isn't applied yet → "Opening product…".
 // Applying the scope makes the project active with its product
-// (`selectEditorScope`) and points the root PCB store at the product's board
-// (`setDocScope`, P2-EDITOR-4); the editor mounts once both match the URL,
-// keyed by project and product, so switching product remounts every editor.
+// (`selectEditorScope`); fills a built product's documents from its build on
+// its first open (`ensureSeeded`, P2-BUILDLOAD-7 — once the build history has
+// hydrated, so the row's build is known); then points the root PCB store at
+// the product's board (`setDocScope`, P2-EDITOR-4). The editor mounts once
+// both match the URL, keyed by project and product, so switching product
+// remounts every editor. Under the top bar it shows what the seed brought in
+// (P2-BUILDLOAD-12), then "Bring it in" (P2-EDITOR-5): one banner at a time.
 //
 // The Brief (/project/<slug>/brief) is the project's: it has no product,
 // and a locked project keeps it (View brief stays, §3.8.5).
@@ -28,8 +32,11 @@ import { HelpCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
+import { useCreateHistory } from "@/lib/create/history";
+import { pendingNoticeOf, type SeedEditor } from "@/lib/manual/build-load";
+import { ensureSeeded, readSeed, type EnsureResult, type SeedBuilt } from "@/lib/manual/build-load-io";
 import { useManualProjects, type ManualFlowState } from "@/lib/manual/projects";
-import { productRowsOf } from "@/lib/manual/project-read";
+import { buildsOf, productRowsOf, productsOfProject } from "@/lib/manual/project-read";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
 import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
@@ -37,6 +44,7 @@ import { useMarket } from "@/lib/market/market-store";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
 import { cn } from "@/lib/utils";
 import { BringInBanner, EditorBannerProvider } from "./bring-in-banner";
+import { ImportNotice, SeedFailedNotice } from "./import-notice";
 
 function BlankShell({ label }: { label: string }) {
   return (
@@ -135,6 +143,28 @@ const APP_BY_STEP: Record<keyof ManualFlowState, React.ComponentType> = {
 
 const OWNER = { kind: "local-owner" } as const;
 
+/** The editor each step's import notice belongs to (P2-BUILDLOAD-12). */
+const SEED_EDITOR_OF: Partial<Record<keyof ManualFlowState, SeedEditor>> = {
+  pcb: "pcb",
+  three: "three",
+  code: "code",
+  wiring: "wiring",
+};
+
+/** What this open's seed did for one product (`key` = project:row), and the
+ *  notices Got it has hidden since. */
+type SeedState = { key: string; result: EnsureResult; hidden: SeedEditor[]; failureHidden: boolean };
+
+const SKIPPED: EnsureResult = { status: "skipped", record: null };
+
+function storageOrNull(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null; // blocked storage: no editor can read a document either
+  }
+}
+
 export function ProjectWorkspace({
   slug,
   step,
@@ -157,6 +187,7 @@ export function ProjectWorkspace({
     touchOpened,
   } = useManualProjects();
   const market = useMarket();
+  const { hydrated: historyHydrated, builds } = useCreateHistory();
   const pcb = usePcbActions();
   const pcbScope = usePcbDocScope();
   const project = findBySlug(slug);
@@ -200,17 +231,54 @@ export function ProjectWorkspace({
     if (activeProjectId !== projectId) selectProject(projectId);
   }, [ready, projectId, isBrief, activeProjectId, selectProject]);
 
+  // The build a row is, read when the scope is applied — never a dependency,
+  // so a build running elsewhere doesn't re-apply an open product.
+  const builtOf = React.useEffectEvent((rowId: string): SeedBuilt | null => {
+    if (!project) return null;
+    return productsOfProject(project, buildsOf(project, builds)).find((r) => r.id === rowId)?.built ?? null;
+  });
+  const seedNow = React.useEffectEvent((scope: EditorScope, head: string, storage: Storage) =>
+    ensureSeeded(scope, builtOf(scope.productId), Date.now(), storage, head),
+  );
+
+  // This open's seed (P2-BUILDLOAD-7, 12), and the product this mount has
+  // already run it for, so a refused seed is retried once per open, not in a
+  // loop.
+  const [seed, setSeed] = React.useState<SeedState | null>(null);
+  const seededFor = React.useRef<string | null>(null);
+
   // A product route applies its scope: the project and product become the
-  // editor's, then the PCB store takes the product's board. Re-applied if the
-  // store lets go of it while this route is open (Load / Restore, delete).
+  // editor's; a built product's documents are seeded on its first open,
+  // after the gate and before anything reads them; then the PCB store takes
+  // the product's board. Re-applied if the store lets go of it while this
+  // route is open (Load / Restore, delete).
   React.useEffect(() => {
-    if (!ready || !projectId || !rowId || !headRowId || locked) return;
+    if (!ready || !historyHydrated || !projectId || !rowId || !headRowId || locked) return;
     const scope: EditorScope = { projectId, productId: rowId };
+    const key = `${projectId}:${rowId}`;
     selectEditorScope(projectId, rowId);
-    // BUILDLOAD (TB2): `ensureSeeded(scope, built, now, localStorage, headRowId)`
-    // runs here — after the gate, before the PCB store reads the documents.
+    if (seededFor.current === key && pcbHolds) return;
+    const storage = storageOrNull();
+    if (pcbHolds) {
+      // An earlier open holds the board. Its seed record says what it did —
+      // unless that seed was refused, or the row has taken a build since:
+      // then the store lets go first (flushing the maker's pending save),
+      // so the seed below never races a board still in memory.
+      const record = storage ? readSeed(scope, storage) : null;
+      if (!record && storage && builtOf(rowId)) {
+        pcb.releaseScope(scope);
+        return;
+      }
+      seededFor.current = key;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the seed record is external state, read once per open
+      setSeed({ key, result: record ? { status: "exists", record } : SKIPPED, hidden: [], failureHidden: false });
+      return;
+    }
+    seededFor.current = key;
+    const result = storage ? seedNow(scope, headRowId, storage) : SKIPPED;
+    setSeed({ key, result, hidden: [], failureHidden: false });
     pcb.setDocScope(scope, headRowId);
-  }, [ready, projectId, rowId, headRowId, locked, pcbHolds, selectEditorScope, pcb]);
+  }, [ready, historyHydrated, projectId, rowId, headRowId, locked, pcbHolds, selectEditorScope, pcb]);
 
   // P2-EDITOR-7 (COR-91): this product at this step is where it resumes.
   React.useEffect(() => {
@@ -259,7 +327,10 @@ export function ProjectWorkspace({
       />
     );
   }
-  if (!applied) return <BlankShell label="Opening product…" />;
+  // The seed is decided inside "Opening product…" too: no editor mounts on
+  // documents its build is about to fill.
+  const seedHere = seed?.key === `${project.id}:${row.id}` ? seed : null;
+  if (!applied || !seedHere) return <BlankShell label="Opening product…" />;
   // The same object every render of this product (pcbScope is the store's
   // published value), so the banner's storage read runs once per product.
   const scope = pcbScope!;
@@ -267,9 +338,28 @@ export function ProjectWorkspace({
   const App = APP_BY_STEP[step];
   const bringInEditor = step === "code" ? "code" : step === "three" ? "three" : null;
   const productName = row.name.trim() || "Not named yet";
-  // The banner slot under the top bar (P2-EDITOR-5; BUILDLOAD's import
-  // notice, TB2, shows before it).
-  const banners = bringInEditor ? (
+
+  // The banner slot under the top bar, one banner at a time: a refused seed,
+  // else what the seed brought into this editor (P2-BUILDLOAD-12), else
+  // "Bring it in" (P2-EDITOR-5).
+  const seedEditor = SEED_EDITOR_OF[step] ?? null;
+  const { result } = seedHere;
+  const failure = result.status === "failed" && !seedHere.failureHidden ? result.message : null;
+  const notice =
+    seedEditor && !seedHere.hidden.includes(seedEditor) ? pendingNoticeOf(result.record, seedEditor) : null;
+  const hide = (patch: Partial<Pick<SeedState, "hidden" | "failureHidden">>) =>
+    setSeed((s) => (s && s.key === seedHere.key ? { ...s, ...patch } : s));
+  const banners = failure ? (
+    <SeedFailedNotice message={failure} onDismissed={() => hide({ failureHidden: true })} />
+  ) : notice && seedEditor ? (
+    <ImportNotice
+      key={seedEditor}
+      scope={scope}
+      editor={seedEditor}
+      notice={notice}
+      onDismissed={(e) => hide({ hidden: [...seedHere.hidden, e] })}
+    />
+  ) : bringInEditor ? (
     <BringInBanner
       key={`${scope.projectId}:${scope.productId}:${generation}`}
       editor={bringInEditor}

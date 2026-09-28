@@ -1,11 +1,11 @@
 // Task C2a — the project header's own words: the rename and description
-// checks (CNT-2, CNT-5), the Open in editor hint (COR-12) and the
-// pending-version notices (COR-18, COR-101).
+// checks (CNT-2, CNT-5) and the pending-version notices (COR-18, COR-101).
+// The Open in editor hint (COR-12) is deleted (P2-BUILDLOAD-14).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as header from "../../.tmp-test/lib/manual/project-header.js";
 import {
   DESCRIPTION_SAVED,
-  EDITOR_HINT,
   WRITE_FAILED,
   checkDescription,
   checkProjectName,
@@ -33,8 +33,14 @@ function job(id, statuses, companions = []) {
 const READY = ["ready", "ready", "ready", "ready", "ready"];
 const LINEAGES = [{ chatId: "chat_car", title: "Car" }];
 
+test("P2-BUILDLOAD-14: the sample-board hint is gone", () => {
+  assert.equal("EDITOR_HINT" in header, false);
+  for (const value of Object.values(header)) {
+    if (typeof value === "string") assert.doesNotMatch(value, /sample board/);
+  }
+});
+
 test("the copy the header prints as it is", () => {
-  assert.equal(EDITOR_HINT, "The editor starts from a sample board — your build's parts aren't in it yet.");
   assert.equal(WRITE_FAILED, "This browser's storage is full — the change wasn't saved.");
   assert.equal(DESCRIPTION_SAVED, "Description saved");
   assert.equal(renamedMessage("Car Mk2"), "Renamed to “Car Mk2”");

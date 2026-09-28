@@ -206,8 +206,12 @@ function FitCamera({ shapes, tick }: { shapes: SceneShape[]; tick: number }) {
     shapes.forEach((s) => {
       if (s.hidden) return;
       const v = new THREE.Vector3(s.position[0], s.position[1], s.position[2]);
-      box.expandByPoint(v.clone().addScalar(-1.5));
-      box.expandByPoint(v.clone().addScalar(1.5));
+      // Half its size on each axis — the unit geometry times its scale, so a
+      // stretched shape (a seeded enclosure) is framed whole — never under
+      // the 1.5 margin a unit shape gets.
+      const half = new THREE.Vector3(...s.scale.map((k) => Math.max(1.5, Math.abs(k))));
+      box.expandByPoint(v.clone().sub(half));
+      box.expandByPoint(v.clone().add(half));
     });
     if (box.isEmpty()) return;
     const size = box.getSize(new THREE.Vector3()).length();
