@@ -26,16 +26,16 @@ import {
   type ProjectTabId,
 } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
-import {
-  LegacyDetailsBlock,
-  LegacyEditorBlock,
-  LegacyHeader,
-  LegacyManageBlock,
-  LegacyNetwork,
-} from "./legacy";
+import { LegacyHeader, LegacyNetwork } from "./legacy";
 import { MediaTab } from "./media-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProductsTab } from "./products-tab";
+import { RailDetails } from "./rail-details";
+import { RailEditor } from "./rail-editor";
+import { RailLog } from "./rail-log";
+import { RailManage } from "./rail-manage";
+import { RailOutcome } from "./rail-outcome";
+import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import type { ProjectSlots, SlotProps } from "./slots";
 
@@ -60,6 +60,15 @@ function ProductsSlot({ project, view, viewer, now }: SlotProps) {
   );
 }
 
+// C7's two rail blocks take their own props; they mount through these, as the
+// slot contract asks. The other four rail blocks are SlotProps components.
+function OutcomeSlot({ view, brief, viewer }: SlotProps) {
+  return <RailOutcome summary={view.summary} commerce={view.commerce} draft={brief} viewer={viewer} />;
+}
+function DetailsSlot({ project, view, viewer }: SlotProps) {
+  return <RailDetails project={project} summary={view.summary} viewer={viewer} />;
+}
+
 const SLOTS: ProjectSlots = {
   header: LegacyHeader,
   tabs: {
@@ -68,9 +77,12 @@ const SLOTS: ProjectSlots = {
     network: LegacyNetwork,
   },
   rail: {
-    editor: LegacyEditorBlock,
-    details: LegacyDetailsBlock,
-    manage: LegacyManageBlock,
+    outcome: OutcomeSlot,
+    editor: RailEditor,
+    details: DetailsSlot,
+    versions: RailVersions,
+    log: RailLog,
+    manage: RailManage,
   },
 };
 

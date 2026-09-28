@@ -1,14 +1,13 @@
 "use client";
 
 // The page's frame (spec COR-5, COR-54, COR-56): the page container that the
-// layout's container queries read, the two columns, the rail's one surface and
-// one rail block. The skeleton draws the same frame, so the page never changes
-// shape when the stores arrive (COR-2).
+// layout's container queries read, the two columns and the rail's one
+// surface. One rail block is C7's RailBlock (./rail-block.tsx), which C8
+// unified the whole rail on; this file no longer draws its own. The skeleton
+// draws the same frame, so the page never changes shape when the stores
+// arrive (COR-2).
 
 import * as React from "react";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { cn } from "@/lib/utils";
 
 /** The page container: as wide as `main`, and that width is what the container
  *  queries measure (§7 X6). At 1366 px with the sidebar open it is 1086 px, so
@@ -53,79 +52,5 @@ export function ProjectFrame({
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * One rail block (COR-54, COR-56): a section under its own h2. Beside the tabs,
- * from a 1024 px page container, it is always open. Stacked under the tab
- * panel, it is a disclosure that stays closed until pressed. It is the same
- * element either way, switched by the container query, so nothing renders
- * twice and the hidden variant is out of the accessibility tree.
- *
- * - `summary` rides on the closed row: "Outcome · Listed · Showcased" (COM-55).
- * - `collapsible={false}` keeps a block open at every width: Manage, whose
- *   Delete is the last thing on the page at 400 px.
- */
-export function RailBlock({
-  id,
-  title,
-  summary,
-  collapsible = true,
-  children,
-}: {
-  id: string;
-  title: string;
-  summary?: string;
-  collapsible?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const headingId = `rail-${id}-heading`;
-  const bodyId = `rail-${id}-body`;
-  return (
-    <section aria-labelledby={headingId} className="py-4 [@container(min-width:1024px)]:p-10">
-      <h2 id={headingId} className="text-lg font-bold leading-lg text-text-primary">
-        {collapsible ? (
-          <>
-            <span className="hidden [@container(min-width:1024px)]:inline">{title}</span>
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-controls={bodyId}
-              onClick={() => setOpen((v) => !v)}
-              className="flex min-h-[var(--touch-min)] w-full items-center justify-between gap-6 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus [@container(min-width:1024px)]:hidden"
-            >
-              <span className="min-w-0">
-                {title}
-                {summary ? (
-                  <span className="font-medium text-text-secondary"> · {summary}</span>
-                ) : null}
-              </span>
-              <span
-                aria-hidden
-                className={cn(
-                  "inline-flex shrink-0 text-text-tertiary transition-transform duration-normal ease-out motion-reduce:transition-none",
-                  open && "rotate-90",
-                )}
-              >
-                <Icon icon={ArrowRight01Icon} size={18} />
-              </span>
-            </button>
-          </>
-        ) : (
-          title
-        )}
-      </h2>
-      <div
-        id={bodyId}
-        className={cn(
-          "mt-6",
-          collapsible && !open && "hidden [@container(min-width:1024px)]:block",
-        )}
-      >
-        {children}
-      </div>
-    </section>
   );
 }
