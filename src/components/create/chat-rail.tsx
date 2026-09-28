@@ -41,6 +41,7 @@ import {
   type ChatTurn,
 } from "@/lib/create/history";
 import { useCredits } from "@/lib/create/credits";
+import type { SaveMode } from "@/lib/manual/save-step";
 import {
   activityOf,
   announcementFor,
@@ -97,6 +98,8 @@ export function useRailModel(
   labels: Map<string, string>,
   projectName: string,
   savedName?: string,
+  /** The save the ready build gets, for the next-step sentence (P2-SAVE-11). */
+  saveMode?: SaveMode | null,
 ): RailModel {
   const { balance, hydrated } = useCredits();
   const build = job ?? null;
@@ -153,6 +156,7 @@ export function useRailModel(
       hydrated,
       projectName,
       savedName,
+      saveMode,
     }),
     rows,
     build:

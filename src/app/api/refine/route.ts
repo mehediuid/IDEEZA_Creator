@@ -4,19 +4,35 @@
 // API key) — into whichever thing the caller asked for: a project brief
 // ("brief", the default), a 10-second product-video scene ("video", the Prompt
 // Help modal), or one precise instruction for a change to a concept already
-// on screen ("change", the chat composer). Falls back to a deterministic
-// answer per mode if the model is unreachable, so the button always returns
-// something.
+// on screen ("change", the chat composer), or one overview of a project from
+// its products' own descriptions ("project", the description's "Update with
+// AI", P2-SAVE-8). Falls back to a deterministic answer per mode if the model
+// is unreachable, so the button always returns something.
 //
 // Request:  { prompt: string, mode?: "brief" | "video" | "change" }
-// Response: { refined: string }
+//           { mode: "project", products: { name, description }[] }  — the
+//           prompt is built here from the products, one "{name}: {description}"
+//           line each.
+// Response: { refined: string } — plus `fallback: true` in project mode when
+//           the model didn't answer and `refined` is the products' own
+//           sentences joined (joinDescriptions, the save step's prefill too).
 
 import { NextResponse } from "next/server";
 import { refinePromptTemplate } from "@/lib/dashboard/refine";
 import { videoScenePrompt } from "@/lib/brief/video-prompt";
+import {
+  DESCRIBE_MAX,
+  describePromptOf,
+  joinDescriptions,
+  type DescribedProduct,
+} from "@/lib/manual/describe";
 
-type RefineMode = "brief" | "video" | "change";
-const MODES: RefineMode[] = ["brief", "video", "change"];
+type RefineMode = "brief" | "video" | "change" | "project";
+const MODES: RefineMode[] = ["brief", "video", "change", "project"];
+
+/** At most this many products, each clipped, so one request can't carry a novel. */
+const MAX_PRODUCTS = 20;
+const MAX_WORDS = 1000;
 
 const SYSTEM: Record<RefineMode, string> = {
   brief:
@@ -31,7 +47,31 @@ const SYSTEM: Record<RefineMode, string> = {
     "Rewrite their request as ONE short, specific instruction that describes only the change — material, colour, shape, size, a feature added or removed. " +
     "Do not describe the whole product, do not name a microcontroller or parts, and never invent a different product. " +
     "At most 25 words. Output ONLY the instruction — no preamble, no quotes, no lists.",
+  project:
+    "You are given the products of one hardware project, one per line as \"name: description\". " +
+    "Write ONE overview of the whole project that brings every product together. " +
+    "At most 3 sentences and 400 characters. Use only facts stated in the lines — never add a part, a feature, a number or a claim that isn't there. " +
+    "Output ONLY the overview — no preamble, no markdown, no quotes, no lists.",
 };
+
+// The project mode's products, as the body sent them: names and descriptions
+// as strings, clipped, the empty ones dropped.
+function productsFrom(body: unknown): DescribedProduct[] {
+  const raw =
+    typeof body === "object" && body !== null
+      ? (body as { products?: unknown }).products
+      : undefined;
+  if (!Array.isArray(raw)) return [];
+  const out: DescribedProduct[] = [];
+  for (const item of raw.slice(0, MAX_PRODUCTS)) {
+    if (typeof item !== "object" || item === null) continue;
+    const { name, description } = item as { name?: unknown; description?: unknown };
+    const n = typeof name === "string" ? name.trim().slice(0, 120) : "";
+    const d = typeof description === "string" ? description.trim().slice(0, MAX_WORDS) : "";
+    if (n || d) out.push({ name: n, description: d });
+  }
+  return out;
+}
 
 // The change-mode fallback: the maker's own words, tidied — a capital and a
 // full stop. Nothing is added, because anything added would be a guess.
@@ -106,6 +146,19 @@ export async function POST(req: Request) {
   const mode: RefineMode = MODES.includes(asked as RefineMode)
     ? (asked as RefineMode)
     : "brief";
+  if (mode === "project") {
+    // Nothing is written anywhere: the caller puts the answer in its textarea
+    // as unsaved text, and the maker saves it or undoes it.
+    const products = productsFrom(body);
+    const fallback = joinDescriptions(products);
+    const lines = describePromptOf(products);
+    if (lines.length < 6) return NextResponse.json({ refined: fallback, fallback: true });
+    const answer = await refineWithAI(lines, "project");
+    const ok = answer.length > 0 && answer.length <= DESCRIBE_MAX;
+    return ok
+      ? NextResponse.json({ refined: answer })
+      : NextResponse.json({ refined: fallback, fallback: true });
+  }
   if (prompt.trim().length < 6) {
     return NextResponse.json({ refined: "" });
   }

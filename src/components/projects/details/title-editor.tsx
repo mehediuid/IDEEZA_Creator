@@ -9,6 +9,11 @@
 // because the editor lives at /project/<slug> (CNT-3). No other surface
 // edits the name.
 //
+// Save goes through the edit gate (P2-LISTING-13 as changed, T11's
+// useProjectEditGate): a live Buy-now listing asks "Temporarily remove from
+// the marketplace?" first and pauses it; a running auction or a project sold
+// in full refuses, and the reason shows under the field.
+//
 // The h1 also carries the shell's own arrival focus (COR-7): `titleRef`
 // comes from usePageArrival (shell.tsx) through the header slot, and is
 // merged here with the ref useTruncated needs to measure the element.
@@ -20,6 +25,7 @@ import { Button, IconButton, TextInput } from "@/components/ideeza";
 import { PROJECT_NAME_MAX, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { WRITE_FAILED, checkProjectName, renamedMessage } from "@/lib/manual/project-header";
 import { cn } from "@/lib/utils";
+import { useProjectEditGate } from "../use-edit-gate";
 import { useStoreWrite } from "./use-store-write";
 
 /** The h1's id — a stable hook for anything that wants to find it. Arrival
@@ -43,6 +49,8 @@ export function ProjectTitle({
   titleRef?: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const { projects, updateProject } = useManualProjects();
+  const gate = useProjectEditGate(project.id);
+  const [refusal, setRefusal] = React.useState<string | null>(null);
   const [fieldOpen, setFieldOpen] = React.useState(false);
   // Entering Preview as buyer while the field is open closes it with the pencil (PPL-6).
   const editing = fieldOpen && canRename;
@@ -71,6 +79,9 @@ export function ProjectTitle({
     [projects, project.id],
   );
   const check = checkProjectName(draft, others, PROJECT_NAME_MAX);
+  // Why a rename can't go ahead right now (an auction, the lock), before the press.
+  const blocked = editing ? gate.reasonOf("rename") : null;
+  const reason = refusal ?? blocked;
 
   // Where focus goes once the next render is on screen: the field when it
   // opens, the pencil when it closes (CNT-1). An effect, so the element exists.
@@ -91,6 +102,7 @@ export function ProjectTitle({
     focusNext.current = "pencil";
     setFieldOpen(false);
     setPending(null);
+    setRefusal(null);
   };
   const write = useStoreWrite(pending !== null && project.name === pending, () => {
     if (pending !== null) announce(renamedMessage(pending));
@@ -122,9 +134,17 @@ export function ProjectTitle({
       close();
       return;
     }
-    setPending(check.value);
-    write.start();
-    updateProject(project.id, { name: check.value });
+    const name = check.value;
+    setRefusal(null);
+    const outcome = gate.guard("rename", () => {
+      setPending(name);
+      write.start();
+      updateProject(project.id, { name });
+    });
+    if (outcome.kind === "refused") {
+      setRefusal(outcome.reason);
+      inputRef.current?.focus();
+    }
   };
 
   return (
@@ -170,7 +190,15 @@ export function ProjectTitle({
               }}
               containerClassName="min-w-0 flex-1 basis-64"
             />
-            <Button type="submit" hierarchy="secondary" size="lg" disabled={write.saving} className={TOUCH}>
+            <Button
+              type="submit"
+              hierarchy="secondary"
+              size="lg"
+              disabled={write.saving}
+              aria-disabled={blocked !== null || undefined}
+              aria-describedby={reason ? messageId : undefined}
+              className={cn(TOUCH, blocked !== null && "cursor-not-allowed opacity-60")}
+            >
               {write.saving ? "Saving…" : "Save"}
             </Button>
             <Button type="button" hierarchy="ghost" size="lg" disabled={write.saving} onClick={cancel} className={TOUCH}>
@@ -187,6 +215,7 @@ export function ProjectTitle({
               <p className="text-text-secondary">{check.note}</p>
             ) : null}
             {write.failed && <p className="text-text-error">{WRITE_FAILED}</p>}
+            {reason && <p className="text-text-secondary">{reason}</p>}
           </div>
         </form>
       ) : canRename ? (
@@ -211,6 +240,7 @@ export function ProjectTitle({
           {project.name}
         </span>
       )}
+      {gate.dialog}
     </div>
   );
 }

@@ -39,6 +39,8 @@ import { RailManage } from "./rail-manage";
 import { RailOutcome } from "./rail-outcome";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
+import { SavedBanner } from "./saved-banner";
+import { DescriptionCoachmark } from "./description-coachmark";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
 import { BusinessPlanChip } from "./business-plan-chip";
@@ -162,6 +164,7 @@ export const SLOTS: ProjectSlots = {
     PreviewBannerSlot,
     ContributorPreviewBannerSlot,
   ],
+  notice: SavedBanner,
   header: HeaderSlot,
   headerParts: {
     titleRow: [
@@ -172,6 +175,7 @@ export const SLOTS: ProjectSlots = {
       UtilityPill,
     ],
     afterDescription: [
+      DescriptionCoachmark,
     ],
   },
   actions: {
