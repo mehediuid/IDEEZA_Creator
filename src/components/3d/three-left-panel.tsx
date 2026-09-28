@@ -233,6 +233,12 @@ function ShapeIcon({ type }: { type?: SceneShape["type"] }) {
   );
 }
 
+/** A shape's row label: its own name when it has one (a seeded build
+ *  shape), else its type and a short id, as a shape the maker drew reads. */
+function shapeLabel(shape: SceneShape): string {
+  return shape.name?.trim() || `${shape.type} · ${shape.id.split("-").pop()?.slice(0, 5)}`;
+}
+
 // ── Single part row with eye + 3-dot menu ────────────────────────────────
 function ShapeRow({
   shape,
@@ -271,8 +277,11 @@ function ShapeRow({
         }}
       >
         <ShapeIcon type={shape.type} />
-        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {shape.type} · {shape.id.split("-").pop()?.slice(0, 5)}
+        <span
+          title={shape.name ? `${shape.name} (${shape.type})` : undefined}
+          style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {shapeLabel(shape)}
         </span>
         {shape.locked && (
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.7" strokeLinecap="round">
@@ -338,7 +347,12 @@ export function ThreePartsSection({
     return () => window.removeEventListener("click", close);
   }, [openMenuFor]);
 
-  const filtered = shapes.filter((s) => !search || s.type.toLowerCase().includes(search.toLowerCase()) || s.id.toLowerCase().includes(search.toLowerCase()));
+  // A seeded build shape is found by its own name ("Enclosure base",
+  // "U1 · ESP32") as well as its type and id (BUILDLOAD C6).
+  const q = search.trim().toLowerCase();
+  const filtered = shapes.filter(
+    (s) => !q || [s.name ?? "", s.type, s.id].some((field) => field.toLowerCase().includes(q)),
+  );
 
   return (
     <div style={{ padding: "var(--spacing-3) var(--spacing-1) 0" }}>

@@ -28,6 +28,8 @@ import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
 import { useManualProjects } from "@/lib/manual/projects";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { ProductNameField } from "@/components/manual/product-name-field";
+import { ProductSwitcher } from "@/components/manual/product-switcher";
+import { EditorBannerOutlet } from "@/components/manual/bring-in-banner";
 
 const VIOLET = "var(--color-violet-600)";
 
@@ -74,6 +76,10 @@ function pickMenu(step: FlowStep | null): React.ReactNode | null {
   }
 }
 
+// The toolbar row each module keeps under this bar: PCB's tools, 3D's shape
+// toolbar, Code's Blockly strip. The banner slot sits below it.
+const MODULE_ROW_H: Partial<Record<FlowStep, number>> = { pcb: 46, three: 38, code: 36 };
+
 export function TopBar() {
   const pathname = usePathname();
   const currentStep = stepFromPath(pathname);
@@ -103,8 +109,11 @@ export function TopBar() {
         <HugeiconsIcon icon={ArrowDown01Icon} size={14} color={VIOLET} strokeWidth={2.5} />
       </div>
 
-      {/* Active project — the ONLY place the product / project name chip
-          lives (removed from the left panel + breadcrumb everywhere else). */}
+      {/* The product the editor holds, with its project under it — the ONLY
+          place the product / project name chip lives (removed from the left
+          panel + breadcrumb everywhere else). The Brief is the project's, so
+          there it names the project alone: no product rename, no switcher
+          (P2-EDITOR-6). */}
       {onFlowPage && activeProject && (
         <div
           style={{
@@ -119,26 +128,14 @@ export function TopBar() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           </svg>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              minWidth: 0,
-              lineHeight: 1.12,
-            }}
-          >
-            <ProductNameField
-              fontSize="var(--font-size-md)"
-              fontWeight={600}
-              maxWidth={220}
-            />
+          {currentStep === "brief" ? (
             <span
               title={activeProject.name}
               style={{
-                fontSize: "var(--font-size-2xs)",
-                fontWeight: 500,
-                color: "var(--color-text-tertiary)",
-                maxWidth: 220,
+                fontSize: "var(--font-size-md)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+                maxWidth: 240,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -146,7 +143,39 @@ export function TopBar() {
             >
               {activeProject.name}
             </span>
-          </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                minWidth: 0,
+                lineHeight: 1.12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
+                <ProductNameField
+                  fontSize="var(--font-size-md)"
+                  fontWeight={600}
+                  maxWidth={220}
+                />
+                <ProductSwitcher />
+              </div>
+              <span
+                title={activeProject.name}
+                style={{
+                  fontSize: "var(--font-size-2xs)",
+                  fontWeight: 500,
+                  color: "var(--color-text-tertiary)",
+                  maxWidth: 220,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {activeProject.name}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -230,6 +259,11 @@ export function TopBar() {
           <HugeiconsIcon icon={SidebarLeft01Icon} size={16} color="var(--color-text-tertiary)" strokeWidth={2} />
         </ToolBtn>
       </div>
+
+      {/* The editor's banner slot (P2-EDITOR-5, BUILDLOAD's notices), in this
+          bar's layer: over the panels and canvas, under the editor's modals.
+          It clears the module's own toolbar row, so no control is covered. */}
+      <EditorBannerOutlet top={62 + (currentStep ? MODULE_ROW_H[currentStep] ?? 0 : 0) + 8} />
     </div>
   );
 }

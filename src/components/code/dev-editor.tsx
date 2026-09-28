@@ -3,7 +3,9 @@
 // IDEEZA Code — Code Development mode (Figma 41579:737403 / 737606).
 // Real Monaco editor + multi-file state + per-file language detection +
 // working File/Edit/View menus + an interactive terminal stub. Files survive
-// reloads via localStorage. The IDE chrome (Diamond icon, menus, README title,
+// reloads via localStorage, per product (`ideeza:code:files:<projectId>:<productId>`,
+// P2-EDITOR-3). The pre-P2 global `ideeza:code:files` is never read here —
+// it's the maker's to bring into a product (P2-EDITOR-5). The IDE chrome (Diamond icon, menus, README title,
 // Choose Language) wraps around the editor.
 
 import * as React from "react";
@@ -11,6 +13,8 @@ import dynamic from "next/dynamic";
 import { AiChatPanel, AI_BOT_ICON, hasAiHandoff } from "./ai-chat";
 import { C } from "@/lib/pcb/colors";
 import { DEFAULT_FILES, langForFile, type FileEntry } from "@/lib/code/files";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { editorDocKey } from "@/lib/manual/editor-scope";
 
 // Monaco needs the browser — dynamic-import with ssr disabled.
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.default), {
@@ -21,8 +25,6 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((m) => m.
     </div>
   ),
 });
-
-const STORAGE_KEY = "ideeza:code:files";
 
 // FileEntry, DEFAULT_FILES and langForFile live in lib/code/files.ts, with
 // the build's firmware as a file (BUILDLOAD P2-BUILDLOAD-4).
@@ -228,10 +230,10 @@ function ChooseLanguage({ onPick, value, langOpen, onToggle }: { onPick: (id: st
   );
 }
 
-function loadFiles(): FileEntry[] {
-  if (typeof window === "undefined") return DEFAULT_FILES;
+function loadFiles(key: string | null): FileEntry[] {
+  if (typeof window === "undefined" || !key) return DEFAULT_FILES;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as FileEntry[];
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -240,18 +242,21 @@ function loadFiles(): FileEntry[] {
   return DEFAULT_FILES;
 }
 
-function persistFiles(files: FileEntry[]) {
-  if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(files)); } catch {}
+function persistFiles(key: string | null, files: FileEntry[]) {
+  if (typeof window === "undefined" || !key) return;
+  try { window.localStorage.setItem(key, JSON.stringify(files)); } catch {}
 }
 
 type TerminalLine = { kind: "out" | "in"; text: string };
 
 export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: number; leftOffset?: number }) {
-  const [files, setFiles] = React.useState<FileEntry[]>(() => loadFiles());
-  const [activeName, setActiveName] = React.useState<string>(() => loadFiles()[0]?.name || "bot.py");
+  // The app is keyed by product, so the key is fixed for this mount.
+  const editor = useEditorScope();
+  const storageKey = editor ? editorDocKey("code.files", editor.scope) : null;
+  const [files, setFiles] = React.useState<FileEntry[]>(() => loadFiles(storageKey));
+  const [activeName, setActiveName] = React.useState<string>(() => loadFiles(storageKey)[0]?.name || "bot.py");
   const [openTabs, setOpenTabs] = React.useState<string[]>(() => {
-    const f = loadFiles();
+    const f = loadFiles(storageKey);
     return f.slice(0, 2).map((x) => x.name);
   });
   const [openMenu, setOpenMenu] = React.useState<string | null>(null);
@@ -277,7 +282,7 @@ export function DevEditor({ topOffset = 152, leftOffset = 74 }: { topOffset?: nu
 
   const activeFile = files.find((f) => f.name === activeName);
 
-  React.useEffect(() => { persistFiles(files); }, [files]);
+  React.useEffect(() => { persistFiles(storageKey, files); }, [storageKey, files]);
 
   const openFile = (name: string) => {
     setActiveName(name);

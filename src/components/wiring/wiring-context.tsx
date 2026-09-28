@@ -4,7 +4,7 @@
 // Holds placed peripheral parts, finished wires, the active Draw tool, the
 // in-progress draft (a small step machine: pick pin → set height → pick pin →
 // set height → auto-route), and the selected wire. Parts + wires persist per
-// project in localStorage. A window.__wiring hook mirrors the key actions for
+// product in localStorage (`ideeza:wiring:doc:<projectId>:<productId>`). A window.__wiring hook mirrors the key actions for
 // deterministic verification.
 
 import * as React from "react";
@@ -18,6 +18,8 @@ import {
   type WirePoint,
   type WireTool,
 } from "@/lib/wiring/types";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { DocSaveQueue, globalTimers, readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
 
 type DraftStage = "idle" | "pin1" | "height1" | "pin2" | "height2" | "sketch";
 
@@ -74,14 +76,6 @@ interface Ctx {
 
 const WiringContext = React.createContext<Ctx | null>(null);
 
-function docKey(): string {
-  let pid = "default";
-  try {
-    pid = window.localStorage.getItem("ideeza:manual:active") || "default";
-  } catch {}
-  return `ideeza:wiring:doc:${pid}`;
-}
-
 export function WiringProvider({ children }: { children: React.ReactNode }) {
   const [parts, setParts] = React.useState<WirePart[]>([]);
   const [wires, setWires] = React.useState<WireObj[]>([]);
@@ -99,36 +93,62 @@ export function WiringProvider({ children }: { children: React.ReactNode }) {
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
 
-  // One-time hydrate from the external store (localStorage). This is exactly
-  // what an effect is for; the strict cascading-render lint doesn't apply.
+  // This product's wiring (P2-EDITOR-3): its own key, else — on the first
+  // row — a legacy per-project wiring the maker changed, else empty. The app
+  // is keyed by product, so this reads once per product, and the key it was
+  // read for is where every save lands.
+  const editor = useEditorScope();
+  const scope = editor?.scope ?? null;
+  const headRowId = editor?.headRowId ?? "";
+  const handleRef = React.useRef<DocHandle | null>(null);
+  const loadedRef = React.useRef<{ parts: WirePart[]; wires: WireObj[] } | null>(null);
+  const [saveQueue] = React.useState(
+    () =>
+      new DocSaveQueue<DocHandle, { parts: WirePart[]; wires: WireObj[] }>(
+        250,
+        (handle, doc) => writeEditorDoc(handle, JSON.stringify(doc), window.localStorage),
+        globalTimers,
+      ),
+  );
+
+  // One hydrate per product from the external store (localStorage). This is
+  // exactly what an effect is for; the strict cascading-render lint doesn't apply.
   /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
+    if (!scope) return;
+    let nextParts: WirePart[] = [];
+    let nextWires: WireObj[] = [];
     try {
-      const raw = window.localStorage.getItem(docKey());
-      if (raw) {
-        const doc = JSON.parse(raw);
-        if (Array.isArray(doc.parts)) setParts(doc.parts);
-        if (Array.isArray(doc.wires)) setWires(doc.wires);
-        const ids = [...(doc.parts ?? []), ...(doc.wires ?? [])]
+      const read = readEditorDoc("wiring", scope, headRowId, window.localStorage);
+      handleRef.current = { key: read.key, settle: read.settle };
+      if (read.raw) {
+        const doc = JSON.parse(read.raw);
+        if (Array.isArray(doc.parts)) nextParts = doc.parts;
+        if (Array.isArray(doc.wires)) nextWires = doc.wires;
+        const ids = [...nextParts, ...nextWires]
           .map((o: { id: string }) => parseInt(String(o.id).replace(/\D/g, ""), 10))
           .filter((n) => !Number.isNaN(n));
         counter.current = Math.max(1, ...ids) + 1;
       }
     } catch {}
+    loadedRef.current = { parts: nextParts, wires: nextWires };
+    setParts(nextParts);
+    setWires(nextWires);
     setHydrated(true);
-  }, []);
+  }, [scope, headRowId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // persist (debounced) after hydration
+  // persist (debounced) after hydration — not the wiring as just read
   React.useEffect(() => {
-    if (!hydrated) return;
-    const t = setTimeout(() => {
-      try {
-        window.localStorage.setItem(docKey(), JSON.stringify({ parts, wires }));
-      } catch {}
-    }, 250);
-    return () => clearTimeout(t);
-  }, [parts, wires, hydrated]);
+    const handle = handleRef.current;
+    if (!hydrated || !handle) return;
+    const loaded = loadedRef.current;
+    if (loaded && loaded.parts === parts && loaded.wires === wires) return;
+    loadedRef.current = null;
+    saveQueue.schedule(handle, { parts, wires });
+  }, [parts, wires, hydrated, saveQueue]);
+  // Leaving the editor (another step, another product) writes the last edit.
+  React.useEffect(() => () => void saveQueue.flush(), [saveQueue]);
 
   const nextId = (prefix: string) => `${prefix}_${counter.current++}`;
 

@@ -23,6 +23,8 @@ import { landPatternFor, unresolvedReason } from "@/lib/pcb/land-patterns";
 import { MODULE_CATALOG, PART_CATALOG, readPersonalModules, readPersonalParts, type AgileModule, type CatalogPart } from "@/lib/pcb/part-catalog";
 import { readPackages, type SavedPackage } from "@/lib/package/library";
 import { FootprintThumb, SymbolThumb } from "@/components/package/package-thumbs";
+import { normalizeProjects } from "@/lib/manual/projects";
+import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 
 const LS_KEYS = ["ideeza:pcb:personalPackages", "ideeza:pcb:personalParts", "ideeza:pcb:personalModules", "ideeza:manual:active", "ideeza:manual:projects"];
 const subscribeStorage = (cb: () => void) => {
@@ -360,7 +362,7 @@ function OpenBoard({ board, known }: { board: string | null; known: boolean }) {
   return (
     <Link
       href={board}
-      title="Opens this project's board — place it there from Insert ▸ Place a Part"
+      title="Opens this product's board — place it there from Insert ▸ Place a Part"
       className={buttonVariants({ hierarchy: "primary", size: "lg", className: "no-underline" })}
     >
       Open the board
@@ -368,15 +370,16 @@ function OpenBoard({ board, known }: { board: string | null; known: boolean }) {
   );
 }
 
-/** The editor the Open action goes to — only when a project is actually open. */
+/** The editor the Open action goes to — only when a project is actually open:
+ *  the PCB of the product it resumes (P2-EDITOR-2), the one it was left on. */
 function activeBoardHref(): string | null {
   if (typeof window === "undefined") return null;
   try {
     const id = window.localStorage.getItem("ideeza:manual:active");
     if (!id) return null;
-    const list = JSON.parse(window.localStorage.getItem("ideeza:manual:projects") || "[]");
-    const proj = Array.isArray(list) ? list.find((p: { id?: string }) => p && p.id === id) : null;
-    return proj && proj.slug ? `/project/${proj.slug}/pcb` : null;
+    const list = normalizeProjects(JSON.parse(window.localStorage.getItem("ideeza:manual:projects") || "[]"));
+    const proj = list.find((p) => p.id === id);
+    return proj ? editorHref(proj, resumeProductOf(proj), "pcb") : null;
   } catch {
     return null;
   }

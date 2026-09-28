@@ -5,7 +5,9 @@
 // Flow: type a prompt → POST /api/three/generate (turns the prompt into a
 // concept image via Pollinations, then kicks off image→3D) → poll until the
 // .glb is ready → show it in <ModelViewer>. The last result is persisted per
-// project so reopening the module brings it back.
+// product (`ideeza:three:aimodel:<projectId>:<productId>`, P2-EDITOR-3) so
+// reopening the module brings it back; the project's first row adopts the
+// pre-P2 per-project model once, and its first save moves it.
 //
 // Providers (server-decided): "meshy" when MESHY_API_KEY is set (real models),
 // otherwise "demo" — a bundled sample mesh so the whole flow is usable with no
@@ -13,6 +15,9 @@
 
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { readEditorDoc, writeEditorDoc, type DocHandle } from "@/lib/manual/editor-docs";
+import type { EditorScope } from "@/lib/manual/p2-types";
 import { ModelViewer } from "./model-viewer";
 
 type Provider = "meshy" | "demo";
@@ -25,38 +30,34 @@ type Persisted = {
   provider: Provider | null;
 };
 
-function storeKey(projectId?: string): string {
-  return `ideeza:three:aimodel:${projectId ?? "default"}`;
-}
-
-function loadPersisted(projectId?: string): Persisted | null {
-  if (typeof window === "undefined") return null;
+/** This product's stored model, and where its next save lands. */
+function loadPersisted(scope: EditorScope, headRowId: string): { saved: Persisted | null; handle: DocHandle } {
+  const read = readEditorDoc("three.ai", scope, headRowId, window.localStorage);
+  const handle = { key: read.key, settle: read.settle };
   try {
-    const raw = window.localStorage.getItem(storeKey(projectId));
-    return raw ? (JSON.parse(raw) as Persisted) : null;
+    return { saved: read.raw ? (JSON.parse(read.raw) as Persisted) : null, handle };
   } catch {
-    return null;
+    return { saved: null, handle };
   }
 }
 
-function savePersisted(projectId: string | undefined, v: Persisted) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(storeKey(projectId), JSON.stringify(v));
-  } catch {}
+function savePersisted(handle: DocHandle, v: Persisted) {
+  writeEditorDoc(handle, JSON.stringify(v), window.localStorage);
 }
 
 export function AiGenerateModal({
   open,
   onClose,
-  projectId,
   defaultPrompt = "",
 }: {
   open: boolean;
   onClose: () => void;
-  projectId?: string;
   defaultPrompt?: string;
 }) {
+  const editor = useEditorScope();
+  const scope = editor?.scope ?? null;
+  const headRowId = editor?.headRowId ?? "";
+  const handleRef = React.useRef<DocHandle | null>(null);
   const [prompt, setPrompt] = React.useState("");
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [imgLoaded, setImgLoaded] = React.useState(false);
@@ -73,8 +74,9 @@ export function AiGenerateModal({
 
   // Seed prompt + restore last result when the modal opens.
   React.useEffect(() => {
-    if (!open) return;
-    const saved = loadPersisted(projectId);
+    if (!open || !scope) return;
+    const { saved, handle } = loadPersisted(scope, headRowId);
+    handleRef.current = handle;
     if (saved) {
       setPrompt(saved.prompt || defaultPrompt);
       setImageUrl(saved.imageUrl);
@@ -86,7 +88,7 @@ export function AiGenerateModal({
       setPhase("idle");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, projectId]);
+  }, [open, scope, headRowId]);
 
   // Stop any in-flight polling when the modal closes or unmounts.
   React.useEffect(() => {
@@ -155,7 +157,7 @@ export function AiGenerateModal({
           setGlbUrl(data.glbUrl);
           setProgress(100);
           setPhase("ready");
-          savePersisted(projectId, {
+          if (handleRef.current) savePersisted(handleRef.current, {
             prompt: text,
             imageUrl: created.imageUrl,
             glbUrl: data.glbUrl,
@@ -176,7 +178,7 @@ export function AiGenerateModal({
       }
     };
     setTimeout(poll, 1500);
-  }, [prompt, projectId]);
+  }, [prompt]);
 
   if (!open) return null;
 

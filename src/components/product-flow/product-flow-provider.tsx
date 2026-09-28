@@ -23,6 +23,7 @@ import {
   useManualProjects,
   type ManualFlowState,
 } from "@/lib/manual/projects";
+import { parseEditorPath } from "@/lib/manual/editor-scope";
 
 export type FlowStep = keyof ManualFlowState;
 
@@ -37,12 +38,14 @@ export const FLOW_LABELS: Record<FlowStep, string> = {
   brief: "Brief",
 };
 // Inverse lookup: given a pathname, return the matching FlowStep or null.
-// Handles both the project-scoped route (/project/<slug>/<segment>) and the
+// Handles both editor route shapes — the product's
+// (/project/<slug>/products/<productId>/<segment>, P2-EDITOR-1) and the
+// project's (/project/<slug>/<segment>) — through `parseEditorPath`, plus the
 // legacy flat routes (/pcb, /code, /3d, /preview, /brief) that still redirect.
 export function stepFromPath(pathname: string | null): FlowStep | null {
   if (!pathname) return null;
-  const scoped = pathname.match(/^\/project\/[^/]+\/([^/]+)/);
-  if (scoped) return SEGMENT_TO_STEP[scoped[1]] ?? null;
+  const scoped = parseEditorPath(pathname);
+  if (scoped) return scoped.step;
   const legacy = pathname.match(/^\/(pcb|code|3d|preview|wiring|brief)(?:\/|$)/);
   if (legacy) return SEGMENT_TO_STEP[legacy[1]] ?? null;
   return null;

@@ -16,6 +16,9 @@ import { javascriptGenerator } from "blockly/javascript";
 import { pythonGenerator } from "blockly/python";
 import * as En from "blockly/msg/en";
 import { C } from "@/lib/pcb/colors";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { editorDocKey } from "@/lib/manual/editor-scope";
+import type { EditorScope } from "@/lib/manual/p2-types";
 import { CODE_EVENT, type CodeAction } from "./code-menu-strip";
 
 Blockly.setLocale(En as unknown as { [key: string]: string });
@@ -157,7 +160,9 @@ const IdeezaTheme = Blockly.Theme.defineTheme("ideeza", {
   },
 });
 
-const STORAGE_KEY = "ideeza:code:blockly-workspace";
+/** The workspace is per product (`ideeza:code:blockly-workspace:<projectId>:<productId>`,
+ *  P2-EDITOR-3); the pre-P2 global one is the maker's to bring in (P2-EDITOR-5). */
+const blocklyKey = (scope: EditorScope | null) => (scope ? editorDocKey("code.blockly", scope) : null);
 
 function ChevronRight({ down }: { down?: boolean }) {
   return (
@@ -561,6 +566,8 @@ function CodePreviewCard({ code, lang, onLang }: { code: string; lang: "javascri
 }
 
 export function BlocklyImpl() {
+  // The Code app is keyed by product, so this key is fixed for the mount.
+  const storageKey = blocklyKey(useEditorScope()?.scope ?? null);
   const wsHostRef = React.useRef<HTMLDivElement>(null);
   const wsRef = React.useRef<Blockly.WorkspaceSvg | null>(null);
   const [ws, setWs] = React.useState<Blockly.WorkspaceSvg | null>(null);
@@ -601,7 +608,7 @@ export function BlocklyImpl() {
     setWs(newWs);
 
     try {
-      const xml = window.localStorage.getItem(STORAGE_KEY);
+      const xml = storageKey ? window.localStorage.getItem(storageKey) : null;
       if (xml) {
         const dom = Blockly.utils.xml.textToDom(xml);
         Blockly.Xml.domToWorkspace(dom, newWs);
@@ -615,7 +622,7 @@ export function BlocklyImpl() {
       } catch {}
       try {
         const xml = Blockly.Xml.workspaceToDom(newWs);
-        window.localStorage.setItem(STORAGE_KEY, Blockly.Xml.domToText(xml));
+        if (storageKey) window.localStorage.setItem(storageKey, Blockly.Xml.domToText(xml));
       } catch {}
     };
     regen();
