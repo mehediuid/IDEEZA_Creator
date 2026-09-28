@@ -38,6 +38,7 @@ import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
+import { BusinessPlanChip } from "./business-plan-chip";
 
 // ─────────────────────────── the slot adapters ───────────────────────────
 
@@ -129,6 +130,7 @@ export const SLOTS: ProjectSlots = {
   header: HeaderSlot,
   headerParts: {
     titleRow: [
+      BusinessPlanChip,
     ],
     statusRow: [
     ],
