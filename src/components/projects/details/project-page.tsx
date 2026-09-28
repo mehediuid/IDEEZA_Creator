@@ -28,6 +28,8 @@ import {
 import { useManualProjects } from "@/lib/manual/projects";
 import { BUYER_VIEW, VIEW_PARAM } from "@/lib/manual/buyer-preview";
 import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "./buyer-preview";
+import { ContributorPreviewBanner } from "./contributor-preview-banner";
+import { ContributorsTab } from "./contributors-tab";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { NetworkTab, useNetworkTabVisible } from "./network-tab";
@@ -93,13 +95,28 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
+// T17's wiring (P2-CONTRIB-12): the contributor-preview banner is its own
+// entry in `banners`, alongside the (still singular, v1) buyer one above —
+// T12 folds `banner` into `banners` when it rewrites this file's frame.
+function ContributorPreviewBannerSlot({ viewer }: SlotProps) {
+  return viewer.kind === "contributor-preview" ? <ContributorPreviewBanner viewer={viewer} /> : null;
+}
+
+// T17's wiring (P2-CONTRIB-1…13): the roster, its dialog and removal all live
+// in ContributorsTab, fed by `view.ownership` and `view.canCtx` (COR-74).
+function ContributorsSlot(props: SlotProps) {
+  return <ContributorsTab {...props} />;
+}
+
 const SLOTS: ProjectSlots = {
   banner: PreviewBannerSlot,
+  banners: [ContributorPreviewBannerSlot],
   header: HeaderSlot,
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
     network: NetworkSlot,
+    contributors: ContributorsSlot,
   },
   rail: {
     outcome: OutcomeSlot,

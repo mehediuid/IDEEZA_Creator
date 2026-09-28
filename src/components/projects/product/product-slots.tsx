@@ -17,6 +17,7 @@ import type { Viewer } from "@/lib/manual/permissions";
 import type { ProductVersionView } from "@/lib/manual/product-page";
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
+import { ProductContributorsPanel } from "./product-contributors";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -40,7 +41,15 @@ export type ProductSlots = {
   headerParts?: { titleRow?: React.ComponentType<ProductSlotProps>[] };
 };
 
+// T17's wiring (P2-CONTRIB-15, P2-TABS-4): the product page's read-only
+// contributors credit.
+function ContributorsSlot(props: ProductSlotProps) {
+  return <ProductContributorsPanel {...props} />;
+}
+
 export const PRODUCT_SLOTS: ProductSlots = {
-  panels: {},
+  panels: {
+    contributors: ContributorsSlot,
+  },
   rail: {},
 };
