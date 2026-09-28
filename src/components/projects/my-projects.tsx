@@ -21,7 +21,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft01Icon, ArrowRight01Icon, Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ProjectNotice } from "@/components/projects/project-notice";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
@@ -29,6 +29,7 @@ import { SearchInput, SelectMenu, buttonVariants } from "@/components/ideeza";
 import { useMinuteClock } from "@/components/create/build-status";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useCreateHistory } from "@/lib/create/history";
+import { useMarket } from "@/lib/market/market-store";
 import { readBriefDraft, showcaseBackfillOf } from "@/lib/brief/project-brief";
 import { briefDraftKey } from "@/lib/brief/types";
 import { projectSummary, type ListQuery } from "@/lib/manual/project-summary";
@@ -39,7 +40,6 @@ import {
   countLine,
   filterProjects,
   listQueryString,
-  pageItemsFor,
   parseListQuery,
   searchInUrl,
   tabCountLabel,
@@ -50,6 +50,7 @@ import {
 import { useManualProjects } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 import { ProjectCard, ProjectCardSkeleton, NoProjectsState, NoMatchState, EmptyTabState } from "./project-card";
+import { Pagination } from "./pagination";
 
 const PANEL_ID = "projects-panel";
 const SOURCE_ID = "projects-source";
@@ -163,6 +164,7 @@ export function MyProjects() {
   const { hydrated, projects, selectProject, backfillShowcase } = useManualProjects();
   const { hydrated: buildsHydrated, builds } = useCreateHistory();
   const { hydrated: jobsHydrated, jobs } = useVideoJobs();
+  const { hydrated: marketHydrated, data: market } = useMarket();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -204,7 +206,7 @@ export function MyProjects() {
 
   // ── the data ──
   const draftsTick = React.useSyncExternalStore(subscribeDrafts, draftsSnapshot, draftsServerSnapshot);
-  const storesReady = hydrated && buildsHydrated && jobsHydrated;
+  const storesReady = hydrated && buildsHydrated && jobsHydrated && marketHydrated;
   const drafts = React.useMemo(
     () =>
       storesReady && draftsTick >= 0
@@ -237,10 +239,11 @@ export function MyProjects() {
               videoJobs: jobs,
               now,
               projects,
+              market,
             }),
           }))
         : null,
-    [drafts, projects, builds, jobs, now],
+    [drafts, projects, builds, jobs, now, market],
   );
   const result = React.useMemo(() => (items ? filterProjects(items, view) : null), [items, view]);
 
@@ -577,85 +580,6 @@ function ProjectTabs({
         );
       })}
     </div>
-  );
-}
-
-// ───────────────────────── pagination ─────────────────────────
-
-// LST-27: ‹ 1 … n-1 n n+1 … last ›, the current page marked. Below a 480 px
-// content box the numbers give way to "Page 2 of 4". Hidden on a single page
-// (the caller doesn't render it).
-function Pagination({
-  page,
-  pageCount,
-  onChange,
-}: {
-  page: number;
-  pageCount: number;
-  onChange: (p: number) => void;
-}) {
-  const btn =
-    "inline-flex h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-solid px-[8px] text-md font-medium outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(max-width:559px)]:h-[44px] [@container(max-width:559px)]:min-w-[44px]";
-  const idle =
-    "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary";
-  const numbersOnly = "[@container(max-width:479px)]:hidden";
-
-  return (
-    <nav aria-label="Pagination" className="mt-[28px] flex items-center justify-end gap-[6px]">
-      <button
-        type="button"
-        aria-label="Previous page"
-        disabled={page <= 1}
-        onClick={() => onChange(page - 1)}
-        className={cn(btn, idle, "disabled:cursor-not-allowed disabled:opacity-40")}
-      >
-        <Icon icon={ArrowLeft01Icon} size={16} />
-      </button>
-
-      <p className="px-[8px] text-md font-medium text-text-secondary [@container(min-width:480px)]:hidden">
-        Page {page} of {pageCount}
-      </p>
-
-      {pageItemsFor(page, pageCount).map((it, i) =>
-        it === "ellipsis" ? (
-          <span
-            key={`e-${i}`}
-            aria-hidden
-            className={cn(
-              "inline-flex h-[36px] min-w-[24px] items-center justify-center text-md text-text-tertiary",
-              numbersOnly,
-            )}
-          >
-            …
-          </span>
-        ) : (
-          <button
-            key={it}
-            type="button"
-            aria-label={`Page ${it}`}
-            aria-current={it === page ? "page" : undefined}
-            onClick={() => onChange(it)}
-            className={cn(
-              btn,
-              numbersOnly,
-              it === page ? "border-transparent bg-bg-brand-subtle font-semibold text-text-brand" : idle,
-            )}
-          >
-            {it}
-          </button>
-        ),
-      )}
-
-      <button
-        type="button"
-        aria-label="Next page"
-        disabled={page >= pageCount}
-        onClick={() => onChange(page + 1)}
-        className={cn(btn, idle, "disabled:cursor-not-allowed disabled:opacity-40")}
-      >
-        <Icon icon={ArrowRight01Icon} size={16} />
-      </button>
-    </nav>
   );
 }
 
