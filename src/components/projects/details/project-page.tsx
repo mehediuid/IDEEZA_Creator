@@ -29,15 +29,15 @@ import { useManualProjects } from "@/lib/manual/projects";
 import {
   LegacyDetailsBlock,
   LegacyEditorBlock,
-  LegacyHeader,
   LegacyManageBlock,
   LegacyNetwork,
   LegacyProducts,
 } from "./legacy";
+import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { ProjectNotFound, ProjectSkeleton } from "./page-states";
 import { ProjectShell } from "./shell";
-import type { ProjectSlots, SlotProps } from "./slots";
+import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 
 // C5's wiring (task-C1.md's Hand-off): the page renders only after every
 // store is read, so `hydrated` is always true here.
@@ -45,8 +45,16 @@ function MediaSlot({ project, view, brief, viewer }: SlotProps) {
   return <MediaTab project={project} refs={view.refs} hydrated draft={brief} viewer={viewer} />;
 }
 
+// C2's wiring: the header's own data props are `{ project, view, viewer }`
+// (task-C2.md); this adapter is what satisfies HeaderSlotProps, threading
+// the shell's arrival-focus ref and its one live region announcer down to
+// ProjectHeader (which forwards `titleRef` on to ProjectTitle).
+function HeaderSlot({ project, view, viewer, titleRef, announce }: HeaderSlotProps) {
+  return <ProjectHeader project={project} view={view} viewer={viewer} titleRef={titleRef} announce={announce} />;
+}
+
 const SLOTS: ProjectSlots = {
-  header: LegacyHeader,
+  header: HeaderSlot,
   tabs: {
     products: LegacyProducts,
     media: MediaSlot,

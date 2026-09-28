@@ -4,7 +4,6 @@
 // moved here when the page became a shell with slots, so the page keeps
 // showing all it did while the real slots land. Each fills one slot in
 // project-page.tsx until its task replaces it, and that task deletes it here:
-//   LegacyHeader                           → the header task (§5.4)
 //   LegacyProducts                         → the Products tab task (§5.6)
 //   LegacyNetwork                          → the Network tab task (§5.9, C6)
 //   LegacyEditorBlock, LegacyDetailsBlock  → the rail task (§5.10)
@@ -19,14 +18,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ActivityIcon,
   AlertCircleIcon,
   ArrowRight01Icon,
   ArrowUpRight01Icon,
   CheckmarkBadge01Icon,
-  CpuIcon,
   File01Icon,
   HelpCircleIcon,
   PencilEdit01Icon,
@@ -34,22 +31,14 @@ import {
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { NetworkSection } from "@/components/network/network-section";
 import { DeleteProjectControl } from "@/components/projects/delete-project-dialog";
-import {
-  bomFor,
-  bookedSpec,
-  partChangesOf,
-  partChangesText,
-  specOfSource,
-} from "@/lib/create/build-artifacts";
+import { bomFor } from "@/lib/create/build-artifacts";
 import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
-  productsOf,
-  useCreateHistory,
   type BuildItem,
   type BuildJob,
 } from "@/lib/create/history";
-import { conceptOf, resumeStepOf, type ProjectView } from "@/lib/manual/project-read";
+import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDateTime } from "@/lib/manual/project-summary";
 import {
   FLOW_STEPS,
@@ -58,11 +47,9 @@ import {
   productLabel,
   stepHref,
   useManualProjects,
-  type ManualProject,
 } from "@/lib/manual/projects";
-import { specLine } from "@/lib/spec/format";
 import { RailBlock } from "./frame";
-import type { HeaderSlotProps, SlotProps } from "./slots";
+import type { SlotProps } from "./slots";
 
 /** The newest build this project holds that is still in this browser. */
 function legacyBuild(view: ProjectView): BuildJob | null {
@@ -71,105 +58,6 @@ function legacyBuild(view: ProjectView): BuildJob | null {
     if (ref.job && (!newest || ref.job.createdAt > newest.createdAt)) newest = ref.job;
   }
   return newest;
-}
-
-export function LegacyHeader({ project, view, titleRef }: HeaderSlotProps) {
-  const router = useRouter();
-  const { selectProject } = useManualProjects();
-  const { chats } = useCreateHistory();
-  const build = legacyBuild(view);
-
-  // Each product the maker changed on the spec sheet before it was built,
-  // and how. The description above is the concept's, written before any
-  // edit, so a buzzer taken out still "beeps when dry" there (e2e #2).
-  const changes = React.useMemo(() => {
-    if (!build) return [];
-    const chat = chats.find((c) => c.id === build.chatId);
-    return productsOf(build).flatMap((p) => {
-      const concept = conceptOf(chat, build, p);
-      const c = concept ? partChangesOf(p, concept) : null;
-      return c ? [{ id: p.id, name: p.name, text: partChangesText(c) }] : [];
-    });
-  }, [build, chats]);
-
-  const open = () => {
-    selectProject(project.id);
-    router.push(stepHref(project, resumeStepOf(project)));
-  };
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-center gap-[12px]">
-        <h1
-          ref={titleRef}
-          tabIndex={-1}
-          className="text-2xl font-bold tracking-tight text-text-primary outline-none"
-        >
-          {project.name}
-        </h1>
-        <StatusBadge status={project.status} />
-        <button
-          type="button"
-          onClick={open}
-          className="ml-auto inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-violet-600 px-[16px] text-sm font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          <Icon icon={CpuIcon} size={18} />
-          Open in editor
-        </button>
-      </div>
-      <p className="mt-[6px] text-sm text-text-secondary">
-        Product:{" "}
-        <span className="font-semibold text-text-primary">{productLabel(project)}</span>
-      </p>
-
-      {build && (
-        <ul role="list" aria-label="What each product is" className="mt-[6px] flex flex-col gap-[2px]">
-          {productsOf(build).map((p) => (
-            <li key={p.id} className="text-sm text-text-secondary">
-              {specLine(p.name, specOfSource(p))}
-              {/* A build that predates spec booking has this number worked
-                  out from its parts just now, not a decision the maker made
-                  at booking time (Minor 10). */}
-              {!bookedSpec(p) ? " · worked out from the parts" : ""}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {build?.conceptImageUrl && (
-        <div className="mt-[18px] overflow-hidden rounded-[12px] border border-border bg-bg-surface-raised">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={build.conceptImageUrl}
-            alt={`Concept image for ${project.name}`}
-            className="block max-h-[360px] w-full object-cover"
-          />
-        </div>
-      )}
-
-      <p className="mt-[18px] max-w-[68ch] text-sm leading-relaxed text-text-secondary">
-        {project.description || "No description yet."}
-      </p>
-      {changes.length > 0 && (
-        <ul role="list" aria-label="Part changes" className="mt-[8px] flex max-w-[68ch] flex-col gap-[4px]">
-          {changes.map((c) => (
-            <li key={c.id} className="text-sm leading-relaxed text-text-secondary">
-              {/* One product needs no name; in a system the line says which
-                  of them it is about. */}
-              {build && productsOf(build).length > 1 ? (
-                <>
-                  <span className="font-semibold text-text-primary">{c.name}</span> — built
-                  with your part changes: {c.text}
-                </>
-              ) : (
-                <>Built with your part changes: {c.text}</>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 export function LegacyProducts({ view }: SlotProps) {
@@ -389,21 +277,6 @@ function ItemStatus({ item }: { item: BuildItem }) {
 }
 
 // ───────────────────────── pieces ─────────────────────────
-
-function StatusBadge({ status }: { status: ManualProject["status"] }) {
-  const completed = status === "completed";
-  return (
-    <span
-      className={[
-        "inline-flex h-[26px] items-center gap-[6px] rounded-full px-[12px] text-2xs font-bold uppercase tracking-wide",
-        completed ? "bg-bg-success-subtle text-text-success" : "bg-bg-brand-subtle text-text-brand",
-      ].join(" ")}
-    >
-      <Icon icon={completed ? CheckmarkBadge01Icon : PencilEdit01Icon} size={13} />
-      {completed ? "Completed" : "Draft"}
-    </span>
-  );
-}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (

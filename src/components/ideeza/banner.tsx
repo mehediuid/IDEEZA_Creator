@@ -60,10 +60,17 @@ export interface BannerProps {
    */
   title?: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * A control the banner offers alongside its message — e.g. Preview as
+   * buyer's Exit preview (PPL-5), or a pending-version notice's Review
+   * version / Open chat (COR-18). Right-aligned, vertically centered with
+   * the text. Absent by default, so every existing Banner is unchanged.
+   */
+  action?: React.ReactNode;
   className?: string;
 }
 
-export function Banner({ tone, title, children, className }: BannerProps) {
+export function Banner({ tone, title, children, action, className }: BannerProps) {
   const t = TONES[tone];
   return (
     <div
@@ -100,6 +107,7 @@ export function Banner({ tone, title, children, className }: BannerProps) {
       ) : (
         <span className="min-w-0 flex-1">{children}</span>
       )}
+      {action && <span className="shrink-0 self-center">{action}</span>}
     </div>
   );
 }
