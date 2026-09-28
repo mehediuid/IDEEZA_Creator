@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 const { parseBriefDraft, readBriefDraft, commerceOf, showcaseBackfillOf } = await import(
   "../../.tmp-test/lib/brief/project-brief.js"
 );
-const { briefDraftKey } = await import("../../.tmp-test/lib/brief/types.js");
+const { DEFAULT_STATE, briefDraftKey, normalizeBrief, stepsFor } = await import("../../.tmp-test/lib/brief/types.js");
 
 const NOW = Date.UTC(2026, 8, 26, 12, 0);
 const MINTED = Date.UTC(2026, 8, 22, 21, 9);
@@ -71,6 +71,47 @@ test("parseBriefDraft runs normalizeBrief and normalizeStep, so an older draft r
   assert.equal(parseBriefDraft(JSON.stringify({ state: {}, step: "nope" })).step, "idea");
 });
 
+test("Phase 2 draft fields: normalizeBrief({}) gives a lazy mint, 10 % selling and no benefits (§3.3.5)", () => {
+  const s = normalizeBrief({});
+  assert.equal(s.mintType, "lazy");
+  assert.equal(s.sellingPct, "10");
+  assert.deepEqual(s.benefits, []);
+  assert.deepEqual(
+    [DEFAULT_STATE.mintType, DEFAULT_STATE.sellingPct, DEFAULT_STATE.benefits],
+    ["lazy", "10", []],
+  );
+  // What was stored is kept; an unknown mint type reads as lazy (P2-MINT-4).
+  assert.equal(normalizeBrief({ mintType: "instant" }).mintType, "instant");
+  assert.equal(normalizeBrief({ mintType: "onChain" }).mintType, "lazy");
+  assert.equal(normalizeBrief({ sellingPct: "25" }).sellingPct, "25");
+  assert.equal(normalizeBrief({ sellingPct: 25 }).sellingPct, "10");
+  // Benefits keep a valid duration; a half-typed name survives, a broken row is dropped.
+  assert.deepEqual(
+    normalizeBrief({
+      benefits: [
+        { id: "ben_a", name: "Exclusive group", duration: { months: 12 } },
+        { id: "ben_b", name: "", duration: { whileHeld: true } },
+        { id: "ben_c", name: "Bad", duration: { months: 2 } },
+        { id: "", name: "No id", duration: { months: 1 } },
+        "junk",
+      ],
+    }).benefits,
+    [
+      { id: "ben_a", name: "Exclusive group", duration: { months: 12 } },
+      { id: "ben_b", name: "", duration: { whileHeld: true } },
+    ],
+  );
+  // `understandGas` stays parseable and is ignored.
+  assert.equal(normalizeBrief({ understandGas: true }).understandGas, true);
+});
+
+test("stepsFor: Give runs the preview before the form, like Sell; Save keeps it after (§2.6, P2-VIDEO-17)", () => {
+  assert.deepEqual(stepsFor("give"), ["idea", "preview", "form", "success"]);
+  assert.deepEqual(stepsFor("sell"), ["idea", "preview", "form", "success"]);
+  assert.deepEqual(stepsFor("save"), ["idea", "form", "preview", "success"]);
+  assert.deepEqual(stepsFor(null), ["idea"]);
+});
+
 test("readBriefDraft reads the project's own key; no browser, or a throwing storage, reads as null", () => {
   assert.equal(readBriefDraft("proj_a"), null); // node has no window
   assert.equal(briefDraftKey("proj_a"), "ideeza:brief:draft:proj_a");
@@ -133,7 +174,7 @@ test("commerceOf: minted save → private, with the minted facts and no sale or 
   assert.deepEqual(commerceOf(project({ status: "completed" }), d, [], NOW), {
     outcome: "private",
     intent: "save",
-    mint: "minted",
+    mint: "legacy",
     mintedAt: MINTED,
     network: { id: "baseSepolia", label: "Base Sepolia (Testnet)" },
     collection: "Garden Sensors",
@@ -146,7 +187,7 @@ test("commerceOf: minted give → given, with the licence and its one-line terms
   assert.deepEqual(commerceOf(project({ status: "completed" }), d, [], NOW), {
     outcome: "given",
     intent: "give",
-    mint: "minted",
+    mint: "legacy",
     mintedAt: MINTED,
     network: { id: "mumbai", label: "Mumbai Testnet (Polygon)" },
     license: { id: "mit", label: "MIT License", info: "Permissive; keep the notice, no warranty." },
@@ -162,7 +203,7 @@ test("commerceOf: minted sell at a fixed price → listed, with its price, token
   assert.deepEqual(commerceOf(project({ status: "completed" }), d, [], NOW), {
     outcome: "listed",
     intent: "sell",
-    mint: "minted",
+    mint: "legacy",
     mintedAt: MINTED,
     network: { id: "baseSepolia", label: "Base Sepolia (Testnet)" },
     collection: "Garden Sensors",
@@ -211,7 +252,7 @@ test("commerceOf: royalties outside the form's range are not shown", () => {
 });
 
 test("commerceOf: completed with no mint in the draft → mintedUnreadable, claiming nothing else (COM-15)", () => {
-  const expected = { outcome: "mintedUnreadable", intent: null, mint: "minted", clip: NONE };
+  const expected = { outcome: "mintedUnreadable", intent: null, mint: "legacy", clip: NONE };
   assert.deepEqual(commerceOf(project({ status: "completed" }), null, [], NOW), expected);
   const reopened = draft({ intent: "sell", videoJobId: "vj_1" }, "preview");
   assert.deepEqual(commerceOf(project({ status: "completed" }), reopened, [job()], NOW), expected);

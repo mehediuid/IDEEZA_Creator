@@ -162,15 +162,16 @@ test("the typed name: trimmed, exact, case-sensitive (§5.1.10)", () => {
   assert.equal(matchesTypedName("", "Garden Probe"), false);
 });
 
-test("Delete is blocked only while Listed, with the reason and the honest detail (COR-70)", () => {
-  assert.deepEqual(deleteBlockOf("listed"), {
+// Phase 2 §3.8.4: deleteBlockOf reads the facts, not the status; its every rule is in permissions.test.mjs.
+const FREE = { marketUnreadable: false, sold: { sharePct: 0, editions: 0 }, auction: null, listed: false, otherOwners: [] };
+
+test("Delete is blocked while Listed, with the reason and the way out (COR-70, P2-LISTING-19)", () => {
+  assert.deepEqual(deleteBlockOf({ ...FREE, listed: true }), {
     id: "listed", // A4b's DeleteBlock carries its rule id
     reason: "A listed project can't be deleted.",
-    detail: "There's no way to withdraw a listing yet — that comes with the marketplace.",
+    detail: "Remove the listing first — it's in the Marketplace block.",
   });
-  for (const status of ["draft", "private", "given", "minted"]) {
-    assert.equal(deleteBlockOf(status), null, status);
-  }
+  assert.equal(deleteBlockOf(FREE), null);
 });
 
 test("only the owner can delete; Preview as buyer has no Delete (COR-67, PPL-6)", () => {

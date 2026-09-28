@@ -79,21 +79,26 @@ const MINTED_AS: Record<Intent, ProjectStatus> = {
  *  preview hides Outcome, the block that names it (PPL-7), so the log
  *  doesn't name it either. */
 export function logLinesOf(entries: ProjectLogEntry[], { network: showNetwork = true }: { network?: boolean } = {}): LogLine[] {
-  return entries.map((e) => {
+  return entries.flatMap((e): LogLine[] => {
     if (e.kind === "created") {
-      return { key: `created:${e.at}`, title: "Created by hand", note: null, when: [when(e.at)] };
+      return [{ key: `created:${e.at}`, title: "Created by hand", note: null, when: [when(e.at)] }];
     }
     if (e.kind === "showcased") {
-      return { key: `showcased:${e.at}`, title: "Showcased", note: null, when: [when(e.at)] };
+      return [{ key: `showcased:${e.at}`, title: "Showcased", note: null, when: [when(e.at)] }];
     }
+    // The Phase 2 kinds (mint, listing, market, editions, business plan) get their lines in T10;
+    // nothing produces them before then.
+    if (e.kind !== "minted") return [];
     const status = MINTED_AS[e.intent];
     const network = NETWORKS.find((n) => n.value === e.network)?.label ?? e.network;
-    return {
-      key: `minted:${e.at}`,
-      title: `Minted · ${STATUS_WORD[status]}${showNetwork ? ` · ${network}` : ""}`,
-      note: status === "listed" ? `${LISTED_SUBLINE}.` : null,
-      when: [when(e.at)],
-    };
+    return [
+      {
+        key: `minted:${e.at}`,
+        title: `Minted · ${STATUS_WORD[status]}${showNetwork ? ` · ${network}` : ""}`,
+        note: status === "listed" ? `${LISTED_SUBLINE}.` : null,
+        when: [when(e.at)],
+      },
+    ];
   });
 }
 

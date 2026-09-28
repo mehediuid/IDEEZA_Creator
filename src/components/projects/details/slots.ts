@@ -10,6 +10,7 @@ import type { StoredDraft } from "@/lib/brief/project-brief";
 import type { Viewer } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
+import type { NextAction } from "@/lib/manual/project-summary";
 
 /** What every slot is rendered with. */
 export type SlotProps = {
@@ -41,17 +42,47 @@ export type HeaderSlotProps = SlotProps & {
  *  renders role="tabpanel" itself. */
 export type PanelSlot = React.ComponentType<SlotProps>;
 
-/** The rail's blocks, in order (COR-54). NEXT: "businessPlan" goes after "outcome". */
-export const RAIL_ORDER = ["outcome", "editor", "details", "versions", "log", "manage"] as const;
+/** The rail's blocks, in order (COR-54; Phase 2 spec §2.2, §3.10). The v1
+ *  `editor` block moves to the product page (decision 7). */
+export const RAIL_ORDER = ["marketplace", "outcome", "details", "legal", "versions", "log", "manage"] as const;
 export type RailBlockId = (typeof RAIL_ORDER)[number];
 
+/** The header's "Add to marketplace" / "List another share" (§3.6.3): the
+ *  header renders `slots.actions["add-to-marketplace"]` in the pair's place,
+ *  with the pair's tone and the header's button class (T22). */
+export type ActionSlotProps = SlotProps & {
+  action: Extract<NextAction, { kind: "add-to-marketplace" }>;
+  violet: boolean;
+  className: string;
+};
+
+/** The page's composition (§3.10). Every Phase 2 key is optional, so a page
+ *  without it still compiles; tasks add their entries at the merge points. */
 export type ProjectSlots = {
-  /** First in the content, above the breadcrumb: the Preview-as-buyer banner (PPL-5). */
+  /** v1: first in the content, above the breadcrumb — the Preview-as-buyer banner (PPL-5). */
   banner?: React.ComponentType<SlotProps>;
+  /** Each returns null unless it applies (buyer, contributor, demo buyer). */
+  banners?: React.ComponentType<SlotProps>[];
+  /** Above the tab strip: SAVE's "Saved to My projects". */
+  notice?: React.ComponentType<SlotProps>;
   /** Everything between the breadcrumb and the tab strip (COR-8…18, CNT-1…7). */
   header: React.ComponentType<HeaderSlotProps>;
+  /** Parts the header renders in its rows: the title row (Activity, Business plan chips),
+   *  the status row (Utility NFT pill) and after the description (its coachmark). */
+  headerParts?: {
+    titleRow?: React.ComponentType<SlotProps>[];
+    statusRow?: React.ComponentType<SlotProps>[];
+    afterDescription?: React.ComponentType<SlotProps>[];
+  };
+  actions?: { "add-to-marketplace"?: React.ComponentType<ActionSlotProps> };
   /** One panel per tab (COR-19). A tab without a panel is not in the strip. */
-  tabs: { products: PanelSlot; media?: PanelSlot; network?: PanelSlot };
+  tabs: {
+    products: PanelSlot;
+    media?: PanelSlot;
+    network?: PanelSlot;
+    contributors?: PanelSlot;
+    customers?: PanelSlot;
+  };
   /** Rendered in RAIL_ORDER inside the rail surface. Each block wraps itself in
    *  <RailBlock>; a block with nothing real in it returns null, which leaves no
    *  divider behind (COR-54). */

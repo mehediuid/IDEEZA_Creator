@@ -37,7 +37,7 @@ type EditorStep = Exclude<ProjectStep, "brief">;
 const STEPS = FLOW_STEPS.filter((s): s is EditorStep => s !== "brief");
 
 export function RailEditor({ project, viewer }: SlotProps) {
-  if (!can(viewer, "project.openEditor")) return null;
+  if (!can(viewer, "product.openEditor")) return null;
   return (
     <RailBlock title="Editor">
       <EditorRows project={project} />

@@ -33,6 +33,8 @@ import { productsOf, type BuildJob, type BuildProduct } from "../create/history"
 // It is safe only because no module in it uses another's exports while
 // loading — only from inside functions.
 import { lineageProjectOf, modelNameOf } from "./project-read";
+import type { MintRecord } from "../wallet/types";
+import type { Contributor, DescriptionHint, EditorStep, ProjectLegal } from "./p2-types";
 
 export type ManualProjectStatus = "draft" | "completed";
 
@@ -118,8 +120,11 @@ export type ManualProject = {
   buildId?: string;
   /** Every build the project holds, in attach order. Written from now on; legacy projects are read by buildsOf(). */
   builds?: ProjectBuildRef[];
-  /** The editor step last opened. Open in editor's resume target — never a progress signal. */
-  lastOpened?: { step: ProjectStep; at: number };
+  /** The editor step last opened, and on which product row (Phase 2). Open in editor's resume
+   *  target — never a progress signal. */
+  lastOpened?: { step: ProjectStep; at: number; productId?: string };
+  /** Per product row id: the editor step last opened on it (P2-EDITOR-7). */
+  editorOpened?: Record<string, { step: EditorStep; at: number }>;
   /** Showcase (COR-105): a time = showcased since then; null = the maker stopped; absent = never recorded.
    *  A flag on the project, orthogonal to the outcome — never derived from the Brief's shareToNewsfeed. */
   showcasedAt?: number | null;
@@ -128,6 +133,16 @@ export type ManualProject = {
    *  applies again; absent = never chosen. A reference, never an image URL (§5.1.10). A later ProjectCover
    *  with a `kind` reads this shape as kind "concept" (§7 X10). */
   cover?: ProductSource | null;
+  /** The demo mint (P2-MINT-8): written only by the mint and listing commits (`setMint`). */
+  mint?: MintRecord;
+  /** The people the owner added, with their role and share (decision 2, P2-CONTRIB). */
+  contributors?: Contributor[];
+  /** When "I confirm I am the rightful owner of this idea" was ticked (VIDEO). */
+  ownerConfirmedAt?: number;
+  /** The rail Legal block's details (TABS). */
+  legal?: ProjectLegal;
+  /** The description coachmark, dismissed (P2-TABS-22). */
+  descriptionHint?: DescriptionHint;
 };
 
 /** What updateProject takes. Its product rows may come without ids (the Brief's Step 1 writes

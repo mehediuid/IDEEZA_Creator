@@ -22,5 +22,5 @@
       "@/*": ["../../src/*"]
     }
   },
-  "include": ["../../src/lib/manual/**/*", "../../src/lib/brief/**/*", "../../src/lib/ui/tab-keys.ts", "../../src/lib/create/save-footer.ts", "../../src/lib/network/products.ts"]
+  "include": ["../../src/lib/manual/**/*", "../../src/lib/brief/**/*", "../../src/lib/wallet/**/*", "../../src/lib/market/**/*", "../../src/lib/video/**/*", "../../src/lib/ui/tab-keys.ts", "../../src/lib/create/save-footer.ts", "../../src/lib/network/products.ts"]
 }

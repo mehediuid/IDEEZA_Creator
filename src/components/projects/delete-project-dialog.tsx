@@ -52,7 +52,18 @@ export function DeleteProjectControl(props: DeleteProjectControlProps) {
   const [open, setOpen] = React.useState(false);
   const reasonId = React.useId();
   if (!can(viewer, "project.delete")) return null;
-  const block = status === undefined ? null : deleteBlockOf(status);
+  // Phase 2 §3.8.4 takes the facts; until deleteFactsOf(view) lands (T10, T19),
+  // the v1 page knows only its status, so a Listed project is the one block.
+  const block =
+    status === undefined
+      ? null
+      : deleteBlockOf({
+          marketUnreadable: false,
+          sold: { sharePct: 0, editions: 0 },
+          auction: null,
+          listed: status === "listed" || status === "paused",
+          otherOwners: [],
+        });
   const unavailable = status === undefined || block !== null;
   return (
     <div className="flex flex-col items-start gap-[8px]">
