@@ -6,9 +6,11 @@
 // Two states, driven by the "Choose Project" dropdown:
 //   1. Existing project picked   → Name field hidden; Description
 //                                  pre-fills with that project's saved
-//                                  description (editable); submit sets
-//                                  it as the active project and routes
-//                                  to the next incomplete step.
+//                                  description, read-only (CNT-6 — its one
+//                                  home is the project's own inline editor
+//                                  now); submit sets it as the active
+//                                  project and routes to the next
+//                                  incomplete step.
 //   2. "Create New Project"      → Name field visible (required);
 //                                  Description optional; submit creates
 //                                  a draft project and routes to /pcb.
@@ -45,8 +47,7 @@ export function ProjectInfoModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { projects, createProject, selectProject, updateProject } =
-    useManualProjects();
+  const { projects, createProject, selectProject } = useManualProjects();
 
   // Default to "create new" on every open so the dropdown shows the
   // empty-placeholder state when projects exist and the create-new
@@ -106,14 +107,13 @@ export function ProjectInfoModal({
       router.push(stepHref(project, "pcb"));
       return;
     }
-    // Existing project: persist any description edits, set as active,
-    // route to the next incomplete step so the user resumes where they
-    // left off rather than starting over.
+    // Existing project: set it active and route to the next incomplete
+    // step so the user resumes where they left off. Its description is
+    // shown for context only (CNT-6, "One home for the description") — this
+    // modal picks or creates a project, it doesn't edit one, so it never
+    // writes over what the project's own inline editor holds (CNT-1…7).
     const existing = projects.find((p) => p.id === choice);
     if (!existing) return;
-    if (description.trim() !== existing.description) {
-      updateProject(existing.id, { description: description.trim() });
-    }
     selectProject(existing.id);
     onClose();
     router.push(stepHref(existing, firstIncompleteStep(existing)));
@@ -213,12 +213,19 @@ export function ProjectInfoModal({
               id="project-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              readOnly={!isNew}
+              aria-readonly={!isNew}
               placeholder="Write description"
               rows={4}
-              className="w-full resize-y rounded-lg border border-border bg-bg-page px-[14px] py-[12px] text-md leading-relaxed text-text-primary outline-none transition-colors duration-fast hover:border-border-strong focus:border-border-focus focus:bg-bg-surface placeholder:text-text-tertiary"
+              className={[
+                "w-full resize-y rounded-lg border border-border bg-bg-page px-[14px] py-[12px] text-md leading-relaxed text-text-primary outline-none transition-colors duration-fast placeholder:text-text-tertiary",
+                isNew
+                  ? "hover:border-border-strong focus:border-border-focus focus:bg-bg-surface"
+                  : "cursor-not-allowed text-text-secondary",
+              ].join(" ")}
             />
             <p className="mt-[4px] text-2xs text-text-tertiary">
-              Optional.
+              {isNew ? "Optional." : "From the project's own page — edit it there."}
             </p>
           </FieldLabel>
         </div>
