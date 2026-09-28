@@ -58,7 +58,9 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
               onValueChange?.("");
               onClear?.();
             }}
-            className="inline-flex shrink-0 items-center justify-center text-[color:var(--color-text-tertiary)] transition-colors hover:text-[color:var(--color-text-primary)]"
+            // The glyph is 13 px. The ::before pad makes the target 24 px
+            // without moving anything (WCAG 2.5.8), and the ring shows focus.
+            className="relative inline-flex shrink-0 items-center justify-center rounded-full text-[color:var(--color-text-tertiary)] outline-none transition-colors before:absolute before:-inset-[5.5px] before:content-[''] hover:text-[color:var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
           >
             <ClearIcon />
           </button>
