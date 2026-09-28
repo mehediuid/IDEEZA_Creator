@@ -342,7 +342,7 @@ function ReviewPanel({
             so on the control, where a pointer, a keyboard and a touch
             screen all reach it. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <NetworkAction project={saved} build={job} />
+          <NetworkAction project={saved} />
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>

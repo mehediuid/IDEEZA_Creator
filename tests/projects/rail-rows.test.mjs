@@ -96,6 +96,22 @@ test("logLinesOf: each intent mints into its status word; only Listed carries a 
   assert.deepEqual(logLinesOf([]), []);
 });
 
+test("logLinesOf: network: false leaves the chain out of a mint (PPL-7, Preview as buyer)", () => {
+  const [minted, showcased] = logLinesOf(
+    [
+      { kind: "minted", at: 2, intent: "sell", network: "baseSepolia" },
+      { kind: "showcased", at: 1 },
+    ],
+    { network: false },
+  );
+  assert.equal(minted.title, "Minted · Listed");
+  // The Listed subline stays: "Listed" never stands alone (COR-76).
+  assert.equal(minted.note, "Goes on sale when the marketplace opens.");
+  assert.equal(showcased.title, "Showcased");
+  // The default is the owner's line, chain included.
+  assert.equal(logLinesOf([{ kind: "minted", at: 2, intent: "sell", network: "baseSepolia" }])[0].title, "Minted · Listed · Base Sepolia (Testnet)");
+});
+
 test("productAtVersionHref: a product's page at one version (COR-41)", () => {
   assert.equal(productAtVersionHref("proj_car", "p2", 2), "/projects/proj_car/products/p2?v=2");
   assert.equal(productAtVersionHref("a b", "p/1", 1), "/projects/a%20b/products/p%2F1?v=1");

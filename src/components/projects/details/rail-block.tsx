@@ -60,7 +60,6 @@ function useStackedProbe() {
 export function RailBlock({
   title,
   meta,
-  busy = false,
   collapsible = true,
   children,
 }: {
@@ -68,8 +67,6 @@ export function RailBlock({
   title: string;
   /** Said after the title on the stacked toggle — the block's state in a few words. */
   meta?: string;
-  /** The block's own read hasn't finished; it shows "—" meanwhile (COM-22, COR-2). */
-  busy?: boolean;
   /** False keeps the block open once stacked, under a plain h2: Manage, whose
    *  Delete is the last thing on the page at 400 px (§3.3, COR-67). */
   collapsible?: boolean;
@@ -83,7 +80,6 @@ export function RailBlock({
   return (
     <section
       aria-labelledby={headingId}
-      aria-busy={busy || undefined}
       className="relative flex flex-col gap-6 py-10 [@container(min-width:1024px)]:px-10"
     >
       <span

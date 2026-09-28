@@ -33,7 +33,7 @@ import { productDocTitle, resolveProject } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { LiveRegion, usePageArrival } from "../details/arrival";
 import { Breadcrumb } from "../details/breadcrumb";
-import { BuyerPreviewBanner, isBuyerPreview, useViewer } from "../details/buyer-preview";
+import { BuyerPreviewBanner, isBuyerPreview, useFocusAfterPreview, useViewer } from "../details/buyer-preview";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
 import { ProductDeliverables } from "./product-deliverables";
@@ -124,6 +124,9 @@ function ProductPageBody({ id, productId }: { id: string; productId: string }) {
     name,
     project && product ? productDocTitle(name, project.name) : "",
   );
+  // PPL-5: this page has no Preview as buyer button, so Exit preview hands
+  // focus to the h1 once the owner view is back.
+  useFocusAfterPreview(!buyer, () => titleRef.current);
 
   if (!hydrated || !buildsHydrated) return <ProductLoading />;
   if (!project) return <ProjectNotFound id={id} />;

@@ -74,8 +74,11 @@ const MINTED_AS: Record<Intent, ProjectStatus> = {
  *  aren't versions: every save and build is the Versions block's (COR-107,
  *  §7 X39). A rename isn't recorded anywhere yet — `updatedAt` moves on every
  *  edit, so it can't stand in for one — and has no line until the stored log
- *  that records it (COR-53, NEXT). */
-export function logLinesOf(entries: ProjectLogEntry[]): LogLine[] {
+ *  that records it (COR-53, NEXT).
+ *  `network: false` leaves the chain out of a mint's title — a buyer's
+ *  preview hides Outcome, the block that names it (PPL-7), so the log
+ *  doesn't name it either. */
+export function logLinesOf(entries: ProjectLogEntry[], { network: showNetwork = true }: { network?: boolean } = {}): LogLine[] {
   return entries.map((e) => {
     if (e.kind === "created") {
       return { key: `created:${e.at}`, title: "Created by hand", note: null, when: [when(e.at)] };
@@ -87,7 +90,7 @@ export function logLinesOf(entries: ProjectLogEntry[]): LogLine[] {
     const network = NETWORKS.find((n) => n.value === e.network)?.label ?? e.network;
     return {
       key: `minted:${e.at}`,
-      title: `Minted · ${STATUS_WORD[status]} · ${network}`,
+      title: `Minted · ${STATUS_WORD[status]}${showNetwork ? ` · ${network}` : ""}`,
       note: status === "listed" ? `${LISTED_SUBLINE}.` : null,
       when: [when(e.at)],
     };

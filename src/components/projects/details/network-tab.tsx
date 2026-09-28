@@ -14,45 +14,42 @@
 // its own.
 
 import * as React from "react";
-import type { BuildJob } from "@/lib/create/history";
 import type { ManualProject } from "@/lib/manual/projects";
 import type { Viewer } from "@/lib/manual/permissions";
+import type { BuildRef } from "@/lib/manual/project-read";
 import { isBuyerPreview, networkTabVisible } from "@/lib/manual/buyer-preview";
 import { NetworkSection, NetworkSummary } from "@/components/network/network-section";
 import { networkProducts } from "@/lib/network/products";
 import { useProjectNetwork } from "@/lib/network/store";
 
-/** The tab-strip's contract: its Network button must be
- *  `id={`tab-${NETWORK_TAB_ID}`}` / `aria-controls={`panel-${NETWORK_TAB_ID}`}`
- *  to match the panel ids the shell already draws. */
-export const NETWORK_TAB_ID = "network";
-
 /** Whether the tab-strip should offer "Network" at all: always for the
  *  owner (Create Network is its empty state); for a buyer, only once
- *  there's a network to read (COR-49). */
-export function useNetworkTabVisible(projectId: string, viewer: Viewer): boolean {
+ *  there's a network to read (COR-49). `hydrated` is the network store's
+ *  own read, which the page's skeleton waits for. */
+export function useNetworkTabVisible(projectId: string, viewer: Viewer): { hydrated: boolean; shown: boolean } {
   const { hydrated, network } = useProjectNetwork(projectId);
-  return networkTabVisible(viewer, hydrated, network !== null);
+  return { hydrated, shown: networkTabVisible(viewer, hydrated, network !== null) };
 }
 
 export function NetworkTab({
   project,
-  build,
+  refs,
   viewer,
 }: {
   project: ManualProject;
-  build: BuildJob | null;
+  /** Every build the project holds (`view.refs`, COR-48). */
+  refs: BuildRef[];
   viewer: Viewer;
 }) {
   if (isBuyerPreview(viewer)) {
-    return <NetworkTabPreview project={project} build={build} />;
+    return <NetworkTabPreview project={project} refs={refs} />;
   }
-  return <NetworkSection project={project} build={build} />;
+  return <NetworkSection project={project} refs={refs} />;
 }
 
-function NetworkTabPreview({ project, build }: { project: ManualProject; build: BuildJob | null }) {
+function NetworkTabPreview({ project, refs }: { project: ManualProject; refs: BuildRef[] }) {
   const { hydrated, network } = useProjectNetwork(project.id);
-  const products = React.useMemo(() => networkProducts(project, build), [project, build]);
+  const products = React.useMemo(() => networkProducts(project, refs), [project, refs]);
 
   // COR-49 "absent" branch: nothing to preview yet, so nothing renders —
   // not even a heading (PPL-8: no empty state earns a call to action).

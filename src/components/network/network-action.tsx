@@ -11,7 +11,8 @@ import { useRouter } from "next/navigation";
 import { ConnectIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
-import type { BuildJob } from "@/lib/create/history";
+import { useCreateHistory } from "@/lib/create/history";
+import { buildsOf } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { useProjectNetwork } from "@/lib/network/store";
 import { AddNetworkDialog } from "./add-network-dialog";
@@ -20,10 +21,13 @@ import { networkHref } from "./network-section";
 const shape =
   "inline-flex h-[36px] items-center gap-4 rounded-lg border border-solid border-border px-6 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
 
-export function NetworkAction({ project, build }: { project: ManualProject | null; build: BuildJob }) {
+export function NetworkAction({ project }: { project: ManualProject | null }) {
   const router = useRouter();
   const { hydrated, network } = useProjectNetwork(project?.id);
+  const { builds } = useCreateHistory();
   const [open, setOpen] = React.useState(false);
+  // Every build the project holds, this one among them once it is saved (COR-48).
+  const refs = React.useMemo(() => (project ? buildsOf(project, builds) : []), [project, builds]);
 
   if (!project || !hydrated) {
     // Before the browser's copy is read there is nothing to say yet; the
@@ -57,7 +61,7 @@ export function NetworkAction({ project, build }: { project: ManualProject | nul
       {open && (
         <AddNetworkDialog
           project={project}
-          build={build}
+          refs={refs}
           onClose={() => setOpen(false)}
           onViewNetwork={() => router.push(networkHref(project.id))}
         />

@@ -17,6 +17,7 @@ import { ArrowRight01Icon, Cancel01Icon, ConnectIcon } from "@hugeicons/core-fre
 import { Icon } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
+import { buildsOf } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
   diffNetworks,
@@ -58,13 +59,10 @@ export function ConnectionMapPage({ id }: { id: string }) {
   const { hydrated, projects } = useManualProjects();
   const { hydrated: buildsHydrated, builds } = useCreateHistory();
   const project = projects.find((p) => p.id === id) ?? projects.find((p) => p.slug === id) ?? null;
-  const buildId = project?.buildId;
-  const build = React.useMemo(
-    () => (buildId ? builds.find((b) => b.id === buildId) ?? null : null),
-    [buildId, builds],
-  );
+  // Every build the project holds, not project.buildId alone (COR-48, COR-86).
+  const refs = React.useMemo(() => (project ? buildsOf(project, builds) : []), [project, builds]);
   const { hydrated: netHydrated, network } = useProjectNetwork(project?.id);
-  const products = React.useMemo(() => (project ? networkProducts(project, build) : []), [project, build]);
+  const products = React.useMemo(() => (project ? networkProducts(project, refs) : []), [project, refs]);
   const [creating, setCreating] = React.useState(false);
 
   if (!hydrated || !buildsHydrated || !netHydrated) {
@@ -90,7 +88,7 @@ export function ConnectionMapPage({ id }: { id: string }) {
         <span aria-hidden className="text-text-tertiary">
           <Icon icon={ArrowRight01Icon} size={15} />
         </span>
-        <Link href={`/projects/${project.id}`} className="truncate rounded-sm font-medium text-text-secondary no-underline outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus">
+        <Link href={`/projects/${project.id}?tab=network`} className="truncate rounded-sm font-medium text-text-secondary no-underline outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus">
           {project.name}
         </Link>
         <span aria-hidden className="text-text-tertiary">
@@ -118,7 +116,7 @@ export function ConnectionMapPage({ id }: { id: string }) {
         </div>
       )}
       {creating && (
-        <AddNetworkDialog project={project} build={build} onClose={() => setCreating(false)} onViewNetwork={() => setCreating(false)} />
+        <AddNetworkDialog project={project} refs={refs} onClose={() => setCreating(false)} onViewNetwork={() => setCreating(false)} />
       )}
     </div>
   );

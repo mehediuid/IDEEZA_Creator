@@ -17,6 +17,7 @@
 // order. See task-C5.md's Notes for what this requires of that function.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ArrowLeft01Icon,
@@ -27,12 +28,14 @@ import {
   Image01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { Badge, Banner, Button, IconButton, linkVariants } from "@/components/ideeza";
 import { productsOf } from "@/lib/create/history";
 import { stepHref, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { coverOf, type BuildRef } from "@/lib/manual/project-read";
 import { can, type Viewer } from "@/lib/manual/permissions";
 import type { StoredDraft } from "@/lib/brief/project-brief";
+import { cn } from "@/lib/utils";
 
 // ─────────────────────────── tiles (CNT-9) ───────────────────────────
 
@@ -85,26 +88,31 @@ const VISIBLE_STEP = 24; // CNT-11: the first 24, then "Show more (n)" — no nu
 export type MediaTabProps = {
   project: ManualProject;
   /** `buildsOf(project, builds)` — computed once by the page shell (COR-74:
-   *  one derivation feeds the page; this tab never derives its own). */
+   *  one derivation feeds the page; this tab never derives its own). The
+   *  page shows its skeleton until every store is read (COR-2), so this tab
+   *  never renders before its data — the empty state can't flash first. */
   refs: BuildRef[];
-  /** True once both the projects and the builds stores have hydrated
-   *  (COR-2). Until then, CNT-12's per-slot skeleton shows instead of any
-   *  content — including the empty state, which must never flash first. */
-  hydrated: boolean;
   /** The project's Brief draft (COM-1's `useProjectBrief`, read once by the
-   *  page shell) — `undefined` before it is read, `null` when there is
-   *  none. CNT-19 reads only `draft.state.videoJobId` from it. */
-  draft: StoredDraft | null | undefined;
+   *  page shell) — `null` when there is none. CNT-19 reads only
+   *  `draft.state.videoJobId` from it. */
+  draft: StoredDraft | null;
   viewer: Viewer;
 };
 
-export function MediaTab({ project, refs, hydrated, draft, viewer }: MediaTabProps) {
+export function MediaTab({ project, refs, draft, viewer }: MediaTabProps) {
   const { setCover } = useManualProjects();
   const [expanded, setExpanded] = React.useState(false);
   const [lightbox, setLightbox] = React.useState<{ index: number; trigger: HTMLElement } | null>(null);
 
   const tiles = React.useMemo(() => mediaTilesOf(refs), [refs]);
   const coverUrl = coverOf(project, refs); // the one source of truth (CNT-14); its own override wins (LST-34).
+  // What the cover would be without the maker's pick. "Stop using as cover"
+  // is offered only where the pick is what makes the cover — on the default
+  // cover it would change nothing, so that tile keeps its chip and no toggle.
+  const pinned = React.useMemo(
+    () => project.cover != null && coverUrl !== null && coverUrl !== coverOf({ ...project, cover: null }, refs),
+    [project, refs, coverUrl],
+  );
   const shown = expanded ? tiles : tiles.slice(0, VISIBLE_STEP);
   const remaining = tiles.length - shown.length;
 
@@ -113,7 +121,12 @@ export function MediaTab({ project, refs, hydrated, draft, viewer }: MediaTabPro
   const canOpenBrief = can(viewer, "project.brief"); // PPL-6: the preview-clip note's Open Brief is owner-only.
   const videoJobId = draft?.state.videoJobId ?? null;
 
-  const openLightbox = (index: number, trigger: HTMLElement) => setLightbox({ index, trigger });
+  // The tile takes focus as it opens the lightbox (Safari doesn't focus a
+  // clicked button), so the dialog's focus return always lands on it.
+  const openLightbox = (index: number, trigger: HTMLElement) => {
+    trigger.focus();
+    setLightbox({ index, trigger });
+  };
   const closeLightbox = () => {
     const trigger = lightbox?.trigger;
     setLightbox(null);
@@ -126,53 +139,52 @@ export function MediaTab({ project, refs, hydrated, draft, viewer }: MediaTabPro
         Media
       </h2>
 
-      {!hydrated ? (
-        <MediaSkeleton />
+      {videoJobId && (
+        <Banner tone="info" className="mt-7">
+          {"Preview clip — made in the Brief. Rendering is simulated in this prototype, so there's no video file to show yet."}
+          {canOpenBrief && (
+            <>
+              {" "}
+              {/* Neutral, underlined: the page's one violet is its primary action. */}
+              <Link
+                href={stepHref(project, "brief")}
+                className={cn(linkVariants({ color: "neutral", size: "md" }), "font-semibold underline underline-offset-2")}
+              >
+                Open Brief
+              </Link>
+            </>
+          )}
+        </Banner>
+      )}
+
+      {tiles.length === 0 ? (
+        <EmptyMedia />
       ) : (
         <>
-          {videoJobId && (
-            <Banner tone="info" className="mt-7">
-              {"Preview clip — made in the Brief. Rendering is simulated in this prototype, so there's no video file to show yet."}
-              {canOpenBrief && (
-                <>
-                  {" "}
-                  <Link href={stepHref(project, "brief")} className={linkVariants({ color: "brand", size: "sm" })}>
-                    Open Brief
-                  </Link>
-                </>
-              )}
-            </Banner>
-          )}
-
-          {tiles.length === 0 ? (
-            <EmptyMedia />
-          ) : (
-            <>
-              <h3 className="mt-7 text-sm font-semibold text-text-secondary">From your builds</h3>
-              <ul role="list" className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-6">
-                {shown.map((tile, i) => (
-                  <MediaTileCard
-                    key={tile.key}
-                    tile={tile}
-                    isCover={tile.url === coverUrl}
-                    showCoverControl={showCoverControl}
-                    hideCoverChip={buyerView}
-                    onOpen={(el) => openLightbox(i, el)}
-                    onToggleCover={() =>
-                      setCover(
-                        project.id,
-                        tile.url === coverUrl ? null : { buildId: tile.buildId, productId: tile.productId },
-                      )
-                    }
-                  />
-                ))}
-              </ul>
-              {remaining > 0 && (
-                <Button hierarchy="secondary" size="sm" className="mt-6" onClick={() => setExpanded(true)}>
-                  Show more ({remaining})
-                </Button>
-              )}
-            </>
+          <h3 className="mt-7 text-sm font-semibold text-text-secondary">From your builds</h3>
+          <ul role="list" className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-6">
+            {shown.map((tile, i) => {
+              const isCover = tile.url === coverUrl;
+              return (
+                <MediaTileCard
+                  key={tile.key}
+                  tile={tile}
+                  isCover={isCover}
+                  // Use as cover on every other tile; Stop only on the maker's own pick.
+                  coverControl={!showCoverControl ? null : !isCover ? "use" : pinned ? "stop" : null}
+                  hideCoverChip={buyerView}
+                  onOpen={(el) => openLightbox(i, el)}
+                  onToggleCover={() =>
+                    setCover(project.id, isCover ? null : { buildId: tile.buildId, productId: tile.productId })
+                  }
+                />
+              );
+            })}
+          </ul>
+          {remaining > 0 && (
+            <Button hierarchy="secondary" size="sm" className="mt-6" onClick={() => setExpanded(true)}>
+              Show more ({remaining})
+            </Button>
           )}
         </>
       )}
@@ -189,7 +201,7 @@ export function MediaTab({ project, refs, hydrated, draft, viewer }: MediaTabPro
   );
 }
 
-// ─────────────────────────── empty / loading (CNT-12, CNT-13) ───────────────────────────
+// ─────────────────────────── empty (CNT-13) ───────────────────────────
 
 function EmptyMedia() {
   return (
@@ -204,29 +216,21 @@ function EmptyMedia() {
   );
 }
 
-function MediaSkeleton() {
-  return (
-    <ul aria-hidden className="mt-7 grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-6">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <li key={i} className="aspect-[4/3] animate-pulse rounded-lg bg-bg-subtle motion-reduce:animate-none" />
-      ))}
-    </ul>
-  );
-}
-
 // ─────────────────────────── one tile (CNT-9, CNT-14, CNT-15) ───────────────────────────
 
 function MediaTileCard({
   tile,
   isCover,
-  showCoverControl,
+  coverControl,
   hideCoverChip,
   onOpen,
   onToggleCover,
 }: {
   tile: MediaTile;
   isCover: boolean;
-  showCoverControl: boolean;
+  /** "use" → Use as cover; "stop" → Stop using as cover (the maker's own
+   *  pick only); null → no toggle (a buyer, or the default cover). */
+  coverControl: "use" | "stop" | null;
   hideCoverChip: boolean;
   onOpen: (trigger: HTMLElement) => void;
   onToggleCover: () => void;
@@ -269,13 +273,13 @@ function MediaTileCard({
         </Badge>
       )}
 
-      {showCoverControl && (
+      {coverControl && (
         <IconButton
           hierarchy="secondary"
           size="sm"
-          icon={<Icon icon={isCover ? BookmarkCheck02Icon : Bookmark02Icon} size={16} />}
-          aria-label={`${isCover ? "Stop using as cover" : "Use as cover"} — ${caption}`}
-          title={isCover ? "Stop using as cover" : "Use as cover"}
+          icon={<Icon icon={coverControl === "stop" ? BookmarkCheck02Icon : Bookmark02Icon} size={16} />}
+          aria-label={`${coverControl === "stop" ? "Stop using as cover" : "Use as cover"} — ${caption}`}
+          title={coverControl === "stop" ? "Stop using as cover" : "Use as cover"}
           onClick={onToggleCover}
           className="absolute right-2 top-2 bg-bg-surface/90 [@media(pointer:coarse)]:size-[var(--touch-min)]"
         />
@@ -286,24 +290,20 @@ function MediaTileCard({
 
 // ─────────────────────────── lightbox (CNT-18) ───────────────────────────
 
-// Elements the Tab trap below cycles between — the same selector
-// `use-dialog-focus.ts` uses for every other dialog in the app, kept local
-// here since this component owns its own open/close (no ModalFrame): the
-// caller's `onClose` does the focus-return (see the note above), so only
-// the in-dialog Tab trap is this component's own responsibility.
-const FOCUSABLE =
-  'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+// The lightbox's round controls sit on the dark scrim in both themes: white
+// glyphs (text-on-brand is white in both), a faint white wash on hover.
+const LIGHTBOX_BUTTON =
+  "z-10 inline-flex h-[var(--touch-min)] w-[var(--touch-min)] items-center justify-center rounded-lg text-text-on-brand outline-none transition-colors duration-normal ease-decelerate hover:bg-[color-mix(in_srgb,var(--color-text-on-brand)_10%,transparent)] focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
 
 /**
  * CNT-18: opened from a tile; `contain`-fit within ~90vw × 85vh; ←/→ within
- * the group with a counter and the item's name; × and Esc close and return
- * focus to the tile (the caller's `onClose` does the focus-return, since
- * only it knows which tile opened this); one dark scrim; no Desktop/Mobile
- * toggle; never a play button (there are no video files in NOW). Tab and
- * Shift+Tab stay inside the dialog while it is open, matching every other
- * modal in the app (`useDialogFocus`'s trap, inlined here since this
- * dialog's initial-focus and return-focus are already its own). Exported
- * so the Activity drawer can reuse it as-is (NEXT).
+ * the group with a counter and the item's name; × and Esc close; one dark
+ * scrim; no Desktop/Mobile toggle; never a play button (there are no video
+ * files in NOW). It renders through a portal over the page, like every
+ * ModalFrame (ideeza/dialog.tsx), and keeps the keyboard the way they do
+ * (useDialogFocus): focus starts on ×, Tab stays inside, and closing hands
+ * focus back to the tile that opened it. Exported so the Activity drawer can
+ * reuse it as-is (NEXT).
  */
 export function MediaLightbox({
   tiles,
@@ -319,51 +319,22 @@ export function MediaLightbox({
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const closeRef = React.useRef<HTMLButtonElement>(null);
   const tile = tiles[index];
-
-  React.useEffect(() => {
-    requestAnimationFrame(() => closeRef.current?.focus());
-  }, []);
+  useDialogFocus(true, dialogRef, closeRef);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key === "ArrowLeft" && index > 0) {
-        onIndexChange(index - 1);
-        return;
-      }
-      if (e.key === "ArrowRight" && index < tiles.length - 1) {
-        onIndexChange(index + 1);
-        return;
-      }
-      if (e.key === "Tab") {
-        // Focus trap: Tab/Shift+Tab never leave the dialog while it is open.
-        const root = dialogRef.current;
-        if (!root) return;
-        const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)];
-        if (!items.length) return;
-        const first = items[0];
-        const last = items[items.length - 1];
-        const active = document.activeElement;
-        if (e.shiftKey && (active === first || !root.contains(active))) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && (active === last || !root.contains(active))) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
+      else if (e.key === "ArrowRight" && index < tiles.length - 1) onIndexChange(index + 1);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [index, tiles.length, onClose, onIndexChange]);
 
-  if (!tile) return null;
+  if (!tile || typeof document === "undefined") return null;
   const caption = `${tile.name} · v${tile.version}`;
 
-  return (
+  return createPortal(
     <div
       ref={dialogRef}
       role="dialog"
@@ -382,7 +353,7 @@ export function MediaLightbox({
         type="button"
         onClick={onClose}
         aria-label="Close"
-        className="absolute right-4 top-4 z-10 inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-text-on-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus hover:bg-white/10"
+        className={`absolute right-4 top-4 ${LIGHTBOX_BUTTON}`}
       >
         <Icon icon={Cancel01Icon} size={22} />
       </button>
@@ -395,7 +366,7 @@ export function MediaLightbox({
             onIndexChange(index - 1);
           }}
           aria-label="Previous image"
-          className="absolute left-4 top-1/2 z-10 inline-flex h-[44px] w-[44px] -translate-y-1/2 items-center justify-center rounded-lg text-text-on-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus hover:bg-white/10"
+          className={`absolute left-4 top-1/2 -translate-y-1/2 ${LIGHTBOX_BUTTON}`}
         >
           <Icon icon={ArrowLeft01Icon} size={22} />
         </button>
@@ -408,7 +379,7 @@ export function MediaLightbox({
             onIndexChange(index + 1);
           }}
           aria-label="Next image"
-          className="absolute right-4 top-1/2 z-10 inline-flex h-[44px] w-[44px] -translate-y-1/2 items-center justify-center rounded-lg text-text-on-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus hover:bg-white/10"
+          className={`absolute right-4 top-1/2 -translate-y-1/2 ${LIGHTBOX_BUTTON}`}
         >
           <Icon icon={ArrowRight01Icon} size={22} />
         </button>
@@ -419,12 +390,13 @@ export function MediaLightbox({
         src={tile.url}
         alt={`${tile.name} concept image, v${tile.version}`}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
+        className="relative max-h-[85vh] max-w-[90vw] rounded-lg object-contain"
       />
 
       <p onClick={(e) => e.stopPropagation()} className="relative z-10 text-sm text-text-on-brand">
         {index + 1} of {tiles.length} · {caption}
       </p>
-    </div>
+    </div>,
+    document.body,
   );
 }
