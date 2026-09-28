@@ -1,17 +1,12 @@
 // The project header's own words and rules (spec §5.4) — what `headerText()`
 // in project-summary.ts doesn't print: the inline editors' checks (CNT-2,
-// CNT-5), the Open in editor hint (COR-12) and the pending-version notices
-// (COR-18). The chip, status line, meta line and action pair are
-// `headerText()`'s; nothing here repeats them.
+// CNT-5) and the pending-version notices (COR-18). The chip, status line,
+// meta line and action pair are `headerText()`'s; nothing here repeats them.
 //
 // Pure. Value imports are relative, so `node --test` loads the compiled
 // module as it is (harness notes).
 
 import { piecesOf, type Lineage, type PendingBuild } from "./project-read";
-
-/** COR-12: under the header, and the Open in editor button's description,
- *  until sub-project B makes the editor load the build (§11, X30). */
-export const EDITOR_HINT = "The editor starts from a sample board — your build's parts aren't in it yet.";
 
 /** CNT-5 / COR-93: the store kept the change in memory, but localStorage refused it. */
 export const WRITE_FAILED = "This browser's storage is full — the change wasn't saved.";

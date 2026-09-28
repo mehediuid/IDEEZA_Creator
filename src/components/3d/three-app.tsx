@@ -24,6 +24,8 @@ import { AiGenerateModal } from "@/components/3d/ai-generate-modal";
 import { C } from "@/lib/pcb/colors";
 import { DEFAULT_SHAPES } from "@/lib/three/scene";
 import { editorDocKey } from "@/lib/manual/editor-scope";
+import { fingerprintOf } from "@/lib/manual/build-load";
+import { readSeed } from "@/lib/manual/build-load-io";
 import type { EditorScope } from "@/lib/manual/p2-types";
 
 type ThreeMode = "demo" | "sketch" | "fullview" | "preview";
@@ -142,6 +144,18 @@ function readShapesFromStorage(key: string): SceneShape[] {
   return DEFAULT_SHAPES;
 }
 
+/** The scene is still exactly what the product's build seeded
+ *  (P2-BUILDLOAD-3): an enclosure sized in millimetres, far larger than the
+ *  default camera frames, so it opens fitted. */
+function isSeededScene(scope: EditorScope, key: string): boolean {
+  try {
+    const fp = readSeed(scope, window.localStorage)?.seeded["three.shapes"];
+    return fp !== undefined && fp === fingerprintOf("three.shapes", window.localStorage.getItem(key));
+  } catch {
+    return false;
+  }
+}
+
 function readRightFromStorage(key: string): RightPanelState {
   try {
     const raw = window.localStorage.getItem(key);
@@ -167,14 +181,17 @@ export function ThreeApp() {
   const [right, setRight] = React.useState<RightPanelState>(DEFAULT_RIGHT_STATE);
   const [hydrated, setHydrated] = React.useState(false);
 
+  const [resetTick, setResetTick] = React.useState(0);
+  const [fitTick, setFitTick] = React.useState(0);
+  const scope = editor?.scope ?? null;
   React.useEffect(() => {
-    if (!keys) return;
+    if (!keys || !scope) return;
     setShapes(readShapesFromStorage(keys.shapes));
     setRight(readRightFromStorage(keys.right));
     setHydrated(true);
-  }, [keys]);
-  const [resetTick, setResetTick] = React.useState(0);
-  const [fitTick, setFitTick] = React.useState(0);
+    // A seeded scene opens on its existing Fit, once.
+    if (isSeededScene(scope, keys.shapes)) setFitTick((t) => t + 1);
+  }, [keys, scope]);
   const [transformMode, setTransformMode] = React.useState<TransformMode>("translate");
   const [mouse, setMouse] = React.useState<{ x: number; y: number; z: number; distance: number } | null>(null);
   const [modal, setModal] = React.useState<ModalId>(null);
