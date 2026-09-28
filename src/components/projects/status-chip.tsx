@@ -33,7 +33,7 @@ export function StatusChip({ status, word }: { status: ProjectStatus; word: stri
     <Badge
       tone={neutral ? "neutral" : "success"}
       icon={<Icon icon={ICONS[STATUS_ICON[status]]} size={12} />}
-      className="h-[22px] items-center gap-[4px] px-[8px] py-0 text-2xs font-semibold leading-none"
+      className="h-[22px] items-center gap-[4px] px-[8px] py-0 text-sm font-semibold leading-none"
     >
       {word}
     </Badge>
@@ -48,7 +48,7 @@ export function ShowcaseChip() {
       <Badge
         tone="info"
         icon={<Icon icon={ICONS[SHOWCASE_BADGE.icon]} size={12} />}
-        className="h-[22px] items-center gap-[4px] px-[8px] py-0 text-2xs font-semibold leading-none"
+        className="h-[22px] items-center gap-[4px] px-[8px] py-0 text-sm font-semibold leading-none"
       >
         {SHOWCASE_BADGE.word}
       </Badge>
