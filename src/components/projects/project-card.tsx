@@ -69,16 +69,16 @@ function MetaRow({ text }: { text: CardText }) {
 
 // ───────────────────────── next-action button ─────────────────────────
 
-/** LST-40: shows `cardText().action` (== `summary.next.first`, with its
+/** LST-40: shows `cardText().action` (== `summary.next.card`, with its
  *  aria-label already built), "Opening…" while it navigates, a second press
  *  blocked — the same press-state every LeaveButton on the details page
  *  uses, kept local here so this file has no dependency on that page's
- *  module. */
+ *  module. A card without a violet step shows no button (Phase 2 §2.5). */
 function NextActionButton({
   action,
   onBeforeNavigate,
 }: {
-  action: CardText["action"];
+  action: NonNullable<CardText["action"]>;
   onBeforeNavigate?: () => void;
 }) {
   const router = useRouter();
@@ -187,9 +187,11 @@ export function ProjectCard({
         </div>
       </div>
 
-      <div className="[@container(min-width:560px)]:mx-[14px] [@container(min-width:560px)]:mb-[14px]">
-        <NextActionButton action={text.action} onBeforeNavigate={onBeforeNavigate} />
-      </div>
+      {text.action && (
+        <div className="[@container(min-width:560px)]:mx-[14px] [@container(min-width:560px)]:mb-[14px]">
+          <NextActionButton action={text.action} onBeforeNavigate={onBeforeNavigate} />
+        </div>
+      )}
     </article>
   );
 }

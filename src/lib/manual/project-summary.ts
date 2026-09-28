@@ -13,13 +13,12 @@
 import type { BuildJob, BuildStatus } from "../create/history";
 import { LICENSES, type BriefStepId, type Intent } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
-import { STEP_LABELS, stepHref, type ManualProject } from "./projects";
+import { stepHref, type ManualProject } from "./projects";
 import {
   buildsOf,
   coverOf,
   pendingVersionsOf,
   productsOfProject,
-  resumeStepOf,
   type BuildRef,
 } from "./project-read";
 
@@ -28,11 +27,11 @@ import {
 /** The glyph a status chip or the Showcase badge carries. The chip component
  *  maps each name to its Hugeicons glyph. The names live here so this module
  *  imports neither React nor the icon package. */
-export type IconName = "circle" | "lock" | "hand-heart" | "tag" | "hexagon" | "eye";
+export type IconName = "circle" | "lock" | "hand-heart" | "tag" | "pause" | "badge-check" | "hexagon" | "eye";
 
-/** The status is the outcome (owner decisions O5, O6). Showcase is not one of them. */
-export type ProjectStatus = "draft" | "private" | "given" | "listed" | "minted";
-// LATER: | "lazyMinted" | "auction" | "paused" | "sold" — a live Buy-now listing stays "listed", with live facts
+/** The status is the outcome (owner decisions O5, O6; Phase 2 spec §3.2). Showcase is not one of them;
+ *  the mint is a second axis (MintStatus) and the lock a fact (ProjectLock), not statuses. */
+export type ProjectStatus = "draft" | "private" | "given" | "listed" | "paused" | "sold" | "minted";
 
 /** One table. Changing a word here changes the list tab, the card chip and the details chip together. */
 export const STATUS_WORD: Record<ProjectStatus, string> = {
@@ -40,6 +39,8 @@ export const STATUS_WORD: Record<ProjectStatus, string> = {
   private: "Private",
   given: "Given",
   listed: "Listed",
+  paused: "Paused",
+  sold: "Sold",
   minted: "Minted",
 };
 
@@ -48,6 +49,8 @@ export const STATUS_ICON: Record<ProjectStatus, IconName> = {
   private: "lock",
   given: "hand-heart",
   listed: "tag",
+  paused: "pause",
+  sold: "badge-check",
   minted: "hexagon",
 };
 
@@ -105,23 +108,36 @@ export function sourceTag(source: ProjectSource): { label: string; tip: string |
 
 // ─────────────────────────── the next step ───────────────────────────
 
+/** The pair's kinds (Phase 2 spec §3.6.3). There is no `open-editor`: Open in editor lives on
+ *  the product page (decision 7). There is no `relist` or `view-listing`: an existing listing's
+ *  operations live in the rail's Marketplace block (C1, C22). */
 export type NextAction =
   | { kind: "review-version"; label: string; href: string } // "Review version 3" → /build/<id>
   | { kind: "continue-brief"; label: "Continue Brief"; href: string }
   | { kind: "add-brief"; label: "Add Brief"; href: string }
-  | { kind: "open-editor"; label: string; href: string } // "Open in editor" | "Open in editor · PCB Design"
-  | { kind: "view-brief"; label: "View brief"; href: string };
+  | { kind: "view-brief"; label: "View brief"; href: string }
+  | { kind: "add-to-marketplace"; label: "Add to marketplace" | "List another share"; href: string; blocked?: string };
 
-/** The header pair; the My projects card shows `first` (LST-40). */
-export type ActionPair = { first: NextAction; second: NextAction | null; violet: boolean };
+/** The header pair. `card` is what the My projects card shows: `first` when it is the
+ *  page's violet step, else null (§2.5 — a card never shows "View …"). */
+export type ActionPair = { first: NextAction | null; second: NextAction | null; violet: boolean; card: NextAction | null };
 
 /** A newer build of the project's chat, not saved anywhere yet (COR-18). */
 export type PendingVersion = { buildId: string; n: number; status: BuildStatus };
 
+function pairOf(first: NextAction | null, second: NextAction | null, violet: boolean): ActionPair {
+  return { first, second, violet, card: violet ? first : null };
+}
+
 /**
- * The one next-step chooser (§3.5). The header shows the pair and the card
- * shows `first`, so the two can't differ (COR-11). Showcase never changes it
- * (§3.8). At most one violet, and none once minted.
+ * The one next-step chooser (§3.5, Phase 2 §3.6.3). The header shows the pair
+ * and the card shows `card`, so the two can't differ (COR-11). Showcase never
+ * changes it (§3.8). At most one violet, and none once minted.
+ *
+ * T01 keeps v1's facts and only reshapes the answer: a Draft's violet step is
+ * Review version / Continue Brief / Add Brief (a build or by hand), a minted
+ * project reads View brief (quiet), and an unreadable mint has no pair. T10
+ * adds the listing facts and the Add to marketplace rows (§2.2).
  */
 export function nextAction(
   p: ManualProject,
@@ -132,41 +148,21 @@ export function nextAction(
     pending: PendingVersion | null;
   },
 ): ActionPair {
-  // The Brief is not an editor step. The workspace also wraps /brief, so a
-  // stamp of it resumes PCB (resumeStepOf never returns "brief") with the
-  // plain label: Open in editor never lands in the Brief, which has its own
-  // button. The label names a step only when an editor step was stamped.
-  const step = resumeStepOf(p);
-  const stamped = !!p.lastOpened && p.lastOpened.step !== "brief";
-  const editor: NextAction = {
-    kind: "open-editor",
-    label: stamped ? `Open in editor · ${STEP_LABELS[step]}` : "Open in editor",
-    href: stepHref(p, step),
-  };
   const briefHref = stepHref(p, "brief");
 
-  if (facts.status === "minted") return { first: editor, second: null, violet: false };
+  if (facts.status === "minted") return pairOf(null, null, false);
   if (facts.status !== "draft") {
-    return { first: editor, second: { kind: "view-brief", label: "View brief", href: briefHref }, violet: false };
+    return pairOf({ kind: "view-brief", label: "View brief", href: briefHref }, null, false);
   }
   if (facts.pending?.status === "ready") {
-    return {
-      first: {
-        kind: "review-version",
-        label: `Review version ${facts.pending.n}`,
-        href: `/build/${facts.pending.buildId}`,
-      },
-      second: editor,
-      violet: true,
-    };
+    return pairOf(
+      { kind: "review-version", label: `Review version ${facts.pending.n}`, href: `/build/${facts.pending.buildId}` },
+      null,
+      true,
+    );
   }
-  if (facts.brief) {
-    return { first: { kind: "continue-brief", label: "Continue Brief", href: briefHref }, second: editor, violet: true };
-  }
-  const add: NextAction = { kind: "add-brief", label: "Add Brief", href: briefHref };
-  return facts.source.kind === "hand"
-    ? { first: editor, second: add, violet: true }
-    : { first: add, second: editor, violet: true };
+  if (facts.brief) return pairOf({ kind: "continue-brief", label: "Continue Brief", href: briefHref }, null, true);
+  return pairOf({ kind: "add-brief", label: "Add Brief", href: briefHref }, null, true);
 }
 
 // ─────────────────────────── the one date formatter ───────────────────────────
@@ -372,7 +368,8 @@ export type CardText = {
   metaText: string;
   sourceTip: string | null; // the tooltip on "AI build · not in this browser"
   version: string | null;
-  action: NextAction & { ariaLabel: string }; // LST-40: next.first, "{label} for {project}"
+  /** LST-40 / §2.5: `next.card`, "{label} for {project}"; null when the pair has no violet step. */
+  action: (NextAction & { ariaLabel: string }) | null;
 };
 
 export type HeaderText = {
@@ -412,7 +409,7 @@ export function cardText(s: ProjectSummary, now: number): CardText {
     metaText: metaTextOf(meta),
     sourceTip: tag.tip,
     version,
-    action: { ...s.next.first, ariaLabel: `${s.next.first.label} for ${s.name}` },
+    action: s.next.card ? { ...s.next.card, ariaLabel: `${s.next.card.label} for ${s.name}` } : null,
   };
 }
 

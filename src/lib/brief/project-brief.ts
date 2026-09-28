@@ -33,6 +33,7 @@ import {
 } from "./types";
 import { useManualProjects, type ManualProject } from "../manual/projects";
 import { etaLabel, progressOf, type VideoJob } from "../video/jobs";
+import type { MintStatus } from "../wallet/types";
 
 // ── The read ─────────────────────────────────────────────────────────────────
 
@@ -141,7 +142,9 @@ export function useProjectBrief(projectId: string): StoredDraft | null | undefin
 export type Outcome =
   | "none" | "briefing" | "private" | "given" | "listed"
   | "mintedUnreadable";                                                  // status completed, no mint in the draft
-export type MintStatus = "notMinted" | "minted";                         // LATER: "lazyMinted" | "mintedOnChain"
+/** The mint axis (Phase 2 spec §3.2), owned by `../wallet/types`. A v1 Brief mint, which has no
+ *  MintRecord, reads "legacy" here until T10's `commerceOf` reads the record. */
+export type { MintStatus };
 export type SaleTerms =
   | { kind: "buyNow"; token: Token; price: string }
   | { kind: "auction"; token: Token; minBid: string; buyNow?: string; endsAt: number; ended: boolean };
@@ -240,7 +243,7 @@ export function commerceOf(
     return {
       outcome,
       intent: s.intent,
-      mint: "minted",
+      mint: "legacy",
       mintedAt: s.mintedAt,
       ...(network ? { network: { id: network.value, label: network.label } } : null),
       ...(collection ? { collection } : null),
@@ -251,7 +254,7 @@ export function commerceOf(
     };
   }
   if (p.status === "completed") {
-    return { outcome: "mintedUnreadable", intent: null, mint: "minted", clip: { state: "none" } };
+    return { outcome: "mintedUnreadable", intent: null, mint: "legacy", clip: { state: "none" } };
   }
   if (!d) return { outcome: "none", intent: null, mint: "notMinted", clip: { state: "none" } };
   return {

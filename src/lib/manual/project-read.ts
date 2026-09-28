@@ -24,6 +24,8 @@ import type { ResolvedSpec } from "../spec/types";
 import type { ManualProduct, ManualProject, ProjectBuildRef, ProjectStep } from "./projects";
 import { commerceOf, type ProjectCommerce, type StoredDraft } from "../brief/project-brief";
 import type { VideoJob } from "../video/jobs";
+import type { EditionKind, EditionUse, ListingEvent, Sale, SupportRequest } from "../market/types";
+import type { Charge } from "../wallet/types";
 // project-summary.ts reads this module too. The cycle is safe: neither side
 // calls the other while the modules load, only from inside functions.
 import { projectSummary, type ProjectSummary } from "./project-summary";
@@ -401,12 +403,47 @@ export function lineageProjectOf(job: BuildJob, all: BuildJob[], projects: Manua
 // ───────────────────────── log, cover, resume ─────────────────────────
 
 /** The events that aren't versions — saves and builds are in versionsOf() (COR-52, COR-107). */
+/** One event of the rail's Project log (Phase 2 spec §3.3.5). T01 fixes the union; the
+ *  producers of the Phase 2 kinds (mint, listing, market, editions, business plan) are T10's. */
 export type ProjectLogEntry =
   | { kind: "created"; at: number } // made by hand
-  | { kind: "minted"; at: number; intent: Intent; network: Network }
-  | { kind: "showcased"; at: number }; // while showcasedAt is a time
+  | { kind: "minted"; at: number; intent: Intent; network: Network } // v1: a Brief mint with no MintRecord
+  | { kind: "showcased"; at: number } // while showcasedAt is a time
+  // MINT
+  | { kind: "lazyMinted"; at: number; intent: Intent; network: Network; tokenId: number }
+  | {
+      kind: "mintedOnChain";
+      at: number;
+      intent: Intent;
+      network: Network;
+      tokenId: number;
+      via: "instant" | "upgrade" | "sale"; // "sale": settled at the first Main sale (C12)
+      charge?: Charge;
+    }
+  | { kind: "payoutChanged"; at: number; toLabel: string; toAddress: string }
+  // LISTING
+  | { kind: "listing"; at: number; event: ListingEvent }
+  // MARKETPLACE
+  | { kind: "sold"; at: number; sale: Sale }
+  | { kind: "support"; at: number; request: SupportRequest }
+  // TABS. `nft` is the edition kind: `kind` is the union's tag (SaleItem names it `nft` too).
+  | { kind: "editions"; at: number; productId: string; nft: EditionKind; use: EditionUse; n: number; event: "created" | "listed" }
+  | { kind: "businessPlan"; at: number };
 
-const LOG_RANK: Record<ProjectLogEntry["kind"], number> = { showcased: 2, minted: 1, created: 0 };
+/** At the same moment, a later step of one commit sits above an earlier one. */
+const LOG_RANK: Record<ProjectLogEntry["kind"], number> = {
+  support: 5,
+  sold: 4,
+  listing: 3,
+  editions: 3,
+  payoutChanged: 3,
+  businessPlan: 3,
+  showcased: 2,
+  minted: 1,
+  lazyMinted: 1,
+  mintedOnChain: 1,
+  created: 0,
+};
 
 /** Newest first; at the same moment Showcased sits above Minted (the Brief's
  *  commit sets both at the mint time). A project a build created has no

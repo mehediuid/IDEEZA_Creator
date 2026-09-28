@@ -26,7 +26,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight02Icon, BubbleChatIcon, CpuIcon, EyeIcon } from "@hugeicons/core-free-icons";
+import { ArrowRight02Icon, BubbleChatIcon, EyeIcon, Tag01Icon } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
@@ -50,7 +50,7 @@ const ACTION_ICON: Record<NextAction["kind"], IconValue> = {
   "continue-brief": ArrowRight02Icon,
   "add-brief": ArrowRight02Icon,
   "view-brief": ArrowRight02Icon,
-  "open-editor": CpuIcon,
+  "add-to-marketplace": Tag01Icon,
 };
 
 /** Full width and 44 px at phone width (COR-11, PPL-4); their own width from a 520 px header. */
@@ -81,11 +81,11 @@ export function ProjectHeader({
   const text = headerText(summary);
   const owner = can(viewer, "facts.seeOwnerOnly");
   const allowed = (a: NextAction) =>
-    a.kind === "open-editor" || a.kind === "review-version"
-      ? can(viewer, "project.openEditor")
-      : can(viewer, "project.brief");
+    a.kind === "review-version" ? can(viewer, "product.openEditor") : can(viewer, "project.brief");
   // Preview as buyer has no pair (§3.5); the header never shows half of one.
-  const pair = allowed(text.pair.first) ? text.pair : null;
+  // An unreadable mint has no pair at all (Phase 2 §2.2: `first` is null).
+  const first = text.pair.first && allowed(text.pair.first) ? text.pair.first : null;
+  const pair = first ? { ...text.pair, first } : null;
   const second = pair?.second && allowed(pair.second) ? pair.second : null;
   const preview = can(viewer, "preview.enter") && hasAudience(summary.status, summary.showcase);
   // COR-12: a project with a build opens on a sample board all the same.
@@ -115,7 +115,6 @@ export function ProjectHeader({
       blocked={leaving !== null}
       onClick={() => leave(key, a.href)}
       icon={ACTION_ICON[a.kind]}
-      aria-describedby={hint && a.kind === "open-editor" ? EDITOR_HINT_ID : undefined}
       className={HEADER_BUTTON}
     >
       {a.label}

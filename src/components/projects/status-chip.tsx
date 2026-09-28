@@ -3,10 +3,20 @@
 // The two badges that ride on the My projects card (B2) and the project
 // details header alike (B2 amendment: this file is shared so C2 doesn't
 // build them again). §4's icon table: Draft ○ circle · Private lock · Given
-// hand-heart · Listed tag · Minted hexagon · Showcase eye.
+// hand-heart · Listed tag · Paused pause · Sold badge-check · Minted hexagon ·
+// Showcase eye (Phase 2 spec §3.2).
 
 import * as React from "react";
-import { CircleIcon, LockIcon, HandHeartIcon, Tag01Icon, Hexagon01Icon, EyeIcon } from "@hugeicons/core-free-icons";
+import {
+  BadgeCheckIcon,
+  CircleIcon,
+  EyeIcon,
+  HandHeartIcon,
+  Hexagon01Icon,
+  LockIcon,
+  PauseIcon,
+  Tag01Icon,
+} from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza";
 import { SHOWCASE_BADGE, STATUS_ICON, type IconName, type ProjectStatus } from "@/lib/manual/project-summary";
@@ -19,6 +29,8 @@ export const ICONS: Record<IconName, IconValue> = {
   lock: LockIcon,
   "hand-heart": HandHeartIcon,
   tag: Tag01Icon,
+  pause: PauseIcon,
+  "badge-check": BadgeCheckIcon,
   hexagon: Hexagon01Icon,
   eye: EyeIcon,
 };

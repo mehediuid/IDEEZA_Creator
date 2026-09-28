@@ -239,9 +239,12 @@ const BUILDS = [bCar, bSoil, bRain, bV1, bV2, bV3];
 const sum = (p, brief = null, over = {}) =>
   projectSummary(p, { builds: BUILDS, brief, videoJobs: [], now: NOW, ...over });
 
-const editor = (slug, label = "Open in editor", seg = "pcb") => ({ kind: "open-editor", label, href: `/project/${slug}/${seg}` });
 const addBrief = (slug) => ({ kind: "add-brief", label: "Add Brief", href: `/project/${slug}/brief` });
 const viewBrief = (slug) => ({ kind: "view-brief", label: "View brief", href: `/project/${slug}/brief` });
+// Phase 2 §3.6.3: no open-editor kind (Open in editor is the product page's, decision 7); the
+// card shows `card`, which is `first` when it is violet and null otherwise (§2.5).
+const violetPair = (first) => ({ first, second: null, violet: true, card: first });
+const quietPair = (first) => ({ first, second: null, violet: false, card: null });
 const DRAFT_CHIP = (line) => ({ word: "Draft", icon: "circle", badge: null, line });
 
 // ── LST-32 / COR-11: the card and the header derive identical strings ──
@@ -254,7 +257,7 @@ const FIXTURES = [
     productLine: "4 products · RC Car Controller, Remote Controller +2",
     card: "AI build · Saved 4:12 PM",
     header: "4 products · Saved Sep 26, 2026",
-    pair: { first: addBrief("car"), second: editor("car"), violet: true },
+    pair: violetPair(addBrief("car")),
     cover: "https://img.test/b_car.png",
   },
   {
@@ -265,7 +268,7 @@ const FIXTURES = [
     productLine: "1 product · not named yet",
     card: "By hand · Created Aug 3",
     header: "1 product · Made by hand · Created Aug 3, 2026",
-    pair: { first: editor("garden-weather-station"), second: addBrief("garden-weather-station"), violet: true },
+    pair: violetPair(addBrief("garden-weather-station")),
     cover: null,
   },
   {
@@ -276,7 +279,7 @@ const FIXTURES = [
     productLine: "1 product · Soil Probe",
     card: "AI build · Saved Sep 20",
     header: "1 product · Saved Sep 20, 2026",
-    pair: { first: editor("plant-soil-monitor"), second: viewBrief("plant-soil-monitor"), violet: false },
+    pair: quietPair(viewBrief("plant-soil-monitor")),
     cover: "https://img.test/b_soil.png",
   },
   {
@@ -287,7 +290,7 @@ const FIXTURES = [
     productLine: "2 products · Station Hub, Rain Gauge",
     card: "AI build · Created Aug 3",
     header: "2 products · Created Aug 3, 2026",
-    pair: { first: addBrief("weather-station"), second: editor("weather-station"), violet: true },
+    pair: violetPair(addBrief("weather-station")),
     cover: "https://img.test/b_rain.png",
   },
   {
@@ -298,7 +301,7 @@ const FIXTURES = [
     productLine: "1 product · Lamp Base",
     card: "AI build · not in this browser · Saved Dec 5, 2025",
     header: "1 product · Saved Dec 5, 2025 · build not in this browser",
-    pair: { first: addBrief("desk-lamp"), second: editor("desk-lamp"), violet: true },
+    pair: violetPair(addBrief("desk-lamp")),
     cover: null,
   },
   {
@@ -309,7 +312,7 @@ const FIXTURES = [
     productLine: "4 products · RC Car Controller, Remote Controller +2",
     card: "AI build · Saved 4:12 PM · Version 2",
     header: "4 products · Version 2 · Saved Sep 26, 2026",
-    pair: { first: { kind: "review-version", label: "Review version 3", href: "/build/b_v3" }, second: editor("rc-car"), violet: true },
+    pair: violetPair({ kind: "review-version", label: "Review version 3", href: "/build/b_v3" }),
     cover: "https://img.test/b_v2.png",
   },
   {
@@ -321,7 +324,7 @@ const FIXTURES = [
     productLine: "1 product · Feeder",
     card: "By hand · Created Aug 3",
     header: "1 product · Made by hand · Created Aug 3, 2026",
-    pair: { first: editor("pet-feeder"), second: null, violet: false },
+    pair: { first: null, second: null, violet: false, card: null },
     cover: null,
   },
 ];
@@ -344,9 +347,12 @@ for (const f of FIXTURES) {
     assert.deepEqual(card.chip, header.chip);
     assert.equal(card.count, header.count);
     assert.equal(card.version, header.version);
-    const { ariaLabel, ...cardButton } = card.action;
-    assert.deepEqual(cardButton, header.pair.first);
-    assert.equal(ariaLabel, `${header.pair.first.label} for ${f.p.name}`);
+    if (header.pair.card === null) assert.equal(card.action, null);
+    else {
+      const { ariaLabel, ...cardButton } = card.action;
+      assert.deepEqual(cardButton, header.pair.card);
+      assert.equal(ariaLabel, `${header.pair.card.label} for ${f.p.name}`);
+    }
     const cardTime = card.meta.find((m) => m.kind === "time").time;
     const headerTime = header.meta.find((m) => m.kind === "time").time;
     assert.equal(cardTime.dateTime, headerTime.dateTime);
@@ -365,16 +371,12 @@ for (const f of FIXTURES) {
 }
 
 // ── §4.1, one test per state ──
-test("§4.1 row 1 · Draft, a newer version waiting → ★ Review version {n} · Open in editor", () => {
+test("§4.1 row 1 · Draft, a newer version waiting → ★ Review version {n}", () => {
   const s = sum(rebuilt);
   assert.equal(s.status, "draft");
   assert.deepEqual(s.pendingVersion, { buildId: "b_v3", n: 3, status: "ready" });
   assert.equal(s.statusLine, "Version 3 is ready to save");
-  assert.deepEqual(s.next, {
-    first: { kind: "review-version", label: "Review version 3", href: "/build/b_v3" },
-    second: editor("rc-car"),
-    violet: true,
-  });
+  assert.deepEqual(s.next, violetPair({ kind: "review-version", label: "Review version 3", href: "/build/b_v3" }));
 });
 
 test("§4.1 row 1 · a build still running doesn't take the primary (it stays in the COR-18 banner)", () => {
@@ -385,15 +387,11 @@ test("§4.1 row 1 · a build still running doesn't take the primary (it stays in
   assert.equal(s.next.first.kind, "add-brief");
 });
 
-test("§4.1 row 2 · Draft, Brief in progress → ★ Continue Brief · Open in editor", () => {
+test("§4.1 row 2 · Draft, Brief in progress → ★ Continue Brief", () => {
   const s = sum(car4, draft({ intent: "sell" }, "preview"));
   assert.equal(s.statusWord, "Draft");
   assert.equal(s.statusLine, "Brief in progress · to sell · Preview step");
-  assert.deepEqual(s.next, {
-    first: { kind: "continue-brief", label: "Continue Brief", href: "/project/car/brief" },
-    second: editor("car"),
-    violet: true,
-  });
+  assert.deepEqual(s.next, violetPair({ kind: "continue-brief", label: "Continue Brief", href: "/project/car/brief" }));
   assert.equal(sum(car4, draft({ intent: "give" }, "idea")).statusLine, "Brief in progress · to give · Idea step");
   // The step is left out at the form step.
   assert.equal(sum(car4, draft({ intent: "save" }, "form")).statusLine, "Brief in progress · to keep");
@@ -406,18 +404,18 @@ test("§4.1 row 3 · Draft, Brief started → ★ Continue Brief", () => {
   assert.equal(s.next.violet, true);
 });
 
-test("§4.1 row 4 · Draft from a build, not briefed → ★ Add Brief · Open in editor (also when the build is gone)", () => {
+test("§4.1 row 4 · Draft from a build, not briefed → ★ Add Brief (also when the build is gone)", () => {
   for (const p of [car4, handJoined, purged]) {
     const s = sum(p);
     assert.equal(s.statusLine, "Not briefed yet");
-    assert.deepEqual([s.next.first.kind, s.next.second.kind, s.next.violet], ["add-brief", "open-editor", true]);
+    assert.deepEqual([s.next.first.kind, s.next.second, s.next.violet], ["add-brief", null, true]);
   }
 });
 
-test("§4.1 row 5 · Draft by hand, not briefed → ★ Open in editor · Add Brief", () => {
+test("§4.1 row 5 · Draft by hand, not briefed → ★ Add Brief (Phase 2 §2.2: a build or by hand)", () => {
   const s = sum(legacyHand);
   assert.equal(s.statusLine, "Not briefed yet");
-  assert.deepEqual(s.next, { first: editor("garden-weather-station"), second: addBrief("garden-weather-station"), violet: true });
+  assert.deepEqual(s.next, violetPair(addBrief("garden-weather-station")));
 });
 
 test("§4.1 row 6 · Private, and its showcased form; showcasing never changes the pair", () => {
@@ -429,7 +427,7 @@ test("§4.1 row 6 · Private, and its showcased form; showcasing never changes t
   assert.equal(s.statusLine, "Minted Sep 22 · kept private");
   assert.equal(s.showcase, null);
   assert.equal(s.mintedAt, MINTED);
-  assert.deepEqual(s.next, { first: editor("night-light"), second: viewBrief("night-light"), violet: false });
+  assert.deepEqual(s.next, quietPair(viewBrief("night-light")));
 
   const shown = sum({ ...minted, showcasedAt: NOW }, d);
   assert.deepEqual(shown.showcase, { at: NOW });
@@ -443,7 +441,7 @@ test("§4.1 row 7 · Given, under its licence", () => {
   assert.equal(s.statusWord, "Given");
   assert.equal(STATUS_ICON[s.status], "hand-heart");
   assert.equal(s.statusLine, "Minted Sep 22 · given to the community under MIT License");
-  assert.deepEqual(s.next, { first: editor("night-light"), second: viewBrief("night-light"), violet: false });
+  assert.deepEqual(s.next, quietPair(viewBrief("night-light")));
 });
 
 test("§4.1 row 8 · Listed, never without its subline; the record's own status is never read alone (LST-5)", () => {
@@ -458,7 +456,7 @@ test("§4.1 row 8 · Listed, never without its subline; the record's own status 
   assert.equal(sum({ ...listedShowcased, status: "draft" }, soilDraft).status, "listed");
 });
 
-test("§4.1 row 9 · Minted, the brief record unreadable (LST-9) → Open in editor only", () => {
+test("§4.1 row 9 · Minted, the brief record unreadable (LST-9) → no pair (Phase 2 §2.2)", () => {
   const s = sum(lost, null);
   assert.equal(s.status, "minted");
   assert.equal(s.statusWord, "Minted");
@@ -466,7 +464,7 @@ test("§4.1 row 9 · Minted, the brief record unreadable (LST-9) → Open in edi
   assert.equal(s.statusLine, "Minted · the brief record isn't in this browser");
   assert.equal(s.mintedAt, null);
   assert.deepEqual(s.showcase, { at: MINTED });
-  assert.deepEqual(s.next, { first: editor("pet-feeder"), second: null, violet: false });
+  assert.deepEqual(s.next, { first: null, second: null, violet: false, card: null });
 });
 
 // ── Modifiers and the rules around them ──
@@ -502,19 +500,17 @@ test("Modifier · a newer version waiting on a minted project changes neither th
   assert.deepEqual(after.next, before.next);
 });
 
-test("Open in editor resumes the step opened last (COR-12); a Brief stamp never makes it the Brief", () => {
-  const s = sum({ ...car4, lastOpened: { step: "three", at: NOW } });
-  assert.deepEqual(s.next.second, editor("car", "Open in editor · 3D Module", "3d"));
-  const hand = sum({ ...legacyHand, lastOpened: { step: "wiring", at: NOW } });
-  assert.deepEqual(hand.next.first, editor("garden-weather-station", "Open in editor · Peripheral Wiring", "wiring"));
-  const brief = sum({ ...car4, lastOpened: { step: "brief", at: NOW } });
-  assert.deepEqual(brief.next.second, editor("car"));
+test("Open in editor is not in the pair (decision 7): an editor stamp never changes it", () => {
+  for (const step of ["three", "wiring", "brief"]) {
+    assert.deepEqual(sum({ ...car4, lastOpened: { step, at: NOW } }).next, sum(car4).next, step);
+    assert.deepEqual(sum({ ...legacyHand, lastOpened: { step, at: NOW } }).next, sum(legacyHand).next, step);
+  }
 });
 
 test("nextAction() is the one chooser the summary uses (COR-11)", () => {
   const s = sum(car4);
   assert.deepEqual(nextAction(car4, { status: "draft", brief: null, source: s.source, pending: null }), s.next);
-  assert.equal(nextAction(car4, { status: "draft", brief: null, source: { kind: "hand" }, pending: null }).first.kind, "open-editor");
+  assert.equal(nextAction(car4, { status: "draft", brief: null, source: { kind: "hand" }, pending: null }).first.kind, "add-brief");
 });
 
 test("Products, not builds; a dropped product stays (LST-37, COR-42, COR-108)", () => {
@@ -561,8 +557,24 @@ test("The one date formatter (LST-41, COM-7)", () => {
   assert.equal(formatDateTime(MINTED), "Sep 22, 2026 · 9:09 PM");
 });
 
-test("One word table: Draft · Private · Given · Listed · Minted, and no 'Ready to sell' (O6)", () => {
-  assert.deepEqual(STATUS_WORD, { draft: "Draft", private: "Private", given: "Given", listed: "Listed", minted: "Minted" });
-  assert.deepEqual(STATUS_ICON, { draft: "circle", private: "lock", given: "hand-heart", listed: "tag", minted: "hexagon" });
+test("One word table: Draft · Private · Given · Listed · Paused · Sold · Minted, and no 'Ready to sell' (O6, Phase 2 §3.2)", () => {
+  assert.deepEqual(STATUS_WORD, {
+    draft: "Draft",
+    private: "Private",
+    given: "Given",
+    listed: "Listed",
+    paused: "Paused",
+    sold: "Sold",
+    minted: "Minted",
+  });
+  assert.deepEqual(STATUS_ICON, {
+    draft: "circle",
+    private: "lock",
+    given: "hand-heart",
+    listed: "tag",
+    paused: "pause",
+    sold: "badge-check",
+    minted: "hexagon",
+  });
   assert.ok(!Object.values(STATUS_WORD).includes("Ready to sell"));
 });

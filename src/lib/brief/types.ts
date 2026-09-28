@@ -7,6 +7,9 @@
 // `brief-app.tsx` re-exports everything here, so `./brief-app` imports keep
 // working unchanged.
 
+import type { UtilityBenefit } from "../market/types";
+import type { MintType } from "../wallet/types";
+
 export type Intent = "sell" | "give" | "save";
 export type MediaType = "ai" | "ar" | "skip";
 export type Quality = "low" | "high";
@@ -169,6 +172,13 @@ export type BriefState = {
   minBid: string;
   auctionBuyNow: string;
   expiresAt: string; // datetime-local value, e.g. "2026-01-18T14:30"
+  // Phase 2 (spec §3.3.5). How the commit mints (P2-MINT-4): Save always
+  // forces "lazy". The listing's sale fields stay here only as the unsubmitted
+  // draft (P2-LISTING-22): the share of ownership being sold, as typed, and
+  // the holder benefits (P2-CUSTOMERS-16).
+  mintType: MintType;
+  sellingPct: string;
+  benefits: UtilityBenefit[];
   // What was typed, not what it was corrected to: the field holds the digits
   // as they are entered (one decimal place) and the form states the range it
   // has to land in, rather than rewriting "1" to "2" under the cursor.
@@ -212,6 +222,9 @@ export const DEFAULT_STATE: BriefState = {
   minBid: "",
   auctionBuyNow: "",
   expiresAt: "",
+  mintType: "lazy",
+  sellingPct: "10",
+  benefits: [],
   royalties: "10",
   understandGas: false,
   confirmOwnership: false,
@@ -260,6 +273,27 @@ const QUALITIES: readonly Quality[] = ["low", "high"];
 const NETWORK_IDS: readonly Network[] = ["baseSepolia", "mumbai"];
 const LISTING_IDS: readonly ListingType[] = ["buyNow", "auction"];
 const LICENSE_IDS: readonly License[] = LICENSES.map((l) => l.value);
+const MINT_TYPES: readonly MintType[] = ["lazy", "instant"];
+const BENEFIT_MONTHS: readonly number[] = [1, 3, 6, 12];
+
+// The draft's holder benefits: each needs a string id, a string name (empty is
+// kept — the form names it at submit) and a duration the Select can write. A
+// row that isn't one of those is dropped rather than guessed at.
+function normalizeBenefits(v: unknown): UtilityBenefit[] {
+  if (!Array.isArray(v)) return [];
+  const out: UtilityBenefit[] = [];
+  for (const raw of v) {
+    const b = asDict(raw);
+    if (typeof b.id !== "string" || !b.id || typeof b.name !== "string") continue;
+    const d = asDict(b.duration);
+    if (typeof d.months === "number" && BENEFIT_MONTHS.includes(d.months)) {
+      out.push({ id: b.id, name: b.name, duration: { months: d.months as 1 | 3 | 6 | 12 } });
+    } else if (d.whileHeld === true) {
+      out.push({ id: b.id, name: b.name, duration: { whileHeld: true } });
+    }
+  }
+  return out;
+}
 
 function normalizeScenes(v: unknown): Scene[] {
   if (!Array.isArray(v)) return [];
@@ -373,6 +407,10 @@ export function normalizeBrief(parsed: unknown): BriefState {
     minBid: str(s.minBid, DEFAULT_STATE.minBid),
     auctionBuyNow: str(s.auctionBuyNow, DEFAULT_STATE.auctionBuyNow),
     expiresAt: str(s.expiresAt, DEFAULT_STATE.expiresAt),
+    // A missing or unknown mint type reads as lazy (P2-MINT-4).
+    mintType: oneOf(s.mintType, MINT_TYPES, DEFAULT_STATE.mintType),
+    sellingPct: str(s.sellingPct, DEFAULT_STATE.sellingPct),
+    benefits: normalizeBenefits(s.benefits),
     royalties: normalizeRoyalties(s.royalties),
     understandGas: bool(s.understandGas, DEFAULT_STATE.understandGas),
     confirmOwnership: bool(s.confirmOwnership, DEFAULT_STATE.confirmOwnership),
@@ -398,24 +436,20 @@ export const BRIEF_FORM_LABEL: Record<Intent, string> = {
 };
 
 /**
- * The steps this brief really runs, in order.
+ * The steps this brief really runs, in order (Phase 2 spec §2.6).
  *
- * Selling is a listing, so the clip is part of what is being sold and comes
- * before the terms. Giving or saving needs no clip at all — the maker goes
- * straight from the idea to the form — unless they also post it to
- * Innovations, which does need one, so the preview slots in after the form
- * that asked for it.
+ * Selling and giving both publish the project, and every product needs its
+ * video before either commits (decision 6, P2-VIDEO-17), so the preview comes
+ * before the terms. Saving keeps the project private: its clip is optional,
+ * so the preview comes after the form.
  */
 export function stepsFor(intent: Intent | null): BriefStepId[] {
   if (!intent) return ["idea"];
-  if (intent === "sell") return ["idea", "preview", "form", "success"];
-  // Give and save get the preview too, and always after the form — the clip
-  // is optional for them, and asking for one before they have said what they
-  // are doing with the design is asking for work nobody may ever look at.
-  // It used to appear only when "Share to Innovations" was ticked, which made
-  // the step read as missing: a maker who wanted a clip for a private build
-  // had no way to ask for one. Skipping is a card on the step now, not the
-  // absence of the step.
+  if (intent === "sell" || intent === "give") return ["idea", "preview", "form", "success"];
+  // Save gets the preview too, after the form — the clip is optional for a
+  // private build, and asking for one before the maker has said what they are
+  // doing with the design is asking for work nobody may ever look at.
+  // Skipping is a card on the step, not the absence of the step.
   return ["idea", "form", "preview", "success"];
 }
 
