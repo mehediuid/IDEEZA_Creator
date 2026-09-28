@@ -160,9 +160,9 @@ function ProjectPageInner({ id }: { id: string }) {
   const view = React.useMemo(
     () =>
       project && brief !== undefined
-        ? projectView(project, { builds, chats, brief, videoJobs, now })
+        ? projectView(project, { builds, chats, brief, videoJobs, now, projects })
         : null,
-    [project, brief, builds, chats, videoJobs, now],
+    [project, brief, builds, chats, videoJobs, now, projects],
   );
 
   if (!hydrated || !historyHydrated || !videoHydrated || !network.hydrated) return <ProjectSkeleton />;

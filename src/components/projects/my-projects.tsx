@@ -236,6 +236,7 @@ export function MyProjects() {
               brief: drafts.get(project.id) ?? null,
               videoJobs: jobs,
               now,
+              projects,
             }),
           }))
         : null,
