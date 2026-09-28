@@ -17,15 +17,7 @@ export function RailManage({ project, view, viewer, brief }: SlotProps) {
   if (!can(viewer, "project.delete")) return null;
   return (
     <RailBlock title="Manage" collapsible={false}>
-      <DeleteProjectControl
-        project={project}
-        viewer={viewer}
-        status={view.summary.status}
-        draft={brief}
-        showcased={view.summary.showcase !== null}
-        productCount={view.summary.productCount}
-        refs={view.refs}
-      />
+      <DeleteProjectControl project={project} viewer={viewer} view={view} draft={brief} />
     </RailBlock>
   );
 }

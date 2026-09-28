@@ -1,32 +1,36 @@
 "use client";
 
 // Delete project — the Manage block's one control and the one dialog behind
-// it (COR-67…71, owner answer 6).
+// it (COR-67…71, owner answer 6; Phase 2 §3.8.4).
 //
 // - The control is owner-only (`can(viewer, "project.delete")`) and absent in
-//   Preview as buyer. While `deleteBlockOf(status)` names a reason — NOW only
-//   a Listed project — it stays where it is, aria-disabled and in the tab
-//   order, with the reason beside it and named by aria-describedby; pressing
-//   it opens nothing.
+//   Preview as buyer. `deleteBlockOf(view.deleteFacts)` (§3.8.4) names the
+//   first rule that applies — unreadable market records, a sale, a live
+//   auction, a live or paused listing, or a co-owner's share — and while it
+//   does, the control stays where it is, aria-disabled and in the tab order,
+//   with the reason and detail beside it, named by aria-describedby; pressing
+//   it opens nothing. The otherOwners case also carries a quiet "Open
+//   Contributors" link that selects the Contributors tab (P2-CONTRIB-14).
 // - The dialog lists what goes and what stays (deletePlanOf) and asks for the
 //   typed project name only when editor work, a mint record or a network would
 //   be lost. Cancel has the focus; the destructive button reads Delete project.
-// - Confirm queues "Deleted “{name}”" for My projects, then deletes and
+// - Confirm queues "Deleted "{name}"" for My projects, then deletes and
 //   navigates in one transition, so this page never renders "We couldn't find
 //   this project" on the way out.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ConfirmDialog, TextInput } from "@/components/ideeza";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
+import { readMarketNow } from "@/lib/market/market-store";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
 import { editorWorkOf } from "@/lib/manual/editor-work";
 import { can, deleteBlockOf, type Viewer } from "@/lib/manual/permissions";
-import type { BuildRef } from "@/lib/manual/project-read";
-import type { ProjectStatus } from "@/lib/manual/project-summary";
+import type { ProjectView } from "@/lib/manual/project-read";
+import { withTab } from "@/lib/manual/project-route";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { readNetwork } from "@/lib/network/store";
 import { cn } from "@/lib/utils";
@@ -35,36 +39,27 @@ import { setProjectNotice } from "./project-notice";
 export type DeleteProjectControlProps = {
   project: ManualProject;
   viewer: Viewer;
-  /** The page's status (summary.status); undefined until the brief draft is read. */
-  status: ProjectStatus | undefined;
+  /** The page's one derivation — §3.8.4's facts (`view.deleteFacts`) and every other fact the
+   *  dialog reads (mint, summary). */
+  view: ProjectView;
   /** The project's brief draft as the page read it. */
   draft: StoredDraft | null;
-  /** summary.showcase !== null */
-  showcased: boolean;
-  /** summary.productCount */
-  productCount: number;
-  /** buildsOf(project, builds) — the page's refs */
-  refs: BuildRef[];
 };
 
-export function DeleteProjectControl(props: DeleteProjectControlProps) {
-  const { viewer, status } = props;
+export function DeleteProjectControl({ project, viewer, view, draft }: DeleteProjectControlProps) {
+  const pathname = usePathname();
+  const search = useSearchParams();
   const [open, setOpen] = React.useState(false);
   const reasonId = React.useId();
   if (!can(viewer, "project.delete")) return null;
-  // Phase 2 §3.8.4 takes the facts; until deleteFactsOf(view) lands (T10, T19),
-  // the v1 page knows only its status, so a Listed project is the one block.
-  const block =
-    status === undefined
-      ? null
-      : deleteBlockOf({
-          marketUnreadable: false,
-          sold: { sharePct: 0, editions: 0 },
-          auction: null,
-          listed: status === "listed" || status === "paused",
-          otherOwners: [],
-        });
-  const unavailable = status === undefined || block !== null;
+  // §3.8.4: the first rule that applies, from the page's one derivation — no
+  // second reading of the market or the roster here.
+  const block = deleteBlockOf(view.deleteFacts);
+  const unavailable = block !== null;
+  const openContributors = () => {
+    const qs = withTab(search.toString(), block!.link!.tab);
+    window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  };
   return (
     <div className="flex flex-col items-start gap-[8px]">
       <button
@@ -89,29 +84,32 @@ export function DeleteProjectControl(props: DeleteProjectControlProps) {
         <div id={reasonId} className="max-w-[40ch] text-sm leading-relaxed">
           <p className="font-medium text-text-primary">{block.reason}</p>
           <p className="text-text-secondary">{block.detail}</p>
+          {block.link && (
+            <button
+              type="button"
+              onClick={openContributors}
+              className="mt-1 rounded-sm text-text-primary underline decoration-border-strong underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:decoration-current focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {block.link.label}
+            </button>
+          )}
         </div>
       )}
-      {open && status !== undefined && (
-        <DeleteProjectDialog {...props} status={status} onClose={() => setOpen(false)} />
+      {open && (
+        <DeleteProjectDialog project={project} view={view} draft={draft} onClose={() => setOpen(false)} />
       )}
     </div>
   );
 }
 
-type DeleteProjectDialogProps = Omit<DeleteProjectControlProps, "viewer" | "status"> & {
-  status: ProjectStatus;
+type DeleteProjectDialogProps = {
+  project: ManualProject;
+  view: ProjectView;
+  draft: StoredDraft | null;
   onClose: () => void;
 };
 
-function DeleteProjectDialog({
-  project,
-  status,
-  draft,
-  showcased,
-  productCount,
-  refs,
-  onClose,
-}: DeleteProjectDialogProps) {
+function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDialogProps) {
   const router = useRouter();
   const { deleteProject } = useManualProjects();
   const { chats } = useCreateHistory();
@@ -122,27 +120,41 @@ function DeleteProjectDialog({
   const fieldId = React.useId();
   const errorId = React.useId();
   const name = project.name.trim();
+  const status = view.summary.status;
 
-  // Read when the dialog opens: the editor docs and the network are in this
-  // browser's storage, not in the page's derivation.
+  // Read when the dialog opens: the editor docs, the network and the
+  // marketplace's ended listings are in this browser's storage, not in the
+  // page's derivation.
   const plan = React.useMemo(() => {
-    const live = refs.filter((r) => r.job !== null);
+    const live = view.refs.filter((r) => r.job !== null);
     const known = new Set(chats.map((c) => c.id));
     const keptChats = new Set(
       live.flatMap((r) => (r.chatId && known.has(r.chatId) ? [r.chatId] : [])),
     );
     const network = readNetwork(project.id);
+    // P2-LISTING-19: only removed or closed listings are left once delete is
+    // offered (a live or paused one already blocks it) — they're deletable,
+    // and the sweep drops them (dropProjectListings).
+    const endedListings = readMarketNow().listings.filter(
+      (l) => l.projectId === project.id && (l.status === "removed" || l.status === "closed"),
+    ).length;
+    // P2-CONTRIB-15: the contributors a co-owner's share doesn't already
+    // cover — viewers, editors, and any co-owner whose share came back to 0.
+    const contributors = (project.contributors ?? []).filter((c) => !(c.role === "coOwner" && c.share > 0)).length;
     return deletePlanOf({
       status,
       draft,
-      products: productCount,
-      work: editorWorkOf(project.id),
+      products: view.summary.productCount,
+      work: editorWorkOf({ projectId: project.id, productId: "p1" }, "p1"),
       network: network ? { links: network.links.length } : null,
-      showcased,
+      showcased: view.summary.showcase !== null,
       builds: live.length,
       chats: keptChats.size,
+      contributors,
+      endedListings,
+      mint: view.mint.status,
     });
-  }, [project.id, status, draft, productCount, showcased, refs, chats]);
+  }, [project.id, project.contributors, status, draft, view.summary.productCount, view.summary.showcase, view.refs, view.mint.status, chats]);
 
   const matched = !plan.typed || matchesTypedName(entry, name);
   const mismatch = plan.typed && tried && !matched;
@@ -154,7 +166,7 @@ function DeleteProjectDialog({
       fieldRef.current?.focus();
       return;
     }
-    setProjectNotice(`Deleted “${name}”`);
+    setProjectNotice(`Deleted "${name}"`);
     // One transition: the record goes as /projects arrives.
     startTransition(() => {
       deleteProject(project.id);
@@ -165,7 +177,7 @@ function DeleteProjectDialog({
   return (
     <ConfirmDialog
       open
-      title={`Delete “${name}”?`}
+      title={`Delete "${name}"?`}
       confirmLabel={pending ? "Deleting…" : "Delete project"}
       confirmUnavailable={!matched || pending}
       onConfirm={confirm}
@@ -218,7 +230,7 @@ function DeleteProjectDialog({
           />
           {/* Always on the page, so the polite region speaks when it fills. */}
           <p id={errorId} aria-live="polite" className="mt-[6px] min-h-[20px] text-text-error">
-            {mismatch ? `That doesn't match “${name}”.` : ""}
+            {mismatch ? `That doesn't match "${name}".` : ""}
           </p>
         </div>
       )}
