@@ -40,6 +40,8 @@ const { editorWorkOf, EDITOR_GLOBAL_NOTE } = await import("../../.tmp-test/lib/m
 
 const PID = "proj_test1";
 
+// ───────────────────── the deprecated 1-arg form (legacy per-project keys) ─────────────────────
+
 test("no docs at all: PCB and Wiring read not-opened, everything else reads none", () => {
   setStorage({});
   const work = editorWorkOf(PID);
@@ -110,7 +112,7 @@ test("corrupt PCB and wiring JSON degrade to not-opened instead of throwing", ()
   assert.deepEqual(work.wiring, { state: "not-opened" });
 });
 
-test("Code and Preview never carry a per-project fact, and the honest note matches the spec verbatim", () => {
+test("Code and Preview never carry a fact through the deprecated 1-arg form (no legacy key to adopt), and the old note string is unchanged", () => {
   setStorage({});
   const work = editorWorkOf(PID);
   assert.deepEqual(work.code, { state: "none" });
@@ -119,4 +121,51 @@ test("Code and Preview never carry a per-project fact, and the honest note match
     EDITOR_GLOBAL_NOTE,
     "Code, 3D shapes and Preview are shared by every project in this browser for now, so they show no progress here.",
   );
+});
+
+// ───────────────────── the scoped 2-arg form (P2-EDITOR-8) ─────────────────────
+
+test("the scoped form on the first row still adopts the legacy per-project PCB/Wiring/Assembly/3D-AI keys", () => {
+  setStorage({ [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json") });
+  const work = editorWorkOf({ projectId: PID, productId: "p1" }, "p1");
+  assert.deepEqual(work.pcb, { state: "work", text: "4 objects · 2 on the board" });
+});
+
+test("the scoped form on a NON-first row never reads the legacy per-project key", () => {
+  setStorage({ [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json") });
+  const work = editorWorkOf({ projectId: PID, productId: "prd_b" }, "p1");
+  assert.deepEqual(work.pcb, { state: "not-opened" });
+});
+
+test("Code gains a real fact once the product has its own scoped Code document", () => {
+  setStorage({ [`ideeza:code:files:${PID}:prd_a`]: [{ name: "a.py" }, { name: "b.py" }] });
+  const work = editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1");
+  assert.deepEqual(work.code, { state: "work", text: "2 files" });
+});
+
+test("Code never reads the global ideeza:code:files key, even for the first row (P2-EDITOR-4/C4)", () => {
+  setStorage({ "ideeza:code:files": [{ name: "old.py" }] });
+  const work = editorWorkOf({ projectId: PID, productId: "p1" }, "p1");
+  assert.deepEqual(work.code, { state: "none" });
+});
+
+test("3D gains shape and AI-model facts, joined when both exist", () => {
+  setStorage({ [`ideeza:3d:shapes:${PID}:prd_a`]: [{ id: "s1" }, { id: "s2" }, { id: "s3" }] });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").three, { state: "work", text: "3 shapes" });
+
+  setStorage({
+    [`ideeza:3d:shapes:${PID}:prd_a`]: [{ id: "s1" }],
+    [`ideeza:three:aimodel:${PID}:prd_a`]: fixture("three-aimodel-ready.json"),
+  });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").three, {
+    state: "work",
+    text: "1 shapes · AI model generated",
+  });
+});
+
+test("Preview reads the mate count once the product has its own scoped mates", () => {
+  setStorage({ [`ideeza:preview:mates:${PID}:prd_a`]: { i1: {}, i2: {} } });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").preview, { state: "work", text: "2 mates set" });
+  setStorage({});
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").preview, { state: "none" });
 });

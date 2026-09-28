@@ -1,5 +1,11 @@
 // A7a — lastOpened, the one resume signal (COR-91, §5.1.10). Compiled by tests/projects/tsconfig.json (A1):
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
+//
+// P2-EDITOR-7 (spec §3.5.8) replaces the per-project `stampOpened` with the
+// per-product `stampEditorOpened` (editor-scope.ts) — its tests live in
+// editor-scope.test.mjs, next to the function. `stampOpened` stays here,
+// unchanged and @deprecated, until the provider's `touchOpened` (T09) moves
+// its one call site over.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { OPENED_EVERY_MS, stampOpened } from "../../.tmp-test/lib/manual/project-storage.js";
