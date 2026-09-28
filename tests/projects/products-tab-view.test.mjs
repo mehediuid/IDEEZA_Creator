@@ -177,6 +177,15 @@ test("headlineConfidenceOf: checked only when every product is checked", () => {
   assert.deepEqual(out.passed, [...a.passed, ...b.passed]);
 });
 
+test("headlineConfidenceOf: a sentence two products share is listed once", () => {
+  const notRun = { group: "design-rule", notRun: true, text: "Design-rule check not run yet." };
+  const a = { productId: "a", productName: "A", tier: "draft", issues: [notRun], passed: ["Enclosure fit ok."] };
+  const b = { productId: "b", productName: "B", tier: "draft", issues: [{ ...notRun }], passed: ["Enclosure fit ok."] };
+  const out = headlineConfidenceOf([a, b]);
+  assert.equal(out.issues.length, 1);
+  assert.deepEqual(out.passed, ["Enclosure fit ok."]);
+});
+
 test("headlineConfidenceOf: draft as soon as one product is draft, with every issue folded in", () => {
   const a = { productId: "a", productName: "A", tier: "checked", issues: [], passed: ["ok"] };
   const b = {

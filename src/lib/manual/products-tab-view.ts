@@ -145,7 +145,19 @@ export function headlineConfidenceOf(
     productId: "__headline__",
     productName: "",
     tier: current.some((c) => c.tier === "draft") ? "draft" : "checked",
-    issues: current.flatMap((c) => c.issues),
-    passed: current.flatMap((c) => c.passed),
+    // Products share sentences (a check not run reads the same for each), and
+    // the panel keys rows by their text: one line per sentence.
+    issues: uniqueBy(current.flatMap((c) => c.issues), (i) => i.text),
+    passed: uniqueBy(current.flatMap((c) => c.passed), (t) => t),
   };
+}
+
+function uniqueBy<T>(list: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return list.filter((item) => {
+    const k = key(item);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
