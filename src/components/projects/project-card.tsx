@@ -31,7 +31,6 @@ import { useRouter } from "next/navigation";
 import { CpuIcon, ImageNotFound01Icon, File01Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, StateCard } from "@/components/ideeza";
-import { useMinuteClock } from "@/components/create/build-status";
 import { StatusChip, ShowcaseChip, ICONS } from "./status-chip";
 import { cardText, type ProjectSummary, type CardText, type ListQuery } from "@/lib/manual/project-summary";
 
@@ -82,7 +81,7 @@ function NextActionButton({
       type="button"
       hierarchy="secondary"
       size="md"
-      className="w-full"
+      className="w-full [@container(max-width:559px)]:min-h-[44px]"
       disabled={busy}
       aria-label={action.ariaLabel}
       onClick={() => {
@@ -109,18 +108,14 @@ export function ProjectCard({
   /** The product the search matched when it isn't the first (LST-14). */
   matchedProductName?: string;
   onBeforeNavigate?: () => void;
-  /** Only for the date math in `cardText()` (today's time vs. a bare date).
-   *  Optional: B2's own call — `ProjectCard({ summary, matchedProductName,
-   *  onBeforeNavigate })` — doesn't pass one, so this falls back to its own
-   *  minute clock (the same `useMinuteClock` my-projects.tsx already ticks)
-   *  rather than reading `Date.now()` during render, which React's purity
-   *  rule (react-hooks/purity) forbids. */
-  now?: number;
+  /** The list's minute clock, for the date math in `cardText()` (today's time
+   *  vs. a bare date). One clock for the page, not one per card; render never
+   *  reads `Date.now()` itself (react-hooks/purity). */
+  now: number;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
-  const clock = useMinuteClock();
   const hasCover = Boolean(summary.cover);
-  const text = cardText(summary, now ?? clock);
+  const text = cardText(summary, now);
 
   return (
     <article className="flex h-full flex-col gap-[10px] overflow-hidden rounded-[12px] border border-border bg-bg-surface p-[10px] [@container(min-width:560px)]:gap-0 [@container(min-width:560px)]:p-0">
@@ -239,22 +234,36 @@ export function NoMatchState({
   tabLabel,
   onClearSearch,
   onSearchAll,
+  source,
 }: {
   query: string;
   tabLabel: string;
   onClearSearch: () => void;
   onSearchAll?: () => void;
+  /** With no search text, the Source filter alone emptied the list: name it
+   *  and offer to remove it instead. */
+  source?: { label: string; onClear: () => void };
 }) {
+  const byFilter = !query.trim() && source !== undefined;
   return (
     <StateCard
       tone="empty"
       icon={<Icon icon={Search01Icon} size={32} />}
-      title={`No matches for "${query}"`}
-      body={`Nothing in ${tabLabel} has that in a project or product name or description.`}
+      title={byFilter ? `No projects match “Source: ${source.label}”` : `No matches for "${query}"`}
+      body={
+        byFilter
+          ? `Nothing in ${tabLabel} matches this Source filter.`
+          : `Nothing in ${tabLabel} has that in a project or product name or description.`
+      }
       action={
         <div className="flex flex-wrap items-center justify-center gap-[10px]">
-          <Button type="button" hierarchy="secondary" size="md" onClick={onClearSearch}>
-            Clear search
+          <Button
+            type="button"
+            hierarchy="secondary"
+            size="md"
+            onClick={byFilter ? source.onClear : onClearSearch}
+          >
+            {byFilter ? "Clear filter" : "Clear search"}
           </Button>
           {onSearchAll && (
             <Button type="button" hierarchy="ghost" size="md" onClick={onSearchAll}>

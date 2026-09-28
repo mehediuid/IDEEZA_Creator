@@ -424,13 +424,10 @@ export function MyProjects() {
                 ))}
               </ul>
             ) : result.rows.length === 0 ? (
-              // LST-54 (a typed search came back empty) takes priority over
-              // LST-53 (the outcome tab itself is empty); on the All tab a
-              // narrowed-to-zero result (the Source facet alone, with no
-              // search text) has no tab of its own to name, so it also reads
-              // as a "no match" rather than throwing on EmptyTabState's
-              // Exclude<"all">.
-              view.q.trim() || view.tab === "all" ? (
+              // LST-53 (the outcome tab itself holds nothing) only when the tab's
+              // own count is zero; otherwise the search or the Source filter
+              // emptied it (LST-54), and the state names which one to undo.
+              view.tab === "all" || result.counts[view.tab] > 0 ? (
                 <NoMatchState
                   query={view.q}
                   tabLabel={tabLabel}
@@ -438,7 +435,12 @@ export function MyProjects() {
                     setText("");
                     write({ ...view, q: "", page: 1 });
                   }}
-                  onSearchAll={view.tab !== "all" ? () => changeView({ tab: "all" }) : undefined}
+                  onSearchAll={view.tab !== "all" && view.q.trim() ? () => changeView({ tab: "all" }) : undefined}
+                  source={
+                    view.source !== "any"
+                      ? { label: sourceLabel, onClear: () => changeView({ source: "any" }) }
+                      : undefined
+                  }
                 />
               ) : (
                 <EmptyTabState tab={view.tab as Exclude<ListTab, "all">} />
@@ -454,6 +456,7 @@ export function MyProjects() {
                       <ProjectCard
                         summary={row.summary}
                         matchedProductName={row.via}
+                        now={now}
                         onBeforeNavigate={() => selectProject(row.project.id)}
                       />
                     </li>
