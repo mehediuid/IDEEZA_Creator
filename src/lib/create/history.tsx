@@ -392,7 +392,9 @@ export function allItems(job: BuildJob): BuildItem[] {
 
 /** The products a build covers, primary first. §4.7 opens each into its
  *  own tabs, and §4.4.9 gives each its own badge, so both surfaces walk
- *  this rather than special-casing the primary. */
+ *  this rather than special-casing the primary. The primary carries the
+ *  job's own description, as a companion carries its own (COR-90): without
+ *  it every reader fell back to `summary`, which is the parts line. */
 export function productsOf(job: BuildJob): BuildProduct[] {
   return [
     {
@@ -402,6 +404,7 @@ export function productsOf(job: BuildJob): BuildProduct[] {
       conceptPrompt: job.conceptPrompt,
       title: job.title,
       summary: job.summary,
+      ...(job.description ? { description: job.description } : null),
       parts: job.parts,
       ...(job.spec ? { spec: job.spec } : null),
       items: job.items,
