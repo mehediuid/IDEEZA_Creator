@@ -42,6 +42,7 @@ import { ProjectShell } from "./shell";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
 import { BusinessPlanChip } from "./business-plan-chip";
+import { BuyerRail } from "@/components/marketplace/buyer-rail";
 
 // ─────────────────────────── the slot adapters ───────────────────────────
 
@@ -139,6 +140,13 @@ function ContributorsSlot(props: SlotProps) {
   return <ContributorsTab {...props} />;
 }
 
+// T23's wiring (P2-MARKETPLACE-10, P2-LISTING-21): every viewer but the owner reads
+// the Marketplace block as the read-only buyer rail — facts and "Open in Explore
+// marketplace", never a Buy or Bid button. The owner's card is T22's branch.
+function MarketplaceBuyerSlot(props: SlotProps) {
+  return props.viewer.kind === "local-owner" ? null : <BuyerRail {...props} />;
+}
+
 // ─────────────────────────── the page's composition ───────────────────────────
 
 /** Exported for its `banners`, which the product page shows too, so a preview reads the same
@@ -167,6 +175,7 @@ export const SLOTS: ProjectSlots = {
     customers: CustomersSlot,
   },
   rail: {
+    marketplace: MarketplaceBuyerSlot,
     outcome: OutcomeSlot,
     details: DetailsSlot,
     legal: RailLegal,
