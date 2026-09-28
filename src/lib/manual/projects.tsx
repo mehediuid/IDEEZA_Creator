@@ -19,13 +19,14 @@
 // active selection.
 
 import * as React from "react";
+import { deleteNetwork } from "../network/store";
 import {
   currentWriteError,
   reportWrite,
   subscribeWriteError,
   type WriteError,
 } from "../storage-status";
-import { stampOpened } from "./project-storage";
+import { stampOpened, sweepProjectKeys } from "./project-storage";
 import { productsOf, type BuildJob, type BuildProduct } from "../create/history";
 // project-read.ts imports only types from this file, so this is no runtime cycle.
 import { lineageProjectOf, modelNameOf } from "./project-read";
@@ -766,6 +767,9 @@ type Ctx = {
   /** COR-93: the newest browser write that failed and hasn't saved since,
    *  from this store or the create-history store; null when all went through. */
   writeError: WriteError | null;
+  /** COR-92: removes the record and everything the project keeps in this
+   *  browser (§5.1.9). Callers check deleteBlockOf() first (COR-70). */
+  deleteProject: (id: string) => void;
 };
 
 const ManualProjectsContext = React.createContext<Ctx | null>(null);
@@ -1012,6 +1016,25 @@ export function ManualProjectsProvider({
     });
   }, []);
 
+  // COR-92 — the record, the active selection, this session's build guard
+  // and every key the project keeps in this browser (§5.1.9). Builds keep
+  // their now-dangling projectId, so History drops the link and the build's
+  // review offers Save again (COR-71).
+  const deleteProject = React.useCallback((id: string) => {
+    setProjects((arr) => arr.filter((p) => p.id !== id));
+    setActiveProjectId((cur) => (cur === id ? null : cur));
+    for (const [buildId, made] of builtFrom.current) {
+      if (made.id === id) builtFrom.current.delete(buildId);
+    }
+    if (typeof window === "undefined") return;
+    try {
+      sweepProjectKeys(id, window.localStorage);
+    } catch {
+      // Storage itself is unreachable (blocked site data): nothing to sweep.
+    }
+    deleteNetwork(id);
+  }, []);
+
   const activeProject =
     activeProjectId === null
       ? null
@@ -1040,6 +1063,7 @@ export function ManualProjectsProvider({
     clearActive,
     touchOpened,
     writeError,
+    deleteProject,
   };
 
   return (

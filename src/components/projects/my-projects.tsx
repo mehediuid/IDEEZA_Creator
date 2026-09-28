@@ -30,6 +30,7 @@ import {
   Hexagon01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { ProjectNotice } from "@/components/projects/project-notice";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useCreateHistory } from "@/lib/create/history";
 import { resumeStepOf } from "@/lib/manual/project-read";
@@ -188,6 +189,7 @@ export function MyProjects() {
   return (
     <div className="w-full px-[32px] py-[28px]">
       <StorageErrorBanner className="mb-[16px]" />
+      <ProjectNotice className="mb-[16px]" />
       <header className="mb-[20px]">
         <h1 className="text-xl font-bold tracking-tight text-text-primary">
           My projects
