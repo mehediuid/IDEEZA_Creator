@@ -551,9 +551,12 @@ function ReviewPanel({
 
           {!building && (
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
-            {saved ? (
-              <>
-                <p role="status" className="inline-flex items-center gap-4 text-sm text-text-secondary">
+            {/* One live region for both states, mounted with the footer: a
+                region that appears already holding its words isn't read,
+                so the save is said when this same element's text changes. */}
+            <p role="status" className="inline-flex items-center gap-4 text-sm text-text-secondary">
+              {saved ? (
+                <>
                   <Icon
                     icon={CheckmarkCircle02Icon}
                     size={16}
@@ -563,7 +566,7 @@ function ReviewPanel({
                     Saved to{" "}
                     <Link
                       href={`/projects/${saved.id}`}
-                      className="rounded-sm font-semibold text-text-primary underline decoration-dotted underline-offset-2 outline-none ring-offset-background transition-colors duration-fast hover:text-text-brand focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus"
+                      className="rounded-sm font-semibold text-text-primary underline decoration-dotted underline-offset-2 outline-none ring-offset-bg-surface transition-colors duration-fast hover:text-text-brand focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus"
                     >
                       {saved.name}
                     </Link>
@@ -571,59 +574,60 @@ function ReviewPanel({
                     brief to sell, give or keep it private — or open the
                     project to keep editing.
                   </span>
-                </p>
-                <div className="flex flex-wrap items-center gap-6">
-                  <LeaveButton
-                    tone="primary"
-                    busy={leaving === "brief"}
-                    blocked={leaving !== null}
-                    onClick={openBrief}
-                    icon={ArrowRight02Icon}
-                  >
-                    Add Brief
-                  </LeaveButton>
-                  <LeaveButton
-                    id={OPEN_IN_EDITOR_ID}
-                    tone="quiet"
-                    busy={leaving === "editor"}
-                    blocked={leaving !== null}
-                    onClick={openInEditor}
-                    icon={PencilEdit02Icon}
-                  >
-                    Open in editor
-                  </LeaveButton>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-text-secondary">
+                </>
+              ) : (
+                <span>
                   {pieceCount === ITEM_KINDS.length
                     ? "All five pieces are ready."
                     : `All ${pieceCount} pieces are ready.`}{" "}
                   {unsavedCopy}
-                </p>
-                <div className="flex flex-wrap items-center gap-6">
-                  <button
-                    type="button"
-                    onClick={saveProject}
-                    disabled={leaving !== null}
-                    className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none ring-offset-background transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus disabled:opacity-60"
-                  >
-                    <Icon icon={FloppyDiskIcon} size={18} />
-                    Save Project
-                  </button>
-                  <LeaveButton
-                    id={OPEN_IN_EDITOR_ID}
-                    tone="quiet"
-                    busy={leaving === "editor"}
-                    blocked={leaving !== null}
-                    onClick={openInEditor}
-                    icon={PencilEdit02Icon}
-                  >
-                    Open in editor
-                  </LeaveButton>
-                </div>
-              </>
+                </span>
+              )}
+            </p>
+            {saved ? (
+              <div className="flex flex-wrap items-center gap-6">
+                <LeaveButton
+                  tone="primary"
+                  busy={leaving === "brief"}
+                  blocked={leaving !== null}
+                  onClick={openBrief}
+                  icon={ArrowRight02Icon}
+                >
+                  Add Brief
+                </LeaveButton>
+                <LeaveButton
+                  id={OPEN_IN_EDITOR_ID}
+                  tone="quiet"
+                  busy={leaving === "editor"}
+                  blocked={leaving !== null}
+                  onClick={openInEditor}
+                  icon={PencilEdit02Icon}
+                >
+                  Open in editor
+                </LeaveButton>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-6">
+                <button
+                  type="button"
+                  onClick={saveProject}
+                  disabled={leaving !== null}
+                  className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none ring-offset-bg-surface transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus disabled:opacity-60"
+                >
+                  <Icon icon={FloppyDiskIcon} size={18} />
+                  Save Project
+                </button>
+                <LeaveButton
+                  id={OPEN_IN_EDITOR_ID}
+                  tone="quiet"
+                  busy={leaving === "editor"}
+                  blocked={leaving !== null}
+                  onClick={openInEditor}
+                  icon={PencilEdit02Icon}
+                >
+                  Open in editor
+                </LeaveButton>
+              </div>
             )}
           </footer>
           )}

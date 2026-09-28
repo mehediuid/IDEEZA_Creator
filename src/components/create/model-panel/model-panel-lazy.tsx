@@ -14,14 +14,18 @@ export const ModelPanelLazy = dynamic(
   { ssr: false, loading: () => <ViewerLoading /> },
 );
 
+/** The panel's own frame round a box of its viewer's 522 px (model-panel.tsx),
+ *  so the tab keeps its height when the chunk lands. */
 function ViewerLoading() {
   return (
-    <div
-      role="status"
-      className="flex h-[420px] items-center justify-center gap-4 rounded-xl border border-border bg-bg-subtle text-md text-text-secondary"
-    >
-      <Spinner />
-      Loading the 3D viewer…
+    <div className="rounded-2xl border border-solid border-card-border bg-bg-surface p-7">
+      <div
+        role="status"
+        className="flex h-[522px] items-center justify-center gap-4 rounded-xl border border-solid border-border bg-bg-subtle text-md text-text-secondary"
+      >
+        <Spinner />
+        Loading the 3D viewer…
+      </div>
     </div>
   );
 }

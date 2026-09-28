@@ -77,8 +77,8 @@ export function ProjectInfoModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // When the user picks an existing project, pre-fill description so
-  // they can update it without retyping. Switching back to New clears.
+  // An existing project shows its own description, read-only, for context
+  // (CNT-6: its one home is the project page). New or nothing clears it.
   React.useEffect(() => {
     if (!choice || choice === NEW_SENTINEL) {
       setDescription("");
@@ -91,6 +91,9 @@ export function ProjectInfoModal({
   if (!open) return null;
 
   const isNew = choice === NEW_SENTINEL;
+  // Only a picked project's description is locked: before any choice the
+  // field is simply empty, not "from the project's own page".
+  const locked = choice !== "" && !isNew;
   const canSubmit =
     (isNew && name.trim().length > 0) ||
     (!isNew && choice !== "" && projects.some((p) => p.id === choice));
@@ -213,19 +216,19 @@ export function ProjectInfoModal({
               id="project-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              readOnly={!isNew}
-              aria-readonly={!isNew}
+              readOnly={locked}
+              aria-readonly={locked}
               placeholder="Write description"
               rows={4}
               className={[
                 "w-full resize-y rounded-lg border border-border bg-bg-page px-[14px] py-[12px] text-md leading-relaxed text-text-primary outline-none transition-colors duration-fast placeholder:text-text-tertiary",
-                isNew
-                  ? "hover:border-border-strong focus:border-border-focus focus:bg-bg-surface"
-                  : "cursor-not-allowed text-text-secondary",
+                locked
+                  ? "cursor-not-allowed text-text-secondary"
+                  : "hover:border-border-strong focus:border-border-focus focus:bg-bg-surface",
               ].join(" ")}
             />
-            <p className="mt-[4px] text-2xs text-text-tertiary">
-              {isNew ? "Optional." : "From the project's own page — edit it there."}
+            <p className="mt-[4px] text-sm text-text-tertiary">
+              {locked ? "From the project's own page — edit it there." : "Optional."}
             </p>
           </FieldLabel>
         </div>
@@ -234,7 +237,7 @@ export function ProjectInfoModal({
           <button
             type="submit"
             disabled={!canSubmit}
-            className="inline-flex h-[44px] w-full items-center justify-center gap-[8px] rounded-lg bg-violet-600 text-md font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-[44px] w-full items-center justify-center gap-[8px] rounded-lg bg-bg-brand text-md font-bold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface disabled:cursor-not-allowed disabled:opacity-50"
           >
             Create Project
           </button>
