@@ -93,7 +93,7 @@ export function ProjectShell({
           // A write the browser refused says so first (A7, COR-93), then the
           // Preview-as-buyer banner.
           <>
-            <StorageErrorBanner className="mb-[16px]" />
+            <StorageErrorBanner className="mb-8" />
             {Banner ? <Banner {...props} /> : null}
           </>
         }
