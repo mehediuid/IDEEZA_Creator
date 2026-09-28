@@ -402,7 +402,6 @@ export function lineageProjectOf(job: BuildJob, all: BuildJob[], projects: Manua
 
 // ───────────────────────── log, cover, resume ─────────────────────────
 
-/** The events that aren't versions — saves and builds are in versionsOf() (COR-52, COR-107). */
 /** One event of the rail's Project log (Phase 2 spec §3.3.5). T01 fixes the union; the
  *  producers of the Phase 2 kinds (mint, listing, market, editions, business plan) are T10's. */
 export type ProjectLogEntry =

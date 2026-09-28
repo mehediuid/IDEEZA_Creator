@@ -20,8 +20,10 @@ function priceMicros(price: Amount): bigint {
   return toMicros(price) ?? ZERO;
 }
 
+/** Clamped to 0–10 000 bps (0–100 %), so a payout can never go negative. */
 function bpsOf(bps: number): bigint {
-  return Number.isFinite(bps) && bps > 0 ? BigInt(Math.round(bps)) : ZERO;
+  if (!Number.isFinite(bps) || bps <= 0) return ZERO;
+  return BigInt(Math.min(10_000, Math.round(bps)));
 }
 
 /** The fee on `price`, floored to the micro: ideezaFeeOf("0.05") = "0.00125"; ideezaFeeOf("0.000001") = "0". */

@@ -89,7 +89,9 @@ export function ProjectHeader({
   const second = pair?.second && allowed(pair.second) ? pair.second : null;
   const preview = can(viewer, "preview.enter") && hasAudience(summary.status, summary.showcase);
   // COR-12: a project with a build opens on a sample board all the same.
-  const hint = pair !== null && summary.source.kind !== "hand";
+  // The sample-board hint described the header's Open in editor, which Phase 2
+  // moved to the product page (P2-EDITOR); T12/TB2 delete it outright.
+  const hint = false;
   // A Draft's line is the maker's own workflow ("Brief in progress · …"); a buyer sees the chip alone.
   // A minted line stays — "Listed" never stands without its subline (COR-76).
   const showLine = owner || summary.status !== "draft";
