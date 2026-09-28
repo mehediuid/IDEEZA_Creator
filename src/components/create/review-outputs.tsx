@@ -31,7 +31,7 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { deriveAssembly } from "@/lib/three/assembly";
-import { ModelPanel } from "./model-panel/model-panel";
+import { ModelPanelLazy } from "./model-panel/model-panel-lazy";
 import {
   ITEM_LABELS,
   ITEM_KINDS,
@@ -464,7 +464,7 @@ function ReviewPanel({
               aria-labelledby={`review-tab-${shown}`}
               className="px-10 pb-10"
             >
-              <ModelPanel
+              <ModelPanelLazy
                 key={product.id}
                 assembly={assembly}
                 shellNote={shellNote}

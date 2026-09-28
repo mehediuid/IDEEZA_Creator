@@ -30,10 +30,18 @@ function ToastLayer() {
       {/* At phone width it docks at the foot instead: top-centre it covered
           the menu button and the Canvas/Chat tabs, so nothing could be
           reached until the toast was dismissed. There it shares the foot
-          with a render toast, so it stands on top of one when one is up. */}
+          with a render toast, so it stands on top of one when one is up.
+          From `md` it used to sit at top-16px, which the project page's own
+          header then had to fit under — its title, action pair and Preview
+          as buyer all sit on that same first row (spec §3.3, COR-8), and a
+          two-line attention message reached as far as the button (COR-103,
+          "the attention toast never covers the header primary"). No
+          (create) page has a separate app bar above its own header (the
+          shell is sidebar + `main`, `(create)/layout.tsx`), so 132px clears
+          every page's first row instead of measuring one page at a time. */}
       <div
         id="ideeza-toast-layer"
-        className="pointer-events-none fixed bottom-[16px] left-1/2 z-toast flex -translate-x-1/2 flex-col items-center gap-[8px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] md:bottom-auto md:top-[16px]"
+        className="pointer-events-none fixed bottom-[16px] left-1/2 z-toast flex -translate-x-1/2 flex-col items-center gap-[8px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] md:bottom-auto md:top-[132px]"
       >
         <div
           id="ideeza-toast-layer-attention"

@@ -11,7 +11,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-[0.1px] leading-[16px] transition-[background-color,filter,box-shadow] duration-[var(--motion-duration-fast)] ease-[var(--motion-easing-standard)] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-[0.1px] leading-[16px] transition-[background-color,filter,box-shadow] duration-[var(--motion-duration-fast)] ease-[var(--motion-easing-standard)] cursor-pointer outline-none ring-offset-[var(--color-bg-page)] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
   {
     variants: {
       hierarchy: {
