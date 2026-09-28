@@ -14,7 +14,7 @@ import {
   projectView,
   versionsOf,
 } from "../../.tmp-test/lib/manual/project-read.js";
-import { ALL, DAY, MINT, T, dropsOne, mintedSell } from "./fixtures/projects.mjs";
+import { ALL, DAY, MINT, T, build, dropsOne, mintedSell } from "./fixtures/projects.mjs";
 
 const NOW = T + 10 * DAY;
 const ctxOf = (fx) => ({ builds: fx.builds, chats: fx.chats, brief: fx.draft, videoJobs: [], now: NOW });
@@ -51,6 +51,18 @@ describe("projectView (COR-74)", () => {
       view.summary.products.map((x) => x.name),
       ["RC Car Controller", "Remote Controller", "Battery Charger", "Spare Battery Pack"],
     );
+  });
+  it("with the project list, the page and the card both offer a build whose project is gone (COR-18)", () => {
+    const orphan = build({ id: "b-car-3", chatId: "c-car", title: "RC Car Controller", projectId: "p-deleted", createdAt: T + 6 * DAY });
+    const builds = [...dropsOne.builds, orphan];
+    const ctx = { ...ctxOf(dropsOne), builds, projects: [dropsOne.project] };
+    const view = projectView(dropsOne.project, ctx);
+    assert.deepEqual(view.pending.map((w) => [w.job.id, w.version]), [["b-car-3", 3]]);
+    assert.deepEqual(view.summary.pendingVersion, { buildId: "b-car-3", n: 3, status: "ready" });
+    assert.deepEqual(view.summary, projectSummary(dropsOne.project, { builds, brief: null, videoJobs: [], now: NOW, projects: [dropsOne.project] }));
+    // The same build, its project still here: neither offers it.
+    const kept = projectView(dropsOne.project, { ...ctx, projects: [dropsOne.project, { ...dropsOne.project, id: "p-deleted" }] });
+    assert.deepEqual([kept.pending, kept.summary.pendingVersion], [[], null]);
   });
   it("reads a project minted to sell as Listed and showcased, from its draft and its record", () => {
     const view = projectView(mintedSell.project, ctxOf(mintedSell));

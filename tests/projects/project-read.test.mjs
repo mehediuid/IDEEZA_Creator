@@ -16,6 +16,8 @@ import {
   resumeStepOf,
   versionsOf,
 } from "../../.tmp-test/lib/manual/project-read.js";
+import { STATUS_WORD, projectStatus } from "../../.tmp-test/lib/manual/project-summary.js";
+import { logLinesOf } from "../../.tmp-test/lib/manual/rail-rows.js";
 import {
   DAY,
   MIN,
@@ -348,6 +350,17 @@ describe("pendingVersionsOf (COR-18)", () => {
   it("is empty when nothing newer waits", () => {
     assert.deepEqual(pendingVersionsOf(refsOf(four), four.builds), []);
   });
+  it("counts a build saved into a project that no longer exists — Save would bring it here", () => {
+    const orphan = { ...b4, projectId: "p-deleted" };
+    const all = [...rebuiltTwice.builds, orphan];
+    const refs = buildsOf(rebuiltTwice.project, all);
+    const live = [rebuiltTwice.project, four.project];
+    assert.deepEqual(pendingVersionsOf(refs, all, live).map((w) => [w.job.id, w.version]), [["b-bot-4", 4]]);
+    // Saved into a project that is still here: that project's, not this one's.
+    assert.deepEqual(pendingVersionsOf(refs, all, [...live, project({ id: "p-deleted", name: "Other" })]), []);
+    // Without the project list nothing can be told gone, so nothing is claimed.
+    assert.deepEqual(pendingVersionsOf(refs, all), []);
+  });
 });
 
 describe("lineageProjectOf (COR-89)", () => {
@@ -376,6 +389,20 @@ describe("projectLogOf (COR-52)", () => {
       { kind: "showcased", at: MINT },
       { kind: "minted", at: MINT, intent: "sell", network: "baseSepolia" },
     ]);
+  });
+  it("logs a mint whenever mintedAt is set — one with no intent mints into Private, as projectStatus reads it", () => {
+    const noIntent = { ...mintedSell.draft.state, intent: null };
+    assert.deepEqual(projectLogOf(mintedSell.project, noIntent), [
+      { kind: "showcased", at: MINT },
+      { kind: "minted", at: MINT, intent: "save", network: "baseSepolia" },
+    ]);
+    // Every intent, and none: the log's word is the status chip's word.
+    for (const intent of ["sell", "give", "save", null]) {
+      const draft = { ...mintedSell.draft, state: { ...mintedSell.draft.state, intent } };
+      const minted = projectLogOf(mintedSell.project, draft.state).find((e) => e.kind === "minted");
+      const [line] = logLinesOf([minted]);
+      assert.equal(line.title.split(" · ")[1], STATUS_WORD[projectStatus(mintedSell.project, draft)], String(intent));
+    }
   });
   it("drops the showcase once it stops, and never shows one on a Draft", () => {
     const stopped = { ...mintedSell.project, showcasedAt: null };
