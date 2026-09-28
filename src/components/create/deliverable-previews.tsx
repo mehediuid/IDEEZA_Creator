@@ -20,8 +20,8 @@ import {
   type ArtifactSource,
   type NetWire,
 } from "@/lib/create/build-artifacts";
-import type { ConceptPartCategory } from "@/lib/create/concept";
 import { connectorPartsOf } from "@/lib/create/confidence";
+import { WIRING_ROLES } from "@/lib/pcb/from-build";
 import { batteryOf, isBatteryPart } from "@/lib/spec/batteries";
 import { boardLabel, FAB_PROFILE, mcuOf, needsNoPower, powerLabel, radioOf } from "@/lib/spec/format";
 import { currentLabel, mm3 } from "@/lib/spec/units";
@@ -408,14 +408,8 @@ export function PcbPreview({ job }: { job: ArtifactSource }) {
 
 // ────────────────────────────── wiring ─────────────────────────────
 
-// Left to right, the way current travels: what plugs in, what conditions
-// it, what decides, what it drives.
-const WIRING_ROLES: ConceptPartCategory[][] = [
-  ["Connector & mech"],
-  ["Power Management"],
-  ["Microcontroller"],
-  ["Sensor", "Actuator", "Display & I/O", "Connectivity", "Passive"],
-];
+// Columns left to right by WIRING_ROLES (lib/pcb/from-build.ts), the way
+// current travels — the seeded schematic lays its parts out by the same order.
 
 const WIRE_STROKE: Record<NetWire["cls"], string> = {
   power: "var(--color-text-secondary)",
