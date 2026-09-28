@@ -321,3 +321,128 @@ test("newProductId: prd_ and 8 base-36 characters, never the same twice in 1,000
   assert.equal(ids.size, 1000);
   for (const id of ids) assert.match(id, /^prd_[0-9a-z]{8}$/);
 });
+
+// ── T09: the Phase 2 fields (spec §3.3.5), each through its own normalizer ──
+
+const MINT = {
+  v: 1,
+  demo: true,
+  type: "lazy",
+  network: "baseSepolia",
+  collection: "Test Collection",
+  tokenId: 1,
+  wallet: { account: 1, address: "0x955d2f5d7d1e3a6b0c4f8e2a9b1c3d5e7f90ed95" },
+  at: T,
+  signedAt: T,
+  signature: "0xabc",
+};
+const ANA = { id: "ctb_ana00001", name: "Ana Silva", role: "coOwner", share: 30, addedAt: T };
+const LEE = { id: "ctb_lee00001", name: "Lee Park", role: "viewer", share: 0, addedAt: T, updatedAt: T + 1 };
+const LEGAL = { patent: "US 1,234,567", copyright: { text: "© 2026 Ada", url: "https://ada.test" }, updatedAt: T };
+
+test("a project holding every Phase 2 field, all valid, comes back as the same object", () => {
+  const p = legacy({
+    lastOpened: { step: "code", at: T, productId: "p1" },
+    editorOpened: { p1: { step: "code", at: T } },
+    mint: MINT,
+    contributors: [ANA, LEE],
+    ownerConfirmedAt: T,
+    legal: LEGAL,
+    descriptionHint: { dismissedAt: T, productCount: 3 },
+  });
+  assert.equal(normalizeProjects([p])[0], p);
+  // A stored record in another key order is still the same record.
+  const reordered = legacy({ mint: { tokenId: 1, ...MINT, wallet: { address: MINT.wallet.address, account: 1 } } });
+  assert.equal(normalizeProjects([reordered])[0], reordered);
+});
+
+test("mint: kept through normalizeMintRecord; one whose tokenId is a string is dropped", () => {
+  const [kept, bad, junk] = normalizeProjects([
+    legacy({ id: "a", slug: "a", mint: MINT }),
+    legacy({ id: "b", slug: "b", mint: { ...MINT, tokenId: "1" } }),
+    legacy({ id: "c", slug: "c", mint: "minted" }),
+  ]);
+  assert.deepEqual(kept.mint, MINT);
+  assert.equal("mint" in bad, false);
+  assert.equal("mint" in junk, false);
+  // The rest of the project is untouched.
+  assert.equal(bad.name, "RC Car");
+});
+
+test("contributors: kept through contributorsIn; a share on a viewer is forced to 0; [] stays []", () => {
+  const [a, b, c, d] = normalizeProjects([
+    legacy({ id: "a", slug: "a", contributors: [ANA, { ...LEE, share: 25 }] }),
+    legacy({ id: "b", slug: "b", contributors: [] }),
+    legacy({ id: "c", slug: "c", contributors: [{ name: "No id" }, { ...ANA, share: 12.5 }] }),
+    legacy({ id: "d", slug: "d", contributors: "Ana" }),
+  ]);
+  assert.deepEqual(a.contributors, [ANA, LEE]);
+  // Everyone removed is not the same as nobody ever added.
+  assert.deepEqual(b.contributors, []);
+  assert.equal("contributors" in c, false);
+  assert.equal("contributors" in d, false);
+});
+
+test("editorOpened: an entry with a bad step, a bad time or a bad key is dropped; none left = none", () => {
+  const [a, b] = normalizeProjects([
+    legacy({
+      id: "a",
+      slug: "a",
+      editorOpened: {
+        p1: { step: "wiring", at: T },
+        p2: { step: "brief", at: T }, // the Brief is no editor step
+        p3: { step: "cad", at: T },
+        p4: { step: "pcb", at: "now" },
+        "p:5": { step: "pcb", at: T },
+        p6: "pcb",
+        p7: { step: "code", at: T, extra: 1 },
+      },
+    }),
+    legacy({ id: "b", slug: "b", editorOpened: { p1: { step: "brief", at: T } } }),
+  ]);
+  assert.deepEqual(a.editorOpened, { p1: { step: "wiring", at: T }, p7: { step: "code", at: T } });
+  assert.equal("editorOpened" in b, false);
+});
+
+test("lastOpened: a productId that is a row id is kept; a bad one is dropped and the record stays", () => {
+  const [a, b] = normalizeProjects([
+    legacy({ id: "a", slug: "a", lastOpened: { step: "code", at: T, productId: "prd_b" } }),
+    legacy({ id: "b", slug: "b", lastOpened: { step: "code", at: T, productId: 7 } }),
+  ]);
+  assert.deepEqual(a.lastOpened, { step: "code", at: T, productId: "prd_b" });
+  assert.deepEqual(b.lastOpened, { step: "code", at: T });
+});
+
+test("ownerConfirmedAt, legal and descriptionHint are kept when they parse, dropped when not", () => {
+  const [ok, bad, empty] = normalizeProjects([
+    legacy({ id: "a", slug: "a", ownerConfirmedAt: T, legal: LEGAL, descriptionHint: { dismissedAt: T, productCount: 0 } }),
+    legacy({
+      id: "b",
+      slug: "b",
+      ownerConfirmedAt: "yes",
+      legal: { patent: "US 1", updatedAt: "today" },
+      descriptionHint: { dismissedAt: T, productCount: 2.5 },
+    }),
+    legacy({ id: "c", slug: "c", legal: { patent: "  ", updatedAt: T }, descriptionHint: { productCount: 3 } }),
+  ]);
+  assert.equal(ok.ownerConfirmedAt, T);
+  assert.deepEqual(ok.legal, LEGAL);
+  assert.deepEqual(ok.descriptionHint, { dismissedAt: T, productCount: 0 });
+  for (const p of [bad, empty]) {
+    assert.equal("ownerConfirmedAt" in p, false);
+    assert.equal("legal" in p, false); // all-empty reads as never set
+    assert.equal("descriptionHint" in p, false);
+  }
+});
+
+test("a normalized Phase 2 record is stable: the next load hands back the same object", () => {
+  const once = normalizeProjects([
+    legacy({
+      contributors: [{ ...LEE, share: 25 }],
+      editorOpened: { p1: { step: "pcb", at: T }, p2: { step: "brief", at: T } },
+      mint: { ...MINT, tokenId: "1" },
+    }),
+  ]);
+  assert.equal(normalizeProjects(once)[0], once[0]);
+  assert.deepEqual(normalizeProjects(JSON.parse(JSON.stringify(once))), once);
+});
