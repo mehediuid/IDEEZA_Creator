@@ -15,6 +15,13 @@
 // `view.canCtx`. The build's snapshot is read-only (the build-lock rule); the
 // only way to change a product is its editor, and a project sold in full has
 // none (§3.8.5). `?v=`, `?tab=` and the preview's `?view=` are URL state.
+//
+// In the "market" context (`/marketplace/[id]/products/[productId]`,
+// P2-MARKETPLACE-8, -21) the viewer is the active demo buyer: the breadcrumb
+// starts at Explore marketplace, links keep the `/marketplace` base, the
+// Testnet demo banner leads, a project never listed reads "This project isn't
+// on the marketplace", and the firmware and downloads wait for a holding
+// (`DeliverablesAccess`, from `can(viewer, "deliverables.download", …)`).
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -36,8 +43,11 @@ import { Breadcrumb, type Crumb } from "../details/breadcrumb";
 import { isPreview, previewQuery, useFocusAfterPreview } from "../details/buyer-preview";
 import { ProjectFrame } from "../details/frame";
 import { ProjectNotFound } from "../details/page-states";
+import { DemoBuyerBanner } from "@/components/marketplace/demo-buyer-banner";
+import { NotOnMarketplace } from "@/components/marketplace/market-project-page";
 import { SLOTS as PROJECT_SLOTS } from "../details/project-page";
 import { useProjectPageData, type ProjectPageContext } from "../details/use-project-page-data";
+import { DeliverablesAccess } from "./product-deliverables";
 import { ProductIdentity } from "./product-identity";
 import { ProductRail } from "./product-rail";
 import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
@@ -139,9 +149,11 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   useFocusAfterPreview(viewer !== null && !isPreview(viewer), () => titleRef.current);
 
   if (data.state === "loading") return <ProductLoading />;
-  if (data.state === "missing" || !ready || !project || !view || !viewer) return <ProjectNotFound id={id} />;
-
   const market = context === "market";
+  if (data.state === "missing" || !ready || !project || !view || !viewer) {
+    return market ? <NotOnMarketplace id={id} /> : <ProjectNotFound id={id} />;
+  }
+
   const projectHref = market ? `/marketplace/${project.id}` : `/projects/${project.id}${previewQuery(viewer)}`;
   if (!product) return <ProductMissing projectName={project.name} href={projectHref} />;
 
@@ -171,10 +183,17 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   return (
     <>
       <ProjectFrame
-        // The project page's own banners, each null unless it applies (buyer, contributor).
-        banner={PROJECT_SLOTS.banners?.map((B, i) => (
-          <B key={i} project={project} view={view} viewer={viewer} brief={ready.brief} now={ready.now} announce={announce} />
-        ))}
+        // The project page's own banners, each null unless it applies (buyer, contributor);
+        // Explore marketplace's Testnet demo banner on the buyer view.
+        banner={
+          market ? (
+            <DemoBuyerBanner className="mb-10" />
+          ) : (
+            PROJECT_SLOTS.banners?.map((B, i) => (
+              <B key={i} project={project} view={view} viewer={viewer} brief={ready.brief} now={ready.now} announce={announce} />
+            ))
+          )
+        }
         breadcrumb={<Breadcrumb trail={trail} />}
         main={
           <div className="flex flex-col gap-10">
@@ -259,15 +278,17 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
               <p className="max-w-[68ch] text-md leading-relaxed text-text-primary">{description}</p>
             ) : null}
 
-            <ProductTabs
-              key={`${product.id}:${version?.shown ?? 0}`}
-              slot={slot}
-              job={job}
-              bp={bp}
-              chatHref={ownerFacts && job && chats.some((c) => c.id === job.chatId) ? `/chat/${job.chatId}` : null}
-              asked={query.get("tab")}
-              onTab={(tab) => router.replace(`${pathname}${withQuery(search, { tab })}`, { scroll: false })}
-            />
+            <DeliverablesAccess.Provider value={can(viewer, "deliverables.download", view.canCtx)}>
+              <ProductTabs
+                key={`${product.id}:${version?.shown ?? 0}`}
+                slot={slot}
+                job={job}
+                bp={bp}
+                chatHref={ownerFacts && job && chats.some((c) => c.id === job.chatId) ? `/chat/${job.chatId}` : null}
+                asked={query.get("tab")}
+                onTab={(tab) => router.replace(`${pathname}${withQuery(search, { tab })}`, { scroll: false })}
+              />
+            </DeliverablesAccess.Provider>
           </div>
         }
         rail={<ProductRail slot={slot} />}
