@@ -11,7 +11,9 @@
 // - Every video ready: ★ Relist makes the ONE wallet request (a free
 //   signature, or the network fee for an on-chain listing), and its commit
 //   writes `relistListing` — status live, and a new metadata snapshot of the
-//   project as it is now.
+//   project as it is now. Just before it confirms, the videos and the maker's
+//   share are read again (`sellRecheckOf`): another tab may have changed
+//   either while the listing was paused.
 // - A video missing or still rendering: Relist is aria-disabled ("Finish the
 //   items above to relist."), and pressing it — or "Generate videos" — opens
 //   T14's ReadinessDialog for the relist, whose own "Relist" goes on once the
@@ -21,6 +23,7 @@ import * as React from "react";
 import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner } from "@/components/ideeza";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { listingMetadataOf, type ProjectView } from "@/lib/manual/project-read";
@@ -31,7 +34,7 @@ import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import type { Listing } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 import { ReadinessDialog } from "../details/readiness-dialog";
-import { refusedCopy } from "./listing-dialog";
+import { refusedCopy, sellRecheckOf } from "./listing-dialog";
 
 const FINISH_FIRST = "Finish the items above to relist.";
 
@@ -62,6 +65,12 @@ export function RelistPanel({
   const { projects } = useManualProjects();
   const { writeListings } = useMarket();
   const { request } = useWalletRequest();
+  const { jobs } = useVideoJobs();
+  // The latest records, for a recheck that runs seconds after the press.
+  const latest = React.useRef({ projects, jobs });
+  React.useEffect(() => {
+    latest.current = { projects, jobs };
+  }, [projects, jobs]);
   const [gate, setGate] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -78,11 +87,22 @@ export function RelistPanel({
     setBusy(true);
     const result = await request(relistRequestOf(listing, project.name, changed), {
       recheck: () => {
-        const cur = readMarketNow().listings.find((l) => l.id === listing.id);
-        return cur?.status === "paused" ? null : "This listing isn't paused any more.";
+        const m = readMarketNow();
+        const cur = m.listings.find((l) => l.id === listing.id);
+        if (cur?.status !== "paused") return "This listing isn't paused any more.";
+        const p = latest.current.projects.find((x) => x.id === project.id) ?? project;
+        return sellRecheckOf(p, {
+          view,
+          brief,
+          purpose: "relist",
+          percentSelling: cur.percentSelling,
+          market: m,
+          jobs: latest.current.jobs,
+          now: Date.now(),
+        });
       },
       commit: (proof) => {
-        const p = projects.find((x) => x.id === project.id) ?? project;
+        const p = latest.current.projects.find((x) => x.id === project.id) ?? project;
         const next = relistListing(
           readMarketNow().listings,
           listing.id,

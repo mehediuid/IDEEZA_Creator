@@ -10,9 +10,13 @@
 // - The CTA stays focusable while something is missing (aria-disabled), with
 //   the first problem under it; pressing it then shows every message and
 //   moves focus to the first field that needs one (P2-LISTING-5).
-// - Submitting makes ONE wallet request (§3.9). Its `commit` runs inside the
-//   dialog at confirmed: the mint record (when it changes), then the listing
-//   in one write; a refused listing write puts the record back as it was.
+// - Submitting makes ONE wallet request (§3.9). Just before it confirms, the
+//   recheck reads the market, every product's video and the maker's share
+//   fresh (`sellRecheckOf`): another tab may have listed it, dropped a
+//   video or given the share away. Its `commit` runs inside the dialog at
+//   confirmed: the mint record (when it changes; a mint that yields no
+//   record writes nothing), then the listing in one write; a refused listing
+//   write puts the record back as it was.
 //   The collection's token counter moves only for a new mint. The wallet
 //   writes its debit after all of that, last.
 // - Busy: the CTA reads "Listing…" / "Updating…", and the wallet dialog on
@@ -21,6 +25,7 @@
 
 import * as React from "react";
 import { Banner, Button, ModalFrame, Spinner, TestnetDemoBadge } from "@/components/ideeza";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { MintCostRows, WalletFactLine, useMintShortfall } from "@/components/wallet/mint-cost";
 import { useMint } from "@/components/wallet/use-mint";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
@@ -28,8 +33,11 @@ import { estimateGas } from "@/lib/brief/gas";
 import type { Network } from "@/lib/brief/types";
 import { bumpMinted } from "@/lib/brief/wallet";
 import type { StoredDraft } from "@/lib/brief/project-brief";
+import { parseStored, readStoredKey } from "@/lib/key-store";
+import { ownershipOf } from "@/lib/manual/ownership";
 import { listingMetadataOf, type ProjectView } from "@/lib/manual/project-read";
-import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
 import { FEE_LABEL } from "@/lib/market/fee";
 import { createListing, editListing, listingViewOf } from "@/lib/market/listing";
 import {
@@ -54,8 +62,10 @@ import {
   type ListingInput,
 } from "@/lib/market/listing-form";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
-import { randomId } from "@/lib/market/sales";
-import type { Listing, ListingMetadata } from "@/lib/market/types";
+import { mainSalesOf, randomId } from "@/lib/market/sales";
+import type { Listing, ListingMetadata, MarketData } from "@/lib/market/types";
+import type { VideoJob } from "@/lib/video/jobs";
+import { readProjectVideos } from "@/lib/video/store";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import type { RequestResult } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
@@ -64,6 +74,7 @@ import { ListingFields, type ListingField } from "./listing-fields";
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const NETWORK_UNKNOWN = "This mint's network isn't known, so it can't be listed. Check it in the Brief.";
 const GONE = "This project no longer exists.";
+const NO_MINT_RECORD = "This project's mint record is gone, so it can't be minted on chain now. Close this and look again.";
 /** Amount fields show a wrong typed value at once; the rest after they're left (P2-LISTING-5). */
 const AT_ONCE: ReadonlySet<ListingField> = new Set<ListingField>(["price", "minBid", "auctionBuyNow"]);
 const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
@@ -88,6 +99,40 @@ export function refusedCopy(reason: "unreadable" | "conflict" | "storage"): stri
   return STORAGE_FULL;
 }
 
+/**
+ * The last check before a new listing or a relist confirms, read fresh: every
+ * product's video still ready (Sell's rule, P2-VIDEO-13) and the maker still
+ * holding the share it sells (R1-1). Null when both hold.
+ */
+export function sellRecheckOf(
+  p: ManualProject,
+  ctx: {
+    view: ProjectView;
+    brief: StoredDraft | null;
+    purpose: "sell" | "relist";
+    percentSelling: number;
+    market: MarketData;
+    jobs: VideoJob[];
+    now: number;
+  },
+): string | null {
+  const facts = readinessFactsOf(p, ctx.view, ctx.brief, readProjectVideos(p.id), ctx.jobs, ctx.now);
+  const videos = readinessOf(facts, ctx.purpose).rules.find((r) => r.id === "videos");
+  if (videos && !videos.ok) return `A video changed while this was open: ${videos.reason}`;
+  // The co-owners as storage holds them: another tab may have given the share away.
+  const stored = normalizeProjects(parseStored(readStoredKey(PROJECTS_KEY)).value ?? []).find((x) => x.id === p.id);
+  const maker = ownershipOf({
+    createdAt: p.createdAt,
+    contributors: (stored ?? p).contributors ?? [],
+    sales: mainSalesOf(p.id, ctx.market.sales),
+    listedPercent: 0,
+  }).maker;
+  if (ctx.percentSelling <= maker) return null;
+  return maker > 0
+    ? `You hold ${maker}% of this project now, less than the ${ctx.percentSelling}% this listing sells. Close this and lower Percent Selling.`
+    : "You no longer hold any share of this project to sell.";
+}
+
 export type ListingDialogProps = {
   mode: "add" | "edit";
   project: ManualProject;
@@ -107,6 +152,7 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
   const { writeListings } = useMarket();
   const mint = useMint();
   const { request } = useWalletRequest();
+  const { jobs } = useVideoJobs();
   const editing = mode === "edit" && listing ? listing : null;
   const creatorPct = view.ownership.maker;
   const mintStatus = view.mint.status;
@@ -133,9 +179,11 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
 
   // The latest record, for a commit that runs seconds after the press.
   const latest = React.useRef(projects);
+  const latestJobs = React.useRef(jobs);
   React.useEffect(() => {
     latest.current = projects;
-  }, [projects]);
+    latestJobs.current = jobs;
+  }, [projects, jobs]);
   const find = () => latest.current.find((p) => p.id === project.id) ?? null;
 
   const network = input.network;
@@ -185,8 +233,20 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
       // Another tab may have listed it meanwhile (errata 13: the caller gates a new listing).
       recheck: () => {
         const m = readMarketNow();
-        const v = listingViewOf(project.id, { listings: m.listings, sales: m.sales, bids: m.bids, now: Date.now(), current: NO_METADATA });
-        return v.kind === "live" || v.kind === "paused" ? "This project is already on the marketplace." : null;
+        const at = Date.now();
+        const v = listingViewOf(project.id, { listings: m.listings, sales: m.sales, bids: m.bids, now: at, current: NO_METADATA });
+        if (v.kind === "live" || v.kind === "paused") return "This project is already on the marketplace.";
+        const p = find();
+        if (!p) return GONE;
+        return sellRecheckOf(p, {
+          view,
+          brief,
+          purpose: "sell",
+          percentSelling: input.percentSelling ?? 0,
+          market: m,
+          jobs: latestJobs.current,
+          now: at,
+        });
       },
       commit: (proof) => {
         const p = find();
@@ -211,6 +271,8 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
         if (!created.ok) return { ok: false, message: created.reason };
         const prior = p.mint ?? null;
         const record = plan.request ? plan.nextRecord(proof) : null;
+        // A mint that yields no record would list it as minted with nothing behind it.
+        if (plan.request && !record) return { ok: false, conflict: true, message: NO_MINT_RECORD };
         if (record && !setMint(p.id, record)) return { ok: false, message: STORAGE_FULL };
         const w = writeListings(created.listings);
         if (!w.ok) {
