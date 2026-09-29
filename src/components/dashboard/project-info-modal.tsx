@@ -22,6 +22,8 @@
 //                                  and opens its first product's PCB
 //                                  (`editorHref(p, "p1", "pcb")`).
 //
+// A project sold in full is read-only (decision 12), so it isn't offered.
+//
 // Create Project is never silently disabled: a press that can't go ahead
 // says why, under the field that needs it, and focuses it.
 //
@@ -38,6 +40,7 @@ import {
   type DetailsField,
   type ProjectDetailsFieldsHandle,
 } from "@/components/projects/project-details-fields";
+import { lockOfProject } from "@/components/create/save-step";
 import { editorHref, productResumeOf, resumeProductOf } from "@/lib/manual/editor-scope";
 import { checkDescription, checkProjectName } from "@/lib/manual/project-header";
 import {
@@ -46,6 +49,7 @@ import {
   PROJECT_NAME_MAX,
   useManualProjects,
 } from "@/lib/manual/projects";
+import { useMarket } from "@/lib/market/market-store";
 
 const NEW_SENTINEL = "__new__";
 const CHOOSE_FIRST = "Choose a project, or create a new one.";
@@ -65,6 +69,8 @@ export function ProjectInfoModal({
 function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { projects, createProject, selectProject } = useManualProjects();
+  const { data: market } = useMarket();
+  const openable = React.useMemo(() => projects.filter((p) => lockOfProject(p, market) === null), [projects, market]);
 
   const [choice, setChoice] = React.useState<string>("");
   const [name, setName] = React.useState("");
@@ -78,7 +84,7 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
   const choiceMsgId = React.useId();
 
   const isNew = choice === NEW_SENTINEL;
-  const existing = !isNew && choice ? (projects.find((p) => p.id === choice) ?? null) : null;
+  const existing = !isNew && choice ? (openable.find((p) => p.id === choice) ?? null) : null;
   const otherNames = React.useMemo(() => projects.map((p) => p.name), [projects]);
 
   const submit = () => {
@@ -162,9 +168,9 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
                 Choose Project
               </option>
               <option value={NEW_SENTINEL}>Create New Project</option>
-              {projects.length > 0 && (
+              {openable.length > 0 && (
                 <optgroup label="Existing projects">
-                  {projects.map((p) => (
+                  {openable.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} {p.status === "draft" ? "· Draft" : ""}
                     </option>
