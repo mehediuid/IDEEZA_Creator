@@ -124,7 +124,7 @@ export function Drawer({
               type="button"
               onClick={onBack}
               aria-label="Back"
-              className="mt-[2px] inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+              className="mt-[2px] inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
             >
               <Icon icon={ArrowLeft01Icon} size={18} />
             </button>
@@ -143,7 +143,7 @@ export function Drawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+            className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
           >
             <Icon icon={Cancel01Icon} size={18} />
           </button>

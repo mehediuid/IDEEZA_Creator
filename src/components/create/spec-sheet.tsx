@@ -498,8 +498,8 @@ function SheetPanel({
       >
         {product.locked && (
           // Where the sheet starts: this is the build's spec, and where it
-          // changes — one jump to the review's Open in editor, the control
-          // that does it, never a second copy of it here. The sentence and
+          // changes — one jump to the review's Save Project / Open project,
+          // the control that does it, never a second copy of it here. The sentence and
           // the jump under it, as the rail's next step lays its own out; the
           // lock is the card's "Always built" glyph. No rule under it: the
           // Size section's own rule is the one between them.
@@ -511,13 +511,13 @@ function SheetPanel({
               <p>
                 {product.building
                   ? "This is what is being built. Once it is ready, change it in the editor."
-                  : "This is what was built. To change it, open the build in the editor."}
+                  : "This is what was built. To change it, use the build review's Save Project / Open project."}
               </p>
               {onShowEditor && !product.building && (
                 <button
                   type="button"
                   // Named by what it says first (WCAG 2.5.3), then where it goes.
-                  aria-label="Show on canvas — the build's Open in editor"
+                  aria-label="Show on canvas — the build review's Save Project / Open project"
                   className={`-ml-[4px] gap-[4px] ${QUIET_BUTTON}`}
                   onClick={() => {
                     blurInside();
