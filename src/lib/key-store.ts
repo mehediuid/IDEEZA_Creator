@@ -67,6 +67,16 @@ export function parseStored(raw: string | null): { value: unknown; unreadable: b
   }
 }
 
+/** Whether `key` holds something a writer must not overwrite: present, but not
+ *  JSON, or JSON that `readable` rejects. A writer refuses such a key and leaves
+ *  it exactly as it is (errata 37), as the market writers do. */
+export function storedUnreadable(key: string, readable: (value: unknown) => boolean = () => true): boolean {
+  const raw = readStoredKey(key);
+  if (raw === null) return false;
+  const { value, unreadable } = parseStored(raw);
+  return unreadable || !readable(value);
+}
+
 /** The key's raw string, live. `hydrated` is false until the browser's copy
  *  has been read, so a surface never flashes an empty state at stored data. */
 export function useStoredKey(key: string | null): { hydrated: boolean; raw: string | null } {

@@ -13,7 +13,7 @@
 import * as React from "react";
 import { onProjectDeleted } from "./events";
 import { normalizeJourney, JOURNEY_KEY, type Activity, type ProjectJourney } from "./journey";
-import { parseStored, readStoredKey, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
+import { parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 
 // ─────────────────────────── the text ───────────────────────────
 
@@ -25,8 +25,13 @@ export function readJourney(projectId: string): ProjectJourney {
   return decodeJourney(readStoredKey(JOURNEY_KEY(projectId)));
 }
 
+const isJourneyShape = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** Refused (and the key left as it is) when the stored journey can't be read: writing over it
+ *  would lose every entry this browser still holds. */
 export function writeJourney(projectId: string, next: ProjectJourney): WriteResult {
   if (!projectId) return { ok: false };
+  if (storedUnreadable(JOURNEY_KEY(projectId), isJourneyShape)) return { ok: false };
   return writeStoredKey(JOURNEY_KEY(projectId), next);
 }
 

@@ -8,7 +8,7 @@
 // (a version, a section, a pricing tier) and keeps the rest.
 
 import * as React from "react";
-import { parseStored, readStoredKey, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
+import { parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 import {
   BIZPLAN_KEY,
   PLAN_SECTIONS,
@@ -104,9 +104,11 @@ export function readBusinessPlan(projectId: string): BusinessPlan | null {
   return decodeBusinessPlan(readStoredKey(BIZPLAN_KEY(projectId)), projectId);
 }
 
-/** Writes under `projectId`'s key, whatever `next.projectId` says. */
+/** Writes under `projectId`'s key, whatever `next.projectId` says. Refused (and the key left as it
+ *  is) when the stored plan can't be read, so its versions are never overwritten blind. */
 export function writeBusinessPlan(projectId: string, next: BusinessPlan): WriteResult {
   if (!projectId) return { ok: false };
+  if (storedUnreadable(BIZPLAN_KEY(projectId), (v) => normalizePlan(v, projectId) !== null)) return { ok: false };
   return writeStoredKey(BIZPLAN_KEY(projectId), { ...next, projectId });
 }
 

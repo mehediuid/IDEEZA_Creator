@@ -363,3 +363,32 @@ test("parseStored: absent, JSON and not-JSON", () => {
   assert.deepEqual(parseStored("[1]"), { value: [1], unreadable: false });
   assert.deepEqual(parseStored("{x"), { value: undefined, unreadable: true });
 });
+
+test("the journey and business-plan writers refuse a key they couldn't read, and leave it as it is (R2 minor)", async () => {
+  const { writeJourney } = await import("../../.tmp-test/lib/manual/journey-store.js");
+  const { writeBusinessPlan } = await import("../../.tmp-test/lib/manual/business-plan-store.js");
+  const map = new Map();
+  const prev = globalThis.window;
+  const w = new EventTarget();
+  w.localStorage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)) };
+  globalThis.window = w;
+  try {
+    const journey = { v: 1, activities: [] };
+    const plan = { v: 1, projectId: "proj_1", current: 0, versions: [] };
+    assert.equal(writeJourney("proj_1", journey).ok, true, "an absent key is written");
+    assert.equal(writeBusinessPlan("proj_1", plan).ok, true);
+    map.set("ideeza:project:journey:proj_1", "{nope");
+    map.set("ideeza:project:bizplan:proj_1", "{nope");
+    assert.equal(writeJourney("proj_1", journey).ok, false);
+    assert.equal(writeBusinessPlan("proj_1", plan).ok, false);
+    assert.equal(map.get("ideeza:project:journey:proj_1"), "{nope");
+    assert.equal(map.get("ideeza:project:bizplan:proj_1"), "{nope");
+    // JSON that isn't the store's shape is unreadable too: a plan whose version it can't read.
+    map.set("ideeza:project:bizplan:proj_1", JSON.stringify({ v: 9 }));
+    assert.equal(writeBusinessPlan("proj_1", plan).ok, false);
+    map.set("ideeza:project:journey:proj_1", JSON.stringify([1, 2]));
+    assert.equal(writeJourney("proj_1", journey).ok, false);
+  } finally {
+    globalThis.window = prev;
+  }
+});
