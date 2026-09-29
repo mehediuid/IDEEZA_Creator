@@ -77,14 +77,19 @@ test("the tabs come from projectTabsFor, and the strip's divider is never a tab 
   assert.doesNotMatch(strip, /PROJECT_TAB_LABEL/, "the strip takes its labels from the page");
 });
 
-test("the Marketplace block leads the rail, one DOM instance, before the tabs below 1024 px (C21)", () => {
+test("the Marketplace block is second in the DOM, one instance, and grid lines place it from 1024 px (C21)", () => {
   const frame = read(DETAILS + "frame.tsx");
-  assert.match(frame, /export function SplitRail/);
-  assert.match(frame, /order-2[^"]*\[@container\(min-width:1024px\)\]:order-none/);
-  assert.match(frame, /order-3 min-w-0/);
-  assert.match(frame, /order-4 min-w-0/);
+  assert.match(frame, /export function RailRest/);
+  assert.match(frame, /data-rail-lead/);
+  // The Tab order is the phone's reading order: header → Marketplace block → panel → the rest.
+  const split = frame.slice(frame.indexOf("function SplitColumns"));
+  const at = ["{head}", "{lead}", "{main}", "{rest}"].map((part) => split.indexOf(part));
+  assert.ok(at.every((i) => i > -1), "SplitColumns renders all four parts");
+  assert.deepEqual([...at].sort((a, b) => a - b), at, "in DOM order");
+  assert.doesNotMatch(frame, /\border-(\d|none)\b/, "no CSS `order` moves a part away from its DOM place");
   const shell = read(DETAILS + "shell.tsx");
-  assert.match(shell, /<SplitRail label="Project record" lead=/);
+  assert.match(shell, /lead=\{Lead \? <Lead \{\.\.\.props\} \/> : null\}/);
+  assert.match(shell, /<RailRest label="Project record">/);
   assert.match(shell, /RAIL_ORDER\.filter\(\(id\) => id !== "marketplace"\)/);
 });
 
