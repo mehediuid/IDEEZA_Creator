@@ -18,6 +18,16 @@ import { ESTIMATE_NOTE, labelize, provenanceLabel, sectionContextText } from "./
 
 const IMPROVE_CHIPS = ["Make it shorter", "Add more detail", "More formal tone"];
 
+/** Improve's `context`: the section's own text as it stands in the editor —
+ *  what the instruction rewrites — then the earlier sections, for
+ *  consistency. The section API keeps the first 2,000 characters, so its own
+ *  text goes first. */
+function improveContextOf(section: PlanSection, precedingDone: readonly PlanSection[]): string {
+  const own = sectionContextText([{ ...section, state: "done" }]);
+  const earlier = sectionContextText(precedingDone);
+  return [own && `This section, to rewrite:\n${own}`, earlier && `Earlier sections:\n${earlier}`].filter(Boolean).join("\n\n");
+}
+
 function newSectionId(): string {
   return `bps_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -217,17 +227,20 @@ function SectionEditor({
   const [improving, setImproving] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [proposal, setProposal] = React.useState<PlanSection["fields"] | null>(null);
+  const [failed, setFailed] = React.useState(false);
 
   const runImprove = async (instruction: string) => {
     setBusy(true);
+    setFailed(false);
     const fields = await fetchPlanSection({
       prompt: planPrompt,
       section: section.kind === "custom" ? { title: section.title, brief: section.title } : section.kind,
-      context: sectionContextText(precedingDone),
+      context: improveContextOf(section, precedingDone),
       instruction: instruction || "Rewrite this section.",
     });
     setBusy(false);
     if (fields) setProposal(fields);
+    else setFailed(true);
   };
 
   return (
@@ -269,7 +282,16 @@ function SectionEditor({
         {(section.kind === "market" || section.kind === "pricing") && <p className="text-xs text-text-tertiary">{ESTIMATE_NOTE}</p>}
       </div>
 
-      {improving && !proposal && <ImproveBar busy={busy} onImprove={runImprove} onClose={() => setImproving(false)} />}
+      {improving && !proposal && (
+        <>
+          <ImproveBar busy={busy} onImprove={runImprove} onClose={() => setImproving(false)} />
+          {failed && (
+            <p role="status" className="mt-2 text-xs text-text-error">
+              Couldn&apos;t rewrite this section. Try again in a moment.
+            </p>
+          )}
+        </>
+      )}
 
       {proposal && (
         <div className="mt-4 rounded-xl border border-solid border-border-brand bg-bg-brand-subtle p-4">
@@ -426,6 +448,7 @@ export function PlanEditView({
   versionN,
   sections,
   planPrompt,
+  saveBlocked,
   onCancel,
   onSaved,
 }: {
@@ -433,6 +456,8 @@ export function PlanEditView({
   versionN: number;
   sections: readonly PlanSection[];
   planPrompt: string;
+  /** Why the edits can't be saved now — the project was sold in full while editing; null when they can. */
+  saveBlocked?: string | null;
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -456,7 +481,9 @@ export function PlanEditView({
     else onCancel();
   };
 
+  const blockedId = React.useId();
   const save = () => {
+    if (saveBlocked) return;
     saveEditedSections(projectId, versionN, original, draft);
     onSaved();
   };
@@ -469,11 +496,23 @@ export function PlanEditView({
           <Button type="button" hierarchy="secondary" onClick={cancel}>
             Cancel
           </Button>
-          <Button type="button" hierarchy="primary" onClick={save}>
+          <Button
+            type="button"
+            hierarchy="primary"
+            onClick={save}
+            aria-disabled={saveBlocked ? true : undefined}
+            aria-describedby={saveBlocked ? blockedId : undefined}
+            className={saveBlocked ? "cursor-not-allowed opacity-60" : undefined}
+          >
             Save changes
           </Button>
         </div>
       </div>
+      {saveBlocked && (
+        <p id={blockedId} role="status" className="mt-4 text-sm text-text-secondary">
+          {saveBlocked}
+        </p>
+      )}
 
       <AddSectionSlot planPrompt={planPrompt} precedingDone={[]} onAdd={(s) => setDraft((prev) => [s, ...prev])} />
       {draft.map((section, i) => (

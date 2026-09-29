@@ -131,9 +131,12 @@ export function WritingBusinessPlanDialog({ open, onClose, projectId, plan }: { 
         </p>
         <ProgressBar value={pct} label={`${run.next} of ${total} sections`} />
         {current.state === "failed" ? (
-          <Button type="button" hierarchy="secondary" size="sm" className="w-fit" onClick={() => retryPlanSection(projectId, current.id)}>
-            Try again
-          </Button>
+          // A live run is already asking for the next section; the model takes one request at a time.
+          !live && (
+            <Button type="button" hierarchy="secondary" size="sm" className="w-fit" onClick={() => retryPlanSection(projectId, current.id)}>
+              Try again
+            </Button>
+          )
         ) : (
           <p className="text-sm text-text-secondary">About 2–5 minutes. You can close this — writing carries on while IDEEZA is open.</p>
         )}

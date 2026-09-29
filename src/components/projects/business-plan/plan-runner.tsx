@@ -116,6 +116,27 @@ export function sectionAtOrdinal(sections: readonly PlanSection[], ordinal: numb
 
 type Fields = Record<string, string | string[] | PricingTier[]>;
 
+/** The free model serves one request per IP: a section asked for while the
+ *  one before is still being answered upstream (a 45 s timeout doesn't stop
+ *  it there) comes back busy. One wait, then one more try. */
+const BUSY_RETRY_MS = 5_000;
+const BUSY = new Set([429, 503]);
+
+function waitOrAbort(ms: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(false);
+    const timer = window.setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      resolve(false);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export async function fetchPlanSection(args: {
   prompt: string;
   section: SectionKind | { title: string; brief: string };
@@ -123,24 +144,31 @@ export async function fetchPlanSection(args: {
   instruction?: string;
   signal?: AbortSignal;
 }): Promise<Fields | null> {
-  try {
-    const res = await fetch(SECTION_API, {
-      method: "POST",
-      signal: args.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: args.prompt,
-        section: args.section,
-        context: args.context,
-        ...(args.instruction ? { instruction: args.instruction } : null),
-      }),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { fields?: unknown };
-    return body.fields && typeof body.fields === "object" ? (body.fields as Fields) : null;
-  } catch {
-    return null;
+  const body = JSON.stringify({
+    prompt: args.prompt,
+    section: args.section,
+    context: args.context,
+    ...(args.instruction ? { instruction: args.instruction } : null),
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(SECTION_API, {
+        method: "POST",
+        signal: args.signal,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (res.ok) {
+        const reply = (await res.json()) as { fields?: unknown };
+        return reply.fields && typeof reply.fields === "object" ? (reply.fields as Fields) : null;
+      }
+      if (!BUSY.has(res.status) || attempt > 0) return null;
+    } catch {
+      return null;
+    }
+    if (!(await waitOrAbort(BUSY_RETRY_MS, args.signal))) return null;
   }
+  return null;
 }
 
 // ─────────────────────────── the store writes ───────────────────────────
@@ -159,12 +187,15 @@ function seedVersion(projectId: string, seed: { version: number; prompt: string;
 
 /** Re-reads before writing, so a concurrent retry (of a different section)
  *  can't be clobbered by a stale in-memory copy — the only guard localStorage
- *  needs against this file's own two call sites racing each other. */
-function mergeSection(projectId: string, version: number, index: number, patch: Partial<PlanSection>, next?: number): void {
+ *  needs against this file's own two call sites racing each other. The
+ *  section is found by its id: the stored list can have lost or moved a
+ *  section since the caller read it, and a position would then name another. */
+function mergeSection(projectId: string, version: number, sectionId: string, patch: Partial<PlanSection>, next?: number): void {
   const plan = readBusinessPlan(projectId);
   if (!plan) return;
   const vi = plan.versions.findIndex((v) => v.n === version);
-  if (vi < 0 || !plan.versions[vi].sections[index]) return;
+  const index = vi < 0 ? -1 : plan.versions[vi].sections.findIndex((s) => s.id === sectionId);
+  if (index < 0) return;
   const sections = plan.versions[vi].sections.slice();
   sections[index] = { ...sections[index], ...patch };
   const versions = plan.versions.slice();
@@ -172,6 +203,10 @@ function mergeSection(projectId: string, version: number, index: number, patch: 
   const run = next !== undefined ? { version, next, startedAt: plan.run?.startedAt ?? Date.now() } : plan.run;
   writeBusinessPlan(projectId, { v: 1, projectId, current: version, versions, ...(run ? { run } : null) });
 }
+
+/** Sections a "Try again" in this tab is writing right now, by id: the run
+ *  neither asks for them a second time nor drops them when it ends. */
+const retrying = new Set<string>();
 
 /** Ends the run: keeps every section that was actually attempted (done or
  *  failed — CNT-67 "Cancel keeps what's written"), drops any never touched,
@@ -182,7 +217,7 @@ function finalizeRun(projectId: string, version: number, stopped: boolean): void
   if (!plan) return;
   const vi = plan.versions.findIndex((v) => v.n === version);
   const built = vi >= 0 ? plan.versions[vi] : null;
-  const kept = (built?.sections ?? []).filter((s) => s.state !== "pending");
+  const kept = (built?.sections ?? []).filter((s) => s.state !== "pending" || retrying.has(s.id));
   if (!kept.length) {
     const versions = plan.versions.filter((v) => v.n !== version);
     const current = versions.length ? Math.max(...versions.map((v) => v.n)) : 0;
@@ -213,14 +248,15 @@ async function driveRun(projectId: string, seed: { version: number; prompt: stri
     if (entry.controller.signal.aborted) break;
     const sec = working[idx];
     if (sec.kind === "custom") continue; // never queued automatically; carried through as-is
+    if (retrying.has(sec.id)) continue; // a Try again is already writing it
     const ordinal = canon.indexOf(idx) + 1;
-    mergeSection(projectId, seed.version, idx, { state: "pending" }, ordinal);
+    mergeSection(projectId, seed.version, sec.id, { state: "pending" }, ordinal);
     const context = sectionContextText(working.filter((s, j) => j < idx));
     const fields = await fetchPlanSection({ prompt: seed.prompt, section: sec.kind, context, signal: entry.controller.signal });
     if (entry.controller.signal.aborted) break;
     const patch: Partial<PlanSection> = fields ? { fields, state: "done" } : { state: "failed" };
     working[idx] = { ...working[idx], ...patch };
-    mergeSection(projectId, seed.version, idx, patch);
+    mergeSection(projectId, seed.version, sec.id, patch);
   }
 
   const reason = entry.reason;
@@ -284,11 +320,13 @@ export function stopPlanRun(projectId: string): void {
   }
 }
 
-/** CNT-68's "Try again", for one section — during a run (the section that
- *  just failed while later ones keep going) or long after one ended. Reads
- *  fresh and writes back through the same re-read-first path the loop uses,
- *  so it can't collide with a run still advancing other sections. */
+/** CNT-68's "Try again", for one section, once no run is live in this tab:
+ *  the model answers one request at a time, so a retry beside a live run
+ *  would only make both fail — the controls offer it only then, and this
+ *  refuses it too. Reads fresh and writes back by the section's id through
+ *  the same re-read-first path the loop uses. */
 export function retryPlanSection(projectId: string, sectionId: string): void {
+  if (runs.has(projectId) || retrying.has(sectionId)) return;
   const plan = readBusinessPlan(projectId);
   if (!plan) return;
   const targetN = plan.run?.version ?? plan.current;
@@ -298,11 +336,13 @@ export function retryPlanSection(projectId: string, sectionId: string): void {
   if (!version || !sec || sec.state !== "failed") return;
   const kind = sec.kind;
   if (kind === "custom") return;
-  mergeSection(projectId, version.n, idx, { state: "pending" });
+  retrying.add(sectionId);
+  mergeSection(projectId, version.n, sectionId, { state: "pending" });
   void (async () => {
     const context = sectionContextText(version.sections.filter((s, j) => j < idx));
     const fields = await fetchPlanSection({ prompt: version.prompt, section: kind, context });
-    mergeSection(projectId, version.n, idx, fields ? { fields, state: "done" } : { state: "failed" });
+    retrying.delete(sectionId);
+    mergeSection(projectId, version.n, sectionId, fields ? { fields, state: "done" } : { state: "failed" });
   })();
 }
 
@@ -387,10 +427,14 @@ export function PlanRunner() {
     () =>
       onPlanCompletion((c) => {
         if (c.kind !== "done") return;
+        // A buyer's view — the preview (`?view=`) or Explore marketplace — shows
+        // none of the owner's notices; the chip says it once the preview ends.
+        if (pathRef.current.startsWith("/marketplace") || new URLSearchParams(window.location.search).has("view")) return;
         const proj = projectsRef.current.find((p) => p.id === c.projectId);
-        const here = [`/projects/${c.projectId}`, proj ? `/projects/${proj.slug}` : null].filter(Boolean).some((p) => pathRef.current === p);
-        if (here) setReady({ projectId: c.projectId, version: c.version });
-        else setToast(c.projectId);
+        const homes = [`/projects/${c.projectId}`, proj ? `/projects/${proj.slug}` : null].filter((p): p is string => p !== null);
+        if (homes.some((p) => pathRef.current === p)) setReady({ projectId: c.projectId, version: c.version });
+        // On the plan page itself the plan is already on screen; "Open" would lead back to it.
+        else if (!homes.some((p) => pathRef.current === `${p}/business-plan`)) setToast(c.projectId);
       }),
     [],
   );
@@ -413,10 +457,19 @@ export function PlanRunner() {
             className="fixed bottom-16 right-16 z-toast flex items-center gap-6 rounded-xl border border-solid border-border bg-bg-surface px-6 py-4 shadow-3"
           >
             <span className="text-sm text-text-primary">Business plan ready</span>
-            <Link href={`/projects/${toast}/business-plan`} className="text-sm font-semibold text-text-brand" onClick={() => setToast(null)}>
+            <Link
+              href={`/projects/${toast}/business-plan`}
+              className="inline-flex min-h-[32px] items-center rounded-md text-sm font-semibold text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
+              onClick={() => setToast(null)}
+            >
               Open
             </Link>
-            <button type="button" aria-label="Dismiss" onClick={() => setToast(null)} className="text-text-tertiary">
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setToast(null)}
+              className="-my-2 -mr-3 inline-flex size-[32px] shrink-0 items-center justify-center rounded-md text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)] [@media(pointer:coarse)]:size-[var(--touch-min)]"
+            >
               <Icon icon={Cancel01Icon} size={14} />
             </button>
           </div>,
