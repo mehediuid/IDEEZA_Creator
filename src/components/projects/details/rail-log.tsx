@@ -24,7 +24,11 @@ import type { SlotProps } from "./slots";
 
 export function RailLog({ view, viewer }: SlotProps) {
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const lines = React.useMemo(() => logLinesOf(view.log, { network: owner }), [view.log, owner]);
+  // The product names let an edition line say which product it is about.
+  const lines = React.useMemo(
+    () => logLinesOf(view.log, { network: owner, products: view.products }),
+    [view.log, owner, view.products],
+  );
   if (lines.length === 0) return null;
   return (
     <RailBlock title="Project log">

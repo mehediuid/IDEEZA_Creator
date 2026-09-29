@@ -52,9 +52,12 @@ import { RailMarketplace } from "./rail-marketplace";
 // ─────────────────────────── the slot adapters ───────────────────────────
 
 // C5's wiring. The page renders only after every store is read, so the tab
-// has no loading state of its own.
-function MediaSlot({ project, view, brief, viewer }: SlotProps) {
-  return <MediaTab project={project} refs={view.refs} draft={brief} viewer={viewer} canCtx={view.canCtx} />;
+// has no loading state of its own. A cover change is said in the page's one
+// live region.
+function MediaSlot({ project, view, brief, viewer, announce }: SlotProps) {
+  return (
+    <MediaTab project={project} refs={view.refs} draft={brief} viewer={viewer} canCtx={view.canCtx} announce={announce} />
+  );
 }
 
 // The header renders the page's own headerParts and actions in its rows (§3.10).

@@ -15,7 +15,10 @@
 // derivation (COR-74); every write is the listing dialogs' own. What changed
 // is said in the page's one polite live region (COR-101), and focus moves to
 // what's next: this block's first control after a write, the header's
-// "Add to marketplace" after Remove.
+// "Add to marketplace" after Remove. Every card carries MARKETPLACE_FOCUS_ID
+// on that first control — on its lead line when it has none (Ended, None) —
+// so a write that changes the card (Close auction → Sold or Ended) still
+// lands the keyboard in the block.
 //
 // T27: the block's tabs are "Main NFT · Physical NFT · Virtual NFT" (Main
 // first and selected); Physical and Virtual are read-only summaries
@@ -74,6 +77,8 @@ const PILL_TONE: Record<PillTone, string> = {
 
 const LINK =
   "inline-flex items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
+/** A card's lead line when it has no control: a focus target, not a Tab stop. */
+const LEAD = "m-0 rounded-sm text-md font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
 
 export function RailMarketplace(props: SlotProps) {
   const { viewer, view } = props;
@@ -121,14 +126,18 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
 
       {card.kind === "none" && (
         <div className="flex flex-col gap-2">
-          <p className="m-0 text-md font-semibold text-text-primary">{card.lines[0]}</p>
+          <p id={MARKETPLACE_FOCUS_ID} tabIndex={-1} className={LEAD}>
+            {card.lines[0]}
+          </p>
           <p className="m-0 text-md leading-relaxed text-text-secondary">{card.lines[1]}</p>
         </div>
       )}
 
       {card.kind === "ended" && (
         <div className="flex flex-col gap-2">
-          <p className="m-0 text-md font-semibold text-text-primary">{card.lead}</p>
+          <p id={MARKETPLACE_FOCUS_ID} tabIndex={-1} className={LEAD}>
+            {card.lead}
+          </p>
           <p className="m-0 text-md text-text-secondary">{card.when}</p>
           <p className="m-0 text-sm text-text-secondary">{card.terms}</p>
         </div>
@@ -197,7 +206,12 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
               primaryClass={PRIMARY}
               onDone={(m) => done(m)}
             >
-              <button type="button" onClick={() => setDialog("edit")} className={cn(button, QUIET)}>
+              <button
+                type="button"
+                id={MARKETPLACE_FOCUS_ID}
+                onClick={() => setDialog("edit")}
+                className={cn(button, QUIET)}
+              >
                 Edit
               </button>
               <button type="button" onClick={() => setDialog("remove")} className={cn(button, QUIET, "text-text-error")}>
@@ -211,7 +225,12 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
       {card.kind === "sold" && (
         <>
           <Facts facts={card.facts} />
-          <Link href={`/projects/${project.id}?tab=customers`} scroll={false} className={LINK}>
+          <Link
+            href={`/projects/${project.id}?tab=customers`}
+            scroll={false}
+            id={MARKETPLACE_FOCUS_ID}
+            className={LINK}
+          >
             See customers
             <Icon icon={ArrowRight01Icon} size={16} />
           </Link>
