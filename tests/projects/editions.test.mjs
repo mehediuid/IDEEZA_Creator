@@ -151,3 +151,134 @@ test("normalizeEditions: drops malformed rows, keeps well-formed ones", () => {
   const badListing = normalizeEditions([trackFixture({ id: "ed_3", listing: { token: "MATIC" } })]);
   assert.deepEqual(badListing, []); // a present-but-broken listing drops the whole row
 });
+
+// ───────────────────────── T27: transitions and views ─────────────────────────
+
+const {
+  addToSupply,
+  checkAddNfts,
+  editionChainOf,
+  editionOffersOf,
+  editionSummaryOf,
+  editTrackListing,
+  listTrack,
+  nextSerialOf,
+  trackCardOf,
+  unlistProjectTracks,
+  unlistTrack,
+  wholeNumberOf,
+} = await import("../../.tmp-test/lib/market/editions.js");
+
+const TERMS = { token: "ETH", regular: "0.01", extended: "0.02", royaltyPct: 5 };
+const unitSale = (trackId, at, serial = 1) => ({
+  id: `sale_${trackId}${serial}`,
+  listingId: trackId,
+  at,
+  item: { nft: "physical", trackId, productId: "prd_1", productName: "Widget", use: "private", tier: "regular", serial },
+});
+
+test("listTrack / editTrackListing / unlistTrack: one track changes, the rest stay; the wrong state refuses", () => {
+  const tracks = [trackFixture(), trackFixture({ id: "ed_2", use: "commercial" })];
+  const listed = listTrack(tracks, "ed_1", TERMS, 50);
+  assert.deepEqual(listed[0].listing, { ...TERMS, listedAt: 50, updatedAt: 50 });
+  assert.equal(listed[1], tracks[1]);
+  assert.equal(listTrack(listed, "ed_1", TERMS, 60), null); // already listed
+  assert.equal(listTrack(tracks, "ed_x", TERMS, 60), null); // gone
+
+  const edited = editTrackListing(listed, "ed_1", { ...TERMS, regular: "0.015" }, 70);
+  assert.equal(edited[0].listing.regular, "0.015");
+  assert.equal(edited[0].listing.listedAt, 50);
+  assert.equal(edited[0].listing.updatedAt, 70);
+  assert.equal(editTrackListing(tracks, "ed_1", TERMS, 70), null); // not listed
+
+  const removed = unlistTrack(edited, "ed_1");
+  assert.equal(removed[0].listing, null);
+  assert.equal(removed[0].supply.total, 10); // P2-TABS-27 AC3: the supply is kept
+  assert.equal(unlistTrack(removed, "ed_1"), null);
+});
+
+test("addToSupply: 10 + 20 reads 'NFTs sold 0/30' and '+20 new'; a later sale retires the badge (P2-TABS-27 AC1, AC2)", () => {
+  const [t] = addToSupply([trackFixture({ listing: { ...TERMS, listedAt: 1, updatedAt: 1 } })], "ed_1", 20, 100);
+  assert.deepEqual(t.supply, { total: 30, lastAdded: { n: 20, at: 100 } });
+  const fresh = trackCardOf(t, []);
+  assert.equal(fresh.soldLine, "NFTs sold 0/30");
+  assert.equal(fresh.newBadge, "+20 new");
+  // A sale from before the addition doesn't retire it; one after does.
+  assert.equal(trackCardOf(t, [unitSale("ed_1", 50)]).newBadge, "+20 new");
+  const after = trackCardOf(t, [unitSale("ed_1", 150)]);
+  assert.equal(after.soldLine, "NFTs sold 1/30");
+  assert.equal(after.newBadge, null);
+});
+
+test("trackCardOf: sold out at s = t; a sale of another track doesn't count", () => {
+  const t = trackFixture({ supply: { total: 2 } });
+  assert.equal(trackCardOf(t, [unitSale("ed_1", 1, 1), unitSale("ed_2", 1, 1)]).soldLine, "NFTs sold 1/2");
+  const out = trackCardOf(t, [unitSale("ed_1", 1, 1), unitSale("ed_1", 2, 2)]);
+  assert.equal(out.soldOut, true);
+  assert.equal(out.soldLine, "Sold out");
+  assert.equal(nextSerialOf("ed_1", [unitSale("ed_1", 1, 1)]), 2);
+});
+
+test("unlistProjectTracks: removing Main takes every listed track of that project off, supply kept", () => {
+  const tracks = [
+    trackFixture({ listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
+    trackFixture({ id: "ed_2", use: "commercial" }),
+    trackFixture({ id: "ed_3", projectId: "proj_2", listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
+  ];
+  const { tracks: next, removed } = unlistProjectTracks(tracks, "proj_1");
+  assert.equal(removed, 1);
+  assert.equal(next[0].listing, null);
+  assert.equal(next[0].supply.total, 10);
+  assert.notEqual(next[2].listing, null);
+});
+
+test("checkAddNfts and wholeNumberOf", () => {
+  assert.equal(checkAddNfts({ count: 0, confirmed: true }), "Enter a whole number from 1 to 10,000.");
+  assert.equal(checkAddNfts({ count: null, confirmed: true }), "Enter a whole number from 1 to 10,000.");
+  assert.equal(checkAddNfts({ count: 20, confirmed: false }), "Tick the box to add them at the listing's current prices.");
+  assert.equal(checkAddNfts({ count: 20, confirmed: true }), null);
+  assert.equal(wholeNumberOf("20"), 20);
+  assert.equal(wholeNumberOf("1.5"), null);
+  assert.equal(wholeNumberOf(""), null);
+});
+
+test("editionSummaryOf: empty until a track exists; then a row per product and a line per use (P2-TABS-28)", () => {
+  const products = [
+    { id: "prd_1", name: "Controller" },
+    { id: "prd_2", name: "Remote" },
+  ];
+  assert.deepEqual(editionSummaryOf(products, [], [], "physical", { listedOnly: false }), []);
+  const tracks = [trackFixture({ supply: { total: 30 }, listing: { ...TERMS, listedAt: 1, updatedAt: 1 } })];
+  const rows = editionSummaryOf(products, tracks, [], "physical", { listedOnly: false });
+  assert.deepEqual(rows, [
+    { productId: "prd_1", name: "Controller", lines: ["Private use · Listed · 0/30 sold", "Commercial use · Not created"] },
+    { productId: "prd_2", name: "Remote", lines: ["Private use · Not created", "Commercial use · Not created"] },
+  ]);
+  // The preview reads listed lines only.
+  assert.deepEqual(editionSummaryOf(products, tracks, [], "physical", { listedOnly: true }), [
+    { productId: "prd_1", name: "Controller", lines: ["Private use · Listed · 0/30 sold"] },
+  ]);
+  assert.deepEqual(editionSummaryOf(products, tracks, [], "virtual", { listedOnly: false }), []);
+});
+
+test("editionOffersOf: listed tracks only, hidden while Main is paused or removed", () => {
+  const products = [{ id: "prd_1", name: "Controller" }];
+  const tracks = [
+    trackFixture({ id: "ed_c", use: "commercial", listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
+    trackFixture({ id: "ed_p", listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
+    trackFixture({ id: "ed_v", kind: "virtual" }),
+  ];
+  const live = editionOffersOf(products, tracks, { kind: "live" });
+  assert.deepEqual(live[0].tracks.map((t) => t.id), ["ed_p", "ed_c"]);
+  assert.deepEqual(editionOffersOf(products, tracks, { kind: "paused" }), []);
+  assert.deepEqual(editionOffersOf(products, tracks, { kind: "ended", why: "removed" }), []);
+});
+
+test("editionChainOf: the mint record, else the Main listing, else a v1 draft; null without a collection", () => {
+  const rec = { network: "baseSepolia", collection: "Cars" };
+  assert.deepEqual(editionChainOf(rec, { network: "mumbai", collection: "X" }, null), rec);
+  assert.deepEqual(editionChainOf(null, { network: "mumbai", collection: "X" }, null), { network: "mumbai", collection: "X" });
+  assert.deepEqual(editionChainOf(null, null, { network: "mumbai", collection: " Y " }), { network: "mumbai", collection: "Y" });
+  assert.equal(editionChainOf(null, null, { network: "mumbai", collection: "" }), null);
+  assert.equal(editionChainOf(null, null, null), null);
+});

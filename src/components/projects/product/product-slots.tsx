@@ -21,6 +21,7 @@ import { ProductCustomers } from "./product-customers";
 import { ProductActivityChip } from "../details/activity-chip";
 import { ProductContributorsPanel } from "./product-contributors";
 import { ProductMediaPanel } from "./product-media";
+import { EditionBlock } from "../editions/edition-block";
 
 /** What every product slot is rendered with. */
 export type ProductSlotProps = {
@@ -61,13 +62,21 @@ function ContributorsSlot(props: ProductSlotProps) {
   return <ProductContributorsPanel {...props} />;
 }
 
+// T27's wiring (P2-TABS-24…27): the rail's Marketplace block, this product's
+// Physical and Virtual NFT editions.
+function EditionsSlot(props: ProductSlotProps) {
+  return <EditionBlock {...props} />;
+}
+
 export const PRODUCT_SLOTS: ProductSlots = {
   panels: {
     media: ProductMediaPanel,
     contributors: ContributorsSlot,
     customers: CustomersSlot,
   },
-  rail: {},
+  rail: {
+    marketplace: EditionsSlot,
+  },
   headerParts: {
     titleRow: [ActivitySlot],
   },

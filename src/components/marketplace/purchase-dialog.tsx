@@ -20,6 +20,12 @@
 //   listing was just sold." with nothing written (errata 37).
 // - A demo buyer is never the maker (C4); the seller's payout wallet is the
 //   mint record's, and a purchase from it is refused all the same.
+// - A Physical or Virtual NFT (T27, P2-TABS-26) is the same request with the
+//   buyer's tier: Regular (this version only) or Extended (every future
+//   version). Its quote is `purchaseQuote(track, "buyNow", tier, network)` on
+//   the project's own chain (errata 9). `recheck` reads the track fresh — still
+//   listed at the same price, not sold out, and not hidden by a paused or
+//   removed Main listing — and `commit` appends one Sale for the next unit.
 
 import * as React from "react";
 import { estimateGas } from "@/lib/brief/gas";
@@ -28,7 +34,11 @@ import type { ManualProject } from "@/lib/manual/projects";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import { makeSale, purchaseQuote } from "@/lib/market/purchase";
 import { holdingOf } from "@/lib/market/sales";
-import type { Listing, MarketData } from "@/lib/market/types";
+import type { EditionTrack, Listing, MarketData } from "@/lib/market/types";
+import { readEditions } from "@/lib/market/editions-store";
+import { editionChainOf, editionsHiddenWith, KIND_WORD, nextSerialOf, soldOf, USE_WORD } from "@/lib/market/editions";
+import { listingViewOf } from "@/lib/market/listing";
+import { displayProductName } from "@/lib/manual/products-tab-view";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { DEMO_ACCOUNTS, DEMO_BUYERS } from "@/lib/wallet/identities";
 import type { DemoBuyerId, WalletRequest } from "@/lib/wallet/types";
@@ -169,4 +179,147 @@ export function usePurchase({
   );
 
   return { busy, buy };
+}
+
+// ─────────────────────────── a Physical or Virtual NFT (T27) ───────────────────────────
+
+const SOLD_OUT = "These NFTs just sold out.";
+const TRACK_GONE = "The creator took these NFTs off the marketplace.";
+
+export type EditionTier = "regular" | "extended";
+export const TIER_WORD: Record<EditionTier, string> = { regular: "Regular", extended: "Extended" };
+export const TIER_LINE: Record<EditionTier, string> = {
+  regular: "Regular (this version only)",
+  extended: "Extended (includes future versions)",
+};
+
+/** Why a track can't be bought right now, read from the stores as they are. */
+function trackClosedReason(track: EditionTrack, tier: EditionTier, data: MarketData, now: number, price: string): string | null {
+  const cur = readEditions(track.projectId).find((t) => t.id === track.id);
+  if (!cur || !cur.listing) return TRACK_GONE;
+  const main = listingViewOf(track.projectId, {
+    listings: data.listings,
+    sales: data.sales,
+    bids: data.bids,
+    now,
+    current: { name: "", description: "", products: [], cover: null, at: 0 },
+  });
+  if (main.kind === "paused") return PAUSED;
+  if (editionsHiddenWith(main)) return TRACK_GONE;
+  if (soldOf(cur.id, data.sales) >= cur.supply.total) return SOLD_OUT;
+  const nowPrice = tier === "extended" ? cur.listing.extended : cur.listing.regular;
+  if (nowPrice !== price || cur.listing.token !== track.listing?.token) {
+    return `The creator changed the price to ${nowPrice} ${cur.listing.token} — close this and check it again.`;
+  }
+  return null;
+}
+
+export function useEditionPurchase({
+  project,
+  view,
+  buyerId,
+}: {
+  project: ManualProject;
+  view: ProjectView;
+  buyerId: DemoBuyerId;
+}): { busyId: string | null; buy: (track: EditionTrack, tier: EditionTier) => Promise<string | null> } {
+  const { request } = useWalletRequest();
+  const { appendSale } = useMarket();
+  const [busyId, setBusyId] = React.useState<string | null>(null);
+
+  const buy = React.useCallback(
+    async (track: EditionTrack, tier: EditionTier): Promise<string | null> => {
+      const terms = track.listing;
+      const main = view.listing.kind === "none" ? null : view.listing.listing;
+      const chain = editionChainOf(view.mint.record, main, null);
+      // The offers render only with a known chain and a live listing (edition-offers.tsx).
+      if (!terms || !chain) return null;
+      const quote = purchaseQuote(track, "buyNow", tier, chain.network);
+      const gas = estimateGas(chain.network);
+      const name = buyerNameOf(buyerId);
+      const buyerAddress = demoAddress(buyerId);
+      const sellerAddress = sellerAddressOf(view);
+      const productName = displayProductName(view.products.find((p) => p.id === track.productId)?.name ?? "");
+      const what = `${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT`;
+      const serialNow = nextSerialOf(track.id, view.sales);
+      const doneLine = `Purchase successful. ${productName} · ${what} (${TIER_WORD[tier]}) was minted to ${name}'s demo wallet.`;
+
+      const req: WalletRequest = {
+        kind: "transaction",
+        purpose: "purchase",
+        identity: buyerId,
+        network: chain.network,
+        title: "Confirm purchase",
+        summary: [
+          { label: "Product", value: `${productName} · ${project.name}` },
+          { label: "NFT", value: `${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]} · #${serialNow} of ${track.supply.total}` },
+          { label: "Tier", value: TIER_LINE[tier] },
+          { label: "Token", value: "Minted on this sale (lazy mint)" },
+          { label: "Paying from", value: `${name}'s demo wallet · ${shortAddress(buyerAddress)}` },
+        ],
+        note: quote.lines.find((l) => l.startsWith("Includes")) ?? "",
+        doneLine,
+        charge: {
+          network: chain.network,
+          lines: [
+            { coin: terms.token, amount: quote.price },
+            { coin: gas.native, amount: quote.networkFee },
+          ],
+        },
+      };
+
+      setBusyId(track.id);
+      try {
+        const result = await request(req, {
+          recheck: () => {
+            if (buyerAddress.toLowerCase() === sellerAddress.toLowerCase()) return OWN_PROJECT;
+            return trackClosedReason(track, tier, readMarketNow(), Date.now(), quote.price);
+          },
+          commit: (proof) => {
+            const data = readMarketNow();
+            const why = trackClosedReason(track, tier, data, proof.at, quote.price);
+            if (why) return { ok: false, message: why };
+            const sale = makeSale(
+              {
+                listingId: track.id,
+                projectId: project.id,
+                buyerId,
+                buyerAddress: proof.address,
+                sellerAddress,
+                item: {
+                  nft: track.kind,
+                  trackId: track.id,
+                  productId: track.productId,
+                  productName,
+                  use: track.use,
+                  tier,
+                  serial: nextSerialOf(track.id, data.sales),
+                },
+                via: "buyNow",
+                token: terms.token,
+                price: quote.price,
+                royaltiesPct: terms.royaltyPct,
+                network: chain.network,
+                collection: chain.collection,
+              },
+              { sales: data.sales, mint: view.mint, ownership: { creatorPct: view.ownership.maker }, now: proof.at },
+            );
+            if ("ok" in sale) return { ok: false, message: sale.message };
+            const written = appendSale(sale);
+            if (written.ok) return { ok: true };
+            return {
+              ok: false,
+              message: written.reason === "conflict" ? SOLD_OUT : written.reason === "storage" ? STORAGE_FULL : UNREADABLE,
+            };
+          },
+        });
+        return result.ok ? doneLine : null;
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [request, appendSale, project.id, project.name, view, buyerId],
+  );
+
+  return { busyId, buy };
 }
