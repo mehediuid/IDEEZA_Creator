@@ -95,7 +95,7 @@ test("LISTING-5: the buy now price is typed but is 0", () => {
 
 test("LISTING-5: the minimum bid can't be above the buy now price", () => {
   const r = listingProblems(auction({ minBid: "0.5", auctionBuyNow: "0.1" }), ctx());
-  assert.equal(r.fields.minBid, "The minimum bid can't be above the buy now price.");
+  assert.equal(r.fields.minBid, "The minimum bid has to be below the buy now price.");
 });
 
 test("LISTING-5: no end date", () => {
@@ -270,4 +270,33 @@ test("listingSummaryRows: the auction variant says the fee comes from the winnin
   const lines = rows.map((r) => (r.label ? `${r.label} · ${r.value}` : r.value));
   assert.ok(lines.includes("IDEEZA fee (2.5%) · taken from the winning bid"));
   assert.ok(lines.includes("You receive the winning bid minus 2.5%"));
+});
+
+// ── final fix wave: the auction's validation gaps (R1 minor) ──
+
+test("LISTING-5: an auction's Buy now of \".\" is not a price", () => {
+  const r = listingProblems(auction({ auctionBuyNow: "." }), ctx());
+  assert.equal(r.fields.auctionBuyNow, "Enter the buy now price, or leave it empty.");
+  assert.equal(listingProblems(auction({ auctionBuyNow: "abc" }), ctx()).fields.auctionBuyNow, "Enter the buy now price, or leave it empty.");
+});
+
+test("LISTING-5: a minimum bid equal to the Buy now price is refused — every bid would be", () => {
+  const r = listingProblems(auction({ minBid: "0.05", auctionBuyNow: "0.050" }), ctx());
+  assert.equal(r.fields.minBid, "The minimum bid has to be below the buy now price.");
+  assert.equal(listingProblems(auction({ minBid: "0.049", auctionBuyNow: "0.05" }), ctx()).first, null);
+});
+
+test("LISTING-5: a minimum bid of 0 is refused", () => {
+  assert.equal(listingProblems(auction({ minBid: "0" }), ctx()).fields.minBid, "The minimum bid must be above 0.");
+  assert.equal(listingProblems(auction({ minBid: "0.000" }), ctx()).fields.minBid, "The minimum bid must be above 0.");
+});
+
+test("LISTING-5: an end date that doesn't parse is refused, not skipped", () => {
+  assert.equal(listingProblems(auction({ endsAt: "soon" }), ctx()).fields.endsAt, "Set the date the auction ends.");
+});
+
+test("LISTING-5: an edit to the same price, written differently, is still nothing changed", () => {
+  const original = { token: "MATIC", price: "0.05", percentSelling: 10, royaltiesPct: 10, benefits: [] };
+  const r = listingProblems(buyNow({ price: "0.050" }), ctx({ mode: "edit", original }));
+  assert.equal(r.first, "Change the price, the selling percentage, the royalties or a benefit to update.");
 });

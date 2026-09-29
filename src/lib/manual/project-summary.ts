@@ -388,7 +388,9 @@ export function statusLineOf(status: ProjectStatus, f: StatusLineFacts): string 
     return licence ? `${phrase} · given to the community under ${licence.label}` : `${phrase} · given to the community`;
   }
   if (listing.kind === "ended") {
-    if (listing.why === "noBids") return `${phrase} · auction ended with no bids`;
+    if (listing.why === "noBids") {
+      return listing.unpaid ? `${phrase} · auction ended — no bid could be paid` : `${phrase} · auction ended with no bids`;
+    }
     const removed = listing.listing.events.filter((e) => e.kind === "removed").map((e) => e.at);
     const at = listing.listing.endedAt ?? (removed.length ? Math.max(...removed) : listing.listing.updatedAt);
     return `${phrase} · removed from the marketplace ${formatShortDate(at, f.now)}`;

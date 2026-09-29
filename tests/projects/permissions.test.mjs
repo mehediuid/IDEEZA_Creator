@@ -370,3 +370,11 @@ test("commerceOf's outcome and projectStatus() never disagree (§5.1.4; with no 
     assert.equal(projectStatus(p, d), EXPECTED[outcome], `${p.status} · ${JSON.stringify(d?.state.intent)} · ${outcome}`);
   }
 });
+
+test("rule 2 · an auction that has ended asks to be closed, not waited for (R2 minor)", () => {
+  assert.deepEqual(deleteBlockOf({ ...FREE, auction: { endsAt: ENDS, ended: true } }), {
+    id: "auction",
+    reason: "A project in an auction can't be deleted.",
+    detail: `The auction ended on ${formatDate(ENDS)} — close it in the Marketplace block first.`,
+  });
+});

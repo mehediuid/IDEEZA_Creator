@@ -110,7 +110,8 @@ export function makeBid(input: {
   };
 }
 
-export type SettleResult = { kind: "running" } | { kind: "sale"; bid: Bid } | { kind: "noBids" };
+/** `noBids` with `unpaid`: there were bids, but `availableOf` refused every one. */
+export type SettleResult = { kind: "running" } | { kind: "sale"; bid: Bid } | { kind: "noBids"; unpaid?: true };
 
 /** Called by LISTING's Close (P2-MARKETPLACE-17), once the auction has
  *  ended: the highest bid whose wallet still covers it, earliest on a tie.
@@ -126,8 +127,9 @@ export function settleAuction(
 ): SettleResult {
   const endsAt = listing.endsAt ?? now;
   if (now < endsAt) return { kind: "running" };
-  for (const bid of bidsOf(listing.id, bids)) {
+  const ordered = bidsOf(listing.id, bids);
+  for (const bid of ordered) {
     if (availableOf(bid)) return { kind: "sale", bid };
   }
-  return { kind: "noBids" };
+  return ordered.length ? { kind: "noBids", unpaid: true } : { kind: "noBids" };
 }

@@ -293,7 +293,9 @@ const DELETE_RULES: readonly DeleteRule[] = [
     applies: (f) => f.auction !== null,
     block: (f) => ({
       reason: "A project in an auction can't be deleted.",
-      detail: `Close the auction after it ends on ${formatDate(f.auction!.endsAt)}, in the Marketplace block.`,
+      detail: f.auction!.ended
+        ? `The auction ended on ${formatDate(f.auction!.endsAt)} — close it in the Marketplace block first.`
+        : `Close the auction after it ends on ${formatDate(f.auction!.endsAt)}, in the Marketplace block.`,
     }),
   },
   {

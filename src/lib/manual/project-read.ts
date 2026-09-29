@@ -430,7 +430,8 @@ export function lineageProjectOf(job: BuildJob, all: BuildJob[], projects: Manua
 /** A listing's terms as the log names them ("Listed · Buy now · 0.05 MATIC", "Auction started ·
  *  ends Oct 3, 2026 · 2:30 PM"). `projectLogOf` attaches them to each listing event; a listing
  *  event built elsewhere (`listingLogOf` alone) has none and reads its generic line. */
-export type ListingTerms = { type: Listing["type"]; token: Token; price?: Amount; endsAt?: number };
+/** `bids`: how many bids an auction took — a close with some means none could be paid. */
+export type ListingTerms = { type: Listing["type"]; token: Token; price?: Amount; endsAt?: number; bids?: number };
 
 /** One event of the rail's Project log (Phase 2 spec §3.3.5). T01 fixed the union; T10 adds the
  *  optional `terms` on a listing event (above) and produces every kind in `projectLogOf`. */
@@ -535,11 +536,13 @@ export function projectLogOf(p: ManualProject, brief: BriefState | null, facts: 
   const termsOf = new Map<ListingEvent, ListingTerms>();
   for (const l of market.listings) {
     if (l.projectId !== p.id) continue;
+    const bids = l.type === "auction" ? market.bids.filter((b) => b.listingId === l.id).length : 0;
     const terms: ListingTerms = {
       type: l.type,
       token: l.token,
       ...(l.type === "buyNow" && l.price ? { price: l.price } : null),
       ...(typeof l.endsAt === "number" ? { endsAt: l.endsAt } : null),
+      ...(bids ? { bids } : null),
     };
     for (const e of l.events) termsOf.set(e, terms);
   }
@@ -686,7 +689,10 @@ export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "own
       editions: view.sales.length - main.length,
       buyers: new Set(main.map((s) => s.buyerId)).size,
     },
-    auction: live && live.type === "auction" ? { endsAt: live.endsAt ?? live.listedAt } : null,
+    auction:
+      live && live.type === "auction"
+        ? { endsAt: live.endsAt ?? live.listedAt, ...(listing.kind === "live" && listing.auction?.phase === "ended" ? { ended: true } : null) }
+        : null,
     listed: (live !== null && live.type === "buyNow") || listing.kind === "paused",
     otherOwners: otherOwnersOf(view.ownership),
   };

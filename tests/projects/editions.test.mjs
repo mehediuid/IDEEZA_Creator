@@ -294,3 +294,11 @@ test("editionsHiddenWith / editionOffersOf: a project sold in full hides every o
   assert.equal(editionOffersOf(products, tracks, { kind: "sold" }).length, 1);
   assert.deepEqual(editionOffersOf(products, tracks, { kind: "sold" }, true), []);
 });
+
+test("listTrack and editTrackListing store prices in their one written form (§3.1)", () => {
+  const t = trackFixture({ listing: null });
+  const listed = listTrack([t], t.id, { token: "MATIC", regular: "0.010", extended: ".5", royaltyPct: 5 }, 2);
+  assert.deepEqual([listed[0].listing.regular, listed[0].listing.extended], ["0.01", "0.5"]);
+  const edited = editTrackListing(listed, t.id, { token: "MATIC", regular: "1.", extended: "2.000", royaltyPct: 5 }, 3);
+  assert.deepEqual([edited[0].listing.regular, edited[0].listing.extended], ["1", "2"]);
+});

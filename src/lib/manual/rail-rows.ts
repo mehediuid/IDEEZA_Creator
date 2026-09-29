@@ -124,7 +124,7 @@ function listingTitle(event: ListingEvent, terms: ListingTerms | undefined): str
     case "removed":
       return "Removed from the marketplace";
     case "closed":
-      return "Auction ended with no bids";
+      return terms?.bids ? "Auction ended — no bid could be paid" : "Auction ended with no bids";
   }
 }
 

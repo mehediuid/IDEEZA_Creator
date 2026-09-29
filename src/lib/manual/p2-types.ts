@@ -90,7 +90,8 @@ export type DeleteFacts = {
    * which picks "A buyer owns …" over "Buyers own …". Absent reads as one.
    */
   sold: { sharePct: number; editions: number; buyers?: number };
-  auction: { endsAt: number } | null;
+  /** `ended`: past its end and not yet closed. */
+  auction: { endsAt: number; ended?: boolean } | null;
   listed: boolean;
   otherOwners: OtherOwner[];
 };

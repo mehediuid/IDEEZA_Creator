@@ -379,3 +379,23 @@ test("canCtxOf(…, { productId }): an edition of that product lets its holder d
   assert.equal(canCtxOf(v, leo, { productId: "p1" }).holding, true);
   assert.equal(canCtxOf(v, leo, { productId: "p2" }).holding, false);
 });
+
+test("statusLineOf · an auction closed with bids nobody could pay says so, not \"no bids\"", () => {
+  const closed = auction({
+    status: "closed", endedAt: NOW - 60 * MIN, endsAt: NOW - 90 * MIN,
+    events: [{ kind: "listed", at: LISTED }, { kind: "closed", at: NOW - 60 * MIN }],
+  });
+  const m = market({ listings: [closed], bids: [bid("0.04")] });
+  assert.equal(sum(project({ mint: lazy }), SELL, m).statusLine, "Lazy minted Sep 22 · auction ended — no bid could be paid");
+  const log = view(project({ mint: lazy }), SELL, m).log.find((e) => e.kind === "listing" && e.event.kind === "closed");
+  assert.equal(log.terms.bids, 1);
+});
+
+test("deleteFactsOf: an auction past its end, not yet closed, is marked ended", () => {
+  const p = project({ mint: lazy });
+  assert.deepEqual(view(p, SELL, market({ listings: [auction()] })).deleteFacts.auction, { endsAt: NOW + 134 * MIN });
+  assert.deepEqual(view(p, SELL, market({ listings: [auction({ endsAt: NOW - MIN })] })).deleteFacts.auction, {
+    endsAt: NOW - MIN,
+    ended: true,
+  });
+});

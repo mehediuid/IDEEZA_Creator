@@ -7,7 +7,7 @@
 
 import type { Intent, Network } from "../brief/types";
 import { ROYALTY_MAX, ROYALTY_MIN } from "../brief/types";
-import { toMicros } from "../wallet/money";
+import { normalizeAmount, toMicros } from "../wallet/money";
 import type { EditionKind, EditionTrack, EditionUse, Listing, ListingView, Sale } from "./types";
 import { randomId } from "./sales";
 
@@ -221,17 +221,22 @@ function mapTrack(tracks: EditionTrack[], trackId: string, f: (t: EditionTrack) 
   return tracks.map((t, i) => (i === at ? next : t));
 }
 
+/** The terms with each price in its one written form (§3.1: "0.010" → "0.01"). */
+function termsOf(terms: TrackTerms): TrackTerms {
+  return { ...terms, regular: normalizeAmount(terms.regular) ?? terms.regular, extended: normalizeAmount(terms.extended) ?? terms.extended };
+}
+
 /** P2-TABS-26: an unlisted track goes on sale at `terms`. */
 export function listTrack(tracks: EditionTrack[], trackId: string, terms: TrackTerms, now: number): EditionTrack[] | null {
   return mapTrack(tracks, trackId, (t) =>
-    t.listing ? null : { ...t, listing: { ...terms, listedAt: now, updatedAt: now } },
+    t.listing ? null : { ...t, listing: { ...termsOf(terms), listedAt: now, updatedAt: now } },
   );
 }
 
 /** P2-TABS-27 Edit: a listed track's token, prices and royalties; use and supply stay. */
 export function editTrackListing(tracks: EditionTrack[], trackId: string, terms: TrackTerms, now: number): EditionTrack[] | null {
   return mapTrack(tracks, trackId, (t) =>
-    t.listing ? { ...t, listing: { ...terms, listedAt: t.listing.listedAt, updatedAt: now } } : null,
+    t.listing ? { ...t, listing: { ...termsOf(terms), listedAt: t.listing.listedAt, updatedAt: now } } : null,
   );
 }
 
