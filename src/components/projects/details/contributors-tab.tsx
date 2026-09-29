@@ -33,7 +33,7 @@ import type { Contributor } from "@/lib/manual/p2-types";
 import { can } from "@/lib/manual/permissions";
 import { useManualProjects } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
-import { useFocusAfterPreview } from "./buyer-preview";
+import { contributorPreviewEntry, useFocusAfterPreview } from "./buyer-preview";
 import { ContributorDialog } from "./contributor-dialog";
 import { useEnterContributorPreview } from "./contributor-preview-banner";
 import type { SlotProps } from "./slots";
@@ -83,21 +83,23 @@ export function ContributorsTab({ project, view, viewer, announce }: SlotProps) 
   const emptyAddRef = React.useRef<HTMLButtonElement>(null);
   const editRefs = useVariantButtonRefs();
   const previewRefs = useVariantButtonRefs();
-  const lastPreviewed = React.useRef<string | null>(null);
   // Declared before the team-credit early return below (Rules of Hooks).
   const limitId = React.useId();
 
   const enterContributorPreview = useEnterContributorPreview();
-  useFocusAfterPreview(!isPreview(viewer), () => {
-    const id = lastPreviewed.current;
-    return id ? previewRefs.find(id) : null;
-  });
+  // Exit preview hands focus back to the row's "Preview as" that entered it,
+  // and to nothing else: the header's fallback covers a row that's gone.
+  useFocusAfterPreview(
+    !isPreview(viewer),
+    (from) => {
+      const c = contributors.find((x) => from === contributorPreviewEntry(x.id));
+      return c ? previewRefs.find(c.id) : null;
+    },
+    { claims: (from) => contributors.some((c) => from === contributorPreviewEntry(c.id)), fallback: false },
+  );
 
   const openEdit = (c: Contributor) => setDialog({ mode: "edit", contributor: c });
-  const openPreview = (c: Contributor) => {
-    lastPreviewed.current = c.id;
-    enterContributorPreview(c.id);
-  };
+  const openPreview = (c: Contributor) => enterContributorPreview(c.id);
 
   const focusAfterRemoval = (removedId: string) => {
     const ordered = [...contributors].sort((a, b) => a.addedAt - b.addedAt);
