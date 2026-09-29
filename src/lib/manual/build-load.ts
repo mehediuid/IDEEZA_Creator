@@ -77,7 +77,14 @@ export type SeedBackupPrev = {
   seeded: Partial<Record<SeedKey, string>>;
   kept: SeedKey[];
   reports: SeedReports;
+  /** R3-35 addition (optional): `EditorSeed.versions` for these keys. */
+  versions?: SeedVersions;
 };
+
+/** R3-35 addition: the version a document came from, for each key whose
+ *  version isn't the record's `from.version` — after a Load that left some
+ *  documents as they were. An absent key is `from.version`'s. */
+export type SeedVersions = Partial<Record<SeedKey, number>>;
 
 export type EditorSeed = {
   v: 1;
@@ -91,6 +98,8 @@ export type EditorSeed = {
   reports: SeedReports;
   dismissed: SeedEditor[];
   backup: { version: number | null; keys: SeedKey[]; at: number; prev?: SeedBackupPrev } | null;
+  /** R3-35 addition (optional); absent when every document is `from.version`'s. */
+  versions?: SeedVersions;
 };
 
 /** The documents, in the order they're decided, written and listed. */
@@ -105,6 +114,25 @@ export function editorOfKey(key: SeedKey): SeedEditor {
 /** The documents one editor holds. */
 export function keysOfEditor(editor: SeedEditor): SeedKey[] {
   return SEED_KEYS.filter((k) => editorOfKey(k) === editor);
+}
+
+/** The version `key`'s document came from (R3-35). */
+export function versionOfKey(record: Pick<EditorSeed, "from" | "versions">, key: SeedKey): number {
+  return record.versions?.[key] ?? record.from.version;
+}
+
+/** The `versions` a record from version `from` stores: each key whose
+ *  version `of` says differs, or undefined when none does. */
+export function versionsFor(from: number, of: (key: SeedKey) => number): SeedVersions | undefined {
+  const out: SeedVersions = {};
+  for (const k of SEED_KEYS) if (of(k) !== from) out[k] = of(k);
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** The one version all of `keys` came from, or null when they differ. */
+export function sharedVersionOf(record: Pick<EditorSeed, "from" | "versions">, keys: readonly SeedKey[]): number | null {
+  const vs = new Set(keys.map((k) => versionOfKey(record, k)));
+  return vs.size === 1 ? [...vs][0] : null;
 }
 
 // ───────────────────────────── copy ─────────────────────────────
@@ -375,6 +403,13 @@ function keyList(v: unknown): SeedKey[] {
   return Array.isArray(v) ? SEED_KEYS.filter((k) => v.includes(k)) : [];
 }
 
+function versionsOf(v: unknown): SeedVersions | undefined {
+  if (!isRecord(v)) return undefined;
+  const out: SeedVersions = {};
+  for (const k of SEED_KEYS) if (isNum(v[k])) out[k] = v[k] as number;
+  return Object.keys(out).length ? out : undefined;
+}
+
 function reportsOf(v: unknown): SeedReports {
   const out: SeedReports = {};
   if (!isRecord(v)) return out;
@@ -464,16 +499,26 @@ export function normalizeSeed(raw: unknown): EditorSeed | null {
     if (keys.length) {
       const pv = b.prev;
       const pFrom = isRecord(pv) ? fromOf(pv.from) : null;
+      const pVersions = isRecord(pv) ? versionsOf(pv.versions) : undefined;
       backup = {
         version: b.version as number | null,
         keys,
         at: b.at,
         ...(isRecord(pv) && pFrom
-          ? { prev: { from: pFrom, seeded: fingerprintsOf(pv.seeded), kept: keyList(pv.kept), reports: reportsOf(pv.reports) } }
+          ? {
+              prev: {
+                from: pFrom,
+                seeded: fingerprintsOf(pv.seeded),
+                kept: keyList(pv.kept),
+                reports: reportsOf(pv.reports),
+                ...(pVersions ? { versions: pVersions } : {}),
+              },
+            }
           : {}),
       };
     }
   }
+  const versions = versionsOf(v.versions);
   return {
     v: 1,
     from,
@@ -483,6 +528,7 @@ export function normalizeSeed(raw: unknown): EditorSeed | null {
     reports: reportsOf(v.reports),
     dismissed: Array.isArray(v.dismissed) ? SEED_EDITORS.filter((e) => (v as { dismissed: unknown[] }).dismissed.includes(e)) : [],
     backup,
+    ...(versions ? { versions } : {}),
   };
 }
 
@@ -534,7 +580,7 @@ export function loadOfferOf(
         hint = "Holds your earlier work";
         break;
       }
-      if (fingerprintOf(k, raw) !== seededFp) hint = `Changed since version ${record!.from.version}`;
+      if (fingerprintOf(k, raw) !== seededFp) hint = `Changed since version ${versionOfKey(record!, k)}`;
     }
     rows.push({ editor, keys, label, checked: hint === null, hint });
   }
@@ -563,6 +609,23 @@ export type SeedCaption = {
 };
 
 const EDITOR_WORD: Record<SeedEditor, string> = { pcb: "PCB", three: "3D", code: "Code", wiring: "Wiring" };
+const PIECE_OF: Record<SeedEditor, SeedPiece> = { pcb: "board", three: "3D model", code: "firmware", wiring: "wiring parts" };
+
+/** R3-35: "Wiring is still version 1's." for each editor a partial Load
+ *  left on a version older than `rowVersion`, when `rowVersion` has that
+ *  piece to load; none for kept work (its own line says so). */
+function olderLinesOf(record: EditorSeed, rowVersion: number, pieces: readonly SeedPiece[]): string[] {
+  const byVersion = new Map<number, string[]>();
+  for (const e of SEED_EDITORS) {
+    const keys = keysOfEditor(e);
+    if (!pieces.includes(PIECE_OF[e]) || keys.every((k) => record.kept.includes(k))) continue;
+    const v = versionOfKey(record, keys[0]);
+    if (v < rowVersion) (byVersion.get(v) ?? byVersion.set(v, []).get(v)!).push(EDITOR_WORD[e]);
+  }
+  return [...byVersion]
+    .sort(([a], [b]) => a - b)
+    .map(([v, words]) => `${joinList(words)} ${words.length === 1 ? "is" : "are"} still version ${v}'s.`);
+}
 
 /** Where the product's documents came from (P2-BUILDLOAD-13).
  *  `state` is the row's `productsOfProject` state; `rowVersion` the version
@@ -598,13 +661,19 @@ export function seedCaptionOf(
   } else if (record.kept.length) {
     const kept = [...new Set(record.kept.map(editorOfKey))].map((e) => EDITOR_WORD[e]);
     lines.push(
-      anySeeded
-        ? `Loaded from version ${n}. Your earlier ${joinList(kept)} work was kept.`
-        : `Your earlier editor work was kept, so version ${n} isn't loaded.`,
+      [
+        anySeeded
+          ? `Loaded from version ${n}. Your earlier ${joinList(kept)} work was kept.`
+          : `Your earlier editor work was kept, so version ${n} isn't loaded.`,
+        ...olderLinesOf(record, rowVersion, pieces),
+      ].join(" "),
     );
     load = { version: n, label: `Load version ${n}…` };
   } else if (anySeeded) {
-    lines.push(`Loaded from version ${n}.`);
+    const older = olderLinesOf(record, rowVersion, pieces);
+    lines.push([`Loaded from version ${n}.`, ...older].join(" "));
+    // An unticked piece keeps its way to the row's version.
+    if (older.length) load = { version: rowVersion, label: `Load version ${rowVersion}…` };
   } else {
     lines.push(`Version ${n} has no finished pieces to load, so the editor starts from its samples.`);
   }
@@ -762,7 +831,8 @@ export function importNoticeOf<E extends SeedEditor>(
  *  imported — and none when the seed reported nothing for that editor. */
 export function pendingNoticeOf(record: EditorSeed | null, editor: SeedEditor): ImportNotice | null {
   if (!record || record.dismissed.includes(editor)) return null;
-  const n = record.from.version;
+  // Each editor's own version: a partial Load leaves the others as they were.
+  const n = versionOfKey(record, keysOfEditor(editor)[0]);
   switch (editor) {
     case "pcb":
       return record.reports.pcb && !record.kept.includes("pcb") ? pcbNotice(record.reports.pcb, n) : null;
