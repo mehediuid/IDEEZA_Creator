@@ -196,7 +196,7 @@ export function BidCard({
               type="button"
               hierarchy="secondary"
               size="lg"
-              className="h-[44px] w-full border-solid"
+              className="h-[44px] w-full"
               disabled={buyBusy}
               onClick={onBuyNow}
             >

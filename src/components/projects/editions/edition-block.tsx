@@ -59,7 +59,8 @@ import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
 import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
 import type { ProductSlotProps } from "../product/product-slots";
 import { AddNftsDialog } from "./add-nfts-dialog";
-import { CreateDialog, focusSoon, TAP, writeTracks } from "./create-dialog";
+import { focusSoon } from "../listing/listing-dialog";
+import { CreateDialog, TAP, writeTracks } from "./create-dialog";
 import { EditDialog } from "./edit-dialog";
 import { ListDialog } from "./list-dialog";
 

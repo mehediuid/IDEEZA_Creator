@@ -14,18 +14,23 @@
 //   must still be live, unsold and at the same price. The wallet provider
 //   re-checks the funds itself.
 // - `commit` makes the `Sale` (`makeSale`, T04) and appends it (`appendSale`,
-//   T11) — ONE write. Ownership, the lazy mint's settlement, Customers, the
-//   owner's log and both wallets' balances all derive from it. A second Main
-//   sale of the listing comes back `conflict`, and the dialog says "This
-//   listing was just sold." with nothing written (errata 37).
+//   T11) — ONE write, carrying the transaction hash the wallet showed.
+//   Ownership, the lazy mint's settlement, Customers, the owner's log and
+//   both wallets' balances all derive from it. A second Main sale of the
+//   listing comes back `conflict`, and the dialog says "This listing was just
+//   sold." with nothing written (errata 37) and a single Close.
+// - An auction's "Buy now with X" by its own top bidder releases that bid's
+//   hold, so the funds check counts it back in (`releasesHoldOf`).
 // - A demo buyer is never the maker (C4); the seller's payout wallet is the
-//   mint record's, and a purchase from it is refused all the same.
+//   mint record's, else Demo account 1 (`payoutAddressOf`, one rule for a
+//   purchase and an auction's close).
 // - A Physical or Virtual NFT (T27, P2-TABS-26) is the same request with the
 //   buyer's tier: Regular (this version only) or Extended (every future
 //   version). Its quote is `purchaseQuote(track, "buyNow", tier, network)` on
 //   the project's own chain (errata 9). `recheck` reads the track fresh — still
 //   listed at the same price, not sold out, and not hidden by a paused or
-//   removed Main listing — and `commit` appends one Sale for the next unit.
+//   removed Main listing, and the project not sold in full (the lock) — and
+//   `commit` appends one Sale for the next unit.
 
 import * as React from "react";
 import { estimateGas } from "@/lib/brief/gas";
@@ -41,8 +46,9 @@ import { listingViewOf } from "@/lib/market/listing";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { DEMO_ACCOUNTS, DEMO_BUYERS } from "@/lib/wallet/identities";
-import type { DemoBuyerId, WalletRequest } from "@/lib/wallet/types";
+import type { DemoBuyerId, MintRecord, WalletRequest } from "@/lib/wallet/types";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import { lockedNow } from "@/components/video-jobs/video-jobs-provider";
 
 export const JUST_SOLD = "This listing was just sold.";
 const TAKEN_OFF = "The creator took this listing off the marketplace.";
@@ -50,7 +56,7 @@ const PAUSED = "Paused by the creator — it can't be bought right now.";
 const AUCTION_OVER = "The auction ended before you confirmed.";
 const STORAGE_FULL = "Your browser didn't save this purchase — storage is full.";
 const UNREADABLE = "This browser's marketplace records couldn't be read, so the purchase wasn't saved.";
-const OWN_PROJECT = "This demo wallet is the creator's own payout wallet — a project can't be bought by its creator.";
+const SOLD_IN_FULL = "This project was just sold in full, so its NFTs are off the marketplace.";
 
 export function buyerNameOf(id: DemoBuyerId): string {
   return DEMO_BUYERS.find((b) => b.id === id)?.name ?? "Demo buyer";
@@ -67,10 +73,11 @@ export function stillOpenReason(listing: Listing, data: MarketData, now: number,
   return null;
 }
 
-/** The payout wallet the sale pays: the mint record's, else Demo account 1 (the default payout). */
-function sellerAddressOf(view: ProjectView): string {
-  return view.mint.record?.wallet.address ?? DEMO_ACCOUNTS[0].address;
+/** The payout wallet a sale pays: the mint record's, else Demo account 1 (the default payout). */
+export function payoutAddressOf(record: MintRecord | null | undefined): string {
+  return record?.wallet.address ?? DEMO_ACCOUNTS[0].address;
 }
+
 
 export function usePurchase({
   project,
@@ -92,12 +99,13 @@ export function usePurchase({
       const gas = estimateGas(listing.network);
       const name = buyerNameOf(buyerId);
       const buyerAddress = demoAddress(buyerId);
-      const sellerAddress = sellerAddressOf(view);
+      const sellerAddress = payoutAddressOf(view.mint.record);
       const share = listing.percentSelling;
       const lazy = view.mint.status === "lazyMinted";
       const token = view.mint.tokenId !== null ? `Token #${view.mint.tokenId}` : "The token";
       const owned = (holdingOf(project.id, buyerId, view.sales)?.sharePct ?? 0) + share;
-      const doneLine = `Purchase successful. You own ${owned}% of ${project.name}. ${token} ${
+      // The dialog's heading is "Purchase successful"; the page's live region says both.
+      const doneLine = `You own ${owned}% of ${project.name}. ${token} ${
         lazy ? "was minted to" : "moved to"
       } ${name}'s demo wallet.`;
 
@@ -129,8 +137,8 @@ export function usePurchase({
       setBusy(true);
       try {
         const result = await request(req, {
+          releasesHoldOf: via === "auctionBuyNow" ? listing.id : undefined,
           recheck: () => {
-            if (buyerAddress.toLowerCase() === sellerAddress.toLowerCase()) return OWN_PROJECT;
             const data = readMarketNow();
             const why = stillOpenReason(listing, data, Date.now(), via === "auctionBuyNow");
             if (why) return why;
@@ -161,16 +169,17 @@ export function usePurchase({
               },
               { sales: data.sales, mint: view.mint, ownership: { creatorPct: view.ownership.maker }, now: proof.at },
             );
-            if ("ok" in sale) return { ok: false, message: sale.reason === "alreadySold" ? JUST_SOLD : sale.message };
-            const written = appendSale(sale);
+            // A refusal here is the market's (sold, or the share went elsewhere): no retry clears it.
+            if ("ok" in sale) {
+              return { ok: false, conflict: true, message: sale.reason === "alreadySold" ? JUST_SOLD : sale.message };
+            }
+            const written = appendSale({ ...sale, txHash: proof.txHash ?? sale.txHash });
             if (written.ok) return { ok: true };
-            return {
-              ok: false,
-              message: written.reason === "conflict" ? JUST_SOLD : written.reason === "storage" ? STORAGE_FULL : UNREADABLE,
-            };
+            if (written.reason === "conflict") return { ok: false, conflict: true, message: JUST_SOLD };
+            return { ok: false, message: written.reason === "storage" ? STORAGE_FULL : UNREADABLE };
           },
         });
-        return result.ok ? doneLine : null;
+        return result.ok ? `Purchase successful. ${doneLine}` : null;
       } finally {
         setBusy(false);
       }
@@ -194,9 +203,17 @@ export const TIER_LINE: Record<EditionTier, string> = {
 };
 
 /** Why a track can't be bought right now, read from the stores as they are. */
-function trackClosedReason(track: EditionTrack, tier: EditionTier, data: MarketData, now: number, price: string): string | null {
+function trackClosedReason(
+  project: ManualProject,
+  track: EditionTrack,
+  tier: EditionTier,
+  data: MarketData,
+  now: number,
+  price: string,
+): string | null {
   const cur = readEditions(track.projectId).find((t) => t.id === track.id);
   if (!cur || !cur.listing) return TRACK_GONE;
+  if (lockedNow(project, data.sales)) return SOLD_IN_FULL;
   const main = listingViewOf(track.projectId, {
     listings: data.listings,
     sales: data.sales,
@@ -238,11 +255,11 @@ export function useEditionPurchase({
       const gas = estimateGas(chain.network);
       const name = buyerNameOf(buyerId);
       const buyerAddress = demoAddress(buyerId);
-      const sellerAddress = sellerAddressOf(view);
+      const sellerAddress = payoutAddressOf(view.mint.record);
       const productName = displayProductName(view.products.find((p) => p.id === track.productId)?.name ?? "");
       const what = `${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT`;
       const serialNow = nextSerialOf(track.id, view.sales);
-      const doneLine = `Purchase successful. ${productName} · ${what} (${TIER_WORD[tier]}) was minted to ${name}'s demo wallet.`;
+      const doneLine = `${productName} · ${what} (${TIER_WORD[tier]}) was minted to ${name}'s demo wallet.`;
 
       const req: WalletRequest = {
         kind: "transaction",
@@ -271,14 +288,11 @@ export function useEditionPurchase({
       setBusyId(track.id);
       try {
         const result = await request(req, {
-          recheck: () => {
-            if (buyerAddress.toLowerCase() === sellerAddress.toLowerCase()) return OWN_PROJECT;
-            return trackClosedReason(track, tier, readMarketNow(), Date.now(), quote.price);
-          },
+          recheck: () => trackClosedReason(project, track, tier, readMarketNow(), Date.now(), quote.price),
           commit: (proof) => {
             const data = readMarketNow();
-            const why = trackClosedReason(track, tier, data, proof.at, quote.price);
-            if (why) return { ok: false, message: why };
+            const why = trackClosedReason(project, track, tier, data, proof.at, quote.price);
+            if (why) return { ok: false, conflict: true, message: why };
             const sale = makeSale(
               {
                 listingId: track.id,
@@ -304,21 +318,19 @@ export function useEditionPurchase({
               },
               { sales: data.sales, mint: view.mint, ownership: { creatorPct: view.ownership.maker }, now: proof.at },
             );
-            if ("ok" in sale) return { ok: false, message: sale.message };
-            const written = appendSale(sale);
+            if ("ok" in sale) return { ok: false, conflict: true, message: sale.message };
+            const written = appendSale({ ...sale, txHash: proof.txHash ?? sale.txHash });
             if (written.ok) return { ok: true };
-            return {
-              ok: false,
-              message: written.reason === "conflict" ? SOLD_OUT : written.reason === "storage" ? STORAGE_FULL : UNREADABLE,
-            };
+            if (written.reason === "conflict") return { ok: false, conflict: true, message: SOLD_OUT };
+            return { ok: false, message: written.reason === "storage" ? STORAGE_FULL : UNREADABLE };
           },
         });
-        return result.ok ? doneLine : null;
+        return result.ok ? `Purchase successful. ${doneLine}` : null;
       } finally {
         setBusyId(null);
       }
     },
-    [request, appendSale, project.id, project.name, view, buyerId],
+    [request, appendSale, project, view, buyerId],
   );
 
   return { busyId, buy };

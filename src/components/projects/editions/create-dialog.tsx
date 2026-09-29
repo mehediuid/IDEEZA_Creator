@@ -61,17 +61,6 @@ export function failureCopy(result: RequestResult): string | null {
   return result.message || STORAGE_FULL;
 }
 
-/** Focuses `id` once it's on the page — the next render may be the one that draws it. */
-export function focusSoon(id: string, tries = 12): void {
-  const step = (left: number) =>
-    requestAnimationFrame(() => {
-      const el = document.getElementById(id);
-      if (el) el.focus();
-      else if (left > 0) step(left - 1);
-    });
-  step(tries);
-}
-
 /** "Testnet demo — nothing is minted or listed on a real blockchain." with its pill. */
 export function DemoLine() {
   return (
