@@ -98,7 +98,17 @@ function InfoBubble({ label, text }: { label: string; text: string }) {
 
 // ─────────────────────────── ⋮ Actions for {stage} ───────────────────────────
 
-function EntryMenu({ stage, onEdit, onDelete }: { stage: string; onEdit: () => void; onDelete: () => void }) {
+function EntryMenu({
+  activityId,
+  stage,
+  onEdit,
+  onDelete,
+}: {
+  activityId: string;
+  stage: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const [open, setOpen] = React.useState(false);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
@@ -132,6 +142,7 @@ function EntryMenu({ stage, onEdit, onDelete }: { stage: string; onEdit: () => v
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Actions for ${stage}`}
+        data-activity-actions={activityId}
         onClick={() => setOpen((v) => !v)}
         className="inline-flex size-8 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
       >
@@ -159,6 +170,9 @@ function EntryMenu({ stage, onEdit, onDelete }: { stage: string; onEdit: () => v
             type="button"
             role="menuitem"
             onClick={() => {
+              // The item goes with the menu: the keyboard waits on ⋮, which
+              // the drawer hands it back to after the form or the confirm.
+              triggerRef.current?.focus();
               setOpen(false);
               onEdit();
             }}
@@ -170,6 +184,7 @@ function EntryMenu({ stage, onEdit, onDelete }: { stage: string; onEdit: () => v
             type="button"
             role="menuitem"
             onClick={() => {
+              triggerRef.current?.focus();
               setOpen(false);
               onDelete();
             }}
@@ -360,7 +375,7 @@ export function ActivityEntry({
           <h3 className="truncate text-md font-semibold text-text-primary">{title}</h3>
           {help && <InfoBubble label={`What is ${title}?`} text={help} />}
         </div>
-        {canWrite && <EntryMenu stage={title} onEdit={onEdit} onDelete={onDeleteRequest} />}
+        {canWrite && <EntryMenu activityId={activity.id} stage={title} onEdit={onEdit} onDelete={onDeleteRequest} />}
       </div>
 
       <p className="mt-1 text-sm text-text-tertiary">

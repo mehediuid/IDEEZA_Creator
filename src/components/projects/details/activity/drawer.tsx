@@ -25,6 +25,7 @@ import { useMarket } from "@/lib/market/market-store";
 import { useEditions } from "@/lib/market/editions-store";
 import { formatDate } from "@/lib/manual/project-summary";
 import type { ListingMetadata } from "@/lib/market/types";
+import { LinkConfirmDialog } from "../link-confirm";
 import { ActivityForm, ActivityFormFooter } from "./form";
 import { ActivityLightbox } from "./entry";
 import { ActivityTimeline } from "./timeline";
@@ -57,6 +58,12 @@ type Overlay =
   | { kind: "link"; url: string };
 
 const FORM_ID = "activity-form";
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Where the keyboard goes once the drawer's body changes under it: into the
+ *  form it opened, back to the entry's ⋮ it came from, or to Add. */
+type FocusAfter = "form" | "add" | { entry: string };
 
 /** The facts `snapshotPrices` reads: the project's live Main listing and its
  *  live edition tracks. Read once, at save time — an edit never re-snapshots
@@ -119,16 +126,49 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
 
   const entries = activitiesFor(record, { productId: scope?.productId });
 
+  // The control that was pressed leaves with the view it was in (Add goes
+  // with the list, Update with the form), so focus is placed on the next
+  // frame, once the new view is drawn, rather than falling to <body>.
+  const focusAfter = React.useRef<FocusAfter | null>(null);
+  const addRef = React.useRef<HTMLButtonElement>(null);
+  const formRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!focusAfter.current) return;
+    const raf = requestAnimationFrame(() => {
+      const want = focusAfter.current;
+      focusAfter.current = null;
+      const el =
+        want === "form"
+          ? formRef.current?.querySelector<HTMLElement>(FOCUSABLE)
+          : typeof want === "object" && want
+            ? document.querySelector<HTMLElement>(`[data-activity-actions="${CSS.escape(want.entry)}"]`)
+            : null;
+      (el ?? addRef.current)?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [view, overlay]);
+
+  const openForm = (mode: "add" | "edit", entry: Activity | null) => {
+    focusAfter.current = "form";
+    setView({ kind: "form", mode, entry });
+  };
+  const toList = () => {
+    focusAfter.current = view.kind === "form" && view.entry ? { entry: view.entry.id } : "add";
+    setView({ kind: "list" });
+  };
+
   const addActivity = (a: Activity) => write({ ...record, activities: [...record.activities, a] });
   const updateActivity = (a: Activity) => write({ ...record, activities: record.activities.map((x) => (x.id === a.id ? a : x)) });
 
-  const handleSaved = (mode: "add" | "edit") => (stageLabel: string) => {
-    setView({ kind: "list" });
+  const handleSaved = (mode: "add" | "edit", stageLabel: string) => {
+    toList();
     announce(`${stageLabel} ${mode === "add" ? "added to" : "updated in"} your product journey.`);
   };
 
   const handleDelete = async (entry: Activity) => {
     const result = await removeActivity(projectId, entry.id);
+    // Its ⋮ is gone with it.
+    if (result.ok) focusAfter.current = "add";
     setOverlay(null);
     if (result.ok) announce(`${stageTitleOf(entry)} deleted from your product journey.`);
   };
@@ -137,7 +177,9 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
     ? undefined
     : scope
       ? `${scope.productName}'s journey and the whole project's, newest first.`
-      : "Your product journey, newest first. Use ⋮ to edit a stage.";
+      : canWrite
+        ? "Your product journey, newest first. Use ⋮ to edit a stage."
+        : "Your product journey, newest first.";
 
   const title =
     view.kind === "list" ? "Activity History" : view.mode === "add" ? "Add New Activity" : "Edit Activity";
@@ -147,18 +189,19 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
       <Drawer
         open={open}
         onClose={onClose}
-        onBack={view.kind === "form" ? () => setView({ kind: "list" }) : undefined}
+        onBack={view.kind === "form" ? toList : undefined}
         title={title}
         description={view.kind === "list" ? subtitle : undefined}
         covered={overlay !== null}
         pinned={
           view.kind === "list" && canWrite ? (
             <Button
+              ref={addRef}
               type="button"
               hierarchy="primary"
               size="lg"
               className="w-full max-md:min-h-[var(--touch-min)]"
-              onClick={() => setView({ kind: "form", mode: "add", entry: null })}
+              onClick={() => openForm("add", null)}
             >
               + Add New Activity
             </Button>
@@ -166,7 +209,7 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
         }
         footer={
           view.kind === "form" ? (
-            <ActivityFormFooter formId={FORM_ID} mode={view.mode} busy={formBusy} onCancel={() => setView({ kind: "list" })} />
+            <ActivityFormFooter formId={FORM_ID} mode={view.mode} busy={formBusy} onCancel={toList} />
           ) : undefined
         }
       >
@@ -177,24 +220,26 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
             products={products}
             canWrite={canWrite}
             isPreview={isPreview}
-            onEdit={(entry) => setView({ kind: "form", mode: "edit", entry })}
+            onEdit={(entry) => openForm("edit", entry)}
             onDeleteRequest={(entry) => setOverlay({ kind: "delete", entry })}
             onOpenMedia={(media, index) => setOverlay({ kind: "lightbox", media, index })}
             onOpenLink={(url) => setOverlay({ kind: "link", url })}
           />
         ) : (
-          <ActivityForm
-            mode={view.mode}
-            entry={view.entry}
-            projectId={projectId}
-            products={products}
-            defaultProductId={scope?.productId}
-            listingFacts={listingFacts}
-            onSubmit={view.mode === "add" ? addActivity : updateActivity}
-            onSaved={handleSaved(view.mode)}
-            formId={FORM_ID}
-            onBusyChange={setFormBusy}
-          />
+          <div ref={formRef}>
+            <ActivityForm
+              mode={view.mode}
+              entry={view.entry}
+              projectId={projectId}
+              products={products}
+              defaultProductId={scope?.productId}
+              listingFacts={listingFacts}
+              onSubmit={view.mode === "add" ? addActivity : updateActivity}
+              onSaved={(stageLabel) => handleSaved(view.mode, stageLabel)}
+              formId={FORM_ID}
+              onBusyChange={setFormBusy}
+            />
+          </div>
         )}
       </Drawer>
 
@@ -220,21 +265,7 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
         </ConfirmDialog>
       )}
 
-      {overlay?.kind === "link" && (
-        <ConfirmDialog
-          open
-          title="Open this link in a new tab?"
-          confirmLabel="Open link"
-          tone="primary"
-          onConfirm={() => {
-            window.open(overlay.url, "_blank", "noopener");
-            setOverlay(null);
-          }}
-          onCancel={() => setOverlay(null)}
-        >
-          It leaves IDEEZA — only open links you trust.
-        </ConfirmDialog>
-      )}
+      {overlay?.kind === "link" && <LinkConfirmDialog url={overlay.url} onClose={() => setOverlay(null)} />}
     </>
   );
 }

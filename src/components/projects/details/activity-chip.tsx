@@ -10,7 +10,9 @@
 // (project-page.tsx's `headerParts.titleRow`), the second `ProductSlotProps`
 // (product-slots.tsx's). Both read the same journey (T11's `useJourney`) and
 // own the drawer's open state — the chip is a self-contained widget, not
-// something the page has to wire state for.
+// something the page has to wire state for. Writing asks
+// `can(viewer, "activity.write", view.canCtx)`: the lock (decision 12) is the
+// page's one derivation's, never re-derived here.
 
 import * as React from "react";
 import { HelpCircleIcon } from "@hugeicons/core-free-icons";
@@ -19,12 +21,8 @@ import { Badge, Tooltip } from "@/components/ideeza";
 import { activitiesFor } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { isPreview } from "@/lib/manual/buyer-preview";
-import { lockOf } from "@/lib/manual/edit-gate";
-import { ownershipOf } from "@/lib/manual/ownership";
-import { can, type Viewer } from "@/lib/manual/permissions";
+import { can, type CanContext, type Viewer } from "@/lib/manual/permissions";
 import type { ManualProject } from "@/lib/manual/projects";
-import { useMarket } from "@/lib/market/market-store";
-import { mainSalesOf } from "@/lib/market/sales";
 import { cn } from "@/lib/utils";
 import { ActivityDrawer } from "./activity/drawer";
 import type { ProductSlotProps } from "../product/product-slots";
@@ -32,29 +30,6 @@ import type { SlotProps } from "./slots";
 
 const PROJECT_TOOLTIP = "Check and add the current phase and status of this project.";
 const PRODUCT_TOOLTIP = "Check and add the current phase and status of this product.";
-
-// ─────────────────────────── the lock (decision 12) ───────────────────────────
-
-/**
- * Whether `activity.write` is refused because the project is locked (sold in
- * full). A minimal, local read of the same facts T10's `canCtxOf(view)` will
- * eventually derive once it lands (§3.5.10) — `ownershipOf` + `lockOf` (T05,
- * T08), already in this base. `listedPercent: 0` is safe here: the lock only
- * reads `split.maker`, which a live listing's reserved share never changes.
- */
-function useActivityLocked(project: ManualProject): boolean {
-  const { data } = useMarket();
-  return React.useMemo(() => {
-    const sales = mainSalesOf(project.id, data.sales);
-    const split = ownershipOf({
-      createdAt: project.createdAt,
-      contributors: project.contributors ?? [],
-      sales,
-      listedPercent: 0,
-    });
-    return lockOf(split, sales) !== null;
-  }, [project.id, project.createdAt, project.contributors, data.sales]);
-}
 
 // ─────────────────────────── "?" — opens on hover, focus and tap ───────────────────────────
 
@@ -107,7 +82,11 @@ function ActivityChipButton({
     <button
       ref={triggerRef}
       type="button"
-      onClick={onOpen}
+      onClick={(e) => {
+        // Safari doesn't focus a clicked button; the drawer hands focus back to what opened it.
+        e.currentTarget.focus();
+        onOpen();
+      }}
       aria-label={`Activity, ${count} entries — open the activity history`}
       className={cn(
         "inline-flex items-center gap-2 rounded-full border border-solid border-border bg-bg-surface px-4 py-2 text-sm font-medium text-text-secondary outline-none transition-colors duration-fast",
@@ -135,6 +114,7 @@ function ActivityChipWidget({
   productName,
   products,
   viewer,
+  canCtx,
   announce,
   tooltip,
   now,
@@ -144,17 +124,27 @@ function ActivityChipWidget({
   productName?: string;
   products: { id: string; name: string }[];
   viewer: Viewer;
+  /** The page's `view.canCtx` (§3.7). */
+  canCtx: CanContext;
   announce: (message: string) => void;
   tooltip: string;
   now: number;
 }) {
   const { record } = useJourney(project.id);
-  const locked = useActivityLocked(project);
   const [open, setOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   const count = activitiesFor(record, { productId }).length;
-  const canWrite = can(viewer, "activity.write", { locked });
+  const canWrite = can(viewer, "activity.write", canCtx);
+  const close = () => {
+    setOpen(false);
+    // The drawer returns focus to its opener; if that didn't land (the
+    // opener went with a view it was in), the chip takes it.
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (!at || at === document.body) triggerRef.current?.focus();
+    });
+  };
 
   return (
     <div className="flex items-center gap-1">
@@ -162,7 +152,7 @@ function ActivityChipWidget({
       <InfoButton label="What is Activity?" text={tooltip} />
       <ActivityDrawer
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         projectId={project.id}
         scope={productId && productName ? { productId, productName } : undefined}
         products={products}
@@ -184,6 +174,7 @@ export function ProjectActivityChip({ project, view, viewer, announce, now }: Sl
       project={project}
       products={products}
       viewer={viewer}
+      canCtx={view.canCtx}
       announce={announce}
       tooltip={PROJECT_TOOLTIP}
       now={now}
@@ -202,6 +193,7 @@ export function ProductActivityChip({ project, view, product, viewer, announce, 
       productName={product.name}
       products={products}
       viewer={viewer}
+      canCtx={view.canCtx}
       announce={announce}
       tooltip={PRODUCT_TOOLTIP}
       now={now}

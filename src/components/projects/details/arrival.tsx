@@ -4,6 +4,7 @@
 // browser (COR-7, COR-3). The project page and the product page use it.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 /**
  * When `key` changes, which means arriving and not switching tab:
@@ -59,11 +60,20 @@ export function usePageArrival(key: string, name: string, title: string) {
 }
 
 /** The page's one polite live region. It mounts empty, so whatever `announce`
- *  puts in it is a change, and gets read. */
+ *  puts in it is a change, and gets read. A portal to <body>: the Activity
+ *  drawer marks `<main>` inert while it is open, and an inert region is
+ *  silent. */
 export function LiveRegion({ text }: { text: string }) {
-  return (
+  const client = React.useSyncExternalStore(noSubscribe, onClient, onServer);
+  if (!client) return null;
+  return createPortal(
     <p role="status" aria-live="polite" className="sr-only">
       {text}
-    </p>
+    </p>,
+    document.body,
   );
 }
+
+const noSubscribe = () => () => {};
+const onClient = () => true;
+const onServer = () => false;
