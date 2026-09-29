@@ -13,19 +13,15 @@
 //   owner and a contributor, a team credit elsewhere with ≥ 1 contributor;
 //   Customers is the owner's only (§2.3's table).
 // - Panels come from PRODUCT_SLOTS.panels, and a missing panel means a
-//   missing tab — except Media, the one tab every product has: until VIDEO's
-//   panel is in the map it shows the product's concept image (P2-TABS-4).
+//   missing tab; Media, the one tab every product has, is VIDEO's panel.
 // - The ┆ is an `aria-hidden` hairline, never a tab stop; the arrows cross it.
 
 import * as React from "react";
-import { Image02Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { productsOf, type BuildJob, type BuildProduct } from "@/lib/create/history";
+import type { BuildJob, BuildProduct } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { pickProductTab, productTabsOf, type ProductTabId } from "@/lib/manual/product-page";
 import { TabStrip, type TabDef } from "../details/tab-strip";
 import { ProductPiecePanel } from "./product-deliverables";
-import { ConceptImage } from "./product-identity";
 import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
 
 export const PRODUCT_TAB_LABEL: Record<ProductTabId, string> = {
@@ -93,7 +89,7 @@ export function ProductTabs({
   const groups = [tabs.filter((t) => !PEOPLE.has(t)).map(def), tabs.filter((t) => PEOPLE.has(t)).map(def)];
 
   const piece = PIECE[active];
-  const Panel = active === "media" ? (panels.media ?? ProductImages) : PEOPLE.has(active) ? panels[active as "contributors" | "customers"] : undefined;
+  const Panel = active === "media" ? panels.media : PEOPLE.has(active) ? panels[active as "contributors" | "customers"] : undefined;
 
   return (
     <div>
@@ -112,34 +108,5 @@ export function ProductTabs({
         ) : null}
       </div>
     </div>
-  );
-}
-
-/** Media, until VIDEO's `ProductMediaPanel` is in PRODUCT_SLOTS (P2-TABS-4's fallback):
- *  the product's concept image at the version shown, in v1 Media's tile. */
-function ProductImages({ product, version }: ProductSlotProps) {
-  const job = version.build.job;
-  const bp = job && version.productId ? (productsOf(job).find((x) => x.id === version.productId) ?? null) : null;
-  const url = bp?.conceptImageUrl ?? null;
-  return (
-    <section aria-labelledby="product-media-heading" className="flex flex-col gap-8">
-      <h2 id="product-media-heading" className="text-lg font-bold text-text-primary">
-        Media
-      </h2>
-      {url ? (
-        <ul role="list" className="grid grid-cols-2 gap-8 [@container(min-width:640px)]:grid-cols-3">
-          <li>
-            <ConceptImage key={url} src={url} alt={`${product.name} concept image`} className="aspect-square w-full" />
-          </li>
-        </ul>
-      ) : (
-        <p className="flex items-center gap-4 text-md text-text-secondary">
-          <span aria-hidden className="inline-flex text-text-tertiary">
-            <Icon icon={Image02Icon} size={18} />
-          </span>
-          No images for this product yet.
-        </p>
-      )}
-    </section>
   );
 }
