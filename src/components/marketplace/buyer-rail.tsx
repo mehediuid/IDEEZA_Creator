@@ -11,8 +11,8 @@
 //   - a live auction is the Auction card (bid-card.tsx);
 //   - paused, removed, closed with no bids and sold each say so, with no button.
 // - Preview as buyer (`?view=buyer`) and a contributor preview that may see
-//   the listing read the same facts with no button, and a quiet "Open in
-//   Explore marketplace" (preview stays read-only, PPL-6).
+//   the listing read the same facts with no button, the Testnet demo badge,
+//   and a quiet "Open in Explore marketplace" (preview stays read-only, PPL-6).
 // - A project never listed has no block.
 //
 // - Below the Main NFT, the project's listed Physical and Virtual NFTs
@@ -58,8 +58,10 @@ function closedLine(view: ProjectView): { title: string; detail?: string } | nul
   const lv = view.listing;
   if (lv.kind === "paused") return { title: "Paused by the creator — it can't be bought right now." };
   if (lv.kind === "ended") {
-    return lv.why === "removed"
-      ? { title: "The creator took this listing off the marketplace." }
+    if (lv.why === "removed") return { title: "The creator took this listing off the marketplace." };
+    // Closed with bids that nobody could pay is not "no bids".
+    return view.bids.some((b) => b.listingId === lv.listing.id)
+      ? { title: "Ended without a sale: no bid could be paid." }
       : { title: "Ended with no bids." };
   }
   if (lv.kind === "sold") {
@@ -220,6 +222,7 @@ function PreviewBody({
   const facts = <ListingFacts listing={listing} view={view} auction={auction} />;
   return (
     <>
+      <TestnetDemoBadge className="self-start" />
       {closed ? (
         <ClosedLine line={closed} />
       ) : auction ? (
@@ -281,7 +284,8 @@ function BuyerBody({
   const { busy, buy } = usePurchase({ project, view, buyerId });
   const summaryRef = React.useRef<HTMLButtonElement>(null);
   const afterClose = useAfterDialogClose();
-  const holding = holdingOf(project.id, buyerId, view.sales);
+  // The Main share only: Purchased Summary and "Buy another share" are about it, whatever else the buyer holds.
+  const holding = holdingOf(project.id, buyerId, view.sales.filter((s) => s.item.nft === "main"));
   const ctx = view.canCtx;
   const live = view.listing.kind === "live";
   const closed = closedLine(view);

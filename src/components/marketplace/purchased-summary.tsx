@@ -127,7 +127,7 @@ export function PurchasedSummary({
           type="button"
           hierarchy="secondary"
           size="lg"
-          className="h-[44px] w-full border-solid"
+          className="h-[44px] w-full"
           onClick={() => setAsking(true)}
         >
           Get creator support

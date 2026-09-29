@@ -14,10 +14,14 @@
 //   back; it owns no gate and no copy (`request.ts`, `request-view.ts`).
 //
 // Focus: on each phase change focus moves to that phase's primary, or to
-// the body heading when it has none. The body is a polite live region;
-// failed and can't-afford are role=alert. Phases crossfade (200 ms, the
-// `normal` motion token); under reduced motion nothing moves and the
-// spinner and bar are still, with the words unchanged.
+// the body heading when it has none. Review focuses Reject instead, so a
+// second Enter never pays (MARKETPLACE-23), and a failure Try again can't
+// clear (a recheck: just sold, taken off, price changed, auction over,
+// outbid) offers a single, focused Close (MARKETPLACE-14). The body is a
+// polite live region; failed and can't-afford are role=alert. Pending can't
+// be closed: ✕, Escape and the scrim say so instead. Phases crossfade
+// (200 ms, the `normal` motion token); under reduced motion nothing moves
+// and the spinner and bar are still, with the words unchanged.
 //
 // Violet: a request's primary is the brand violet, and the page's own violet
 // is under the scrim, so one is in view. Manage mode, once connected, has no
@@ -76,6 +80,8 @@ export type RequestView = {
   hash: string | null;
   proof: Proof | null;
   canUseLazy: boolean;
+  /** Confirmed, with a wallet write that didn't land. */
+  warning: string | null;
 };
 
 export type RequestActions = {
@@ -143,6 +149,14 @@ function BusyMark() {
       className="inline-block size-[14px] shrink-0 rounded-full border-2 border-solid border-current border-r-transparent motion-safe:animate-spin"
     />
   );
+}
+
+/** The confirmed heading, by what went through (MINT-3's table, MARKETPLACE-14). */
+function confirmedTitleOf(req: WalletRequest, fallback: string): string {
+  if (req.kind !== "transaction") return fallback;
+  if (req.purpose === "purchase") return "Purchase successful";
+  if (req.purpose === "instantMint" || req.purpose === "upgradeMint") return "Minted on chain.";
+  return fallback;
 }
 
 function useMovingFocus(key: string) {
@@ -546,9 +560,15 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
     </h3>
   );
 
-  const primary = (label: string, onPress: () => void, o: { busy?: boolean; unavailable?: boolean } = {}) => (
+  const [nudge, setNudge] = React.useState(0);
+
+  const primary = (
+    label: string,
+    onPress: () => void,
+    o: { busy?: boolean; unavailable?: boolean; noFocus?: boolean } = {},
+  ) => (
     <Button
-      ref={setTarget}
+      ref={o.noFocus ? undefined : setTarget}
       type="button"
       hierarchy="primary"
       size="lg"
@@ -562,8 +582,15 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
       {label}
     </Button>
   );
-  const secondary = (label: string, onPress: () => void) => (
-    <Button type="button" hierarchy="secondary" size="lg" className={TAP} onClick={onPress}>
+  const secondary = (label: string, onPress: () => void, o: { focus?: boolean } = {}) => (
+    <Button
+      ref={o.focus ? setTarget : undefined}
+      type="button"
+      hierarchy="secondary"
+      size="lg"
+      className={TAP}
+      onClick={onPress}
+    >
       {label}
     </Button>
   );
@@ -649,9 +676,12 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
       );
       footer = (
         <>
-          {secondary("Reject", actions.reject)}
+          {secondary("Reject", actions.reject, { focus: true })}
           {short && view.canUseLazy && secondary("Use lazy mint instead", actions.useLazy)}
-          {primary(req.kind === "signature" ? "Sign" : "Confirm and pay", actions.approve, { unavailable: !!short })}
+          {primary(req.kind === "signature" ? "Sign" : "Confirm and pay", actions.approve, {
+            unavailable: !!short,
+            noFocus: true,
+          })}
         </>
       );
       break;
@@ -680,15 +710,22 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
             />
           )}
           <Indeterminate label={copyText.body[0]} />
-          <p className="text-text-tertiary">{copyText.body[1]}</p>
+          {nudge > 0 ? (
+            <p key={nudge} role="alert" className="font-medium text-text-primary">
+              {copyText.body[1]}
+            </p>
+          ) : (
+            <p className="text-text-tertiary">{copyText.body[1]}</p>
+          )}
         </>
       );
       break;
     case "confirmed":
       body = (
         <>
-          {heading(copyText.title)}
+          {heading(confirmedTitleOf(req, copyText.title))}
           <p className="text-text-primary">{req.doneLine}</p>
+          {view.warning && <Banner tone="attention">{view.warning}</Banner>}
           {view.proof?.txHash && (
             <HashLine
               label="Transaction"
@@ -731,12 +768,16 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
           <p>Nothing was charged.</p>
         </div>
       );
-      footer = (
-        <>
-          {secondary("Close", actions.cancel)}
-          {primary("Try again", actions.retry)}
-        </>
-      );
+      // A recheck (or a commit that met the same market change) can't clear on a retry.
+      footer =
+        reason === "recheck" ? (
+          secondary("Close", actions.cancel, { focus: true })
+        ) : (
+          <>
+            {secondary("Close", actions.cancel)}
+            {primary("Try again", actions.retry)}
+          </>
+        );
       break;
     }
   }
@@ -744,7 +785,7 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
   return (
     <ModalFrame
       open
-      onClose={actions.cancel}
+      onClose={phase === "pending" ? () => setNudge((n) => n + 1) : actions.cancel}
       size="sm"
       initialFocus={target}
       title={req.title}

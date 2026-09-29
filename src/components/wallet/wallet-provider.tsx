@@ -21,8 +21,13 @@
 // - Then `opts.recheck` (a string fails the request with that copy), then
 //   `opts.commit(proof)` — the caller's writes, in order. A commit that
 //   refuses or throws becomes `failed` / `storageFailed`, and nothing else is
-//   written. Only then is the wallet's activity line (the debit) written:
-//   the LAST write (§3.9).
+//   written; one that refuses with `conflict` (the market moved: just sold,
+//   sold out, taken off) becomes `failed` / `recheck`, which offers Close only.
+//   Only then is the wallet's activity line (the debit) written: the LAST
+//   write (§3.9). A refused debit still confirms (the caller's writes landed)
+//   and the dialog says the balance may read wrong.
+// - `releasesHoldOf`: an auction's Buy now by its own top bidder releases
+//   that bid's hold, so the funds check counts it back in (R6-12).
 // - `request()` resolves at `confirmed` ({ ok: true, proof }), so the caller
 //   moves on behind the dialog, which stays open on Done. A rejected or
 //   failed request resolves when the dialog is closed, with its reason, so
@@ -56,6 +61,7 @@ import {
   requestIdentityOf,
   shortfallOf,
 } from "@/lib/wallet/request-view";
+import type { MarketData } from "@/lib/market/types";
 import type {
   DemoWallet,
   FailReason,
@@ -69,9 +75,17 @@ import type {
 import { useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { WalletDialog, type RequestView } from "./wallet-dialog";
 
+/** The lib's options, plus what only this dialog acts on. */
+export type WalletRequestOptions = Omit<RequestOptions, "commit"> & {
+  /** `conflict`: the market moved under the request, so Try again can't help (MARKETPLACE-14). */
+  commit?: (proof: Proof) => { ok: true } | { ok: false; message: string; conflict?: boolean };
+  /** The auction whose top bid, the buyer's own, this purchase releases (R6-12). */
+  releasesHoldOf?: string;
+};
+
 export type WalletRequestApi = {
   /** Opens the dialog for one signature or transaction (§3.9). */
-  request: (req: WalletRequest, opts?: RequestOptions) => Promise<RequestResult>;
+  request: (req: WalletRequest, opts?: WalletRequestOptions) => Promise<RequestResult>;
   /** Opens the Demo wallet dialog (P2-MINT-2): connect, account, network, demo buyers. */
   openManage: () => void;
 };
@@ -85,10 +99,15 @@ export function persistWallet(next: DemoWallet): boolean {
   return ok;
 }
 
+/** The market as the funds check reads it: without the bids of the auction this purchase closes. */
+function withoutHold(market: MarketData, listingId: string | undefined): MarketData {
+  return listingId ? { ...market, bids: market.bids.filter((b) => b.listingId !== listingId) } : market;
+}
+
 type Flight = {
   seq: number;
   req: WalletRequest;
-  opts: RequestOptions;
+  opts: WalletRequestOptions;
   resolve: (r: RequestResult) => void;
   settled: boolean;
   identity: IdentityId;
@@ -111,9 +130,15 @@ type Screen =
       message: string | null;
       hash: string | null;
       proof: Proof | null;
+      /** The listing whose hold this request releases. */
+      releases: string | null;
+      /** Confirmed, but the wallet's debit line wasn't saved. */
+      warning: string | null;
     };
 
 const BUSY_WATCH: readonly RequestPhase[] = ["signing", "pending"];
+const DEBIT_UNSAVED =
+  "It went through, but this browser couldn't save the charge in your demo wallet (storage is full or blocked), so its balance may read wrong.";
 
 function nonce(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -137,7 +162,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const show = React.useCallback(
     (
       phase: RequestPhase,
-      extra: Partial<Omit<Extract<Screen, { mode: "request" }>, "mode" | "phase" | "req" | "canUseLazy">> = {},
+      extra: Partial<Omit<Extract<Screen, { mode: "request" }>, "mode" | "phase" | "req" | "canUseLazy" | "releases">> = {},
     ) => {
       const f = flight.current;
       if (!f) return;
@@ -151,6 +176,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         message: extra.message ?? null,
         hash: extra.hash ?? null,
         proof: extra.proof ?? null,
+        releases: f.opts.releasesHoldOf ?? null,
+        warning: extra.warning ?? null,
       });
     },
     [],
@@ -217,7 +244,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const request = React.useCallback(
-    (req: WalletRequest, opts: RequestOptions = {}): Promise<RequestResult> => {
+    (req: WalletRequest, opts: WalletRequestOptions = {}): Promise<RequestResult> => {
       const busy = flight.current;
       if (busy && !busy.settled) {
         return Promise.resolve({ ok: false, reason: "rejected", message: "Another wallet request is open." });
@@ -285,24 +312,30 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const now = readWallet();
       const failure = failureOf(f.before, now, f.identity);
       if (failure) return fail(failure);
-      if (shortfallOf(f.req, f.identity, { wallet: now, market: readMarketNow(), now: Date.now() })) {
+      const market = withoutHold(readMarketNow(), f.opts.releasesHoldOf);
+      if (shortfallOf(f.req, f.identity, { wallet: now, market, now: Date.now() })) {
         return fail("insufficientFunds");
       }
       const recheck = f.opts.recheck?.() ?? null;
       if (recheck) return fail("recheck", recheck);
       const proof = proofOf(f.req, f.identity, Date.now(), hash);
-      let committed: { ok: true } | { ok: false; message: string };
+      let committed: ReturnType<NonNullable<WalletRequestOptions["commit"]>>;
       try {
         committed = f.opts.commit ? f.opts.commit(proof) : { ok: true };
       } catch {
         committed = { ok: false, message: "" };
       }
-      if (!committed.ok) return fail("storageFailed", committed.message || undefined);
-      // The debit and its activity line: the last write.
-      persistWallet(pushActivity(readWallet(), activityOf(f.req, proof, `act_${nonce()}`)));
+      if (!committed.ok) {
+        return committed.conflict && committed.message
+          ? fail("recheck", committed.message)
+          : fail("storageFailed", committed.message || undefined);
+      }
+      // The debit and its activity line: the last write. The caller's writes
+      // have landed, so a refusal here still confirms — and says so.
+      const debited = persistWallet(pushActivity(readWallet(), activityOf(f.req, proof, `act_${nonce()}`)));
       f.settled = true;
       f.outcome = null;
-      show("confirmed", { proof, hash: proof.txHash ?? null });
+      show("confirmed", { proof, hash: proof.txHash ?? null, warning: debited ? null : DEBIT_UNSAVED });
       f.resolve({ ok: true, proof });
     },
     [fail, show],
@@ -315,7 +348,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const now = readWallet();
     const failure = failureOf(f.before, now, f.identity);
     if (failure) return fail(failure);
-    if (shortfallOf(f.req, f.identity, { wallet: now, market: readMarketNow(), now: Date.now() })) {
+    const market = withoutHold(readMarketNow(), f.opts.releasesHoldOf);
+    if (shortfallOf(f.req, f.identity, { wallet: now, market, now: Date.now() })) {
       return fail("insufficientFunds");
     }
     const seed = `${f.identity}:${f.req.purpose}:${Date.now()}:${nonce()}`;
@@ -394,6 +428,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           hash: screen.hash,
           proof: screen.proof,
           canUseLazy: screen.canUseLazy,
+          warning: screen.warning,
         }
       : null;
 
@@ -404,7 +439,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         open={screen.mode !== "closed"}
         mode={screen.mode === "request" ? "request" : "manage"}
         wallet={wallet}
-        market={market}
+        market={screen.mode === "request" ? withoutHold(market, screen.releases ?? undefined) : market}
         write={persistWallet}
         onClose={dismiss}
         request={view}

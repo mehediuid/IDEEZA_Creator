@@ -3,7 +3,9 @@
 // The buyer rail's edition offers (Figma 41505:134786; spec §2.4, TABS T2,
 // P2-TABS-26 "Done"): every listed Physical or Virtual NFT of the project,
 // under its product, below the Main NFT's card in the same Marketplace block.
-// A paused or removed Main listing hides them all (`editionsHiddenWith`).
+// A paused or removed Main listing hides them all (`editionsHiddenWith`), and
+// so does the lock: once the project is sold in full, its NFTs aren't for
+// sale (R1-2).
 //
 // - A card per track: "{Kind} NFT · {Use}", "NFTs sold {s}/{t}" (or "Sold
 //   out"), and the tier — Regular (this version only) or Extended (every
@@ -31,7 +33,7 @@ import { TIER_WORD, useEditionPurchase, type EditionTier } from "./purchase-dial
 const TIERS: EditionTier[] = ["regular", "extended"];
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const LINK =
-  "rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus";
+  "inline-flex items-center rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 
@@ -44,7 +46,7 @@ export function EditionOffers({ project, view, viewer, announce }: Pick<SlotProp
   const groups = editionOffersOf(products, view.editions, view.listing);
   const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, null);
-  if (!groups.length || !chain) return null;
+  if (!groups.length || !chain || view.lock) return null;
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
 
   return (
@@ -58,7 +60,7 @@ export function EditionOffers({ project, view, viewer, announce }: Pick<SlotProp
       {groups.map((g) => (
         <div key={g.productId} className="flex flex-col gap-4">
           {buyerId ? (
-            <Link href={`/marketplace/${project.id}/products/${g.productId}`} className={cn(LINK, "self-start break-words")}>
+            <Link href={`/marketplace/${project.id}/products/${g.productId}`} className={cn(LINK, TAP, "self-start break-words")}>
               {g.name}
             </Link>
           ) : (
