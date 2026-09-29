@@ -34,7 +34,7 @@ import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import type { Listing } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 import { ReadinessDialog } from "../details/readiness-dialog";
-import { refusedCopy, sellRecheckOf } from "./listing-dialog";
+import { makerShareNow, refusedCopy, sellRecheckOf } from "./listing-dialog";
 
 const FINISH_FIRST = "Finish the items above to relist.";
 
@@ -103,12 +103,14 @@ export function RelistPanel({
       },
       commit: (proof) => {
         const p = latest.current.projects.find((x) => x.id === project.id) ?? project;
+        const m = readMarketNow();
         const next = relistListing(
-          readMarketNow().listings,
+          m.listings,
           listing.id,
           listingMetadataOf(p, view.products, proof.at),
           videosReady,
           proof.at,
+          { creatorPct: makerShareNow(p, m) },
         );
         if (!next.ok) return { ok: false, message: next.reason };
         const w = writeListings(next.listings);

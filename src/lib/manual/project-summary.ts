@@ -192,6 +192,11 @@ export function listFlowHref(projectId: string): string {
  * | sold in full (locked) | View brief | — | — |
  * | minted, record unreadable | — | — | — |
  *
+ * View brief is offered only for a brief that minted (R2-8): it opens on its
+ * read-only success step. A project minted from its page has none, and an
+ * unminted draft would open an editable Step 1 on a minted — even a locked —
+ * project, so the pair leaves it out there.
+ *
  * The listing facts are optional so a v1 caller still compiles: without them
  * the maker holds everything and nothing is locked.
  */
@@ -209,7 +214,8 @@ export function nextAction(
   },
 ): ActionPair {
   const briefHref = stepHref(p, "brief");
-  const viewBrief: NextAction = { kind: "view-brief", label: "View brief", href: briefHref };
+  const viewBrief: NextAction | null =
+    facts.brief?.state.mintedAt != null ? { kind: "view-brief", label: "View brief", href: briefHref } : null;
   const creatorPct = facts.creatorPct ?? 100;
   const locked = facts.locked ?? false;
 

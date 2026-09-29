@@ -56,7 +56,8 @@ const REFUSAL_COPY: Record<ContributorRefusal, string> = {
   invalid: "That value isn't valid. Check the fields and try again.",
   duplicate: "Someone with that name is already on this project.",
   full: "This project already has as many contributors as it can hold.",
-  over100: "That share would put the project's ownership over 100%. Lower it and try again.",
+  over100:
+    "That share is more than there is to give: ownership can't pass 100%, and once a share has sold you keep at least 1%. Lower it and try again.",
 };
 
 type Pending = { kind: "add" | "edit"; contributor: Contributor };

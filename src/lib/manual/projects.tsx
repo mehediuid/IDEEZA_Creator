@@ -618,7 +618,7 @@ function modelDescOf(bp: BuildProduct): string {
 
 /**
  * A build joins a project — the one merge (§5.1.8). Pure: the provider's
- * `attachBuild` runs it on the stored record, and so does every test.
+ * Save (`saveRecord`) runs it on the stored record, and so does every test.
  *
  * `lineage` is the OTHER builds of `job.chatId`. The build is recorded as the
  * next version of its chat inside this project; its products replace the rows
@@ -1114,16 +1114,6 @@ type Ctx = {
     lineage: BuildJob[],
     input: SaveInput,
   ) => { project: ManualProject; revert: () => void } | null;
-  // A build joins a project (COR-88): attach() on the stored record,
-  // idempotent by build id — the one writer Save, Open in editor and the
-  // Brief's Step 1 share. `origin` only for the project this build creates.
-  // Null when there is no such project.
-  attachBuild: (
-    projectId: string,
-    job: BuildJob,
-    lineage?: BuildJob[],
-    opts?: { origin?: boolean },
-  ) => ManualProject | null;
   selectProject: (id: string) => void;
   updateProject: (id: string, patch: ProjectPatch) => void;
   // "Use as cover" / "Stop using as cover" (CNT-15): a product source, or
@@ -1349,39 +1339,6 @@ export function ManualProjectsProvider({
     (id: string, on: boolean, at?: number) =>
       updateProject(id, { showcasedAt: on ? (at ?? Date.now()) : null }),
     [updateProject],
-  );
-
-  // A build joins a project — attach() on the record as it stands, written
-  // back to the list. Idempotent by build id: a build already in the project
-  // hands the record back unchanged and writes nothing.
-  const attachBuild = React.useCallback(
-    (
-      projectId: string,
-      job: BuildJob,
-      lineage: BuildJob[] = [],
-      opts: { origin?: boolean } = {},
-    ): ManualProject | null => {
-      const base =
-        projects.find((p) => p.id === projectId) ?? made.current.get(projectId);
-      if (!base) return null;
-      const now = Date.now();
-      const next = attach(base, job, lineage, now, opts);
-      if (next === base) return base;
-      // The record this computed is the one stored, product ids and all. Only a
-      // record another write in this same event already changed is merged
-      // again, onto that newer copy.
-      setProjects((arr) =>
-        arr.map((p) =>
-          p.id !== projectId
-            ? p
-            : p === base
-              ? next
-              : attach(p, job, lineage, now, opts),
-        ),
-      );
-      return next;
-    },
-    [projects],
   );
 
   // Save (P2-SAVE-15): saveRecord on the list as this event sees it, in one
@@ -1692,7 +1649,6 @@ export function ManualProjectsProvider({
     findBySlug,
     createProject,
     saveBuild,
-    attachBuild,
     selectProject,
     updateProject,
     setCover,

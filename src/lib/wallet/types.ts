@@ -132,8 +132,10 @@ export type Proof = { identity: IdentityId; address: string; at: number; signatu
 export type RequestOptions = {
   /** Runs just before confirming; a string fails the request with that copy. */
   recheck?: () => string | null;
-  /** The caller's writes, in order (§3.9). */
-  commit?: (proof: Proof) => { ok: true } | { ok: false; message: string };
+  /** The caller's writes, in order (§3.9). `conflict`: the market moved under the request (just
+   *  sold, sold out, taken off), so Try again can't help and the dialog offers Close only
+   *  (MARKETPLACE-14). */
+  commit?: (proof: Proof) => { ok: true } | { ok: false; message: string; conflict?: boolean };
   onUseLazy?: () => void;
 };
 

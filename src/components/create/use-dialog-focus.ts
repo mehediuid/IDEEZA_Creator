@@ -123,3 +123,29 @@ export function useDialogFocus(
     };
   }, [open, container, initial]);
 }
+
+/**
+ * Runs `run` once no modal dialog is open any more — after the last layer's
+ * own focus return (a passive-effect cleanup) has run. The wallet dialog
+ * stays open on Done after `request()` resolves, and whatever opened it may be
+ * gone by then (a sold listing's Buy now, the listing form), so a caller that
+ * moves focus to the page must wait for every layer, not just its own.
+ * Returns a stop.
+ */
+export function whenDialogsClose(run: () => void): () => void {
+  const open = () => document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
+  let timer: number | null = null;
+  const observer = new MutationObserver(() => {
+    if (!open()) fire();
+  });
+  const fire = () => {
+    observer.disconnect();
+    timer = window.setTimeout(() => requestAnimationFrame(run), 0);
+  };
+  if (!open()) fire();
+  else observer.observe(document.body, { childList: true });
+  return () => {
+    observer.disconnect();
+    if (timer !== null) window.clearTimeout(timer);
+  };
+}

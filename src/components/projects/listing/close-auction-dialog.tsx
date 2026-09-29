@@ -14,10 +14,11 @@
 // named, nothing is written: the body shows the new winner and asks again.
 // If the sale itself is refused (the maker no longer holds the share it
 // sells), the dialog says why and offers "Close without a sale" (R5-19).
+// A sale that sells the project in full takes its edition listings off too.
 
 import * as React from "react";
 import { Banner, Button, ModalFrame } from "@/components/ideeza";
-import { payoutAddressOf } from "@/components/marketplace/purchase-dialog";
+import { unlistTracksIfLocked } from "@/components/marketplace/purchase-dialog";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { ownershipOf } from "@/lib/manual/ownership";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
@@ -30,7 +31,7 @@ import type { SettleResult } from "@/lib/market/auction";
 import type { Listing, MarketData } from "@/lib/market/types";
 import { demoAddress, readWallet } from "@/lib/wallet/demo-wallet";
 import { buyerLabel } from "@/lib/wallet/identities";
-import { mintViewOf } from "@/lib/wallet/mint";
+import { mintViewOf, payoutAddressOf } from "@/lib/wallet/mint";
 import { formatAmount } from "@/lib/wallet/money";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { refusedCopy } from "./listing-dialog";
@@ -149,6 +150,7 @@ export function CloseAuctionDialog({
     }
     const w = appendSale(sale);
     if (!w.ok) return setError(w.reason === "conflict" ? "This auction has already been settled." : refusedCopy(w.reason));
+    unlistTracksIfLocked(p, [...m.sales, sale]);
     onDone(closedAnnouncement(settled, cur));
   };
 

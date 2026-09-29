@@ -24,6 +24,7 @@
 //   written. A refused write: this dialog stays open and says why.
 
 import * as React from "react";
+import { whenDialogsClose } from "@/components/create/use-dialog-focus";
 import { Banner, Button, ModalFrame, Spinner, TestnetDemoBadge } from "@/components/ideeza";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { MintCostRows, WalletFactLine, useMintShortfall } from "@/components/wallet/mint-cost";
@@ -81,15 +82,24 @@ const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], 
 
 const wallClock = () => Date.now();
 
-/** Focuses `id` once it's on the page — the next render may be the one that draws it. */
+let pendingFocus: (() => void) | null = null;
+
+/** Focuses `id` once it's on the page — the next render may be the one that draws it — and
+ *  once every dialog has closed: the wallet dialog stays open on Done after the write, and
+ *  its own close would otherwise take focus back to a control that's gone. The latest call
+ *  wins; it outlives the caller, whose card may be replaced by the write. */
 export function focusSoon(id: string, tries = 12): void {
+  pendingFocus?.();
   const step = (left: number) =>
     requestAnimationFrame(() => {
       const el = document.getElementById(id);
       if (el) el.focus();
       else if (left > 0) step(left - 1);
     });
-  step(tries);
+  pendingFocus = whenDialogsClose(() => {
+    pendingFocus = null;
+    step(tries);
+  });
 }
 
 /** Why a store write was refused, in the listing's words. */
@@ -97,6 +107,18 @@ export function refusedCopy(reason: "unreadable" | "conflict" | "storage"): stri
   if (reason === "unreadable") return MARKET_UNREADABLE;
   if (reason === "conflict") return "Another tab changed this listing first — close this and look again.";
   return STORAGE_FULL;
+}
+
+/** The maker's share now: the co-owners as storage holds them (another tab may have given
+ *  the share away) and the Main sales in `market`. */
+export function makerShareNow(p: ManualProject, market: MarketData): number {
+  const stored = normalizeProjects(parseStored(readStoredKey(PROJECTS_KEY)).value ?? []).find((x) => x.id === p.id);
+  return ownershipOf({
+    createdAt: p.createdAt,
+    contributors: (stored ?? p).contributors ?? [],
+    sales: mainSalesOf(p.id, market.sales),
+    listedPercent: 0,
+  }).maker;
 }
 
 /**
@@ -119,14 +141,7 @@ export function sellRecheckOf(
   const facts = readinessFactsOf(p, ctx.view, ctx.brief, readProjectVideos(p.id), ctx.jobs, ctx.now);
   const videos = readinessOf(facts, ctx.purpose).rules.find((r) => r.id === "videos");
   if (videos && !videos.ok) return `A video changed while this was open: ${videos.reason}`;
-  // The co-owners as storage holds them: another tab may have given the share away.
-  const stored = normalizeProjects(parseStored(readStoredKey(PROJECTS_KEY)).value ?? []).find((x) => x.id === p.id);
-  const maker = ownershipOf({
-    createdAt: p.createdAt,
-    contributors: (stored ?? p).contributors ?? [],
-    sales: mainSalesOf(p.id, ctx.market.sales),
-    listedPercent: 0,
-  }).maker;
+  const maker = makerShareNow(p, ctx.market);
   if (ctx.percentSelling <= maker) return null;
   return maker > 0
     ? `You hold ${maker}% of this project now, less than the ${ctx.percentSelling}% this listing sells. Close this and lower Percent Selling.`

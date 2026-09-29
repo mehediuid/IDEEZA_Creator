@@ -27,6 +27,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useCreateHistory } from "@/lib/create/history";
 import { AS_PARAM, BUYER_VIEW, CONTRIBUTOR_VIEW, VIEW_PARAM } from "@/lib/manual/buyer-preview";
 import { can, type Viewer } from "@/lib/manual/permissions";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMarket } from "@/lib/market/market-store";
@@ -39,7 +40,6 @@ import {
   VideoUpkeep,
   etaLabel,
   isProductJob,
-  lockedNow,
   progressOf,
   useVideoJobs,
   type VideoJob,
@@ -108,7 +108,7 @@ function RenderToasts() {
   const targetOf = (j: VideoJob): VideoTarget | null => {
     if (!isProductJob(j)) return null;
     const project = projects.find((p) => p.id === j.projectId);
-    if (!project || !can(OWNER, "video.generate", { locked: lockedNow(project, market.sales) })) return null;
+    if (!project || !can(OWNER, "video.generate", { locked: projectLockOf(project, market.sales) !== null })) return null;
     const product = productsOfProject(project, buildsOf(project, builds)).find((x) => x.id === j.productId);
     return product ? videoTargetOf(project, product) : null;
   };

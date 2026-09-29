@@ -148,6 +148,24 @@ test("Code never reads the global ideeza:code:files key, even for the first row 
   assert.deepEqual(work.code, { state: "none" });
 });
 
+test("Code counts the product's own Blockly blocks (stored as XML), beside its files", () => {
+  const XML = (body) => `<xml xmlns="https://developers.google.com/blockly/xml">${body}</xml>`;
+  const loop =
+    '<block type="controls_for" id="a"><field name="VAR" id="v">i</field><value name="FROM"><shadow type="math_number" id="s"><field name="NUM">1</field></shadow></value><statement name="DO"><block type="text_print" id="b"></block></statement></block>';
+  setStorage({ [`ideeza:code:blockly-workspace:${PID}:prd_a`]: XML(loop) });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").code, { state: "work", text: "2 blocks" });
+  setStorage({
+    [`ideeza:code:files:${PID}:prd_a`]: [{ name: "a.py" }],
+    [`ideeza:code:blockly-workspace:${PID}:prd_a`]: XML('<block type="text_print" id="b"></block>'),
+  });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").code, { state: "work", text: "1 file · 1 block" });
+  // An empty workspace, and the global one, are nothing of this product's.
+  setStorage({ [`ideeza:code:blockly-workspace:${PID}:prd_a`]: XML('<variables><variable id="v">i</variable></variables>') });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").code, { state: "none" });
+  setStorage({ "ideeza:code:blockly-workspace": XML(loop) });
+  assert.deepEqual(editorWorkOf({ projectId: PID, productId: "p1" }, "p1").code, { state: "none" });
+});
+
 test("3D gains shape and AI-model facts, joined when both exist", () => {
   setStorage({ [`ideeza:3d:shapes:${PID}:prd_a`]: [{ id: "s1" }, { id: "s2" }, { id: "s3" }] });
   assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").three, { state: "work", text: "3 shapes" });
@@ -191,7 +209,7 @@ test("editorWorkOfProject reads every sweep row — the first adopting the legac
     ["p1", "An earlier product"],
   ]);
   assert.deepEqual(rows[0].work.pcb, { state: "work", text: "4 objects · 2 on the board" }, "the head row adopts the legacy doc");
-  assert.deepEqual(rows[1].work.code, { state: "work", text: "1 files" });
+  assert.deepEqual(rows[1].work.code, { state: "work", text: "1 file" });
   assert.deepEqual(rows[2].work.three, { state: "work", text: "1 shapes" });
   assert.deepEqual(rows[3].work.pcb, { state: "not-opened" }, "p1 isn't the head here, so it never reads the legacy key");
 });

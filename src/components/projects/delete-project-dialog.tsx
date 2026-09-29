@@ -13,8 +13,9 @@
 //   Contributors" link that selects the Contributors tab (P2-CONTRIB-14).
 // - The dialog lists what goes and what stays (deletePlanOf) and asks for the
 //   typed project name only when editor work, a mint record or a network would
-//   be lost. The editor work is every swept row's (sweepRowIdsOf), and the
-//   activity history is counted. Cancel has the focus; the destructive button
+//   be lost. The editor work is every swept row's (`editorWorkOfProject`),
+//   each product named once more than one has work, and the activity history
+//   is counted. Cancel has the focus; the destructive button
 //   reads Delete project.
 // - Confirm re-reads the delete gate from storage first: a sale, listing or
 //   co-owner that arrived while the dialog was open blocks it there, with the
@@ -32,19 +33,13 @@ import { useCreateHistory } from "@/lib/create/history";
 import { parseStored, readStoredKey } from "@/lib/key-store";
 import { readMarketNow } from "@/lib/market/market-store";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
-import { editorWorkOf, type EditorWork, type StepFact } from "@/lib/manual/editor-work";
+import { editorWorkOfProject } from "@/lib/manual/editor-work";
 import { readJourney } from "@/lib/manual/journey-store";
 import { can, deleteBlockOf, type DeleteBlock, type Viewer } from "@/lib/manual/permissions";
-import { deleteFactsOf, productRowsOf, type ProjectView } from "@/lib/manual/project-read";
+import { deleteFactsOf, type ProjectView } from "@/lib/manual/project-read";
 import { withTab } from "@/lib/manual/project-route";
 import { projectSummary } from "@/lib/manual/project-summary";
-import {
-  normalizeProjects,
-  PROJECTS_KEY,
-  sweepRowIdsOf,
-  useManualProjects,
-  type ManualProject,
-} from "@/lib/manual/projects";
+import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { readNetwork } from "@/lib/network/store";
 import { cn } from "@/lib/utils";
 import { setProjectNotice } from "./project-notice";
@@ -122,33 +117,6 @@ type DeleteProjectDialogProps = {
   onClose: () => void;
 };
 
-/** Every row the sweep deletes documents under, with its editor facts (P2-EDITOR-8). */
-function rowWorksOf(project: ManualProject): EditorWork[] {
-  const head = productRowsOf(project)[0]?.id ?? "p1";
-  return sweepRowIdsOf(project).map((rowId) => editorWorkOf({ projectId: project.id, productId: rowId }, head));
-}
-
-/** Nothing to lose: a store that exists but holds nothing yet ("0 objects · …"). */
-const counts = (f: StepFact) => f.state === "work" && !/^0\b/.test(f.text);
-
-/** One fact per step across the rows, for the plan's single `work`: the first
- *  row whose step holds work, else a sample board, else the first row's own. */
-function foldWorks(works: readonly EditorWork[]): EditorWork {
-  const first = works[0];
-  const pick = (step: keyof EditorWork): StepFact =>
-    works.find((w) => counts(w[step]))?.[step] ??
-    works.find((w) => w[step].state === "sample")?.[step] ??
-    first?.[step] ?? { state: "none" };
-  return {
-    pcb: pick("pcb"),
-    assembly: pick("assembly"),
-    wiring: pick("wiring"),
-    three: pick("three"),
-    code: pick("code"),
-    preview: pick("preview"),
-  };
-}
-
 /** The stored projects, as another tab may have left them; null when unreadable. */
 function storedProject(id: string): ManualProject | null {
   const parsed = parseStored(readStoredKey(PROJECTS_KEY));
@@ -213,13 +181,12 @@ function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDia
     const contributors = (project.contributors ?? []).filter((c) => !(c.role === "coOwner" && c.share > 0)).length;
     // The sweep deletes the scoped documents of every row it names, so the
     // plan reads every one of them — not just the virtual first row.
-    const works = rowWorksOf(project);
     const journey = readJourney(project.id);
     return deletePlanOf({
       status,
       draft,
       products: view.summary.productCount,
-      work: foldWorks(works),
+      rows: editorWorkOfProject(project),
       network: network ? { links: network.links.length } : null,
       showcased: view.summary.showcase !== null,
       builds: live.length,

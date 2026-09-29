@@ -40,7 +40,7 @@ import {
   type DetailsField,
   type ProjectDetailsFieldsHandle,
 } from "@/components/projects/project-details-fields";
-import { lockOfProject } from "@/components/create/save-step";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { editorHref, productResumeOf, resumeProductOf } from "@/lib/manual/editor-scope";
 import { checkDescription, checkProjectName } from "@/lib/manual/project-header";
 import {
@@ -70,7 +70,7 @@ function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { projects, createProject, selectProject } = useManualProjects();
   const { data: market } = useMarket();
-  const openable = React.useMemo(() => projects.filter((p) => lockOfProject(p, market) === null), [projects, market]);
+  const openable = React.useMemo(() => projects.filter((p) => projectLockOf(p, market.sales) === null), [projects, market]);
 
   const [choice, setChoice] = React.useState<string>("");
   const [name, setName] = React.useState("");

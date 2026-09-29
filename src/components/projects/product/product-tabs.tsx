@@ -21,7 +21,7 @@ import type { BuildJob, BuildProduct } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { pickProductTab, productTabsOf, type ProductTabId } from "@/lib/manual/product-page";
 import { TabStrip, type TabDef } from "../details/tab-strip";
-import { ProductPiecePanel } from "./product-deliverables";
+import { DeliverablesAccess, ProductPiecePanel } from "./product-deliverables";
 import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
 
 export const PRODUCT_TAB_LABEL: Record<ProductTabId, string> = {
@@ -64,12 +64,13 @@ export function ProductTabs({
   /** Writes `?tab=` (null drops it: Media is never written). */
   onTab: (tab: string | null) => void;
 }) {
-  const { project, product, viewer, view } = slot;
-  const ctx = view.canCtx;
+  const { project, product, viewer } = slot;
   const panels = PRODUCT_SLOTS.panels;
   const contributors = project.contributors?.length ?? 0;
+  // The page's product-scoped download grant (an edition holder of this product has it too).
+  const downloads = React.useContext(DeliverablesAccess);
   const tabs = productTabsOf(product, job && bp ? bp.items : null, {
-    firmware: can(viewer, "deliverables.download", ctx),
+    firmware: downloads,
     contributors:
       panels.contributors !== undefined &&
       (can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && contributors > 0)),

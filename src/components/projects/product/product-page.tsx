@@ -21,7 +21,9 @@
 // starts at Explore marketplace, links keep the `/marketplace` base, the
 // Testnet demo banner leads, a project never listed reads "This project isn't
 // on the marketplace", and the firmware and downloads wait for a holding
-// (`DeliverablesAccess`, from `can(viewer, "deliverables.download", …)`).
+// (`DeliverablesAccess`, from `can(viewer, "deliverables.download", …)` with
+// the product-scoped `canCtxOf(view, viewer, { productId })`: an edition NFT
+// of this product holds its files too, R5-20).
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -35,7 +37,7 @@ import { openInEditorOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
 import { productPiecesOf, productVersionView, withQuery, type ProductVersionView } from "@/lib/manual/product-page";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { conceptOf } from "@/lib/manual/project-read";
+import { canCtxOf, conceptOf } from "@/lib/manual/project-read";
 import { productDocTitle } from "@/lib/manual/project-route";
 import { useManualProjects } from "@/lib/manual/projects";
 import { LiveRegion, usePageArrival } from "../details/arrival";
@@ -279,7 +281,9 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
               <p className="max-w-[68ch] text-md leading-relaxed text-text-primary">{description}</p>
             ) : null}
 
-            <DeliverablesAccess.Provider value={can(viewer, "deliverables.download", view.canCtx)}>
+            <DeliverablesAccess.Provider
+              value={can(viewer, "deliverables.download", canCtxOf(view, viewer, { productId: product.id }))}
+            >
               <ProductTabs
                 key={`${product.id}:${version?.shown ?? 0}`}
                 slot={slot}

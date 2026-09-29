@@ -78,6 +78,14 @@ const FAIL_TEXT: Record<Exclude<FailReason, "recheck">, string> = {
   storageFailed: "This browser couldn't save it — storage is full or blocked.",
 };
 
+/** The confirmed heading, by what went through (MINT-3's table, MARKETPLACE-14). */
+function confirmedTitleOf(req: WalletRequest): string {
+  if (req.kind === "signature") return "Signed.";
+  if (req.purpose === "purchase") return "Purchase successful";
+  if (req.purpose === "instantMint" || req.purpose === "upgradeMint") return "Minted on chain.";
+  return "Confirmed.";
+}
+
 export type RequestCopy = { title: string; body: string[]; primary?: string; secondary?: string[] };
 
 /**
@@ -132,7 +140,7 @@ export function requestCopy(
       };
     case "confirmed":
       return {
-        title: req.kind === "signature" ? "Signed." : "Confirmed.",
+        title: confirmedTitleOf(req),
         body: [req.doneLine],
         primary: "Done",
       };

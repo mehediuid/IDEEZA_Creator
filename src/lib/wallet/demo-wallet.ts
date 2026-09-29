@@ -235,7 +235,7 @@ export function readWallet(): DemoWallet {
 /** A stored wallet that can't be read back: present, but not JSON or not an object. A v1 or
  *  partial record still normalizes, and is migrated by the next write; a corrupt one isn't, so
  *  its activity — what every balance is derived from — would be wiped. */
-function storedUnreadable(raw: string | null): boolean {
+export function walletUnreadable(raw: string | null): boolean {
   if (!raw) return false;
   try {
     return !isDict(JSON.parse(raw));
@@ -249,8 +249,21 @@ function storedUnreadable(raw: string | null): boolean {
 export function writeWallet(w: DemoWallet): boolean {
   if (typeof window === "undefined") return true;
   try {
-    if (storedUnreadable(window.localStorage.getItem(DEMO_WALLET_KEY))) return false;
+    if (walletUnreadable(window.localStorage.getItem(DEMO_WALLET_KEY))) return false;
     window.localStorage.setItem(DEMO_WALLET_KEY, JSON.stringify(w));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The wallet dialog's "Reset the demo wallet", the way out of an unreadable record that
+ *  refuses every write: the default wallet written over it (not connected, fresh test funds).
+ *  What it held can't be read, so nothing readable is lost. `false`: the browser refused it. */
+export function resetWallet(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    window.localStorage.setItem(DEMO_WALLET_KEY, JSON.stringify(defaultWallet()));
     return true;
   } catch {
     return false;

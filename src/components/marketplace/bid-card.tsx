@@ -21,6 +21,7 @@
 
 import * as React from "react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { whenDialogsClose } from "@/components/create/use-dialog-focus";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, TextInput } from "@/components/ideeza";
 import { formatDateTime } from "@/lib/manual/project-summary";
@@ -73,31 +74,17 @@ export function useAuctionClock(endsAt: number | undefined, pageNow: number): nu
 }
 
 /**
- * Runs `run` once no modal dialog is open any more — the wallet dialog stays
- * open on Done after `request()` resolves, and the control that opened it may
- * be gone by then (a sold listing's Buy now), so focus would fall to <body>.
+ * Runs `run` once no modal dialog is open any more (`whenDialogsClose`) — the
+ * wallet dialog stays open on Done after `request()` resolves, and the control
+ * that opened it may be gone by then (a sold listing's Buy now), so focus
+ * would fall to <body>. Unmounting the caller cancels it.
  */
 export function useAfterDialogClose(): (run: () => void) => void {
   const stop = React.useRef<(() => void) | null>(null);
   React.useEffect(() => () => stop.current?.(), []);
   return React.useCallback((run: () => void) => {
     stop.current?.();
-    const open = () => document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
-    let timer: number | null = null;
-    const observer = new MutationObserver(() => {
-      if (!open()) fire();
-    });
-    const fire = () => {
-      observer.disconnect();
-      // After the dialog's own focus return (a passive-effect cleanup) has run.
-      timer = window.setTimeout(() => requestAnimationFrame(run), 0);
-    };
-    stop.current = () => {
-      observer.disconnect();
-      if (timer !== null) window.clearTimeout(timer);
-    };
-    if (!open()) fire();
-    else observer.observe(document.body, { childList: true });
+    stop.current = whenDialogsClose(run);
   }, []);
 }
 

@@ -19,13 +19,11 @@ import * as React from "react";
 import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, Checkbox, ModalFrame } from "@/components/ideeza";
-import { editGateOf, lockOf } from "@/lib/manual/edit-gate";
-import { ownershipOf } from "@/lib/manual/ownership";
+import { editGateOf, projectLockOf } from "@/lib/manual/edit-gate";
 import type { EditGate } from "@/lib/manual/p2-types";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { listingViewOf, pauseForEdit } from "@/lib/market/listing";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
-import { mainSalesOf } from "@/lib/market/sales";
 import type { ListingChange, ListingMetadata, MarketData } from "@/lib/market/types";
 import { WRITE_ERROR_MESSAGE } from "@/lib/storage-status";
 import { cn } from "@/lib/utils";
@@ -51,14 +49,8 @@ function gateFor(
     now,
     current: NO_METADATA,
   });
-  const sales = mainSalesOf(projectId, market.sales);
-  const split = ownershipOf({
-    createdAt: project?.createdAt ?? 0,
-    contributors: project?.contributors ?? [],
-    sales,
-    listedPercent: 0,
-  });
-  return editGateOf({ listing, lock: lockOf(split, sales) }, change);
+  const lock = projectLockOf(project ?? { id: projectId, createdAt: 0, contributors: [] }, market.sales);
+  return editGateOf({ listing, lock }, change);
 }
 
 const MINUTE = 60_000;

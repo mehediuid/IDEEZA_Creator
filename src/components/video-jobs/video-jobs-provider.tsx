@@ -44,11 +44,8 @@ import {
   type VideoJobStage,
 } from "@/lib/video/jobs";
 import { onProjectDeleted } from "@/lib/manual/events";
-import { lockOf } from "@/lib/manual/edit-gate";
-import { ownershipOf } from "@/lib/manual/ownership";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { readMarketNow } from "@/lib/market/market-store";
-import { mainSalesOf } from "@/lib/market/sales";
-import type { Sale } from "@/lib/market/types";
 import { readBriefDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
@@ -184,15 +181,6 @@ function writeProduct(
 
 /** A take cancelled by its maker: its job ends acknowledged, with no toast. */
 const cancelled = (take: { failure?: { kind: string } } | undefined) => take?.failure?.kind === "cancelled";
-
-/** Sold in full (decision 12), from the sales as they are now (another tab may
- *  have just sold the rest) — for code with no ProjectView to read `lock` from. */
-export function lockedNow(project: ManualProject | undefined, sales: Sale[] = readMarketNow().sales): boolean {
-  if (!project) return false;
-  const main = mainSalesOf(project.id, sales);
-  const split = ownershipOf({ createdAt: project.createdAt, contributors: project.contributors ?? [], sales: main, listedPercent: 0 });
-  return lockOf(split, main) !== null;
-}
 
 function takeOf(j: VideoJob) {
   if (!j.projectId || !j.productId) return undefined;
@@ -403,8 +391,10 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
           durationMs: clip.durationMs,
           bytes: clip.video.size,
         };
-        // Sold in full: the buyer's product keeps the video it was sold with.
-        const locked = lockedNow(projectsRef.current.find((p) => p.id === projectId));
+        // Sold in full (read from the sales as they are now: another tab may
+        // have just sold the rest), the buyer's product keeps the video it was sold with.
+        const owner = projectsRef.current.find((p) => p.id === projectId);
+        const locked = !!owner && projectLockOf(owner, readMarketNow().sales) !== null;
         const wrote = writeProduct(projectId, productId, (v) => {
           if (!v) return null;
           const next = pv.finishTake(v, id, meta, Date.now());

@@ -21,11 +21,12 @@ const NOTHING = {
   preview: { state: "none" },
 };
 const MINTED_AT = Date.UTC(2026, 8, 22, 12, 0); // midday, so every time zone reads Sep 22
-const input = (over = {}) => ({
+// `work`: the one row's editor facts, for the plan's `rows`.
+const input = ({ work = NOTHING, ...over } = {}) => ({
   status: "draft",
   draft: null,
   products: 1,
-  work: NOTHING,
+  rows: [{ name: "Car", work }],
   network: null,
   showcased: false,
   builds: 0,

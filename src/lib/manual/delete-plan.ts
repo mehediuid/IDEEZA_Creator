@@ -15,11 +15,9 @@ export type DeletePlanInput = {
   draft: StoredDraft | null;
   /** How many products the project lists (summary.productCount). */
   products: number;
-  /** One product's editor facts. Superseded by `rows` — kept so a caller that hasn't moved yet compiles. */
-  work?: EditorWork;
   /** Every row the sweep removes (`editorWorkOfProject(p)`), read when the dialog opens: the sweep
    *  deletes every row's documents, so the plan lists them all (R2-C1). */
-  rows?: readonly { name: string; work: EditorWork }[];
+  rows: readonly { name: string; work: EditorWork }[];
   /** The project's network, when it has one. */
   network: { links: number } | null;
   /** summary.showcase !== null */
@@ -97,7 +95,7 @@ export function deletePlanOf(input: DeletePlanInput): DeletePlan {
   if (people > 0) goes.push(`The contributors list — ${people} ${people === 1 ? "person" : "people"}`);
 
   // Every row's documents go; name the product once more than one row has something listed.
-  const rows = (input.rows ?? (input.work ? [{ name: "", work: input.work }] : [])).map((r) => ({ name: r.name, ...workLines(r.work) }));
+  const rows = input.rows.map((r) => ({ name: r.name, ...workLines(r.work) }));
   const listed = rows.filter((r) => r.lines.length > 0);
   for (const r of listed) goes.push(...(listed.length > 1 ? r.lines.map((l) => `${l} (${r.name})`) : r.lines));
   const workLost = rows.some((r) => r.lost);

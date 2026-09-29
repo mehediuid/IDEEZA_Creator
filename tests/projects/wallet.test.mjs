@@ -131,3 +131,28 @@ test("writeWallet refuses to overwrite a stored wallet it can't read (R1 minor):
     globalThis.window = prev;
   }
 });
+
+test("an unreadable wallet is said so, and resetWallet is the one write that replaces it", async () => {
+  const { resetWallet, walletUnreadable, writeWallet } = await import("../../.tmp-test/lib/wallet/demo-wallet.js");
+  assert.equal(walletUnreadable(null), false, "no key: the default wallet, nothing to reset");
+  assert.equal(walletUnreadable(JSON.stringify({ v: 1, connected: true })), false, "an old record migrates");
+  assert.equal(walletUnreadable("{not json"), true);
+  assert.equal(walletUnreadable("[]"), true, "JSON that isn't a wallet object");
+  const map = new Map([["ideeza:wallet:demo", "{not json"]]);
+  const prev = globalThis.window;
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => map.set(k, String(v)),
+    },
+  };
+  try {
+    assert.equal(writeWallet(defaultWallet()), false);
+    assert.equal(resetWallet(), true);
+    assert.deepEqual(JSON.parse(map.get("ideeza:wallet:demo")), defaultWallet());
+    assert.equal(walletUnreadable(map.get("ideeza:wallet:demo")), false);
+    assert.equal(writeWallet(defaultWallet()), true, "every write works again");
+  } finally {
+    globalThis.window = prev;
+  }
+});
