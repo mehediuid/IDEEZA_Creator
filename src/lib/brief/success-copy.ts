@@ -1,38 +1,44 @@
 // success-copy.ts — Step 4's pure copy (COM-21). Showcase, including any
 // Innovations post, is the project's own flag (COR-105, set from the
-// Outcome row or this step's own Showcase control); neither the live nor
-// the pending line claims a post that hasn't happened, and Give's "Your
-// community can claim it." is dropped — nothing here promises what the app
-// can't back yet.
+// Outcome row or this step's own Showcase control); no line claims a post
+// that hasn't happened, and Give's "Your community can claim it." is
+// dropped — nothing here promises what the app can't back yet.
+//
+// A Sell commit writes the listing itself (P2-LISTING-22, as changed in
+// spec §4.5), and the readiness gate is strict (C5): every product's video
+// is ready before a Sell or a Give can commit. So a sale has only the live
+// line, and only a Save can arrive here with a video still rendering.
 import type { Intent } from "./types";
 
+/** P2-LISTING-22 (C): the Sell success line, and its one link. */
+export const LISTED_LINE = "Your project is listed on Explore marketplace — a testnet demo.";
+export const VIEW_ON_MARKETPLACE = "View on marketplace";
+/** Under the listing's terms on a minted sale (P2-LISTING-22). */
+export const LISTING_HOME_NOTE = "Change the price or remove the listing from the project's Marketplace block.";
+
 export function liveSubline(intent: Intent, hasClip: boolean): string {
-  // Until the Brief's Sell writes the listing itself (P2-LISTING-22, T26), a Sell mint reads
-  // Private on its page, where Add to marketplace lists it (P2-LISTING-24).
   return intent === "sell"
-    ? hasClip
-      ? "Your video is final and your project is minted. Add it to Explore marketplace from its page."
-      : "Your project is minted. Add it to Explore marketplace from its page."
+    ? LISTED_LINE
     : intent === "give"
       ? hasClip
-        ? "Your video is final and the drop is open."
+        ? "Your videos are final and the drop is open."
         : "The drop is open."
       : "Stored in your library. Pick it up any time.";
 }
 
-/** Minted, with the render still running — what happens without you. */
-export function pendingSubline(intent: Intent): string {
-  return intent === "sell"
-    ? "Your project is minted. Add it to Explore marketplace from its page once its video finishes."
-    : intent === "give"
-      ? "We’ll open the drop the moment the video finishes — no extra action needed."
-      : "Stored in your library. Pick it up any time.";
+/** A Save minted while its videos still render — what happens without you. */
+export function pendingSubline(): string {
+  return "Stored in your library. Its videos keep rendering — you can leave this page.";
 }
 
-/** The line under the storyboard, while the render is still running. */
-export function pendingCardLine(intent: Intent, quality: string): string {
-  const clip = `your ${quality} 10s video`;
-  if (intent === "sell") return `Your project is minted — its video lands as soon as ${clip} finishes.`;
-  if (intent === "give") return `The drop opens as soon as ${clip} finishes.`;
-  return `It is replaced by ${clip} as soon as that finishes.`;
+/** The line in the pending card, while a Save's videos still render. */
+export function pendingCardLine(rendering: number): string {
+  return rendering === 1
+    ? "1 video is still rendering. It lands on the project's Media tab when it finishes."
+    : `${rendering} videos are still rendering. They land on the project's Media tab when they finish.`;
+}
+
+/** P2-VIDEO-16: the Showcase line while the readiness gate is blocked. */
+export function showcaseGateLine(ready: number, total: number): string {
+  return `Every product needs an AI video first — ${ready} of ${total} have one.`;
 }
