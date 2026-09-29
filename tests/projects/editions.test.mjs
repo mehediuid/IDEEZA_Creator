@@ -282,3 +282,15 @@ test("editionChainOf: the mint record, else the Main listing, else a v1 draft; n
   assert.equal(editionChainOf(null, null, { network: "mumbai", collection: "" }), null);
   assert.equal(editionChainOf(null, null, null), null);
 });
+
+test("editionsHiddenWith / editionOffersOf: a project sold in full hides every offer (R1-2)", async () => {
+  assert.equal(editionsHiddenWith({ kind: "live" }, true), true);
+  assert.equal(editionsHiddenWith({ kind: "sold" }, true), true);
+  assert.equal(editionsHiddenWith({ kind: "sold" }, false), false);
+  const { createTrack } = await import("../../.tmp-test/lib/market/editions.js");
+  const products = [{ id: "prd_a", name: "A" }];
+  const listed = { ...createTrack({ projectId: "proj_1", productId: "prd_a", kind: "physical", use: "private", count: 3, now: 1 }) };
+  const tracks = listTrack([listed], listed.id, { token: "MATIC", regular: "0.01", extended: "0.02", royaltyPct: 5 }, 2);
+  assert.equal(editionOffersOf(products, tracks, { kind: "sold" }).length, 1);
+  assert.deepEqual(editionOffersOf(products, tracks, { kind: "sold" }, true), []);
+});

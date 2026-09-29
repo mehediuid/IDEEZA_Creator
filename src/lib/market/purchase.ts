@@ -82,7 +82,9 @@ export function purchaseQuote(
 
 // ───────────────────────── recording a sale ─────────────────────────
 
-export type SaleRefusal = { ok: false; reason: "alreadySold" | "overShare" | "badAmount"; message: string };
+export type SaleRefusal = { ok: false; reason: "alreadySold" | "overShare" | "badAmount" | "locked"; message: string };
+
+const LOCKED_MESSAGE = "This project was sold in full, so its NFTs aren't for sale any more.";
 
 export type MakeSaleInput = {
   listingId: string;
@@ -113,6 +115,9 @@ export type MakeSaleCtx = {
   /** The creator's current sellable share, 0–100 (`ownershipOf`, T05). */
   ownership: { creatorPct: number };
   now: number;
+  /** `view.lock !== null`. Without it, the lock is read from `sales` and
+   *  `creatorPct` the way `lockOf` reads it: 0 % left after a Main sale. */
+  locked?: boolean;
 };
 
 /** The sale's `txHash`: deterministic for a given sale id, always
@@ -129,12 +134,19 @@ export function txHashOf(saleId: string): string {
  *   sells once; another share needs a new listing). An edition track's
  *   `listingId` takes one sale per unit, and its caller keeps it within the supply;
  * - a Main sale's `sharePct` is more than the creator's current share
- *   (`overShare`).
+ *   (`overShare`);
+ * - the project is sold in full (`locked`, decision 12): its editions stop
+ *   selling with it (R1-2).
  */
 export function makeSale(input: MakeSaleInput, ctx: MakeSaleCtx): Sale | SaleRefusal {
   const priceMicros = toMicros(input.price);
   if (priceMicros === null || priceMicros <= BigInt(0)) {
     return { ok: false, reason: "badAmount", message: "Enter a valid amount." };
+  }
+  const soldInFull =
+    ctx.ownership.creatorPct <= 0 && ctx.sales.some((s) => s.projectId === input.projectId && s.item.nft === "main");
+  if (input.item.nft !== "main" && (ctx.locked || soldInFull)) {
+    return { ok: false, reason: "locked", message: LOCKED_MESSAGE };
   }
   // A Main listing sells once; an edition track sells one unit per sale, up to
   // its supply, which the caller checks (sales.ts, P2-TABS-27).

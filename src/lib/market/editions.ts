@@ -114,8 +114,11 @@ export function listGate(mainView: ListingView, projectName: string): EditionGat
 /** Pausing or removing the Main listing hides or removes its editions
  *  (TABS C19-3): hidden while Main has never been listed, is paused, or was
  *  explicitly removed. An auction that simply lapsed with no bids, or a
- *  Main sale, leaves editions exactly as they were. */
-export function editionsHiddenWith(mainView: ListingView): boolean {
+ *  Main sale, leaves editions exactly as they were — unless that sale sold
+ *  the project in full: `locked` (`view.lock !== null`) hides them all, since
+ *  the maker has nothing left to sell them from (R1-2). */
+export function editionsHiddenWith(mainView: ListingView, locked = false): boolean {
+  if (locked) return true;
   if (mainView.kind === "none" || mainView.kind === "paused") return true;
   return mainView.kind === "ended" && mainView.why === "removed";
 }
@@ -344,13 +347,15 @@ export function editionSummaryOf(
 }
 
 /** A buyer's offers (spec §2.4, TABS T2): every listed track whose Main listing
- *  doesn't hide it, grouped by product in the products' order. */
+ *  doesn't hide it, grouped by product in the products' order. None while the
+ *  project is `locked` (sold in full, R1-2). */
 export function editionOffersOf(
   products: { id: string; name: string }[],
   tracks: EditionTrack[],
   mainView: ListingView,
+  locked = false,
 ): { productId: string; name: string; tracks: EditionTrack[] }[] {
-  if (editionsHiddenWith(mainView)) return [];
+  if (editionsHiddenWith(mainView, locked)) return [];
   const order: Record<EditionKind, number> = { physical: 0, virtual: 1 };
   const useOrder: Record<EditionUse, number> = { private: 0, commercial: 1 };
   return products

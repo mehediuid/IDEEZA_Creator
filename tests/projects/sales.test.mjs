@@ -108,3 +108,37 @@ test("holdingOf sums a buyer's Main sales of a project, and is null when they ho
   assert.equal(mira.sales.length, 2);
   assert.equal(holdingOf("proj_1", "buyer-sam", sales), null);
 });
+
+// ── final fix wave: editions can't oversell (R1 minor), edition holders get the files (R5-20) ──
+
+const editionSale = (id, serial, over = {}) =>
+  saleFixture({
+    id,
+    listingId: "ed_1",
+    item: { nft: "physical", trackId: "ed_1", productId: "prd_1", productName: "Widget", use: "private", tier: "regular", serial },
+    ...over,
+  });
+
+test("normalizeSales: one sale per edition unit — a serial sold twice keeps the earliest", () => {
+  const result = normalizeSales([editionSale("sale_late", 2, { at: 3000 }), editionSale("sale_a", 1), editionSale("sale_early", 2, { at: 2000 })]);
+  assert.deepEqual(result.map((s) => s.id), ["sale_a", "sale_early"]);
+  // The same serial on another track is another unit.
+  const other = editionSale("sale_b", 1, { listingId: "ed_2", item: { ...editionSale("x", 1).item, trackId: "ed_2" } });
+  assert.equal(normalizeSales([editionSale("sale_a", 1), other]).length, 2);
+});
+
+test("holdingOf(…, { productId }): an edition of that product is a holding too, for its downloads", () => {
+  const ed = editionSale("sale_ed", 1, { projectId: "proj_1", buyerId: "buyer-leo" });
+  const sales = [ed, saleFixture({ id: "sale_m", buyerId: "buyer-mira" })];
+  // Project-wide, a holding is still the Main share.
+  assert.equal(holdingOf("proj_1", "buyer-leo", sales), null);
+  const leo = holdingOf("proj_1", "buyer-leo", sales, { productId: "prd_1" });
+  assert.equal(leo.sharePct, 0);
+  assert.deepEqual(leo.sales, []);
+  assert.deepEqual(leo.editions.map((s) => s.id), ["sale_ed"]);
+  assert.equal(holdingOf("proj_1", "buyer-leo", sales, { productId: "prd_2" }), null);
+  // A Main holder holds every product.
+  const mira = holdingOf("proj_1", "buyer-mira", sales, { productId: "prd_2" });
+  assert.equal(mira.sharePct, 10);
+  assert.deepEqual(mira.editions, []);
+});

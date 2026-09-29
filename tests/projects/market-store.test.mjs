@@ -141,8 +141,40 @@ test("appendSalePlan: a second Main sale of one listing is refused; edition sale
       listingId: "ed_track001",
       item: { nft: "physical", trackId: "ed_track001", productId: "p1", productName: "Car", use: "private", tier: "regular", serial },
     });
-  const e = storeOf({ [K.sales]: JSON.stringify([edition("sale_e1", 1)]) });
+  const e = storeOf({ [K.sales]: JSON.stringify([edition("sale_e1", 1)]), [EDITIONS("proj_1")]: JSON.stringify([track(3)]) });
   assert.equal(appendSalePlan(e.get, edition("sale_e2", 2)).ok, true);
+});
+
+const EDITIONS = (projectId) => `ideeza:project:editions:${projectId}`;
+function track(total) {
+  return {
+    id: "ed_track001", projectId: "proj_1", productId: "p1", kind: "physical", use: "private",
+    supply: { total }, createdAt: 1, lazy: true,
+    listing: { token: "MATIC", regular: "0.01", extended: "0.02", royaltyPct: 5, listedAt: 1, updatedAt: 1 }, demo: true,
+  };
+}
+const editionSale = (id, serial, at = 3000) =>
+  sale({
+    id, at, listingId: "ed_track001",
+    item: { nft: "physical", trackId: "ed_track001", productId: "p1", productName: "Car", use: "private", tier: "regular", serial },
+  });
+
+test("appendSalePlan: an edition sale past the track's supply, re-read from its store, is refused (another tab sold the last)", () => {
+  const full = storeOf({
+    [K.sales]: JSON.stringify([editionSale("sale_e1", 1), editionSale("sale_e2", 2)]),
+    [EDITIONS("proj_1")]: JSON.stringify([track(2)]),
+  });
+  assert.deepEqual(appendSalePlan(full.get, editionSale("sale_e3", 3)), { ok: false, reason: "conflict" });
+  // The same serial twice: two tabs priced the same unit.
+  const room = storeOf({ [K.sales]: JSON.stringify([editionSale("sale_e1", 1)]), [EDITIONS("proj_1")]: JSON.stringify([track(5)]) });
+  assert.deepEqual(appendSalePlan(room.get, editionSale("sale_e9", 1)), { ok: false, reason: "conflict" });
+  assert.equal(appendSalePlan(room.get, editionSale("sale_e2", 2)).ok, true);
+  // No such track, or an editions key that can't be read: never sold blind.
+  assert.deepEqual(appendSalePlan(storeOf({}).get, editionSale("sale_e1", 1)), { ok: false, reason: "conflict" });
+  assert.deepEqual(appendSalePlan(storeOf({ [EDITIONS("proj_1")]: "{nope" }).get, editionSale("sale_e1", 1)), {
+    ok: false,
+    reason: "unreadable",
+  });
 });
 
 test("appendBidPlan / appendSupportPlan: a row already stored (another tab) is a conflict", () => {

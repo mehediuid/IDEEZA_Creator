@@ -252,3 +252,30 @@ test("purchaseQuote(track, 'buyNow', tier, network): the tier's price on the pro
   assert.equal(ext.payout, "0.0195");
   assert.ok(reg.lines[0].endsWith("ETH"));
 });
+
+test("makeSale: while the project is sold in full, its editions are refused (R1-2)", () => {
+  const item = { nft: "physical", trackId: "ed_1", productId: "prd_1", productName: "Widget", use: "private", tier: "regular", serial: 1 };
+  const fullSale = { id: "sale_all", listingId: "lst_1", projectId: "proj_1", at: 1500, buyerId: "buyer-leo", item: { nft: "main", sharePct: 100 } };
+  const refused = makeSale(saleInputFixture({ listingId: "ed_1", item, price: "0.01" }), {
+    sales: [fullSale],
+    mint: mintViewFixture(),
+    ownership: { creatorPct: 0 },
+    now: 2000,
+  });
+  assert.deepEqual(refused, {
+    ok: false,
+    reason: "locked",
+    message: "This project was sold in full, so its NFTs aren't for sale any more.",
+  });
+  // The caller's own lock flag refuses too.
+  assert.equal(
+    makeSale(saleInputFixture({ listingId: "ed_1", item, price: "0.01" }), {
+      sales: [], mint: mintViewFixture(), ownership: { creatorPct: 100 }, now: 2000, locked: true,
+    }).reason,
+    "locked",
+  );
+  // Co-owners holding everything without a sale is no lock.
+  assert.ok(!("ok" in makeSale(saleInputFixture({ listingId: "ed_1", item, price: "0.01" }), {
+    sales: [], mint: mintViewFixture(), ownership: { creatorPct: 0 }, now: 2000,
+  })));
+});

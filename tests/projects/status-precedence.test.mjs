@@ -367,3 +367,15 @@ test("a paused listing reserves its Percent Selling, like a live one", () => {
   const removed = sum(project({ mint: lazy }), SELL, market({ listings: [listing({ percentSelling: 60, status: "removed", endedAt: NOW - MIN })] }));
   assert.equal(removed.ownership.reserved, 0);
 });
+
+test("canCtxOf(…, { productId }): an edition of that product lets its holder download (R5-20)", () => {
+  const edition = sale({
+    id: "sale_e", listingId: "ed_a", buyerId: "buyer-leo",
+    item: { nft: "physical", trackId: "ed_a", productId: "p1", productName: "RC Car", use: "private", tier: "regular", serial: 1 },
+  });
+  const v = view(project({ mint: lazy }), SELL, market({ listings: [listing()], sales: [edition] }));
+  const leo = { kind: "demo-buyer", buyerId: "buyer-leo" };
+  assert.equal(canCtxOf(v, leo).holding, false, "project-wide, only a Main share holds");
+  assert.equal(canCtxOf(v, leo, { productId: "p1" }).holding, true);
+  assert.equal(canCtxOf(v, leo, { productId: "p2" }).holding, false);
+});

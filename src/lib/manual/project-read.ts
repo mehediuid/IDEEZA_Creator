@@ -693,10 +693,12 @@ export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "own
 }
 
 /** The one `CanContext` the page passes to every `can()` (§3.7). `holding` is true only for a
- *  demo buyer who owns part of the Main NFT. */
+ *  demo buyer who owns part of the Main NFT — or, with `opts.productId` (the product page's
+ *  downloads, R5-20), an edition NFT of that product. */
 export function canCtxOf(
   view: Pick<ProjectView, "summary" | "mint" | "listing" | "ownership" | "lock" | "sales">,
   viewer?: Viewer,
+  opts: { productId?: string } = {},
 ): CanContext {
   const listing = view.listing;
   const auction = listing.kind === "live" ? listing.auction?.phase : undefined;
@@ -707,7 +709,7 @@ export function canCtxOf(
     ...(auction ? { auction } : null),
     creatorPct: view.ownership.maker,
     listingLive: listing.kind === "live",
-    holding: viewer?.kind === "demo-buyer" ? holdingOf(view.summary.id, viewer.buyerId, view.sales) !== null : false,
+    holding: viewer?.kind === "demo-buyer" ? holdingOf(view.summary.id, viewer.buyerId, view.sales, opts) !== null : false,
     locked: view.lock !== null,
   };
 }
