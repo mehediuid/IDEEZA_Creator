@@ -9,6 +9,9 @@
 // First in the rail, and below a 1024 px page container between the header
 // and the tab strip (C21), always open there: it can hold the page's one
 // violet (Close auction once an auction has ended, Relist while paused).
+// There an auction's and a paused listing's action row comes first in the
+// card, right under its state line and before its facts, so that violet is
+// above a phone's fold; it is the DOM order, so Tab follows what is seen.
 // Absent for a Draft, Given, and a mint whose record can't be read.
 //
 // Every fact is `marketplaceCardOf(view.listing)`, from the page's one
@@ -113,6 +116,34 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
   const closeDialog = () => {
     setDialog(null);
   };
+  // Below 1024 px it goes first in the card (C21).
+  const auctionActions = card.kind === "auction" && (
+    <>
+      {manage && (
+        <div className="flex flex-wrap gap-4">
+          <button type="button" onClick={() => setDialog("bids")} className={cn(button, QUIET)}>
+            {biddingHistoryLabel(card.bids)}
+          </button>
+          <button
+            type="button"
+            aria-disabled={!card.closeReady || undefined}
+            aria-describedby={card.closeHint ? closeHintId : undefined}
+            onClick={() => {
+              if (card.closeReady) setDialog("close");
+            }}
+            className={cn(button, card.closeReady ? PRIMARY : cn(QUIET, "cursor-not-allowed opacity-60"))}
+          >
+            Close auction
+          </button>
+        </div>
+      )}
+      {card.closeHint && (
+        <p id={closeHintId} className="m-0 text-sm text-text-secondary">
+          {card.closeHint}
+        </p>
+      )}
+    </>
+  );
   const marketLink = (first: boolean) => (
     <Link href={`/marketplace/${project.id}`} id={first ? MARKETPLACE_FOCUS_ID : undefined} className={LINK}>
       View on marketplace
@@ -162,41 +193,21 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
 
       {card.kind === "auction" && listing && (
         <>
+          {stacked && auctionActions}
           <Facts facts={card.facts} />
           {marketLink(true)}
-          {manage && (
-            <div className="flex flex-wrap gap-4">
-              <button type="button" onClick={() => setDialog("bids")} className={cn(button, QUIET)}>
-                {biddingHistoryLabel(card.bids)}
-              </button>
-              <button
-                type="button"
-                aria-disabled={!card.closeReady || undefined}
-                aria-describedby={card.closeHint ? closeHintId : undefined}
-                onClick={() => {
-                  if (card.closeReady) setDialog("close");
-                }}
-                className={cn(button, card.closeReady ? PRIMARY : cn(QUIET, "cursor-not-allowed opacity-60"))}
-              >
-                Close auction
-              </button>
-            </div>
-          )}
-          {card.closeHint && (
-            <p id={closeHintId} className="m-0 text-sm text-text-secondary">
-              {card.closeHint}
-            </p>
-          )}
+          {!stacked && auctionActions}
           <p className="m-0 text-sm text-text-tertiary">{card.fixedNote}</p>
         </>
       )}
 
       {card.kind === "paused" && listing && (
         <>
-          <p className="m-0 text-md leading-relaxed text-text-secondary">{card.changed}</p>
-          <p className="m-0 text-sm text-text-secondary">{card.terms}</p>
+          {!(manage && stacked) && pausedFacts(card)}
           {manage && (
             <RelistPanel
+              actionsFirst={stacked}
+              facts={stacked ? pausedFacts(card) : undefined}
               project={project}
               view={view}
               brief={brief}
@@ -275,6 +286,16 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
           onDone={(m) => done(m)}
         />
       )}
+    </>
+  );
+}
+
+/** A paused card's lines: what changed, and the terms buyers would get. */
+function pausedFacts(card: Extract<MarketplaceCard, { kind: "paused" }>) {
+  return (
+    <>
+      <p className="m-0 text-md leading-relaxed text-text-secondary">{card.changed}</p>
+      <p className="m-0 text-sm text-text-secondary">{card.terms}</p>
     </>
   );
 }

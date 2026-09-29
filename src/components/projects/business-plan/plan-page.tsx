@@ -214,6 +214,7 @@ export function BusinessPlanPage({ id }: { id: string }) {
                 <Select
                   aria-label="Jump to section"
                   placeholder="Jump to section"
+                  className="max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
                   options={current.sections.map((s) => ({ label: s.title, value: s.id }))}
                   onChange={(v) => document.getElementById(`section-${v}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 />

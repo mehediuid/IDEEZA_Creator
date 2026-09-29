@@ -29,9 +29,12 @@ import { cn } from "@/lib/utils";
 export const PAGE_CONTAINER = "[container-type:inline-size]";
 
 /** The content box: capped at 1280 px, 16 px gutters, 32 px from a 640 px page
- *  container (spacing tokens). */
+ *  container (spacing tokens). While render toasts are up, its foot clears their
+ *  capped stack (global-render-indicator.tsx: two toasts and a line from `md`,
+ *  one below it), so the rail's last controls can always be scrolled out from
+ *  under it. */
 export const PAGE_CONTENT =
-  "mx-auto w-full max-w-[1280px] px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16";
+  "mx-auto w-full max-w-[1280px] px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16 max-md:[body:has(.ix-render-toast)_&]:pb-[120px] md:[body:has(.ix-render-toast)_&]:pb-[184px]";
 
 /** The rail's one surface: hairlines between blocks, no card in a card
  *  (COR-54). Stacked after the tab panel it is a hairline-topped run of blocks

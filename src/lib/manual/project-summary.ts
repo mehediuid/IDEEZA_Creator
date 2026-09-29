@@ -144,7 +144,7 @@ export function sourceTag(source: ProjectSource): { label: string; tip: string |
 
 // ─────────────────────────── the next step ───────────────────────────
 
-/** The pair's kinds (Phase 2 spec §3.6.3). There is no `open-editor`: Open in editor lives on
+/** The pair's kinds (Phase 2 spec §3.6.3). Open in editor is not one of them: it lives on
  *  the product page (decision 7). There is no `relist` or `view-listing`: an existing listing's
  *  operations live in the rail's Marketplace block (C1, C22). */
 export type NextAction =
@@ -252,6 +252,19 @@ export function nextAction(
     case "paused":
       return pairOf(viewBrief, null, false);
   }
+}
+
+/**
+ * Whether `/project/<slug>/brief` (and a saved build's Brief) may open the Brief: the route
+ * matches `nextAction`'s buttons. A draft's Brief is its next step (Add or Continue Brief),
+ * and a Brief that minted opens on its read-only success step (View brief). A project
+ * minted any other way — from its page, or with a record this browser can't read — has no
+ * Brief: opening one would be an editable Step 1 on a minted, perhaps locked, project, even
+ * when a stale draft that never minted is still stored. A sold project is always minted.
+ */
+export function briefOpensFor(p: ManualProject, brief: StoredDraft | null): boolean {
+  if (brief?.state.mintedAt != null) return true;
+  return p.mint === undefined && p.status !== "completed";
 }
 
 // ─────────────────────────── the one date formatter ───────────────────────────

@@ -102,4 +102,6 @@ test("counts and state changes", () => {
   assert.equal(copy.toastHeading("rendering", "under a minute"), "Video rendering · under a minute left");
   assert.equal(copy.toastHeading("ready", ""), "Video ready");
   assert.equal(copy.toastHeading("failed", ""), "Video render failed");
+  assert.equal(copy.moreToastsLine(1), "+1 more video");
+  assert.equal(copy.moreToastsLine(3), "+3 more videos");
 });

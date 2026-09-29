@@ -198,8 +198,12 @@ function BuyableOffer({
           hierarchy="secondary"
           size="lg"
           className="h-[44px] w-full"
-          disabled={busy}
-          onClick={async () => {
+          // Not `disabled`, which would drop focus before the wallet dialog reads its opener.
+          aria-disabled={busy || undefined}
+          onClick={async (e) => {
+            if (busy) return;
+            // Safari doesn't focus a clicked button.
+            e.currentTarget.focus();
             const done = await buy(track, tier);
             if (done) announce(done);
           }}

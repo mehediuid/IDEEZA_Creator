@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import {
   EMPTY_MARKET,
   NO_SHARE_TO_SELL,
+  briefOpensFor,
   cardText,
   nextAction,
   projectSummary,
@@ -184,4 +185,20 @@ test("R2-8 · View brief only for a brief that minted: a project minted from its
   assert.deepEqual(pairOf(project({ mint: lazy }), started, full), quiet(null));
   // A brief that minted keeps it, locked or not.
   assert.deepEqual(pairOf(project({ mint: lazy }), SELL, full), quiet(viewBrief));
+});
+
+test("R2-8 · the Brief route matches the buttons: a draft's Brief and a Brief that minted open; nothing else minted does", () => {
+  const draftProject = project({ status: "draft" });
+  const started = draft({ intent: "sell" }, "form");
+  assert.equal(briefOpensFor(draftProject, null), true, "a draft with no Brief yet: Add Brief");
+  assert.equal(briefOpensFor(draftProject, started), true, "a draft's own Brief: Continue Brief");
+  assert.equal(briefOpensFor(project({ mint: lazy }), SELL), true, "a Brief that minted: View brief, read-only");
+  assert.equal(briefOpensFor(project({ mint: lazy }), null), false, "minted from its page: no Brief");
+  assert.equal(briefOpensFor(project({ mint: lazy }), started), false, "minted from its page, a stale draft: still none");
+  assert.equal(briefOpensFor(project(), null), false, "a completed v1 project whose mint can't be read");
+  // The buttons agree: no Brief button where the route refuses.
+  for (const [p, b] of [[project({ mint: lazy }), null], [project({ mint: lazy }), started]]) {
+    const pair = pairOf(p, b);
+    assert.ok(![pair.first, pair.second].some((a) => a && a.href === BRIEF), JSON.stringify(pair));
+  }
 });

@@ -127,7 +127,7 @@ export function ConfidenceBadge({
         // with this same id only while `open` is true, so pointing at it
         // sooner would name an element that isn't in the DOM yet.
         aria-controls={isOpen ? issuesPanelId(confidence.productId) : undefined}
-        className="inline-flex w-fit flex-wrap items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex w-fit flex-wrap items-center gap-[8px] rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
       >
         {badge}
         <span className="whitespace-nowrap text-sm text-text-secondary">

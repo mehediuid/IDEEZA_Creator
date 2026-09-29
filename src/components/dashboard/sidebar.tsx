@@ -224,7 +224,7 @@ function MobileBar({
         onClick={onOpenMenu}
         aria-label="Open the menu"
         aria-haspopup="dialog"
-        className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex h-[var(--touch-min)] w-[var(--touch-min)] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={Menu01Icon} />
       </button>
@@ -239,7 +239,7 @@ function MobileBar({
         type="button"
         onClick={onOpenSearch}
         aria-label="Search commands, pages, and settings"
-        className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+        className="inline-flex h-[var(--touch-min)] w-[var(--touch-min)] items-center justify-center rounded-lg text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
       >
         <Icon icon={Search01Icon} />
       </button>

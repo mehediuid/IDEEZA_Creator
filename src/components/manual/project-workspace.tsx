@@ -24,15 +24,20 @@
 // (P2-BUILDLOAD-12), then "Bring it in" (P2-EDITOR-5): one banner at a time.
 //
 // The Brief (/project/<slug>/brief) is the project's: it has no product,
-// and a locked project keeps it (View brief stays, §3.8.5).
+// and a locked project keeps it (View brief stays, §3.8.5). The route
+// matches the page's buttons (R2-8, `useBriefOpens`): a draft's Brief, or a
+// Brief that minted (its read-only success step). A project minted without
+// one — from its page — says it has no Brief and links back, and never
+// opens an editable Step 1.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { HelpCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon, LockIcon, NoteRemoveIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
+import { useBriefOpens } from "@/components/brief/use-brief-opens";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { useCreateHistory } from "@/lib/create/history";
 import { pendingNoticeOf, type SeedEditor } from "@/lib/manual/build-load";
@@ -197,6 +202,7 @@ export function ProjectWorkspace({
 
   const isBrief = step === "brief";
   const ready = hydrated && market.hydrated;
+  const briefOpens = useBriefOpens(isBrief && ready ? (project ?? null) : null);
   // The lock (decision 12): Open in editor is refused, so the route is too.
   // Unreadable market records read as "no sales", so they lock it as well.
   const marketUnreadable = !isBrief && !!project && market.data.unreadable;
@@ -331,7 +337,17 @@ export function ProjectWorkspace({
   if (isBrief) {
     // Hold the Brief until the active project matches the URL — avoids a
     // frame of the previous project's chrome while selectProject settles.
-    if (activeProjectId !== project.id) return <BlankShell label="Opening project…" />;
+    if (activeProjectId !== project.id || briefOpens === undefined) return <BlankShell label="Opening project…" />;
+    if (!briefOpens) {
+      return (
+        <EditorStateCard
+          icon={NoteRemoveIcon}
+          title={`${project.name} has no Brief`}
+          body="It was minted without one, so there's no Brief to open. Everything about it is on its project page."
+          backHref={projectHref}
+        />
+      );
+    }
     return <BriefApp key={project.id} />;
   }
 

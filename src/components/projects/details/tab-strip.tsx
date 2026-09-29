@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 export type TabDef<T extends string> = { id: T; label: string };
 
 const TAB =
-  "inline-flex h-[36px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-8 text-md font-semibold leading-md outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:h-[var(--touch-min)]";
+  "inline-flex h-[36px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-8 text-md font-semibold leading-md outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus max-md:h-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)]";
 const TAB_ON = "border-text-primary bg-bg-subtle text-text-primary";
 const TAB_OFF = "border-transparent text-text-secondary hover:bg-bg-subtle hover:text-text-primary";
 

@@ -18,6 +18,9 @@
 //   items above to relist."), and pressing it — or "Generate videos" — opens
 //   T14's ReadinessDialog for the relist, whose own "Relist" goes on once the
 //   videos are ready.
+// - Below a 1024 px page (`actionsFirst`, C21) the Relist row leads — its hint
+//   and error with it — then the card's lines (`facts`), then the checklist,
+//   so Relist is above a phone's fold.
 
 import * as React from "react";
 import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
@@ -37,6 +40,7 @@ import { ReadinessDialog } from "../details/readiness-dialog";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "./listing-dialog";
 
 const FINISH_FIRST = "Finish the items above to relist.";
+const FINISH_BELOW = "Finish the items below to relist.";
 
 export function RelistPanel({
   project,
@@ -47,6 +51,8 @@ export function RelistPanel({
   buttonClass,
   primaryClass,
   onDone,
+  actionsFirst = false,
+  facts,
   children,
 }: {
   project: ManualProject;
@@ -59,6 +65,10 @@ export function RelistPanel({
   buttonClass: string;
   primaryClass: string;
   onDone: (message: string) => void;
+  /** The Relist row before the checklist, with `facts` between them (C21). */
+  actionsFirst?: boolean;
+  /** The card's own lines, drawn between the row and the checklist when `actionsFirst`. */
+  facts?: React.ReactNode;
   /** Edit and Remove listing, after Relist in the same row. */
   children: React.ReactNode;
 }) {
@@ -122,48 +132,51 @@ export function RelistPanel({
     else if (result.reason !== "rejected") setError(result.message || refusedCopy("storage"));
   };
 
-  return (
-    <>
-      <section aria-labelledby={headId} className="flex flex-col gap-3">
-        <h3 id={headId} className="m-0 text-sm font-semibold text-text-primary">
-          To relist:
-        </h3>
-        <ul role="list" className="m-0 flex flex-col gap-3 p-0">
-          {items.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 text-sm">
-              {item.id === "metadata" ? (
-                <span aria-hidden className="w-[16px] shrink-0 text-center text-text-tertiary">
-                  •
-                </span>
-              ) : (
-                <span
-                  aria-hidden
-                  className={cn("inline-flex shrink-0 pt-px", item.ok ? "text-text-success" : "text-text-error")}
-                >
-                  <Icon icon={item.ok ? Tick02Icon : Cancel01Icon} size={16} />
-                </span>
-              )}
-              <span className="min-w-0 flex-1 text-text-primary">
-                {item.label}
-                {item.id !== "metadata" && (
-                  <span className={cn("font-semibold", item.ok ? "text-text-success" : "text-text-error")}>
-                    {` · ${item.ok ? "Ready" : "Missing"}`}
-                  </span>
-                )}
+  const checklist = (
+    <section aria-labelledby={headId} className="flex flex-col gap-3">
+      <h3 id={headId} className="m-0 text-sm font-semibold text-text-primary">
+        To relist:
+      </h3>
+      <ul role="list" className="m-0 flex flex-col gap-3 p-0">
+        {items.map((item) => (
+          <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 text-sm">
+            {item.id === "metadata" ? (
+              <span aria-hidden className="w-[16px] shrink-0 text-center text-text-tertiary">
+                •
               </span>
-              {item.href === "generate-videos" && (
-                <button
-                  type="button"
-                  onClick={() => setGate(true)}
-                  className="rounded-sm text-sm font-semibold text-text-link underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
-                >
-                  Generate videos
-                </button>
+            ) : (
+              <span
+                aria-hidden
+                className={cn("inline-flex shrink-0 pt-px", item.ok ? "text-text-success" : "text-text-error")}
+              >
+                <Icon icon={item.ok ? Tick02Icon : Cancel01Icon} size={16} />
+              </span>
+            )}
+            <span className="min-w-0 flex-1 text-text-primary">
+              {item.label}
+              {item.id !== "metadata" && (
+                <span className={cn("font-semibold", item.ok ? "text-text-success" : "text-text-error")}>
+                  {` · ${item.ok ? "Ready" : "Missing"}`}
+                </span>
               )}
-            </li>
-          ))}
-        </ul>
-      </section>
+            </span>
+            {item.href === "generate-videos" && (
+              <button
+                type="button"
+                onClick={() => setGate(true)}
+                className="rounded-sm text-sm font-semibold text-text-link underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
+              >
+                Generate videos
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+
+  const actions = (
+    <>
       {error && <Banner tone="error">{error}</Banner>}
       <div className="flex flex-wrap gap-4">
         <button
@@ -180,8 +193,25 @@ export function RelistPanel({
       </div>
       {!ready && (
         <p id={hintId} className="m-0 text-sm text-text-secondary">
-          {FINISH_FIRST}
+          {actionsFirst ? FINISH_BELOW : FINISH_FIRST}
         </p>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      {actionsFirst ? (
+        <>
+          {actions}
+          {facts}
+          {checklist}
+        </>
+      ) : (
+        <>
+          {checklist}
+          {actions}
+        </>
       )}
 
       {gate && (
