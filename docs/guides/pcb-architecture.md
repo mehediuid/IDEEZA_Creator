@@ -41,7 +41,7 @@ src/components/pcb/
 - **`stateRef.current`** — read latest state inside async/event actions.
 - **`setToolAs(tool, text)`** — arms a place tool whose object carries a given name (`state.placeText`, consumed + cleared by `placeObject`). Lets several menu rows share one symbol kind honestly: Insert ▸ Power & Ground places `vcc5v` as **VCC / +5V / -5V**, and the supply glyph draws `obj.text`.
 - Actions may call `actions.<other>()` (safe — invoked on events, not during render).
-- **Persistence:** the *document* (`objects, pcbBoard, twoD, threeD, gridSize, gridType, unit, snapEnabled, designRules, pcbDrcConfig, pcbLayers, pcbNets, pcbDefaults, boardSettings`) auto-saves (debounced) to `localStorage` under `ideeza:pcb:doc:<projectId>`, scoped by `ideeza:manual:active`. So layer colours/visibility/lock, net colours, place defaults, grid style and DRC rule-tuning now survive reload. UI flags (zoom, panels, menus, sheets) are session-only. `saveDoc()` force-writes; `sanitizePcbDoc()` shape-checks every key on load.
+- **Persistence:** the *document* (`objects, pcbBoard, twoD, threeD, gridSize, gridType, unit, snapEnabled, designRules, pcbDrcConfig, pcbLayers, pcbNets, pcbDefaults, boardSettings`) auto-saves (debounced) to `localStorage` under `ideeza:pcb:doc:<projectId>:<productId>`, one document per product: the store holds none until an editor route names one (`setDocScope`, `usePcbDocScope`) and never reads `ideeza:manual:active` for it. So layer colours/visibility/lock, net colours, place defaults, grid style and DRC rule-tuning now survive reload. UI flags (zoom, panels, menus, sheets) are session-only. `saveDoc()` force-writes; `sanitizePcbDoc()` shape-checks every key on load.
 
 ## `CanvasObject` — the universal placed-object model
 
@@ -50,3 +50,12 @@ comment, side, props` (typed-field bag), `scope` (`"schematic"|"pcb"`),
 `sheetId` (multi-sheet), `sourceId` (cross-probe link), `points` (real polygon
 rings for Combine results). Add a field here + handle it in `placed-objects.tsx`
 + (if persisted) the doc sanitizer.
+
+## Persisted state (project pages, market, wallet, video)
+Key names only; shapes live beside each store. Every store reads through `src/lib/key-store.ts` (one live key) and shape-checks on read. A project's delete sweep (`lib/manual/project-storage.ts`, `ideeza:project-deleted`) removes the per-project keys.
+- **Projects:** `ideeza:manual:projects`, `ideeza:manual:active`; the Brief draft `ideeza:brief:draft:<projectId>` and `ideeza:brief:draft:build:<buildId>`; the network `ideeza:network:<projectId>`.
+- **Per-project records:** `ideeza:project:journey:<projectId>` (Activity), `ideeza:project:bizplan:<projectId>`, `ideeza:project:editions:<projectId>`, `ideeza:video:<projectId>` (product takes).
+- **Wallet and market (all Testnet demo):** `ideeza:wallet:demo`; `ideeza:market:listings|sales|bids|support|buyer` (buyer is the active Shopping-as identity).
+- **Editor documents, one per product** (`lib/manual/editor-scope.ts`): `ideeza:pcb:doc:<projectId>:<productId>`, `ideeza:wiring:doc:…`, `ideeza:assembly:…`, `ideeza:three:aimodel:…`, `ideeza:3d:shapes|right|sketches:…`, `ideeza:code:files:…`, `ideeza:code:blockly-workspace:…`, `ideeza:preview:canvas|mates:…`; the first row of a project may still read the legacy `…:<projectId>` key.
+- **BUILDLOAD:** `ideeza:editor:seed:<projectId>:<productId>` (what the first open seeded, plus the one-slot Restore backup) and `ideeza:editor:bring-in:dismissed:<editor>`.
+- **IndexedDB:** `ideeza-video` / `clips` (a take's video and poster, indexed by `projectId`) and `ideeza-media` / `files` (Activity attachments, indexed by `projectId`).
