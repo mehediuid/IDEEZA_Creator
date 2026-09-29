@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { refusedCopy } from "@/components/projects/listing/listing-dialog";
+import { Banner } from "@/components/ideeza";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useMint } from "@/components/wallet/use-mint";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
@@ -65,7 +66,7 @@ import { mainSalesOf, randomId } from "@/lib/market/sales";
 import type { ListingMetadata } from "@/lib/market/types";
 import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
 import { readWallet } from "@/lib/wallet/demo-wallet";
-import { mintViewOf } from "@/lib/wallet/mint";
+import { mintViewOf, normalizeMintRecord } from "@/lib/wallet/mint";
 import { requestCopy } from "@/lib/wallet/request";
 import type { MintType, Proof, RequestResult } from "@/lib/wallet/types";
 import {
@@ -407,18 +408,27 @@ function projectDetailOf(p: ManualProject, buildId: string | undefined, builds: 
   return version ? `${products} · version ${version}` : products;
 }
 
-/** Writes the draft now, so the commit's writes land in their order (the persist effect only follows a render). */
-function writeDraft(scope: string, state: BriefState, step: BriefStepId): void {
+/** Writes the draft now, so the commit's writes land in their order (the persist effect only follows a render).
+ *  False when the browser refused it. */
+function writeDraft(scope: string, state: BriefState, step: BriefStepId): boolean {
   try {
     window.localStorage.setItem(draftKey(scope), JSON.stringify({ state, step }));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
 const GONE = "This project no longer exists.";
 const STORAGE_FAILED = "This browser couldn't save it — storage is full or blocked.";
+/** The wallet's answer didn't make a whole MintRecord (normalizeMintRecord refused it). */
+const RECORD_INCOMPLETE = "The wallet's answer didn't make a complete mint record, so nothing was saved.";
 const ALREADY_LISTED = "This project is already on the marketplace.";
-export const NOT_MINTED_REJECTED = "Not minted — you rejected it in your wallet. Nothing was charged.";
+const NOT_MINTED_REJECTED = "Not minted — you rejected it in your wallet. Nothing was charged.";
+/** The mint and its listing are written; only the brief's own record of it isn't. */
+const DRAFT_NOT_SAVED =
+  "Minted and saved on the project, but this browser couldn't save the brief itself — storage is full or blocked. After a reload the brief opens on an earlier step.";
 
 /** "Not minted — {reason} Nothing was charged." (P2-MINT-6). */
 function notMintedLine(reason: string): string {
@@ -480,6 +490,8 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   const [minting, setMinting] = React.useState(false);
   // Why the last commit didn't mint (a reject, or a failure's reason).
   const [mintError, setMintError] = React.useState<string | null>(null);
+  // The commit minted, but its draft write was refused (writeDraft).
+  const [draftNotSaved, setDraftNotSaved] = React.useState(false);
   // Set when this project's own brief was kept instead of being overwritten by
   // its build's older draft — the page says so on arrival. The slot is
   // one-shot, so the ref keeps the read to once per project: StrictMode runs
@@ -746,6 +758,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         const prior = cur.mint ?? null;
         const record = proof && plan.request ? plan.nextRecord(proof) : null;
         // 1. The MintRecord.
+        if (record && !normalizeMintRecord(record)) return { ok: false, message: RECORD_INCOMPLETE };
         if (record && !setMint(cur.id, record)) return { ok: false, message: STORAGE_FAILED };
         // 2. The listing (Sell). Refused: the record goes back to what it was.
         if (listings) {
@@ -761,7 +774,7 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         if (newMint) bumpMinted(network, collection);
         // 3. The draft's mintedAt — one moment, which a showcase it starts shares (COR-105) —
         //    then the v1 writes.
-        writeDraft(scope, { ...s, mintedAt: at }, "success");
+        setDraftNotSaved(!writeDraft(scope, { ...s, mintedAt: at }, "success"));
         markStepCompleted(cur.id, "brief");
         setStatus(cur.id, "completed");
         if (typeof cur.ownerConfirmedAt !== "number") setOwnerConfirmed(cur.id, at);
@@ -868,6 +881,11 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           carried={handoffKept.carried}
           minted={handoffKept.minted}
         />
+      ) : null}
+      {draftNotSaved && step === "success" ? (
+        <Banner tone="attention" className="w-full max-w-[600px]">
+          {DRAFT_NOT_SAVED}
+        </Banner>
       ) : null}
 
       <Crossfade keyName={`step-${step}`}>

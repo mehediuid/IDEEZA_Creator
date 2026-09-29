@@ -47,7 +47,7 @@ import type { VideoTake } from "@/lib/video/types";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   sell: "Listed on the marketplace",
-  give: "Drop is live",
+  give: "Given to the community",
   save: "Saved",
 };
 
@@ -96,6 +96,7 @@ export function Step4Success({
       ? listingViewOf(projectId, { ...market, now: minute, current: NO_METADATA })
       : null;
   const listed = listing && listing.kind !== "none" ? listing.listing : null;
+  const onMarket = listing?.kind === "live" || listing?.kind === "paused";
 
   return (
     <div className="flex w-full max-w-[560px] flex-col items-center gap-[24px] text-center">
@@ -140,12 +141,15 @@ export function Step4Success({
           </div>
           <p className="m-0 text-md font-medium tabular-nums text-text-primary">{termsLineOf(listed)}</p>
           <p className="m-0 text-sm text-text-secondary">{LISTING_HOME_NOTE}</p>
-          <Link
-            href={`/marketplace/${projectId}`}
-            className="mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-          >
-            {VIEW_ON_MARKETPLACE}
-          </Link>
+          {/* Only while there is a listing to see: a removed or ended one opens nothing there. */}
+          {onMarket && (
+            <Link
+              href={`/marketplace/${projectId}`}
+              className="mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {VIEW_ON_MARKETPLACE}
+            </Link>
+          )}
         </section>
       ) : null}
 

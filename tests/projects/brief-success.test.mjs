@@ -17,7 +17,7 @@ import { commitCtaLabel } from "../../.tmp-test/lib/wallet/mint.js";
 
 const briefPath = (name) => new URL(`../../src/components/brief/${name}`, import.meta.url);
 const read = (name) => readFileSync(briefPath(name), "utf8");
-const CLAIMS = /Innovations|claim it|is up\b/i;
+const CLAIMS = /Innovations|claim it|is up\b|drop is (open|live)/i;
 
 /** The body of `const <name> = …` up to the next top-level marker. */
 function slice(src, from, to) {
@@ -33,7 +33,8 @@ test("no success line claims a post or a claimable drop, for any intent (COM-21)
   }
   assert.doesNotMatch(pendingSubline(), CLAIMS);
   assert.doesNotMatch(pendingCardLine(2), CLAIMS);
-  assert.equal(liveSubline("give", true), "Your videos are final and the drop is open.");
+  assert.equal(liveSubline("give", true), "Your videos are final. It's free to use and build on.");
+  assert.equal(liveSubline("give", false), "It's free to use and build on.");
   assert.equal(liveSubline("save", false), "Stored in your library. Pick it up any time.");
 });
 
@@ -63,6 +64,7 @@ test("the step keeps none of the old claims (COM-21)", () => {
     "Your Innovations post goes up",
     "Your community can claim it",
     "Listing is minted",
+    "Drop is live",
   ]) {
     assert.ok(!src.includes(claim), `still says "${claim}"`);
   }

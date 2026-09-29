@@ -1,8 +1,9 @@
 // success-copy.ts — Step 4's pure copy (COM-21). Showcase, including any
 // Innovations post, is the project's own flag (COR-105, set from the
 // Outcome row or this step's own Showcase control); no line claims a post
-// that hasn't happened, and Give's "Your community can claim it." is
-// dropped — nothing here promises what the app can't back yet.
+// that hasn't happened, and Give promises no drop to claim ("Your community
+// can claim it.", "The drop is open.") — claiming comes later; nothing here
+// promises what the app can't back yet.
 //
 // A Sell commit writes the listing itself (P2-LISTING-22, as changed in
 // spec §4.5), and the readiness gate is strict (C5): every product's video
@@ -21,8 +22,8 @@ export function liveSubline(intent: Intent, hasClip: boolean): string {
     ? LISTED_LINE
     : intent === "give"
       ? hasClip
-        ? "Your videos are final and the drop is open."
-        : "The drop is open."
+        ? "Your videos are final. It's free to use and build on."
+        : "It's free to use and build on."
       : "Stored in your library. Pick it up any time.";
 }
 
