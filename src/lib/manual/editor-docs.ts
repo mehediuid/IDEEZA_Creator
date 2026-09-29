@@ -183,19 +183,24 @@ export class DocSaveQueue<T, V = string> {
 
 export type BringInEditor = "code" | "three";
 
-/** The pre-P2 global key of each document an editor brings in — editor-scope's
- *  base key, which the product's own key extends with `:<projectId>:<rowId>`. */
-export const GLOBAL_DOC_KEY = {
-  "code.files": "ideeza:code:files",
-  "code.blockly": "ideeza:code:blockly-workspace",
-  "three.shapes": "ideeza:3d:shapes",
-  "three.right": "ideeza:3d:right",
-  "three.sketches": "ideeza:3d:sketches",
-  "preview.canvas": "ideeza:preview:canvas",
-  "preview.mates": "ideeza:preview:mates",
-} as const satisfies Partial<Record<EditorDoc, string>>;
+const GLOBAL_DOCS = [
+  "code.files",
+  "code.blockly",
+  "three.shapes",
+  "three.right",
+  "three.sketches",
+  "preview.canvas",
+  "preview.mates",
+] as const satisfies readonly EditorDoc[];
 
-type GlobalDoc = keyof typeof GLOBAL_DOC_KEY;
+type GlobalDoc = (typeof GLOBAL_DOCS)[number];
+
+/** The pre-P2 global key of each document an editor brings in: editor-scope's
+ *  base key (its one home), which the product's own key extends with
+ *  `:<projectId>:<rowId>` — so it is that key with empty ids, less the `::`. */
+export const GLOBAL_DOC_KEY = Object.fromEntries(
+  GLOBAL_DOCS.map((doc) => [doc, editorDocKey(doc, { projectId: "", productId: "" }).slice(0, -2)]),
+) as Record<GlobalDoc, string>;
 
 /** What each editor brings in. 3D carries Preview's canvas and mates with it,
  *  because Preview shows the 3D scene. */
@@ -326,26 +331,79 @@ function appendById(own: unknown[], earlier: unknown[]): unknown[] {
   })];
 }
 
-/** A Blockly workspace's XML with the earlier one's blocks added. Variables
- *  are carried over only when the product's workspace doesn't declare that
- *  id already; Blockly re-issues any block id that clashes. */
+const BLOCKLY_VARS = /<variables>([\s\S]*?)<\/variables>/;
+
+type XmlVariable = { raw: string; id: string | null; type: string; name: string };
+
+const attrOf = (attrs: string, name: string): string | null =>
+  new RegExp(`\\b${name}="([^"]*)"`).exec(attrs)?.[1] ?? null;
+const withAttr = (attrs: string, name: string, value: string) =>
+  attrs.replace(new RegExp(`\\b${name}="[^"]*"`), () => `${name}="${value}"`);
+const ENTITY: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+const xmlText = (s: string) => s.replace(/&(lt|gt|amp|quot|apos);/g, (_m, e: string) => ENTITY[e]);
+
+/** The `<variables>` a workspace declares: `<variable type id>name</variable>`. */
+function variablesOf(inner: string): XmlVariable[] {
+  const body = BLOCKLY_VARS.exec(inner)?.[1] ?? "";
+  return [...body.matchAll(/<variable\b([^>]*)>([\s\S]*?)<\/variable>/g)].map((m) => ({
+    raw: m[0],
+    id: attrOf(m[1], "id"),
+    type: attrOf(m[1], "type") ?? "",
+    name: m[2],
+  }));
+}
+
+/** A Blockly workspace's XML with the earlier one's blocks added (C2).
+ *  Blockly refuses a workspace that declares one name twice with two ids —
+ *  a for-loop's "i" in each — and loads nothing. So an earlier variable is
+ *  matched to the product's by name and type, as Blockly matches them (any
+ *  case), and its blocks' fields and function arguments are re-pointed to
+ *  the product's id; one whose id the product uses for another name gets a
+ *  new id. Blockly re-issues any block id that clashes. */
 export function appendBlocklyXml(own: string, earlier: string): string {
   const inner = (xml: string) => {
     const open = xml.indexOf(">", xml.indexOf("<xml"));
     const close = xml.lastIndexOf("</xml>");
     return open >= 0 && close > open ? xml.slice(open + 1, close) : "";
   };
-  const VARS = /<variables>([\s\S]*?)<\/variables>/;
+  const VARS = BLOCKLY_VARS;
   const ownInner = inner(own);
   const earlierInner = inner(earlier);
-  const ownIds = new Set([...ownInner.matchAll(/<variable\b[^>]*\bid="([^"]*)"/g)].map((m) => m[1]));
-  const earlierVars = [...(earlierInner.match(VARS)?.[1] ?? "").matchAll(/<variable\b[^>]*>[\s\S]*?<\/variable>/g)]
-    .map((m) => m[0])
-    .filter((v) => {
-      const id = /\bid="([^"]*)"/.exec(v)?.[1];
-      return !id || !ownIds.has(id);
+  const ownVars = variablesOf(ownInner);
+  const nameKey = (v: XmlVariable) => `${v.type}\u0000${xmlText(v.name).toLowerCase()}`;
+  const ownByName = new Map(ownVars.map((v) => [nameKey(v), v]));
+  const ownIds = new Set(ownVars.map((v) => v.id));
+  const declared = variablesOf(earlierInner);
+  const taken = new Set([...ownIds, ...declared.map((v) => v.id)]);
+  // earlier id → the id (and, for a name match, the name) its blocks use now
+  const repoint = new Map<string, { id: string; name: string | null }>();
+  const earlierVars: string[] = [];
+  for (const v of declared) {
+    const same = ownByName.get(nameKey(v));
+    if (same) {
+      if (v.id && same.id && v.id !== same.id) repoint.set(v.id, { id: same.id, name: same.name });
+      continue;
+    }
+    if (v.id && ownIds.has(v.id)) {
+      let id = `${v.id}-earlier`;
+      for (let n = 2; taken.has(id); n++) id = `${v.id}-earlier${n}`;
+      taken.add(id);
+      repoint.set(v.id, { id, name: null });
+      earlierVars.push(v.raw.replace(/^<variable\b[^>]*>/, (open) => withAttr(open, "id", id)));
+      continue;
+    }
+    earlierVars.push(v.raw);
+  }
+  const earlierBlocks = earlierInner
+    .replace(VARS, "")
+    .replace(/<field\b([^>]*)>([\s\S]*?)<\/field>/g, (m, attrs: string, text: string) => {
+      const to = repoint.get(attrOf(attrs, "id") ?? "");
+      return to ? `<field${withAttr(attrs, "id", to.id)}>${to.name ?? text}</field>` : m;
+    })
+    .replace(/<arg\b([^>]*)>/g, (m, attrs: string) => {
+      const to = repoint.get(attrOf(attrs, "varid") ?? "");
+      return to ? `<arg${withAttr(attrs, "varid", to.id)}>` : m;
     });
-  const earlierBlocks = earlierInner.replace(VARS, "");
   let merged = ownInner;
   if (earlierVars.length) {
     merged = VARS.test(merged)
