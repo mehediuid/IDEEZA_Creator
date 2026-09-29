@@ -19,7 +19,9 @@
 // clear (a recheck: just sold, taken off, price changed, auction over,
 // outbid) offers a single, focused Close (MARKETPLACE-14). The body is a
 // polite live region; failed and can't-afford are role=alert. Pending can't
-// be closed: ✕, Escape and the scrim say so instead. Phases crossfade
+// be closed: ✕ reads unavailable, and it, Escape and the scrim say so instead.
+// A stored wallet that can't be read refuses every write, so both modes say
+// that (not "storage is full") and offer "Reset the demo wallet". Phases crossfade
 // (200 ms, the `normal` motion token); under reduced motion nothing moves
 // and the spinner and bar are still, with the words unchanged.
 //
@@ -69,6 +71,7 @@ import type {
   RequestPhase,
   WalletRequest,
 } from "@/lib/wallet/types";
+import { resetDemoWallet, useWalletUnreadable } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 
 export type RequestView = {
@@ -93,6 +96,8 @@ export type RequestActions = {
   cancel: () => void;
   useLazy: () => void;
   done: () => void;
+  /** "Reset the demo wallet", then the request from the top. */
+  reset: () => void;
 };
 
 export type WalletDialogProps = {
@@ -108,6 +113,11 @@ export type WalletDialogProps = {
 };
 
 const WRITE_FAILED = "This browser couldn't save the wallet — storage is full or blocked.";
+const WALLET_UNREADABLE =
+  "This browser's demo wallet can't be read, so nothing can be saved to it. Reset it to start over with fresh test funds; nothing on the marketplace changes.";
+const DEBIT_UNREADABLE =
+  "It went through, but this browser's demo wallet can't be read, so the charge wasn't saved there and its balance may read wrong. Reset it from the Demo wallet.";
+const RESET = "Reset the demo wallet";
 // 44 px at phone width and on a coarse pointer (P2-MINT-2 "Size").
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const FADE = "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal motion-safe:ease-out";
@@ -149,14 +159,6 @@ function BusyMark() {
       className="inline-block size-[14px] shrink-0 rounded-full border-2 border-solid border-current border-r-transparent motion-safe:animate-spin"
     />
   );
-}
-
-/** The confirmed heading, by what went through (MINT-3's table, MARKETPLACE-14). */
-function confirmedTitleOf(req: WalletRequest, fallback: string): string {
-  if (req.kind !== "transaction") return fallback;
-  if (req.purpose === "purchase") return "Purchase successful";
-  if (req.purpose === "instantMint" || req.purpose === "upgradeMint") return "Minted on chain.";
-  return fallback;
 }
 
 function useMovingFocus(key: string) {
@@ -317,7 +319,8 @@ function ManageDialog({ wallet, market, write, onClose }: WalletDialogProps) {
   const connected = state?.connected === true;
   const network: Network = state?.network ?? "baseSepolia";
   const address = demoAddress(id);
-  const { target, setTarget } = useMovingFocus(wallet ? (connected ? "on" : "off") : "unread");
+  const unreadable = useWalletUnreadable();
+  const { target, setTarget } = useMovingFocus(unreadable ? "corrupt" : wallet ? (connected ? "on" : "off") : "unread");
 
   // Each write re-reads the store, so another tab's change is never overwritten with a stale copy.
   const apply = (change: (w: DemoWallet) => DemoWallet) => {
@@ -387,10 +390,26 @@ function ManageDialog({ wallet, market, write, onClose }: WalletDialogProps) {
       footer={footer}
     >
       <div className="flex flex-col gap-[16px] text-sm text-text-secondary">
-        {failed && (
-          <div role="alert">
-            <Banner tone="error">{WRITE_FAILED}</Banner>
+        {unreadable ? (
+          <div role="alert" className="flex flex-col items-start gap-[8px]">
+            <Banner tone="error">{WALLET_UNREADABLE}</Banner>
+            <Button
+              ref={setTarget}
+              type="button"
+              hierarchy="secondary"
+              size="md"
+              className={cn("min-h-[32px]", TAP)}
+              onClick={() => setFailed(!resetDemoWallet())}
+            >
+              {RESET}
+            </Button>
           </div>
+        ) : (
+          failed && (
+            <div role="alert">
+              <Banner tone="error">{WRITE_FAILED}</Banner>
+            </div>
+          )
         )}
 
         {!wallet ? (
@@ -538,6 +557,7 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
   const { req, identity, phase, reason } = view;
   const copyText = requestCopy(phase, req, wallet, reason ?? undefined);
   const { target, setTarget } = useMovingFocus(phase);
+  const unreadable = useWalletUnreadable();
   const { copied, copy } = useCopy();
   const alertId = React.useId();
   const headingId = React.useId();
@@ -723,9 +743,9 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
     case "confirmed":
       body = (
         <>
-          {heading(confirmedTitleOf(req, copyText.title))}
+          {heading(copyText.title)}
           <p className="text-text-primary">{req.doneLine}</p>
-          {view.warning && <Banner tone="attention">{view.warning}</Banner>}
+          {view.warning && <Banner tone="attention">{unreadable ? DEBIT_UNREADABLE : view.warning}</Banner>}
           {view.proof?.txHash && (
             <HashLine
               label="Transaction"
@@ -761,6 +781,10 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
       } else if ((reason === "recheck" || reason === "storageFailed") && view.message) {
         line = view.message;
       }
+      // The wallet's own write was refused because its record can't be read: a retry can't
+      // help, a reset can.
+      const corrupt = reason === "storageFailed" && !view.message && unreadable;
+      if (corrupt) line = WALLET_UNREADABLE;
       body = (
         <div role="alert" className="flex flex-col gap-[8px]">
           {heading(copyText.title)}
@@ -772,6 +796,11 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
       footer =
         reason === "recheck" ? (
           secondary("Close", actions.cancel, { focus: true })
+        ) : corrupt ? (
+          <>
+            {secondary("Close", actions.cancel)}
+            {primary(RESET, actions.reset)}
+          </>
         ) : (
           <>
             {secondary("Close", actions.cancel)}
@@ -786,6 +815,7 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
     <ModalFrame
       open
       onClose={phase === "pending" ? () => setNudge((n) => n + 1) : actions.cancel}
+      closeUnavailable={phase === "pending"}
       size="sm"
       initialFocus={target}
       title={req.title}

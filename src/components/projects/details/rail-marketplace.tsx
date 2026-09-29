@@ -85,7 +85,7 @@ export function RailMarketplace(props: SlotProps) {
   if (!can(viewer, "facts.seeOwnerOnly") || !WITH_BLOCK.has(view.summary.status)) return null;
   return (
     <RailBlock title="Marketplace" collapsible={false}>
-      <NftTypeTabs projectId={props.project.id} view={view} listedOnly={false} main={<MarketplaceBody {...props} />} />
+      <NftTypeTabs projectId={props.project.id} view={view} main={<MarketplaceBody {...props} />} />
     </RailBlock>
   );
 }

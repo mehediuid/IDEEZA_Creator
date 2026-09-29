@@ -90,7 +90,7 @@ export function EditionBlock(props: ProductSlotProps) {
   const { view, product, viewer } = props;
   const owner = can(viewer, "facts.seeOwnerOnly");
   const mine = React.useMemo(() => tracksOf(product.id, view.editions), [product.id, view.editions]);
-  const hidden = editionsHiddenWith(view.listing);
+  const hidden = editionsHiddenWith(view.listing, view.lock !== null);
   // What buyers can see: listed, and not hidden by a paused or removed Main listing.
   const publicTracks = React.useMemo(() => (hidden ? [] : mine.filter((t) => t.listing !== null)), [hidden, mine]);
 
@@ -254,7 +254,7 @@ function OwnerBody({ project, view, product, viewer, announce, tracks }: Product
                       view={view}
                       projectName={project.name}
                       listBlocked={listing.kind === "blocked" ? listing.reason : null}
-                      hidden={t.listing !== null && editionsHiddenWith(view.listing)}
+                      hidden={t.listing !== null && editionsHiddenWith(view.listing, view.lock !== null)}
                       onList={() => startListing(t)}
                       onEdit={() => open({ kind: "edit", track: t })}
                       onRemove={() => open({ kind: "remove", track: t })}
@@ -410,8 +410,9 @@ function TrackCard({
   onAdd: () => void;
 }) {
   const id = firstControlId(track.id);
-  const hiddenLine =
-    view.listing.kind === "paused"
+  const hiddenLine = view.lock
+    ? `Off Explore marketplace: ${projectName} was sold in full.`
+    : view.listing.kind === "paused"
       ? `Hidden on Explore marketplace while ${projectName}'s listing is paused.`
       : `Hidden on Explore marketplace until ${projectName} is listed again.`;
   return (

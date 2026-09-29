@@ -6,7 +6,7 @@
 // Virtual are read-only summaries: one row per product — its name, a link to
 // its page, the one home of every edition control (C19-1) — and a line per
 // use, e.g. "Private use · Listed · 0/30 sold" or "Commercial use · Not
-// created". A preview reads listed lines only.
+// created".
 
 import * as React from "react";
 import Link from "next/link";
@@ -38,12 +38,10 @@ export function EditionSummary({
   projectId,
   view,
   kind,
-  listedOnly,
 }: {
   projectId: string;
   view: ProjectView;
   kind: EditionKind;
-  listedOnly: boolean;
 }) {
   const products = React.useMemo(
     () =>
@@ -52,7 +50,7 @@ export function EditionSummary({
         .map((p) => ({ id: p.id, name: displayProductName(p.name) })),
     [view.products, view.editions],
   );
-  const rows = editionSummaryOf(products, view.editions, view.sales, kind, { listedOnly });
+  const rows = editionSummaryOf(products, view.editions, view.sales, kind, { listedOnly: false });
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-end">
@@ -86,12 +84,10 @@ export function EditionSummary({
 export function NftTypeTabs({
   projectId,
   view,
-  listedOnly,
   main,
 }: {
   projectId: string;
   view: ProjectView;
-  listedOnly: boolean;
   /** LISTING's Main NFT card. */
   main: React.ReactNode;
 }) {
@@ -128,7 +124,7 @@ export function NftTypeTabs({
         })}
       </div>
       <div id={panelId} role="tabpanel" aria-labelledby={tabId(active)} className="flex flex-col gap-6">
-        {active === "main" ? main : <EditionSummary projectId={projectId} view={view} kind={active} listedOnly={listedOnly} />}
+        {active === "main" ? main : <EditionSummary projectId={projectId} view={view} kind={active} />}
       </div>
     </>
   );

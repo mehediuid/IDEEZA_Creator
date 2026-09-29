@@ -171,3 +171,17 @@ test("§3.6.3 · the facts are optional: a v1 caller gets the maker holding ever
   assert.deepEqual(nextAction(p, { ...base, status: "sold", creatorPct: 40 }).first.label, "List another share");
   assert.deepEqual(nextAction(p, { ...base, status: "sold", creatorPct: 0, locked: true }), quiet(viewBrief));
 });
+
+test("R2-8 · View brief only for a brief that minted: a project minted from its page has none to open", () => {
+  // Minted and listed from the page: no brief draft at all.
+  assert.deepEqual(pairOf(project({ mint: lazy }), null), violet(add));
+  assert.deepEqual(pairOf(project({ mint: lazy }), null, market({ listings: [listing()] })), quiet(null));
+  const full = market({ listings: [listing({ percentSelling: 100 })], sales: [sale({ item: { nft: "main", sharePct: 100 } })] });
+  assert.deepEqual(pairOf(project({ mint: lazy }), null, full), quiet(null), "locked, minted from the page");
+  // A draft that never minted would open an editable Step 1 on a minted project.
+  const started = draft({ intent: "sell" }, "form");
+  assert.deepEqual(pairOf(project({ mint: lazy }), started), violet(add));
+  assert.deepEqual(pairOf(project({ mint: lazy }), started, full), quiet(null));
+  // A brief that minted keeps it, locked or not.
+  assert.deepEqual(pairOf(project({ mint: lazy }), SELL, full), quiet(viewBrief));
+});

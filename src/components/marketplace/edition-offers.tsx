@@ -43,10 +43,10 @@ export function EditionOffers({ project, view, viewer, announce }: Pick<SlotProp
     [view.products],
   );
   const titleId = React.useId();
-  const groups = editionOffersOf(products, view.editions, view.listing);
+  const groups = editionOffersOf(products, view.editions, view.listing, view.lock !== null);
   const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, null);
-  if (!groups.length || !chain || view.lock) return null;
+  if (!groups.length || !chain) return null;
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
 
   return (

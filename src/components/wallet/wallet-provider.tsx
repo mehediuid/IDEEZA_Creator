@@ -26,8 +26,9 @@
 //   Only then is the wallet's activity line (the debit) written: the LAST
 //   write (§3.9). A refused debit still confirms (the caller's writes landed)
 //   and the dialog says the balance may read wrong.
-// - `releasesHoldOf`: an auction's Buy now by its own top bidder releases
-//   that bid's hold, so the funds check counts it back in (R6-12).
+// - A purchase naming the listing it `releases` (an auction's Buy now by its
+//   own top bidder) counts that bid's hold back in: the lib's funds check
+//   reads `req.releases` (R1-3, R6-12).
 // - `request()` resolves at `confirmed` ({ ok: true, proof }), so the caller
 //   moves on behind the dialog, which stays open on Done. A rejected or
 //   failed request resolves when the dialog is closed, with its reason, so
@@ -61,7 +62,6 @@ import {
   requestIdentityOf,
   shortfallOf,
 } from "@/lib/wallet/request-view";
-import type { MarketData } from "@/lib/market/types";
 import type {
   DemoWallet,
   FailReason,
@@ -72,20 +72,12 @@ import type {
   RequestResult,
   WalletRequest,
 } from "@/lib/wallet/types";
-import { useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
+import { resetDemoWallet, useDemoWallet, writeDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import { WalletDialog, type RequestView } from "./wallet-dialog";
-
-/** The lib's options, plus what only this dialog acts on. */
-export type WalletRequestOptions = Omit<RequestOptions, "commit"> & {
-  /** `conflict`: the market moved under the request, so Try again can't help (MARKETPLACE-14). */
-  commit?: (proof: Proof) => { ok: true } | { ok: false; message: string; conflict?: boolean };
-  /** The auction whose top bid, the buyer's own, this purchase releases (R6-12). */
-  releasesHoldOf?: string;
-};
 
 export type WalletRequestApi = {
   /** Opens the dialog for one signature or transaction (§3.9). */
-  request: (req: WalletRequest, opts?: WalletRequestOptions) => Promise<RequestResult>;
+  request: (req: WalletRequest, opts?: RequestOptions) => Promise<RequestResult>;
   /** Opens the Demo wallet dialog (P2-MINT-2): connect, account, network, demo buyers. */
   openManage: () => void;
 };
@@ -99,15 +91,10 @@ export function persistWallet(next: DemoWallet): boolean {
   return ok;
 }
 
-/** The market as the funds check reads it: without the bids of the auction this purchase closes. */
-function withoutHold(market: MarketData, listingId: string | undefined): MarketData {
-  return listingId ? { ...market, bids: market.bids.filter((b) => b.listingId !== listingId) } : market;
-}
-
 type Flight = {
   seq: number;
   req: WalletRequest;
-  opts: WalletRequestOptions;
+  opts: RequestOptions;
   resolve: (r: RequestResult) => void;
   settled: boolean;
   identity: IdentityId;
@@ -130,8 +117,6 @@ type Screen =
       message: string | null;
       hash: string | null;
       proof: Proof | null;
-      /** The listing whose hold this request releases. */
-      releases: string | null;
       /** Confirmed, but the wallet's debit line wasn't saved. */
       warning: string | null;
     };
@@ -162,7 +147,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const show = React.useCallback(
     (
       phase: RequestPhase,
-      extra: Partial<Omit<Extract<Screen, { mode: "request" }>, "mode" | "phase" | "req" | "canUseLazy" | "releases">> = {},
+      extra: Partial<Omit<Extract<Screen, { mode: "request" }>, "mode" | "phase" | "req" | "canUseLazy">> = {},
     ) => {
       const f = flight.current;
       if (!f) return;
@@ -176,7 +161,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         message: extra.message ?? null,
         hash: extra.hash ?? null,
         proof: extra.proof ?? null,
-        releases: f.opts.releasesHoldOf ?? null,
         warning: extra.warning ?? null,
       });
     },
@@ -244,7 +228,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const request = React.useCallback(
-    (req: WalletRequest, opts: WalletRequestOptions = {}): Promise<RequestResult> => {
+    (req: WalletRequest, opts: RequestOptions = {}): Promise<RequestResult> => {
       const busy = flight.current;
       if (busy && !busy.settled) {
         return Promise.resolve({ ok: false, reason: "rejected", message: "Another wallet request is open." });
@@ -312,14 +296,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const now = readWallet();
       const failure = failureOf(f.before, now, f.identity);
       if (failure) return fail(failure);
-      const market = withoutHold(readMarketNow(), f.opts.releasesHoldOf);
-      if (shortfallOf(f.req, f.identity, { wallet: now, market, now: Date.now() })) {
+      if (shortfallOf(f.req, f.identity, { wallet: now, market: readMarketNow(), now: Date.now() })) {
         return fail("insufficientFunds");
       }
       const recheck = f.opts.recheck?.() ?? null;
       if (recheck) return fail("recheck", recheck);
       const proof = proofOf(f.req, f.identity, Date.now(), hash);
-      let committed: ReturnType<NonNullable<WalletRequestOptions["commit"]>>;
+      let committed: ReturnType<NonNullable<RequestOptions["commit"]>>;
       try {
         committed = f.opts.commit ? f.opts.commit(proof) : { ok: true };
       } catch {
@@ -348,8 +331,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const now = readWallet();
     const failure = failureOf(f.before, now, f.identity);
     if (failure) return fail(failure);
-    const market = withoutHold(readMarketNow(), f.opts.releasesHoldOf);
-    if (shortfallOf(f.req, f.identity, { wallet: now, market, now: Date.now() })) {
+    if (shortfallOf(f.req, f.identity, { wallet: now, market: readMarketNow(), now: Date.now() })) {
       return fail("insufficientFunds");
     }
     const seed = `${f.identity}:${f.req.purpose}:${Date.now()}:${nonce()}`;
@@ -400,6 +382,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [close, end, reject, screen]);
 
+  /** "Reset the demo wallet" from a failed request: the default over the unreadable record, then the gate again. */
+  const reset = React.useCallback(() => {
+    if (!resetDemoWallet()) return fail("storageFailed");
+    gate();
+  }, [fail, gate]);
+
   const switchToLazy = React.useCallback(() => {
     const onUseLazy = flight.current?.opts.onUseLazy;
     end({ ok: false, reason: "rejected" });
@@ -439,11 +427,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         open={screen.mode !== "closed"}
         mode={screen.mode === "request" ? "request" : "manage"}
         wallet={wallet}
-        market={screen.mode === "request" ? withoutHold(market, screen.releases ?? undefined) : market}
+        market={market}
         write={persistWallet}
         onClose={dismiss}
         request={view}
-        actions={{ connect, switchNetwork, approve, reject, retry: gate, cancel: dismiss, useLazy: switchToLazy, done: dismiss }}
+        actions={{ connect, switchNetwork, approve, reject, retry: gate, cancel: dismiss, useLazy: switchToLazy, done: dismiss, reset }}
       />
     </WalletContext.Provider>
   );

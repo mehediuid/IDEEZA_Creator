@@ -32,10 +32,18 @@ export type StepFact =
 
 export type EditorWork = Record<EditorStep, StepFact>;
 
-function readJSON(key: string): unknown {
+function readRaw(key: string): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(key);
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function readJSON(key: string): unknown {
+  try {
+    const raw = readRaw(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -93,14 +101,20 @@ function wiringFact(scope: EditorScope, headRowId: string): StepFact {
   return { state: "work", text: `${parts} parts · ${wires} wires` };
 }
 
-/** "{n} files" once the product has its own scoped Code document
- *  (P2-EDITOR-8). Global `ideeza:code:files` is never read here (C4): it
- *  isn't this product's until the maker brings it in (P2-EDITOR-5). */
+/** "{n} files", "{n} blocks", or both joined by " · ", once the product has
+ *  its own scoped Code document or Blockly workspace (P2-EDITOR-8). The
+ *  workspace is stored as XML, not JSON; each `<block>` counts (a shadow
+ *  isn't one). Global `ideeza:code:files` and the global workspace are never
+ *  read here (C4): they aren't this product's until the maker brings them
+ *  in (P2-EDITOR-5). */
 function codeFact(scope: EditorScope, headRowId: string): StepFact {
   const files = readDoc("code.files", scope, headRowId);
-  return Array.isArray(files) && files.length > 0
-    ? { state: "work", text: `${files.length} files` }
-    : { state: "none" };
+  const xml = readRaw(docReadKeys("code.blockly", scope, headRowId).key) ?? "";
+  const blocks = (xml.match(/<block[\s>]/g) ?? []).length;
+  const parts: string[] = [];
+  if (Array.isArray(files) && files.length > 0) parts.push(`${files.length} ${files.length === 1 ? "file" : "files"}`);
+  if (blocks > 0) parts.push(`${blocks} ${blocks === 1 ? "block" : "blocks"}`);
+  return parts.length > 0 ? { state: "work", text: parts.join(" · ") } : { state: "none" };
 }
 
 /** "{n} shapes", "AI model generated", or both joined by " · " (P2-EDITOR-8).

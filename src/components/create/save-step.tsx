@@ -41,8 +41,7 @@ import { useStoreWrite } from "@/components/projects/details/use-store-write";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory, type BuildJob } from "@/lib/create/history";
-import { lockOf } from "@/lib/manual/edit-gate";
-import { ownershipOf } from "@/lib/manual/ownership";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { can } from "@/lib/manual/permissions";
 import { buildsOf, coverOf } from "@/lib/manual/project-read";
 import { formatShortDate, projectStatus } from "@/lib/manual/project-summary";
@@ -64,9 +63,7 @@ import {
 } from "@/lib/manual/save-step";
 import { listingViewOf } from "@/lib/market/listing";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
-import { mainSalesOf } from "@/lib/market/sales";
 import type { Listing, ListingMetadata, MarketData } from "@/lib/market/types";
-import type { ProjectLock } from "@/lib/manual/p2-types";
 import { cn } from "@/lib/utils";
 
 // ─────────────────────────── the mode, with the lock applied ───────────────────────────
@@ -82,18 +79,11 @@ export type SaveModeInfo = {
 
 const OWNER = { kind: "local-owner" } as const;
 
-/** The lock a project is under, from the market's sales alone (decision 12).
- *  Every chooser that offers existing projects leaves a locked one out. */
-export function lockOfProject(p: ManualProject, market: MarketData): ProjectLock | null {
-  const sales = mainSalesOf(p.id, market.sales);
-  if (!sales.length) return null;
-  const split = ownershipOf({ createdAt: p.createdAt, contributors: p.contributors ?? [], sales, listedPercent: 0 });
-  return lockOf(split, sales);
-}
-
-/** The projects a build may join: `can(owner, "product.add")` under each one's lock (P2-SAVE-5 as changed). */
+/** The projects a build may join: `can(owner, "product.add")` under each one's lock
+ *  (`projectLockOf`, decision 12; P2-SAVE-5 as changed). Every chooser that offers existing
+ *  projects leaves a locked one out. */
 function joinableOf(projects: readonly ManualProject[], market: MarketData): ManualProject[] {
-  return projects.filter((p) => can(OWNER, "product.add", { locked: lockOfProject(p, market) !== null }));
+  return projects.filter((p) => can(OWNER, "product.add", { locked: projectLockOf(p, market.sales) !== null }));
 }
 
 /**
@@ -116,7 +106,7 @@ export function useSaveMode(job: BuildJob | null): SaveModeInfo | null {
     const joinable = joinableOf(projects, market);
     const single = (job.companions?.length ?? 0) === 0;
     if (base.kind === "version" || base.kind === "join") {
-      const lock = lockOfProject(base.project, market);
+      const lock = projectLockOf(base.project, market.sales);
       if (lock) {
         // The link to that project is broken for this build: it saves as a new one.
         const block = saveBlockOf(base, { kind: "locked", reason: lock.line });

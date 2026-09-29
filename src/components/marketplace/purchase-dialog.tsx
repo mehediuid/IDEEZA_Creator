@@ -19,10 +19,12 @@
 //   both wallets' balances all derive from it. A second Main sale of the
 //   listing comes back `conflict`, and the dialog says "This listing was just
 //   sold." with nothing written (errata 37) and a single Close.
-// - An auction's "Buy now with X" by its own top bidder releases that bid's
-//   hold, so the funds check counts it back in (`releasesHoldOf`).
+// - An auction's "Buy now with X" names the listing it `releases`: its own
+//   top bidder's held bid counts back in to the funds check (R1-3).
+// - A Main sale that leaves the maker 0 % locks the project (decision 12):
+//   its Physical and Virtual NFT listings come off the marketplace with it.
 // - A demo buyer is never the maker (C4); the seller's payout wallet is the
-//   mint record's, else Demo account 1 (`payoutAddressOf`, one rule for a
+//   mint record's, else Demo account 1 (lib `payoutAddressOf`, one rule for a
 //   purchase and an auction's close).
 // - A Physical or Virtual NFT (T27, P2-TABS-26) is the same request with the
 //   buyer's tier: Regular (this version only) or Extended (every future
@@ -30,7 +32,8 @@
 //   the project's own chain (errata 9). `recheck` reads the track fresh — still
 //   listed at the same price, not sold out, and not hidden by a paused or
 //   removed Main listing, and the project not sold in full (the lock) — and
-//   `commit` appends one Sale for the next unit.
+//   `commit` appends one Sale for the next unit. A unit another tab sold in
+//   between is a conflict: buying again gets the next one.
 
 import * as React from "react";
 import { estimateGas } from "@/lib/brief/gas";
@@ -41,14 +44,24 @@ import { makeSale, purchaseQuote } from "@/lib/market/purchase";
 import { holdingOf } from "@/lib/market/sales";
 import type { EditionTrack, Listing, MarketData } from "@/lib/market/types";
 import { readEditions } from "@/lib/market/editions-store";
-import { editionChainOf, editionsHiddenWith, KIND_WORD, nextSerialOf, soldOf, USE_WORD } from "@/lib/market/editions";
+import {
+  editionChainOf,
+  editionsHiddenWith,
+  KIND_WORD,
+  nextSerialOf,
+  soldOf,
+  unlistProjectTracks,
+  USE_WORD,
+} from "@/lib/market/editions";
 import { listingViewOf } from "@/lib/market/listing";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
-import { DEMO_ACCOUNTS, DEMO_BUYERS } from "@/lib/wallet/identities";
-import type { DemoBuyerId, MintRecord, WalletRequest } from "@/lib/wallet/types";
+import { DEMO_BUYERS } from "@/lib/wallet/identities";
+import { payoutAddressOf } from "@/lib/wallet/mint";
+import type { DemoBuyerId, WalletRequest } from "@/lib/wallet/types";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { lockedNow } from "@/components/video-jobs/video-jobs-provider";
+import { writeTracks } from "@/components/projects/editions/create-dialog";
 
 export const JUST_SOLD = "This listing was just sold.";
 const TAKEN_OFF = "The creator took this listing off the marketplace.";
@@ -73,11 +86,16 @@ export function stillOpenReason(listing: Listing, data: MarketData, now: number,
   return null;
 }
 
-/** The payout wallet a sale pays: the mint record's, else Demo account 1 (the default payout). */
-export function payoutAddressOf(record: MintRecord | null | undefined): string {
-  return record?.wallet.address ?? DEMO_ACCOUNTS[0].address;
+/** A Main sale that sold the project in full takes its edition listings off with it (R1-2).
+ *  The lock already hides them and refuses their sale, so a refused write changes nothing a
+ *  buyer sees. */
+export function unlistTracksIfLocked(project: ManualProject, sales: MarketData["sales"]): void {
+  if (!projectLockOf(project, sales)) return;
+  writeTracks(project.id, (all) => {
+    const { tracks, removed } = unlistProjectTracks(all, project.id);
+    return removed ? tracks : null;
+  });
 }
-
 
 export function usePurchase({
   project,
@@ -132,12 +150,12 @@ export function usePurchase({
             { coin: gas.native, amount: quote.networkFee },
           ],
         },
+        ...(via === "auctionBuyNow" ? { releases: listing.id } : null),
       };
 
       setBusy(true);
       try {
         const result = await request(req, {
-          releasesHoldOf: via === "auctionBuyNow" ? listing.id : undefined,
           recheck: () => {
             const data = readMarketNow();
             const why = stillOpenReason(listing, data, Date.now(), via === "auctionBuyNow");
@@ -173,8 +191,12 @@ export function usePurchase({
             if ("ok" in sale) {
               return { ok: false, conflict: true, message: sale.reason === "alreadySold" ? JUST_SOLD : sale.message };
             }
-            const written = appendSale({ ...sale, txHash: proof.txHash ?? sale.txHash });
-            if (written.ok) return { ok: true };
+            const final = { ...sale, txHash: proof.txHash ?? sale.txHash };
+            const written = appendSale(final);
+            if (written.ok) {
+              unlistTracksIfLocked(project, [...data.sales, final]);
+              return { ok: true };
+            }
             if (written.reason === "conflict") return { ok: false, conflict: true, message: JUST_SOLD };
             return { ok: false, message: written.reason === "storage" ? STORAGE_FULL : UNREADABLE };
           },
@@ -184,7 +206,7 @@ export function usePurchase({
         setBusy(false);
       }
     },
-    [request, appendSale, project.id, project.name, view, buyerId],
+    [request, appendSale, project, view, buyerId],
   );
 
   return { busy, buy };
@@ -194,6 +216,7 @@ export function usePurchase({
 
 const SOLD_OUT = "These NFTs just sold out.";
 const TRACK_GONE = "The creator took these NFTs off the marketplace.";
+const UNIT_TAKEN = "Another buyer took that NFT a moment ago. Close this and buy again to get the next one.";
 
 export type EditionTier = "regular" | "extended";
 export const TIER_WORD: Record<EditionTier, string> = { regular: "Regular", extended: "Extended" };
@@ -213,7 +236,8 @@ function trackClosedReason(
 ): string | null {
   const cur = readEditions(track.projectId).find((t) => t.id === track.id);
   if (!cur || !cur.listing) return TRACK_GONE;
-  if (lockedNow(project, data.sales)) return SOLD_IN_FULL;
+  const locked = projectLockOf(project, data.sales) !== null;
+  if (locked) return SOLD_IN_FULL;
   const main = listingViewOf(track.projectId, {
     listings: data.listings,
     sales: data.sales,
@@ -222,7 +246,7 @@ function trackClosedReason(
     current: { name: "", description: "", products: [], cover: null, at: 0 },
   });
   if (main.kind === "paused") return PAUSED;
-  if (editionsHiddenWith(main)) return TRACK_GONE;
+  if (editionsHiddenWith(main, locked)) return TRACK_GONE;
   if (soldOf(cur.id, data.sales) >= cur.supply.total) return SOLD_OUT;
   const nowPrice = tier === "extended" ? cur.listing.extended : cur.listing.regular;
   if (nowPrice !== price || cur.listing.token !== track.listing?.token) {
@@ -316,12 +340,19 @@ export function useEditionPurchase({
                 network: chain.network,
                 collection: chain.collection,
               },
-              { sales: data.sales, mint: view.mint, ownership: { creatorPct: view.ownership.maker }, now: proof.at },
+              {
+                sales: data.sales,
+                mint: view.mint,
+                ownership: { creatorPct: view.ownership.maker },
+                now: proof.at,
+                locked: projectLockOf(project, data.sales) !== null,
+              },
             );
             if ("ok" in sale) return { ok: false, conflict: true, message: sale.message };
             const written = appendSale({ ...sale, txHash: proof.txHash ?? sale.txHash });
             if (written.ok) return { ok: true };
-            if (written.reason === "conflict") return { ok: false, conflict: true, message: SOLD_OUT };
+            // Read just before this write, the unit was free: another tab sold it in between.
+            if (written.reason === "conflict") return { ok: false, conflict: true, message: UNIT_TAKEN };
             return { ok: false, message: written.reason === "storage" ? STORAGE_FULL : UNREADABLE };
           },
         });

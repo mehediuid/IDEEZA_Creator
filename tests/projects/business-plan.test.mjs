@@ -149,4 +149,13 @@ describe("parsePlanSection", () => {
     const fields = parsePlanSection("identity", text);
     assert.equal(fields.tagline, "Build fast.");
   });
+
+  it("pricing: a tier line has pipes; a prose line under Tiers is skipped, and all prose is rejected", () => {
+    const text = ["Tiers:", "- Maker | $0 | month | 1 project", "Our pricing is simple and fair.", "- Pro | $12 | month | Unlimited | Export"].join("\n");
+    assert.deepEqual(parsePlanSection("pricing", text).tiers, [
+      { name: "Maker", price: "$0", cadence: "month", features: ["1 project"] },
+      { name: "Pro", price: "$12", cadence: "month", features: ["Unlimited", "Export"] },
+    ]);
+    assert.equal(parsePlanSection("pricing", ["Tiers:", "- Free for everyone.", "- Paid later."].join("\n")), null);
+  });
 });

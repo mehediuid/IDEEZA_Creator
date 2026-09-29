@@ -50,6 +50,9 @@ export type UseMint = {
 
 const PAYOUT_LOCKED = "The token is on chain now, so its payout wallet is locked.";
 const STORAGE_FAILED = "This browser couldn't save it — storage is full or blocked.";
+const MINT_GONE = "This project's mint is gone.";
+/** The wallet's answer didn't name a signer and a signature to re-point the record with. */
+const RECORD_INCOMPLETE = "The wallet's answer didn't make a complete mint record, so nothing was saved.";
 
 function statusOf(p: ManualProject): MintStatus {
   return mintViewOf(p, readBriefDraft(p.id), readMarketNow().sales).status;
@@ -140,13 +143,14 @@ export function useMint(): UseMint {
         // A first sale meanwhile puts the token on chain, and the payout wallet with it.
         recheck: () => {
           const now = find(projectId);
-          if (!now?.mint) return "This project's mint is gone.";
+          if (!now?.mint) return MINT_GONE;
           return statusOf(now) === "lazyMinted" ? null : PAYOUT_LOCKED;
         },
         commit: (proof) => {
           const now = find(projectId);
           const signer = accountOf(proof);
-          if (!now?.mint || !signer || !proof.signature) return { ok: false, message: STORAGE_FAILED };
+          if (!now?.mint) return { ok: false, message: MINT_GONE };
+          if (!signer || !proof.signature) return { ok: false, message: RECORD_INCOMPLETE };
           const next = repointRecord(now.mint, { account: signer, address: proof.address }, proof.at, proof.signature);
           return setMint(projectId, next) ? { ok: true } : { ok: false, message: STORAGE_FAILED };
         },

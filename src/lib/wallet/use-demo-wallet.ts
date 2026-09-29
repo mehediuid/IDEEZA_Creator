@@ -6,7 +6,7 @@
 
 import * as React from "react";
 import { ACTIVE_BUYER_KEY } from "../market/types";
-import { DEMO_WALLET_KEY, defaultWallet, normalizeWallet, writeWallet } from "./demo-wallet";
+import { DEMO_WALLET_KEY, defaultWallet, normalizeWallet, resetWallet, walletUnreadable, writeWallet } from "./demo-wallet";
 import { activeBuyerOf, type DemoBuyer } from "./identities";
 import type { DemoWallet } from "./types";
 
@@ -61,6 +61,19 @@ export function useDemoWallet(): DemoWallet | undefined {
  */
 export function writeDemoWallet(next: DemoWallet): boolean {
   const ok = writeWallet(next);
+  notify();
+  return ok;
+}
+
+/** The stored wallet can't be read, so every write is refused until it is reset. */
+export function useWalletUnreadable(): boolean {
+  const raw = React.useSyncExternalStore(subscribe, readWalletRaw, () => null);
+  return walletUnreadable(raw);
+}
+
+/** "Reset the demo wallet": the default written over an unreadable record, this tab told at once. */
+export function resetDemoWallet(): boolean {
+  const ok = resetWallet();
   notify();
   return ok;
 }

@@ -13,7 +13,7 @@ import { Breadcrumb } from "../details/breadcrumb";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
 import { ProjectSkeleton } from "../details/page-states";
 import { useViewer } from "../details/buyer-preview";
-import { useProjectEditGate } from "../use-edit-gate";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useMarket } from "@/lib/market/market-store";
 import { resolveProject } from "@/lib/manual/project-route";
@@ -37,9 +37,8 @@ export function BusinessPlanPage({ id }: { id: string }) {
   const live = useIsPlanLive(project?.id ?? null);
   // Sold in full, the plan is read-only like the rest of the project. The
   // lock reads the market's sales, so the page waits for that store as well.
-  const { hydrated: marketHydrated } = useMarket();
-  const gate = useProjectEditGate(project?.id ?? null).gateOf("rename");
-  const lockReason = gate.kind === "locked" ? gate.reason : null;
+  const { hydrated: marketHydrated, data: market } = useMarket();
+  const lockReason = project ? (projectLockOf(project, market.sales)?.line ?? null) : null;
   const locked = lockReason !== null;
   const lockId = React.useId();
 

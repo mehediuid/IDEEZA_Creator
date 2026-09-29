@@ -8,8 +8,6 @@
 // `can(viewer, "businessPlan.manage", view.canCtx)`, which a locked project
 // (sold in full, decision 12) refuses: Generate and Continue writing go, but
 // a plan that exists stays readable — the chip is "View business plan" then.
-//
-// `useIsProjectLocked` is for the plan page, which has no `view` of its own.
 
 import * as React from "react";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -20,18 +18,9 @@ import { can } from "@/lib/manual/permissions";
 import type { ManualProject } from "@/lib/manual/projects";
 import { useBusinessPlan } from "@/lib/manual/business-plan-store";
 import { planChipState } from "@/lib/manual/business-plan";
-import { useProjectEditGate } from "../use-edit-gate";
 import type { SlotProps } from "./slots";
 import { GenerateBusinessPlanDialog, WritingBusinessPlanDialog } from "../business-plan/plan-dialogs";
 import { resumePlanRun, startPlanRun, stopPlanRun, useIsPlanLive } from "../business-plan/plan-runner";
-
-/** The lock for a page without a `view` (the plan page). Any `ListingChange`
- *  does: the lock check in `editGateOf` fires before the listing table is
- *  even consulted. */
-export function useIsProjectLocked(project: ManualProject | null | undefined): boolean {
-  const { gateOf } = useProjectEditGate(project?.id ?? null);
-  return gateOf("rename").kind === "locked";
-}
 
 function promptSeed(project: ManualProject, productNames: readonly string[]): string {
   const desc = project.description.trim();

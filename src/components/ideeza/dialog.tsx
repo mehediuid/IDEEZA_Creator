@@ -10,6 +10,9 @@
 // ModalFrame — a portal over one scrim. Focus moves in, Tab stays inside,
 // Escape and the scrim close it, and focus goes back to whatever opened it
 // (useDialogFocus). `covered` hands the keyboard to a dialog opened on top.
+// `closeUnavailable` greys the ✕ while the dialog can't close (a submitted
+// transaction), keeping it focusable and still calling onClose, so the caller
+// says why — as ConfirmDialog's confirm does.
 //
 // ConfirmDialog — a decision that removes something, said plainly: the way out
 // first and focused first, the danger second. `confirmUnavailable` marks the
@@ -48,6 +51,8 @@ export interface ModalFrameProps {
   bodyClassName?: string;
   /** What takes focus on open; the first focusable control when omitted. */
   initialFocus?: React.RefObject<HTMLElement | null>;
+  /** The dialog can't be closed right now: ✕ reads aria-disabled, and `onClose` explains. */
+  closeUnavailable?: boolean;
 }
 
 export function ModalFrame({
@@ -61,6 +66,7 @@ export function ModalFrame({
   footer,
   bodyClassName,
   initialFocus,
+  closeUnavailable = false,
 }: ModalFrameProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -111,7 +117,13 @@ export function ModalFrame({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)]"
+            aria-disabled={closeUnavailable || undefined}
+            className={cn(
+              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)]",
+              closeUnavailable
+                ? "cursor-not-allowed text-text-disabled"
+                : "text-text-tertiary hover:bg-bg-subtle hover:text-text-primary",
+            )}
           >
             <Icon icon={Cancel01Icon} size={18} />
           </button>

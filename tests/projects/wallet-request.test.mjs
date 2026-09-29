@@ -147,7 +147,15 @@ test("requestCopy: confirmed carries the request's own doneLine", () => {
   assert.equal(signatureDone.primary, "Done");
 
   const txDone = requestCopy("confirmed", buyerReq, undefined);
-  assert.equal(txDone.title, "Confirmed.");
+  assert.equal(txDone.title, "Purchase successful");
+});
+
+test("requestCopy: the confirmed heading says what went through", () => {
+  const tx = (purpose) => requestCopy("confirmed", { ...buyerReq, identity: "maker", purpose }, undefined).title;
+  assert.equal(tx("instantMint"), "Minted on chain.");
+  assert.equal(tx("upgradeMint"), "Minted on chain.");
+  assert.equal(tx("list"), "Confirmed.");
+  assert.equal(requestCopy("confirmed", { ...makerReq, purpose: "purchase" }, undefined).title, "Signed.");
 });
 
 test("requestCopy: rejected", () => {

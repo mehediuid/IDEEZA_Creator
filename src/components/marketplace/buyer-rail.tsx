@@ -59,10 +59,8 @@ function closedLine(view: ProjectView): { title: string; detail?: string } | nul
   if (lv.kind === "paused") return { title: "Paused by the creator — it can't be bought right now." };
   if (lv.kind === "ended") {
     if (lv.why === "removed") return { title: "The creator took this listing off the marketplace." };
-    // Closed with bids that nobody could pay is not "no bids".
-    return view.bids.some((b) => b.listingId === lv.listing.id)
-      ? { title: "Ended without a sale: no bid could be paid." }
-      : { title: "Ended with no bids." };
+    // Closed with bids that nobody could pay is not "no bids" (`unpaid`).
+    return lv.unpaid ? { title: "Ended without a sale: no bid could be paid." } : { title: "Ended with no bids." };
   }
   if (lv.kind === "sold") {
     const sale = lv.sale;

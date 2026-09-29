@@ -37,6 +37,7 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
+import { projectLockOf } from "@/lib/manual/edit-gate";
 import { useMarket } from "@/lib/market/market-store";
 import {
   companionNameOf,
@@ -64,7 +65,7 @@ import { ProjectRail, RailAnnouncer, useRailModel } from "./chat-rail";
 import { BuildStatus } from "./build-status";
 import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
-import { lockOfProject, useSaveMode } from "./save-step";
+import { useSaveMode } from "./save-step";
 import { COMPOSER_INPUT_ID, PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
 import {
@@ -339,7 +340,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   }, [chat]);
   const setupProjects = React.useMemo(
     () =>
-      projects.filter((p) => lockOfProject(p, market) === null).map((p) => {
+      projects.filter((p) => projectLockOf(p, market.sales) === null).map((p) => {
         const n = p.products?.length || 1;
         return {
           id: p.id,

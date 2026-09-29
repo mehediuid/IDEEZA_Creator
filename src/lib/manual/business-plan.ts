@@ -111,11 +111,15 @@ function blocksOf(text: string): Map<string, string[]> {
   return blocks;
 }
 
+/** One tier per "Name | Price | Cadence | features…" line; a line with no pipe isn't a tier
+ *  (it would read as a tier with no price) and is skipped. */
 function parsePricingTiers(lines: readonly string[]): PricingTier[] {
-  return lines.map((line): PricingTier => {
-    const [name = "", price = "", cadence = "", ...features] = line.split("|").map((s) => s.trim());
-    return { name, price, cadence, features: features.filter(Boolean) };
-  });
+  return lines
+    .filter((line) => line.includes("|"))
+    .map((line): PricingTier => {
+      const [name = "", price = "", cadence = "", ...features] = line.split("|").map((s) => s.trim());
+      return { name, price, cadence, features: features.filter(Boolean) };
+    });
 }
 
 /** Validates the model's reply against the section's shape; `null` rejects it (a caller then
@@ -129,5 +133,7 @@ export function parsePlanSection(kind: SectionKind, text: string): PlanSection["
   for (const [key, lines] of blocks) {
     fields[key] = kind === "pricing" && key === "tiers" ? parsePricingTiers(lines) : lines.length === 1 ? lines[0] : lines;
   }
+  // A pricing reply whose tier lines are all prose has no tiers to show.
+  if (kind === "pricing" && !(fields.tiers as PricingTier[]).length) return null;
   return fields;
 }
