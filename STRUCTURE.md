@@ -29,7 +29,8 @@ ideeza-creator-panel/
    ├─ app/                   Next App Router — routes & layouts
    │  ├─ layout.tsx          Root layout (ThemeProvider, fonts, global CSS)
    │  ├─ api/                Server API routes (concept/generate · concept/summarize
-   │  │                      · refine · build/start · three/generate · and others)
+   │  │                      · refine · build/start · three/generate · business-plan/section
+   │  │                      · and others)
    │  ├─ (dashboard)/        Home + Parts + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
@@ -40,11 +41,15 @@ ideeza-creator-panel/
    │  │   ├─ projects/                    "/projects" — My projects (index)
    │  │   │   └─ [id]/                    "/projects/<id>" — Project details
    │  │   │       ├─ network/             "/projects/<id>/network" — the Connection Map
+   │  │   │       ├─ business-plan/       "/projects/<id>/business-plan" — the seven-section plan
    │  │   │       └─ products/[productId]/  "/projects/<id>/products/<productId>" — the product page
+   │  │   ├─ marketplace/                 "/marketplace" — Explore marketplace
+   │  │   │   └─ [id]/                    the buyer view (+ products/[productId]/)
    │  │   ├─ history/                 "/history"  — past generations
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
-   │  ├─ project/[projectSlug]/[step]/   per-project editor host (PCB/Code/3D/…)
+   │  ├─ project/[projectSlug]/products/[productId]/[step]/   the product-scoped editor (PCB/Code/3D/…)
+   │  ├─ project/[projectSlug]/[step]/   legacy editor address (redirects to the resumed product) + the Brief
    │  └─ pcb/ code/ 3d/ preview/ wiring/ brief/   legacy flat routes (each redirects to
    │                                       /project/<slug>/<step>) + pcb-editor.css
    │
@@ -65,15 +70,22 @@ ideeza-creator-panel/
    │  │                      confirmation, and the chrome both editors share
    │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
-   │  ├─ projects/           my-projects + project-card, details/ (the project page: shell, SLOTS, header, tabs, rail), product/ (the product page — see docs/guides/features/platform-and-projects.md)
+   │  ├─ projects/           my-projects + project-card; details/ (the project page: shell, SLOTS,
+   │  │                      header, tabs, rail, activity/); product/ (the product page + Editor block);
+   │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
+   │  │                      and Virtual NFT); business-plan/ (chip runner + page) — see
+   │  │                      docs/guides/features/platform-and-projects.md
+   │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
+   │  │                      bid and support dialogs, demo-buyer banner
+   │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
    │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,
    │  │                      all-parameters), network-section (project page),
    │  │                      network-action (review card), connection-map-page, summary, ui
-   │  ├─ manual/             manual project creation + step navigation
+   │  ├─ manual/             project-workspace (the editor gate: product scope, seed, banners) + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
-   │  ├─ video-jobs/         background render/video jobs + indicator
+   │  ├─ video-jobs/         render jobs provider, browser clip renderer, player, Generate dialog, indicator
    │  ├─ brief/              Add Brief: brief-app (the intent-aware sequence) + brief-rail,
    │  │                      step-1-idea · step-2-video (preview) · step-3-mint (the form) ·
    │  │                      step-4-success, review-modal (the headline's video),
@@ -124,13 +136,16 @@ ideeza-creator-panel/
    │  │                      (backward-compatible pure readers — versions, sourceOf,
    │  │                      coverOf), project-summary.ts (the one card/details
    │  │                      derivation), permissions.ts (can/deleteBlockOf), editor-work.ts
-   │  │                      (editor progress facts)
+   │  │                      (editor progress facts), editor-scope/editor-docs (per-product editor
+   │  │                      keys + documents), build-load(-io) (BUILDLOAD), readiness, edit-gate,
+   │  │                      contributors, customers, ownership, journey(-store), business-plan(-store),
+   │  │                      legal, save-step
    │  ├─ wiring/             types.ts, from-build.ts (a build's wiring document)
    │  ├─ code/               files.ts (Code's file model + a build's firmware)
    │  ├─ market/             Explore marketplace: listings, sales, bids, auctions, editions,
    │  │                      fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
-   │  ├─ video/              product-video takes, frames, preview-clip job maths
+   │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
    │  ├─ key-store.ts · storage-status.ts   one live localStorage key; refused-write reporting
    │  ├─ feed.ts · feed-image-manifest.ts   community-feed data
