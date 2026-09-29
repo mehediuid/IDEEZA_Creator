@@ -128,3 +128,20 @@ test("no ⋮ menu and no Premium Parts tab on either page (P2-TABS-30)", () => {
     assert.doesNotMatch(src, /⋮|MoreVertical|"More"|"Options"|Premium Parts/, path);
   }
 });
+
+test("the Contributors and Media phone targets are 44 px at phone width and on a coarse pointer (pd2 final re-verify)", () => {
+  const PHONE = /max-md:min-h-\[var\(--touch-min\)\] \[@media\(pointer:coarse\)\]:min-h-\[var\(--touch-min\)\]/;
+  const contrib = read(DETAILS + "contributors-tab.tsx");
+  assert.match(contrib, new RegExp(`const PHONE_TAP = "${PHONE.source}"`), "Add contributor's phone rule");
+  assert.equal(contrib.match(/className=\{PHONE_TAP\}/g)?.length, 2, "both Add contributor buttons (roster and empty state) carry it");
+  assert.match(contrib, /const CARD_ACTION = "min-h-\[var\(--touch-min\)\] min-w-\[var\(--touch-min\)\]/, "a card row action is 44 px both ways (Edit)");
+  assert.match(contrib, /\[@media\(pointer:coarse\)\]:min-w-\[var\(--touch-min\)\]/, "and a table row action on a coarse pointer");
+  assert.match(read(DETAILS + "media-tab.tsx"), /max-md:size-\[var\(--touch-min\)\] \[@media\(pointer:coarse\)\]:size-\[var\(--touch-min\)\]/, "Use as cover");
+  assert.match(read("components/projects/delete-project-dialog.tsx"), new RegExp(`\\{block\\.link && \\([\\s\\S]{0,120}onClick=\\{openContributors\\}[\\s\\S]{0,400}${PHONE.source}`), "the blocked Delete's Open Contributors");
+  assert.match(read(DETAILS + "rail-details.tsx"), new RegExp(`onClick=\\{goToContributors\\}[\\s\\S]{0,300}${PHONE.source}`), "the Details row's Open Contributors");
+  assert.match(read("components/network/network-section.tsx"), new RegExp(`cn\\(btn\\.quiet, "mt-2 ${PHONE.source}"\\)`), "the Network tab's Create Network");
+  // My projects' and Explore's search: the input is one text row inside a 44 px box; the box focuses it.
+  const search = read("components/ideeza/search-input.tsx");
+  assert.match(search, /onMouseDown=\{\(e\) => \{\s*if \(e\.target === inputRef\.current \|\| \(e\.target as HTMLElement\)\.closest\("button"\)\) return;\s*e\.preventDefault\(\);\s*inputRef\.current\?\.focus\(\);/, "a press anywhere in the search box focuses its input");
+  assert.match(search, /<input\s+ref=\{inputRef\}/);
+});

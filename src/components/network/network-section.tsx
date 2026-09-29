@@ -44,7 +44,11 @@ export function NetworkSection({ project, refs }: { project: ManualProject; refs
           <p className="max-w-[56ch] text-sm text-text-secondary">
             A network records which products in this project talk to each other, over which protocol, and what each one does.
           </p>
-          <button type="button" className={cn(btn.quiet, "mt-2")} onClick={() => setOpen(true)}>
+          <button
+            type="button"
+            className={cn(btn.quiet, "mt-2 max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]")}
+            onClick={() => setOpen(true)}
+          >
             Create Network
           </button>
         </div>

@@ -39,9 +39,13 @@ import { useEnterContributorPreview } from "./contributor-preview-banner";
 import type { SlotProps } from "./slots";
 
 /** ≥ 24 px on a fine pointer, ≥ 44 px on a coarse one (P2-CONTRIB-2's row
- *  actions, in the wide table). The stacked card always uses 44 px. */
-const ROW_ACTION = "min-h-[24px] px-2 -mx-2 [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-const CARD_ACTION = "min-h-[var(--touch-min)] px-2 -mx-2";
+ *  actions, in the wide table). The stacked card always uses 44 px, both ways:
+ *  a short label ("Edit") still gets a 44 px wide target, its text left where it was. */
+const ROW_ACTION =
+  "min-h-[24px] px-2 -mx-2 [@media(pointer:coarse)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-w-[var(--touch-min)]";
+const CARD_ACTION = "min-h-[var(--touch-min)] min-w-[var(--touch-min)] px-2 -mx-2";
+/** 44 px at phone width and on a coarse pointer (the page's other phone targets). */
+const PHONE_TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 type DialogState = { mode: "add" } | { mode: "edit"; contributor: Contributor };
 
@@ -169,6 +173,7 @@ export function ContributorsTab({ project, view, viewer, announce }: SlotProps) 
               <Button
                 ref={emptyAddRef}
                 hierarchy="secondary"
+                className={PHONE_TAP}
                 iconLeading={<Icon icon={PlusSignIcon} size={16} />}
                 onClick={() => setDialog({ mode: "add" })}
               >
@@ -189,6 +194,7 @@ export function ContributorsTab({ project, view, viewer, announce }: SlotProps) 
                   ref={addBtnRef}
                   hierarchy="secondary"
                   size="sm"
+                  className={PHONE_TAP}
                   iconLeading={<Icon icon={PlusSignIcon} size={14} />}
                   aria-disabled={atLimit || undefined}
                   aria-describedby={atLimit ? limitId : undefined}
