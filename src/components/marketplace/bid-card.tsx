@@ -184,8 +184,14 @@ export function BidCard({
               hierarchy="secondary"
               size="lg"
               className="h-[44px] w-full"
-              disabled={buyBusy}
-              onClick={onBuyNow}
+              // Not `disabled`, which would drop focus before the wallet dialog reads its opener.
+              aria-disabled={buyBusy || undefined}
+              onClick={(e) => {
+                if (buyBusy) return;
+                // Safari doesn't focus a clicked button.
+                e.currentTarget.focus();
+                onBuyNow();
+              }}
             >
               Buy now with {formatAmount(listing.auctionBuyNow, listing.token)}
             </Button>
@@ -270,7 +276,8 @@ function BidForm({
             className="tabular-nums"
           />
         </div>
-        <Button type="submit" hierarchy="primary" size="lg" className="h-[44px] shrink-0" disabled={busy}>
+        {/* aria-disabled, not disabled: focus stays on it for the wallet dialog to hand back. */}
+        <Button type="submit" hierarchy="primary" size="lg" className="h-[44px] shrink-0" aria-disabled={busy || undefined}>
           Place bid
         </Button>
       </div>

@@ -323,8 +323,15 @@ function BuyerBody({
               hierarchy="primary"
               size="lg"
               className="h-[44px] w-full"
-              disabled={busy}
-              onClick={() => void purchase("buyNow")}
+              // Not `disabled`: that drops its focus before the wallet dialog reads its opener,
+              // so Reject or Close would hand focus to <body> (the dialog covers it meanwhile).
+              aria-disabled={busy || undefined}
+              onClick={(e) => {
+                if (busy) return;
+                // Safari doesn't focus a clicked button.
+                e.currentTarget.focus();
+                void purchase("buyNow");
+              }}
             >
               Buy now
             </Button>

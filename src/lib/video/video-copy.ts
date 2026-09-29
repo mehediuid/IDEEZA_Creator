@@ -182,3 +182,8 @@ export function stateChangeLine(productName: string, status: ProductVideoStatus)
 export function toastHeading(state: "rendering" | "ready" | "failed", eta: string): string {
   return state === "rendering" ? `Video rendering · ${eta} left` : state === "ready" ? "Video ready" : "Video render failed";
 }
+
+/** The line under a capped toast stack: how many more wait behind the ones shown. */
+export function moreToastsLine(n: number): string {
+  return `+${n} more video${n === 1 ? "" : "s"}`;
+}

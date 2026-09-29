@@ -20,6 +20,11 @@
 // none (errata 56). Try again is `can(owner, "video.generate", { locked })`,
 // so a project sold in full offers none. Watch and Try again hide their toast,
 // so when their dialog closes focus goes to the next toast, else <main>.
+//
+// The stack is capped: two toasts, one at phone width, and a quiet
+// "+N more videos" line under them — so however many renders finish, the
+// stack never climbs over the rail's controls (a phone's Marketplace block
+// sits near the fold). Hiding or watching one brings the next one up.
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -33,7 +38,7 @@ import { useManualProjects } from "@/lib/manual/projects";
 import { useMarket } from "@/lib/market/market-store";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
-import { toastHeading } from "@/lib/video/video-copy";
+import { moreToastsLine, toastHeading } from "@/lib/video/video-copy";
 import { GenerateVideoDialog, videoTargetOf, type VideoTarget } from "./generate-video-dialog";
 import { VideoPlayerDialog } from "./video-player";
 import {
@@ -48,6 +53,11 @@ import {
 type Watching = { projectId: string; productId: string; takeId: string; productName: string };
 
 const OWNER: Viewer = { kind: "local-owner" };
+
+/** Toasts on screen at once from `md`; below it, one. */
+const SHOWN = 2;
+const MORE =
+  "m-0 rounded-full border border-solid border-border bg-bg-surface px-[12px] py-[2px] text-sm text-text-secondary shadow-1";
 
 /** After a dialog opened from a toast closes: that toast is gone, so focus
  *  goes to the next toast's first control, else the page's <main>. */
@@ -114,8 +124,9 @@ function RenderToasts() {
   };
 
   const visible = hydrated && !buyerView ? jobs.filter((j) => j.acknowledged !== true) : [];
-  // Newest job on top.
+  // Newest job on top; the rest wait behind the line.
   const stacked = [...visible].reverse();
+  const shown = stacked.slice(0, SHOWN);
 
   return (
     <>
@@ -123,11 +134,12 @@ function RenderToasts() {
         stacked.length > 0 &&
         createPortal(
           <div className="flex flex-col items-end gap-[8px]" role="status" aria-live="polite" aria-label="Video render status">
-            {stacked.map((j) => {
+            {shown.map((j, i) => {
               const target = j.stage === "failed" ? targetOf(j) : null;
               return (
                 <ToastLine
                   key={j.id}
+                  className={i > 0 ? "max-md:hidden" : undefined}
                   job={j}
                   now={now}
                   onWatch={
@@ -160,6 +172,9 @@ function RenderToasts() {
                 />
               );
             })}
+            {/* `ix-render-more` lifts the phone's attention toast over this line (layout.tsx). */}
+            {stacked.length > 1 && <p className={`ix-render-more md:hidden ${MORE}`}>{moreToastsLine(stacked.length - 1)}</p>}
+            {stacked.length > SHOWN && <p className={`max-md:hidden ${MORE}`}>{moreToastsLine(stacked.length - SHOWN)}</p>}
 
             <style>{`
               @keyframes ix-render-toast-in {
@@ -216,6 +231,7 @@ function WatchDialog({ watching, onClose }: { watching: Watching; onClose: () =>
 }
 
 function ToastLine({
+  className,
   job,
   now,
   onWatch,
@@ -223,6 +239,7 @@ function ToastLine({
   onRetry,
   onDismiss,
 }: {
+  className?: string;
   job: VideoJob;
   now: number;
   onWatch: (() => void) | null;
@@ -256,6 +273,7 @@ function ToastLine({
           : tone === "success"
             ? "border-[var(--color-border-success)]"
             : "border-border",
+        className,
       ].join(" ")}
     >
       <span

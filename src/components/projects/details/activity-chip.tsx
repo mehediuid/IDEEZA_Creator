@@ -87,7 +87,7 @@ function ActivityChipButton({
         e.currentTarget.focus();
         onOpen();
       }}
-      aria-label={`Activity, ${count} entries — open the activity history`}
+      aria-label={`Activity, ${count} ${count === 1 ? "entry" : "entries"} — open the activity history`}
       className={cn(
         "inline-flex items-center gap-2 rounded-full border border-solid border-border bg-bg-surface px-4 py-2 text-sm font-medium text-text-secondary outline-none transition-colors duration-fast",
         "hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",

@@ -72,7 +72,7 @@ export function NotOnMarketplace({ id }: { id: string }) {
           titleRef={titleRef}
           icon={<Icon icon={Store01Icon} size={32} />}
           title="This project isn't on the marketplace"
-          body="Only a project its creator added to Explore marketplace opens here. It may never have been listed, or it was listed in a different browser."
+          body="This page shows only projects their creator added to Explore marketplace. This one may never have been listed, or it was listed in a different browser."
           action={
             <Link
               href="/marketplace"
