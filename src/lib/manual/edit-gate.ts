@@ -8,6 +8,8 @@
 
 import type { ListingChange, ListingView, Sale } from "../market/types";
 import type { EditGate, Holding, OwnershipSplit, ProjectLock } from "./p2-types";
+import type { ManualProject } from "./projects";
+import { ownershipOf } from "./ownership";
 import { formatDate } from "./project-summary";
 
 // ─────────────────────────── the listing's own gate (P2-LISTING-13) ───────────────────────────
@@ -80,6 +82,23 @@ export function lockOf(split: OwnershipSplit, sales: readonly Sale[]): ProjectLo
     buyers,
     line: `Sold in full to ${who} on ${formatDate(at)} — it's theirs now, so this project is read-only.`,
   };
+}
+
+/**
+ * The lock of a project read where no `ProjectView` exists (the save step's
+ * join list, a page before its view is built): its contributors and its Main
+ * sales through the same `ownershipOf` + `lockOf`, so there's one derivation.
+ * Where a view exists, read `view.lock` / `view.canCtx` instead. A listing's
+ * reserve never moves `split.maker`, so none is passed.
+ */
+export function projectLockOf(
+  p: Pick<ManualProject, "id" | "createdAt" | "contributors">,
+  sales: readonly Sale[],
+): ProjectLock | null {
+  const main = sales.filter((s) => s.projectId === p.id && s.item.nft === "main");
+  if (!main.length) return null;
+  const split = ownershipOf({ createdAt: p.createdAt, contributors: p.contributors ?? [], sales: main, listedPercent: 0 });
+  return lockOf(split, main);
 }
 
 // ─────────────────────────── the one gate every edit asks (§3.5.9) ───────────────────────────

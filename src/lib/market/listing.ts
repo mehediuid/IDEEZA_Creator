@@ -404,13 +404,25 @@ export function pauseForEdit(ls: Listing[], id: string, change: ListingChange, n
 }
 
 /** Paused only, and only once `ready` (VIDEO's readiness, checked by the
- *  caller) — otherwise "Finish the items above to relist." (P2-LISTING-14). */
-export function relistListing(ls: Listing[], id: string, meta: ListingMetadata, ready: boolean, now: number): Result {
+ *  caller) — otherwise "Finish the items above to relist." (P2-LISTING-14).
+ *  `opts.creatorPct` (the maker's share now, `ownership.maker`) re-checks the
+ *  listing's own percent, which a co-owner written meanwhile may have taken (R1-1). */
+export function relistListing(
+  ls: Listing[],
+  id: string,
+  meta: ListingMetadata,
+  ready: boolean,
+  now: number,
+  opts: { creatorPct?: number } = {},
+): Result {
   const idx = ls.findIndex((l) => l.id === id);
   if (idx === -1) return { ok: false, reason: "This listing no longer exists." };
   const listing = ls[idx];
   if (listing.status !== "paused") return { ok: false, reason: "Only a paused listing can be relisted." };
   if (!ready) return { ok: false, reason: "Finish the items above to relist." };
+  if (opts.creatorPct !== undefined && listing.percentSelling > opts.creatorPct) {
+    return { ok: false, reason: `You hold ${Math.max(0, opts.creatorPct)}% now — lower the selling percentage in Edit, then relist.` };
+  }
   const next: Listing = {
     ...listing,
     status: "live",

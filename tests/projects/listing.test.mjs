@@ -182,6 +182,15 @@ test("relistListing goes live again with a new metadata snapshot, once ready", (
   assert.equal(relisted.listings[0].pause, undefined);
 });
 
+test("relistListing re-checks the share: a listing selling more than the maker now holds is refused (R1-1)", () => {
+  const created = createListing([], "p1", buyNowInput({ percentSelling: 50 }), meta(), "page", NOW, idMaker());
+  const paused = pauseForEdit(created.listings, created.listings[0].id, "rename", NOW + 1);
+  const r = relistListing(paused.listings, created.listings[0].id, meta(), true, NOW + 2, { creatorPct: 40 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "You hold 40% now — lower the selling percentage in Edit, then relist.");
+  assert.equal(relistListing(paused.listings, created.listings[0].id, meta(), true, NOW + 2, { creatorPct: 50 }).ok, true);
+});
+
 // ─────────────────────────────── closeListing ───────────────────────────────
 
 test("closeListing refuses a running auction", () => {

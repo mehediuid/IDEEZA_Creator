@@ -353,3 +353,17 @@ test("projectView · the log merges the mint, listing, market, editions and busi
   assert.deepEqual(listed.terms, { type: "buyNow", token: "MATIC", price: "0.05" });
   assert.equal(v.log.find((e) => e.kind === "payoutChanged").toLabel, "Demo account 2");
 });
+
+// ── final fix wave (R1-1): a paused listing's share is reserved too ──
+
+test("a paused listing reserves its Percent Selling, like a live one", () => {
+  const live = sum(project({ mint: lazy }), SELL, market({ listings: [listing({ percentSelling: 60 })] }));
+  assert.equal(live.ownership.reserved, 60);
+  const paused = listing({ percentSelling: 60, status: "paused", pause: { at: NOW - MIN, changes: ["rename"] } });
+  const s = sum(project({ mint: lazy }), SELL, market({ listings: [paused] }));
+  assert.equal(s.ownership.reserved, 60);
+  assert.equal(s.ownership.sellable, 40);
+  // A removed one reserves nothing.
+  const removed = sum(project({ mint: lazy }), SELL, market({ listings: [listing({ percentSelling: 60, status: "removed", endedAt: NOW - MIN })] }));
+  assert.equal(removed.ownership.reserved, 0);
+});

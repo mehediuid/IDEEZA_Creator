@@ -490,7 +490,8 @@ export function projectSummary(
     createdAt: p.createdAt,
     contributors: p.contributors ?? [],
     sales,
-    listedPercent: listing.kind === "live" ? listing.listing.percentSelling : 0,
+    // A paused listing still holds its share: relisting it must not find it given away (R1-1).
+    listedPercent: listing.kind === "live" || listing.kind === "paused" ? listing.listing.percentSelling : 0,
   });
   const lock = lockOf(ownership, sales);
   const soldOwner = soldPartsOf(customers, "owner", ctx.now);

@@ -954,7 +954,8 @@ export function applyPatch(p: ManualProject, patch: ProjectPatch, now: number): 
 /** What the Contributor dialog hands a writer, after `checkContributor`. */
 export type ContributorValue = Pick<Contributor, "name" | "role" | "share">;
 /** Why a writer refused. `over100`: the co-owners plus the sold shares would
- *  pass 100 % (the ownership invariant). */
+ *  pass 100 % (the ownership invariant), or — once a Main share has sold —
+ *  reach it, leaving the maker nothing (R2-5). */
 export type ContributorRefusal = "missing" | "invalid" | "duplicate" | "full" | "over100";
 export type ContributorWrite =
   | { ok: true; project: ManualProject; contributor: Contributor }
@@ -986,7 +987,9 @@ const coOwnedPct = (list: readonly Contributor[]) =>
 // The invariant (P2-CONTRIB-5): every co-owner share plus every sold share is
 // 100 or less. A write that breaks it is refused — unless the record was
 // already past 100 (a hand-edited one) and this write doesn't raise it, so the
-// maker can still fix such a record one row at a time.
+// maker can still fix such a record one row at a time. Once a Main share has
+// sold, a write that raises the co-owners to leave the maker 0 % is refused
+// too: that would lock the project (decision 12), and nobody could undo it (R2-5).
 function breaksInvariant(
   before: readonly Contributor[],
   after: readonly Contributor[],
@@ -994,7 +997,8 @@ function breaksInvariant(
 ): boolean {
   const sold = soldPct !== undefined && Number.isFinite(soldPct) ? Math.max(0, soldPct) : 0;
   const total = coOwnedPct(after) + sold;
-  return total > 100 && total > coOwnedPct(before) + sold;
+  if (total > 100 && total > coOwnedPct(before) + sold) return true;
+  return sold > 0 && total >= 100 && coOwnedPct(after) > coOwnedPct(before);
 }
 
 /** Adds a contributor (P2-CONTRIB-6). Refuses an invalid value, a name already

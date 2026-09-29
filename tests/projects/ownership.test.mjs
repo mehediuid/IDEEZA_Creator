@@ -219,3 +219,36 @@ test("ownedBySegment: a majority buyer holding reads their buyer label", () => {
     linked: true,
   });
 });
+
+// ── final fix wave (R1-1, R2-4, R2-6) ──
+
+test("maxShareFor never gives away a listing's reserved share (R1-1)", () => {
+  // The maker holds 100 % and has Buy now live at 100 %: nothing is free to give.
+  const listed = ownershipOf({ createdAt: CREATED, contributors: [], sales: [], listedPercent: 100 });
+  assert.equal(maxShareFor(listed, null), 0);
+  // A 60 % listing leaves 40 % to give; editing a co-owner counts their own share back in.
+  const part = ownershipOf({ createdAt: CREATED, contributors: [ANA], sales: [], listedPercent: 60 });
+  assert.equal(maxShareFor(part, null), 10);
+  assert.equal(maxShareFor(part, ANA), 40);
+});
+
+test("maxShareFor keeps the maker's last percent once a Main share has sold (R2-5)", () => {
+  const sold = ownershipOf({ createdAt: CREATED, contributors: [], sales: [mainSale("sale_a", "buyer-mira", 10, 1)], listedPercent: 0 });
+  assert.equal(sold.maker, 90);
+  assert.equal(maxShareFor(sold, null), 89);
+  // With a live listing holding a reserve, the reserve already keeps the maker above 0.
+  const listed = ownershipOf({ createdAt: CREATED, contributors: [], sales: [mainSale("sale_a", "buyer-mira", 10, 1)], listedPercent: 20 });
+  assert.equal(maxShareFor(listed, null), 70);
+});
+
+test("majority is summed per holder: two 30 % buys make Mira the majority (R2-6)", () => {
+  const sales = [mainSale("sale_a", "buyer-mira", 30, 1), mainSale("sale_b", "buyer-mira", 30, 2), mainSale("sale_c", "buyer-leo", 20, 3)];
+  const s = ownershipOf({ createdAt: CREATED, contributors: [], sales, listedPercent: 0 });
+  assert.equal(s.majority.holder.kind, "buyer");
+  assert.equal(s.majority.holder.buyerId, "buyer-mira");
+  assert.equal(s.majority.percent, 60);
+  assert.equal(s.majority.since, 1);
+  assert.deepEqual(ownedBySegment(s, { kind: "owner-preview" }), { created: null, ownedBy: "Mira (demo buyer)", linked: false });
+  // The holdings themselves stay one row per sale.
+  assert.equal(s.holdings.length, 4);
+});
