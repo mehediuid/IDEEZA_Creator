@@ -7,26 +7,27 @@
 // tell a buyer, and no "Add legal details" for them to see.
 //
 // Owner-only editing: an inline form (Save / Cancel), never a dialog, so the
-// block stays where it is while it's open. `checkLegal` and `normalizeLegal`
+// block stays where it is while it's open. It asks `can(…, view.canCtx)`, so
+// a project sold in full shows its legal details and no Edit, and a form that
+// is open when the lock arrives closes. `checkLegal` and `normalizeLegal`
 // (lib/manual/legal.ts, T08) hold the real validation and the stored shape;
 // this file only decides what to show and wires the write.
 //
 // A Copyright or Trademark row with a link becomes a button — the same
-// external-link confirm P2-TABS-8 gives Activity's link cards ("Open this
-// link in a new tab?"). T20 (a parallel W1 task) owns that shared confirm and
-// hasn't landed it yet, so this file carries its own copy of it for now; a
-// later pass can swap this for the shared component once T20 merges.
+// external-link confirm P2-TABS-8 gives Activity's link cards
+// (./link-confirm.tsx).
 
 import * as React from "react";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, ConfirmDialog, TextInput } from "@/components/ideeza";
+import { Button, TextInput } from "@/components/ideeza";
 import { checkLegal, normalizeLegal, type LegalInput } from "@/lib/manual/legal";
 import { WRITE_FAILED } from "@/lib/manual/project-header";
 import type { ProjectLegal } from "@/lib/manual/p2-types";
 import { can } from "@/lib/manual/permissions";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
+import { LinkConfirmDialog } from "./link-confirm";
 import { RailBlock, RailFact, RailFacts, useRailStacked } from "./rail-block";
 import { RAIL_LINK, SHOW_ALL } from "./rail-versions";
 import { useStoreWrite } from "./use-store-write";
@@ -35,8 +36,6 @@ import type { SlotProps } from "./slots";
 const FOOTNOTE = "As stated by you — not verified.";
 const EMPTY_OWNER_HINT = "Add the patent, copyright or trademark details buyers should know.";
 const SAVED_MESSAGE = "Legal details saved";
-const LINK_TITLE = "Open this link in a new tab?";
-const LINK_BODY = "It leaves IDEEZA — only open links you trust.";
 
 export type LegalRow =
   | { key: "patent"; label: string; text: string }
@@ -64,8 +63,8 @@ export function legalRows(legal: ProjectLegal | undefined): LegalRow[] {
   return rows;
 }
 
-export function RailLegal({ project, viewer, announce }: SlotProps) {
-  const editable = can(viewer, "legal.edit");
+export function RailLegal({ project, view, viewer, announce }: SlotProps) {
+  const editable = can(viewer, "legal.edit", view.canCtx);
   const rows = legalRows(project.legal);
   if (!editable && rows.length === 0) return null;
   return (
@@ -99,7 +98,7 @@ function LegalBody({
 
   return (
     <>
-      {editing ? (
+      {editing && editable ? (
         <LegalForm
           project={project}
           onSaved={() => {
@@ -137,7 +136,7 @@ function LegalBody({
           )}
         </>
       )}
-      {linkUrl && <LegalLinkConfirm url={linkUrl} onClose={() => setLinkUrl(null)} />}
+      {linkUrl && <LinkConfirmDialog url={linkUrl} onClose={() => setLinkUrl(null)} />}
     </>
   );
 }
@@ -164,18 +163,6 @@ function LegalRowValue({ row, onOpenLink }: { row: LegalRow; onOpenLink: (url: s
     <button type="button" onClick={() => onOpenLink(url)} className={cn(RAIL_LINK, "block text-left")}>
       {body}
     </button>
-  );
-}
-
-function LegalLinkConfirm({ url, onClose }: { url: string; onClose: () => void }) {
-  const openLink = () => {
-    window.open(url, "_blank", "noopener");
-    onClose();
-  };
-  return (
-    <ConfirmDialog open title={LINK_TITLE} confirmLabel="Open link" tone="primary" onConfirm={openLink} onCancel={onClose}>
-      {LINK_BODY}
-    </ConfirmDialog>
   );
 }
 

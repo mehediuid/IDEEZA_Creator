@@ -39,7 +39,8 @@ import { StatusGlyph, useClipUrl } from "@/components/video-jobs/video-player";
 import { VideoLightbox, type LightboxVideo } from "@/components/video-jobs/video-lightbox";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { productsOf } from "@/lib/create/history";
-import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { useManualProjects, type ManualProject, type ProductSource } from "@/lib/manual/projects";
+import { WRITE_FAILED } from "@/lib/manual/project-header";
 import { coverOf, productsOfProject, type BuildRef, type ProjectProduct } from "@/lib/manual/project-read";
 import { can, type CanContext, type Viewer } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
@@ -51,6 +52,7 @@ import { useProjectVideos } from "@/lib/video/store";
 import type { ProductVideoStatus, VideoTake } from "@/lib/video/types";
 import { actionLabel, resolutionOf, statusCopy, videosGroupMeta } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { useStoreWrite } from "./use-store-write";
 
 // ─────────────────────────── tiles (CNT-9) ───────────────────────────
 
@@ -111,19 +113,32 @@ export type MediaTabProps = {
   /** The project's Brief draft — `null` when there is none. */
   draft: StoredDraft | null;
   viewer: Viewer;
-  /** The page's `view.canCtx` (§3.7). Until the page passes it, the lock is
-   *  read from the edit gate, which reads the same market. */
-  canCtx?: CanContext;
+  /** The page's `view.canCtx` (§3.7). */
+  canCtx: CanContext;
+  /** The page's one polite live region (COR-101): a cover change is said there. */
+  announce: (message: string) => void;
 };
 
-export function MediaTab({ project, refs, viewer, canCtx }: MediaTabProps) {
+/** The cover a press is writing, and what to say once it is stored. */
+type CoverWrite = { cover: ProductSource | null; said: string };
+
+function sameCover(a: ProductSource | null | undefined, b: ProductSource | null): boolean {
+  if (!a || !b) return !a && !b;
+  return a.buildId === b.buildId && a.productId === b.productId;
+}
+
+export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: MediaTabProps) {
   const { setCover } = useManualProjects();
   const gate = useProjectEditGate(project.id);
   const [expanded, setExpanded] = React.useState(false);
   const [lightbox, setLightbox] = React.useState<{ index: number; trigger: HTMLElement } | null>(null);
   const [coverNote, setCoverNote] = React.useState<string | null>(null);
-
-  const ctx: CanContext = canCtx ?? { locked: gate.gateOf("cover").kind === "locked" };
+  const [coverWrite, setCoverWrite] = React.useState<CoverWrite | null>(null);
+  // Said once the projects store has kept it — a refused write says so instead.
+  const write = useStoreWrite(coverWrite !== null && sameCover(project.cover, coverWrite.cover), () => {
+    if (coverWrite) announce(coverWrite.said);
+    setCoverWrite(null);
+  });
   const tiles = React.useMemo(() => mediaTilesOf(refs), [refs]);
   // `productsOfProject` over the page's own refs is the view's `products`.
   const products = React.useMemo(() => currentProductsOf(productsOfProject(project, refs)), [project, refs]);
@@ -168,9 +183,9 @@ export function MediaTab({ project, refs, viewer, canCtx }: MediaTabProps) {
       ) : (
         <>
           <h3 className="mt-7 text-sm font-semibold text-text-secondary">From your builds</h3>
-          {coverNote && (
+          {(coverNote || write.failed) && (
             <Banner tone="attention" className="mt-4">
-              {coverNote}
+              {coverNote ?? WRITE_FAILED}
             </Banner>
           )}
           <ul role="list" className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-6">
@@ -188,8 +203,11 @@ export function MediaTab({ project, refs, viewer, canCtx }: MediaTabProps) {
                   onToggleCover={() => {
                     // A live listing pauses first (P2-LISTING-13); an auction or the lock refuses.
                     const out = gate.guard("cover", () => {
+                      const cover = isCover ? null : { buildId: tile.buildId, productId: tile.productId };
                       setCoverNote(null);
-                      setCover(project.id, isCover ? null : { buildId: tile.buildId, productId: tile.productId });
+                      setCoverWrite({ cover, said: cover ? `${tile.name} is the cover now` : "The cover is back to the default image" });
+                      write.start();
+                      setCover(project.id, cover);
                     });
                     if (out.kind === "refused") setCoverNote(out.reason);
                   }}

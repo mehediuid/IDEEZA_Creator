@@ -67,7 +67,7 @@ export function RailOutcome({
         commerce={commerce}
         projectId={summary.id}
         name={summary.name}
-        canShowcase={can(viewer, "project.showcase", { status: summary.status })}
+        canShowcase={can(viewer, "project.showcase", view.canCtx)}
         readiness={readiness}
         view={view}
         announce={announce}

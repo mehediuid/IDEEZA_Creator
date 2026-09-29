@@ -10,8 +10,9 @@
 // - the one polite live region;
 // - the banners, then the notice above the tab strip;
 // - the tab strip and its URL: `projectTabsFor(viewer, …)`, only tabs with a panel;
-// - the rail, in RAIL_ORDER. Below a 1024 px page container the Marketplace
-//   block stands between the header and the tab strip, one DOM instance (C21).
+// - the rail, in RAIL_ORDER. The Marketplace block comes second in the DOM,
+//   after the header and before the tab strip — where it stands below a
+//   1024 px page container, and first in the rail from there (C21).
 // What fills it comes in as slots (./slots.ts), all rendered from the same
 // props, so the owner's page and every preview are one tree (PPL-2).
 
@@ -32,7 +33,7 @@ import type { ManualProject } from "@/lib/manual/projects";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { LiveRegion, usePageArrival } from "./arrival";
 import { Breadcrumb, type Crumb } from "./breadcrumb";
-import { ProjectFrame, SplitRail } from "./frame";
+import { ProjectFrame, RailRest } from "./frame";
 import { RAIL_ORDER, type ProjectSlots, type SlotProps } from "./slots";
 import { TabStrip } from "./tab-strip";
 
@@ -119,6 +120,7 @@ export function ProjectShell({
           <Breadcrumb trail={trail ?? [{ label: "My projects", href: "/projects" }, { label: project.name }]} />
         }
         head={<Header {...props} titleRef={titleRef} />}
+        lead={Lead ? <Lead {...props} /> : null}
         main={
           <>
             {Notice ? (
@@ -145,12 +147,12 @@ export function ProjectShell({
         }
         rail={
           // COR-99: the rail landmark; a block with nothing real to say returns null.
-          <SplitRail label="Project record" lead={Lead ? <Lead {...props} /> : null}>
+          <RailRest label="Project record">
             {REST_OF_RAIL.map((id) => {
               const Block = slots.rail[id];
               return Block ? <Block key={id} {...props} /> : null;
             })}
-          </SplitRail>
+          </RailRest>
         }
       />
       <LiveRegion text={live} />

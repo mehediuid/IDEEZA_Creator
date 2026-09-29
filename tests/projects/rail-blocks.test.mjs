@@ -20,7 +20,7 @@ test("the Outcome block still has no door to Innovations or the Brief — its on
 test("Showcase and the owner-only facts ask the one permission source (PPL-1, COM-55, PPL-7)", () => {
   const outcome = read("rail-outcome.tsx");
   assert.match(outcome, /can\(viewer, "facts\.seeOwnerOnly"\)/);
-  assert.match(outcome, /can\(viewer, "project\.showcase", \{ status: summary\.status \}\)/);
+  assert.match(outcome, /can\(viewer, "project\.showcase", view\.canCtx\)/);
   // P2-VIDEO-15: "Stop showcasing" is never gated; "Showcase project" flips at once only once
   // `readinessOf` passes, so the single v1 toggle is now these two explicit calls.
   assert.match(outcome, /setShowcase\(projectId, true\)/);

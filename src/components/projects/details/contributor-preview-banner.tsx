@@ -18,17 +18,19 @@ import { ROLE_WORD } from "@/lib/manual/contributors";
 import type { Contributor } from "@/lib/manual/p2-types";
 import type { Viewer } from "@/lib/manual/permissions";
 import { withView } from "@/lib/manual/buyer-preview";
-import { useExitPreview } from "./buyer-preview";
+import { contributorPreviewEntry, notePreviewEntry, useExitPreview } from "./buyer-preview";
 
 type ContributorPreviewViewer = Extract<Viewer, { kind: "contributor-preview" }>;
 
 /** Preview's entry (P2-CONTRIB-12): pushes `?view=contributor&as=<id>` as one
- *  history entry, so Back exits it — keeping every other parameter. */
+ *  history entry, so Back exits it — keeping every other parameter — and
+ *  records the row, so Exit hands the focus back to its "Preview as". */
 export function useEnterContributorPreview(): (contributorId: string) => void {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   return React.useCallback(
     (contributorId: string) => {
+      notePreviewEntry(contributorPreviewEntry(contributorId));
       const qs = withView(searchParams.toString(), { contributor: contributorId });
       window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
     },
@@ -72,7 +74,7 @@ export function ContributorPreviewBanner({ viewer }: { viewer: ContributorPrevie
           <button
             type="button"
             onClick={exit}
-            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-border bg-bg-surface px-8 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
+            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
           >
             Exit preview
           </button>

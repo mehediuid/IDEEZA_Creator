@@ -45,7 +45,7 @@ import { headerText, type NextAction } from "@/lib/manual/project-summary";
 import { withTab } from "@/lib/manual/project-route";
 import { can, hasAudience } from "@/lib/manual/permissions";
 import { pendingNoticesOf, type PendingNotice } from "@/lib/manual/project-header";
-import { isPreview, useEnterPreview, useFocusAfterPreview } from "./buyer-preview";
+import { BUYER_PREVIEW_ENTRY, isPreview, useEnterPreview, useFocusAfterPreview } from "./buyer-preview";
 import { ProjectDescription } from "./description-editor";
 import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
@@ -131,9 +131,14 @@ export function ProjectHeader({
     router.push(href);
   };
   const enterPreview = useEnterPreview();
-  // PPL-5: Exit preview hands focus back to this button — or to the h1 when
-  // the project offers no preview button of its own (a bare ?view=buyer link).
-  useFocusAfterPreview(!isPreview(viewer), () => document.getElementById(PREVIEW_TRIGGER_ID) ?? titleRef.current);
+  // PPL-5: Exit preview hands focus back to this button when it entered the
+  // preview — or to the h1 when the project offers no preview button of its
+  // own (a bare ?view=buyer link), or the control that entered isn't here.
+  useFocusAfterPreview(
+    !isPreview(viewer),
+    () => document.getElementById(PREVIEW_TRIGGER_ID) ?? titleRef.current,
+    { claims: (from) => from === BUYER_PREVIEW_ENTRY },
+  );
 
   const Action = actions?.["add-to-marketplace"];
   const actionButton = (a: NextAction, key: "first" | "second", primary: boolean) => {

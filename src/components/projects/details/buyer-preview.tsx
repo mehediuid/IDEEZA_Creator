@@ -17,9 +17,13 @@
 // Entering and leaving preview is Next's router-integrated pushState, the
 // tab strip's own (shell.tsx): a query-only change, so useSearchParams
 // follows at once with no server round trip, and Back leaves preview
-// (PPL-5). Exit's focus return is the returning page's: the header focuses
-// its Preview as buyer button once it is back on screen, the product page
-// its h1 (useFocusAfterPreview).
+// (PPL-5). Exit's focus return is the returning page's, and only the control
+// that entered the preview takes it: entering records its key
+// (`BUYER_PREVIEW_ENTRY`, `contributorPreviewEntry(id)`), and after Exit the
+// one `useFocusAfterPreview` that claims that key focuses — the header's
+// Preview as buyer button, the roster's "Preview as". The page's fallback
+// (the header's own, the product page's h1) takes it when nothing claims it:
+// a bare `?view=` link, or a claimed control that isn't on this page.
 
 import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -57,11 +61,24 @@ export function previewQuery(viewer: Viewer): string {
   return qs ? `?${qs}` : "";
 }
 
-// Set by Exit preview, spent by the first owner view that mounts its focus
-// target after it (useFocusAfterPreview). Module state, not React state:
-// the page that exits (the buyer tree) and the one that takes the focus
-// (the owner tree) are different renders of the same route.
-let focusOnReturn = false;
+/** The header's Preview as buyer button's entry key. */
+export const BUYER_PREVIEW_ENTRY = "buyer";
+/** The roster's "Preview as" entry key for one contributor. */
+export function contributorPreviewEntry(contributorId: string): string {
+  return `contributor:${contributorId}`;
+}
+
+// Module state, not React state: the page that exits (the preview tree) and
+// the one that takes the focus (the owner tree) are different renders of the
+// same route. `entered` is set by the control that enters a preview; Exit
+// turns it into `returning`, which the first claiming view spends.
+let entered: string | null = null;
+let returning: { from: string | null } | null = null;
+
+/** Records which control entered the preview, so Exit hands the focus back to it. */
+export function notePreviewEntry(from: string): void {
+  entered = from;
+}
 
 /** Adds or drops `view=buyer` as a history entry, keeping every other param
  *  (`?tab=`, `?v=`). */
@@ -76,33 +93,64 @@ function pushView(pathname: string, search: string, view: "buyer" | null) {
 export function useEnterPreview(): () => void {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  return React.useCallback(() => pushView(pathname, searchParams.toString(), "buyer"), [pathname, searchParams]);
+  return React.useCallback(() => {
+    notePreviewEntry(BUYER_PREVIEW_ENTRY);
+    pushView(pathname, searchParams.toString(), "buyer");
+  }, [pathname, searchParams]);
 }
 
-/** Drops `view` alone and keeps the rest. Focus goes back to the button
+/** Drops `view` alone and keeps the rest. Focus goes back to the control
  *  that opened preview once the owner view is on screen again (PPL-5). */
 export function useExitPreview(): () => void {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   return React.useCallback(() => {
-    focusOnReturn = true;
+    returning = { from: entered };
+    entered = null;
     pushView(pathname, searchParams.toString(), null);
   }, [pathname, searchParams]);
 }
 
-/** After Exit preview: focuses `target()` the first time `ready` — the owner
- *  view is back and its target is in the DOM. A page without a Preview as
- *  buyer button passes its h1, so focus never falls to the body. */
-export function useFocusAfterPreview(ready: boolean, target: () => HTMLElement | null) {
-  const focusTarget = React.useEffectEvent(() => {
-    const el = target();
+export type FocusAfterPreviewOptions = {
+  /** The entry keys this view hands the focus back for. */
+  claims?: (from: string) => boolean;
+  /** Takes the focus when nothing claims it (default true; false for a claimer only). */
+  fallback?: boolean;
+};
+
+/** After Exit preview, once `ready` (the owner view is back): focuses
+ *  `target(from)` if this view claims the control that entered, or — as the
+ *  page's fallback — when nothing does. A claimed control gets the frame
+ *  first: it can be in a later effect of the same commit, or not on the page
+ *  at all, and then the fallback (a page's h1) still keeps focus off <body>. */
+export function useFocusAfterPreview(
+  ready: boolean,
+  target: (from: string | null) => HTMLElement | null,
+  { claims, fallback = true }: FocusAfterPreviewOptions = {},
+) {
+  const take = React.useEffectEvent((ticket: { from: string | null }) => {
+    if (returning !== ticket) return;
+    const el = target(ticket.from);
     if (!el) return;
-    focusOnReturn = false;
+    returning = null;
     el.focus();
   });
+  const claimed = React.useEffectEvent((from: string | null) => from !== null && (claims?.(from) ?? false));
   React.useEffect(() => {
-    if (ready && focusOnReturn) focusTarget();
-  }, [ready]);
+    const ticket = returning;
+    if (!ready || !ticket) return;
+    if (claimed(ticket.from)) {
+      take(ticket);
+      return;
+    }
+    if (!fallback) return;
+    if (ticket.from === null) {
+      take(ticket);
+      return;
+    }
+    const raf = requestAnimationFrame(() => take(ticket));
+    return () => cancelAnimationFrame(raf);
+  }, [ready, fallback]);
 }
 
 /** PPL-5's sticky banner, at the top of the scrolling `main`. `Banner` is
@@ -137,7 +185,7 @@ export function BuyerPreviewBanner() {
           <button
             type="button"
             onClick={exit}
-            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-border bg-bg-surface px-8 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
+            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
           >
             Exit preview
           </button>

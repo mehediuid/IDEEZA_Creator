@@ -13,25 +13,38 @@
 //   Contributors" link that selects the Contributors tab (P2-CONTRIB-14).
 // - The dialog lists what goes and what stays (deletePlanOf) and asks for the
 //   typed project name only when editor work, a mint record or a network would
-//   be lost. Cancel has the focus; the destructive button reads Delete project.
-// - Confirm queues "Deleted "{name}"" for My projects, then deletes and
-//   navigates in one transition, so this page never renders "We couldn't find
-//   this project" on the way out.
+//   be lost. The editor work is every swept row's (sweepRowIdsOf), and the
+//   activity history is counted. Cancel has the focus; the destructive button
+//   reads Delete project.
+// - Confirm re-reads the delete gate from storage first: a sale, listing or
+//   co-owner that arrived while the dialog was open blocks it there, with the
+//   reason said in the dialog. Otherwise it queues "Deleted "{name}"" for My
+//   projects, then deletes and navigates in one transition, so this page never
+//   renders "We couldn't find this project" on the way out.
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { ConfirmDialog, TextInput } from "@/components/ideeza";
+import { Banner, ConfirmDialog, TextInput } from "@/components/ideeza";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
+import { parseStored, readStoredKey } from "@/lib/key-store";
 import { readMarketNow } from "@/lib/market/market-store";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
-import { editorWorkOf } from "@/lib/manual/editor-work";
-import { can, deleteBlockOf, type Viewer } from "@/lib/manual/permissions";
-import type { ProjectView } from "@/lib/manual/project-read";
+import { editorWorkOf, type EditorWork, type StepFact } from "@/lib/manual/editor-work";
+import { readJourney } from "@/lib/manual/journey-store";
+import { can, deleteBlockOf, type DeleteBlock, type Viewer } from "@/lib/manual/permissions";
+import { deleteFactsOf, productRowsOf, type ProjectView } from "@/lib/manual/project-read";
 import { withTab } from "@/lib/manual/project-route";
-import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { projectSummary } from "@/lib/manual/project-summary";
+import {
+  normalizeProjects,
+  PROJECTS_KEY,
+  sweepRowIdsOf,
+  useManualProjects,
+  type ManualProject,
+} from "@/lib/manual/projects";
 import { readNetwork } from "@/lib/network/store";
 import { cn } from "@/lib/utils";
 import { setProjectNotice } from "./project-notice";
@@ -109,6 +122,63 @@ type DeleteProjectDialogProps = {
   onClose: () => void;
 };
 
+/** Every row the sweep deletes documents under, with its editor facts (P2-EDITOR-8). */
+function rowWorksOf(project: ManualProject): EditorWork[] {
+  const head = productRowsOf(project)[0]?.id ?? "p1";
+  return sweepRowIdsOf(project).map((rowId) => editorWorkOf({ projectId: project.id, productId: rowId }, head));
+}
+
+/** Nothing to lose: a store that exists but holds nothing yet ("0 objects · …"). */
+const counts = (f: StepFact) => f.state === "work" && !/^0\b/.test(f.text);
+
+/** One fact per step across the rows, for the plan's single `work`: the first
+ *  row whose step holds work, else a sample board, else the first row's own. */
+function foldWorks(works: readonly EditorWork[]): EditorWork {
+  const first = works[0];
+  const pick = (step: keyof EditorWork): StepFact =>
+    works.find((w) => counts(w[step]))?.[step] ??
+    works.find((w) => w[step].state === "sample")?.[step] ??
+    first?.[step] ?? { state: "none" };
+  return {
+    pcb: pick("pcb"),
+    assembly: pick("assembly"),
+    wiring: pick("wiring"),
+    three: pick("three"),
+    code: pick("code"),
+    preview: pick("preview"),
+  };
+}
+
+/** The stored projects, as another tab may have left them; null when unreadable. */
+function storedProject(id: string): ManualProject | null {
+  const parsed = parseStored(readStoredKey(PROJECTS_KEY));
+  if (parsed.unreadable) return null;
+  return normalizeProjects(parsed.value ?? []).find((p) => p.id === id) ?? null;
+}
+
+/** §3.8.4 over what is stored now, not what the page last rendered: the market
+ *  and the record, in memory and in storage — either one blocking blocks. */
+function deleteBlockNow(project: ManualProject, view: ProjectView, draft: StoredDraft | null): DeleteBlock | null {
+  const market = readMarketNow();
+  const builds = view.refs.flatMap((r) => (r.job ? [r.job] : []));
+  const now = Date.now();
+  const records = [project, storedProject(project.id)].filter((p): p is ManualProject => p !== null);
+  for (const p of records) {
+    const summary = projectSummary(p, { builds, brief: draft, videoJobs: [], now, market });
+    const block = deleteBlockOf(
+      deleteFactsOf({
+        ...view,
+        listing: summary.listing,
+        sales: market.sales.filter((s) => s.projectId === p.id),
+        ownership: summary.ownership,
+        marketUnreadable: market.unreadable,
+      }),
+    );
+    if (block) return block;
+  }
+  return null;
+}
+
 function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDialogProps) {
   const router = useRouter();
   const { deleteProject } = useManualProjects();
@@ -122,9 +192,9 @@ function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDia
   const name = project.name.trim();
   const status = view.summary.status;
 
-  // Read when the dialog opens: the editor docs, the network and the
-  // marketplace's ended listings are in this browser's storage, not in the
-  // page's derivation.
+  // Read when the dialog opens: the editor docs, the network, the activity
+  // history and the marketplace's ended listings are in this browser's
+  // storage, not in the page's derivation.
   const plan = React.useMemo(() => {
     const live = view.refs.filter((r) => r.job !== null);
     const known = new Set(chats.map((c) => c.id));
@@ -141,29 +211,48 @@ function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDia
     // P2-CONTRIB-15: the contributors a co-owner's share doesn't already
     // cover — viewers, editors, and any co-owner whose share came back to 0.
     const contributors = (project.contributors ?? []).filter((c) => !(c.role === "coOwner" && c.share > 0)).length;
+    // The sweep deletes the scoped documents of every row it names, so the
+    // plan reads every one of them — not just the virtual first row.
+    const works = rowWorksOf(project);
+    const journey = readJourney(project.id);
     return deletePlanOf({
       status,
       draft,
       products: view.summary.productCount,
-      work: editorWorkOf({ projectId: project.id, productId: "p1" }, "p1"),
+      work: foldWorks(works),
       network: network ? { links: network.links.length } : null,
       showcased: view.summary.showcase !== null,
       builds: live.length,
       chats: keptChats.size,
       contributors,
+      activity: {
+        entries: journey.activities.length,
+        files: journey.activities.reduce((n, a) => n + a.media.length, 0),
+      },
       endedListings,
       mint: view.mint.status,
     });
-  }, [project.id, project.contributors, status, draft, view.summary.productCount, view.summary.showcase, view.refs, view.mint.status, chats]);
+  }, [project, status, draft, view.summary.productCount, view.summary.showcase, view.refs, view.mint.status, chats]);
+
+  // §3.8.4 again at confirm: a sale, a listing or a co-owner that arrived
+  // while the dialog was open (another tab included) still blocks the delete.
+  const liveBlock = deleteBlockOf(view.deleteFacts);
+  const [lateBlock, setLateBlock] = React.useState<DeleteBlock | null>(null);
+  const block = liveBlock ?? lateBlock;
 
   const matched = !plan.typed || matchesTypedName(entry, name);
   const mismatch = plan.typed && tried && !matched;
 
   const confirm = () => {
-    if (pending) return;
+    if (pending || block) return;
     if (!matched) {
       setTried(true);
       fieldRef.current?.focus();
+      return;
+    }
+    const now = deleteBlockNow(project, view, draft);
+    if (now) {
+      setLateBlock(now);
       return;
     }
     setProjectNotice(`Deleted "${name}"`);
@@ -179,12 +268,20 @@ function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDia
       open
       title={`Delete "${name}"?`}
       confirmLabel={pending ? "Deleting…" : "Delete project"}
-      confirmUnavailable={!matched || pending}
+      confirmUnavailable={!matched || pending || block !== null}
       onConfirm={confirm}
       onCancel={() => {
         if (!pending) onClose();
       }}
     >
+      {/* Always on the page, so a block that arrives while it is open is read. */}
+      <div aria-live="polite">
+        {block && (
+          <Banner tone="attention" title={block.reason} className="mb-[16px]">
+            {block.detail}
+          </Banner>
+        )}
+      </div>
       <h3 className="font-semibold text-text-primary">What goes</h3>
       {/* No role="list" on these: reset.css strips the bullets and the indent
           from ul[role="list"], and a bulleted list keeps its semantics. */}
