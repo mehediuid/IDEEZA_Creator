@@ -1870,7 +1870,10 @@ function ConvertConfirmModal() {
   const actions = usePcbActions();
   // The dialog runs the converter as a dry run and lists what it found. Same
   // function the Confirm executes, so the list can't promise something else.
-  const plan = React.useMemo(() => convertSchematicToPcb(state.objects), [state.objects]);
+  const plan = React.useMemo(
+    () => convertSchematicToPcb(state.objects, state.schematicSheets),
+    [state.objects, state.schematicSheets],
+  );
   const p = plan.plan;
   const cell: React.CSSProperties = {
     padding: "var(--spacing-3) var(--spacing-5)",
@@ -1968,7 +1971,10 @@ function ConvertConfirmModal() {
 function ImportChangesModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const plan = React.useMemo(() => planImportChanges(state.objects), [state.objects]);
+  const plan = React.useMemo(
+    () => planImportChanges(state.objects, state.schematicSheets),
+    [state.objects, state.schematicSheets],
+  );
   const removed = plan.removedDesignators.length;
   const nothing = plan.merged.length === 0 && removed === 0;
   const cell: React.CSSProperties = {
