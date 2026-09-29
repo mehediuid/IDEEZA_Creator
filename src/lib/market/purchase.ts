@@ -8,7 +8,7 @@
 import type { Amount, Coin, DemoBuyerId, MintView } from "../wallet/types";
 import type { Network, Token } from "../brief/types";
 import { estimateGas } from "../brief/gas";
-import { addAmounts, toMicros } from "../wallet/money";
+import { toMicros } from "../wallet/money";
 import { FEE_LABEL, IDEEZA_FEE_BPS, ideezaFeeOf, payoutOf } from "./fee";
 import type { EditionTrack, Listing, Sale, SaleItem, UtilityBenefit } from "./types";
 import { randomId } from "./sales";
@@ -70,12 +70,11 @@ export function purchaseQuote(
   const payout = payoutOf(price);
   const gas = estimateGas(net);
   const networkFee: Amount = String(gas.fee);
-  const total = addAmounts(price, networkFee);
+  // No "Total" line: the price and the network fee can be different coins.
   const lines: string[] = [
     `Price · ${price} ${token}`,
     `${gas.label} · ${networkFee} ${gas.native} — ${gas.note}`,
     `Includes ${FEE_LABEL} · ${ideezaFee} ${token} — taken from the price, not added to it`,
-    `Total · ${total} ${token}`,
   ];
   return { price, ideezaFee, networkFee, payout, lines };
 }

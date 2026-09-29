@@ -5,13 +5,9 @@
 //
 // Pure, relative imports only.
 
-import { NETWORKS, type Network, type Token } from "../brief/types";
-import type { MarketData } from "../market/types";
-import { balancesOf } from "./balances";
-import { formatAmount } from "./money";
+import { NETWORKS, type Network } from "../brief/types";
 import type {
   AccountIndex,
-  Coin,
   DemoWallet,
   FailReason,
   IdentityId,
@@ -22,8 +18,6 @@ import type {
 
 /** Milliseconds each busy phase holds, so the demo reads like a real wallet popup. */
 export const TIMING = { connect: 600, switch: 500, sign: 900, confirm: 2400 } as const;
-
-const EMPTY_MARKET: MarketData = { listings: [], sales: [], bids: [], support: [], unreadable: false };
 
 function networkLabel(n: Network): string {
   return NETWORKS.find((x) => x.value === n)?.label ?? n;
@@ -74,18 +68,15 @@ export function failureOf(before: DemoWallet, after: DemoWallet, identity: Ident
   return null;
 }
 
-const FAIL_TEXT: Record<Exclude<FailReason, "insufficientFunds" | "recheck">, string> = {
+/** `insufficientFunds` has a fixed line here: "you now have {n}" needs the wallet AND the market
+ *  (errata 29), so the dialog writes it with `balanceChangedLine` (request-view.ts) instead. */
+const FAIL_TEXT: Record<Exclude<FailReason, "recheck">, string> = {
   walletDisconnected: "Your wallet disconnected before it confirmed.",
   networkChanged: "Your wallet switched network before it confirmed.",
   accountChanged: "Your wallet switched account before it confirmed.",
+  insufficientFunds: "Your balance changed before it confirmed.",
   storageFailed: "This browser couldn't save it — storage is full or blocked.",
 };
-
-/** The short coin that decides the "you now have …" figure of `insufficientFunds`. */
-function shortCoinOf(req: WalletRequest): { coin: Coin; network: Network } {
-  const line = req.charge?.lines[0];
-  return line ? { coin: line.coin, network: req.charge!.network } : { coin: "IDZ", network: req.network };
-}
 
 export type RequestCopy = { title: string; body: string[]; primary?: string; secondary?: string[] };
 
@@ -127,19 +118,6 @@ export function requestCopy(
     case "switching":
       return { title: "Switching…", body: [], primary: "Switching…", secondary: ["Cancel"] };
     case "review": {
-      if (reason === "insufficientFunds") {
-        const { coin, network } = shortCoinOf(req);
-        const identity = resolveIdentity(req, wallet);
-        const have = balancesOf(identity, { wallet, market: EMPTY_MARKET, now: Date.now() });
-        const haveAmount = coin === "IDZ" ? have.idz : (have.native[network]?.[coin as Token] ?? "0");
-        const need = req.charge?.lines.find((l) => l.coin === coin)?.amount ?? "0";
-        return {
-          title: req.title,
-          body: [`Not enough ${coin} — you have ${formatAmount(haveAmount, coin)}, this needs ${formatAmount(need, coin)}.`],
-          primary: "Confirm and pay",
-          secondary: ["Reject", "Use lazy mint instead"],
-        };
-      }
       if (req.kind === "signature") {
         return { title: req.title, body: ["You pay now: Nothing", req.note], primary: "Sign", secondary: ["Reject"] };
       }
@@ -166,18 +144,6 @@ export function requestCopy(
         secondary: ["Close"],
       };
     case "failed": {
-      if (reason === "insufficientFunds") {
-        const { coin, network } = shortCoinOf(req);
-        const identity = resolveIdentity(req, wallet);
-        const have = balancesOf(identity, { wallet, market: EMPTY_MARKET, now: Date.now() });
-        const haveAmount = coin === "IDZ" ? have.idz : (have.native[network]?.[coin as Token] ?? "0");
-        return {
-          title: "It didn't go through.",
-          body: [`Your balance changed — you now have ${formatAmount(haveAmount, coin)}.`, "Nothing was charged."],
-          primary: "Try again",
-          secondary: ["Close"],
-        };
-      }
       const line = reason && reason !== "recheck" ? FAIL_TEXT[reason] : "It didn't go through.";
       return { title: "It didn't go through.", body: [line, "Nothing was charged."], primary: "Try again", secondary: ["Close"] };
     }

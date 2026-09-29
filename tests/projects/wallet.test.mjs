@@ -107,3 +107,27 @@ test("buyerLabel names a buyer without ever reading as a real identity", () => {
   assert.equal(buyerLabel("buyer-mira"), "Mira (demo buyer)");
   assert.equal(DEMO_BUYERS.map((b) => b.id).join(","), "buyer-mira,buyer-leo,buyer-sam");
 });
+
+test("writeWallet refuses to overwrite a stored wallet it can't read (R1 minor): its activity is the balances", async () => {
+  const { writeWallet } = await import("../../.tmp-test/lib/wallet/demo-wallet.js");
+  const map = new Map();
+  const prev = globalThis.window;
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => map.set(k, String(v)),
+    },
+  };
+  try {
+    assert.equal(writeWallet(defaultWallet()), true, "an absent key is written");
+    map.set("ideeza:wallet:demo", "{not json");
+    assert.equal(writeWallet(defaultWallet()), false);
+    assert.equal(map.get("ideeza:wallet:demo"), "{not json", "left exactly as it was");
+    map.set("ideeza:wallet:demo", "42");
+    assert.equal(writeWallet(defaultWallet()), false, "JSON that isn't a wallet object");
+    map.set("ideeza:wallet:demo", JSON.stringify({ v: 1, connected: true }));
+    assert.equal(writeWallet(defaultWallet()), true, "a v1 record is migrated, as normalizeWallet reads it");
+  } finally {
+    globalThis.window = prev;
+  }
+});

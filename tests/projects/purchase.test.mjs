@@ -279,3 +279,9 @@ test("makeSale: while the project is sold in full, its editions are refused (R1-
     sales: [], mint: mintViewFixture(), ownership: { creatorPct: 0 }, now: 2000,
   })));
 });
+
+test("purchaseQuote: no \"Total\" line — price and network fee can be different coins (R1 minor)", () => {
+  const quote = purchaseQuote(listingFixture({ network: "baseSepolia", token: "USDC" }), "buyNow");
+  assert.ok(!quote.lines.some((l) => l.startsWith("Total")), quote.lines.join("\n"));
+  assert.equal(quote.lines.length, 3);
+});

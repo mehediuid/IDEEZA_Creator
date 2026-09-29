@@ -14,7 +14,7 @@ import { formatDate, formatDateTime, formatShortDate } from "../manual/project-s
 import type { Sale } from "../market/types";
 import { DEMO_ACCOUNTS } from "./identities";
 import { formatAmount } from "./money";
-import { shortAddress } from "./demo-wallet";
+import { demoAddress, makerId, sanitizeCharge, shortAddress } from "./demo-wallet";
 import type {
   AccountIndex,
   Charge,
@@ -267,7 +267,8 @@ export function normalizeMintRecord(raw: unknown): MintRecord | undefined {
   if (isDict(raw.onChain) && typeof raw.onChain.at === "number" && typeof raw.onChain.txHash === "string") {
     const via = raw.onChain.via;
     if (via === "instant" || via === "upgrade") {
-      record.onChain = { at: raw.onChain.at, txHash: raw.onChain.txHash, via };
+      const charge = sanitizeCharge(raw.onChain.charge);
+      record.onChain = { at: raw.onChain.at, txHash: raw.onChain.txHash, via, ...(charge ? { charge } : null) };
     }
   }
   if (Array.isArray(raw.walletChanges)) {
@@ -278,6 +279,13 @@ export function normalizeMintRecord(raw: unknown): MintRecord | undefined {
     if (changes.length) record.walletChanges = changes;
   }
   return record;
+}
+
+/** The address a sale pays: the mint record's payout wallet, else Demo account 1 — the default
+ *  payout (P2-MINT-11) — never whichever account happens to be current. One home for every
+ *  sale writer (the purchase, an auction's Close). */
+export function payoutAddressOf(record: Pick<MintRecord, "wallet"> | null | undefined): string {
+  return record?.wallet.address ?? demoAddress(makerId(1));
 }
 
 export function lazyRecord(ctx: {

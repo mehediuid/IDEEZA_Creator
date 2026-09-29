@@ -244,3 +244,33 @@ test("walletFactLineOf: balance on a connected instant mint, and the can't-affor
   );
   assert.equal(rv.mintShortfallOf(poor, "lazy", "baseSepolia", m), null);
 });
+
+// ── final fix wave (R1-3): the top bidder can use the auction's own Buy now ──
+
+test("shortfallOf / balanceAfterOf: a purchase that ends an auction releases its buyer's own hold on it", () => {
+  const auction = {
+    id: "lst_auc", projectId: "proj_1", slot: "main", source: "page", listedAt: NOW - 9000, updatedAt: NOW - 9000,
+    type: "auction", token: "MATIC", minBid: "1", auctionBuyNow: "8", endsAt: NOW + 3_600_000 * 5, percentSelling: 10,
+    royaltiesPct: 5, mintingType: "lazy", network: "mumbai", collection: "Cars", benefits: [],
+    metadata: { name: "Car", description: "", products: [], cover: null, at: 0 }, status: "live", events: [],
+  };
+  const market = {
+    ...EMPTY_MARKET,
+    listings: [auction],
+    bids: [{ id: "bid_1", listingId: "lst_auc", bidderId: "buyer-mira", amount: "6", token: "MATIC", at: NOW - 5000 }],
+  };
+  const w = walletSwitchNetwork(walletConnect(defaultWallet(), "buyer-mira"), "buyer-mira", "mumbai");
+  const buy = {
+    kind: "transaction", purpose: "purchase", identity: "buyer-mira", network: "mumbai", title: "Confirm purchase",
+    summary: [], note: "", doneLine: "",
+    charge: { network: "mumbai", lines: [{ coin: "MATIC", amount: "8" }, { coin: "MATIC", amount: "0.021" }] },
+  };
+  // Mira has 10 MATIC with 6 held by her own top bid: 4 free for anything else…
+  assert.equal(rv.shortfallOf(buy, "buyer-mira", ctx(w, market)).have, "4");
+  // …but this purchase ends that auction, so her hold comes back to pay it.
+  const releasing = { ...buy, releases: "lst_auc" };
+  assert.equal(rv.shortfallOf(releasing, "buyer-mira", ctx(w, market)), null);
+  assert.equal(rv.balanceAfterOf(releasing, "buyer-mira", ctx(w, market)), "1.979 MATIC");
+  // A purchase that ends some other listing leaves this hold where it is.
+  assert.equal(rv.shortfallOf({ ...buy, releases: "lst_other" }, "buyer-mira", ctx(w, market)).have, "4");
+});
