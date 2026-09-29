@@ -10,7 +10,6 @@ import {
   attach,
   mergeProductEdits,
   removeContributorFrom,
-  renameHeadline,
   saveTargetOf,
   sweepRowIdsOf,
   updateContributorIn,
@@ -326,24 +325,6 @@ test("Step 1's words land on their rows: by row id, then by position, then by na
   assert.equal(byName[0], rows[0]);
   // An empty name keeps the row's own.
   assert.equal(mergeProductEdits(rows, [{ name: "  ", description: "A car.", rowId: "p1" }], 9)[0], rows[0]);
-});
-
-// ── the editor chrome's headline rename (COR-95) ─────────────────────────────
-
-test("renaming the headline renames the first product while they agree", () => {
-  const p = project("proj_car", { productName: "RC car", products: [
-    { id: "p1", name: "RC car", description: "A car." },
-    { id: "p2", name: "Remote controller", description: "Steers." },
-  ] });
-  const patch = renameHeadline(p, "Rally car", 7);
-  assert.equal(patch.productName, "Rally car");
-  assert.deepEqual(patch.products, [{ id: "p1", name: "Rally car", description: "A car.", updatedAt: 7 }, p.products[1]]);
-  // The first row was renamed on its own before: it keeps its name.
-  assert.deepEqual(renameHeadline({ ...p, productName: "Car" }, "Rally car", 7), { productName: "Rally car" });
-  // Clearing the headline never blanks a product.
-  assert.deepEqual(renameHeadline(p, "", 7), { productName: "" });
-  // A hand-made project with no list has nothing else to rename.
-  assert.deepEqual(renameHeadline(project("proj_hand", { productName: "Lamp" }), "Desk lamp", 7), { productName: "Desk lamp" });
 });
 
 // ── T09: attach() keeps the virtual "p1" once it has editor work (EDITOR §3.1) ─────

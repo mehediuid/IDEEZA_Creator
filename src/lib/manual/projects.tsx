@@ -927,26 +927,6 @@ export function mergeProductEdits(
   });
 }
 
-/** The editor chrome's headline rename (COR-95): the new `productName`, and
- *  the first product renamed with it while that row still carried the old
- *  headline — they are one product, so the list must not go on calling it by
- *  its old name. An empty name clears the headline ("Untitled product") and
- *  leaves the row named. */
-export function renameHeadline(
-  p: ManualProject,
-  name: string,
-  now: number,
-): Pick<ManualProject, "productName"> & Partial<Pick<ManualProject, "products">> {
-  const clean = name.trim();
-  const first = p.products?.[0];
-  if (!p.products || !first || !clean || first.name !== p.productName || first.name === clean)
-    return { productName: clean };
-  return {
-    productName: clean,
-    products: [{ ...first, name: clean, updatedAt: now }, ...p.products.slice(1)],
-  };
-}
-
 /** A patch laid over a stored record, as `updateProject` writes it: product
  *  rows keep their identity (keepProductIds), and `updatedAt` is `now`. */
 export function applyPatch(p: ManualProject, patch: ProjectPatch, now: number): ManualProject {

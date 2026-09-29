@@ -5,7 +5,6 @@ import {
   BUYER_VIEW,
   CONTRIBUTOR_VIEW,
   AS_PARAM,
-  viewerFromParam,
   viewerFromParams,
   isBuyerPreview,
   isPreview,
@@ -28,18 +27,6 @@ test("VIEW_PARAM, BUYER_VIEW, CONTRIBUTOR_VIEW and AS_PARAM are the query contra
   assert.equal(BUYER_VIEW, "buyer");
   assert.equal(CONTRIBUTOR_VIEW, "contributor");
   assert.equal(AS_PARAM, "as");
-});
-
-// ─────────────────────────── viewerFromParam (legacy, kept for current callers) ───────────────────────────
-
-test("viewerFromParam('buyer') resolves the visitor viewer", () => {
-  assert.deepEqual(viewerFromParam("buyer"), { kind: "owner-preview" });
-});
-
-test("viewerFromParam resolves the local owner for null or any other value", () => {
-  assert.deepEqual(viewerFromParam(null), { kind: "local-owner" });
-  assert.deepEqual(viewerFromParam(""), { kind: "local-owner" });
-  assert.deepEqual(viewerFromParam("seller"), { kind: "local-owner" });
 });
 
 // ─────────────────────────── viewerFromParams (P2-CONTRIB-12) ───────────────────────────

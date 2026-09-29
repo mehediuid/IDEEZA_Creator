@@ -21,7 +21,7 @@ import { qtyOf, unitName } from "../spec/bodies";
 import { specKey } from "../spec/derive";
 import { asConceptSummary } from "../spec/hints";
 import type { ResolvedSpec } from "../spec/types";
-import type { ManualProduct, ManualProject, ProjectBuildRef, ProjectStep } from "./projects";
+import type { ManualProduct, ManualProject, ProjectBuildRef } from "./projects";
 import { commerceOf, type ProjectCommerce, type StoredDraft } from "../brief/project-brief";
 import type { VideoJob } from "../video/jobs";
 import type { ProjectVideos } from "../video/types";
@@ -588,13 +588,6 @@ export function coverOf(p: ManualProject, refs: BuildRef[]): string | null {
     if (img) return img;
   }
   return null;
-}
-
-/** Open in editor's target: the editor step last opened, else PCB (COR-12,
- *  COR-64). The Brief is never it — the Brief has its own door in the header. */
-export function resumeStepOf(p: ManualProject): ProjectStep {
-  const step = p.lastOpened?.step;
-  return step && step !== "brief" ? step : "pcb";
 }
 
 /** The concept a booked product was drawn from, as its chat still has it —

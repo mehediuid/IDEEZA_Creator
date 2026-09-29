@@ -40,11 +40,14 @@ const { editorWorkOf } = await import("../../.tmp-test/lib/manual/editor-work.js
 
 const PID = "proj_test1";
 
-// ───────────────────── the deprecated 1-arg form (legacy per-project keys) ─────────────────────
+// ───────────────────── the first row, adopting the legacy per-project keys ─────────────────────
+
+/** The project's first row "p1", which reads the pre-P2 per-project keys. */
+const firstRowWork = (projectId) => editorWorkOf({ projectId, productId: "p1" }, "p1");
 
 test("no docs at all: PCB and Wiring read not-opened, everything else reads none", () => {
   setStorage({});
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.pcb, { state: "not-opened" });
   assert.deepEqual(work.wiring, { state: "not-opened" });
   assert.deepEqual(work.assembly, { state: "none" });
@@ -55,7 +58,7 @@ test("no docs at all: PCB and Wiring read not-opened, everything else reads none
 
 test("PCB doc holding only the sch- sample: PCB reads sample, Assembly reads none (no board parts)", () => {
   setStorage({ [`ideeza:pcb:doc:${PID}`]: fixture("pcb-sample.json") });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.pcb, { state: "sample" });
   assert.deepEqual(work.assembly, { state: "none" });
 });
@@ -65,14 +68,14 @@ test("PCB doc with real objects and board parts, some checked off", () => {
     [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json"),
     [`ideeza:assembly:${PID}`]: fixture("assembly-progress.json"),
   });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.pcb, { state: "work", text: "4 objects · 2 on the board" });
   assert.deepEqual(work.assembly, { state: "work", text: "1 of 2 parts checked" });
 });
 
 test("PCB doc with board parts but no assembly progress key yet: 0 checked, not none", () => {
   setStorage({ [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json") });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.assembly, { state: "work", text: "0 of 2 parts checked" });
 });
 
@@ -81,40 +84,40 @@ test("a checked-off id no longer on the board doesn't count (stale progress entr
     [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json"),
     [`ideeza:assembly:${PID}`]: { "ghost-part": true },
   });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.assembly, { state: "work", text: "0 of 2 parts checked" });
 });
 
 test("an empty PCB objects array is work, not sample", () => {
   setStorage({ [`ideeza:pcb:doc:${PID}`]: { objects: [] } });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.pcb, { state: "work", text: "0 objects · 0 on the board" });
 });
 
 test("Wiring doc present: parts and wires counted", () => {
   setStorage({ [`ideeza:wiring:doc:${PID}`]: fixture("wiring-doc.json") });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.wiring, { state: "work", text: "3 parts · 2 wires" });
 });
 
 test("3D AI model with a glbUrl reads work; without one reads none", () => {
   setStorage({ [`ideeza:three:aimodel:${PID}`]: fixture("three-aimodel-ready.json") });
-  assert.deepEqual(editorWorkOf(PID).three, { state: "work", text: "AI model generated" });
+  assert.deepEqual(firstRowWork(PID).three, { state: "work", text: "AI model generated" });
 
   setStorage({ [`ideeza:three:aimodel:${PID}`]: fixture("three-aimodel-empty.json") });
-  assert.deepEqual(editorWorkOf(PID).three, { state: "none" });
+  assert.deepEqual(firstRowWork(PID).three, { state: "none" });
 });
 
 test("corrupt PCB and wiring JSON degrade to not-opened instead of throwing", () => {
   setStorage({ [`ideeza:pcb:doc:${PID}`]: "{not json", [`ideeza:wiring:doc:${PID}`]: "{not json" });
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.pcb, { state: "not-opened" });
   assert.deepEqual(work.wiring, { state: "not-opened" });
 });
 
-test("Code and Preview never carry a fact through the deprecated 1-arg form (no legacy key to adopt)", () => {
+test("Code and Preview have no legacy key to adopt: nothing stored reads none", () => {
   setStorage({});
-  const work = editorWorkOf(PID);
+  const work = firstRowWork(PID);
   assert.deepEqual(work.code, { state: "none" });
   assert.deepEqual(work.preview, { state: "none" });
 });

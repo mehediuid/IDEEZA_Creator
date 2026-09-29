@@ -246,8 +246,7 @@ function soldDetail(sold: DeleteFacts["sold"]): string {
 
 /**
  * The co-owner detail of the delete gate (P2-CONTRIB-14): the co-owners holding more
- * than 0 %, in the order given, or null when there are none. `otherOwnersDetail`
- * (ownership.ts, T05) reads this, so the copy has one home.
+ * than 0 %, in the order given, or null when there are none — the one home of this copy.
  * - one: "Ana Silva holds 30%. Change their role or remove them in Contributors first."
  * - two: "Ana Silva and Kofi Mensah hold 40% between them. Change their roles or remove them in Contributors first."
  * - more: "Ana Silva and 2 others hold 45% between them. Change their roles or remove them in Contributors first."

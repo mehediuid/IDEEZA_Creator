@@ -19,15 +19,6 @@ export const BUYER_VIEW = "buyer";
 export const CONTRIBUTOR_VIEW = "contributor";
 export const AS_PARAM = "as";
 
-/** `?view=buyer` → the visitor viewer; anything else → the local owner
- *  (PPL-5's entry, read back on every visit — there's no separate store).
- *  Kept for the current callers (T12 converts them to `viewerFromParams`);
- *  new code should call that instead, since it also resolves the
- *  contributor preview. */
-export function viewerFromParam(view: string | null): Viewer {
-  return view === BUYER_VIEW ? { kind: "owner-preview" } : { kind: "local-owner" };
-}
-
 /**
  * `?view=buyer` → the visitor viewer; `?view=contributor&as=<id>` → that
  * contributor's viewer, when `id` names one of `contributors`; anything

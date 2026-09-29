@@ -6,7 +6,6 @@ import {
   maxShareFor,
   sellableShareOf,
   otherOwnersOf,
-  otherOwnersDetail,
   ownershipRow,
   ownedBySegment,
 } from "../../.tmp-test/lib/manual/ownership.js";
@@ -135,28 +134,6 @@ test("otherOwnersOf: co-owners only — a buyer holding is never in this list", 
   const sales = [mainSale("sale_a", "buyer-mira", 10, 1)];
   const s = ownershipOf({ createdAt: CREATED, contributors: [ANA], sales, listedPercent: 0 });
   assert.deepEqual(otherOwnersOf(s), [{ kind: "coOwner", name: "Ana Silva", percent: 30 }]);
-});
-
-test("otherOwnersDetail: one, two and three-or-more co-owners (reuses permissions.ts's coOwnersDetail, one home for the copy)", () => {
-  const one = ownershipOf({ createdAt: CREATED, contributors: [ANA], sales: [], listedPercent: 0 });
-  assert.deepEqual(otherOwnersDetail(otherOwnersOf(one)), {
-    detail: "Ana Silva holds 30%. Change their role or remove them in Contributors first.",
-    linkToContributors: true,
-  });
-  const two = ownershipOf({ createdAt: CREATED, contributors: [ANA, KOFI], sales: [], listedPercent: 0 });
-  assert.deepEqual(otherOwnersDetail(otherOwnersOf(two)), {
-    detail: "Ana Silva and Kofi Mensah hold 40% between them. Change their roles or remove them in Contributors first.",
-    linkToContributors: true,
-  });
-  const three = ownershipOf({ createdAt: CREATED, contributors: [ANA, KOFI, NIA], sales: [], listedPercent: 0 });
-  assert.deepEqual(otherOwnersDetail(otherOwnersOf(three)), {
-    detail: "Ana Silva and 2 others hold 45% between them. Change their roles or remove them in Contributors first.",
-    linkToContributors: true,
-  });
-});
-
-test("otherOwnersDetail: no co-owners gives an empty, unlinked result", () => {
-  assert.deepEqual(otherOwnersDetail([]), { detail: "", linkToContributors: false });
 });
 
 test("ownershipRow: absent for the owner on a sole-owner project", () => {

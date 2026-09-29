@@ -56,6 +56,7 @@ export type ReadinessFacts = {
 const MINTED_REASON = "Mint it first — minting keeps your name on it before anyone sees it.";
 const OWNERSHIP_REASON = "Confirm you are the rightful owner of this idea.";
 const LICENSE_REASON = "Choose the license it is given under.";
+const NO_EDITION_PRODUCT = "Choose which product these NFTs are for.";
 
 /** Table order, per purpose (P2-VIDEO-13). Relist and Edition take Sell's
  *  rules exactly (C13). */
@@ -102,6 +103,8 @@ function buildRule(
       return { id, ok, fixedIn: "brief", reason: ok ? null : MINTED_REASON };
     }
     case "videos": {
+      // An edition reads one product; with none, there's nothing to list — never a vacuous pass.
+      if (purpose === "edition" && counts.total === 0) return { id, ok: false, fixedIn: "gate", reason: NO_EDITION_PRODUCT };
       const ok = counts.missing === 0 && counts.rendering === 0;
       // Showcase reaches this gate through its own dialog; Sell/Give render
       // their videos inline on the Brief's preview step (P2-VIDEO-17), and

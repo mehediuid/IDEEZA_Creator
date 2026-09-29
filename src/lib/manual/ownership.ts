@@ -11,7 +11,7 @@
 import type { Sale } from "../market/types";
 import { buyerLabel } from "./customers";
 import { ROLE_WORD } from "./contributors";
-import { can, coOwnersDetail, type Viewer } from "./permissions";
+import { can, type Viewer } from "./permissions";
 import type { Contributor, Holder, Holding, OtherOwner, OwnershipSplit } from "./p2-types";
 
 /** A holding at or above this percent is a majority (P2-CONTRIB-9/10). */
@@ -120,17 +120,6 @@ export function otherOwnersOf(split: OwnershipSplit): OtherOwner[] {
   return split.holdings
     .filter((h): h is Holding & { holder: Extract<Holder, { kind: "coOwner" }> } => h.holder.kind === "coOwner" && h.percent > 0)
     .map((h) => ({ kind: "coOwner", name: h.holder.name, percent: h.percent }));
-}
-
-/**
- * The delete gate's co-owner detail (P2-CONTRIB-14) and whether "Open
- * Contributors" follows it. Reuses `coOwnersDetail` from `permissions.ts`
- * (T01), so the copy has one home — this is a thin adapter, not a second
- * writer of the words.
- */
-export function otherOwnersDetail(others: readonly OtherOwner[]): { detail: string; linkToContributors: boolean } {
-  const detail = coOwnersDetail(others);
-  return detail ? { detail, linkToContributors: true } : { detail: "", linkToContributors: false };
 }
 
 function otherHoldersNote(holdings: readonly Holding[]): string {
