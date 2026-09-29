@@ -5,6 +5,7 @@
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import {
   BRING_IN_DOCS,
   DocSaveQueue,
@@ -310,4 +311,97 @@ test("Blockly: an empty product takes the earlier workspace; one with blocks get
   });
   bringIn("code", B, s);
   assert.equal(s.getItem(editorDocKey("code.blockly", B)), earlier);
+});
+
+// ── C2 · Bring it in never loses Blockly work ─────────────────────────────
+// Blockly's createVariable throws when a name is already declared with
+// another id, so two workspaces that each hold a for-loop ("i", random ids)
+// must come out with ONE "i" — the product's — and every earlier block
+// pointing at it. Checked on the real Blockly, headless.
+
+const require = createRequire(import.meta.url);
+const Blockly = require("blockly");
+const XMLNS = 'xmlns="https://developers.google.com/blockly/xml"';
+
+/** A workspace made in Blockly itself: `build(ws)` adds its blocks. */
+function blocklyXml(build) {
+  const ws = new Blockly.Workspace();
+  build(ws);
+  const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(ws));
+  ws.dispose();
+  return xml;
+}
+/** Loads `xml` into a fresh headless workspace — throws as the editor would. */
+function load(xml) {
+  const ws = new Blockly.Workspace();
+  Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml), ws);
+  return ws;
+}
+const varOf = (block) => block.getField("VAR").getVariable();
+
+test("C2: two workspaces with a for-loop each merge into one that loads, with one shared i", () => {
+  const own = blocklyXml((ws) => ws.newBlock("controls_for", "own_for"));
+  const earlier = blocklyXml((ws) => ws.newBlock("controls_for", "earlier_for"));
+  const ownId = /<variable\b[^>]*\bid="([^"]*)"/.exec(own)[1];
+  assert.notEqual(ownId, /<variable\b[^>]*\bid="([^"]*)"/.exec(earlier)[1], "Blockly gave each i its own random id");
+  assert.throws(() => load(own.replace("</variables>", /<variables>([\s\S]*)<\/variables>/.exec(earlier)[1] + "</variables>")), /already in use/, "the clash the old merge wrote");
+
+  const merged = appendBlocklyXml(own, earlier);
+  const ws = load(merged);
+  const loops = ws.getBlocksByType("controls_for", false);
+  assert.equal(loops.length, 2, "both loops are there");
+  assert.deepEqual(ws.getVariableMap().getAllVariables().map((v) => [v.getName(), v.getId()]), [["i", ownId]]);
+  for (const b of loops) assert.equal(varOf(b).getId(), ownId, `${b.id} counts with the product's i`);
+  assert.ok(ws.getBlockById("own_for") && ws.getBlockById("earlier_for"));
+});
+
+test("C2: a same-name variable with another id is matched by name and type (any case)", () => {
+  const own = `<xml ${XMLNS}><variables><variable id="o1">Item</variable></variables><block type="variables_set" id="s1"><field name="VAR" id="o1">Item</field></block></xml>`;
+  const earlier = `<xml ${XMLNS}><variables><variable id="e1">item</variable><variable id="e2">speed</variable></variables><block type="variables_set" id="s2"><field name="VAR" id="e1">item</field></block><block type="variables_get" id="g2"><field name="VAR" id="e2">speed</field></block></xml>`;
+  const merged = appendBlocklyXml(own, earlier);
+  assert.equal(
+    merged,
+    `<xml ${XMLNS}><variables><variable id="o1">Item</variable><variable id="e2">speed</variable></variables><block type="variables_set" id="s1"><field name="VAR" id="o1">Item</field></block><block type="variables_set" id="s2"><field name="VAR" id="o1">Item</field></block><block type="variables_get" id="g2"><field name="VAR" id="e2">speed</field></block></xml>`,
+  );
+  const ws = load(merged);
+  assert.equal(varOf(ws.getBlockById("s2")).getId(), "o1");
+  assert.equal(varOf(ws.getBlockById("g2")).getName(), "speed");
+
+  // Another type is another variable: both are kept.
+  const typed = `<xml ${XMLNS}><variables><variable type="Number" id="e1">item</variable></variables><block type="variables_get" id="g3"><field name="VAR" id="e1" variabletype="Number">item</field></block></xml>`;
+  const both = load(appendBlocklyXml(own, typed));
+  assert.deepEqual(both.getVariableMap().getAllVariables().map((v) => [v.getName(), v.type, v.getId()]).sort(), [["Item", "", "o1"], ["item", "Number", "e1"]]);
+});
+
+test("C2: an earlier variable whose id the product already uses for another name gets a new id", () => {
+  const own = `<xml ${XMLNS}><variables><variable id="v1">count</variable></variables><block type="variables_get" id="g1"><field name="VAR" id="v1">count</field></block></xml>`;
+  const earlier = `<xml ${XMLNS}><variables><variable id="v1">speed</variable></variables><block type="variables_get" id="g2"><field name="VAR" id="v1">speed</field></block></xml>`;
+  const ws = load(appendBlocklyXml(own, earlier));
+  assert.deepEqual(ws.getVariableMap().getAllVariables().map((v) => v.getName()).sort(), ["count", "speed"]);
+  assert.equal(varOf(ws.getBlockById("g1")).getName(), "count");
+  assert.equal(varOf(ws.getBlockById("g2")).getName(), "speed");
+  assert.notEqual(varOf(ws.getBlockById("g2")).getId(), "v1");
+});
+
+test("C2: a function's argument follows its variable to the product's id", () => {
+  const own = blocklyXml((ws) => {
+    ws.getVariableMap().createVariable("x", "", "own_x");
+    ws.newBlock("variables_get", "own_get").getField("VAR").setValue("own_x");
+  });
+  const earlier = `<xml ${XMLNS}><variables><variable id="e_x">x</variable></variables><block type="procedures_defnoreturn" id="fn"><mutation><arg name="x" varid="e_x"></arg></mutation><field name="NAME">drive</field></block></xml>`;
+  const merged = appendBlocklyXml(own, earlier);
+  assert.match(merged, /<arg name="x" varid="own_x"><\/arg>/);
+  const ws = load(merged);
+  assert.deepEqual(ws.getVariableMap().getAllVariables().map((v) => v.getId()), ["own_x"]);
+  assert.deepEqual(ws.getBlockById("fn").getVarModels().map((v) => v.getId()), ["own_x"]);
+});
+
+test("C2: Bring it in keeps both for-loops, and the product's own workspace", () => {
+  const own = blocklyXml((ws) => ws.newBlock("controls_for", "own_for"));
+  const earlier = blocklyXml((ws) => ws.newBlock("controls_for", "earlier_for"));
+  const s = new MemStorage({ "ideeza:code:blockly-workspace": earlier, [editorDocKey("code.blockly", B)]: own });
+  assert.equal(bringIn("code", B, s).ok, true);
+  assert.equal(s.getItem("ideeza:code:blockly-workspace"), null, "the global moved");
+  const ws = load(s.getItem(editorDocKey("code.blockly", B)));
+  assert.deepEqual(ws.getBlocksByType("controls_for", false).map((b) => b.id).sort(), ["earlier_for", "own_for"]);
 });

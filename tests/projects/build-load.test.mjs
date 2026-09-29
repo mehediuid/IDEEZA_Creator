@@ -50,7 +50,7 @@ const { productsOf } = await import(L + "create/history.js");
 const { firmwareFor } = await import(L + "create/build-artifacts.js");
 const { IC_SLOTS, netNameOf, schematicFromBuild, symbolKindOf } = await import(L + "pcb/from-build.js");
 const { convertSchematicToPcb, planImportChanges, routeRatsnest } = await import(L + "pcb/schematic-to-pcb.js");
-const { computeNets, runErc } = await import(L + "pcb/nets.js");
+const { buildNetlist, computeNets, runErc } = await import(L + "pcb/nets.js");
 const { DEFAULT_SCHEM_OBJECTS, DEMO_SCHEM_OBJECTS } = await import(L + "pcb/types.js");
 const { deriveAssembly } = await import(L + "three/assembly.js");
 const { aiModelFromBuild, sceneFromAssembly } = await import(L + "three/from-build.js");
@@ -623,9 +623,10 @@ test("P2-BUILDLOAD-9/10: Load keeps a backup; Restore swaps it back, and again",
   assert.deepEqual(res.record.backup.keys, keys);
   assert.equal(res.record.backup.version, 1);
 
+  // Wiring was left at version 1, so it keeps its way to version 2 (R3-35).
   const cap = seedCaptionOf("built", res.record, 2, plan2.pieces);
-  assert.deepEqual(cap.lines, ["Loaded from version 2.", "Version 1's documents are kept."]);
-  assert.equal(cap.load, null);
+  assert.deepEqual(cap.lines, ["Loaded from version 2. Wiring is still version 1's.", "Version 1's documents are kept."]);
+  assert.deepEqual(cap.load, { version: 2, label: "Load version 2…" });
   assert.deepEqual(cap.restore, { version: 1, label: "Restore version 1" });
 
   const v2 = current();
@@ -904,4 +905,128 @@ test("C2: two same-named labels on a hand-drawn sheet are one net, with an airwi
   // A supply's own text names its power net.
   const named = HAND.map((o) => (o.id === "v1" ? { ...o, text: "VBUS" } : o));
   assert.deepEqual(convertSchematicToPcb(named).plan.powerNets, ["GND", "VBUS"]);
+});
+
+// ── R3-34 · Convert keeps local labels on their own sheet ──────────────────
+
+test("R3-34: a local SDA on each of two sheets is two nets; a global one is one", () => {
+  // Each sheet: two resistors, each wired to its own "SDA" label — so each
+  // sheet has one SDA net joining its two parts. The sheets sit apart, so no
+  // wire end of one sheet is near the other's.
+  const half = (sheetId, dy, kind, n) => [
+    { id: `r${n}a`, kind: "resistorBox", x: 200, y: 200 + dy, scope: "schematic", text: `R${n}A`, sheetId },
+    { id: `r${n}b`, kind: "resistorBox", x: 400, y: 200 + dy, scope: "schematic", text: `R${n}B`, sheetId },
+    { id: `w${n}a`, kind: "wire", x: 224, y: 200 + dy, endX: 260, endY: 200 + dy, scope: "schematic", sheetId },
+    { id: `l${n}a`, kind, x: 260, y: 200 + dy, text: "SDA", scope: "schematic", sheetId },
+    { id: `w${n}b`, kind: "wire", x: 376, y: 200 + dy, endX: 340, endY: 200 + dy, scope: "schematic", sheetId },
+    { id: `l${n}b`, kind, x: 340, y: 200 + dy, text: "SDA", scope: "schematic", sheetId },
+  ];
+  const sheets = [{ id: "sheet-1", name: "Sheet 1" }, { id: "sheet-2", name: "Sheet 2" }];
+  const nets = (r) => [...new Set(r.objects.filter((o) => o.kind === "ratsnest").map((o) => o.net))].sort();
+
+  const local = convertSchematicToPcb([...half("sheet-1", 0, "netLabel", 1), ...half("sheet-2", 300, "netLabel", 2)], sheets);
+  assert.equal(local.airwires, 2, "one airwire per sheet — not three over all four parts");
+  assert.equal(local.nets, 2);
+  assert.deepEqual(nets(local), ["1:SDA", "2:SDA"], "two nets, named per sheet as the netlist names them");
+
+  // Every local kind stays on its sheet; a sheet-1 object with no sheetId is
+  // on the first sheet.
+  for (const kind of ["net", "netBusLabel", "netFlag"]) {
+    const bare = half("sheet-1", 0, kind, 1).map(({ sheetId, ...o }) => o);
+    assert.equal(convertSchematicToPcb([...bare, ...half("sheet-2", 300, kind, 2)], sheets).airwires, 2, kind);
+  }
+
+  // A global label joins across sheets, and keeps its plain name.
+  const global = convertSchematicToPcb([...half("sheet-1", 0, "globalLabel", 1), ...half("sheet-2", 300, "globalLabel", 2)], sheets);
+  assert.equal(global.airwires, 3);
+  assert.deepEqual(nets(global), ["SDA"]);
+  // The netlist agrees on both.
+  const sda = (objs) => buildNetlist(objs, sheets).map((n) => n.name).filter((n) => n.endsWith("SDA"));
+  assert.deepEqual(sda([...half("sheet-1", 0, "globalLabel", 1), ...half("sheet-2", 300, "globalLabel", 2)]), ["SDA"]);
+  assert.deepEqual(sda([...half("sheet-1", 0, "netLabel", 1), ...half("sheet-2", 300, "netLabel", 2)]), ["1:SDA", "2:SDA"]);
+
+  // One sheet alone keeps the plain name, as before.
+  assert.deepEqual(nets(convertSchematicToPcb(half("sheet-1", 0, "netLabel", 1), sheets)), ["SDA"]);
+});
+
+test("R3-34: a label names only a wire on its own sheet", () => {
+  // Sheet 1: R1 and R2, each with a stub wire, not joined. Sheet 2: two
+  // "SIG" labels sitting exactly on sheet 1's wire ends, with no wire of
+  // their own — they name nothing.
+  const objs = [
+    { id: "r1", kind: "resistorBox", x: 200, y: 200, scope: "schematic", text: "R1", sheetId: "sheet-1" },
+    { id: "r2", kind: "resistorBox", x: 400, y: 200, scope: "schematic", text: "R2", sheetId: "sheet-1" },
+    { id: "w1", kind: "wire", x: 224, y: 200, endX: 260, endY: 200, scope: "schematic", sheetId: "sheet-1" },
+    { id: "w2", kind: "wire", x: 376, y: 200, endX: 340, endY: 200, scope: "schematic", sheetId: "sheet-1" },
+    { id: "g1", kind: "globalLabel", x: 260, y: 200, text: "SIG", scope: "schematic", sheetId: "sheet-2" },
+    { id: "g2", kind: "globalLabel", x: 300, y: 204, text: "SIG", scope: "schematic", sheetId: "sheet-2" },
+    { id: "g3", kind: "globalLabel", x: 340, y: 200, text: "SIG", scope: "schematic", sheetId: "sheet-2" },
+  ];
+  const sheets = [{ id: "sheet-1", name: "Sheet 1" }, { id: "sheet-2", name: "Sheet 2" }];
+  assert.equal(convertSchematicToPcb(objs, sheets).airwires, 0);
+  // On sheet 1 the same labels do join the two stubs.
+  const same = objs.map((o) => (o.kind === "globalLabel" ? { ...o, sheetId: "sheet-1" } : o));
+  assert.equal(convertSchematicToPcb(same, sheets).airwires, 1);
+});
+
+// ── R3-35 · a partial Load remembers each document's own version ───────────
+
+test("R3-35: after a partial Load, each editor names its own version, and the rest can still load", () => {
+  const { store, plan2, current } = seededCar();
+  const keys = ["pcb", "three.shapes", "three.ai", "code.files"]; // Wiring left at version 1
+  const res = loadVersion(scopeA, plan2, keys, T + 62 * MIN, store);
+  assert.equal(res.ok, true);
+  const rec = readSeed(scopeA, store);
+  assert.deepEqual(rec.versions, { wiring: 1 }, "stored, and read back");
+
+  assert.equal(pendingNoticeOf(rec, "pcb").title, "Board loaded from version 2");
+  assert.equal(pendingNoticeOf(rec, "code").title, "Firmware loaded from version 2");
+  assert.equal(pendingNoticeOf(rec, "wiring").title, "Parts loaded from version 1", "Wiring wasn't replaced");
+
+  const offer = loadOfferOf(plan2, rec, current());
+  assert.deepEqual(
+    offer.rows.map((r) => [r.editor, r.checked, r.hint]),
+    [
+      ["pcb", true, null],
+      ["three", true, null],
+      ["code", true, null],
+      ["wiring", false, "Changed since version 1"],
+    ],
+  );
+
+  const cap = seedCaptionOf("built", rec, 2, plan2.pieces);
+  assert.deepEqual(cap.lines, ["Loaded from version 2. Wiring is still version 1's.", "Version 1's documents are kept."]);
+  assert.deepEqual(cap.load, { version: 2, label: "Load version 2…" }, "the unticked piece keeps its way to version 2");
+
+  // Loading the rest brings every editor to version 2.
+  const rest = loadVersion(scopeA, plan2, ["wiring"], T + 63 * MIN, store);
+  assert.equal(rest.record.versions, undefined);
+  assert.equal(pendingNoticeOf(rest.record, "wiring").title, "Parts loaded from version 2");
+  assert.equal(rest.record.backup.version, 1, "the backup holds version 1's wiring");
+  const done = seedCaptionOf("built", rest.record, 2, plan2.pieces);
+  assert.deepEqual(done.lines, ["Loaded from version 2.", "Version 1's documents are kept."]);
+  assert.equal(done.load, null);
+});
+
+test("R3-35: Restore puts each document's version back with it", () => {
+  const { store, plan2 } = seededCar();
+  loadVersion(scopeA, plan2, ["pcb"], T + 62 * MIN, store);
+  const mixed = readSeed(scopeA, store);
+  assert.deepEqual(mixed.versions, { "three.shapes": 1, "three.ai": 1, "code.files": 1, wiring: 1 });
+  // A second partial Load backs up a version-1 document although the record says 2.
+  const res = loadVersion(scopeA, plan2, ["code.files"], T + 63 * MIN, store);
+  assert.equal(res.record.backup.version, 1, "the code it replaced was version 1's");
+  assert.deepEqual(res.record.versions, { "three.shapes": 1, "three.ai": 1, wiring: 1 });
+
+  const back = restoreBackup(scopeA, T + 64 * MIN, store);
+  assert.equal(back.message, "Version 1 restored.");
+  assert.deepEqual(back.record.versions, { "three.shapes": 1, "three.ai": 1, "code.files": 1, wiring: 1 });
+  assert.equal(pendingNoticeOf(back.record, "code").title, "Firmware loaded from version 1");
+  assert.equal(pendingNoticeOf(back.record, "pcb").title, "Board loaded from version 2");
+  assert.equal(back.record.backup.version, 2, "the slot now holds version 2's code");
+
+  // A version the row's build doesn't supply is never offered.
+  const cap = seedCaptionOf("built", back.record, 2, ["board"]);
+  assert.equal(cap.load, null);
+  assert.deepEqual(cap.lines, ["Loaded from version 2.", "Version 2's documents are kept."]);
 });

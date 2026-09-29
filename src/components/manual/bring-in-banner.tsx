@@ -15,6 +15,8 @@
 // bar (`EditorBannerProvider`); the TopBar renders it (`EditorBannerOutlet`),
 // inside its own layer — above the editor's panels and canvas, below its
 // modals, since the editors are absolutely laid out and can't be pushed down.
+// A banner that goes (Bring it in, Not now, Got it) hands the focus to the
+// slot itself, so it never falls to <body>.
 
 import * as React from "react";
 import { Banner, Button } from "@/components/ideeza";
@@ -33,20 +35,32 @@ import { cn } from "@/lib/utils";
 
 // ───────────────────────────── the slot ─────────────────────────────
 
-const BannersContext = React.createContext<React.ReactNode>(null);
+// undefined: no editor route above (no slot at all); null: nothing to show.
+const BannersContext = React.createContext<React.ReactNode | undefined>(undefined);
+
+const SLOT_ID = "editor-banner-slot";
 
 /** What the editor shows under its top bar, in order. */
 export function EditorBannerProvider({ banners, children }: { banners: React.ReactNode; children: React.ReactNode }) {
-  return <BannersContext.Provider value={banners}>{children}</BannersContext.Provider>;
+  return <BannersContext.Provider value={banners ?? null}>{children}</BannersContext.Provider>;
+}
+
+/** Moves the focus to the banner slot — where a banner that just went was. */
+export function focusEditorBanners() {
+  document.getElementById(SLOT_ID)?.focus({ preventScroll: true });
 }
 
 /** The slot, rendered by the TopBar. `top` clears a module's own toolbar row. */
 export function EditorBannerOutlet({ top }: { top: number }) {
   const banners = React.useContext(BannersContext);
-  if (!banners) return null;
+  if (banners === undefined) return null;
   return (
     <div
-      className="pointer-events-none absolute left-1/2 flex w-[min(560px,calc(100vw-32px))] -translate-x-1/2 flex-col gap-[8px]"
+      id={SLOT_ID}
+      role="region"
+      aria-label="Editor notices"
+      tabIndex={-1}
+      className="pointer-events-none absolute left-1/2 flex w-[min(560px,calc(100vw-32px))] -translate-x-1/2 flex-col gap-[8px] outline-none"
       style={{ top }}
     >
       {banners}
@@ -101,6 +115,8 @@ export function BringInBanner({
       return;
     }
     setOffer({ show: false, error: null });
+    // The editor remounts on the new documents; ProjectWorkspace focuses
+    // the new slot once it has.
     onBrought(broughtInAnnouncement(productName));
   };
   const notNow = () => {
@@ -109,6 +125,7 @@ export function BringInBanner({
     } catch {
       // No session storage: it hides for as long as this editor is open.
     }
+    focusEditorBanners();
     setOffer({ show: false, error: null });
   };
 

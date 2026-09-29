@@ -7,7 +7,9 @@
 // truth. The gate, in order:
 //   1. not hydrated (projects, marketplace) → "Loading project…";
 //   2. unknown slug → My projects;
-//   3. locked (sold in full, §3.8.5) → "{project} was sold in full";
+//   3. locked (sold in full, §3.8.5) → "{project} was sold in full"; and,
+//      as delete does, unreadable marketplace records lock it too — they
+//      can't say whether it was sold;
 //   4. a legacy /project/<slug>/<step> → the product it resumes (P2-EDITOR-2);
 //   5. unknown product → "This product isn't in {project}" — never another
 //      product silently, or the maker would edit the wrong one;
@@ -43,7 +45,7 @@ import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
 import { useMarket } from "@/lib/market/market-store";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
 import { cn } from "@/lib/utils";
-import { BringInBanner, EditorBannerProvider } from "./bring-in-banner";
+import { BringInBanner, EditorBannerProvider, focusEditorBanners } from "./bring-in-banner";
 import { ImportNotice, SeedFailedNotice } from "./import-notice";
 
 function BlankShell({ label }: { label: string }) {
@@ -196,10 +198,13 @@ export function ProjectWorkspace({
   const isBrief = step === "brief";
   const ready = hydrated && market.hydrated;
   // The lock (decision 12): Open in editor is refused, so the route is too.
+  // Unreadable market records read as "no sales", so they lock it as well.
+  const marketUnreadable = !isBrief && !!project && market.data.unreadable;
   const locked =
-    !isBrief &&
-    !!project &&
-    !can(OWNER, "product.openEditor", { locked: gate.gateOf("editProduct").kind === "locked" });
+    marketUnreadable ||
+    (!isBrief &&
+      !!project &&
+      !can(OWNER, "product.openEditor", { locked: gate.gateOf("editProduct").kind === "locked" }));
   const rows = project ? productRowsOf(project) : [];
   const headRowId = rows[0]?.id ?? null;
   const row = productId !== undefined ? (rows.find((r) => r.id === productId) ?? null) : null;
@@ -294,10 +299,24 @@ export function ProjectWorkspace({
     setAnnouncement(message);
     setGeneration((g) => g + 1);
   }, []);
+  // The remount replaced the slot the pressed button was in: focus the new one.
+  React.useEffect(() => {
+    if (generation > 0) focusEditorBanners();
+  }, [generation]);
 
   if (!ready) return <BlankShell label="Loading project…" />;
   if (!project) return <BlankShell label="Returning to projects…" />;
   const projectHref = `/projects/${project.id}`;
+  if (marketUnreadable) {
+    return (
+      <EditorStateCard
+        icon={LockIcon}
+        title={`${project.name} can't be edited right now`}
+        body="This browser's marketplace records couldn't be read, so we can't tell whether it was sold. Its products stay read-only until they can be."
+        backHref={projectHref}
+      />
+    );
+  }
   if (locked) {
     return (
       <EditorStateCard

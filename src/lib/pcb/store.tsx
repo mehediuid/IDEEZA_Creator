@@ -900,7 +900,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
           const hasLayout = s.objects.some(
             (o) => o.props?.gen === "convert" || o.props?.gen === "route",
           );
-          if (!hasLayout && convertSchematicToPcb(s.objects).objects.length > 0) {
+          if (!hasLayout && convertSchematicToPcb(s.objects, s.schematicSheets).objects.length > 0) {
             merge({ modal: "convertConfirm", pendingMode: m, openMenu: null, ctx: null });
             return;
           }
@@ -2243,7 +2243,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         })),
       convertSchematicToPcb: () => {
         const src = stateRef.current.objects;
-        const { objects: generated, parts, nets, airwires } = convertSchematicToPcb(src);
+        const { objects: generated, parts, nets, airwires } = convertSchematicToPcb(src, stateRef.current.schematicSheets);
         mergeWithHistory((s) => ({
           // Keep the schematic sheet + any hand-placed PCB objects; drop only the
           // previous auto-convert output so re-running is idempotent.
@@ -2273,7 +2273,7 @@ export function PcbProvider({ children }: { children: React.ReactNode }) {
         // applied here (planImportChanges), so the popup can't promise
         // something else.
         const src = stateRef.current.objects;
-        const { merged, rest, added, removedDesignators, kept } = planImportChanges(src);
+        const { merged, rest, added, removedDesignators, kept } = planImportChanges(src, stateRef.current.schematicSheets);
         const removed = removedDesignators.length;
         mergeWithHistory((st) => ({
           objects: [

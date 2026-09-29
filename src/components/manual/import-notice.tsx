@@ -14,11 +14,12 @@
 // next open tries again; Got it only hides it for this open.
 //
 // The banner appears without taking the focus, and Got it is 24 px, 44 px on
-// a coarse pointer.
+// a coarse pointer; pressing it leaves the focus on the banner slot.
 
 import * as React from "react";
 import { Banner, Button } from "@/components/ideeza";
 import { dismissImportNotice } from "@/lib/manual/build-load-io";
+import { focusEditorBanners } from "./bring-in-banner";
 import type { ImportNotice as Notice, SeedEditor } from "@/lib/manual/build-load";
 import type { EditorScope } from "@/lib/manual/p2-types";
 import { cn } from "@/lib/utils";
@@ -40,9 +41,14 @@ function Surface({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Got it hides its banner, so the focus goes to the slot first. */
 function GotIt({ onClick }: { onClick: () => void }) {
+  const press = () => {
+    focusEditorBanners();
+    onClick();
+  };
   return (
-    <Button hierarchy="secondary" size="sm" className={cn("min-h-[24px]", TAP)} onClick={onClick}>
+    <Button hierarchy="secondary" size="sm" className={cn("min-h-[24px]", TAP)} onClick={press}>
       Got it
     </Button>
   );

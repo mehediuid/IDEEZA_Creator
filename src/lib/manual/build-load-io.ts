@@ -18,11 +18,15 @@ import {
   loadedAnnouncement,
   seedPlanOf,
   serializeSeedDoc,
+  sharedVersionOf,
+  versionOfKey,
+  versionsFor,
   type EditorSeed,
   type SeedEditor,
   type SeedKey,
   type SeedPlan,
   type SeedReports,
+  type SeedVersions,
 } from "./build-load";
 import { editorDocKey, legacyDocKey, prevKey, seedRecordKey } from "./editor-scope";
 import type { EditorScope } from "./p2-types";
@@ -87,6 +91,14 @@ function omit<T extends object>(o: T, keys: readonly (keyof T)[]): T {
   return out;
 }
 const editorsOf = (keys: readonly SeedKey[]): SeedEditor[] => [...new Set(keys.map(editorOfKey))];
+
+/** `versions` as a record stores it: none when undefined. */
+const withVersions = <T extends object>(o: T, versions: SeedVersions | undefined): T & { versions?: SeedVersions } => {
+  const out: T & { versions?: SeedVersions } = { ...o };
+  delete out.versions;
+  if (versions) out.versions = versions;
+  return out;
+};
 
 /** Reports with `editors` taken from `from` — and dropped where `from` has none. */
 function withReports(base: SeedReports, from: SeedReports, editors: readonly SeedEditor[]): SeedReports {
@@ -256,28 +268,38 @@ export function loadVersion(
       tx.set(editorDocKey(k, scope), raw);
       fps[k] = fingerprintOf(k, raw)!;
     }
-    const next: EditorSeed = {
-      ...base,
-      from: plan.from,
-      at: now,
-      seeded: { ...omit(base.seeded, ks), ...fps },
-      kept: base.kept.filter((k) => !ks.includes(k)),
-      reports: withReports(base.reports, plan.reports, editors),
-      dismissed: base.dismissed.filter((e) => !editors.includes(e)),
-      backup: keep
-        ? {
-            version: wasKept ? null : base.from.version,
-            keys: ks,
-            at: now,
-            prev: {
-              from: base.from,
-              seeded: pick(base.seeded, ks),
-              kept: base.kept.filter((k) => ks.includes(k)),
-              reports: pick(base.reports, editors),
-            },
-          }
-        : null,
-    };
+    // Each document's own version (R3-35): the replaced ones are version m's
+    // now, and the others keep the one they had.
+    const m = plan.from.version;
+    const prevVersions = versionsFor(base.from.version, (k) => (ks.includes(k) ? versionOfKey(base, k) : base.from.version));
+    const next: EditorSeed = withVersions(
+      {
+        ...base,
+        from: plan.from,
+        at: now,
+        seeded: { ...omit(base.seeded, ks), ...fps },
+        kept: base.kept.filter((k) => !ks.includes(k)),
+        reports: withReports(base.reports, plan.reports, editors),
+        dismissed: base.dismissed.filter((e) => !editors.includes(e)),
+        backup: keep
+          ? {
+              version: wasKept ? null : sharedVersionOf(base, ks),
+              keys: ks,
+              at: now,
+              prev: withVersions(
+                {
+                  from: base.from,
+                  seeded: pick(base.seeded, ks),
+                  kept: base.kept.filter((k) => ks.includes(k)),
+                  reports: pick(base.reports, editors),
+                },
+                prevVersions,
+              ),
+            }
+          : null,
+      },
+      versionsFor(m, (k) => (ks.includes(k) ? m : versionOfKey(base, k))),
+    );
     tx.set(recKey, JSON.stringify(next));
     // One slot: a backup slot no longer named by the record goes — the old
     // backup's other keys, and with "without keeping", these keys' too.
@@ -339,24 +361,33 @@ export function restoreBackup(scope: EditorScope, now: number, storage: SeedStor
       kept: b.version === null ? [...ks] : [],
       reports: pick(record.reports, editors),
     };
-    const next: EditorSeed = {
-      ...record,
-      from: prev.from,
-      seeded: { ...omit(record.seeded, ks), ...pick(prev.seeded, ks) },
-      kept: [...record.kept.filter((k) => !ks.includes(k)), ...prev.kept.filter((k) => ks.includes(k))],
-      reports: withReports(record.reports, prev.reports, editors),
-      backup: {
-        version: ks.some((k) => record.kept.includes(k)) ? null : record.from.version,
-        keys: ks,
-        at: now,
-        prev: {
-          from: record.from,
-          seeded: pick(record.seeded, ks),
-          kept: record.kept.filter((k) => ks.includes(k)),
-          reports: pick(record.reports, editors),
+    // Each document's version swaps with it (R3-35): the backed-up keys
+    // take the slot's, the others keep the record's.
+    const prevOf = (k: SeedKey) => (ks.includes(k) ? versionOfKey(prev, k) : versionOfKey(record, k));
+    const next: EditorSeed = withVersions(
+      {
+        ...record,
+        from: prev.from,
+        seeded: { ...omit(record.seeded, ks), ...pick(prev.seeded, ks) },
+        kept: [...record.kept.filter((k) => !ks.includes(k)), ...prev.kept.filter((k) => ks.includes(k))],
+        reports: withReports(record.reports, prev.reports, editors),
+        backup: {
+          version: ks.some((k) => record.kept.includes(k)) ? null : sharedVersionOf(record, ks),
+          keys: ks,
+          at: now,
+          prev: withVersions(
+            {
+              from: record.from,
+              seeded: pick(record.seeded, ks),
+              kept: record.kept.filter((k) => ks.includes(k)),
+              reports: pick(record.reports, editors),
+            },
+            versionsFor(record.from.version, (k) => (ks.includes(k) ? versionOfKey(record, k) : record.from.version)),
+          ),
         },
       },
-    };
+      versionsFor(prev.from.version, prevOf),
+    );
     tx.set(seedRecordKey(scope), JSON.stringify(next));
     return { ok: true, record: next, message: restoredAnnouncement(b.version) };
   } catch {

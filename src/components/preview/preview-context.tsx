@@ -25,6 +25,7 @@ import {
 import { usePcbState } from "@/lib/pcb/store";
 import { useEditorScope } from "@/components/manual/use-step-nav";
 import { editorDocKey } from "@/lib/manual/editor-scope";
+import { DocSaveQueue, globalTimers } from "@/lib/manual/editor-docs";
 import {
   derivePcb3D,
   type Pcb3DBoard,
@@ -282,17 +283,29 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     setHydrated(true);
   }, [keys]);
+  // Debounced: the transform gizmo updates shapes on every drag frame, and
+  // serializing the whole list to localStorage at 60Hz stutters the drag.
+  const [shapesQueue] = React.useState(
+    () =>
+      new DocSaveQueue<string, SceneShape[]>(
+        200,
+        (key, shapes) => {
+          try {
+            window.localStorage.setItem(key, JSON.stringify(shapes));
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        globalTimers,
+      ),
+  );
   React.useEffect(() => {
     if (!hydrated || !keys) return;
-    // Debounced: the transform gizmo updates shapes on every drag frame, and
-    // serializing the whole list to localStorage at 60Hz stutters the drag.
-    const t = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(keys.shapes, JSON.stringify(enclosureShapes));
-      } catch {}
-    }, 200);
-    return () => window.clearTimeout(t);
-  }, [enclosureShapes, hydrated, keys]);
+    shapesQueue.schedule(keys.shapes, enclosureShapes);
+  }, [enclosureShapes, hydrated, keys, shapesQueue]);
+  // Leaving Preview writes the last edit, as Wiring does.
+  React.useEffect(() => () => void shapesQueue.flush(), [shapesQueue]);
   React.useEffect(() => {
     if (!hydrated || !keys) return;
     try {

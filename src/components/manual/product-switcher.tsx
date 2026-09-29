@@ -8,9 +8,12 @@
 // carries aria-current="page"; a product the current version dropped reads
 // "Not in version {n}", a hand-made one "Made by hand". Esc and an outside
 // click close it and focus returns to the button. A one-product project has
-// no switcher, and neither does the Brief, which is the project's.
+// no switcher, and neither does the Brief, which is the project's. The panel
+// is portalled to <body> with `position: fixed`, clamped into the viewport,
+// so the top bar never clips it; scrolling or resizing closes it.
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
@@ -23,6 +26,9 @@ import { cn } from "@/lib/utils";
 import { UNNAMED_PRODUCT } from "./product-name-field";
 
 const TAP = "[@media(pointer:coarse)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-w-[var(--touch-min)]";
+const MARGIN = 16;
+const GAP = 6;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, Math.max(lo, hi)));
 
 /** The line after a product's name in the list. */
 function suffixOf(p: ProjectProduct): string | null {
@@ -36,6 +42,7 @@ export function ProductSwitcher() {
   const { builds } = useCreateHistory();
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
+  const [pos, setPos] = React.useState<{ top: number; left: number; ready: boolean } | null>(null);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
   const panelId = React.useId();
@@ -48,13 +55,43 @@ export function ProductSwitcher() {
 
   const close = React.useCallback((refocus: boolean) => {
     setOpen(false);
+    setPos(null);
     if (refocus) buttonRef.current?.focus();
   }, []);
 
-  // Esc and a press outside close it; the current product takes focus on open.
+  const toggle = () => {
+    if (open) return close(false);
+    const r = buttonRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setPos({ top: r.bottom + GAP, left: r.left, ready: false });
+    setOpen(true);
+  };
+
+  // Placed once mounted, when its height is known: below the button, or
+  // above it when there is more room there, and inside the viewport.
+  React.useLayoutEffect(() => {
+    if (!open || !pos || pos.ready) return;
+    const r = buttonRef.current?.getBoundingClientRect();
+    const el = panelRef.current;
+    if (!r || !el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const below = window.innerHeight - r.bottom - GAP - MARGIN;
+    const top = h > below && r.top - GAP - MARGIN > below ? r.top - GAP - h : r.bottom + GAP;
+    setPos({
+      top: clamp(top, MARGIN, window.innerHeight - MARGIN - h),
+      left: clamp(r.left, MARGIN, window.innerWidth - MARGIN - w),
+      ready: true,
+    });
+  }, [open, pos]);
+
+  // Esc, a press outside, a scroll or a resize close it; the current
+  // product takes focus once the panel is placed.
+  const placed = open && !!pos?.ready;
   React.useEffect(() => {
-    if (!open) return;
-    panelRef.current?.querySelector<HTMLAnchorElement>('a[aria-current="page"], a')?.focus();
+    if (!placed) return;
+    const panel = panelRef.current;
+    (panel?.querySelector<HTMLAnchorElement>('a[aria-current="page"]') ?? panel?.querySelector("a"))?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
@@ -65,13 +102,22 @@ export function ProductSwitcher() {
       if (panelRef.current?.contains(t) || buttonRef.current?.contains(t)) return;
       close(false);
     };
+    const inPanel = () => !!panelRef.current?.contains(document.activeElement);
+    const onScroll = (e: Event) => {
+      if (!panelRef.current?.contains(e.target as Node)) close(inPanel());
+    };
+    const onResize = () => close(inPanel());
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
-  }, [open, close]);
+  }, [placed, close]);
 
   const parsed = parseEditorPath(pathname ?? "");
   const step = parsed && parsed.productId && parsed.step !== "brief" ? parsed.step : null;
@@ -85,7 +131,7 @@ export function ProductSwitcher() {
         aria-label="Switch product"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className={cn(
           "inline-flex size-[24px] items-center justify-center rounded-[var(--radius-sm)] text-[color:var(--color-text-tertiary)]",
           "hover:bg-[var(--color-bg-subtle)] hover:text-[color:var(--color-text-primary)]",
@@ -104,12 +150,13 @@ export function ProductSwitcher() {
           <Icon icon={ArrowDown01Icon} size={14} strokeWidth={2} />
         </span>
       </button>
-      {open && (
+      {open && createPortal(
         <div
           ref={panelRef}
           id={panelId}
+          style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, visibility: pos?.ready ? "visible" : "hidden" }}
           className={cn(
-            "absolute left-0 top-[calc(100%+6px)] w-[280px] max-w-[calc(100vw-32px)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-[6px] shadow-[var(--elevation-4)]",
+            "fixed z-[var(--z-dropdown)] transition-none w-[280px] max-w-[calc(100vw-32px)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-[6px] shadow-[var(--elevation-4)]",
             "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-normal motion-safe:ease-decelerate",
           )}
         >
@@ -156,7 +203,8 @@ export function ProductSwitcher() {
               );
             })}
           </ul>
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   );
