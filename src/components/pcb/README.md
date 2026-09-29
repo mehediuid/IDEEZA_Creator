@@ -10,7 +10,7 @@ The schematic + PCB editor. Architecture, store and `CanvasObject` model: [docs/
 
 | Folder or file | What lives there | Read before changing |
 |---|---|---|
-| `lib/pcb/store.tsx` | `PcbProvider`: state, actions, undo/redo (`SNAP_KEYS`), debounced doc save to `ideeza:pcb:doc:<projectId>`, `sanitizePcbDoc` | pcb-architecture.md › State / store |
+| `lib/pcb/store.tsx` | `PcbProvider`: state, actions, undo/redo (`SNAP_KEYS`), debounced doc save to the product's `ideeza:pcb:doc:<projectId>:<productId>` (`setDocScope`), `sanitizePcbDoc` | pcb-architecture.md › State / store |
 | `lib/pcb/types.ts` | `PcbState`, `CanvasObject`, `initialState`, `PLACE_TOOLS` / `DRAFT_TOOLS`, `nextDesignator` | pcb-architecture.md › `CanvasObject` |
 | `lib/pcb/data.tsx` | `@ts-nocheck` pure builders: `buildMenusSchematic`, `buildMenus2D`, toolbar, tree, context menu | pcb-tools-menus-panels.md |
 | `lib/pcb/inspector-schema.ts` | Schema-driven Properties inspector (panels + typed fields) | pcb-tools-menus-panels.md › Right panel |
