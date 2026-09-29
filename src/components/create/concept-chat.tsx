@@ -37,6 +37,7 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
+import { useMarket } from "@/lib/market/market-store";
 import {
   companionNameOf,
   composerTarget,
@@ -63,7 +64,7 @@ import { ProjectRail, RailAnnouncer, useRailModel } from "./chat-rail";
 import { BuildStatus } from "./build-status";
 import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
-import { useSaveMode } from "./save-step";
+import { lockOfProject, useSaveMode } from "./save-step";
 import { COMPOSER_INPUT_ID, PromptBar } from "./prompt-bar";
 import { ConfirmBuildDialog, summarizeConcept } from "./confirm-build-dialog";
 import {
@@ -326,8 +327,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
 
   // The projects a single-product build could join. A multi-product build
   // always makes a new one (§4.4.8 puts a system in one project), so this
-  // list is only ever offered for the single case.
+  // list is only ever offered for the single case. A project sold in full
+  // takes nothing (decision 12), so it isn't offered.
   const { projects } = useManualProjects();
+  const { data: market } = useMarket();
   // A chat started from a project's "Add a product" (`/?addTo=`, P2-TABS-29)
   // opens its question on that project.
   const addTo = React.useMemo(() => {
@@ -336,7 +339,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   }, [chat]);
   const setupProjects = React.useMemo(
     () =>
-      projects.map((p) => {
+      projects.filter((p) => lockOfProject(p, market) === null).map((p) => {
         const n = p.products?.length || 1;
         return {
           id: p.id,
@@ -347,7 +350,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           ...(p.id === addTo ? { preselect: true } : null),
         };
       }),
-    [projects, addTo],
+    [projects, market, addTo],
   );
 
   const [confirmFor, setConfirmFor] = React.useState<{
@@ -1016,9 +1019,10 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   );
 
   // A built product's sheet shows what was built, and its spec changes in the
-  // editor now: its Show on canvas lands on the review's Open in editor. Over
-  // the page the sheet goes first and the product stays selected, as Change
-  // by message leaves it; docked it stays open beside the canvas.
+  // editor now: its Show on canvas lands on the review's Save Project / Open
+  // project. Over the page the sheet goes first and the product stays
+  // selected, as Change by message leaves it; docked it stays open beside the
+  // canvas.
   const showEditor = React.useCallback(() => {
     if (!docked) setSpecSheet(null);
     jumpTo({ kind: "editor" }, { focus: true });

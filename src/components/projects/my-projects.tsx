@@ -10,7 +10,7 @@
 // turns the summaries into the tab counts, the search, the Source facet, the
 // order and the page.
 //
-// The tabs are the outcome — All · Draft · Private · Given · Listed — then
+// The tabs are the outcome — All · Draft · Private · Given · Listed · Sold — then
 // Showcase, which is membership, not a state (owner decision O5, LST-4).
 //
 // The view lives in the URL (LST-28): tab, q, sort, source and page, written

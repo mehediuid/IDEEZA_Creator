@@ -6,15 +6,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Note01Icon, PrinterIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { LockIcon, Note01Icon, PrinterIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ConfirmDialog, Select, StateCard, buttonVariants } from "@/components/ideeza";
 import { Breadcrumb } from "../details/breadcrumb";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
 import { ProjectSkeleton } from "../details/page-states";
 import { useViewer } from "../details/buyer-preview";
-import { useIsProjectLocked } from "../details/business-plan-chip";
+import { useProjectEditGate } from "../use-edit-gate";
 import { useManualProjects } from "@/lib/manual/projects";
+import { useMarket } from "@/lib/market/market-store";
 import { resolveProject } from "@/lib/manual/project-route";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useBusinessPlan } from "@/lib/manual/business-plan-store";
@@ -23,6 +24,10 @@ import { PlanSectionView } from "./plan-section";
 import { PlanEditView } from "./plan-edit";
 import { PlanVersionsMenu, RegenerateConfirm } from "./plan-versions";
 
+/** Every control on the page is a 44 px target on a phone or a touch screen. */
+const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+const RESTORE_MID_RUN = "Restore is available once the plan has finished writing.";
+
 export function BusinessPlanPage({ id }: { id: string }) {
   const router = useRouter();
   const { hydrated, projects } = useManualProjects();
@@ -30,7 +35,13 @@ export function BusinessPlanPage({ id }: { id: string }) {
   const viewer = useViewer();
   const { hydrated: planHydrated, record: plan } = useBusinessPlan(project?.id ?? null);
   const live = useIsPlanLive(project?.id ?? null);
-  const locked = useIsProjectLocked(project);
+  // Sold in full, the plan is read-only like the rest of the project. The
+  // lock reads the market's sales, so the page waits for that store as well.
+  const { hydrated: marketHydrated } = useMarket();
+  const gate = useProjectEditGate(project?.id ?? null).gateOf("rename");
+  const lockReason = gate.kind === "locked" ? gate.reason : null;
+  const locked = lockReason !== null;
+  const lockId = React.useId();
 
   const [editing, setEditing] = React.useState(false);
   const [confirmingRegenerate, setConfirmingRegenerate] = React.useState(false);
@@ -41,7 +52,7 @@ export function BusinessPlanPage({ id }: { id: string }) {
     titleRef.current?.focus({ preventScroll: true });
   }, [project?.id]);
 
-  if (!hydrated || !planHydrated) return <ProjectSkeleton />;
+  if (!hydrated || !planHydrated || !marketHydrated) return <ProjectSkeleton />;
   if (!project) {
     return (
       <div className={PAGE_CONTAINER}>
@@ -93,6 +104,13 @@ export function BusinessPlanPage({ id }: { id: string }) {
     router.push(`/projects/${project.id}`);
   };
 
+  // View (the version on screen) and Restore both land on the page's title,
+  // whose meta line names the version now shown.
+  const toTitle = () => {
+    titleRef.current?.scrollIntoView({ block: "start" });
+    titleRef.current?.focus({ preventScroll: true });
+  };
+
   return (
     <div className={PAGE_CONTAINER}>
       <div className={PAGE_CONTENT}>
@@ -112,23 +130,55 @@ export function BusinessPlanPage({ id }: { id: string }) {
             <p className="mt-2 text-sm text-text-secondary">
               {project.name} · Version {current.n} · Generated {formatDate(current.createdAt)} · {doneCount} sections
             </p>
+            {lockReason && (
+              <p id={lockId} className="mt-3 flex max-w-[62ch] items-start gap-2 text-sm text-text-secondary">
+                <span aria-hidden className="mt-[2px] inline-flex shrink-0 text-text-tertiary">
+                  <Icon icon={LockIcon} size={14} />
+                </span>
+                {lockReason}
+              </p>
+            )}
           </div>
           {!editing && (
             <div className="flex flex-wrap items-center gap-3 print:hidden">
-              <PlanVersionsMenu plan={plan} onView={() => {}} onRestore={(n) => restorePlanVersion(project.id, n)} />
-              <Button type="button" hierarchy="secondary" disabled={locked || midRun} onClick={() => setEditing(true)}>
+              <PlanVersionsMenu
+                plan={plan}
+                triggerClassName={TAP}
+                restoreBlocked={lockReason ?? (midRun ? RESTORE_MID_RUN : null)}
+                onView={toTitle}
+                onRestore={(n) => {
+                  restorePlanVersion(project.id, n);
+                  toTitle();
+                }}
+              />
+              <Button
+                type="button"
+                hierarchy="secondary"
+                className={TAP}
+                disabled={locked || midRun}
+                aria-describedby={locked ? lockId : undefined}
+                onClick={() => setEditing(true)}
+              >
                 Edit
               </Button>
               <Button
                 type="button"
                 hierarchy="secondary"
+                className={TAP}
                 disabled={locked || midRun || live}
+                aria-describedby={locked ? lockId : undefined}
                 iconLeading={<Icon icon={Refresh01Icon} size={16} />}
                 onClick={() => setConfirmingRegenerate(true)}
               >
                 Regenerate
               </Button>
-              <Button type="button" hierarchy="primary" iconLeading={<Icon icon={PrinterIcon} size={16} />} onClick={() => window.print()}>
+              <Button
+                type="button"
+                hierarchy="primary"
+                className={TAP}
+                iconLeading={<Icon icon={PrinterIcon} size={16} />}
+                onClick={() => window.print()}
+              >
                 Print or save as PDF
               </Button>
             </div>
@@ -142,6 +192,7 @@ export function BusinessPlanPage({ id }: { id: string }) {
               versionN={current.n}
               sections={current.sections}
               planPrompt={current.prompt}
+              saveBlocked={lockReason}
               onCancel={() => setEditing(false)}
               onSaved={() => setEditing(false)}
             />
@@ -174,8 +225,9 @@ export function BusinessPlanPage({ id }: { id: string }) {
                   section={s}
                   headingId={`section-${s.id}`}
                   retry={
-                    s.state === "failed" ? (
-                      <Button type="button" hierarchy="secondary" size="sm" onClick={() => retryPlanSection(project.id, s.id)}>
+                    // Not beside a live run (the model takes one request at a time), and not once sold in full.
+                    s.state === "failed" && !live && !locked ? (
+                      <Button type="button" hierarchy="secondary" size="sm" className={TAP} onClick={() => retryPlanSection(project.id, s.id)}>
                         Try again
                       </Button>
                     ) : undefined
@@ -183,7 +235,14 @@ export function BusinessPlanPage({ id }: { id: string }) {
                 />
               ))}
               <div className="mt-16 border-t border-solid border-border-subtle pt-8 print:hidden">
-                <Button type="button" hierarchy="ghost" className="text-text-error" onClick={() => setConfirmingDelete(true)}>
+                <Button
+                  type="button"
+                  hierarchy="ghost"
+                  className={`text-text-error ${TAP}`}
+                  disabled={locked}
+                  aria-describedby={locked ? lockId : undefined}
+                  onClick={() => setConfirmingDelete(true)}
+                >
                   Delete business plan…
                 </Button>
               </div>

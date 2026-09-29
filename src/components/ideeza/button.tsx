@@ -10,6 +10,9 @@
 // most filled Buttons sit in dialogs, panels and cards (bg-surface), where a
 // page-coloured gap showed as a darker band in dark. A caller on the bare
 // page can pass its own `ring-offset-bg-page`.
+//
+// Every hierarchy draws a 1 px border — transparent unless it is secondary —
+// so a primary beside a secondary is the same height.
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -21,13 +24,13 @@ const buttonVariants = cva(
     variants: {
       hierarchy: {
         primary:
-          "bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "border border-solid border-transparent bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
         secondary:
           "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border border-solid border-[var(--color-button-secondary-border)] hover:bg-[var(--color-bg-subtle)] disabled:text-[color:var(--color-button-disabled-text)]",
         ghost:
-          "bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "border border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
         danger:
-          "bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:brightness-105 active:brightness-95",
+          "border border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:brightness-105 active:brightness-95",
       },
       size: {
         sm: "gap-[var(--spacing-2)] px-[var(--spacing-5)] py-[var(--spacing-4)] rounded-[var(--radius-sm)] text-[length:var(--font-size-xs)]",

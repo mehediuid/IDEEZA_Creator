@@ -260,7 +260,8 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                 </div>
               )}
               {lockLine && <LockLine line={lockLine} />}
-              {version?.notice && (
+              {/* Version history is the owner's: a buyer sees the version on offer, nothing about the others. */}
+              {ownerFacts && version?.notice && (
                 <VersionNoticeBlock notice={version.notice} name={name} home={home} hrefFor={hrefFor} />
               )}
               <UnbuiltNote state={product.state} />

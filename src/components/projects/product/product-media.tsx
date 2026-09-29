@@ -312,11 +312,13 @@ function TakePoster({ take, playing, onPlay }: { take: VideoTake; playing: boole
 // ─────────────────────────── Images ───────────────────────────
 
 /** This product's concept images across its versions, newest first, each
- *  image once — the project Media tab's tiles, for one product. */
-function productImageTiles({ view, product, version }: Pick<ProductSlotProps, "view" | "product" | "version">): MediaTile[] {
+ *  image once — the project Media tab's tiles, for one product. Version
+ *  history is the owner's: anyone else gets the version on screen only. */
+function productImageTiles({ view, product, version, viewer }: Pick<ProductSlotProps, "view" | "product" | "version" | "viewer">): MediaTile[] {
   // A hand-made product has no build, so no version and no images.
   const at = version?.build.buildId ?? product.built?.ref.buildId;
-  const group = at ? (view.versions.find((g) => g.some((x) => x.buildId === at)) ?? []) : [];
+  const lineage = at ? (view.versions.find((g) => g.some((x) => x.buildId === at)) ?? []) : [];
+  const group = can(viewer, "facts.seeOwnerOnly") ? lineage : lineage.filter((x) => x.buildId === at);
   const seen = new Set<string>();
   const tiles: MediaTile[] = [];
   for (const x of [...group].sort((a, b) => b.version - a.version)) {

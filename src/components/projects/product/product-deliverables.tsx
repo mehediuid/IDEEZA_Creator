@@ -244,7 +244,7 @@ function Downloads({ kind, product, ready }: { kind: BuildItemKind; product: Bui
           hierarchy="secondary"
           size="md"
           onClick={() => save(file)}
-          className="self-start border-solid [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
+          className="self-start [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
         >
           {file.label}
         </Button>

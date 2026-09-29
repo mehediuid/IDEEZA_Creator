@@ -8,9 +8,13 @@
 // time (the runner never calls this twice in parallel for one project).
 //
 // Request:  { prompt, section: SectionKind | { title, brief }, context, instruction? }
+//           — every string clipped (the prompt to the Generate dialog's 500);
+//           a custom section needs a title and a string brief.
 // Response: { fields } on success, or 503 { error: "unavailable" } — never
 //           fallback content (CNT-68): a section either was written, or the
-//           maker sees "Couldn't write {Section}" and tries again.
+//           maker sees "Couldn't write {Section}" and tries again. A custom
+//           section's reply that is JSON, or the provider's quota /
+//           rate-limit prose, is no section: /api/refine's guard.
 //
 // The heading list below mirrors business-plan.ts's own `REQUIRED_HEADINGS`
 // (T08, not exported — it's that file's private parser detail). If a section
@@ -85,6 +89,25 @@ function parseCustomSection(text: string): { body: string[] } | null {
   return lines.length ? { body: lines } : null;
 }
 
+const PROMPT_MAX = 500;
+const TITLE_MAX = 120;
+const BRIEF_MAX = 500;
+const INSTRUCTION_MAX = 500;
+const CONTEXT_MAX = 2000;
+
+/** The provider answers 200 with prose when the shared key is out of budget
+ *  or rate-limited, and error payloads come back as JSON (/api/refine's own
+ *  guard). Neither is a section. The fixed kinds need their headings, which
+ *  noise never has; a custom section has no shape, so it is asked this. */
+function isProviderNoise(text: string): boolean {
+  return (
+    text.startsWith("{") ||
+    text.startsWith("[") ||
+    /\b(api key|key budget|rate limit|quota|too many requests)\b/i.test(text) ||
+    /pollinations\.ai/i.test(text)
+  );
+}
+
 function unfence(text: string): string {
   const fenced = text.match(/```(?:text)?\s*([\s\S]*?)```/);
   return (fenced ? fenced[1] : text).trim();
@@ -125,8 +148,13 @@ function isSectionKind(v: unknown): v is SectionKind {
   return typeof v === "string" && (PLAN_SECTIONS as readonly string[]).includes(v);
 }
 
-function isCustomSection(v: unknown): v is { title: string; brief: string } {
-  return typeof v === "object" && v !== null && typeof (v as { title?: unknown }).title === "string";
+/** A custom section: a title with something in it, and a string brief (which may be empty). */
+function customSectionOf(v: unknown): { title: string; brief: string } | null {
+  if (typeof v !== "object" || v === null) return null;
+  const { title, brief } = v as { title?: unknown; brief?: unknown };
+  if (typeof title !== "string" || typeof brief !== "string") return null;
+  const t = title.trim().slice(0, TITLE_MAX);
+  return t ? { title: t, brief: brief.trim().slice(0, BRIEF_MAX) } : null;
 }
 
 export async function POST(req: Request) {
@@ -137,10 +165,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const fields = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
-  const prompt = typeof fields.prompt === "string" ? fields.prompt.trim() : "";
-  const section: SectionArg | null = isSectionKind(fields.section) ? fields.section : isCustomSection(fields.section) ? fields.section : null;
-  const context = typeof fields.context === "string" ? fields.context.slice(0, 2000) : "";
-  const instruction = typeof fields.instruction === "string" ? fields.instruction.trim() : undefined;
+  const prompt = typeof fields.prompt === "string" ? fields.prompt.trim().slice(0, PROMPT_MAX) : "";
+  const section: SectionArg | null = isSectionKind(fields.section) ? fields.section : customSectionOf(fields.section);
+  const context = typeof fields.context === "string" ? fields.context.slice(0, CONTEXT_MAX) : "";
+  const instruction = typeof fields.instruction === "string" ? fields.instruction.trim().slice(0, INSTRUCTION_MAX) : undefined;
 
   if (!prompt || !section) {
     return NextResponse.json({ error: "prompt and section are required" }, { status: 400 });
@@ -148,17 +176,19 @@ export async function POST(req: Request) {
 
   const userText = [
     `Product: ${prompt}`,
-    context ? `Earlier sections, for consistency:\n${context}` : null,
+    // A revision's context leads with the section's own text (plan-edit.tsx labels its parts).
+    context ? (instruction ? `Context:\n${context}` : `Earlier sections, for consistency:\n${context}`) : null,
     instruction ? `Revision instruction: ${instruction}` : null,
   ]
     .filter(Boolean)
     .join("\n\n");
 
-  const system = typeof section === "string" ? headingSystemPrompt(section) : customSectionSystemPrompt(section.title, section.brief ?? "");
+  const system = typeof section === "string" ? headingSystemPrompt(section) : customSectionSystemPrompt(section.title, section.brief);
   const text = await writeWithAI(system, userText);
   if (!text) return NextResponse.json({ error: "unavailable" }, { status: 503 });
 
-  const parsedFields = typeof section === "string" ? parsePlanSection(section, text) : parseCustomSection(text);
+  const parsedFields =
+    typeof section === "string" ? parsePlanSection(section, text) : isProviderNoise(text) ? null : parseCustomSection(text);
   if (!parsedFields) return NextResponse.json({ error: "unavailable" }, { status: 503 });
 
   return NextResponse.json({ fields: parsedFields });

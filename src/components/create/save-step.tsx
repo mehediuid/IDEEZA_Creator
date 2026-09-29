@@ -22,9 +22,10 @@
 // Saving writes ONE record (the provider's saveBuild), waits for the store's
 // write to settle (useStoreWrite: 250 ms, projectWriteRefused), and only then
 // records the build's project, clears the draft and goes to the project page
-// with `?saved=` (P2-SAVE-9). A refused write reverts the list and keeps the
-// dialog open with its text. What the maker typed is kept per build, in
-// memory, until a save or a reload.
+// with `?saved=` (P2-SAVE-9). A refused write reverts the list — and puts back
+// a listing the pause confirm paused for it — and keeps the dialog open with
+// its text. What the maker typed is kept per build, in memory, until a save
+// or a reload.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -62,9 +63,9 @@ import {
   type SaveMode,
 } from "@/lib/manual/save-step";
 import { listingViewOf } from "@/lib/market/listing";
-import { useMarket } from "@/lib/market/market-store";
+import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import { mainSalesOf } from "@/lib/market/sales";
-import type { ListingMetadata, MarketData } from "@/lib/market/types";
+import type { Listing, ListingMetadata, MarketData } from "@/lib/market/types";
 import type { ProjectLock } from "@/lib/manual/p2-types";
 import { cn } from "@/lib/utils";
 
@@ -81,8 +82,9 @@ export type SaveModeInfo = {
 
 const OWNER = { kind: "local-owner" } as const;
 
-/** The lock a project is under, from the market's sales alone (decision 12). */
-function lockOfProject(p: ManualProject, market: MarketData): ProjectLock | null {
+/** The lock a project is under, from the market's sales alone (decision 12).
+ *  Every chooser that offers existing projects leaves a locked one out. */
+export function lockOfProject(p: ManualProject, market: MarketData): ProjectLock | null {
   const sales = mainSalesOf(p.id, market.sales);
   if (!sales.length) return null;
   const split = ownershipOf({ createdAt: p.createdAt, contributors: p.contributors ?? [], sales, listedPercent: 0 });
@@ -127,6 +129,19 @@ export function useSaveMode(job: BuildJob | null): SaveModeInfo | null {
     }
     return { mode: base, lineage, broken: null };
   }, [job, lineage, projects, builds, chats, market]);
+}
+
+/**
+ * Puts back each of `before` (the project's live listings as the save was
+ * pressed) that reads paused now — the pause the confirm wrote for a save
+ * that was then refused. False when that write is refused too.
+ */
+function unpauseOf(before: readonly Listing[], write: (next: Listing[]) => { ok: boolean }): boolean {
+  if (!before.length) return true;
+  const was = new Map(before.map((l) => [l.id, l]));
+  const now = readMarketNow().listings;
+  if (!now.some((l) => was.has(l.id) && l.status === "paused")) return true;
+  return write(now.map((l) => (l.status === "paused" ? (was.get(l.id) ?? l) : l))).ok;
 }
 
 // ─────────────────────────── the draft ───────────────────────────
@@ -180,10 +195,12 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const router = useRouter();
   const { projects, saveBuild } = useManualProjects();
   const { builds, setBuildProject } = useCreateHistory();
-  const { data: market } = useMarket();
+  const { data: market, writeListings } = useMarket();
   // The mode as the dialog opened: the save itself makes the build "saved" a
-  // render before it settles, and the dialog must not change under it.
-  const [info] = React.useState(infoProp);
+  // render before it settles, and the dialog must not change under it. The
+  // one change it takes is the lock: a sale in another tab that sells the
+  // target in full turns the version or join into a new project, with why.
+  const [info, setInfo] = React.useState(infoProp);
   const [now] = React.useState(() => Date.now());
   const defaults = React.useMemo(() => saveDefaultsOf(job), [job]);
   const single = (job.companions?.length ?? 0) === 0;
@@ -238,8 +255,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
 
   // ── saving ──
   const busy = React.useRef(false);
-  const [pending, setPending] = React.useState<{ projectId: string; revert: () => void } | null>(null);
+  const [pending, setPending] = React.useState<{ projectId: string; revert: () => void; unpause: () => boolean } | null>(null);
   const [storageFull, setStorageFull] = React.useState(false);
+  const [stillPaused, setStillPaused] = React.useState(false);
   const [refusal, setRefusal] = React.useState<string | null>(null);
   const applied = pending !== null && holderOf(job, projects)?.id === pending.projectId;
   const write = useStoreWrite(applied, () => {
@@ -251,11 +269,18 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   });
   const saving = pending !== null || write.saving;
 
+  if (infoProp.broken !== null && info.broken === null && !saving) {
+    setInfo(infoProp);
+    setDraft((d) => ({ ...d, mode: "new", joinId: null }));
+    setChanging(false);
+  }
+
   // Storage full (P2-SAVE-15): the list goes back as it was, the text stays,
   // and the banner takes the focus.
   const onRefused = React.useEffectEvent(() => {
     if (!pending) return;
     pending.revert();
+    setStillPaused(!pending.unpause());
     setPending(null);
     busy.current = false;
     setStorageFull(true);
@@ -278,9 +303,10 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const commit = (input: SaveInput) => {
+  const commit = (input: SaveInput, unpause: () => boolean = () => true) => {
     busy.current = true;
     setStorageFull(false);
+    setStillPaused(false);
     write.start();
     const result = saveBuild(job, info.lineage, input);
     if (!result) {
@@ -291,7 +317,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
       window.requestAnimationFrame(() => nameRef.current?.focus());
       return;
     }
-    setPending({ projectId: result.project.id, revert: result.revert });
+    setPending({ projectId: result.project.id, revert: result.revert, unpause });
   };
 
   const submit = () => {
@@ -322,7 +348,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     }
     const input: SaveInput =
       kind === "version" ? { kind: "version", projectId: target.id } : { kind: "join", projectId: target.id };
-    const outcome = gate.guard("addProduct", () => commit(input));
+    // A live Buy-now listing is paused before the save runs; a refused save puts it back.
+    const live = readMarketNow().listings.filter((l) => l.projectId === target.id && l.status === "live");
+    const outcome = gate.guard("addProduct", () => commit(input, () => unpauseOf(live, writeListings)));
     if (outcome.kind === "refused") setRefusal(outcome.reason);
   };
 
@@ -453,6 +481,8 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
                       className={QUIET_TEXT_BUTTON}
                       onClick={() => {
                         setRefusal(null);
+                        // The project that went is out of the list; the maker picks another.
+                        setGone(null);
                         patch({ mode: "join", joinId: null });
                         setChanging(true);
                         window.requestAnimationFrame(() =>
@@ -545,6 +575,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
               <Banner tone="error" title="This browser's storage is full">
                 The project wasn&apos;t saved. Your text is kept here until you reload. Delete a project you no
                 longer need, then save again.
+                {stillPaused && " Its listing stayed paused: relist it from the project's Marketplace block."}
               </Banner>
             </div>
           )}
