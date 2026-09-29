@@ -92,7 +92,10 @@ export type DeleteFacts = {
   sold: { sharePct: number; editions: number; buyers?: number };
   /** `ended`: past its end and not yet closed. */
   auction: { endsAt: number; ended?: boolean } | null;
+  /** The Main listing: a live or paused Buy now. */
   listed: boolean;
+  /** Edition tracks still listed (absent = none): they block delete too, whatever Main's state. */
+  editionsListed?: number;
   otherOwners: OtherOwner[];
 };
 

@@ -15,8 +15,11 @@ export type DeletePlanInput = {
   draft: StoredDraft | null;
   /** How many products the project lists (summary.productCount). */
   products: number;
-  /** editorWorkOf(id), read when the dialog opens. */
-  work: EditorWork;
+  /** One product's editor facts. Superseded by `rows` — kept so a caller that hasn't moved yet compiles. */
+  work?: EditorWork;
+  /** Every row the sweep removes (`editorWorkOfProject(p)`), read when the dialog opens: the sweep
+   *  deletes every row's documents, so the plan lists them all (R2-C1). */
+  rows?: readonly { name: string; work: EditorWork }[];
   /** The project's network, when it has one. */
   network: { links: number } | null;
   /** summary.showcase !== null */
@@ -43,15 +46,13 @@ export type DeletePlan = {
   stays: string[];
   /** COR-70's line for a project minted in this browser; null otherwise. */
   minted: string | null;
-  /** COR-69: ask for the typed name — only when editor work, a mint record or a network would be lost. */
+  /** COR-69: ask for the typed name — only when any row's editor work, a mint record or a network would be lost. */
   typed: boolean;
 };
 
 export const MINTED_NOTE = "It was minted in this browser only — nothing on a blockchain changes.";
 /** The on-chain note: a testnet-demo token is made in this browser too (decision 1). */
 export const ON_CHAIN_NOTE = "It was minted on chain as a testnet demo in this browser — nothing on a real blockchain changes.";
-export const SHARED_STORES_NOTE =
-  "Code, 3D shapes and Preview aren't touched — every project in this browser shares them for now.";
 
 const AIM: Record<Intent, string> = { sell: "to sell", give: "to give away", save: "to keep" };
 
@@ -63,21 +64,43 @@ function lost(f: StepFact): string | null {
   return f.state === "work" && !/^0\b/.test(f.text) ? f.text : null;
 }
 
+/** Each editor step's line, in the order the dialog lists them. */
+const STEP_LINES: readonly [keyof EditorWork, string][] = [
+  ["pcb", "The PCB board"],
+  ["wiring", "Wiring"],
+  ["assembly", "Assembly checks"],
+  ["code", "Code"],
+  ["three", "The 3D model"],
+  ["preview", "Preview"],
+];
+
+/** A row's lines, and whether any of them is work the maker would lose. */
+function workLines(work: EditorWork): { lines: string[]; lost: boolean } {
+  const lines: string[] = [];
+  let anyLost = false;
+  for (const [step, label] of STEP_LINES) {
+    const text = lost(work[step]);
+    if (text) {
+      lines.push(`${label} — ${text}`);
+      anyLost = true;
+    } else if (step === "pcb" && work.pcb.state === "sample") {
+      lines.push(`${label} — the sample circuit only`);
+    }
+  }
+  return { lines, lost: anyLost };
+}
+
 export function deletePlanOf(input: DeletePlanInput): DeletePlan {
-  const { status, draft, work, network } = input;
+  const { status, draft, network } = input;
   const goes = [`The project — its name, description and ${countLabel(input.products)}`];
   const people = input.contributors ?? 0;
   if (people > 0) goes.push(`The contributors list — ${people} ${people === 1 ? "person" : "people"}`);
 
-  const pcb = lost(work.pcb);
-  const wiring = lost(work.wiring);
-  const assembly = lost(work.assembly);
-  const three = lost(work.three);
-  if (pcb) goes.push(`The PCB board — ${pcb}`);
-  else if (work.pcb.state === "sample") goes.push("The PCB board — the sample circuit only");
-  if (wiring) goes.push(`Wiring — ${wiring}`);
-  if (assembly) goes.push(`Assembly checks — ${assembly}`);
-  if (three) goes.push("The 3D AI model");
+  // Every row's documents go; name the product once more than one row has something listed.
+  const rows = (input.rows ?? (input.work ? [{ name: "", work: input.work }] : [])).map((r) => ({ name: r.name, ...workLines(r.work) }));
+  const listed = rows.filter((r) => r.lines.length > 0);
+  for (const r of listed) goes.push(...(listed.length > 1 ? r.lines.map((l) => `${l} (${r.name})`) : r.lines));
+  const workLost = rows.some((r) => r.lost);
 
   const brief = draft?.state ?? null;
   const mintedAt = brief?.mintedAt ?? null;
@@ -127,16 +150,13 @@ export function deletePlanOf(input: DeletePlanInput): DeletePlan {
   const ended = input.endedListings ?? 0;
   if (ended > 0) goes.push(`Its marketplace history — ${ended} ended ${ended === 1 ? "listing" : "listings"}`);
 
-  const stays = [
-    ...(input.builds > 0 ? [buildsLine(input.builds, input.chats)] : []),
-    SHARED_STORES_NOTE,
-  ];
+  const stays = input.builds > 0 ? [buildsLine(input.builds, input.chats)] : [];
   const mintRecord = mintedAt !== null || status === "minted" || record;
   return {
     goes,
     stays,
     minted: input.mint === "onChain" ? ON_CHAIN_NOTE : mintRecord ? MINTED_NOTE : null,
-    typed: Boolean(pcb || wiring || assembly || three) || mintRecord || network !== null,
+    typed: workLost || mintRecord || network !== null,
   };
 }
 

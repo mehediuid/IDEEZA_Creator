@@ -399,3 +399,21 @@ test("deleteFactsOf: an auction past its end, not yet closed, is marked ended", 
     ended: true,
   });
 });
+
+test("deleteFactsOf: a listed edition track blocks delete as listed, even with Main removed (R2 minor)", () => {
+  const track = (listing) => ({
+    id: "ed_a", projectId: "proj_car", productId: "p1", kind: "physical", use: "private", supply: { total: 5 },
+    createdAt: LISTED, lazy: true, listing, demo: true,
+  });
+  const removed = listing({ status: "removed", endedAt: NOW - MIN });
+  const terms = { token: "MATIC", regular: "0.01", extended: "0.02", royaltyPct: 5, listedAt: LISTED, updatedAt: LISTED };
+  const p = project({ mint: lazy });
+  const facts = view(p, SELL, market({ listings: [removed] }), { editions: [track(terms)] }).deleteFacts;
+  assert.equal(facts.editionsListed, 1);
+  assert.deepEqual(deleteBlockOf(facts), {
+    id: "listed",
+    reason: "A listed project can't be deleted.",
+    detail: "Take its NFTs off the marketplace first — Remove listing is on each product's page.",
+  });
+  assert.equal(deleteBlockOf(view(p, SELL, market({ listings: [removed] }), { editions: [track(null)] }).deleteFacts), null);
+});

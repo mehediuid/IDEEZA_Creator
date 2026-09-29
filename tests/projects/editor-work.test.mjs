@@ -165,3 +165,30 @@ test("Preview reads the mate count once the product has its own scoped mates", (
   setStorage({});
   assert.deepEqual(editorWorkOf({ projectId: PID, productId: "prd_a" }, "p1").preview, { state: "none" });
 });
+
+// ───────────────────── every row the delete sweep removes (R2-C1) ─────────────────────
+
+test("editorWorkOfProject reads every sweep row — the first adopting the legacy keys — and names each", async () => {
+  const { editorWorkOfProject } = await import("../../.tmp-test/lib/manual/editor-work.js");
+  setStorage({
+    [`ideeza:pcb:doc:${PID}`]: fixture("pcb-work.json"),
+    [`ideeza:code:files:${PID}:prd_b`]: [{ name: "main.ino" }],
+    [`ideeza:3d:shapes:${PID}:prd_old`]: [{ id: "s1" }],
+  });
+  const p = {
+    id: PID, slug: "t", name: "T", productName: "Car", description: "", status: "draft", createdAt: 1, updatedAt: 1,
+    flowState: {}, products: [{ id: "prd_a", name: "Car", description: "" }, { id: "prd_b", name: "  ", description: "" }],
+    editorOpened: { prd_old: { step: "three", at: 1 } },
+  };
+  const rows = editorWorkOfProject(p);
+  assert.deepEqual(rows.map((r) => [r.rowId, r.name]), [
+    ["prd_a", "Car"],
+    ["prd_b", "Untitled product"],
+    ["prd_old", "An earlier product"],
+    ["p1", "An earlier product"],
+  ]);
+  assert.deepEqual(rows[0].work.pcb, { state: "work", text: "4 objects · 2 on the board" }, "the head row adopts the legacy doc");
+  assert.deepEqual(rows[1].work.code, { state: "work", text: "1 files" });
+  assert.deepEqual(rows[2].work.three, { state: "work", text: "1 shapes" });
+  assert.deepEqual(rows[3].work.pcb, { state: "not-opened" }, "p1 isn't the head here, so it never reads the legacy key");
+});

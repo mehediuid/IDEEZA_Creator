@@ -677,11 +677,15 @@ export type ProjectView = {
 
 /** §3.8.4's facts (errata #1: `sold.buyers` is the distinct Main buyers). An auction blocks while
  *  it is live — running, or ended and not yet closed; a Buy-now listing while it is live or
- *  paused. Edition listings are live only with Main, so Main's decides. */
-export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "ownership" | "marketUnreadable">): DeleteFacts {
+ *  paused; and an edition track while it's listed, whatever Main's state (its Remove listing is
+ *  on the product page). `editions` is optional so a caller without the tracks still compiles. */
+export function deleteFactsOf(
+  view: Pick<ProjectView, "listing" | "sales" | "ownership" | "marketUnreadable"> & Partial<Pick<ProjectView, "editions">>,
+): DeleteFacts {
   const main = view.sales.filter((s) => s.item.nft === "main");
   const listing = view.listing;
   const live = listing.kind === "live" ? listing.listing : null;
+  const editionsListed = (view.editions ?? []).filter((t) => t.listing !== null).length;
   return {
     marketUnreadable: view.marketUnreadable,
     sold: {
@@ -694,6 +698,7 @@ export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "own
         ? { endsAt: live.endsAt ?? live.listedAt, ...(listing.kind === "live" && listing.auction?.phase === "ended" ? { ended: true } : null) }
         : null,
     listed: (live !== null && live.type === "buyNow") || listing.kind === "paused",
+    ...(editionsListed ? { editionsListed } : null),
     otherOwners: otherOwnersOf(view.ownership),
   };
 }

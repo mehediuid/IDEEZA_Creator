@@ -22,6 +22,7 @@
 import { boardPartsOf } from "../pcb/board-parts";
 import { docReadKeys } from "./editor-scope";
 import type { EditorDoc, EditorScope, EditorStep } from "./p2-types";
+import { sweepRowIdsOf, type ManualProject } from "./projects";
 
 export type StepFact =
   | { state: "not-opened" } // no doc for this product
@@ -149,4 +150,22 @@ export function editorWorkOf(scopeOrProjectId: EditorScope | string, headRowId?:
     code: codeFact(scope, head),
     preview: previewFact(scope, head),
   };
+}
+
+/** One row the delete sweep removes, with its editor facts and the name the plan gives it. */
+export type RowWork = { rowId: string; name: string; work: EditorWork };
+
+/** Every product row's editor facts — exactly the rows the delete sweep removes
+ *  (`sweepRowIdsOf`), the first adopting the legacy per-project keys — so the
+ *  delete plan counts the work that really goes (R2-C1). A row the project
+ *  no longer lists (an id only its editor stamps name) reads "An earlier
+ *  product". Reads storage: call it when the dialog opens, never at render. */
+export function editorWorkOfProject(p: ManualProject): RowWork[] {
+  const rows = p.products?.length ? p.products : [{ id: "p1", name: p.productName }];
+  const head = rows[0].id;
+  return sweepRowIdsOf(p).map((rowId) => {
+    const row = rows.find((r) => r.id === rowId);
+    const name = row ? row.name.trim() || "Untitled product" : "An earlier product";
+    return { rowId, name, work: editorWorkOf({ projectId: p.id, productId: rowId }, head) };
+  });
 }

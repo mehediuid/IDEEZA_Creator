@@ -300,10 +300,12 @@ const DELETE_RULES: readonly DeleteRule[] = [
   },
   {
     id: "listed",
-    applies: (f) => f.listed,
-    block: () => ({
+    applies: (f) => f.listed || (f.editionsListed ?? 0) > 0,
+    block: (f) => ({
       reason: "A listed project can't be deleted.",
-      detail: "Remove the listing first — it's in the Marketplace block.",
+      detail: f.listed
+        ? "Remove the listing first — it's in the Marketplace block."
+        : "Take its NFTs off the marketplace first — Remove listing is on each product's page.",
     }),
   },
   {
