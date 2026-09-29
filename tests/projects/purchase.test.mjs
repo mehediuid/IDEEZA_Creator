@@ -200,3 +200,55 @@ test("txHashOf: deterministic for a given id, 0x + 64 hex, different for a diffe
   assert.notEqual(txHashOf("sale_abc"), txHashOf("sale_xyz"));
   assert.match(txHashOf("sale_abc"), /^0x[0-9a-f]{64}$/);
 });
+
+test("makeSale: an edition track sells one unit per sale — a prior unit's sale doesn't refuse the next (T27)", () => {
+  const item = (serial) => ({
+    nft: "physical",
+    trackId: "ed_1",
+    productId: "prd_1",
+    productName: "Widget",
+    use: "private",
+    tier: "regular",
+    serial,
+  });
+  const first = makeSale(saleInputFixture({ listingId: "ed_1", item: item(1), price: "0.01" }), {
+    sales: [],
+    mint: mintViewFixture({ status: "onChain", record: { ...mintViewFixture().record, type: "instant" } }),
+    ownership: { creatorPct: 100 },
+    now: 2000,
+  });
+  assert.ok(!("ok" in first));
+  // Editions are always lazy: each unit is minted by its own sale, and carries no Main token id.
+  assert.equal(first.mint, "lazy");
+  assert.equal(first.mintedAtSale, true);
+  assert.equal(first.tokenId, null);
+  const second = makeSale(saleInputFixture({ listingId: "ed_1", item: item(2), price: "0.01" }), {
+    sales: [first],
+    mint: mintViewFixture(),
+    ownership: { creatorPct: 100 },
+    now: 3000,
+  });
+  assert.ok(!("ok" in second), JSON.stringify(second));
+  assert.equal(second.item.serial, 2);
+});
+
+test("purchaseQuote(track, 'buyNow', tier, network): the tier's price on the project's chain (errata 9)", () => {
+  const track = {
+    id: "ed_1",
+    projectId: "proj_1",
+    productId: "prd_1",
+    kind: "physical",
+    use: "private",
+    supply: { total: 10 },
+    createdAt: 1,
+    lazy: true,
+    listing: { token: "ETH", regular: "0.01", extended: "0.02", royaltyPct: 5, listedAt: 1, updatedAt: 1 },
+    demo: true,
+  };
+  const reg = purchaseQuote(track, "buyNow", "regular", "baseSepolia");
+  const ext = purchaseQuote(track, "buyNow", "extended", "baseSepolia");
+  assert.equal(reg.price, "0.01");
+  assert.equal(ext.price, "0.02");
+  assert.equal(ext.payout, "0.0195");
+  assert.ok(reg.lines[0].endsWith("ETH"));
+});

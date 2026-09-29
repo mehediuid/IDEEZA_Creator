@@ -24,11 +24,14 @@ const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var
 export function RemoveListingDialog({
   projectName,
   listing,
+  extra,
   onClose,
   onDone,
 }: {
   projectName: string;
   listing: Listing;
+  /** What else the removal takes with it (T27: the project's edition listings). */
+  extra?: React.ReactNode;
   onClose: () => void;
   /** After the write: what the page's live region says. */
   onDone: (message: string) => void;
@@ -103,6 +106,7 @@ export function RemoveListingDialog({
     >
       <div className="flex flex-col gap-6 text-sm leading-relaxed text-text-secondary">
         <p>Buyers can no longer see or buy it. Its terms are kept, so you can list it again.</p>
+        {extra}
         {onChain && <p>Removing an on-chain listing costs a network fee (test tokens — no real cost).</p>}
         {error && <Banner tone="error">{error}</Banner>}
       </div>

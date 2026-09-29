@@ -15,6 +15,10 @@
 //   Explore marketplace" (preview stays read-only, PPL-6).
 // - A project never listed has no block.
 //
+// - Below the Main NFT, the project's listed Physical and Virtual NFTs
+//   (edition-offers.tsx, T27): a tier choice and a quiet Buy now for a demo
+//   buyer, the prices alone in a preview; hidden while Main is paused.
+//
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
 // Below a 1024 px page the block stands above the tab strip, open (C21).
@@ -42,6 +46,7 @@ import { RailBlock, RailFact, RailFacts } from "@/components/projects/details/ra
 import type { SlotProps } from "@/components/projects/details/slots";
 import { cn } from "@/lib/utils";
 import { BidCard, useAfterDialogClose, useAuctionClock } from "./bid-card";
+import { EditionOffers } from "./edition-offers";
 import { buyerNameOf, usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
 
@@ -190,6 +195,7 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
       ) : (
         <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
       )}
+      <EditionOffers project={project} view={view} viewer={viewer} announce={announce} />
     </RailBlock>
   );
 }

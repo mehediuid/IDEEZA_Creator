@@ -125,8 +125,9 @@ export function txHashOf(saleId: string): string {
  * Appends the one record a purchase writes (P2-MARKETPLACE-16, C11).
  * Refuses, never half-writes, when:
  * - the amount doesn't parse or isn't positive (`badAmount`);
- * - this `listingId` already has a sale (`alreadySold` — a Main listing
- *   sells once; another share needs a new listing);
+ * - this Main `listingId` already has a sale (`alreadySold` — a Main listing
+ *   sells once; another share needs a new listing). An edition track's
+ *   `listingId` takes one sale per unit, and its caller keeps it within the supply;
  * - a Main sale's `sharePct` is more than the creator's current share
  *   (`overShare`).
  */
@@ -135,7 +136,9 @@ export function makeSale(input: MakeSaleInput, ctx: MakeSaleCtx): Sale | SaleRef
   if (priceMicros === null || priceMicros <= BigInt(0)) {
     return { ok: false, reason: "badAmount", message: "Enter a valid amount." };
   }
-  if (ctx.sales.some((s) => s.listingId === input.listingId)) {
+  // A Main listing sells once; an edition track sells one unit per sale, up to
+  // its supply, which the caller checks (sales.ts, P2-TABS-27).
+  if (input.item.nft === "main" && ctx.sales.some((s) => s.listingId === input.listingId && s.item.nft === "main")) {
     return { ok: false, reason: "alreadySold", message: "This listing already has a sale." };
   }
   if (input.item.nft === "main" && input.item.sharePct > ctx.ownership.creatorPct) {
@@ -146,8 +149,10 @@ export function makeSale(input: MakeSaleInput, ctx: MakeSaleCtx): Sale | SaleRef
   const ideeza = ideezaFeeOf(input.price);
   const payout = payoutOf(input.price);
   const gas = estimateGas(input.network);
-  const mintedAtSale = ctx.mint.status === "lazyMinted";
-  const tokenId = input.item.nft === "main" ? ctx.mint.tokenId : null;
+  // Editions are always lazy: each unit is minted by its own sale (P2-TABS-25).
+  const edition = input.item.nft !== "main";
+  const mintedAtSale = edition || ctx.mint.status === "lazyMinted";
+  const tokenId = edition ? null : ctx.mint.tokenId;
 
   return {
     id,
@@ -164,7 +169,7 @@ export function makeSale(input: MakeSaleInput, ctx: MakeSaleCtx): Sale | SaleRef
     fees: { ideezaBps: IDEEZA_FEE_BPS, ideeza, network: { coin: gas.native as Coin, amount: String(gas.fee) } },
     payout,
     royaltiesPct: input.royaltiesPct,
-    mint: ctx.mint.record ? ctx.mint.record.type : "lazy",
+    mint: !edition && ctx.mint.record ? ctx.mint.record.type : "lazy",
     mintedAtSale,
     tokenId,
     network: input.network,
