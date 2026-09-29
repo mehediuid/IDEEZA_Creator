@@ -31,8 +31,17 @@ const ClearIcon = () => (
 
 export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
   ({ value, onValueChange, onClear, placeholder = "Search…", className, containerClassName, ...props }, ref) => {
+    const inputRef = React.useRef<HTMLInputElement | null>(null);
+    React.useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
     return (
       <div
+        // The whole box is the field: a press on its padding or the magnifier
+        // focuses the input, so the target is the box's 44 px, not the text row.
+        onMouseDown={(e) => {
+          if (e.target === inputRef.current || (e.target as HTMLElement).closest("button")) return;
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
         className={cn(
           "group flex items-center gap-[var(--spacing-4)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-bg-subtle)] px-[var(--spacing-6)] py-[var(--spacing-4)] transition-[background-color,border-color,box-shadow] duration-150 focus-within:border-[var(--color-border-focus)] focus-within:bg-[var(--color-bg-surface)] focus-within:ring-2 focus-within:ring-[var(--color-border-focus)]",
           containerClassName,
@@ -40,7 +49,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       >
         <MagnifierIcon />
         <input
-          ref={ref}
+          ref={inputRef}
           value={value}
           onChange={(e) => onValueChange?.(e.target.value)}
           placeholder={placeholder}

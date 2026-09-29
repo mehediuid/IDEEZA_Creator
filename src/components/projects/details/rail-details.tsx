@@ -70,7 +70,7 @@ export function RailDetails({
               <button
                 type="button"
                 onClick={goToContributors}
-                className="mt-1 block text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+                className="mt-1 block text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
               >
                 {r.link.label}
               </button>

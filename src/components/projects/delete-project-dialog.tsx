@@ -96,7 +96,7 @@ export function DeleteProjectControl({ project, viewer, view, draft }: DeletePro
             <button
               type="button"
               onClick={openContributors}
-              className="mt-1 rounded-sm text-text-primary underline decoration-border-strong underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:decoration-current focus-visible:ring-2 focus-visible:ring-border-focus"
+              className="mt-1 rounded-sm text-text-primary underline decoration-border-strong underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:decoration-current focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
             >
               {block.link.label}
             </button>
