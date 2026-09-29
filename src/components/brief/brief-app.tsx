@@ -2,56 +2,72 @@
 
 // /brief — a minimal "invisible wizard" whose steps depend on the intent.
 //
-//  idea:    the idea + what the maker wants to do with it
-//  preview: storyboard (preview frames — fast, ~10s gen)
-//  form:    intent-aware mint setup + Pay
-//  success: mint done — listing is live, video renders in background
+//  idea:    the product words + what the maker wants to do with it
+//  preview: one real video per product (VIDEO P2-VIDEO-17), made by the
+//           browser's clip renderer while the rest of the brief is filled
+//  form:    intent-aware mint setup; a Sell is the listing form itself
+//  success: minted — a Sell is listed on Explore marketplace
 //
 // Two homes, one wizard:
 //
 //  • /project/<slug>/brief — the project's own Brief, inside the editor
-//    chrome (top bar, step rail, module rail). The project is already
-//    chosen; Step 1's chooser can only hand the product to another one.
-//  • /build/<id>/brief     — where "Save Project" lands a finished AI
-//    build. There is no project yet: Step 1's chooser is what creates or
-//    picks one, so the shell is the dashboard's (sidebar + "← Back" over
-//    one card) with no rails, and the draft is keyed by the build until
-//    that answer moves it onto the project.
+//    chrome (top bar, step rail, module rail).
+//  • /build/<id>/brief     — a saved build's Brief, in the dashboard shell
+//    (sidebar + "← Back" over one card) with no rails.
 //
-// The order is `stepsFor(intent)`: selling puts the clip
-// before the terms, giving and saving go straight to the form and only make a
-// clip when the maker also posts to Innovations.
+// Either way the Brief has its project before Step 1 renders (P2-SAVE-12):
+// the save step named it, or it is the project the Brief was opened from.
+// Step 1 reads it back and never asks for it again.
 //
-// The 20-min video render NO LONGER blocks any of these steps. Storyboard is
-// the immediate preview; the full 10s video kicks off only after Pay and lives
-// in the global VideoJobsProvider so it stays visible on every page via the
-// GlobalRenderIndicator. User is free to leave at any time after mint.
+// The order is `stepsFor(intent)`: selling and giving make the videos first,
+// saving goes to the form first and may skip them. The commit is ONE wallet
+// request (spec §3.9): the mint record, then — for a Sell — the listing,
+// then the draft's `mintedAt` and the v1 writes.
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
+import { refusedCopy } from "@/components/projects/listing/listing-dialog";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { useMint } from "@/components/wallet/use-mint";
+import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { BriefRail, BriefStepLine } from "./brief-rail";
 import { Step1Idea, type Step1Patch } from "./step-1-idea";
 import { Step2Video } from "./step-2-video";
-import { PromptHelpModal } from "./prompt-help-modal";
 import { Step3Mint } from "./step-3-mint";
 import { Step4Success } from "./step-4-success";
-import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { bumpMinted } from "@/lib/brief/wallet";
+import { useCreateHistory } from "@/lib/create/history";
+import { ownershipOf } from "@/lib/manual/ownership";
+import type { Readiness, ReadinessPurpose } from "@/lib/manual/p2-types";
+import {
+  buildsOf,
+  listingMetadataOf,
+  productRowsOf,
+  productsOfProject,
+  type ProjectProduct,
+} from "@/lib/manual/project-read";
+import type { ProjectStatus } from "@/lib/manual/project-summary";
 import {
   mergeProductEdits,
-  stepHref,
   useManualProjects,
-  type ManualProduct,
   type ManualProject,
-  type ProductEdit,
 } from "@/lib/manual/projects";
-import { lineageProjectOf, productRowsOf } from "@/lib/manual/project-read";
-import {
-  productsOf,
-  useCreateHistory,
-  type BuildJob,
-} from "@/lib/create/history";
+import { currentProductsOf, readinessOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { holderOf } from "@/lib/manual/save-step";
+import { createListing, listingViewOf } from "@/lib/market/listing";
+import { cleanBenefits, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
+import { listingInputFromBrief, type ListingInput } from "@/lib/market/listing-form";
+import { readMarketNow, useMarket } from "@/lib/market/market-store";
+import { mainSalesOf, randomId } from "@/lib/market/sales";
+import type { ListingMetadata } from "@/lib/market/types";
+import { readProjectVideos, useProjectVideos } from "@/lib/video/store";
+import { readWallet } from "@/lib/wallet/demo-wallet";
+import { mintViewOf } from "@/lib/wallet/mint";
+import { requestCopy } from "@/lib/wallet/request";
+import type { MintType, Proof, RequestResult } from "@/lib/wallet/types";
 import {
   BRIEF_DESC_MAX,
   DEFAULT_STATE,
@@ -63,7 +79,7 @@ import {
   stepsFor,
   type BriefState,
   type BriefStepId,
-  type Scene,
+  type Intent,
 } from "@/lib/brief/types";
 
 // The state model, its vocabulary and the stored-draft migration live in
@@ -95,31 +111,18 @@ export type {
 } from "@/lib/brief/types";
 
 // Brief drafts are scoped PER PROJECT so finishing one project's brief never
-// leaks its Step 4 state into another — or, for a brief opened on a build that
-// has no project yet, per build (`briefDraftKey` / `buildDraftScope`). The bare
-// key below is the pre-scoping global draft — read once for cleanup, then
-// removed.
+// leaks its Step 4 state into another (`briefDraftKey`). A build's brief used
+// to be kept under the build (`buildDraftScope`) until Step 1 attached it; such
+// a draft is carried onto the project once, then removed. The bare key below
+// is the pre-scoping global draft — read once for cleanup, then removed.
 const LEGACY_DRAFT_KEY = "ideeza:brief:draft";
 const draftKey = briefDraftKey;
-// Cross-page handoff slot written by the GlobalRenderIndicator when the user
-// picks "Regenerate" on a finished video job. Brief reads it on mount AND on
-// the `ideeza:brief-regenerate` window event, restores the old prompt/quality
-// into BriefState, clears the storyboard + videoJobId, and snaps to the preview
-// step.
-const REGEN_REQUEST_KEY = "ideeza:brief:regenerate";
-const REGEN_EVENT = "ideeza:brief-regenerate";
-// Hand-off slot written when Step 1 attaches the build to a project that turns
-// out to already hold a brief of its own: that draft is kept and the target's
-// Brief says so on arrival, rather than the user finding their answers gone
-// with no explanation. One-shot, and stale after a minute so a hand-off the
-// user abandoned can't surface days later.
+// Hand-off slot written when a build's own draft (from before the build was
+// saved) meets a project that already holds a brief of its own: that brief is
+// kept and says so on arrival, rather than the user finding their answers gone
+// with no explanation. One-shot, and stale after a minute.
 const HANDOFF_KEPT_KEY = "ideeza:brief:handoff-kept";
 const HANDOFF_KEPT_MAX_AGE = 60_000;
-// Two homes, two truths. From a project the hand-off really does open the
-// other project's brief; from a build nothing is opened — the build joins the
-// project and this same shell re-hydrates on the brief that was already there.
-const HANDOFF_KEPT_NOTICE_PROJECT =
-  "That project already has a brief in progress — opening it instead, so nothing there is overwritten.";
 const HANDOFF_KEPT_NOTICE_BUILD =
   "That project already had a brief of its own, so this build joined it rather than replacing it.";
 
@@ -142,7 +145,7 @@ const CARRIED_FIELDS = Object.keys(CARRIED_LABELS) as CarriedField[];
 // still opens on the step it reached.
 //
 // `stored` says whether there was a draft at all, which is the only way to
-// tell an answer apart from a default (see `seedFromBuild`).
+// tell an answer apart from a default.
 function readFromStorage(scope: string): {
   state: BriefState;
   step: BriefStepId;
@@ -168,119 +171,6 @@ function clearDraft(scope: string) {
   } catch {}
 }
 
-// What a build already knows, filled in so Step 1 isn't asking the maker to
-// retype it: the build's title is the product (and the name a new project
-// would take), its summary the one line. Only ever fills a blank — an answer
-// the maker has edited is theirs, and survives every reload.
-//
-// The chooser starts UNANSWERED here, which the stored draft has to be able to
-// say: a build belongs to no project until this step, so defaulting it to
-// "make a new one" would put words in the maker's mouth. `""` is that answer.
-//
-// Only a brief with no stored draft at all is still unanswered. Reading the
-// value instead — "new" with the name empty — cannot tell the default apart
-// from a maker who picked "+ Create new project" and then cleared the name
-// again, and silently reverted their choice on the next reload.
-function seedFromBuild(
-  s: BriefState,
-  job: BuildJob,
-  stored: boolean,
-  projects: ManualProject[],
-  builds: BuildJob[],
-): BriefState {
-  const [head, ...others] = buildWords(job);
-
-  // The project was already chosen, at the setup question, before a single
-  // concept was drawn: an existing one by id, or a name for the new one every
-  // multi-product build gets. Opening this step with an empty chooser asked
-  // the maker the same question a second time and threw the first answer
-  // away. An id whose project is gone from this browser falls back to making
-  // a new one under the same name rather than pointing at nothing.
-  // A rebuild of a chat that was already saved goes where that chat's builds
-  // went: it is that project's next version (COR-89), whatever the setup
-  // question answered before the first build existed.
-  const lineageProject = lineageProjectOf(job, builds, projects);
-  const chosenExists =
-    !!job.projectChoiceId && projects.some((p) => p.id === job.projectChoiceId);
-  const decided =
-    lineageProject?.id ??
-    (chosenExists
-      ? job.projectChoiceId!
-      : job.projectChoiceName?.trim()
-        ? "new"
-        : "");
-
-  return {
-    ...s,
-    projectChoice: stored ? s.projectChoice : decided,
-    newProjectName: s.newProjectName.trim()
-      ? s.newProjectName
-      : job.projectChoiceName?.trim() || job.title,
-    productName: s.productName.trim() ? s.productName : head.name,
-    productDescription: s.productDescription.trim()
-      ? s.productDescription
-      : head.description,
-    // Seeded once, then the maker's own. Their edits are the draft's, so a
-    // reload or a step back does not put the model's wording back.
-    otherProducts: s.otherProducts.length ? s.otherProducts : others,
-  };
-}
-
-// The words Step 1 opens on for a build, in productsOf() order: the build's
-// title and the description the model wrote — not the parts line: `summary`
-// is "ATmega328P · GPS Receiver · IMU · ESC · LiPo Battery", which answered
-// "one line · what does it do?" with an inventory — then each companion.
-function buildWords(job: BuildJob): { name: string; description: string }[] {
-  return [
-    {
-      name: job.title,
-      description: (job.description || job.summary || job.conceptPrompt)
-        .trim()
-        .slice(0, BRIEF_DESC_MAX),
-    },
-    ...(job.companions ?? []).map((x) => ({
-      name: (x.title || x.name).trim(),
-      description: (x.description || x.summary || "").trim(),
-    })),
-  ];
-}
-
-// What the maker changed in Step 1, as edits to the rows the build was just
-// attached to (COR-88). Each product's words go to the row that product
-// became — tied by the row's source, not by name, so a companion the project
-// calls "Remote controller" and Step 1 shows by its concept title is still the
-// one row. Only a field the maker really changed travels: Step 1 opens on the
-// build's own words (buildWords), and writing those back would undo a name the
-// maker gave the row before this rebuild, which attach() kept for them.
-function buildEdits(
-  s: BriefState,
-  rows: ManualProduct[],
-  job: BuildJob,
-): ProductEdit[] {
-  const seeded = buildWords(job);
-  const typed = [
-    { name: s.productName, description: s.productDescription },
-    ...s.otherProducts,
-  ];
-  return productsOf(job).flatMap((bp, i) => {
-    const row = rows.find(
-      (r) => r.source?.buildId === job.id && r.source.productId === bp.id,
-    );
-    const words = typed[i];
-    if (!row || !words) return [];
-    const same = (a: string, b: string | undefined) => a.trim() === (b ?? "").trim();
-    return [
-      {
-        rowId: row.id,
-        name: same(words.name, seeded[i]?.name) ? row.name : words.name,
-        description: same(words.description, seeded[i]?.description)
-          ? row.description
-          : words.description,
-      },
-    ];
-  });
-}
-
 // Does a stored draft hold work of its own? Anything the user answered on Step
 // 1 or produced downstream counts — a draft like this belongs to its project
 // and must never be written over by a hand-off from another one.
@@ -302,16 +192,10 @@ function draftHasWork(s: BriefState, ownProductName: string): boolean {
   );
 }
 
-// Seed another project's brief draft with what Step 1 just answered. The draft
-// is stored PER PROJECT and the active project is about to become that one, so
-// without this the per-project hydration would read an empty draft and throw
-// Step 1 away the moment Continue switches projects.
-//
-// Only the Step 1 answers travel, over a FRESH default — a brief is one
-// product's, so its storyboard, render link, price, licence, confirmations and
-// mint stamp are not another project's to inherit. And a target that already
-// holds a brief of its own keeps it: this returns false and the caller says so
-// instead of replacing that project's work.
+// Seed the project's brief draft with the Step 1 answers a build's own draft
+// holds (see `adoptBuildDraft`). Only the Step 1 answers travel, over a FRESH
+// default. And a project that already holds a brief of its own keeps it: this
+// returns false and the caller says so instead of replacing that work.
 function seedDraft(
   projectId: string,
   s: BriefState,
@@ -330,9 +214,6 @@ function seedDraft(
       projectChoice: projectId,
       productName: s.productName,
       productDescription: s.productDescription,
-      // The other products travel with it. They were left out, so a step back
-      // after the hand-off re-hydrated on a draft that had never heard of
-      // them and the maker's edits to their names went with it.
       otherProducts: s.otherProducts,
       intent: s.intent,
       mediaType: s.mediaType,
@@ -347,9 +228,9 @@ function seedDraft(
   }
 }
 
-// `seedDraft` refused: the target holds a brief of its own and keeps it. The
-// answers Step 1 was just given are not thrown away with the build's draft —
-// they fill in whatever THAT brief left blank, and nothing else. A field it
+// `seedDraft` refused: the project holds a brief of its own and keeps it. The
+// answers the build's draft holds are not thrown away with it — they fill in
+// whatever THAT brief left blank, and nothing else. A field it
 // has already answered is its own and is never written over.
 //
 // The product name is the project's (the adopt effect below syncs the two), so
@@ -397,40 +278,32 @@ function carryIntoKeptDraft(
   }
 }
 
-// The build just went to another project, so this one's draft must stop
-// pointing at a project it no longer owns: left as "new" with the typed name
-// still in it, reopening this Brief and pressing Continue would create a
-// second, identically-named project.
-function releaseProjectChoice(projectId: string) {
-  try {
-    const raw = window.localStorage.getItem(draftKey(projectId));
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as { state?: unknown; step?: unknown };
-    const prev = normalizeBrief(parsed.state);
-    window.localStorage.setItem(
-      draftKey(projectId),
-      JSON.stringify({
-        state: {
-          ...prev,
-          projectChoice: projectId,
-          newProjectName: "",
-          newProjectDescription: "",
-        },
-        step: normalizeStep(parsed.step),
-      }),
-    );
-  } catch {}
+/**
+ * A build's own draft, from before the build was saved (the Brief used to run
+ * on `build:<id>` until Step 1 attached it), moves onto the project it was
+ * saved into — once: the project's draft takes its Step 1 answers when it has
+ * none of its own, otherwise they fill that brief's blanks and the notice says
+ * so. Then the build's draft is removed.
+ */
+function adoptBuildDraft(
+  buildId: string,
+  projectId: string,
+  ownProductName: string,
+  from: string,
+) {
+  const legacy = readFromStorage(buildDraftScope(buildId));
+  if (!legacy.stored) return;
+  if (!seedDraft(projectId, legacy.state, "idea", ownProductName)) {
+    noteHandoffKept(projectId, from, carryIntoKeptDraft(projectId, legacy.state, ownProductName));
+  }
+  clearDraft(buildDraftScope(buildId));
 }
 
-// `from` is the project the answers were typed in — they stay in ITS draft, so
-// the notice on the other side can say where to go back for them. `fromBuild`
-// says the answers came from a build instead, which has no brief of its own to
-// send anyone back to: its draft is gone, so `carried` is what of it survived
-// into the kept brief and `minted` warns that the brief it landed on is
-// already finished and opens on its listing.
+// `from` names the build the answers came from. Its draft is gone, so
+// `carried` is what of it survived into the kept brief, and `minted` warns
+// that the brief it landed on is already finished and opens on its listing.
 type HandoffKept = {
   from: string;
-  fromBuild: boolean;
   carried: CarriedField[];
   minted: boolean;
 };
@@ -438,8 +311,7 @@ type HandoffKept = {
 function noteHandoffKept(
   projectId: string,
   from: string,
-  fromBuild = false,
-  kept?: { carried: CarriedField[]; minted: boolean },
+  kept: { carried: CarriedField[]; minted: boolean },
 ) {
   try {
     window.localStorage.setItem(
@@ -447,9 +319,8 @@ function noteHandoffKept(
       JSON.stringify({
         projectId,
         from,
-        fromBuild,
-        carried: kept?.carried ?? [],
-        minted: kept?.minted ?? false,
+        carried: kept.carried,
+        minted: kept.minted,
         at: Date.now(),
       }),
     );
@@ -464,7 +335,6 @@ function readHandoffKept(projectId: string): HandoffKept | null {
     const parsed = JSON.parse(raw) as {
       projectId?: string;
       from?: string;
-      fromBuild?: boolean;
       carried?: unknown;
       minted?: boolean;
       at?: number;
@@ -482,61 +352,12 @@ function readHandoffKept(projectId: string): HandoffKept | null {
       : [];
     return {
       from: typeof parsed.from === "string" ? parsed.from : "",
-      fromBuild: parsed.fromBuild === true,
       carried,
       minted: parsed.minted === true,
     };
   } catch {
     return null;
   }
-}
-
-// The default answer to Step 1's "Choose Project" is the project the Brief was
-// opened inside. A stored draft only overrides that once the user has really
-// started a new project in it — an untouched "new" is still the default rather
-// than a choice, so a draft saved before the chooser existed doesn't offer to
-// make a second copy of the project you are already in.
-function withDefaultProjectChoice(s: BriefState, activeProjectId: string): BriefState {
-  const unanswered =
-    !s.projectChoice || (s.projectChoice === "new" && !s.newProjectName.trim());
-  return unanswered ? { ...s, projectChoice: activeProjectId } : s;
-}
-
-type RegenRequest = {
-  title?: string;
-  prompt?: string;
-  quality?: "low" | "high";
-};
-
-function readRegenRequest(): RegenRequest | null {
-  try {
-    const raw = window.localStorage.getItem(REGEN_REQUEST_KEY);
-    if (!raw) return null;
-    window.localStorage.removeItem(REGEN_REQUEST_KEY);
-    const parsed = JSON.parse(raw) as RegenRequest;
-    return parsed || null;
-  } catch {
-    return null;
-  }
-}
-
-// Drop the storyboard + render link and pre-fill Step 2 with the snapshot so
-// the user re-enters prompt → storyboard → render. Step 1 fields (project,
-// productName from the brief itself, intent, description) are preserved when
-// already present so the user doesn't have to redo unrelated context.
-function applyRegen(s: BriefState, regen: RegenRequest): BriefState {
-  return {
-    ...s,
-    productName:
-      s.productName || (regen.title && regen.title !== "Untitled" ? regen.title : ""),
-    videoPrompt:
-      typeof regen.prompt === "string" ? regen.prompt : s.videoPrompt,
-    quality: regen.quality === "high" ? "high" : "low",
-    storyboardGenerated: false,
-    scenes: [],
-    videoJobId: null,
-    mediaType: "ai",
-  };
 }
 
 /** Where `step` sits in `seq` — or, off-sequence, the entry just before it. */
@@ -565,53 +386,86 @@ function stepBefore(seq: BriefStepId[], step: BriefStepId): BriefStepId | null {
   return i > 0 ? seq[i - 1] : null;
 }
 
+/** Which readiness gate the commit runs (P2-VIDEO-17): Sell and Give, and a
+ *  Save posted to Innovations (a showcase). A plain Save may skip its videos. */
+function gatePurposeOf(intent: Intent | null, shareToNewsfeed: boolean): ReadinessPurpose | null {
+  if (intent === "sell" || intent === "give") return intent;
+  return intent === "save" && shareToNewsfeed ? "showcase" : null;
+}
+
+/** The status the commit will produce — what the readiness facts read in the Brief. */
+function statusAfterCommit(intent: Intent | null): ProjectStatus {
+  return intent === "sell" ? "listed" : intent === "give" ? "given" : "private";
+}
+
+/** Step 1's read-back: "{k} products", plus " · version {n}" on a build's brief. */
+function projectDetailOf(p: ManualProject, buildId: string | undefined, builds: ReturnType<typeof useCreateHistory>["builds"]): string {
+  const k = productRowsOf(p).length;
+  const products = `${k} ${k === 1 ? "product" : "products"}`;
+  if (!buildId) return products;
+  const version = buildsOf(p, builds).find((r) => r.buildId === buildId)?.version;
+  return version ? `${products} · version ${version}` : products;
+}
+
+/** Writes the draft now, so the commit's writes land in their order (the persist effect only follows a render). */
+function writeDraft(scope: string, state: BriefState, step: BriefStepId): void {
+  try {
+    window.localStorage.setItem(draftKey(scope), JSON.stringify({ state, step }));
+  } catch {}
+}
+
+const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
+const GONE = "This project no longer exists.";
+const STORAGE_FAILED = "This browser couldn't save it — storage is full or blocked.";
+const ALREADY_LISTED = "This project is already on the marketplace.";
+export const NOT_MINTED_REJECTED = "Not minted — you rejected it in your wallet. Nothing was charged.";
+
+/** "Not minted — {reason} Nothing was charged." (P2-MINT-6). */
+function notMintedLine(reason: string): string {
+  return `Not minted — ${reason} Nothing was charged.`;
+}
+
+export type BriefGate = {
+  /** Every current product's video state, and — when `gated` — whether the commit may go ahead. */
+  readiness: Readiness;
+  /** This brief's commit runs the gate (Sell, Give, or a Save posted to Innovations). */
+  gated: boolean;
+};
+
 export function BriefApp({ buildId }: { buildId?: string }) {
   const router = useRouter();
-  const { createJob, markMinted } = useVideoJobs();
+  const { jobs, now: videoNow } = useVideoJobs();
   const {
-    activeProject,
+    hydrated: projectsHydrated,
     activeProjectId,
     projects,
-    createProject,
     markStepCompleted,
-    selectProject,
     setStatus,
     setShowcase,
+    setMint,
+    setOwnerConfirmed,
     updateProject,
-    attachBuild,
   } = useManualProjects();
-  const { builds, getBuild, getChat, setBuildProject } = useCreateHistory();
+  const { builds, getBuild, getChat } = useCreateHistory();
+  const { data: market, writeListings } = useMarket();
+  const mint = useMint();
+  const { request } = useWalletRequest();
   const job = buildId ? getBuild(buildId) : null;
-  // The project this brief belongs to. On a build that is whichever project
-  // Step 1 attached it to — nothing until then, which is the whole reason
-  // build mode exists.
-  // The other builds of this build's chat — its lineage. A rebuild joins the
-  // project that chat already became, as its next version (COR-89).
-  const lineage = React.useMemo(
-    () =>
-      job
-        ? builds.filter((b) => b.chatId === job.chatId && b.id !== job.id)
-        : [],
-    [builds, job],
-  );
 
-  const scopeProjectId = buildId ? (job?.projectId ?? null) : activeProjectId;
-  // …and the record itself. NOT `activeProject`: a build's brief keeps running
-  // in this shell while the editor is pointed somewhere else entirely, so
-  // everything this brief says and writes about "the project" — the name on
-  // the mint form and the success card, the status flip, the flow step — has
-  // to name THIS one.
+  // The project this brief belongs to: the one it was opened in, or — on a
+  // build — the project the build was saved into (P2-SAVE-12). A build that
+  // no project holds has no brief to write (P2-SAVE-13).
   const scopeProject = React.useMemo(
     () =>
-      scopeProjectId
-        ? (projects.find((p) => p.id === scopeProjectId) ?? null)
-        : null,
-    [projects, scopeProjectId],
+      buildId
+        ? job
+          ? holderOf(job, projects)
+          : null
+        : (projects.find((p) => p.id === activeProjectId) ?? null),
+    [buildId, job, projects, activeProjectId],
   );
-  // …and where its draft lives: the project's key once there is one, the
-  // build's before that.
-  const scope =
-    scopeProjectId ?? (buildId ? buildDraftScope(buildId) : null);
+  const scopeProjectId = scopeProject?.id ?? null;
+  const scope = scopeProjectId;
   const [state, setState] = React.useState<BriefState>(DEFAULT_STATE);
   const [step, setStep] = React.useState<BriefStepId>("idea");
   // Which scope the state in hand was loaded for. A plain boolean let the
@@ -620,19 +474,14 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   // brief, wrote over it.
   const [hydratedScope, setHydratedScope] = React.useState<string | null>(null);
   const hydrated = scope !== null && hydratedScope === scope;
-  const [generatingStoryboard, setGeneratingStoryboard] = React.useState(false);
+  // The commit's wallet request is open. The ref stops a second press inside
+  // the same tick; the flag is what the CTAs and the rail read.
+  const mintingRef = React.useRef(false);
   const [minting, setMinting] = React.useState(false);
-  // Step 2's "Help me write it" — a view, not an answer, so it stays out
-  // of the saved draft.
-  const [promptHelpOpen, setPromptHelpOpen] = React.useState(false);
-  // Step 1's hand-off is in flight: Continue has created/attached and the page
-  // is navigating. The ref is what actually stops a second press (React state
-  // doesn't land inside the same tick — the same guard projectFromBuild uses
-  // to keep one build to one project); the flag is what greys the button.
-  const continuingRef = React.useRef(false);
-  const [continuing, setContinuing] = React.useState(false);
+  // Why the last commit didn't mint (a reject, or a failure's reason).
+  const [mintError, setMintError] = React.useState<string | null>(null);
   // Set when this project's own brief was kept instead of being overwritten by
-  // a hand-off from elsewhere — the page says so on arrival. The slot is
+  // its build's older draft — the page says so on arrival. The slot is
   // one-shot, so the ref keeps the read to once per project: StrictMode runs
   // the hydration effect twice in dev and the second pass would otherwise find
   // the notice already consumed and clear it again.
@@ -641,11 +490,9 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   );
   const handoffReadFor = React.useRef<string | null>(null);
 
-  // Hydration is PER SCOPE: load THIS project's (or this build's) brief draft,
-  // or a fresh Step 1 if it has none. The cross-page regenerate handoff still
-  // applies on top. Keyed by the scope so a different project never inherits
-  // another's draft — this is what makes a new project start a brand-new
-  // brief, and what moves a build's draft onto the project it is attached to.
+  // Hydration is PER SCOPE: load THIS project's brief draft, or a fresh Step 1
+  // if it has none. Keyed by the scope so a different project never inherits
+  // another's draft.
   React.useEffect(() => {
     if (!scope) return;
     // One-time cleanup of the pre-scoping global draft so a stale Step 4 from
@@ -653,83 +500,54 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     try {
       window.localStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch {}
+    const own = projects.find((p) => p.id === scope);
+    if (buildId) adoptBuildDraft(buildId, scope, own?.productName ?? "", job?.title ?? "");
     const { state: loaded, step: loadedStep, stored } = readFromStorage(scope);
-    let normalized: BriefState = scopeProjectId
-      ? withDefaultProjectChoice(loaded, scopeProjectId)
-      : loaded;
-    // Unattached, this brief is the build's: fill in what the build already
-    // knows rather than asking for it again.
-    if (!scopeProjectId && job)
-      normalized = seedFromBuild(normalized, job, stored, projects, builds);
-    // A project that already records its products — a build saved in one
-    // click does — opens its first brief on them, so Step 1 shows every
-    // product with its description rather than the headline alone.
-    if (scopeProjectId && !stored) {
-      const own = projects.find((p) => p.id === scopeProjectId);
-      if (own?.products?.length) {
-        normalized = {
-          ...normalized,
-          productDescription:
-            normalized.productDescription ||
-            own.products[0].description.slice(0, BRIEF_DESC_MAX),
-          otherProducts: normalized.otherProducts.length
-            ? normalized.otherProducts
-            : own.products.slice(1),
-        };
-      }
-    }
-    let nextStep = loadedStep;
-    const regen = readRegenRequest();
-    if (regen) {
-      normalized = applyRegen(normalized, regen);
-      nextStep = "preview";
+    let normalized: BriefState = loaded;
+    // A project that already records its products — a saved build does —
+    // opens its first brief on them, so Step 1 shows every product with its
+    // description rather than the headline alone.
+    if (!stored && own?.products?.length) {
+      normalized = {
+        ...normalized,
+        productDescription:
+          normalized.productDescription ||
+          own.products[0].description.slice(0, BRIEF_DESC_MAX),
+        otherProducts: normalized.otherProducts.length
+          ? normalized.otherProducts
+          : own.products.slice(1),
+      };
     }
     setState(normalized);
-    setStep(nextStep);
-    if (scopeProjectId && handoffReadFor.current !== scopeProjectId) {
-      handoffReadFor.current = scopeProjectId;
-      setHandoffKept(readHandoffKept(scopeProjectId));
+    setStep(loadedStep);
+    if (handoffReadFor.current !== scope) {
+      handoffReadFor.current = scope;
+      setHandoffKept(readHandoffKept(scope));
     }
     setHydratedScope(scope);
-    // `job` is only read to fill blanks on the first load of a build's own
-    // draft; re-running when the store re-issues the object would fight the
+    // `projects` and `job` are only read to fill blanks on the first load;
+    // re-running when the stores re-issue their objects would fight the
     // maker's edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, scopeProjectId]);
-
-  // Same-page regenerate handoff: the page doesn't re-mount when the indicator
-  // navigates to /brief from /brief, so we also listen for the event.
-  React.useEffect(() => {
-    const handler = () => {
-      const regen = readRegenRequest();
-      if (!regen) return;
-      setState((s) => applyRegen(s, regen));
-      setStep("preview");
-    };
-    window.addEventListener(REGEN_EVENT, handler);
-    return () => window.removeEventListener(REGEN_EVENT, handler);
-  }, []);
+  }, [scope]);
 
   React.useEffect(() => {
     if (!hydrated || !scope) return;
     // Don't persist until the loaded state belongs to this project — guards a
     // transient cross-write while the active project changes mid-flight.
-    if (scopeProjectId && state.projectId && state.projectId !== scopeProjectId)
-      return;
+    if (state.projectId && state.projectId !== scope) return;
     try {
       window.localStorage.setItem(
         draftKey(scope),
         JSON.stringify({ state, step }),
       );
     } catch {}
-  }, [state, step, hydrated, scope, scopeProjectId]);
+  }, [state, step, hydrated, scope]);
 
   // Adopt the scope project's identity + product name ONCE per project (keyed
   // on the project id). Typing the name in Step 1 writes the other way (via
   // handleStep1Change) — this effect must NOT re-run on those edits, or the
   // synced value would fight the user mid-type (the cursor jumps / reverts).
-  // Only for the project this brief is scoped to: a build's brief must not
-  // adopt the name of whichever project the editor happens to have open.
   React.useEffect(() => {
     if (!hydrated || !scopeProject) return;
     setState((s) =>
@@ -748,20 +566,16 @@ export function BriefApp({ buildId }: { buildId?: string }) {
   const patch = (next: Partial<BriefState>) =>
     setState((s) => ({ ...s, ...next }));
 
-  // The steps this brief runs. Recomputed from the two answers that decide
-  // them, so ticking "Share to Innovations" mid-form really does add the
-  // preview step rather than only changing a label.
+  // The steps this brief runs, from the one answer that decides them.
   const seq = React.useMemo(() => stepsFor(state.intent), [state.intent]);
   // Is this the last thing to answer before the mint? The step CTAs read it
   // for their wording — the handler below is what actually decides.
   const isLastStep = stepAfter(seq, step) === "success";
 
-  // Unticking it takes that step away again — and the user may be standing on
-  // it. When the sequence really changes and the current step is no longer in
-  // it, walk BACK through the sequence they were on to the nearest step the
-  // new one still has: never forward, which would skip a question. Only on a
-  // change, so a step set deliberately from outside (the regenerate hand-off
-  // snaps to the preview) is left where it was put.
+  // A changed intent may take the current step away. When the sequence
+  // really changes and the current step is no longer in it, walk BACK through
+  // the sequence they were on to the nearest step the new one still has:
+  // never forward, which would skip a question.
   const seqRef = React.useRef<BriefStepId[] | null>(null);
   React.useEffect(() => {
     if (!hydrated) return;
@@ -777,200 +591,79 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     });
   }, [seq, hydrated]);
 
+  // ── The project's products, their videos and the readiness gate ──
+  const products = React.useMemo<ProjectProduct[]>(
+    () =>
+      scopeProject
+        ? currentProductsOf(productsOfProject(scopeProject, buildsOf(scopeProject, builds)))
+        : [],
+    [scopeProject, builds],
+  );
+  const { record: videos } = useProjectVideos(scopeProjectId);
+  const purpose = gatePurposeOf(state.intent, state.shareToNewsfeed);
+  const factsOf = React.useCallback(
+    (s: BriefState, live: Pick<ReadinessFacts, "videos" | "jobs" | "now">): ReadinessFacts => ({
+      products,
+      ...live,
+      status: statusAfterCommit(s.intent),
+      ownershipConfirmed: s.confirmOwnership,
+      license: s.license,
+    }),
+    [products],
+  );
+  const gate = React.useMemo<BriefGate>(
+    () => ({
+      // The product rows are the same for every purpose; an ungated Save reads them as Sell's.
+      readiness: readinessOf(factsOf(state, { videos, jobs, now: videoNow }), purpose ?? "sell"),
+      gated: purpose !== null,
+    }),
+    [factsOf, state, videos, jobs, videoNow, purpose],
+  );
+  // The latest jobs, for a commit's recheck that runs seconds after the press.
+  const jobsRef = React.useRef(jobs);
+  React.useEffect(() => {
+    jobsRef.current = jobs;
+  }, [jobs]);
+  const latestProjects = React.useRef(projects);
+  React.useEffect(() => {
+    latestProjects.current = projects;
+  }, [projects]);
+
+  // What the form shows about the mint and the maker's share (P2-MINT-4, P2-LISTING-5).
+  const mintStatus = scopeProject
+    ? mintViewOf(scopeProject, { state, step }, market.sales).status
+    : "notMinted";
+  const creatorPct = scopeProject
+    ? ownershipOf({
+        createdAt: scopeProject.createdAt,
+        contributors: scopeProject.contributors ?? [],
+        sales: mainSalesOf(scopeProject.id, market.sales),
+        listedPercent: 0,
+      }).maker
+    : 100;
+
   // Step 1 edits the product name into local state (smooth, controlled input)
   // AND writes it straight through to the project so the editor chrome shows
   // the same name on every step. Written on change — no reactive round-trip,
-  // so the input never fights itself. Only when the chosen project IS the
-  // active one, though: a product being attached elsewhere must not rename the
-  // product of the project you happen to be standing in. Continue writes it
-  // onto whichever project the build lands in.
+  // so the input never fights itself.
   const handleStep1Change = (next: Step1Patch) => {
     patch(next);
-    if (
-      next.productName !== undefined &&
-      scopeProjectId &&
-      state.projectChoice === scopeProjectId
-    ) {
+    if (next.productName !== undefined && scopeProjectId) {
       updateProject(scopeProjectId, { productName: next.productName });
     }
   };
 
-  // Products already inside a project — the list its page shows: every row it
-  // holds, a product a later version dropped included, each once (COR-95). It
-  // used to count builds, which said one for a build that made four products
-  // and two for a rebuild of one.
-  const productCount = (projectId: string) => {
-    const p = projects.find((x) => x.id === projectId);
-    return p ? productRowsOf(p).length : 0;
-  };
-
-  // Step 1's Continue. Where it lands is the intent's business: selling goes
-  // to the preview, giving and saving straight to the form.
+  // Step 1's Continue: the maker's words go onto the project's own rows, and
+  // the brief moves to the step its intent runs next. The project was chosen
+  // before the Brief opened (P2-SAVE-12), so nothing is created or attached.
+  // Step 1 opened on the project's rows, headline first, so its words line up
+  // with them by position — or by name, once the list has grown under a draft
+  // saved before it did. No row comes or goes.
   const continueFromIdea = () => {
-    // One press, one project.
-    if (continuingRef.current) return;
-
-    // Media is chosen on Step 2 itself, for every intent: recording from a
-    // phone (AR) is a preview too, so Sell / Give are no longer snapped to AI
-    // on the way in. Only "Add later" stays locked for them.
-    let next: BriefState = { ...state };
-
-    // "Choose Project" is answered here, once: a new project is created (and
-    // the choice rewritten to its id, so Back → Continue attaches to the same
-    // project instead of making a second one); an existing one is opened.
-    let targetId = state.projectChoice;
-    // The record the brief lands in — the one just made, or the one picked.
-    // Both branches already hold it (to create it, or to check it still
-    // exists); only the navigation path below reads anything off it, and the
-    // build path never gets that far.
-    let target: ManualProject;
-    // The name the target project already carries — what its own draft would
-    // hold without anyone having typed a thing (see `draftHasWork`).
-    let targetProductName = "";
-    // Freshly made here, so its draft is this build's to seed and its record
-    // can say which build it came from.
-    let created = false;
-    if (state.projectChoice === "new") {
-      if (!state.newProjectName.trim()) return;
-      continuingRef.current = true;
-      setContinuing(true);
-      target = createProject({
-        name: state.newProjectName.trim(),
-        // A project made from a build keeps the concept that started it when
-        // the maker didn't write a description of their own.
-        description:
-          state.newProjectDescription.trim() || job?.conceptPrompt.trim() || "",
-      });
-      created = true;
-      targetId = target.id;
-      next = { ...next, projectChoice: target.id, projectId: target.id };
-    } else {
-      // Step 1 blocks Continue on a choice that matches no project and says
-      // why; this is the last line of defence, not a silent no-op.
-      const picked = projects.find((p) => p.id === targetId);
-      if (!picked) return;
-      continuingRef.current = true;
-      setContinuing(true);
-      target = picked;
-      targetProductName = picked.productName;
-      next = { ...next, projectId: targetId };
-    }
-
-    // Where the brief opens on the other side: the step this intent runs after
-    // the idea, so a seeded hand-off lands exactly where staying put would.
-    const afterIdea =
-      stepAfter(stepsFor(next.intent), "idea") ?? "idea";
-
-    // On a build, this answer is the attachment: the build gets its project,
-    // the project is the one the editor now works on (an explicit act, here,
-    // rather than a side effect of saving), and the draft moves from the
-    // build's key onto the project's — so the rest of the brief runs on the
-    // project, in this same shell, and /project/<slug>/brief opens on exactly
-    // where this left off.
-    // The attachment happens ONCE. `buildId` outlives it — it is in the URL —
-    // so this branch used to swallow every later press: step back to the idea,
-    // press Continue again, and it re-ran the hand-off into a project the
-    // build was already in. `seedDraft` then refused, correctly, because that
-    // project's draft now holds work, and the step was never written. The
-    // button did nothing at all, twice over: no navigation, no advance.
-    if (buildId && job?.projectId !== targetId) {
-      // The build joins first, whichever way the brief goes (COR-88): as the
-      // next version of its chat in that project, with every product it made
-      // — the same writer Save uses. Only a project made here records it as
-      // its origin: stamping an existing one would claim it was this build's
-      // all along.
-      const attached = job
-        ? attachBuild(targetId, job, lineage, { origin: created })
-        : null;
-      // The maker's Step 1 edits over the rows the build became. The rows
-      // themselves are attach()'s: nothing is added or dropped here.
-      const products =
-        attached?.products?.length && job
-          ? mergeProductEdits(
-              attached.products,
-              buildEdits(next, attached.products, job),
-              Date.now(),
-            )
-          : null;
-      // From here the brief is the project's, so its draft opens on the
-      // project's own list — headline first, then every other row — exactly as
-      // the project's brief would have. Every later Continue then lines Step
-      // 1 up with the rows it shows.
-      const onProject: BriefState = products
-        ? {
-            ...next,
-            productDescription: products[0].description.slice(0, BRIEF_DESC_MAX),
-            otherProducts: products
-              .slice(1)
-              .map((r) => ({ name: r.name, description: r.description })),
-          }
-        : next;
-      if (seedDraft(targetId, onProject, afterIdea, targetProductName)) {
-        updateProject(targetId, {
-          // The headline the maker typed. Left as the build named it, a join
-          // keeps the headline attach() gave the project; a new project takes it.
-          ...(created || !job || next.productName.trim() !== job.title.trim()
-            ? { productName: next.productName }
-            : null),
-          ...(products ? { products } : null),
-        });
-      } else {
-        // That project already has a brief in progress — it keeps it, and the
-        // notice on the next render says so. The build is attached either way.
-        //
-        // The build's draft is about to be cleared, so what was just typed
-        // would go with it: carry the three Step 1 answers into the kept brief
-        // wherever it left the same field blank, and nowhere else. A carried
-        // product name also goes on the project record — the brief takes its
-        // product name from there, so without this the sync would wipe it back
-        // out the moment the scope changes.
-        const kept = carryIntoKeptDraft(targetId, next, targetProductName);
-        if (kept.carried.includes("productName")) {
-          updateProject(targetId, { productName: next.productName });
-        }
-        noteHandoffKept(targetId, job?.title ?? "", true, kept);
-      }
-      clearDraft(buildDraftScope(buildId));
-      setBuildProject(buildId, targetId);
-      selectProject(targetId);
-      // The scope change re-hydrates this brief on the project's draft, which
-      // already holds `next` at `afterIdea`.
-      continuingRef.current = false;
-      setContinuing(false);
-      return;
-    }
-
-    // The URL is what says which project the editor is in — the workspace
-    // gate reads the slug and remounts the Brief per project. So attaching the
-    // build elsewhere is a navigation, with the draft seeded first so the
-    // remount opens on the next step carrying what was just typed.
-    // A build's brief on the project the build was saved into carries on in
-    // place — this shell is where it runs, whichever project the editor has
-    // open.
-    const inPlace = !!buildId && job?.projectId === targetId;
-    if (targetId !== activeProjectId && !inPlace) {
-      // Unless that project already has a brief of its own — then its draft
-      // wins, we only open it, and Step 1 there explains what happened.
-      if (seedDraft(targetId, next, afterIdea, targetProductName)) {
-        // The product being built belongs to the project it lands in.
-        updateProject(targetId, { productName: next.productName });
-      } else {
-        // Nothing is lost: this project's own draft still holds what was just
-        // typed, and the notice on the other side names it.
-        noteHandoffKept(targetId, activeProject?.name ?? "");
-      }
-      if (activeProjectId) releaseProjectChoice(activeProjectId);
-      router.push(stepHref(target.slug, "brief"));
-      return;
-    }
-
-    // The ordinary advance — and, for a build already attached, every press
-    // after the first. An edit made on the way back belongs to the project.
-    // This brief opened on the project's own rows, headline first, so Step 1's
-    // words line up with them by position — or by name, once the list has
-    // grown under a draft saved before it did. No row comes or goes.
-    const rows = target.products ?? [];
-    updateProject(targetId, {
+    if (!scopeProject) return;
+    const next: BriefState = { ...state, projectId: scopeProject.id };
+    const rows = scopeProject.products ?? [];
+    updateProject(scopeProject.id, {
       productName: next.productName,
       ...(rows.length
         ? {
@@ -985,145 +678,159 @@ export function BriefApp({ buildId }: { buildId?: string }) {
           }
         : null),
     });
-    continuingRef.current = false;
-    setContinuing(false);
     setState(next);
-    setStep(afterIdea);
+    setStep(stepAfter(stepsFor(next.intent), "idea") ?? "idea");
   };
 
-  // Storyboard generation — 10-second mock. Produces 3 hero scenes that act as
-  // the immediate visual preview for the listing.
-  const generateStoryboard = () => {
-    setGeneratingStoryboard(true);
-    window.setTimeout(() => {
-      setGeneratingStoryboard(false);
-      const baseScenes: Scene[] = [
-        {
-          id: "s1",
-          label: "Scene 1",
-          timeRange: "0–3s",
-          visual: state.videoPrompt
-            ? `${state.videoPrompt.slice(0, 80)} — opening shot.`
-            : "Opening establishing shot, cinematic framing.",
-          bgAudio: state.audioPrompt
-            ? state.audioPrompt.slice(0, 60)
-            : "Ambient room tone",
-          musicCue: state.audioAutoGenerate
-            ? "Lo-fi jazz, soft brush drums"
-            : "(custom from audio prompt)",
-          speech: "",
-        },
-        {
-          id: "s2",
-          label: "Scene 2",
-          timeRange: "3–6s",
-          visual: state.videoPrompt
-            ? `${state.videoPrompt.slice(0, 80)} — close-up detail.`
-            : "Close-up on the subject, soft focus.",
-          bgAudio: state.audioPrompt
-            ? state.audioPrompt.slice(0, 60)
-            : "Subtle motion ambience",
-          musicCue: state.audioAutoGenerate
-            ? "Lo-fi jazz, brighter loop"
-            : "(custom from audio prompt)",
-          speech: "",
-        },
-        {
-          id: "s3",
-          label: "Scene 3",
-          timeRange: "6–10s",
-          visual: state.videoPrompt
-            ? `${state.videoPrompt.slice(0, 80)} — final reveal with logo.`
-            : "Pull-out shot, logo lands with a glow.",
-          bgAudio: state.audioPrompt
-            ? state.audioPrompt.slice(0, 60)
-            : "Smooth synth riser",
-          musicCue: state.audioAutoGenerate
-            ? "Lo-fi jazz outro, fade"
-            : "(custom from audio prompt)",
-          speech: `Built with ${state.productName || "IDEEZA"}.`,
-        },
-      ];
-      // Regenerating storyboard invalidates any render that was kicked off
-      // from the previous storyboard — drop the link so the user gets a fresh
-      // "Continue" button to start a render from this new storyboard.
-      setState((s) => ({
-        ...s,
-        scenes: baseScenes,
-        storyboardGenerated: true,
-        videoJobId: null,
-      }));
-    }, 1500);
-  };
-
-  // Step 2: clicking "Continue" kicks off the render in place — user stays on
-  // Step 2 and sees progress here. A separate "Continue to mint setup" CTA
-  // takes them to Step 3 whenever they want; staying on Step 2 is also fine.
-  const startRender = () => {
-    const needsVideo =
-      state.mediaType === "ai" && state.storyboardGenerated;
-    if (needsVideo && !state.videoJobId) {
-      const videoJobId = createJob({
-        title: state.productName || "Untitled",
-        prompt: state.videoPrompt,
-        quality: state.quality,
-      });
-      setState((s) => ({ ...s, videoJobId }));
-    }
-  };
-
-  // Mint — just locks the listing data. It does NOT make the project live.
-  // Live = mint complete AND videoJob.stage === 'done'. The success step (and
-  // the global indicator) reconcile the two and notify the user when both
-  // conditions hit. We also stamp the linked job as minted so a future
-  // regenerate from the indicator uses the in-place modal flow (no /brief
-  // navigation). One function, whichever step in the sequence is the last one.
-  const commit = () => {
+  // The commit (P2-MINT-6, P2-LISTING-22; spec §3.9): ONE wallet request, and
+  // its writes inside the dialog at `confirmed`, in order — the MintRecord,
+  // then (Sell) the listing, then the draft's `mintedAt` and the v1 writes.
+  // A refused listing write puts the record back, so nothing is minted. A
+  // reject or a failure writes nothing and says why under the CTA.
+  const commit = async () => {
+    const p = scopeProject;
+    const intent = state.intent;
+    if (!p || !intent || !scope || mintingRef.current) return;
+    mintingRef.current = true;
     setMinting(true);
-    window.setTimeout(() => {
-      // Whatever happens in here, the button has to come back: without the
-      // finally a throw mid-write left `minting` true and the CTA disabled
-      // for good, with no way on and no way back.
-      try {
-        // The mint's one moment: mintedAt and a showcase it starts share it,
-        // so the log reads them as one event (COR-105).
-        const at = Date.now();
-        if (state.videoJobId) markMinted(state.videoJobId);
-        // Both writes name the project this BRIEF belongs to, not whichever
-        // one the editor has open: a build's brief runs on its own project
-        // long after My projects has selected another, and marking that one
-        // finished would flip a project the maker never briefed.
-        if (scopeProjectId) {
-          // Brief is the last step in the product flow — closing it out marks
-          // the whole product as complete so the home page can offer "Start
-          // fresh" instead of "Continue".
-          markStepCompleted(scopeProjectId, "brief");
-          // Terminal step done → flip the project Draft → Completed so it
-          // reads as Completed in My Projects.
-          setStatus(scopeProjectId, "completed");
-          // Share to Innovations ticked: the mint showcases the project
-          // (COR-105), so the success step opens on "Showcased" (COM-56). A
-          // project already showcased keeps the time it was first shown.
-          const scoped = projects.find((p) => p.id === scopeProjectId);
-          if (state.shareToNewsfeed && scoped && scoped.showcasedAt == null) {
-            setShowcase(scopeProjectId, true, at);
+    setMintError(null);
+    try {
+      const s = state;
+      const type: MintType = intent === "save" ? "lazy" : s.mintType;
+      const { network, collection } = s;
+      const plan = mint.plan({ projectId: p.id, intent, type, network, collection });
+      if (!plan) {
+        setMintError(notMintedLine(GONE));
+        return;
+      }
+      const terms: ListingInput | null =
+        intent === "sell"
+          ? {
+              ...listingInputFromBrief(s),
+              mintingType: listedMintingType(plan.current, type),
+              benefits: cleanBenefits(s.benefits),
+            }
+          : null;
+      const req = terms
+        ? listRequestOf({
+            projectName: p.name,
+            network,
+            collection,
+            tokenId: plan.tokenId,
+            input: terms,
+            endsAt: terms.type === "auction" ? new Date(terms.endsAt).getTime() : null,
+            mintRequest: plan.request,
+          })
+        : plan.request;
+      const newMint = plan.request?.purpose === "lazyMint" || plan.request?.purpose === "instantMint";
+      let mintedAt: number | null = null;
+
+      const writeAll = (at: number, proof: Proof | null): { ok: true } | { ok: false; message: string } => {
+        const cur = latestProjects.current.find((x) => x.id === p.id);
+        if (!cur) return { ok: false, message: GONE };
+        // The listing is made first, in memory, so a row it refuses leaves nothing written.
+        let listings = null;
+        if (terms) {
+          const made = createListing(
+            readMarketNow().listings,
+            cur.id,
+            terms,
+            listingMetadataOf(cur, products, at),
+            "brief",
+            at,
+            { listing: () => randomId("lst_") },
+          );
+          if (!made.ok) return { ok: false, message: made.reason };
+          listings = made.listings;
+        }
+        const prior = cur.mint ?? null;
+        const record = proof && plan.request ? plan.nextRecord(proof) : null;
+        // 1. The MintRecord.
+        if (record && !setMint(cur.id, record)) return { ok: false, message: STORAGE_FAILED };
+        // 2. The listing (Sell). Refused: the record goes back to what it was.
+        if (listings) {
+          const wrote = writeListings(listings);
+          if (!wrote.ok) {
+            if (record) {
+              if (prior) setMint(cur.id, prior);
+              else updateProject(cur.id, { mint: undefined });
+            }
+            return { ok: false, message: refusedCopy(wrote.reason) };
           }
         }
-        setState((s) => ({ ...s, mintedAt: at }));
-        setStep("success");
-      } finally {
-        setMinting(false);
+        if (newMint) bumpMinted(network, collection);
+        // 3. The draft's mintedAt — one moment, which a showcase it starts shares (COR-105) —
+        //    then the v1 writes.
+        writeDraft(scope, { ...s, mintedAt: at }, "success");
+        markStepCompleted(cur.id, "brief");
+        setStatus(cur.id, "completed");
+        if (typeof cur.ownerConfirmedAt !== "number") setOwnerConfirmed(cur.id, at);
+        // Share to Innovations ticked: the mint showcases the project (COR-105). A
+        // project already showcased keeps the time it was first shown.
+        if (s.shareToNewsfeed && cur.showcasedAt == null) setShowcase(cur.id, true, at);
+        mintedAt = at;
+        return { ok: true };
+      };
+
+      let result: RequestResult | null = null;
+      let switchedToLazy = false;
+      if (!req) {
+        // Already minted, and nothing to list: the writes need no signature.
+        const wrote = writeAll(Date.now(), null);
+        if (!wrote.ok) setMintError(notMintedLine(wrote.message));
+      } else {
+        result = await request(req, {
+          recheck: () => {
+            if (terms) {
+              const m = readMarketNow();
+              const v = listingViewOf(p.id, { listings: m.listings, sales: m.sales, bids: m.bids, now: Date.now(), current: NO_METADATA });
+              if (v.kind === "live" || v.kind === "paused") return ALREADY_LISTED;
+            }
+            // A video still rendering never counts (C5): the gate again, on what's stored now.
+            if (purpose) {
+              const fresh = readinessOf(
+                factsOf(s, { videos: readProjectVideos(p.id), jobs: jobsRef.current, now: Date.now() }),
+                purpose,
+              );
+              if (!fresh.ok) return fresh.blocker;
+            }
+            return null;
+          },
+          commit: (proof) => writeAll(proof.at, proof),
+          // "Use lazy mint instead" when an instant mint can't be paid: back to the form, lazy chosen.
+          onUseLazy:
+            type === "instant"
+              ? () => {
+                  switchedToLazy = true;
+                  patch({ mintType: "lazy" });
+                }
+              : undefined,
+        });
+        if (!result.ok && !switchedToLazy) {
+          setMintError(
+            result.reason === "rejected"
+              ? NOT_MINTED_REJECTED
+              : notMintedLine(result.message || requestCopy("failed", req, readWallet(), result.reason).body[0]),
+          );
+        }
       }
-    }, 1400);
+      if (mintedAt !== null) {
+        const at = mintedAt;
+        setState((cur) => ({ ...cur, mintedAt: at }));
+        setStep("success");
+      }
+    } finally {
+      mintingRef.current = false;
+      setMinting(false);
+    }
   };
 
   // One step along the sequence. Success isn't a step you walk into — it is
   // what the mint produces — so the last step's Continue commits instead.
-  // Any render was kicked off by startRender already.
   const goNext = () => {
     const target = stepAfter(seq, step);
     if (!target) return;
-    if (target === "success") commit();
+    if (target === "success") void commit();
     else setStep(target);
   };
 
@@ -1132,18 +839,25 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     if (target) setStep(target);
   };
 
-  const updateScene =(id: string, p: Partial<Scene>) =>
-    setState((s) => ({
-      ...s,
-      scenes: s.scenes.map((sc) => (sc.id === id ? { ...sc, ...p } : sc)),
-    }));
+  // Back from Step 1 is where this brief was opened from: the build's
+  // review, or My projects.
+  const leave = () =>
+    router.push(
+      job && getChat(job.chatId)
+        ? `/chat/${job.chatId}`
+        : buildId
+          ? `/build/${buildId}`
+          : "/projects",
+    );
+
+  const headline = products[0] ?? null;
+  const conceptImage =
+    headline?.built?.product.conceptImageUrl ||
+    (job ?? (scopeProject?.buildId ? getBuild(scopeProject.buildId) : null))?.conceptImageUrl;
 
   // The wizard itself — the same steps, whichever shell they are standing in.
-  // Nothing is drawn until the scope's draft is in hand: the state before that
-  // is `DEFAULT_STATE`, whose chooser reads "+ Create new project", so a build
-  // flashed the New-project panel for a frame before hydration answered "" and
-  // took it away again.
-  const body = !hydrated ? null : (
+  // Nothing is drawn until the scope's draft is in hand.
+  const body = !hydrated || !scopeProject ? null : (
     <>
       {/* Above the card rather than inside Step 1: the kept brief opens on
           whichever step it had reached, so a Step-1-only notice would go
@@ -1151,7 +865,6 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       {handoffKept ? (
         <HandoffNotice
           from={handoffKept.from}
-          fromBuild={handoffKept.fromBuild}
           carried={handoffKept.carried}
           minted={handoffKept.minted}
         />
@@ -1160,49 +873,29 @@ export function BriefApp({ buildId }: { buildId?: string }) {
       <Crossfade keyName={`step-${step}`}>
             {step === "idea" && (
               <Step1Idea
-                projects={projects}
-                projectChoice={state.projectChoice}
-                newProjectName={state.newProjectName}
-                newProjectDescription={state.newProjectDescription}
-                productCount={productCount}
+                project={{ name: scopeProject.name, detail: projectDetailOf(scopeProject, buildId, builds) }}
                 productName={state.productName}
                 productDescription={state.productDescription}
                 otherProducts={state.otherProducts}
-                projectDecided={
-                  !scopeProjectId &&
-                  !!(job?.projectChoiceId || job?.projectChoiceName?.trim())
-                }
                 fromBuild={!!buildId}
                 intent={state.intent}
-                busy={continuing}
                 onChange={handleStep1Change}
-                // Back is where this brief was opened from: the build's
-                // review, or My projects.
-                onBack={() =>
-                  router.push(
-                    job && getChat(job.chatId)
-                      ? `/chat/${job.chatId}`
-                      : buildId
-                        ? `/build/${buildId}`
-                        : "/projects",
-                  )
-                }
+                onBack={leave}
                 onContinue={continueFromIdea}
               />
             )}
             {step === "preview" && (
               <Step2Video
                 state={state}
-                generatingStoryboard={generatingStoryboard}
+                project={scopeProject}
+                products={products}
+                gate={gate}
                 onChange={patch}
-                onSceneChange={updateScene}
-                onGenerateStoryboard={generateStoryboard}
-                onStartRender={startRender}
                 onContinue={goNext}
                 onBack={goBack}
                 isLastStep={isLastStep}
                 minting={minting}
-                onPromptHelp={() => setPromptHelpOpen(true)}
+                mintError={mintError}
               />
             )}
             {step === "form" && (
@@ -1210,35 +903,36 @@ export function BriefApp({ buildId }: { buildId?: string }) {
                 state={state}
                 onChange={patch}
                 onBack={goBack}
-                onMint={commit}
+                onMint={() => void commit()}
                 onNext={goNext}
                 onPreview={() => setStep("preview")}
                 isLastStep={isLastStep}
                 minting={minting}
-                projectName={scopeProject?.name ?? ""}
-                imageUrl={
-                  (job ??
-                    (scopeProject?.buildId
-                      ? getBuild(scopeProject.buildId)
-                      : null))?.conceptImageUrl
-                }
+                mintError={mintError}
+                projectId={scopeProject.id}
+                projectName={scopeProject.name}
+                headline={headline}
+                imageUrl={conceptImage || undefined}
+                gate={gate}
+                mintStatus={mintStatus}
+                mintAddress={scopeProject.mint?.wallet.address}
+                creatorPct={creatorPct}
               />
             )}
             {step === "success" && (
               <Step4Success
                 state={state}
                 onBrowse={(href) => router.push(href)}
-                projectName={scopeProject?.name ?? ""}
+                projectName={scopeProject.name}
                 projectId={scopeProjectId}
+                products={products}
               />
             )}
       </Crossfade>
     </>
   );
 
-  // Under the card, at reading contrast. It used to be fixed in the
-  // bottom-right corner at 60% opacity (2.8:1), where the video render's
-  // toast now sits.
+  // Under the card, at reading contrast.
   const savedNote =
     hydrated && step !== "success" ? (
       <p
@@ -1251,36 +945,24 @@ export function BriefApp({ buildId }: { buildId?: string }) {
     ) : null;
 
   const chrome = (
-    <>
-      <PromptHelpModal
-        open={promptHelpOpen && step === "preview"}
-        productName={state.productName}
-        productDescription={state.productDescription}
-        onUse={(prompt) => patch({ videoPrompt: prompt })}
-        onClose={() => setPromptHelpOpen(false)}
-      />
-
-
-      <style>{`
-        @keyframes ix-brief-in {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        /* The browser's default placeholder grey measured 2.5:1 on white. */
-        .ix-brief-field::placeholder { color: var(--color-input-placeholder); opacity: 1; }
-        .ix-brief-field:focus {
-          border-color: var(--color-border-brand);
-          box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
-        }
-        .ix-brief-back:hover { color: var(--color-text-primary); }
-      `}</style>
-    </>
+    <style>{`
+      @keyframes ix-brief-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      /* The browser's default placeholder grey measured 2.5:1 on white. */
+      .ix-brief-field::placeholder { color: var(--color-input-placeholder); opacity: 1; }
+      .ix-brief-field:focus {
+        border-color: var(--color-border-brand);
+        box-shadow: 0 0 0 3px var(--color-bg-brand-subtle);
+      }
+      .ix-brief-back:hover { color: var(--color-text-primary); }
+    `}</style>
   );
 
   // A build's brief runs in the dashboard shell the (create) layout already
   // provides — the global sidebar, a "← Back" link over one card. No module
-  // rail and no step rail: there is no project to switch modules inside yet,
-  // and Back is the only way through a card that is one question long.
+  // rail and no step rail.
   if (buildId) {
     return (
       <div
@@ -1288,11 +970,17 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         // Tighter at phone width, where 32 px a side was a fifth of the screen.
         className="flex min-h-full flex-col items-center gap-6 px-[16px] pb-[48px] pt-[24px] md:px-[32px] md:pb-[64px] md:pt-[40px]"
       >
-        {step !== "success" && (
-          <BriefStepLine steps={seq} current={step} intent={state.intent} />
+        {projectsHydrated && !scopeProject ? (
+          <UnsavedBuild buildId={buildId} onBack={leave} />
+        ) : (
+          <>
+            {step !== "success" && hydrated && (
+              <BriefStepLine steps={seq} current={step} intent={state.intent} />
+            )}
+            {body}
+            {savedNote}
+          </>
         )}
-        {body}
-        {savedNote}
         {chrome}
       </div>
     );
@@ -1306,9 +994,9 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         current={step}
         intent={state.intent}
         // Backwards only, and only while there is still something to change:
-        // once it is minted the brief is a record, not a form. The write
-        // itself locks it too — a rail click mid-commit navigated away and
-        // the commit then yanked the user to success behind their back.
+        // once it is minted the brief is a record, not a form. The commit
+        // locks it too — a rail click mid-commit would navigate away while
+        // the wallet dialog is open.
         onGo={step === "success" || minting ? undefined : setStep}
         topOffset={62}
       />
@@ -1324,6 +1012,33 @@ export function BriefApp({ buildId }: { buildId?: string }) {
         {chrome}
       </div>
     </EditorShell>
+  );
+}
+
+/**
+ * A build no project holds has no brief yet (P2-SAVE-12, P2-SAVE-13): the
+ * brief belongs to the project the save step names. The route sends such a
+ * build to its save step before this renders; this says the same if the
+ * project goes while the Brief is open.
+ */
+function UnsavedBuild({ buildId, onBack }: { buildId: string; onBack: () => void }) {
+  return (
+    <BriefCard onBack={onBack}>
+      <div className="flex flex-col gap-[16px]">
+        <h1 className="m-0 text-2xl font-bold tracking-tight text-text-primary">
+          Save this build first
+        </h1>
+        <p className="m-0 text-md text-text-secondary">
+          A brief belongs to a project. Save the build to name its project, then add the brief.
+        </p>
+        <Link
+          href={`/build/${buildId}?save=1`}
+          className="inline-flex min-h-[44px] items-center self-start rounded-lg bg-bg-brand px-[22px] text-md font-semibold text-text-on-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        >
+          Save the build
+        </Link>
+      </div>
+    </BriefCard>
   );
 }
 
@@ -1368,22 +1083,19 @@ function listSentence(items: string[]): string {
 }
 
 /**
- * Why this Brief isn't carrying the answers Step 1 was just given elsewhere,
- * and what became of them. From a project nothing was thrown away — the
- * answers are still in the brief they were typed in, one project away. From a
- * build that draft is gone, so the notice names exactly which answers were
- * carried into this brief's blanks, or says plainly that none were.
+ * Why this Brief isn't carrying the answers its build's own draft held, and
+ * what became of them: that draft is gone, so the notice names exactly which
+ * answers were carried into this brief's blanks, or says plainly that none
+ * were.
  */
 function HandoffNotice({
   from,
-  fromBuild,
-  carried = [],
-  minted = false,
+  carried,
+  minted,
 }: {
   from: string;
-  fromBuild?: boolean;
-  carried?: CarriedField[];
-  minted?: boolean;
+  carried: CarriedField[];
+  minted: boolean;
 }) {
   return (
     <div
@@ -1406,25 +1118,16 @@ function HandoffNotice({
         <circle cx="12" cy="12" r="9" />
         <path d="M12 11v5 M12 7.6v.4" />
       </svg>
-      {fromBuild ? (
-        <span>
-          {HANDOFF_KEPT_NOTICE_BUILD}{" "}
-          {`${from ? `“${from}”` : "The build"} is attached to it all the same — carry on from where that brief left off.`}{" "}
-          {carried.length
-            ? `Your ${listSentence(carried.map((f) => CARRIED_LABELS[f]))} went in where that brief had none; nothing else it holds was changed.`
-            : "Nothing you typed on the last step was carried over — that brief already answers all of it."}
-          {minted
-            ? " It is already minted, so it opens on its listing rather than on a form."
-            : ""}
-        </span>
-      ) : (
-        <span>
-          {HANDOFF_KEPT_NOTICE_PROJECT}{" "}
-          {from
-            ? `What you just typed is still in ${from}'s brief — open that project to carry on there.`
-            : "What you just typed is still in the brief you came from — open that project to carry on there."}
-        </span>
-      )}
+      <span>
+        {HANDOFF_KEPT_NOTICE_BUILD}{" "}
+        {`${from ? `“${from}”` : "The build"} is attached to it all the same — carry on from where that brief left off.`}{" "}
+        {carried.length
+          ? `Your ${listSentence(carried.map((f) => CARRIED_LABELS[f]))} went in where that brief had none; nothing else it holds was changed.`
+          : "Nothing you typed before the build was saved was carried over — that brief already answers all of it."}
+        {minted
+          ? " It is already minted, so it opens on its listing rather than on a form."
+          : ""}
+      </span>
     </div>
   );
 }

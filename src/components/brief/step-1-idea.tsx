@@ -1,12 +1,11 @@
 "use client";
 
 // Step 1 — "What's your idea?"
-// Choose Project (an existing one, or a new one authored right here) + the two
-// product fields + 3 intent cards, inside the shared BriefCard frame.
+// The project, read back (P2-SAVE-12: it was chosen and named before the
+// Brief opened, so it is never asked a second time), the two product fields
+// and the 3 intent cards, inside the shared BriefCard frame.
 
 import * as React from "react";
-import { SelectMenu, type SelectOption } from "@/components/ideeza";
-import type { ManualProject } from "@/lib/manual/projects";
 import { BRIEF_DESC_MAX as MAX_DESC } from "@/lib/brief/types";
 import { BriefCard, type Intent } from "./brief-app";
 
@@ -46,7 +45,7 @@ const INTENTS: {
     id: "save",
     label: "Save as Private",
     sub: "Keep in your library",
-    requirement: "No wallet · no KYC",
+    requirement: "Free signature · no KYC",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -66,9 +65,6 @@ const FIELD_CLASS =
   "ix-brief-field w-full rounded-lg border border-solid border-border bg-[var(--color-input-bg)] px-[12px] text-md text-text-primary outline-none [font-family:inherit]";
 
 export type Step1Patch = {
-  projectChoice?: string;
-  newProjectName?: string;
-  newProjectDescription?: string;
   productName?: string;
   productDescription?: string;
   otherProducts?: { name: string; description: string }[];
@@ -76,28 +72,19 @@ export type Step1Patch = {
 };
 
 export function Step1Idea({
-  projects,
-  projectChoice,
-  newProjectName,
-  newProjectDescription,
-  productCount,
+  project,
   productName,
   productDescription,
   otherProducts,
-  projectDecided,
   fromBuild,
   intent,
-  busy,
   onChange,
   onBack,
   onContinue,
 }: {
-  projects: ManualProject[];
-  projectChoice: string;
-  newProjectName: string;
-  newProjectDescription: string;
-  /** Products already inside a project — its product rows, one per product. */
-  productCount: (projectId: string) => number;
+  /** The project this brief belongs to, read back: its name and "{k} products"
+   *  (plus " · version {n}" on a build's brief). */
+  project: { name: string; detail: string };
   productName: string;
   productDescription: string;
   /** The other products this build made — a system goes into one project
@@ -105,71 +92,28 @@ export function Step1Idea({
    *  Named and described by the model; empty on a single-product build and
    *  on every hand-made project. */
   otherProducts?: { name: string; description: string }[];
-  /** The project was already answered at the setup question, before any
-   *  concept was drawn — so this step reads it back rather than asking it
-   *  again. False on a hand-made project and on an older build that carries
-   *  no such answer, where the chooser IS the question. */
-  projectDecided?: boolean;
   /** Opened from a finished AI build: the idea has been built already, so the
    *  step is not asking for one — it checks what the brief will say. */
   fromBuild?: boolean;
   intent: Intent | null;
-  /** Continue has been answered and the hand-off is in flight. */
-  busy?: boolean;
   onChange: (patch: Step1Patch) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const isNew = projectChoice === "new";
-  const chosen = isNew ? null : projects.find((p) => p.id === projectChoice) ?? null;
   const reasonId = React.useId();
-  // An answer already given is read back, not asked again — the same shape
-  // the setup card in the chat uses. Pressing Change opens the real controls,
-  // because an answer you cannot revise is a trap rather than an answer.
-  const [editingProject, setEditingProject] = React.useState(false);
-  const readBack = !!projectDecided && !editingProject && !!projectChoice;
-  // §4.4.8 — a system's products live in ONE project, so a build carrying
-  // more than one was never offered an existing project to join: the setup
-  // question asked only for a name. Offering "Change" here would offer to
-  // move it somewhere the flow does not allow, so a multi-product build can
-  // rename its project and nothing else, and the chooser never appears.
-  const system = (otherProducts?.length ?? 0) > 0;
   const intentLabelId = React.useId();
 
-  const options: SelectOption[] = React.useMemo(
-    () => [
-      { value: "new", label: "+ Create new project" },
-      ...projects.map((p) => ({
-        value: p.id,
-        label: `${p.name}${p.status === "draft" ? " · Draft" : ""}`,
-        section: "Existing projects",
-      })),
-    ],
-    [projects],
-  );
-
   // The first thing still missing, top-down through the form — it is both what
-  // disables Continue and what its tooltip says.
-  const missing =
-    // A build's brief starts with the chooser unanswered — it is the question
-    // this step exists to ask, so it is also the first thing Continue waits on.
-    !projectChoice
-      ? "Choose a project for this build, or start a new one."
-      : isNew && !newProjectName.trim()
-        ? "Name the new project to continue."
-        : // A stored choice can outlive the project it names (deleted, or a
-          // browser that no longer holds it) — say so rather than letting
-          // Continue do nothing.
-          !isNew && !chosen
-          ? "That project isn't available any more — choose another."
-          : !productName.trim()
-            ? "Add a product name to continue."
-            : !productDescription.trim()
-              ? "Add the one-line description to continue."
-              : !intent
-                ? "Pick how you want to share it."
-                : null;
-  const canContinue = !missing && !busy;
+  // disables Continue and what its tooltip says. The project is never on it:
+  // the Brief always has one before this step renders (P2-SAVE-12).
+  const missing = !productName.trim()
+    ? "Add a product name to continue."
+    : !productDescription.trim()
+      ? "Add the one-line description to continue."
+      : !intent
+        ? "Pick how you want to share it."
+        : null;
+  const canContinue = !missing;
 
   return (
     <BriefCard onBack={onBack}>
@@ -186,54 +130,7 @@ export function Step1Idea({
         </div>
 
         <div className="flex flex-col gap-[16px]">
-          {readBack ? (
-            <DecidedProject
-              name={isNew ? newProjectName.trim() : (chosen?.name ?? "")}
-              detail={
-                isNew
-                  ? system
-                    ? `New project · all ${(otherProducts?.length ?? 0) + 1} products go in it`
-                    : "New project · created when you continue"
-                  : `Existing project · already has ${productCount(
-                      chosen?.id ?? "",
-                    )} ${
-                      productCount(chosen?.id ?? "") === 1
-                        ? "product"
-                        : "products"
-                    }`
-              }
-              actionLabel={system && isNew ? "Rename" : "Change"}
-              onChange={() => setEditingProject(true)}
-            />
-          ) : system ? null : (
-            <SelectMenu
-              label="Choose Project"
-              placeholder="Choose Project"
-              value={projectChoice || null}
-              onChange={(v) => onChange({ projectChoice: v })}
-              options={options}
-              hint={
-                chosen
-                  ? `This build will be added to ${chosen.name}.`
-                  : "Attach this build to an existing project, or start a new one."
-              }
-            />
-          )}
-
-          {readBack ? null : isNew ? (
-            <NewProjectPanel
-              name={newProjectName}
-              description={newProjectDescription}
-              onChange={onChange}
-            />
-          ) : chosen ? (
-            <Callout
-              title={`Adding to ${chosen.name}`}
-              body={`That project already has ${productCount(chosen.id)} ${
-                productCount(chosen.id) === 1 ? "product" : "products"
-              }. Its name and description stay as they are.`}
-            />
-          ) : null}
+          <ProjectRow name={project.name} detail={project.detail} />
 
           <FieldLabel label="Product name">
             <input
@@ -357,86 +254,17 @@ export function Step1Idea({
   );
 }
 
-// The new project is authored in place: an inset panel under the chooser, so
-// the two fields read as belonging to the "+ Create new project" row above.
-function NewProjectPanel({
-  name,
-  description,
-  onChange,
-}: {
-  name: string;
-  description: string;
-  onChange: (patch: Step1Patch) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-[12px] rounded-xl bg-bg-subtle p-[16px]">
-      <div className="text-xs font-semibold tracking-caps text-text-brand">
-        NEW PROJECT DETAILS
-      </div>
-
-      <FieldLabel label="Project name" hint="Products live inside a project. You can rename it later.">
-        <input
-          value={name}
-          onChange={(e) => onChange({ newProjectName: e.target.value })}
-          placeholder="Garden sensors"
-          className={`${FIELD_CLASS} h-[42px] py-0`}
-        />
-      </FieldLabel>
-
-      <FieldLabel label="Project description" hint="Optional.">
-        <textarea
-          value={description}
-          onChange={(e) => onChange({ newProjectDescription: e.target.value })}
-          placeholder="Write description"
-          rows={3}
-          className={`${FIELD_CLASS} h-[72px] resize-y py-[12px] leading-relaxed`}
-        />
-      </FieldLabel>
-    </div>
-  );
-}
-
-function Callout({ title, body }: { title: string; body: string }) {
-  return (
-    // A tint, not a bordered box: it already sits inside the Brief's card.
-    <div className="flex gap-[10px] rounded-lg bg-bg-info-subtle px-[14px] py-[12px]">
-      <svg
-        width="17"
-        height="17"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="var(--color-text-blue)"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="mt-[1px] shrink-0"
-        aria-hidden
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 11v5 M12 7.6v.4" />
-      </svg>
-      <div className="min-w-0">
-        <div className="text-md font-semibold text-text-primary">{title}</div>
-        <div className="mt-[2px] text-sm text-text-secondary">{body}</div>
-      </div>
-    </div>
-  );
-}
-
 function FieldLabel({
   label,
-  hint,
   children,
 }: {
   label: string;
-  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="flex flex-col gap-[6px]">
       <span className="text-md font-medium text-[var(--color-input-label)]">{label}</span>
       {children}
-      {hint ? <span className="text-sm text-[var(--color-input-helper)]">{hint}</span> : null}
     </label>
   );
 }
@@ -566,46 +394,23 @@ function ProductEditor({
   );
 }
 
-/** The project, already answered. It was decided at the setup question before
- *  a single concept was drawn, so presenting a chooser and a name field here
- *  asks the maker the same thing a second time — which is what they saw: the
- *  project named twice on one screen, once as a dropdown and once as a form.
- *  This states it and offers the way back to the controls. */
-function DecidedProject({
-  name,
-  detail,
-  actionLabel,
-  onChange,
-}: {
-  name: string;
-  detail: string;
-  /** "Change" where another project is a real option, "Rename" where the
-   *  project is fixed by the shape of the build and only its name is the
-   *  maker's to edit. */
-  actionLabel: string;
-  onChange: () => void;
-}) {
+/** The project, read back (P2-SAVE-12). It was chosen at the setup question
+ *  and named in the save step, or it is the project this Brief was opened
+ *  from, so this step states it and offers nothing to change: a build lives
+ *  in one project, and the project page owns its name. */
+function ProjectRow({ name, detail }: { name: string; detail: string }) {
   return (
     <div>
       <p className="mx-0 mt-0 mb-[8px] text-md font-semibold text-text-primary">
         Project
       </p>
-      <div className="flex items-center gap-[12px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] py-[12px]">
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-md font-semibold text-text-primary">
-            {name}
-          </span>
-          <span className="mt-[2px] block text-sm text-text-secondary">
-            {detail}
-          </span>
+      <div className="flex min-w-0 flex-col rounded-lg bg-bg-subtle px-[14px] py-[12px]">
+        <span className="block truncate text-md font-semibold text-text-primary">
+          {name}
         </span>
-        <button
-          type="button"
-          onClick={onChange}
-          className="ix-brief-change h-[32px] shrink-0 cursor-pointer rounded-md border border-solid border-border bg-transparent px-[12px] text-md font-semibold text-text-brand"
-        >
-          {actionLabel}
-        </button>
+        <span className="mt-[2px] block text-sm text-text-secondary">
+          {detail}
+        </span>
       </div>
     </div>
   );

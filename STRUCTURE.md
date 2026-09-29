@@ -76,7 +76,7 @@ ideeza-creator-panel/
    │  ├─ video-jobs/         background render/video jobs + indicator
    │  ├─ brief/              Add Brief: brief-app (the intent-aware sequence) + brief-rail,
    │  │                      step-1-idea · step-2-video (preview) · step-3-mint (the form) ·
-   │  │                      step-4-success, review-modal (preview / approve), regenerate-confirm,
+   │  │                      step-4-success, review-modal (the headline's video),
    │  │                      prompt-help-modal, ar-record-panel
    │  ├─ pcb/                ★ PCB module (schematic + PCB editor) — see below
    │  ├─ code/               Code module: Monaco dev-editor + Blockly + AI chat
