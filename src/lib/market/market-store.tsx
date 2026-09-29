@@ -29,10 +29,12 @@ import { useJourneyMediaSweep } from "../manual/journey-store";
 import { availableOf, type BalanceCtx } from "../wallet/balances";
 import { addAmounts, compareAmounts } from "../wallet/money";
 import { settleAuction, type SettleResult } from "./auction";
+import { normalizeEditions } from "./editions";
 import { dropProjectListings, normalizeListings } from "./listing";
 import { normalizeBids, normalizeSales, normalizeSupport } from "./sales";
 import {
   BIDS_KEY,
+  EDITIONS_KEY,
   LISTINGS_KEY,
   SALES_KEY,
   SUPPORT_KEY,
@@ -103,14 +105,31 @@ function appendPlan(get: Get, key: string, row: { id: string }): Plan {
   return { ok: true, write: { key, value: [...p.rows, row] } };
 }
 
+/** Whether one more unit of `sale`'s edition track can be sold, re-read from
+ *  the project's editions key: the track is there, its serial is free and its
+ *  supply isn't reached — so two tabs can't oversell it. */
+function editionRefusalOf(get: Get, projectId: string, unit: { trackId: string; serial: number }, sales: Sale[]): Plan | null {
+  const { value, unreadable } = parseStored(safeGet(get, EDITIONS_KEY(projectId)));
+  if (unreadable) return { ok: false, reason: "unreadable" };
+  const track = normalizeEditions(value).find((t) => t.id === unit.trackId);
+  if (!track) return { ok: false, reason: "conflict" };
+  const serials = sales.flatMap((s) => (s.item.nft !== "main" && s.item.trackId === track.id ? [s.item.serial] : []));
+  if (serials.length >= track.supply.total || serials.includes(unit.serial)) return { ok: false, reason: "conflict" };
+  return null;
+}
+
 /** The one write a sale makes: `sale` appended to the stored rows, as they
- *  are. Refused when a Main sale already names the same listing. */
+ *  are. Refused when a Main sale already names the same listing, and when an
+ *  edition's track is sold out or its serial taken (`editionRefusalOf`). */
 export function appendSalePlan(get: Get, sale: Sale): Plan {
+  const sales = normalizeSales(partOf(get, SALES_KEY).rows);
   if (sale.item.nft === "main") {
-    const sales = normalizeSales(partOf(get, SALES_KEY).rows);
     if (sales.some((s) => s.listingId === sale.listingId && s.item.nft === "main")) {
       return { ok: false, reason: "conflict" };
     }
+  } else {
+    const refused = editionRefusalOf(get, sale.projectId, sale.item, sales);
+    if (refused) return refused;
   }
   return appendPlan(get, SALES_KEY, sale);
 }

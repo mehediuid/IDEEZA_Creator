@@ -5,7 +5,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MINTED_NOTE,
-  SHARED_STORES_NOTE,
   deletePlanOf,
   matchesTypedName,
 } from "../../.tmp-test/lib/manual/delete-plan.js";
@@ -41,7 +40,7 @@ const minted = (intent, extra = {}) => ({
 test("a fresh hand-made project gets the plain confirm", () => {
   assert.deepEqual(deletePlanOf(input()), {
     goes: ["The project — its name, description and 1 product"],
-    stays: [SHARED_STORES_NOTE],
+    stays: [],
     minted: null,
     typed: false,
   });
@@ -85,7 +84,7 @@ test("editor work is listed step by step and asks for the typed name", () => {
     "The PCB board — 42 objects · 12 on the board",
     "Wiring — 6 parts · 9 wires",
     "Assembly checks — 8 of 12 parts checked",
-    "The 3D AI model",
+    "The 3D model — AI model generated",
   ]);
   assert.equal(plan.typed, true);
   for (const step of ["pcb", "wiring", "assembly", "three"]) {
@@ -138,20 +137,13 @@ test("a network asks for the typed name, counted in links", () => {
   assert.equal(empty.typed, true);
 });
 
-test("what stays: the builds and their chats in History, then the shared stores", () => {
+test("what stays: the builds and their chats in History", () => {
   const stay = (builds, chats) => deletePlanOf(input({ builds, chats })).stays;
-  assert.deepEqual(stay(2, 1), [
-    "Its 2 builds and the chat stay in History — you can save them as a project again.",
-    SHARED_STORES_NOTE,
-  ]);
+  assert.deepEqual(stay(2, 1), ["Its 2 builds and the chat stay in History — you can save them as a project again."]);
   assert.equal(stay(1, 1)[0], "Its build and the chat stay in History — you can save it as a project again.");
   assert.equal(stay(1, 0)[0], "Its build stays in History — you can save it as a project again.");
   assert.equal(stay(3, 2)[0], "Its 3 builds and their 2 chats stay in History — you can save them as a project again.");
   assert.equal(stay(2, 0)[0], "Its 2 builds stay in History — you can save them as a project again.");
-  assert.equal(
-    SHARED_STORES_NOTE,
-    "Code, 3D shapes and Preview aren't touched — every project in this browser shares them for now.",
-  );
 });
 
 test("the typed name: trimmed, exact, case-sensitive (§5.1.10)", () => {
@@ -214,4 +206,36 @@ test("The mint record: a MintRecord asks for the typed name, and an on-chain one
   const sell = deletePlanOf(input({ status: "private", draft: minted("sell"), mint: "legacy" }));
   assert.ok(sell.goes.includes(`The brief — to sell, minted ${formatDate(MINTED_AT)}`));
   assert.ok(!sell.goes.some((g) => /listed/.test(g)));
+});
+
+// ── final fix wave (R2-C1): the plan reads every row the sweep removes ──
+
+test("every product row's editor work is listed, named once more than one row has work, and asks for the name", () => {
+  const car = { ...NOTHING, pcb: { state: "work", text: "42 objects · 12 on the board" } };
+  const remote = {
+    ...NOTHING,
+    code: { state: "work", text: "2 files" },
+    three: { state: "work", text: "3 shapes · AI model generated" },
+    preview: { state: "work", text: "4 mates set" },
+  };
+  const plan = deletePlanOf(input({ products: 2, rows: [{ name: "Car", work: car }, { name: "Remote", work: remote }] }));
+  assert.deepEqual(plan.goes.slice(1), [
+    "The PCB board — 42 objects · 12 on the board (Car)",
+    "Code — 2 files (Remote)",
+    "The 3D model — 3 shapes · AI model generated (Remote)",
+    "Preview — 4 mates set (Remote)",
+  ]);
+  assert.equal(plan.typed, true);
+  // One row with work reads as before, without a name.
+  const one = deletePlanOf(input({ rows: [{ name: "Car", work: NOTHING }, { name: "Remote", work: remote }] }));
+  assert.deepEqual(one.goes.slice(1), ["Code — 2 files", "The 3D model — 3 shapes · AI model generated", "Preview — 4 mates set"]);
+  // Code, 3D and Preview alone ask for the typed name too.
+  for (const step of ["code", "three", "preview"]) {
+    assert.equal(deletePlanOf(input({ rows: [{ name: "Car", work: { ...NOTHING, [step]: { state: "work", text: "3 things" } } }] })).typed, true, step);
+  }
+});
+
+test("what stays names only the builds: Code, 3D and Preview go with the project now", () => {
+  assert.deepEqual(deletePlanOf(input()).stays, []);
+  assert.deepEqual(deletePlanOf(input({ builds: 1 })).stays, ["Its build stays in History — you can save it as a project again."]);
 });

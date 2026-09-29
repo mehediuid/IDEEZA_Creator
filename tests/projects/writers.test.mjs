@@ -10,7 +10,6 @@ import {
   attach,
   mergeProductEdits,
   removeContributorFrom,
-  renameHeadline,
   saveTargetOf,
   sweepRowIdsOf,
   updateContributorIn,
@@ -328,24 +327,6 @@ test("Step 1's words land on their rows: by row id, then by position, then by na
   assert.equal(mergeProductEdits(rows, [{ name: "  ", description: "A car.", rowId: "p1" }], 9)[0], rows[0]);
 });
 
-// ── the editor chrome's headline rename (COR-95) ─────────────────────────────
-
-test("renaming the headline renames the first product while they agree", () => {
-  const p = project("proj_car", { productName: "RC car", products: [
-    { id: "p1", name: "RC car", description: "A car." },
-    { id: "p2", name: "Remote controller", description: "Steers." },
-  ] });
-  const patch = renameHeadline(p, "Rally car", 7);
-  assert.equal(patch.productName, "Rally car");
-  assert.deepEqual(patch.products, [{ id: "p1", name: "Rally car", description: "A car.", updatedAt: 7 }, p.products[1]]);
-  // The first row was renamed on its own before: it keeps its name.
-  assert.deepEqual(renameHeadline({ ...p, productName: "Car" }, "Rally car", 7), { productName: "Rally car" });
-  // Clearing the headline never blanks a product.
-  assert.deepEqual(renameHeadline(p, "", 7), { productName: "" });
-  // A hand-made project with no list has nothing else to rename.
-  assert.deepEqual(renameHeadline(project("proj_hand", { productName: "Lamp" }), "Desk lamp", 7), { productName: "Desk lamp" });
-});
-
 // ── T09: attach() keeps the virtual "p1" once it has editor work (EDITOR §3.1) ─────
 
 test("a hand project with editor work on p1 keeps p1 when a build joins, even with no product name", () => {
@@ -394,7 +375,8 @@ test("the writers refuse a total over 100 — co-owners plus the sold shares", (
   const id = p.contributors[0].id;
   assert.deepEqual(updateContributorIn(p, id, { ...ana, share: 90 }, 3, { soldPct: 20 }), { ok: false, reason: "over100" });
   assert.equal(p.contributors[0].share, 30);
-  assert.equal(updateContributorIn(p, id, { ...ana, share: 80 }, 3, { soldPct: 20 }).ok, true);
+  // 80 + 20 would leave the maker 0 % after a sale (R2-5); 79 leaves 1 %.
+  assert.equal(updateContributorIn(p, id, { ...ana, share: 79 }, 3, { soldPct: 20 }).ok, true);
 });
 
 test("a hand-edited record already past 100 can still be lowered, never raised", () => {
@@ -469,4 +451,23 @@ test("sweepRowIdsOf: every row, every stamped row and p1, once each", () => {
   });
   assert.deepEqual(sweepRowIdsOf(p), ["prd_a", "prd_b", "prd_old", "prd_last", "p1"]);
   assert.deepEqual(sweepRowIdsOf(project("proj_hand", { productName: "Lamp" })), ["p1"]);
+});
+
+// ── final fix wave (R2-5): a co-owner write can't lock the project ──
+
+test("once a Main share has sold, no co-owner write may leave the maker at 0 %", () => {
+  const p = project("proj_car");
+  // 10 % sold to Mira; Ana at 90 % would leave the maker nothing: a lock nobody can undo.
+  assert.deepEqual(addContributorTo(p, { ...ana, share: 90 }, 2, { soldPct: 10 }), { ok: false, reason: "over100" });
+  assert.equal(addContributorTo(p, { ...ana, share: 89 }, 2, { soldPct: 10 }).ok, true);
+  const withAna = addContributorTo(p, ana, 2, { soldPct: 10 }).project; // 30
+  const id = withAna.contributors[0].id;
+  assert.deepEqual(updateContributorIn(withAna, id, { ...ana, share: 90 }, 3, { soldPct: 10 }), { ok: false, reason: "over100" });
+  assert.equal(updateContributorIn(withAna, id, { ...ana, share: 89 }, 3, { soldPct: 10 }).ok, true);
+  // No sale yet: a co-owner may take everything (no lock without a sale).
+  assert.equal(addContributorTo(p, { ...ana, share: 100 }, 2, { soldPct: 0 }).ok, true);
+  // A record already at 0 % (written before this rule) can still be renamed or lowered.
+  const stuck = project("proj_stuck", { contributors: [{ id: "ctb_ana00001", name: "Ana", role: "coOwner", share: 90, addedAt: 1 }] });
+  assert.equal(updateContributorIn(stuck, "ctb_ana00001", { name: "Ana S", role: "coOwner", share: 90 }, 4, { soldPct: 10 }).ok, true);
+  assert.equal(updateContributorIn(stuck, "ctb_ana00001", { name: "Ana", role: "coOwner", share: 80 }, 4, { soldPct: 10 }).ok, true);
 });

@@ -187,21 +187,29 @@ export function projectWriteRefused(err: WriteError | null, since: number): bool
   return err !== null && err.key === PROJECTS_KEY && err.at >= since;
 }
 
-function loadJSON<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
+/** The key's raw string; null when it's absent or storage can't be reached. */
+function loadRaw(key: string): string | null {
+  if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+    return window.localStorage.getItem(key);
   } catch {
-    return fallback;
+    return null;
+  }
+}
+/** The stored projects list, parsed; [] when absent or unparsable. */
+function parseList(raw: string | null): unknown {
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
   }
 }
 /** Writes one key; false when the browser refused it — storage full (COR-93). */
-function saveJSON<T>(key: string, v: T): boolean {
+function saveRaw(key: string, raw: string): boolean {
   if (typeof window === "undefined") return true;
   try {
-    window.localStorage.setItem(key, JSON.stringify(v));
+    window.localStorage.setItem(key, raw);
     return true;
   } catch {
     return false;
@@ -298,7 +306,7 @@ function sameRow(x: Record<string, unknown>, row: ManualProduct): boolean {
 }
 
 // COR-87 — a project's product rows: identity, text and provenance. A stored
-// id is kept when it is a non-empty string no earlier row holds; a row without
+// id is kept when it is a row id (§3.1: no ":") no earlier row holds; a row without
 // one takes the first free `p<n>` counting up from its own 1-based position —
 // once, because the save effect persists it. A source is kept when both its
 // fields are strings, updatedAt when it is finite; a row without a string name
@@ -313,7 +321,7 @@ function productsIn(raw: unknown): ManualProduct[] | undefined {
   if (!rows.length) return undefined;
   const taken = new Set<string>();
   const stored = rows.map((x) => {
-    const id = typeof x.id === "string" && x.id && !taken.has(x.id) ? x.id : null;
+    const id = isRowId(x.id) && !taken.has(x.id) ? x.id : null;
     if (id) taken.add(id);
     return id;
   });
@@ -388,7 +396,9 @@ function keepSame<T>(raw: unknown, clean: T | undefined): T | undefined {
 }
 
 // Row ids hold no ":" (§3.1), and a key built from one mustn't either.
-const isRowId = (v: unknown): v is string => typeof v === "string" && v !== "" && !v.includes(":");
+function isRowId(v: unknown): v is string {
+  return typeof v === "string" && v !== "" && !v.includes(":");
+}
 
 // COR-91 — kept when its step is one of FLOW_STEPS and its time is finite; a
 // `productId` (P2-EDITOR-7) is kept when it is a row id, else dropped on its
@@ -546,7 +556,7 @@ export function normalizeProjects(list: unknown): ManualProject[] {
   });
 }
 
-// A write's product rows, each with an id (COR-87). A row carrying an id no
+// A write's product rows, each with an id (COR-87). A row carrying a row id no
 // earlier row holds keeps it. A row without one is the held row it lines up
 // with — by position when the list keeps its length, else by name — and takes
 // that row's id, source and updatedAt; with no free match it is a new product
@@ -558,7 +568,7 @@ export function keepProductIds(
 ): ManualProduct[] {
   const taken = new Set<string>();
   const own = rows.map((r) => {
-    const id = r.id && !taken.has(r.id) ? r.id : null;
+    const id = isRowId(r.id) && !taken.has(r.id) ? r.id : null;
     if (id) taken.add(id);
     return id;
   });
@@ -917,26 +927,6 @@ export function mergeProductEdits(
   });
 }
 
-/** The editor chrome's headline rename (COR-95): the new `productName`, and
- *  the first product renamed with it while that row still carried the old
- *  headline — they are one product, so the list must not go on calling it by
- *  its old name. An empty name clears the headline ("Untitled product") and
- *  leaves the row named. */
-export function renameHeadline(
-  p: ManualProject,
-  name: string,
-  now: number,
-): Pick<ManualProject, "productName"> & Partial<Pick<ManualProject, "products">> {
-  const clean = name.trim();
-  const first = p.products?.[0];
-  if (!p.products || !first || !clean || first.name !== p.productName || first.name === clean)
-    return { productName: clean };
-  return {
-    productName: clean,
-    products: [{ ...first, name: clean, updatedAt: now }, ...p.products.slice(1)],
-  };
-}
-
 /** A patch laid over a stored record, as `updateProject` writes it: product
  *  rows keep their identity (keepProductIds), and `updatedAt` is `now`. */
 export function applyPatch(p: ManualProject, patch: ProjectPatch, now: number): ManualProject {
@@ -954,7 +944,8 @@ export function applyPatch(p: ManualProject, patch: ProjectPatch, now: number): 
 /** What the Contributor dialog hands a writer, after `checkContributor`. */
 export type ContributorValue = Pick<Contributor, "name" | "role" | "share">;
 /** Why a writer refused. `over100`: the co-owners plus the sold shares would
- *  pass 100 % (the ownership invariant). */
+ *  pass 100 % (the ownership invariant), or — once a Main share has sold —
+ *  reach it, leaving the maker nothing (R2-5). */
 export type ContributorRefusal = "missing" | "invalid" | "duplicate" | "full" | "over100";
 export type ContributorWrite =
   | { ok: true; project: ManualProject; contributor: Contributor }
@@ -986,7 +977,9 @@ const coOwnedPct = (list: readonly Contributor[]) =>
 // The invariant (P2-CONTRIB-5): every co-owner share plus every sold share is
 // 100 or less. A write that breaks it is refused — unless the record was
 // already past 100 (a hand-edited one) and this write doesn't raise it, so the
-// maker can still fix such a record one row at a time.
+// maker can still fix such a record one row at a time. Once a Main share has
+// sold, a write that raises the co-owners to leave the maker 0 % is refused
+// too: that would lock the project (decision 12), and nobody could undo it (R2-5).
 function breaksInvariant(
   before: readonly Contributor[],
   after: readonly Contributor[],
@@ -994,7 +987,8 @@ function breaksInvariant(
 ): boolean {
   const sold = soldPct !== undefined && Number.isFinite(soldPct) ? Math.max(0, soldPct) : 0;
   const total = coOwnedPct(after) + sold;
-  return total > 100 && total > coOwnedPct(before) + sold;
+  if (total > 100 && total > coOwnedPct(before) + sold) return true;
+  return sold > 0 && total >= 100 && coOwnedPct(after) > coOwnedPct(before);
 }
 
 /** Adds a contributor (P2-CONTRIB-6). Refuses an invalid value, a name already
@@ -1055,6 +1049,33 @@ export function removeContributorFrom(
     project: { ...p, contributors: withoutContributor(list, contributorId), updatedAt: now },
     contributor,
   };
+}
+
+/** The list `setMint` writes (P2-MINT-8): project `id` with `record` stored as
+ *  normalizeMintRecord reads it back, and updatedAt bumped. Null when the
+ *  record doesn't parse or the project isn't in `list`. */
+export function withMint(list: readonly ManualProject[], id: string, record: MintRecord, now: number): ManualProject[] | null {
+  const clean = normalizeMintRecord(record);
+  if (!clean || !list.some((p) => p.id === id)) return null;
+  return list.map((p) => (p.id === id ? { ...p, mint: clean, updatedAt: now } : p));
+}
+
+/** Another tab's stored projects (§3.4), adopted over this tab's `cur`: `cur`
+ *  itself when they're the same, so nothing re-renders, and when the key
+ *  can't be read — a corrupt key never wipes this tab's list. A removed key
+ *  (`raw` null) reads as no projects. */
+export function projectsFromStorage(cur: ManualProject[], raw: string | null): ManualProject[] {
+  let value: unknown = [];
+  if (raw !== null) {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return cur;
+    }
+    if (!Array.isArray(value)) return cur;
+  }
+  const next = normalizeProjects(value);
+  return sameJson(cur, next) ? cur : next;
 }
 
 /** Every product row id a project's browser keys can be under, for the delete
@@ -1141,8 +1162,9 @@ type Ctx = {
    *  row. Bumps updatedAt. */
   renameProduct: (id: string, rowId: string, name: string) => boolean;
   /** P2-MINT-8: the demo mint record — only the mint and listing commits call
-   *  this. Stored as normalizeMintRecord reads it; false, and no write, for a
-   *  record that doesn't parse or a project that isn't here. Bumps updatedAt. */
+   *  this. Stored as normalizeMintRecord reads it, and written to storage before
+   *  it returns: false, and nothing changed, for a record that doesn't parse, a
+   *  project that isn't here, or a write the browser refused. Bumps updatedAt. */
   setMint: (id: string, record: MintRecord) => boolean;
   /** P2-CONTRIB-6. Each re-checks the value and the ownership invariant —
    *  co-owners plus `soldPct` (the Main shares sold) at most 100 — and
@@ -1200,9 +1222,21 @@ export function ManualProjectsProvider({
   // the Brief creates a project and attaches its build in one press, and
   // `projects` is still the list from before the create.
   const made = React.useRef(new Map<string, ManualProject>());
+  // The newest committed list, for a write that must land now (setMint), from
+  // whichever render its caller was made in.
+  const latest = React.useRef<ManualProject[]>([]);
+  // The key as this tab last read or wrote it (§3.4): a `focus` or `storage`
+  // read that finds it unchanged adopts nothing, so an edit this tab couldn't
+  // save isn't dropped.
+  const synced = React.useRef<string | null>(null);
+  // Another tab's list, once adopted: storage already holds it, so the save
+  // effect doesn't write it straight back.
+  const adopted = React.useRef<ManualProject[] | null>(null);
 
   React.useEffect(() => {
-    const stored = normalizeProjects(loadJSON<unknown>(PROJECTS_KEY, []));
+    const raw = loadRaw(PROJECTS_KEY);
+    synced.current = raw;
+    const stored = normalizeProjects(parseList(raw));
     // Reading localStorage in the state initialiser would render different
     // markup on the server and the client — so the store hydrates here, once,
     // after mount, on purpose.
@@ -1222,9 +1256,36 @@ export function ManualProjectsProvider({
 
   // A write the browser refuses is reported, so the page can say so (COR-93).
   React.useEffect(() => {
-    if (!hydrated) return;
-    reportWrite(PROJECTS_KEY, saveJSON(PROJECTS_KEY, projects));
+    latest.current = projects;
+    if (!hydrated || adopted.current === projects) return;
+    const json = JSON.stringify(projects);
+    const ok = saveRaw(PROJECTS_KEY, json);
+    if (ok) synced.current = json;
+    reportWrite(PROJECTS_KEY, ok);
   }, [projects, hydrated]);
+  // §3.4: another tab's write reaches this one on `storage`, or on `focus` when
+  // that event was missed — so a stale tab's next write can't drop it.
+  React.useEffect(() => {
+    if (!hydrated) return;
+    const reread = () => {
+      const raw = loadRaw(PROJECTS_KEY);
+      if (raw === synced.current) return;
+      synced.current = raw;
+      const next = projectsFromStorage(latest.current, raw);
+      if (next === latest.current) return;
+      adopted.current = next;
+      setProjects(next);
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === null || e.key === PROJECTS_KEY) reread();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", reread);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", reread);
+    };
+  }, [hydrated]);
   React.useEffect(() => {
     if (!hydrated) return;
     reportWrite(ACTIVE_KEY, saveActiveId(activeProjectId));
@@ -1472,19 +1533,22 @@ export function ManualProjectsProvider({
     [recordOf],
   );
 
-  // P2-MINT-8 — the mint record, stored exactly as a reload will read it.
-  const setMint = React.useCallback(
-    (id: string, record: MintRecord) => {
-      const clean = normalizeMintRecord(record);
-      if (!clean || !recordOf(id)) return false;
-      const now = Date.now();
-      setProjects((arr) =>
-        arr.map((p) => (p.id === id ? { ...p, mint: clean, updatedAt: now } : p)),
-      );
-      return true;
-    },
-    [recordOf],
-  );
+  // P2-MINT-8 — the mint record, stored exactly as a reload will read it, and
+  // written to storage NOW (R2-9): the caller's next write (a listing) must
+  // never land when this one was refused, so true means it's in storage.
+  const setMint = React.useCallback((id: string, record: MintRecord) => {
+    const now = Date.now();
+    const unrendered = [...made.current.values()].filter((m) => !latest.current.some((p) => p.id === m.id));
+    const next = withMint(unrendered.length ? [...unrendered, ...latest.current] : latest.current, id, record, now);
+    if (!next) return false;
+    const json = JSON.stringify(next);
+    const ok = saveRaw(PROJECTS_KEY, json);
+    reportWrite(PROJECTS_KEY, ok);
+    if (!ok) return false;
+    synced.current = json;
+    setProjects((arr) => withMint(arr, id, record, now) ?? arr);
+    return true;
+  }, []);
 
   // P2-CONTRIB-6 — one contributor write: computed on the record this event
   // sees, so the caller learns at once whether it was refused and which row
@@ -1588,11 +1652,10 @@ export function ManualProjectsProvider({
         if (held.id === id) builtFrom.current.delete(buildId);
       }
       if (typeof window === "undefined") return;
-      // The root PcbProvider (v1, until P2-EDITOR-4) saves under
-      // `ideeza:pcb:doc:<ideeza:manual:active>` when its debounce fires, so a
-      // save already pending would re-create the swept document. Clearing the
-      // stored active id now — not in the save effect after the next render —
-      // sends that save to its "default" key instead.
+      // The stored active id goes now, not in the save effect after the next
+      // render, so nothing reads the deleted project as active meanwhile. (The
+      // PCB store follows the editor's scope and keeps its own target key, so
+      // this is no longer what stops a pending save re-creating a swept doc.)
       if (loadActiveId() === id) saveActiveId(null);
       try {
         sweepProjectKeys(id, rowIds, window.localStorage);

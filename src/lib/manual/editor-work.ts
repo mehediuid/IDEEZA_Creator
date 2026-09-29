@@ -22,6 +22,7 @@
 import { boardPartsOf } from "../pcb/board-parts";
 import { docReadKeys } from "./editor-scope";
 import type { EditorDoc, EditorScope, EditorStep } from "./p2-types";
+import { sweepRowIdsOf, type ManualProject } from "./projects";
 
 export type StepFact =
   | { state: "not-opened" } // no doc for this product
@@ -124,29 +125,36 @@ function previewFact(scope: EditorScope, headRowId: string): StepFact {
 }
 
 /** Per-product editor facts (P2-EDITOR-8) — every step but Brief, which has
- *  its own read (`project-brief.ts`, COM-1). Pure: reads up to eight
- *  localStorage keys once and returns; never writes, never caches, never
- *  subscribes.
- *
- *  @deprecated The 1-arg, project-only form reads the pre-P2 per-project
- *  keys (via the legacy fallback, at the virtual first row "p1") and reports
- *  "none" for Code/3D shapes/Preview, matching v1's behaviour exactly — kept
- *  for `delete-project-dialog.tsx`, which hasn't moved to the scoped form
- *  yet (T19). Prefer the 2-arg form. */
-export function editorWorkOf(projectId: string): EditorWork;
-export function editorWorkOf(scope: EditorScope, headRowId: string): EditorWork;
-export function editorWorkOf(scopeOrProjectId: EditorScope | string, headRowId?: string): EditorWork {
-  const scope: EditorScope =
-    typeof scopeOrProjectId === "string" ? { projectId: scopeOrProjectId, productId: "p1" } : scopeOrProjectId;
-  const head = headRowId ?? scope.productId;
-
-  const { pcb, assembly } = pcbAndAssemblyFacts(scope, head);
+ *  its own read (`project-brief.ts`, COM-1). `headRowId` is the project's
+ *  first row, the one that adopts the legacy per-project keys. Pure: reads
+ *  up to eight localStorage keys once and returns; never writes, never
+ *  caches, never subscribes. */
+export function editorWorkOf(scope: EditorScope, headRowId: string): EditorWork {
+  const { pcb, assembly } = pcbAndAssemblyFacts(scope, headRowId);
   return {
     pcb,
     assembly,
-    wiring: wiringFact(scope, head),
-    three: threeFact(scope, head),
-    code: codeFact(scope, head),
-    preview: previewFact(scope, head),
+    wiring: wiringFact(scope, headRowId),
+    three: threeFact(scope, headRowId),
+    code: codeFact(scope, headRowId),
+    preview: previewFact(scope, headRowId),
   };
+}
+
+/** One row the delete sweep removes, with its editor facts and the name the plan gives it. */
+export type RowWork = { rowId: string; name: string; work: EditorWork };
+
+/** Every product row's editor facts — exactly the rows the delete sweep removes
+ *  (`sweepRowIdsOf`), the first adopting the legacy per-project keys — so the
+ *  delete plan counts the work that really goes (R2-C1). A row the project
+ *  no longer lists (an id only its editor stamps name) reads "An earlier
+ *  product". Reads storage: call it when the dialog opens, never at render. */
+export function editorWorkOfProject(p: ManualProject): RowWork[] {
+  const rows = p.products?.length ? p.products : [{ id: "p1", name: p.productName }];
+  const head = rows[0].id;
+  return sweepRowIdsOf(p).map((rowId) => {
+    const row = rows.find((r) => r.id === rowId);
+    const name = row ? row.name.trim() || "Untitled product" : "An earlier product";
+    return { rowId, name, work: editorWorkOf({ projectId: p.id, productId: rowId }, head) };
+  });
 }

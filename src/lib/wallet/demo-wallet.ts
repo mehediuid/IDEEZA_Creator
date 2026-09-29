@@ -119,7 +119,8 @@ function sanitizeChargeLine(raw: unknown): ChargeLine | null {
   return { coin: raw.coin as Coin, amount: raw.amount };
 }
 
-function sanitizeCharge(raw: unknown): Charge | undefined {
+/** A stored charge, or undefined when it doesn't parse — also how a mint record keeps its own (MINT-8). */
+export function sanitizeCharge(raw: unknown): Charge | undefined {
   if (!isDict(raw) || !Array.isArray(raw.lines)) return undefined;
   if (!NETWORK_IDS.includes(raw.network as Network)) return undefined;
   const lines = raw.lines.map(sanitizeChargeLine).filter((l): l is ChargeLine => l !== null);
@@ -231,10 +232,24 @@ export function readWallet(): DemoWallet {
   }
 }
 
-/** `false` when the browser refused the write — storage full or blocked (P2-MINT-2's alert). */
+/** A stored wallet that can't be read back: present, but not JSON or not an object. A v1 or
+ *  partial record still normalizes, and is migrated by the next write; a corrupt one isn't, so
+ *  its activity — what every balance is derived from — would be wiped. */
+function storedUnreadable(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    return !isDict(JSON.parse(raw));
+  } catch {
+    return true;
+  }
+}
+
+/** `false` when the browser refused the write — storage full or blocked (P2-MINT-2's alert) — or
+ *  when the stored wallet can't be read, which is left exactly as it is, as the market writers do. */
 export function writeWallet(w: DemoWallet): boolean {
   if (typeof window === "undefined") return true;
   try {
+    if (storedUnreadable(window.localStorage.getItem(DEMO_WALLET_KEY))) return false;
     window.localStorage.setItem(DEMO_WALLET_KEY, JSON.stringify(w));
     return true;
   } catch {

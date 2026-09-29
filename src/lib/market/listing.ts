@@ -13,10 +13,9 @@ import { formatDate } from "../manual/project-summary";
 import type { ProjectLogEntry } from "../manual/project-read";
 import type { Readiness } from "../manual/p2-types";
 import { NETWORKS, LISTING_TYPES, TOKENS_BY_NETWORK } from "../brief/types";
-import { compareAmounts } from "../wallet/money";
+import { normalizeAmount } from "../wallet/money";
+import { auctionStateOf, timeLeftLabel } from "./auction";
 import type {
-  AuctionPhase,
-  AuctionState,
   Bid,
   Listing,
   ListingChange,
@@ -26,7 +25,7 @@ import type {
   Sale,
   UtilityBenefit,
 } from "./types";
-import type { ListingInput } from "./listing-form";
+import { sameAmount, type ListingInput } from "./listing-form";
 
 // ─────────────────────────── normalizing the store ────────────────────────
 
@@ -186,33 +185,16 @@ function normalizeListingRow(raw: unknown): Listing | null {
 
 // ─────────────────────────────── the view ──────────────────────────────────
 
-/** A light read of bids for `listingViewOf`'s auction facts — running /
- *  endingSoon (under an hour) / ended, the current top bid, and `msLeft`.
- *  The bid-increment and settlement rules are MARKETPLACE's own
- *  `auctionStateOf` (T04); this is only what the listing's `kind` needs. */
-function deriveAuctionState(listing: Listing, bids: Bid[], now: number): AuctionState {
-  let top: Bid | null = null;
-  for (const b of bids) {
-    if (b.listingId !== listing.id) continue;
-    if (!top || compareAmounts(b.amount, top.amount) > 0 || (compareAmounts(b.amount, top.amount) === 0 && b.at < top.at)) {
-      top = b;
-    }
-  }
-  const endsAt = listing.endsAt ?? now;
-  const msLeft = Math.max(0, endsAt - now);
-  const phase: AuctionPhase = now >= endsAt ? "ended" : msLeft <= 60 * 60_000 ? "endingSoon" : "running";
-  const minNext = top ? top.amount : listing.minBid ?? "0";
-  return { phase, top, minNext, msLeft };
-}
-
 function newestListingOf(ls: Listing[], projectId: string): Listing | null {
   const rows = ls.filter((l) => l.projectId === projectId && l.slot === "main");
   if (!rows.length) return null;
   return rows.reduce((a, b) => (b.listedAt >= a.listedAt ? b : a));
 }
 
-/** The project's newest listing, read with its sales and bids. No `ready`
- *  input: readiness is checked by callers (C5). */
+/** The project's newest listing, read with its sales and bids — a live
+ *  auction through MARKETPLACE's own `auctionStateOf`, and a closed one that
+ *  had bids as `unpaid` (Close found none payable). No `ready` input:
+ *  readiness is checked by callers (C5). */
 export function listingViewOf(
   projectId: string,
   f: { listings: Listing[]; sales: Sale[]; bids: Bid[]; now: number; current: ListingMetadata },
@@ -222,21 +204,15 @@ export function listingViewOf(
   const sale = f.sales.find((s) => s.listingId === listing.id && s.item.nft === "main");
   if (sale) return { kind: "sold", listing, sale };
   if (listing.status === "live") {
-    const auction = listing.type === "auction" ? deriveAuctionState(listing, f.bids, f.now) : null;
+    const auction = listing.type === "auction" ? auctionStateOf(listing, f.bids, f.now) : null;
     return { kind: "live", listing, auction };
   }
   if (listing.status === "paused") {
     return { kind: "paused", listing, changed: metadataDiff(listing.metadata, f.current) };
   }
   if (listing.status === "removed") return { kind: "ended", listing, why: "removed" };
-  return { kind: "ended", listing, why: "noBids" };
-}
-
-function timeLeftLabel(ms: number): string {
-  const totalMin = Math.max(0, Math.ceil(ms / 60_000));
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+  const unpaid = f.bids.some((b) => b.listingId === listing.id);
+  return unpaid ? { kind: "ended", listing, why: "noBids", unpaid: true } : { kind: "ended", listing, why: "noBids" };
 }
 
 /** The listing-driven part of the status line (§3.2). `live` and `paused`
@@ -268,12 +244,17 @@ export type Ids = { listing: () => string };
 
 const OPEN_STATUSES = new Set<Listing["status"]>(["live", "paused"]);
 
+/** A typed amount in its one written form (§3.1: "0.050" → "0.05"); as typed when it doesn't parse. */
+function amountOf(typed: string): string {
+  return normalizeAmount(typed) ?? typed;
+}
+
 function sameEditableFields(l: Listing, i: ListingInput): boolean {
   const royalties = Number(i.royalties) || 0;
   const percentSelling = i.percentSelling ?? l.percentSelling;
   return (
     l.token === i.token &&
-    (l.price ?? "") === i.price &&
+    sameAmount(l.price ?? "", i.price) &&
     l.percentSelling === percentSelling &&
     l.royaltiesPct === royalties &&
     JSON.stringify(l.benefits) === JSON.stringify(i.benefits)
@@ -302,7 +283,10 @@ export function createListing(
   if (!i.token) return { ok: false, reason: "Choose a token." };
   if (i.percentSelling === null) return { ok: false, reason: "Choose how much you're selling." };
   if (!i.network) return { ok: false, reason: "The mint's network isn't known." };
-  if (i.type === "auction" && !i.endsAt) return { ok: false, reason: "Set the date the auction ends." };
+  const endsAt = i.type === "auction" ? new Date(i.endsAt).getTime() : NaN;
+  if (i.type === "auction" && (!i.endsAt || !Number.isFinite(endsAt))) {
+    return { ok: false, reason: "Set the date the auction ends." };
+  }
 
   const listing: Listing = {
     id: ids.listing(),
@@ -324,11 +308,11 @@ export function createListing(
     events: [{ kind: "listed", at: now }],
   };
   if (i.type === "auction") {
-    listing.minBid = i.minBid;
-    if (i.auctionBuyNow.trim()) listing.auctionBuyNow = i.auctionBuyNow;
-    listing.endsAt = new Date(i.endsAt).getTime();
+    listing.minBid = amountOf(i.minBid);
+    if (i.auctionBuyNow.trim()) listing.auctionBuyNow = amountOf(i.auctionBuyNow);
+    listing.endsAt = endsAt;
   } else {
-    listing.price = i.price;
+    listing.price = amountOf(i.price);
   }
   return { ok: true, listings: [...ls, listing] };
 }
@@ -346,15 +330,16 @@ export function editListing(ls: Listing[], id: string, i: ListingInput, now: num
   if (sameEditableFields(listing, i)) {
     return { ok: false, reason: "Change the price, the selling percentage, the royalties or a benefit to update." };
   }
+  const price = amountOf(i.price);
   const next: Listing = {
     ...listing,
     token: i.token,
-    price: i.price,
+    price,
     percentSelling: i.percentSelling ?? listing.percentSelling,
     royaltiesPct: Number(i.royalties) || 0,
     benefits: i.benefits,
     updatedAt: now,
-    events: [...listing.events, { kind: "updated", at: now, price: i.price }],
+    events: [...listing.events, { kind: "updated", at: now, price }],
   };
   const listings = ls.slice();
   listings[idx] = next;
@@ -404,13 +389,25 @@ export function pauseForEdit(ls: Listing[], id: string, change: ListingChange, n
 }
 
 /** Paused only, and only once `ready` (VIDEO's readiness, checked by the
- *  caller) — otherwise "Finish the items above to relist." (P2-LISTING-14). */
-export function relistListing(ls: Listing[], id: string, meta: ListingMetadata, ready: boolean, now: number): Result {
+ *  caller) — otherwise "Finish the items above to relist." (P2-LISTING-14).
+ *  `opts.creatorPct` (the maker's share now, `ownership.maker`) re-checks the
+ *  listing's own percent, which a co-owner written meanwhile may have taken (R1-1). */
+export function relistListing(
+  ls: Listing[],
+  id: string,
+  meta: ListingMetadata,
+  ready: boolean,
+  now: number,
+  opts: { creatorPct?: number } = {},
+): Result {
   const idx = ls.findIndex((l) => l.id === id);
   if (idx === -1) return { ok: false, reason: "This listing no longer exists." };
   const listing = ls[idx];
   if (listing.status !== "paused") return { ok: false, reason: "Only a paused listing can be relisted." };
   if (!ready) return { ok: false, reason: "Finish the items above to relist." };
+  if (opts.creatorPct !== undefined && listing.percentSelling > opts.creatorPct) {
+    return { ok: false, reason: `You hold ${Math.max(0, opts.creatorPct)}% now — lower the selling percentage in Edit, then relist.` };
+  }
   const next: Listing = {
     ...listing,
     status: "live",

@@ -8,7 +8,7 @@
 import type { BriefState, ListingType, Network, Token } from "../brief/types";
 import { ROYALTY_MAX, ROYALTY_MIN } from "../brief/types";
 import type { MintType, SummaryRow } from "../wallet/types";
-import { formatAmount, toMicros } from "../wallet/money";
+import { formatAmount, normalizeAmount, toMicros } from "../wallet/money";
 import { FEE_LABEL, feePercentText, ideezaFeeOf, payoutOf } from "./fee";
 import type { Listing, UtilityBenefit } from "./types";
 
@@ -59,6 +59,12 @@ function amountShape(raw: string): "empty" | "malformed" | "tooLong" | "ok" {
 
 type Problem = { field: FieldKey | null; message: string };
 
+/** Two typed amounts are the same price when they read the same ("0.05" and "0.050", §3.1). */
+export function sameAmount(a: string, b: string): boolean {
+  const x = normalizeAmount(a);
+  return x !== null ? x === normalizeAmount(b) : a.trim() === b.trim();
+}
+
 /** LISTING-5's table, one rule set for the page and the Brief. The first
  *  problem, read top-down, is the CTA's reason; a field's own message sits
  *  under it. Two of the table's rows aren't computed here, on purpose:
@@ -88,30 +94,33 @@ export function listingProblems(
       note("minBid", "Choose a token and enter the minimum bid.");
     } else if (minShape === "tooLong") {
       note("minBid", "Use at most 6 decimal places.");
+    } else if (toMicros(i.minBid) === BigInt(0)) {
+      note("minBid", "The minimum bid must be above 0.");
     }
     if (i.auctionBuyNow.trim()) {
       const buyShape = amountShape(i.auctionBuyNow);
-      if (buyShape === "tooLong") {
+      if (buyShape === "empty" || buyShape === "malformed") {
+        note("auctionBuyNow", "Enter the buy now price, or leave it empty.");
+      } else if (buyShape === "tooLong") {
         note("auctionBuyNow", "Use at most 6 decimal places.");
-      } else if (buyShape === "ok" && toMicros(i.auctionBuyNow) === BigInt(0)) {
+      } else if (toMicros(i.auctionBuyNow) === BigInt(0)) {
         note("auctionBuyNow", "The buy now price must be above 0.");
-      } else if (buyShape === "ok" && minShape === "ok") {
+      } else if (minShape === "ok") {
         const min = toMicros(i.minBid);
         const buy = toMicros(i.auctionBuyNow);
-        if (min !== null && buy !== null && min > buy) {
-          note("minBid", "The minimum bid can't be above the buy now price.");
+        // At the buy-now price a bid is refused (`validateBid`), so no bid could ever be placed.
+        if (min !== null && buy !== null && min >= buy) {
+          note("minBid", "The minimum bid has to be below the buy now price.");
         }
       }
     }
-    if (!i.endsAt) {
+    const endsMs = i.endsAt ? new Date(i.endsAt).getTime() : NaN;
+    if (!Number.isFinite(endsMs)) {
       note("endsAt", "Set the date the auction ends.");
     } else {
-      const endsMs = new Date(i.endsAt).getTime();
-      if (Number.isFinite(endsMs)) {
-        const delta = endsMs - c.now;
-        if (delta < AUCTION_MIN_MS) note("endsAt", "Set an end at least 5 minutes from now.");
-        else if (delta > AUCTION_MAX_MS) note("endsAt", "Keep the auction to 30 days or less.");
-      }
+      const delta = endsMs - c.now;
+      if (delta < AUCTION_MIN_MS) note("endsAt", "Set an end at least 5 minutes from now.");
+      else if (delta > AUCTION_MAX_MS) note("endsAt", "Keep the auction to 30 days or less.");
     }
   }
 
@@ -145,7 +154,7 @@ export function listingProblems(
     const percentSelling = i.percentSelling ?? o.percentSelling;
     const unchanged =
       o.token === i.token &&
-      (o.price ?? "") === i.price &&
+      sameAmount(o.price ?? "", i.price) &&
       o.percentSelling === percentSelling &&
       o.royaltiesPct === royalties &&
       JSON.stringify(o.benefits) === JSON.stringify(i.benefits);

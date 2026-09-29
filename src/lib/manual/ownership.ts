@@ -11,7 +11,7 @@
 import type { Sale } from "../market/types";
 import { buyerLabel } from "./customers";
 import { ROLE_WORD } from "./contributors";
-import { can, coOwnersDetail, type Viewer } from "./permissions";
+import { can, type Viewer } from "./permissions";
 import type { Contributor, Holder, Holding, OtherOwner, OwnershipSplit } from "./p2-types";
 
 /** A holding at or above this percent is a majority (P2-CONTRIB-9/10). */
@@ -24,7 +24,7 @@ const isMainSale = (s: Sale): s is Sale & { item: MainItem } => s.item.nft === "
  * The split, from the project's contributors and its completed Main sales.
  * `sales` is every sale of the project — this filters to Main itself, so a
  * caller may pass the project's full sale list or an already-filtered one.
- * `listedPercent` is the live Main listing's Percent Selling, or 0.
+ * `listedPercent` is the live or paused Main listing's Percent Selling, or 0.
  */
 export function ownershipOf(input: {
   createdAt: number;
@@ -64,19 +64,44 @@ export function ownershipOf(input: {
   const reserved = Math.min(Math.max(0, input.listedPercent), maker);
   const sellable = maker - reserved;
   const split = holdings.some((h) => h.holder.kind !== "maker" && h.percent > 0);
-  const majority = holdings.reduce<Holding | null>(
-    (best, h) => (h.percent >= MAJORITY && (!best || h.percent > best.percent) ? h : best),
-    null,
-  );
 
-  return { holdings, maker, reserved, sellable, total, overAllocated, split, majority };
+  return { holdings, maker, reserved, sellable, total, overAllocated, split, majority: majorityOf(holdings) };
 }
 
-/** The Contributor dialog's Share max: what the maker can give, plus this
- *  co-owner's own current share when editing them (P2-CONTRIB-4). */
+/** Who a holding belongs to: two Main buys by one buyer are one holder. */
+function holderKey(h: Holder): string {
+  return h.kind === "maker" ? "maker" : h.kind === "coOwner" ? `coOwner:${h.id}` : `buyer:${h.buyerId}`;
+}
+
+/** The holder at or above `MAJORITY`, summed per holder (R2-6) — two 30 % buys by Mira are
+ *  her 60 %. The answer is that holder's first holding, carrying the summed percent. */
+function majorityOf(holdings: readonly Holding[]): Holding | null {
+  const byHolder = new Map<string, Holding>();
+  for (const h of holdings) {
+    const key = holderKey(h.holder);
+    const cur = byHolder.get(key);
+    byHolder.set(key, cur ? { ...cur, percent: cur.percent + h.percent } : h);
+  }
+  let best: Holding | null = null;
+  for (const h of byHolder.values()) {
+    if (h.percent >= MAJORITY && (!best || h.percent > best.percent)) best = h;
+  }
+  return best;
+}
+
+/**
+ * The Contributor dialog's Share max (P2-CONTRIB-4): what the maker can give —
+ * never a live or paused listing's reserved share (R1-1) — plus this
+ * co-owner's own current share when editing them. Once a Main share has sold,
+ * the maker keeps at least 1 % unless a listing already reserves some: a
+ * co-owner taking the last of it would lock the project with nobody able to
+ * undo it (R2-5, decision 12).
+ */
 export function maxShareFor(split: OwnershipSplit, editing: Contributor | null): number {
   const own = editing && editing.role === "coOwner" ? editing.share : 0;
-  return split.maker + own;
+  const sold = split.holdings.some((h) => h.holder.kind === "buyer" && h.percent > 0);
+  const keep = sold && split.reserved === 0 ? 1 : 0;
+  return Math.max(0, split.sellable + own - keep);
 }
 
 /** Percent Selling's max (⚑ MARKETPLACE). Editing a live listing counts its
@@ -95,17 +120,6 @@ export function otherOwnersOf(split: OwnershipSplit): OtherOwner[] {
   return split.holdings
     .filter((h): h is Holding & { holder: Extract<Holder, { kind: "coOwner" }> } => h.holder.kind === "coOwner" && h.percent > 0)
     .map((h) => ({ kind: "coOwner", name: h.holder.name, percent: h.percent }));
-}
-
-/**
- * The delete gate's co-owner detail (P2-CONTRIB-14) and whether "Open
- * Contributors" follows it. Reuses `coOwnersDetail` from `permissions.ts`
- * (T01), so the copy has one home — this is a thin adapter, not a second
- * writer of the words.
- */
-export function otherOwnersDetail(others: readonly OtherOwner[]): { detail: string; linkToContributors: boolean } {
-  const detail = coOwnersDetail(others);
-  return detail ? { detail, linkToContributors: true } : { detail: "", linkToContributors: false };
 }
 
 function otherHoldersNote(holdings: readonly Holding[]): string {

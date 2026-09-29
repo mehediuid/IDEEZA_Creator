@@ -141,8 +141,40 @@ test("appendSalePlan: a second Main sale of one listing is refused; edition sale
       listingId: "ed_track001",
       item: { nft: "physical", trackId: "ed_track001", productId: "p1", productName: "Car", use: "private", tier: "regular", serial },
     });
-  const e = storeOf({ [K.sales]: JSON.stringify([edition("sale_e1", 1)]) });
+  const e = storeOf({ [K.sales]: JSON.stringify([edition("sale_e1", 1)]), [EDITIONS("proj_1")]: JSON.stringify([track(3)]) });
   assert.equal(appendSalePlan(e.get, edition("sale_e2", 2)).ok, true);
+});
+
+const EDITIONS = (projectId) => `ideeza:project:editions:${projectId}`;
+function track(total) {
+  return {
+    id: "ed_track001", projectId: "proj_1", productId: "p1", kind: "physical", use: "private",
+    supply: { total }, createdAt: 1, lazy: true,
+    listing: { token: "MATIC", regular: "0.01", extended: "0.02", royaltyPct: 5, listedAt: 1, updatedAt: 1 }, demo: true,
+  };
+}
+const editionSale = (id, serial, at = 3000) =>
+  sale({
+    id, at, listingId: "ed_track001",
+    item: { nft: "physical", trackId: "ed_track001", productId: "p1", productName: "Car", use: "private", tier: "regular", serial },
+  });
+
+test("appendSalePlan: an edition sale past the track's supply, re-read from its store, is refused (another tab sold the last)", () => {
+  const full = storeOf({
+    [K.sales]: JSON.stringify([editionSale("sale_e1", 1), editionSale("sale_e2", 2)]),
+    [EDITIONS("proj_1")]: JSON.stringify([track(2)]),
+  });
+  assert.deepEqual(appendSalePlan(full.get, editionSale("sale_e3", 3)), { ok: false, reason: "conflict" });
+  // The same serial twice: two tabs priced the same unit.
+  const room = storeOf({ [K.sales]: JSON.stringify([editionSale("sale_e1", 1)]), [EDITIONS("proj_1")]: JSON.stringify([track(5)]) });
+  assert.deepEqual(appendSalePlan(room.get, editionSale("sale_e9", 1)), { ok: false, reason: "conflict" });
+  assert.equal(appendSalePlan(room.get, editionSale("sale_e2", 2)).ok, true);
+  // No such track, or an editions key that can't be read: never sold blind.
+  assert.deepEqual(appendSalePlan(storeOf({}).get, editionSale("sale_e1", 1)), { ok: false, reason: "conflict" });
+  assert.deepEqual(appendSalePlan(storeOf({ [EDITIONS("proj_1")]: "{nope" }).get, editionSale("sale_e1", 1)), {
+    ok: false,
+    reason: "unreadable",
+  });
 });
 
 test("appendBidPlan / appendSupportPlan: a row already stored (another tab) is a conflict", () => {
@@ -330,4 +362,33 @@ test("parseStored: absent, JSON and not-JSON", () => {
   assert.deepEqual(parseStored(null), { value: undefined, unreadable: false });
   assert.deepEqual(parseStored("[1]"), { value: [1], unreadable: false });
   assert.deepEqual(parseStored("{x"), { value: undefined, unreadable: true });
+});
+
+test("the journey and business-plan writers refuse a key they couldn't read, and leave it as it is (R2 minor)", async () => {
+  const { writeJourney } = await import("../../.tmp-test/lib/manual/journey-store.js");
+  const { writeBusinessPlan } = await import("../../.tmp-test/lib/manual/business-plan-store.js");
+  const map = new Map();
+  const prev = globalThis.window;
+  const w = new EventTarget();
+  w.localStorage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)) };
+  globalThis.window = w;
+  try {
+    const journey = { v: 1, activities: [] };
+    const plan = { v: 1, projectId: "proj_1", current: 0, versions: [] };
+    assert.equal(writeJourney("proj_1", journey).ok, true, "an absent key is written");
+    assert.equal(writeBusinessPlan("proj_1", plan).ok, true);
+    map.set("ideeza:project:journey:proj_1", "{nope");
+    map.set("ideeza:project:bizplan:proj_1", "{nope");
+    assert.equal(writeJourney("proj_1", journey).ok, false);
+    assert.equal(writeBusinessPlan("proj_1", plan).ok, false);
+    assert.equal(map.get("ideeza:project:journey:proj_1"), "{nope");
+    assert.equal(map.get("ideeza:project:bizplan:proj_1"), "{nope");
+    // JSON that isn't the store's shape is unreadable too: a plan whose version it can't read.
+    map.set("ideeza:project:bizplan:proj_1", JSON.stringify({ v: 9 }));
+    assert.equal(writeBusinessPlan("proj_1", plan).ok, false);
+    map.set("ideeza:project:journey:proj_1", JSON.stringify([1, 2]));
+    assert.equal(writeJourney("proj_1", journey).ok, false);
+  } finally {
+    globalThis.window = prev;
+  }
 });

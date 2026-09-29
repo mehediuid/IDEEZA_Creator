@@ -127,12 +127,18 @@ function saleIn(v: unknown): Sale | null {
   };
 }
 
+/** One key per thing that sells once: a Main listing, or one serial of an edition track. */
+function unitOf(s: Sale): string {
+  return s.item.nft === "main" ? `main:${s.listingId}` : `edition:${s.item.trackId}:${s.item.serial}`;
+}
+
 /** Every stored sale, malformed rows dropped. A Main NFT sells once per
- *  listing (C11): when more than one sale names the same **Main**
- *  `listingId`, the earliest (by `at`) wins and the rest are dropped — a
- *  storage race must never mint the token twice. An edition track's
- *  `listingId` (its `EditionTrack.id`) may carry many sales, one per unit
- *  sold, up to its supply (enforced by `makeSale`'s caller, not here). */
+ *  listing (C11), and an edition unit once per serial: when more than one
+ *  sale names the same **Main** `listingId`, or the same track and serial,
+ *  the earliest (by `at`) wins and the rest are dropped — a storage race must
+ *  never mint a token twice. An edition track's `listingId` (its
+ *  `EditionTrack.id`) carries many sales, one per unit sold; its supply is
+ *  checked when a sale is appended (`appendSalePlan`), where it's known. */
 export function normalizeSales(v: unknown): Sale[] {
   if (!Array.isArray(v)) return [];
   const rows: Sale[] = [];
@@ -140,13 +146,12 @@ export function normalizeSales(v: unknown): Sale[] {
     const s = saleIn(raw);
     if (s) rows.push(s);
   }
-  const earliestMain = new Map<string, Sale>();
+  const earliest = new Map<string, Sale>();
   for (const s of rows) {
-    if (s.item.nft !== "main") continue;
-    const cur = earliestMain.get(s.listingId);
-    if (!cur || s.at < cur.at) earliestMain.set(s.listingId, s);
+    const cur = earliest.get(unitOf(s));
+    if (!cur || s.at < cur.at) earliest.set(unitOf(s), s);
   }
-  return rows.filter((s) => s.item.nft !== "main" || earliestMain.get(s.listingId) === s);
+  return rows.filter((s) => earliest.get(unitOf(s)) === s);
 }
 
 export function normalizeBids(v: unknown): Bid[] {
@@ -189,14 +194,26 @@ export function mainSalesOf(projectId: string, sales: Sale[]): Sale[] {
 
 /** What one demo buyer holds of a project's Main NFT — their summed
  *  `sharePct` over every Main sale to them, and the sales themselves
- *  (P2-MARKETPLACE-18's "in {n} purchases"). `null` when they hold nothing. */
+ *  (P2-MARKETPLACE-18's "in {n} purchases"). `null` when they hold nothing.
+ *
+ *  With `opts.productId` it answers for that one product's files (R5-20):
+ *  an edition NFT of it is a holding too, listed in `editions` — `sales` and
+ *  `sharePct` stay the Main share. Without it `editions` is always []. */
 export function holdingOf(
   projectId: string,
   buyerId: DemoBuyerId,
   sales: Sale[],
-): { sharePct: number; sales: Sale[] } | null {
+  opts: { productId?: string } = {},
+): { sharePct: number; sales: Sale[]; editions: Sale[] } | null {
   const mine = mainSalesOf(projectId, sales).filter((s) => s.buyerId === buyerId);
-  if (!mine.length) return null;
+  const productId = opts.productId;
+  const editions =
+    productId === undefined
+      ? []
+      : sales.filter(
+          (s) => s.projectId === projectId && s.buyerId === buyerId && s.item.nft !== "main" && s.item.productId === productId,
+        );
+  if (!mine.length && !editions.length) return null;
   const sharePct = mine.reduce((sum, s) => sum + (s.item.nft === "main" ? s.item.sharePct : 0), 0);
-  return { sharePct, sales: mine };
+  return { sharePct, sales: mine, editions };
 }

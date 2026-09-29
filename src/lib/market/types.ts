@@ -73,7 +73,8 @@ export type ListingView =
   /** No onMarket (C5). */
   | { kind: "live"; listing: Listing; auction: AuctionState | null }
   | { kind: "paused"; listing: Listing; changed: string[] }
-  | { kind: "ended"; listing: Listing; why: "removed" | "noBids" }
+  /** `unpaid`: closed with bids, none of which could be paid (the Close skipped them all). */
+  | { kind: "ended"; listing: Listing; why: "removed" | "noBids"; unpaid?: true }
   | { kind: "sold"; listing: Listing; sale: Sale };
 
 export type EditionKind = "physical" | "virtual";

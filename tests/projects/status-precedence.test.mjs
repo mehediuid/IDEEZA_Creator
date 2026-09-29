@@ -353,3 +353,67 @@ test("projectView · the log merges the mint, listing, market, editions and busi
   assert.deepEqual(listed.terms, { type: "buyNow", token: "MATIC", price: "0.05" });
   assert.equal(v.log.find((e) => e.kind === "payoutChanged").toLabel, "Demo account 2");
 });
+
+// ── final fix wave (R1-1): a paused listing's share is reserved too ──
+
+test("a paused listing reserves its Percent Selling, like a live one", () => {
+  const live = sum(project({ mint: lazy }), SELL, market({ listings: [listing({ percentSelling: 60 })] }));
+  assert.equal(live.ownership.reserved, 60);
+  const paused = listing({ percentSelling: 60, status: "paused", pause: { at: NOW - MIN, changes: ["rename"] } });
+  const s = sum(project({ mint: lazy }), SELL, market({ listings: [paused] }));
+  assert.equal(s.ownership.reserved, 60);
+  assert.equal(s.ownership.sellable, 40);
+  // A removed one reserves nothing.
+  const removed = sum(project({ mint: lazy }), SELL, market({ listings: [listing({ percentSelling: 60, status: "removed", endedAt: NOW - MIN })] }));
+  assert.equal(removed.ownership.reserved, 0);
+});
+
+test("canCtxOf(…, { productId }): an edition of that product lets its holder download (R5-20)", () => {
+  const edition = sale({
+    id: "sale_e", listingId: "ed_a", buyerId: "buyer-leo",
+    item: { nft: "physical", trackId: "ed_a", productId: "p1", productName: "RC Car", use: "private", tier: "regular", serial: 1 },
+  });
+  const v = view(project({ mint: lazy }), SELL, market({ listings: [listing()], sales: [edition] }));
+  const leo = { kind: "demo-buyer", buyerId: "buyer-leo" };
+  assert.equal(canCtxOf(v, leo).holding, false, "project-wide, only a Main share holds");
+  assert.equal(canCtxOf(v, leo, { productId: "p1" }).holding, true);
+  assert.equal(canCtxOf(v, leo, { productId: "p2" }).holding, false);
+});
+
+test("statusLineOf · an auction closed with bids nobody could pay says so, not \"no bids\"", () => {
+  const closed = auction({
+    status: "closed", endedAt: NOW - 60 * MIN, endsAt: NOW - 90 * MIN,
+    events: [{ kind: "listed", at: LISTED }, { kind: "closed", at: NOW - 60 * MIN }],
+  });
+  const m = market({ listings: [closed], bids: [bid("0.04")] });
+  assert.equal(sum(project({ mint: lazy }), SELL, m).statusLine, "Lazy minted Sep 22 · auction ended — no bid could be paid");
+  const log = view(project({ mint: lazy }), SELL, m).log.find((e) => e.kind === "listing" && e.event.kind === "closed");
+  assert.equal(log.terms.bids, 1);
+});
+
+test("deleteFactsOf: an auction past its end, not yet closed, is marked ended", () => {
+  const p = project({ mint: lazy });
+  assert.deepEqual(view(p, SELL, market({ listings: [auction()] })).deleteFacts.auction, { endsAt: NOW + 134 * MIN });
+  assert.deepEqual(view(p, SELL, market({ listings: [auction({ endsAt: NOW - MIN })] })).deleteFacts.auction, {
+    endsAt: NOW - MIN,
+    ended: true,
+  });
+});
+
+test("deleteFactsOf: a listed edition track blocks delete as listed, even with Main removed (R2 minor)", () => {
+  const track = (listing) => ({
+    id: "ed_a", projectId: "proj_car", productId: "p1", kind: "physical", use: "private", supply: { total: 5 },
+    createdAt: LISTED, lazy: true, listing, demo: true,
+  });
+  const removed = listing({ status: "removed", endedAt: NOW - MIN });
+  const terms = { token: "MATIC", regular: "0.01", extended: "0.02", royaltyPct: 5, listedAt: LISTED, updatedAt: LISTED };
+  const p = project({ mint: lazy });
+  const facts = view(p, SELL, market({ listings: [removed] }), { editions: [track(terms)] }).deleteFacts;
+  assert.equal(facts.editionsListed, 1);
+  assert.deepEqual(deleteBlockOf(facts), {
+    id: "listed",
+    reason: "A listed project can't be deleted.",
+    detail: "Take its NFTs off the marketplace first — Remove listing is on each product's page.",
+  });
+  assert.equal(deleteBlockOf(view(p, SELL, market({ listings: [removed] }), { editions: [track(null)] }).deleteFacts), null);
+});

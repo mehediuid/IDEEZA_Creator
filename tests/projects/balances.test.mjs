@@ -160,3 +160,17 @@ test("affordOf: ok when every line is covered", () => {
   const charge = { network: "baseSepolia", lines: [{ coin: "IDZ", amount: "4" }, { coin: "ETH", amount: "0.00104" }] };
   assert.deepEqual(affordOf("maker-1", charge, ctx(undefined)), { ok: true });
 });
+
+test("heldBy(…, { releasing }): the listing a purchase ends holds nothing of its buyer (R1-3)", () => {
+  const market = {
+    ...EMPTY_MARKET,
+    listings: [liveAuction()],
+    bids: [{ id: "bid_1", listingId: "lst_auction", bidderId: "buyer-mira", amount: "0.04", token: "MATIC", at: NOW - 2000 }],
+  };
+  assert.deepEqual(heldBy("buyer-mira", { market, now: NOW }, { releasing: "lst_auction" }).native, {});
+  assert.equal(availableOf("buyer-mira", "MATIC", "mumbai", ctx(undefined, market), { releasing: "lst_auction" }), "10");
+  assert.equal(balancesOf("buyer-mira", ctx(undefined, market), { releasing: "lst_other" }).native.mumbai.MATIC, "9.96");
+  const charge = { network: "mumbai", lines: [{ coin: "MATIC", amount: "10" }] };
+  assert.equal(affordOf("buyer-mira", charge, ctx(undefined, market)).ok, false);
+  assert.equal(affordOf("buyer-mira", charge, ctx(undefined, market), { releasing: "lst_auction" }).ok, true);
+});

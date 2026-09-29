@@ -319,3 +319,8 @@ test("firstVersions: five versions per project across lineages, then Show all (Â
   assert.deepEqual(firstVersions(groups, 20), groups);
   assert.deepEqual(firstVersions(groups, 4).map((g) => g.key), ["a"]);
 });
+
+test("the log's close line says no bid could be paid when the auction had bids", () => {
+  const [line] = logLinesOf([{ kind: "listing", at: 7, event: { kind: "closed", at: 7 }, terms: { type: "auction", token: "ETH", bids: 2 } }]);
+  assert.equal(line.title, "Auction ended â€” no bid could be paid");
+});

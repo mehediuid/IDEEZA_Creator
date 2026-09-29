@@ -373,3 +373,10 @@ test("benefit durations round-trip, and cleanBenefits trims and caps (P2-CUSTOME
   assert.equal(clean.length, 5);
   assert.equal(clean[0].name, "Perk 0");
 });
+
+test("an auction closed with bids nobody could pay: the card and the announcement say so", () => {
+  const closedL = auction({ status: "closed", endsAt: NOW - HOUR, endedAt: NOW });
+  const v = { kind: "ended", listing: closedL, why: "noBids", unpaid: true };
+  assert.match(flow.marketplaceCardOf(v, { bids: [], now: NOW }).when, /^The auction ended on Sep 28, 2026 — no bid could be paid\.$/);
+  assert.equal(flow.closedAnnouncement({ kind: "noBids", unpaid: true }, closedL), "Auction closed — no bid could be paid");
+});

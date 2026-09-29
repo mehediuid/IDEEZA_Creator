@@ -7,7 +7,7 @@
 
 import type { Intent, Network } from "../brief/types";
 import { ROYALTY_MAX, ROYALTY_MIN } from "../brief/types";
-import { toMicros } from "../wallet/money";
+import { normalizeAmount, toMicros } from "../wallet/money";
 import type { EditionKind, EditionTrack, EditionUse, Listing, ListingView, Sale } from "./types";
 import { randomId } from "./sales";
 
@@ -114,8 +114,11 @@ export function listGate(mainView: ListingView, projectName: string): EditionGat
 /** Pausing or removing the Main listing hides or removes its editions
  *  (TABS C19-3): hidden while Main has never been listed, is paused, or was
  *  explicitly removed. An auction that simply lapsed with no bids, or a
- *  Main sale, leaves editions exactly as they were. */
-export function editionsHiddenWith(mainView: ListingView): boolean {
+ *  Main sale, leaves editions exactly as they were — unless that sale sold
+ *  the project in full: `locked` (`view.lock !== null`) hides them all, since
+ *  the maker has nothing left to sell them from (R1-2). */
+export function editionsHiddenWith(mainView: ListingView, locked = false): boolean {
+  if (locked) return true;
   if (mainView.kind === "none" || mainView.kind === "paused") return true;
   return mainView.kind === "ended" && mainView.why === "removed";
 }
@@ -218,17 +221,22 @@ function mapTrack(tracks: EditionTrack[], trackId: string, f: (t: EditionTrack) 
   return tracks.map((t, i) => (i === at ? next : t));
 }
 
+/** The terms with each price in its one written form (§3.1: "0.010" → "0.01"). */
+function termsOf(terms: TrackTerms): TrackTerms {
+  return { ...terms, regular: normalizeAmount(terms.regular) ?? terms.regular, extended: normalizeAmount(terms.extended) ?? terms.extended };
+}
+
 /** P2-TABS-26: an unlisted track goes on sale at `terms`. */
 export function listTrack(tracks: EditionTrack[], trackId: string, terms: TrackTerms, now: number): EditionTrack[] | null {
   return mapTrack(tracks, trackId, (t) =>
-    t.listing ? null : { ...t, listing: { ...terms, listedAt: now, updatedAt: now } },
+    t.listing ? null : { ...t, listing: { ...termsOf(terms), listedAt: now, updatedAt: now } },
   );
 }
 
 /** P2-TABS-27 Edit: a listed track's token, prices and royalties; use and supply stay. */
 export function editTrackListing(tracks: EditionTrack[], trackId: string, terms: TrackTerms, now: number): EditionTrack[] | null {
   return mapTrack(tracks, trackId, (t) =>
-    t.listing ? { ...t, listing: { ...terms, listedAt: t.listing.listedAt, updatedAt: now } } : null,
+    t.listing ? { ...t, listing: { ...termsOf(terms), listedAt: t.listing.listedAt, updatedAt: now } } : null,
   );
 }
 
@@ -344,13 +352,15 @@ export function editionSummaryOf(
 }
 
 /** A buyer's offers (spec §2.4, TABS T2): every listed track whose Main listing
- *  doesn't hide it, grouped by product in the products' order. */
+ *  doesn't hide it, grouped by product in the products' order. None while the
+ *  project is `locked` (sold in full, R1-2). */
 export function editionOffersOf(
   products: { id: string; name: string }[],
   tracks: EditionTrack[],
   mainView: ListingView,
+  locked = false,
 ): { productId: string; name: string; tracks: EditionTrack[] }[] {
-  if (editionsHiddenWith(mainView)) return [];
+  if (editionsHiddenWith(mainView, locked)) return [];
   const order: Record<EditionKind, number> = { physical: 0, virtual: 1 };
   const useOrder: Record<EditionUse, number> = { private: 0, commercial: 1 };
   return products

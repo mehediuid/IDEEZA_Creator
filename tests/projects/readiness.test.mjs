@@ -189,11 +189,14 @@ test("edition reads only its own product — another product's missing video doe
   assert.deepEqual(r.products.map((p) => p.productId), ["a"]);
 });
 
-test("edition with no scoped product set reads as nothing to check (defensive default)", () => {
+test("edition with no scoped product fails closed: nothing to list is never ready (R2 minor)", () => {
   const f = facts({ products: [product("a", "A")], videos: {} });
   const r = readinessOf(f, "edition");
   assert.equal(r.counts.total, 0);
-  assert.equal(r.ok, true);
+  assert.equal(r.ok, false);
+  const videos = r.rules.find((x) => x.id === "videos");
+  assert.equal(videos.ok, false);
+  assert.equal(videos.reason, "Choose which product these NFTs are for.");
 });
 
 // ─────────────────────────── gateBlocker ───────────────────────

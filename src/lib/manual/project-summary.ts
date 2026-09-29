@@ -388,7 +388,9 @@ export function statusLineOf(status: ProjectStatus, f: StatusLineFacts): string 
     return licence ? `${phrase} · given to the community under ${licence.label}` : `${phrase} · given to the community`;
   }
   if (listing.kind === "ended") {
-    if (listing.why === "noBids") return `${phrase} · auction ended with no bids`;
+    if (listing.why === "noBids") {
+      return listing.unpaid ? `${phrase} · auction ended — no bid could be paid` : `${phrase} · auction ended with no bids`;
+    }
     const removed = listing.listing.events.filter((e) => e.kind === "removed").map((e) => e.at);
     const at = listing.listing.endedAt ?? (removed.length ? Math.max(...removed) : listing.listing.updatedAt);
     return `${phrase} · removed from the marketplace ${formatShortDate(at, f.now)}`;
@@ -490,7 +492,8 @@ export function projectSummary(
     createdAt: p.createdAt,
     contributors: p.contributors ?? [],
     sales,
-    listedPercent: listing.kind === "live" ? listing.listing.percentSelling : 0,
+    // A paused listing still holds its share: relisting it must not find it given away (R1-1).
+    listedPercent: listing.kind === "live" || listing.kind === "paused" ? listing.listing.percentSelling : 0,
   });
   const lock = lockOf(ownership, sales);
   const soldOwner = soldPartsOf(customers, "owner", ctx.now);

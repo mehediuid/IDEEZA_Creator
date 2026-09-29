@@ -102,6 +102,9 @@ export type WalletRequest = {
   charge?: Charge;
   /** A required signer (changePayout). */
   account?: AccountIndex;
+  /** A purchase that ends this listing (an auction's Buy now): the buyer's own
+   *  held top bid on it pays toward the charge (R1-3). */
+  releases?: string;
 };
 
 export type RequestPhase =

@@ -129,9 +129,7 @@ export function openInEditorOf(p: ManualProject, rowId: string): { label: string
  *  `editorOpened[rowId]`, and `lastOpened` as the legacy-URL resolver's
  *  input. At most one write per (product, step) per minute, and never
  *  touches `updatedAt` — opening a step changes nothing in the project.
- *  Replaces `stampOpened`'s call site once the provider (T09) switches
- *  `touchOpened` over to it; `stampOpened` stays in `project-storage.ts`
- *  until then. */
+ *  The provider's `touchOpened` writes it. */
 export function stampEditorOpened(
   p: ManualProject,
   rowId: string,
@@ -149,7 +147,7 @@ export function stampEditorOpened(
 
 // ───────────────────────────── naming ─────────────────────────────
 
-/** Generalises `renameHeadline` (COR-95) to any row (P2-EDITOR-6):
+/** The headline rename (COR-95), for any row (P2-EDITOR-6):
  *  - the virtual "p1" (no stored rows) writes `productName`;
  *  - renaming the first stored row also moves the headline while the two
  *    still agree, so the list never goes on calling it by its old name;

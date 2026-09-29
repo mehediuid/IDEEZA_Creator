@@ -9,29 +9,14 @@
 // modules have finished loading — the same tolerated pattern project-read.ts
 // documents for its own cycle with projects.tsx.
 
-import type { ManualProject, ProjectStep } from "./projects";
 import { briefDraftKey } from "../brief/types";
 import { editorKeysOf } from "./editor-scope";
 
 // ── lastOpened (COR-91) ─────────────────────────────────────────────────
 
-/** At most one lastOpened write per step per minute (§5.1.10). */
+/** At most one lastOpened write per (product, step) per minute (§5.1.10) —
+ *  `stampEditorOpened` (editor-scope.ts) reads it. */
 export const OPENED_EVERY_MS = 60_000;
-
-/** The project with `step` recorded as the editor step last opened — Open in
- *  editor's resume target. Returns the same object when that step was already
- *  stamped under a minute ago, so the caller can skip the write. Never touches
- *  `updatedAt`: opening a step changes nothing in the project.
- *
- *  @deprecated Superseded by `editor-scope.ts`'s `stampEditorOpened`, which
- *  is per-product (P2-EDITOR-7). Kept, unchanged, until the provider's
- *  `touchOpened` (projects.tsx, T09) switches its one call site over — this
- *  file can't make that edit itself (out of this task's file list). */
-export function stampOpened(p: ManualProject, step: ProjectStep, now: number): ManualProject {
-  const last = p.lastOpened;
-  if (last && last.step === step && now - last.at < OPENED_EVERY_MS) return p;
-  return { ...p, lastOpened: { step, at: now } };
-}
 
 // ── the delete sweep (COR-92, §5.1.9, extended P2 §3.2/§3.4) ────────────
 
@@ -72,23 +57,10 @@ export function projectStorageKeys(id: string, rowIds: readonly string[]): strin
 
 export type KeyStore = Pick<Storage, "getItem" | "removeItem">;
 
-/** Removes the project's keys from `store` and returns the ones it removed.
- *  A key the browser refuses to remove is skipped, never thrown — the rest
- *  still go.
- *
- *  The 2-arg form sweeps only the per-project keys (no `rowIds` known), kept
- *  for the provider's current call site until it passes the project's row
- *  ids through (T09); prefer the 3-arg form, which is the full P2 sweep. */
-export function sweepProjectKeys(id: string, store: KeyStore): string[];
-export function sweepProjectKeys(id: string, rowIds: readonly string[], store: KeyStore): string[];
-export function sweepProjectKeys(
-  id: string,
-  rowIdsOrStore: readonly string[] | KeyStore,
-  maybeStore?: KeyStore,
-): string[] {
-  const [rowIds, store]: [readonly string[], KeyStore] = Array.isArray(rowIdsOrStore)
-    ? [rowIdsOrStore, maybeStore as KeyStore]
-    : [[], rowIdsOrStore as KeyStore];
+/** Removes the project's keys — every row's editor keys among them — from
+ *  `store` and returns the ones it removed. A key the browser refuses to
+ *  remove is skipped, never thrown — the rest still go. */
+export function sweepProjectKeys(id: string, rowIds: readonly string[], store: KeyStore): string[] {
   const removed: string[] = [];
   for (const key of projectStorageKeys(id, rowIds)) {
     try {

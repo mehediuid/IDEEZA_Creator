@@ -446,3 +446,39 @@ test("a normalized Phase 2 record is stable: the next load hands back the same o
   assert.equal(normalizeProjects(once)[0], once[0]);
   assert.deepEqual(normalizeProjects(JSON.parse(JSON.stringify(once))), once);
 });
+
+// ── final fix wave: row ids, the mint write, another tab's projects ──
+
+test("a stored or written row id holding \":\" is replaced — a key built from it would break (§3.1)", () => {
+  const [p] = normalizeProjects([legacy({ products: [{ id: "a:b", name: "RC Car", description: "" }, { id: "prd_ok", name: "Remote", description: "" }] })]);
+  assert.deepEqual(p.products.map((r) => r.id), ["p1", "prd_ok"]);
+  const rows = keepProductIds([{ id: "x:y", name: "RC Car", description: "" }], [{ id: "prd_held", name: "RC Car", description: "" }]);
+  assert.deepEqual(rows.map((r) => r.id), ["prd_held"]);
+});
+
+const MINT_RECORD = {
+  v: 1, demo: true, type: "lazy", network: "mumbai", collection: "Cars", tokenId: 1,
+  wallet: { account: 1, address: "0x955de749945de5b6935de423925de290995ded95" }, at: T,
+};
+
+test("withMint: the list setMint writes at once — the record as a reload reads it, updatedAt bumped", async () => {
+  const { withMint } = await import("../../.tmp-test/lib/manual/projects.js");
+  const list = [legacy(), legacy({ id: "proj_b", slug: "b" })];
+  const next = withMint(list, "proj_b", MINT_RECORD, T + 5);
+  assert.deepEqual(next[1].mint, MINT_RECORD);
+  assert.equal(next[1].updatedAt, T + 5);
+  assert.equal(next[0], list[0], "the other projects are untouched");
+  assert.equal(withMint(list, "proj_gone", MINT_RECORD, T + 5), null);
+  assert.equal(withMint(list, "proj_b", { ...MINT_RECORD, tokenId: "1" }, T + 5), null);
+});
+
+test("projectsFromStorage: another tab's stored list is adopted; the same list, or one that can't be read, keeps this tab's", async () => {
+  const { projectsFromStorage } = await import("../../.tmp-test/lib/manual/projects.js");
+  const cur = normalizeProjects([legacy()]);
+  assert.equal(projectsFromStorage(cur, JSON.stringify(cur)), cur, "nothing changed: the same array, no render");
+  const theirs = [...cur, legacy({ id: "proj_new", slug: "new", name: "New" })];
+  const adopted = projectsFromStorage(cur, JSON.stringify(theirs));
+  assert.deepEqual(adopted.map((p) => p.id), ["proj_a", "proj_new"]);
+  assert.equal(projectsFromStorage(cur, "{not json"), cur, "a corrupt key is never adopted");
+  assert.deepEqual(projectsFromStorage(cur, null), [], "the key was removed");
+});

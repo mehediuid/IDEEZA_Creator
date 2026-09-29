@@ -329,7 +329,7 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
       const when =
         view.why === "removed"
           ? `Removed on ${formatDate(l.endedAt ?? l.updatedAt)}.`
-          : `The auction ended on ${formatDate(l.endsAt ?? l.endedAt ?? l.updatedAt)} with no bids.`;
+          : `The auction ended on ${formatDate(l.endsAt ?? l.endedAt ?? l.updatedAt)}${view.unpaid ? " — no bid could be paid" : " with no bids"}.`;
       return { kind: "ended", lead: "Not on the marketplace.", when, terms: `Your last terms: ${termsLineOf(l)}.` };
     }
     case "live": {
@@ -470,7 +470,7 @@ export function closedAnnouncement(result: SettleResult, l: Listing): string {
   if (result.kind === "sale") {
     return `Auction closed · sold to ${buyerLabel(result.bid.bidderId)} for ${formatAmount(result.bid.amount, l.token)}`;
   }
-  return "Auction closed with no bids";
+  return result.kind === "noBids" && result.unpaid ? "Auction closed — no bid could be paid" : "Auction closed with no bids";
 }
 
 // ─────────────────────────── the Utility NFT pill (P2-CUSTOMERS-17) ───────────────────────────

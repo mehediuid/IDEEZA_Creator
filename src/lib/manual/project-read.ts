@@ -21,7 +21,7 @@ import { qtyOf, unitName } from "../spec/bodies";
 import { specKey } from "../spec/derive";
 import { asConceptSummary } from "../spec/hints";
 import type { ResolvedSpec } from "../spec/types";
-import type { ManualProduct, ManualProject, ProjectBuildRef, ProjectStep } from "./projects";
+import type { ManualProduct, ManualProject, ProjectBuildRef } from "./projects";
 import { commerceOf, type ProjectCommerce, type StoredDraft } from "../brief/project-brief";
 import type { VideoJob } from "../video/jobs";
 import type { ProjectVideos } from "../video/types";
@@ -430,7 +430,8 @@ export function lineageProjectOf(job: BuildJob, all: BuildJob[], projects: Manua
 /** A listing's terms as the log names them ("Listed · Buy now · 0.05 MATIC", "Auction started ·
  *  ends Oct 3, 2026 · 2:30 PM"). `projectLogOf` attaches them to each listing event; a listing
  *  event built elsewhere (`listingLogOf` alone) has none and reads its generic line. */
-export type ListingTerms = { type: Listing["type"]; token: Token; price?: Amount; endsAt?: number };
+/** `bids`: how many bids an auction took — a close with some means none could be paid. */
+export type ListingTerms = { type: Listing["type"]; token: Token; price?: Amount; endsAt?: number; bids?: number };
 
 /** One event of the rail's Project log (Phase 2 spec §3.3.5). T01 fixed the union; T10 adds the
  *  optional `terms` on a listing event (above) and produces every kind in `projectLogOf`. */
@@ -535,11 +536,13 @@ export function projectLogOf(p: ManualProject, brief: BriefState | null, facts: 
   const termsOf = new Map<ListingEvent, ListingTerms>();
   for (const l of market.listings) {
     if (l.projectId !== p.id) continue;
+    const bids = l.type === "auction" ? market.bids.filter((b) => b.listingId === l.id).length : 0;
     const terms: ListingTerms = {
       type: l.type,
       token: l.token,
       ...(l.type === "buyNow" && l.price ? { price: l.price } : null),
       ...(typeof l.endsAt === "number" ? { endsAt: l.endsAt } : null),
+      ...(bids ? { bids } : null),
     };
     for (const e of l.events) termsOf.set(e, terms);
   }
@@ -585,13 +588,6 @@ export function coverOf(p: ManualProject, refs: BuildRef[]): string | null {
     if (img) return img;
   }
   return null;
-}
-
-/** Open in editor's target: the editor step last opened, else PCB (COR-12,
- *  COR-64). The Brief is never it — the Brief has its own door in the header. */
-export function resumeStepOf(p: ManualProject): ProjectStep {
-  const step = p.lastOpened?.step;
-  return step && step !== "brief" ? step : "pcb";
 }
 
 /** The concept a booked product was drawn from, as its chat still has it —
@@ -674,11 +670,15 @@ export type ProjectView = {
 
 /** §3.8.4's facts (errata #1: `sold.buyers` is the distinct Main buyers). An auction blocks while
  *  it is live — running, or ended and not yet closed; a Buy-now listing while it is live or
- *  paused. Edition listings are live only with Main, so Main's decides. */
-export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "ownership" | "marketUnreadable">): DeleteFacts {
+ *  paused; and an edition track while it's listed, whatever Main's state (its Remove listing is
+ *  on the product page). `editions` is optional so a caller without the tracks still compiles. */
+export function deleteFactsOf(
+  view: Pick<ProjectView, "listing" | "sales" | "ownership" | "marketUnreadable"> & Partial<Pick<ProjectView, "editions">>,
+): DeleteFacts {
   const main = view.sales.filter((s) => s.item.nft === "main");
   const listing = view.listing;
   const live = listing.kind === "live" ? listing.listing : null;
+  const editionsListed = (view.editions ?? []).filter((t) => t.listing !== null).length;
   return {
     marketUnreadable: view.marketUnreadable,
     sold: {
@@ -686,17 +686,23 @@ export function deleteFactsOf(view: Pick<ProjectView, "listing" | "sales" | "own
       editions: view.sales.length - main.length,
       buyers: new Set(main.map((s) => s.buyerId)).size,
     },
-    auction: live && live.type === "auction" ? { endsAt: live.endsAt ?? live.listedAt } : null,
+    auction:
+      live && live.type === "auction"
+        ? { endsAt: live.endsAt ?? live.listedAt, ...(listing.kind === "live" && listing.auction?.phase === "ended" ? { ended: true } : null) }
+        : null,
     listed: (live !== null && live.type === "buyNow") || listing.kind === "paused",
+    ...(editionsListed ? { editionsListed } : null),
     otherOwners: otherOwnersOf(view.ownership),
   };
 }
 
 /** The one `CanContext` the page passes to every `can()` (§3.7). `holding` is true only for a
- *  demo buyer who owns part of the Main NFT. */
+ *  demo buyer who owns part of the Main NFT — or, with `opts.productId` (the product page's
+ *  downloads, R5-20), an edition NFT of that product. */
 export function canCtxOf(
   view: Pick<ProjectView, "summary" | "mint" | "listing" | "ownership" | "lock" | "sales">,
   viewer?: Viewer,
+  opts: { productId?: string } = {},
 ): CanContext {
   const listing = view.listing;
   const auction = listing.kind === "live" ? listing.auction?.phase : undefined;
@@ -707,7 +713,7 @@ export function canCtxOf(
     ...(auction ? { auction } : null),
     creatorPct: view.ownership.maker,
     listingLive: listing.kind === "live",
-    holding: viewer?.kind === "demo-buyer" ? holdingOf(view.summary.id, viewer.buyerId, view.sales) !== null : false,
+    holding: viewer?.kind === "demo-buyer" ? holdingOf(view.summary.id, viewer.buyerId, view.sales, opts) !== null : false,
     locked: view.lock !== null,
   };
 }

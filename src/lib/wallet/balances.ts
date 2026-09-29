@@ -17,6 +17,11 @@ export type Balances = { idz: Amount; native: Partial<Record<Network, Partial<Re
 
 export type BalanceCtx = { wallet: DemoWallet | undefined; market: MarketData; now: number };
 
+/** `releasing`: the listing a purchase ends (an auction's own Buy now), whose
+ *  hold of its buyer's top bid comes back to pay it (R1-3) — as `freeMicrosFor`
+ *  counts a bidder's own hold back in for a new bid. */
+export type HoldOpts = { releasing?: string };
+
 function cloneBalances(b: Balances): Balances {
   const native: Balances["native"] = {};
   for (const net of Object.keys(b.native) as Network[]) native[net] = { ...b.native[net] };
@@ -82,11 +87,11 @@ function topBidOf(bids: readonly Bid[]): Bid | null {
  * What `id` has tied up in live auctions: its current top bid on each one, as
  * a real escrow would hold it. An outbid bidder holds nothing.
  */
-export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number }): Balances {
+export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number }, opts: HoldOpts = {}): Balances {
   const held: Balances = { idz: "0", native: {} };
   if (id.startsWith("maker-")) return held; // only buyers bid
   for (const listing of ctx.market.listings) {
-    if (!isLiveAuction(listing, ctx.now)) continue;
+    if (!isLiveAuction(listing, ctx.now) || listing.id === opts.releasing) continue;
     // An auction sold through Buy now is over: its bids no longer hold funds.
     if (ctx.market.sales.some((s) => s.listingId === listing.id)) continue;
     const bids = ctx.market.bids.filter((b) => b.listingId === listing.id);
@@ -102,7 +107,7 @@ export function heldBy(id: IdentityId, ctx: { market: MarketData; now: number })
  * auction's top bid holds. Never stored — every read walks the wallet and the
  * market fresh (C4).
  */
-export function balancesOf(id: IdentityId, ctx: BalanceCtx): Balances {
+export function balancesOf(id: IdentityId, ctx: BalanceCtx, opts: HoldOpts = {}): Balances {
   const bal = seedBalancesOf(id);
   for (const entry of ctx.wallet?.activity ?? []) {
     if (entry.identity !== id || !entry.charge) continue;
@@ -118,21 +123,21 @@ export function balancesOf(id: IdentityId, ctx: BalanceCtx): Balances {
       credit(bal, sale.token, sale.network, sale.payout);
     }
   }
-  apply(bal, heldBy(id, ctx), -1);
+  apply(bal, heldBy(id, ctx, opts), -1);
   return bal;
 }
 
 /** One coin's balance on one network, after every hold (the "available" figure a control checks). */
-export function availableOf(id: IdentityId, coin: Coin, network: Network, ctx: BalanceCtx): Amount {
-  const bal = balancesOf(id, ctx);
+export function availableOf(id: IdentityId, coin: Coin, network: Network, ctx: BalanceCtx, opts: HoldOpts = {}): Amount {
+  const bal = balancesOf(id, ctx, opts);
   return coin === "IDZ" ? bal.idz : (bal.native[network]?.[coin as Token] ?? "0");
 }
 
 export type AffordResult = { ok: true } | { ok: false; short: Coin; have: Amount; need: Amount };
 
 /** Can `id` cover every line of `charge` right now? The first short line wins. */
-export function affordOf(id: IdentityId, charge: Charge, ctx: BalanceCtx): AffordResult {
-  const bal = balancesOf(id, ctx);
+export function affordOf(id: IdentityId, charge: Charge, ctx: BalanceCtx, opts: HoldOpts = {}): AffordResult {
+  const bal = balancesOf(id, ctx, opts);
   for (const line of charge.lines) {
     const have = line.coin === "IDZ" ? bal.idz : (bal.native[charge.network]?.[line.coin as Token] ?? "0");
     if (compareAmounts(have, line.amount) < 0) return { ok: false, short: line.coin, have, need: line.amount };

@@ -259,3 +259,22 @@ test("mintProofRows: an onChain record's buyer rows have no owner facts", () => 
   const rows = mintProofRows(record, { owner: false });
   assert.deepEqual(rows.map((r) => r.key), ["mint", "token"]); // no wallet, no tx for a non-owner read
 });
+
+test("normalizeMintRecord keeps onChain.charge, which the log's \"paid\" note reads (R2 minor)", () => {
+  const charge = { network: "baseSepolia", lines: [{ coin: "IDZ", amount: "4" }, { coin: "ETH", amount: "0.00104" }] };
+  const raw = {
+    v: 1, demo: true, type: "instant", network: "baseSepolia", collection: "Test Collection", tokenId: 1,
+    wallet: { account: 1, address: demoAddress("maker-1") }, at: NOW,
+    onChain: { at: NOW, txHash: "0xabc", via: "instant", charge },
+  };
+  assert.deepEqual(normalizeMintRecord(raw).onChain, { at: NOW, txHash: "0xabc", via: "instant", charge });
+  const bad = normalizeMintRecord({ ...raw, onChain: { ...raw.onChain, charge: { network: "nowhere", lines: [] } } });
+  assert.deepEqual(bad.onChain, { at: NOW, txHash: "0xabc", via: "instant" });
+});
+
+test("payoutAddressOf: the mint record's payout wallet, else Demo account 1 (the default payout)", async () => {
+  const { payoutAddressOf } = await import("../../.tmp-test/lib/wallet/mint.js");
+  assert.equal(payoutAddressOf(null), demoAddress("maker-1"));
+  assert.equal(payoutAddressOf(undefined), demoAddress("maker-1"));
+  assert.equal(payoutAddressOf({ wallet: { account: 2, address: demoAddress("maker-2") } }), demoAddress("maker-2"));
+});

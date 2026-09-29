@@ -13,7 +13,6 @@ import {
   productRowsOf,
   productsOfProject,
   projectLogOf,
-  resumeStepOf,
   versionsOf,
 } from "../../.tmp-test/lib/manual/project-read.js";
 import { STATUS_WORD, projectStatus } from "../../.tmp-test/lib/manual/project-summary.js";
@@ -454,14 +453,6 @@ describe("coverOf (COR-96)", () => {
     // A product id the build doesn't have, and a build that isn't this project's.
     assert.equal(at({ buildId: "b-car-2", productId: "battery-charger" }), fallback);
     assert.equal(at({ buildId: "b-drone", productId: "primary" }, [...dropsOne.builds, ...four.builds]), fallback);
-  });
-});
-
-describe("resumeStepOf (COR-12)", () => {
-  it("resumes the editor step last opened, else PCB — never the Brief", () => {
-    assert.equal(resumeStepOf(legacyHand.project), "pcb");
-    assert.equal(resumeStepOf({ ...legacyHand.project, lastOpened: { step: "wiring", at: T } }), "wiring");
-    assert.equal(resumeStepOf({ ...legacyHand.project, lastOpened: { step: "brief", at: T } }), "pcb");
   });
 });
 

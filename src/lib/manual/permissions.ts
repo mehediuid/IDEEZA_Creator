@@ -246,8 +246,7 @@ function soldDetail(sold: DeleteFacts["sold"]): string {
 
 /**
  * The co-owner detail of the delete gate (P2-CONTRIB-14): the co-owners holding more
- * than 0 %, in the order given, or null when there are none. `otherOwnersDetail`
- * (ownership.ts, T05) reads this, so the copy has one home.
+ * than 0 %, in the order given, or null when there are none — the one home of this copy.
  * - one: "Ana Silva holds 30%. Change their role or remove them in Contributors first."
  * - two: "Ana Silva and Kofi Mensah hold 40% between them. Change their roles or remove them in Contributors first."
  * - more: "Ana Silva and 2 others hold 45% between them. Change their roles or remove them in Contributors first."
@@ -293,15 +292,19 @@ const DELETE_RULES: readonly DeleteRule[] = [
     applies: (f) => f.auction !== null,
     block: (f) => ({
       reason: "A project in an auction can't be deleted.",
-      detail: `Close the auction after it ends on ${formatDate(f.auction!.endsAt)}, in the Marketplace block.`,
+      detail: f.auction!.ended
+        ? `The auction ended on ${formatDate(f.auction!.endsAt)} — close it in the Marketplace block first.`
+        : `Close the auction after it ends on ${formatDate(f.auction!.endsAt)}, in the Marketplace block.`,
     }),
   },
   {
     id: "listed",
-    applies: (f) => f.listed,
-    block: () => ({
+    applies: (f) => f.listed || (f.editionsListed ?? 0) > 0,
+    block: (f) => ({
       reason: "A listed project can't be deleted.",
-      detail: "Remove the listing first — it's in the Marketplace block.",
+      detail: f.listed
+        ? "Remove the listing first — it's in the Marketplace block."
+        : "Take its NFTs off the marketplace first — Remove listing is on each product's page.",
     }),
   },
   {

@@ -2,7 +2,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { editGateOf, listingEditGate, lockOf } from "../../.tmp-test/lib/manual/edit-gate.js";
+import { editGateOf, listingEditGate, lockOf, projectLockOf } from "../../.tmp-test/lib/manual/edit-gate.js";
 
 const T = Date.UTC(2026, 8, 22, 9, 0);
 const DAY = 86_400_000;
@@ -211,5 +211,24 @@ describe("editGateOf", () => {
       auction: { phase: "ended", top: null, minNext: "0.04", msLeft: 0 },
     };
     assert.equal(editGateOf({ listing: view, lock: null }, "addProduct").reason, "Close the auction first, then change the project.");
+  });
+});
+
+// ─────────────────────────── projectLockOf: one derivation where no view exists ───────────────────────────
+
+describe("projectLockOf", () => {
+  const p = { id: "p1", createdAt: T, contributors: [] };
+  it("reads the project's own Main sales through ownershipOf + lockOf", () => {
+    assert.equal(projectLockOf(p, [mainSale({ item: { nft: "main", sharePct: 60 } })]), null);
+    const lock = projectLockOf(p, [mainSale({ item: { nft: "main", sharePct: 100 } })]);
+    assert.equal(lock.kind, "soldInFull");
+    assert.deepEqual(lock.buyers, ["Mira (demo buyer)"]);
+  });
+  it("counts co-owners, and ignores another project's sales and edition sales", () => {
+    const withAna = { ...p, contributors: [{ id: "ctb_ana00001", name: "Ana", role: "coOwner", share: 40, addedAt: T }] };
+    assert.notEqual(projectLockOf(withAna, [mainSale({ item: { nft: "main", sharePct: 60 } })]), null);
+    assert.equal(projectLockOf(p, [mainSale({ projectId: "p2", item: { nft: "main", sharePct: 100 } })]), null);
+    const edition = mainSale({ item: { nft: "physical", trackId: "ed_1", productId: "p1", productName: "Car", use: "private", tier: "regular", serial: 1 } });
+    assert.equal(projectLockOf(p, [edition]), null);
   });
 });

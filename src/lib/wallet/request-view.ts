@@ -161,11 +161,13 @@ export type Shortfall = { coin: Coin; have: Amount; need: Amount; text: string }
  * - "Not enough IDZ — you have 2 IDZ, this needs 4 IDZ."
  * - "Not enough test ETH for the network fee — you have 0.0003 ETH, this needs 0.00104 ETH."
  * - "Not enough test MATIC — you have 9 MATIC, this needs 10.021 MATIC." (a price)
+ * A purchase naming the listing it `releases` counts its buyer's own hold on
+ * that auction back in (R1-3); so does "Balance after".
  */
 export function shortfallOf(req: WalletRequest, identity: IdentityId, ctx: BalanceCtx): Shortfall | null {
   if (req.kind !== "transaction" || !req.charge) return null;
   const charge = sumCharge(req.charge);
-  const r = affordOf(identity, charge, ctx);
+  const r = affordOf(identity, charge, ctx, { releasing: req.releases });
   if (r.ok) return null;
   const gas = estimateGas(charge.network);
   const have = formatAmount(r.have, r.short);
@@ -187,7 +189,7 @@ export function balanceChangedLine(short: Shortfall): string {
 export function balanceAfterOf(req: WalletRequest, identity: IdentityId, ctx: BalanceCtx): string | null {
   if (req.kind !== "transaction" || !req.charge) return null;
   const charge = sumCharge(req.charge);
-  const bal = balancesOf(identity, ctx);
+  const bal = balancesOf(identity, ctx, { releasing: req.releases });
   const lines = [...charge.lines].sort((a, b) => (a.coin === "IDZ" ? -1 : b.coin === "IDZ" ? 1 : 0));
   return lines
     .map((l) => {

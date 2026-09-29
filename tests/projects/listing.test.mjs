@@ -182,6 +182,15 @@ test("relistListing goes live again with a new metadata snapshot, once ready", (
   assert.equal(relisted.listings[0].pause, undefined);
 });
 
+test("relistListing re-checks the share: a listing selling more than the maker now holds is refused (R1-1)", () => {
+  const created = createListing([], "p1", buyNowInput({ percentSelling: 50 }), meta(), "page", NOW, idMaker());
+  const paused = pauseForEdit(created.listings, created.listings[0].id, "rename", NOW + 1);
+  const r = relistListing(paused.listings, created.listings[0].id, meta(), true, NOW + 2, { creatorPct: 40 });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "You hold 40% now — lower the selling percentage in Edit, then relist.");
+  assert.equal(relistListing(paused.listings, created.listings[0].id, meta(), true, NOW + 2, { creatorPct: 50 }).ok, true);
+});
+
 // ─────────────────────────────── closeListing ───────────────────────────────
 
 test("closeListing refuses a running auction", () => {
@@ -439,4 +448,47 @@ test("normalizeListings round-trips a listing through JSON", () => {
   const good = createListing([], "p1", buyNowInput(), meta(), "page", NOW, idMaker()).listings[0];
   const out = normalizeListings(JSON.stringify([good]));
   assert.deepEqual(out, [good]);
+});
+
+// ── final fix wave: amounts in their one written form; one auction clock; an unpaid close ──
+
+test("createListing and editListing store amounts in their one written form (§3.1)", () => {
+  const created = createListing([], "p1", buyNowInput({ price: "0.050" }), meta(), "page", NOW, idMaker());
+  assert.equal(created.listings[0].price, "0.05");
+  const a = createListing([], "p1", auctionInput({ minBid: ".5", auctionBuyNow: "5." }), meta(), "page", NOW, idMaker());
+  assert.equal(a.listings[0].minBid, "0.5");
+  assert.equal(a.listings[0].auctionBuyNow, "5");
+  const edited = editListing(created.listings, created.listings[0].id, buyNowInput({ price: "0.060" }), NOW + 1);
+  assert.equal(edited.listings[0].price, "0.06");
+  assert.deepEqual(edited.listings[0].events.at(-1), { kind: "updated", at: NOW + 1, price: "0.06" });
+  // The same price written differently is no change.
+  const same = editListing(created.listings, created.listings[0].id, buyNowInput({ price: "0.0500" }), NOW + 1);
+  assert.equal(same.ok, false);
+});
+
+test("createListing refuses an auction end that doesn't parse", () => {
+  const r = createListing([], "p1", auctionInput({ endsAt: "soon" }), meta(), "page", NOW, idMaker());
+  assert.deepEqual(r, { ok: false, reason: "Set the date the auction ends." });
+});
+
+test("listingViewOf reads the auction with auctionStateOf, and the status line with its clock", () => {
+  const created = createListing([], "p1", auctionInput(), meta(), "page", NOW, idMaker());
+  const l = { ...created.listings[0], endsAt: NOW + 30_000 };
+  const bids = [{ id: "bid_1", listingId: l.id, bidderId: "buyer-mira", amount: "0.03", token: "MATIC", at: NOW - 1 }];
+  const v = listingViewOf("p1", { listings: [l], sales: [], bids, now: NOW, current: meta() });
+  assert.equal(v.auction.minNext, "0.030001", "one micro above the top bid, as auctionStateOf says");
+  assert.equal(listingStatusLine(v, NOW), "Auction · top bid 0.03 MATIC · Under a minute left");
+  const later = { ...l, endsAt: NOW + 90_500 };
+  const v2 = listingViewOf("p1", { listings: [later], sales: [], bids, now: NOW, current: meta() });
+  assert.equal(listingStatusLine(v2, NOW), "Auction · top bid 0.03 MATIC · 1m left", "rounded down, as the bid card is");
+});
+
+test("listingViewOf: an auction closed with bids nobody could pay reads unpaid", () => {
+  const created = createListing([], "p1", auctionInput(), meta(), "page", NOW, idMaker());
+  const closed = { ...created.listings[0], status: "closed", endsAt: NOW - 1, endedAt: NOW };
+  const none = listingViewOf("p1", { listings: [closed], sales: [], bids: [], now: NOW, current: meta() });
+  assert.deepEqual([none.kind, none.why, none.unpaid], ["ended", "noBids", undefined]);
+  const bids = [{ id: "bid_1", listingId: closed.id, bidderId: "buyer-mira", amount: "0.03", token: "MATIC", at: NOW - 5 }];
+  const unpaid = listingViewOf("p1", { listings: [closed], sales: [], bids, now: NOW, current: meta() });
+  assert.deepEqual([unpaid.kind, unpaid.why, unpaid.unpaid], ["ended", "noBids", true]);
 });

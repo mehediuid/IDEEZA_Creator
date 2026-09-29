@@ -123,14 +123,12 @@ test("the sweep removes exactly the project's P2 keys and nothing else", () => {
   ]);
 });
 
-test("the deprecated 2-arg form sweeps only the per-project keys (no rowIds known)", () => {
-  const store = memoryStore({ "ideeza:pcb:doc:proj_a": "{}" });
-  assert.deepEqual(sweepProjectKeys("proj_a", store), ["ideeza:pcb:doc:proj_a"]);
+test("a key the browser refuses to remove is skipped, never thrown", () => {
   const refusing = {
     getItem: () => "{}",
     removeItem: () => {
       throw new Error("SecurityError");
     },
   };
-  assert.deepEqual(sweepProjectKeys("proj_a", refusing), []);
+  assert.deepEqual(sweepProjectKeys("proj_a", ["p1"], refusing), []);
 });

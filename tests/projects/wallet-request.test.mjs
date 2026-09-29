@@ -112,7 +112,7 @@ test("requestCopy: review, a transaction — the note, and Confirm and pay", () 
   assert.deepEqual(c.secondary, ["Reject"]);
 });
 
-test("requestCopy: review, can't afford — the exact IDZ sentence", () => {
+test("requestCopy: review has no affordability line of its own — shortfallOf reads the full market (errata 29)", () => {
   const req = {
     kind: "transaction",
     purpose: "instantMint",
@@ -120,14 +120,14 @@ test("requestCopy: review, can't afford — the exact IDZ sentence", () => {
     network: "baseSepolia",
     title: "Mint Car",
     summary: [],
-    note: "",
+    note: "Minted on chain now.",
     doneLine: "Minted on chain.",
     charge: { network: "baseSepolia", lines: [{ coin: "IDZ", amount: "4" }] },
   };
   const c = requestCopy("review", req, walletConnect(defaultWallet(), "maker-1"), "insufficientFunds");
-  assert.ok(c.body.some((l) => l === "Not enough IDZ — you have 40 IDZ, this needs 4 IDZ." || l.startsWith("Not enough IDZ")));
+  assert.deepEqual(c.body, ["Minted on chain now."]);
   assert.equal(c.primary, "Confirm and pay");
-  assert.ok(c.secondary.includes("Reject"));
+  assert.deepEqual(c.secondary, ["Reject"]);
 });
 
 test("requestCopy: signing and pending", () => {
@@ -173,9 +173,9 @@ test("requestCopy: failed, every static reason from MINT-3's table", () => {
   }
 });
 
-test("requestCopy: failed, insufficientFunds — the balance that changed", () => {
+test("requestCopy: failed, insufficientFunds — a fixed line; the dialog names the balance from the full market", () => {
   const req = { ...makerReq, kind: "transaction", charge: { network: "baseSepolia", lines: [{ coin: "IDZ", amount: "4" }] } };
   const c = requestCopy("failed", req, walletConnect(defaultWallet(), "maker-1"), "insufficientFunds");
-  assert.ok(c.body.some((l) => l.startsWith("Your balance changed — you now have")));
-  assert.ok(c.body.includes("Nothing was charged."));
+  assert.deepEqual(c.body, ["Your balance changed before it confirmed.", "Nothing was charged."]);
+  assert.equal(c.primary, "Try again");
 });
