@@ -17,15 +17,19 @@
 //   then sets `done`. Until the file is stored, progress holds at 99 %.
 //   One tab encodes a take, under the Web Lock `ideeza-video:<takeId>`;
 //   other tabs pick the result up through the storage event.
-// - A **legacy** job (the v1 Brief's timer-only clip, `render` absent): it
-//   ticks to `done` as before and never makes a file. The Brief still starts
-//   these until T26 moves it to per-product takes; `migrateLegacyClip`
-//   (VideoUpkeep) converts a finished one into a real Take 1.
+// - A **legacy** job (the v1 Brief's timer-only clip, `render` absent): one
+//   stored before the Brief moved to per-product takes (T26) still ticks to
+//   `done` and never makes a file; nothing starts one any more.
+//   `migrateLegacyClip` (VideoUpkeep) converts a finished one into a real
+//   Take 1.
 //
 // × on a toast acknowledges a job instead of deleting it (P2-VIDEO-3, D7).
 // Terminal, acknowledged product-video jobs are pruned — the take keeps its
-// own terminal state. On `ideeza:project-deleted`, the project's running
-// jobs are cancelled and its clip files deleted (P2-VIDEO-18).
+// own terminal state. A cancelled take is acknowledged the moment any tab
+// sees it, so a cancel leaves no "failed" toast in this tab or another. On
+// `ideeza:project-deleted`, the project's running jobs are cancelled and its
+// clip files deleted (P2-VIDEO-18). Once a project is sold in full, a render
+// that finishes keeps its take but never becomes the product's video.
 //
 // The demo speed multiplier (`DEMO_SPEED`, lib/video/jobs) turns the
 // 20-minute budget into ~30 seconds; flip it to 1 for a real backend.
@@ -40,6 +44,11 @@ import {
   type VideoJobStage,
 } from "@/lib/video/jobs";
 import { onProjectDeleted } from "@/lib/manual/events";
+import { lockOf } from "@/lib/manual/edit-gate";
+import { ownershipOf } from "@/lib/manual/ownership";
+import { readMarketNow } from "@/lib/market/market-store";
+import { mainSalesOf } from "@/lib/market/sales";
+import type { Sale } from "@/lib/market/types";
 import { readBriefDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
@@ -89,16 +98,9 @@ type Ctx = {
   /** The clock the progress maths reads: it moves every 500 ms while
    *  anything renders, so render stays pure (no Date.now() in a component). */
   now: number;
-  createJob: (spec: {
-    title: string;
-    prompt: string;
-    quality: "low" | "high";
-    minted?: boolean;
-  }) => string;
-  setEmailReminder: (id: string, email: string | null) => void;
   setBrowserNotify: (id: string, enabled: boolean) => void;
   acknowledge: (id: string) => void;
-  markMinted: (id: string) => void;
+  /** Drops a legacy job (it has no take to fail). */
   dismiss: (id: string) => void;
   // ── Phase 2: product videos ──
   startProductVideo: (spec: ProductVideoSpec) => StartResult;
@@ -136,10 +138,13 @@ function loadJobs(): VideoJob[] {
 const rank = (j: VideoJob) => (terminal(j) ? STAGE_ORDER.length + 1 : STAGE_ORDER.indexOf(j.stage));
 
 /** Another tab's list folded into ours: each job keeps whichever copy is
- *  further along, and an acknowledgement in either tab holds. */
+ *  further along, and an acknowledgement in either tab holds. A finished job
+ *  the other tab no longer lists was pruned there (acknowledged, cancelled or
+ *  dismissed), so it goes here too — kept, this tab would write it back. */
 function mergeJobs(local: VideoJob[], stored: VideoJob[]): VideoJob[] {
+  const listed = new Set(stored.map((s) => s.id));
   const byId = new Map<string, VideoJob>();
-  for (const j of local) byId.set(j.id, j);
+  for (const j of local) if (!terminal(j) || listed.has(j.id)) byId.set(j.id, j);
   for (const s of stored) {
     const l = byId.get(s.id);
     if (!l) {
@@ -177,6 +182,18 @@ function writeProduct(
   return { ok, after };
 }
 
+/** A take cancelled by its maker: its job ends acknowledged, with no toast. */
+const cancelled = (take: { failure?: { kind: string } } | undefined) => take?.failure?.kind === "cancelled";
+
+/** Sold in full (decision 12), from the sales as they are now (another tab may
+ *  have just sold the rest) — for code with no ProjectView to read `lock` from. */
+export function lockedNow(project: ManualProject | undefined, sales: Sale[] = readMarketNow().sales): boolean {
+  if (!project) return false;
+  const main = mainSalesOf(project.id, sales);
+  const split = ownershipOf({ createdAt: project.createdAt, contributors: project.contributors ?? [], sales: main, listedPercent: 0 });
+  return lockOf(split, main) !== null;
+}
+
 function takeOf(j: VideoJob) {
   if (!j.projectId || !j.productId) return undefined;
   return readProjectVideos(j.projectId)?.products[j.productId]?.takes.find((t) => t.id === j.id);
@@ -202,6 +219,12 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     jobsRef.current = jobs;
   }, [jobs]);
+  // The projects, for the lock an encode that ends seconds later reads.
+  const { projects } = useManualProjects();
+  const projectsRef = React.useRef(projects);
+  React.useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
 
   // Hydrate from localStorage after mount.
   React.useEffect(() => {
@@ -229,7 +252,9 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated) return;
     const onStorage = (e: StorageEvent) => {
       if (e.key !== STORAGE_KEY) return;
-      setJobs((prev) => mergeJobs(prev, loadJobs()));
+      // A take cancelled in the other tab is gone from its list: keeping this
+      // tab's copy would write it back, and the two tabs would pass it to and fro.
+      setJobs((prev) => mergeJobs(prev, loadJobs()).filter((j) => !(isProductJob(j) && cancelled(takeOf(j)))));
       setNow(Date.now());
     };
     window.addEventListener("storage", onStorage);
@@ -258,7 +283,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
             }
             if (take.failure) {
               mutated = true;
-              return { ...j, stage: "failed" as VideoJobStage };
+              return { ...j, stage: "failed" as VideoJobStage, ...(cancelled(take) ? { acknowledged: true } : null) };
             }
             if (take.readyAt) {
               mutated = true;
@@ -327,7 +352,7 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       const run = async () => {
         const take = takeOf(job);
         if (!take) return settle(id, "failed", { acknowledged: true });
-        if (take.failure) return settle(id, "failed");
+        if (take.failure) return settle(id, "failed", cancelled(take) ? { acknowledged: true } : undefined);
         if (take.readyAt) return settle(id, "done");
 
         // Loaded on first use: the muxer stays out of every page's bundle.
@@ -378,7 +403,13 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
           durationMs: clip.durationMs,
           bytes: clip.video.size,
         };
-        const wrote = writeProduct(projectId, productId, (v) => (v ? pv.finishTake(v, id, meta, Date.now()) : null));
+        // Sold in full: the buyer's product keeps the video it was sold with.
+        const locked = lockedNow(projectsRef.current.find((p) => p.id === projectId));
+        const wrote = writeProduct(projectId, productId, (v) => {
+          if (!v) return null;
+          const next = pv.finishTake(v, id, meta, Date.now());
+          return locked ? { ...next, inUseId: v.inUseId } : next;
+        });
         if (!wrote.ok) {
           void deleteClips([id]).catch(() => undefined);
           return fail("storage");
@@ -430,41 +461,6 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       }),
     [],
   );
-  const createJob = React.useCallback(
-    (spec: {
-      title: string;
-      prompt: string;
-      quality: "low" | "high";
-      minted?: boolean;
-    }) => {
-      const t = Date.now();
-      const id = `vj_${t.toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`;
-      setJobs((prev) => [
-        ...prev,
-        {
-          id,
-          title: spec.title,
-          prompt: spec.prompt,
-          quality: spec.quality,
-          stage: "queued",
-          startedAt: t,
-          stageStartedAt: t,
-          emailReminder: null,
-          browserNotify: false,
-          acknowledged: false,
-          minted: !!spec.minted,
-        },
-      ]);
-      setNow(t);
-      return id;
-    },
-    [],
-  );
-
-  const setEmailReminder = React.useCallback((id: string, email: string | null) => {
-    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, emailReminder: email } : j)));
-  }, []);
-
   const setBrowserNotify = React.useCallback((id: string, enabled: boolean) => {
     if (enabled && typeof window !== "undefined" && "Notification" in window) {
       if (Notification.permission === "default") Notification.requestPermission().catch(() => undefined);
@@ -474,10 +470,6 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
 
   const acknowledge = React.useCallback((id: string) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, acknowledged: true } : j)).filter((j) => !prunable(j)));
-  }, []);
-
-  const markMinted = React.useCallback((id: string) => {
-    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, minted: true } : j)));
   }, []);
 
   const dismiss = React.useCallback((id: string) => {
@@ -575,11 +567,8 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       jobs,
       hydrated,
       now,
-      createJob,
-      setEmailReminder,
       setBrowserNotify,
       acknowledge,
-      markMinted,
       dismiss,
       startProductVideo,
       cancelRender,
@@ -591,11 +580,8 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
       jobs,
       hydrated,
       now,
-      createJob,
-      setEmailReminder,
       setBrowserNotify,
       acknowledge,
-      markMinted,
       dismiss,
       startProductVideo,
       cancelRender,
