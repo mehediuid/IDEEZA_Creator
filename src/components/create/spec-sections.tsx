@@ -15,7 +15,7 @@
 // no tag, no Reset and no note that only says how to change it.
 
 import * as React from "react";
-import { Add01Icon, Alert02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, Alert02Icon, ArrowRight01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { NumberInput } from "@/components/ideeza/number-input";
 import { Segmented } from "@/components/ideeza/segmented";
@@ -988,13 +988,16 @@ export function WirelessSection({ product, edit, onOpen }: Props) {
     sub: radioSub(c.key, c.builtIn),
   }));
   const current = key ? RADIOS[key].label : radioPart ? readableName(radioPart) : "No wireless";
+  // On a network link its radio is the network's to choose — one control,
+  // one home — so it reads here, with the way there.
+  const network = edit ? product.network : undefined;
   return (
     <Section
       id={id}
       title="Wireless"
       tag={tagOf(product, edited)}
       reset={
-        edit && edited
+        edit && edited && !network
           ? {
               name: "Wireless",
               onReset: () =>
@@ -1007,7 +1010,15 @@ export function WirelessSection({ product, edit, onOpen }: Props) {
           : undefined
       }
     >
-      {edit ? (
+      {network ? (
+        <div className="flex flex-col items-start gap-[4px]">
+          <ReadOnly>{current}</ReadOnly>
+          <button type="button" onClick={network.onJump} className={`-ml-[4px] gap-[4px] text-sm ${QUIET_BUTTON}`}>
+            Change it in Network
+            <Icon icon={ArrowRight01Icon} size={14} />
+          </button>
+        </div>
+      ) : edit ? (
         <Field id={selectId} label="Radio">
           <SelectMenu<RadioKey>
             id={selectId}
@@ -1026,7 +1037,7 @@ export function WirelessSection({ product, edit, onOpen }: Props) {
       ) : (
         <ReadOnly>{current}</ReadOnly>
       )}
-      <LinkNotes links={product.links.filter((l) => l.about === "radio")} onOpen={onOpen} plain={!edit} />
+      <LinkNotes links={product.links.filter((l) => l.about === "radio")} onOpen={onOpen} plain={!edit || !!network} />
     </Section>
   );
 }

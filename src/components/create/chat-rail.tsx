@@ -179,6 +179,7 @@ export function ProjectRail({
   onSelectProduct,
   onJump,
   slot,
+  network,
 }: {
   model: RailModel;
   /** The product the composer changes — the row drawn as chosen. Null when
@@ -191,6 +192,8 @@ export function ProjectRail({
   /** Takes the next-step line's place — the build's own states card while a
    *  build is not ready, which already says what the build is doing. */
   slot?: React.ReactNode;
+  /** The Network section, under the products (network-rail.tsx). */
+  network?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col">
@@ -211,6 +214,7 @@ export function ProjectRail({
           onSelectProduct={onSelectProduct}
         />
       )}
+      {model.rows.length > 0 && network}
       {model.rows.length > 0 && model.suggested.length > 0 && (
         <SuggestedLine names={model.suggested} onJump={onJump} />
       )}
