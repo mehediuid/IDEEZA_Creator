@@ -44,7 +44,7 @@ function pickHub(products: NetProduct[]): string | null {
   );
 }
 
-const PREFERRED_DIRECT: ProtocolKey[] = ["EN", "BL", "ZB", "MT", "LR", "CN", "R5", "R2"];
+const PREFERRED_DIRECT: ProtocolKey[] = ["EN", "BL", "NR", "ZB", "MT", "LR", "CN", "R5", "R2"];
 
 /** The protocol two products share, best local option first; plain Wi-Fi
  *  when their parts share nothing else. */

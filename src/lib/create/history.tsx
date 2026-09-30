@@ -15,6 +15,7 @@
 import * as React from "react";
 import { reportWrite } from "../storage-status";
 import type { Companion } from "./companions";
+import type { LinkEdit, NetworkEdits, NetworkReply } from "./network-reply";
 import {
   BRIEF_CHANGES,
   deriveTitle,
@@ -75,6 +76,10 @@ export type SetupAnswer = {
   /** The maker's spec edits per product — "primary" or a companion id. Kept
    *  per product, not per drawing, so a size set once survives a refine. */
   specs?: Record<string, SpecEdits>;
+  /** The maker's changes to the concept network's links — who sends and
+   *  what travels (concept-network.ts). The protocol is each product's own
+   *  radio, in `specs`. */
+  network?: NetworkEdits;
 };
 
 export type ChatTurn =
@@ -102,6 +107,9 @@ export type ChatTurn =
        *  turns that predate it. */
       productName?: string;
       productSummary?: string;
+      /** How the model said the products talk, from the same call as the
+       *  companions. Absent when it didn't answer; the rule answers then. */
+      network?: NetworkReply;
       answer?: SetupAnswer;
       /** The project this chat was started for, from its page's "Add a
        *  product" (`/?addTo=<id>`, P2-TABS-29). The question opens on it, so
@@ -719,6 +727,7 @@ type Ctx = {
       companions: Companion[];
       productName?: string;
       productSummary?: string;
+      network?: NetworkReply;
     },
   ) => void;
   answerSetupTurn: (
@@ -740,6 +749,8 @@ type Ctx = {
   setTurnConcept: (chatId: string, turnId: string, concept: ConceptSummary) => void;
   /** The maker's spec edits for one product, on the answered question. */
   setSpecEdits: (chatId: string, turnId: string, productId: string, edits: SpecEdits) => void;
+  /** One concept-network link's edit, or null to put it back as suggested. */
+  setNetworkEdit: (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -997,6 +1008,7 @@ export function CreateHistoryProvider({
         companions: Companion[];
         productName?: string;
         productSummary?: string;
+        network?: NetworkReply;
       },
     ) => {
       setChats((arr) =>
@@ -1169,6 +1181,17 @@ export function CreateHistoryProvider({
           }),
         },
       })),
+    [patchSetupAnswer],
+  );
+
+  const setNetworkEdit = React.useCallback(
+    (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) =>
+      patchSetupAnswer(chatId, turnId, (a) => {
+        const links = { ...(a.network?.links ?? {}) };
+        if (edit) links[linkId] = edit;
+        else delete links[linkId];
+        return { ...a, network: { links } };
+      }),
     [patchSetupAnswer],
   );
 
@@ -1718,6 +1741,7 @@ export function CreateHistoryProvider({
     setSetupLeftOut,
     setTurnConcept,
     setSpecEdits,
+    setNetworkEdit,
     getChat,
     startBuild,
     updateBuildItem,

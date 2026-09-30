@@ -3,15 +3,18 @@
 // 44533:123190). One network per project, stored beside the project in this
 // browser (see store.ts).
 
-/** The twelve protocols, by the two-letter key the Figma protocol table and
- *  dropdown print beside each name. */
+/** The Figma table's twelve protocols, by the two-letter key the protocol
+ *  table and dropdown print beside each name — and the two radios the spec
+ *  sheet can put in that the table never named: nRF24 (NR) and cellular (CL). */
 export type ProtocolKey =
   | "WF"
   | "WM"
   | "BL"
   | "EN"
+  | "NR"
   | "ZB"
   | "LR"
+  | "CL"
   | "MT"
   | "CN"
   | "R5"
@@ -67,7 +70,7 @@ export type MapLink = {
   label: string;
 };
 
-export type Frequency = "2.4" | "5" | "868" | "915" | "433" | "na";
+export type Frequency = "2.4" | "5" | "868" | "915" | "433" | "cell" | "na";
 export type Topology = "star" | "mesh" | "bus" | "p2p" | "tree" | "ring";
 export type CloudType = "mqtt" | "rest" | "ws" | "coap" | "amqp" | "none";
 export type Repeater = "none" | "1" | "2" | "3" | "mesh";

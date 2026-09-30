@@ -11,8 +11,14 @@
 // common case and the safe one — a wrong "your lamp needs a dock" sends
 // the user down a branch that costs credits.
 //
+// The same answer says how the products talk (concept-network design S4):
+// `links` between the products it named, or for a lone product `app` —
+// no second model call. Parsed strictly; the rule in concept-network.ts
+// answers whatever is left, so the rule path sends none.
+//
 // Request:  { prompt: string, title?: string }
-// Response: { isSystem: boolean, companions: { id, name, why }[] }
+// Response: { isSystem: boolean, companions: { id, name, why }[],
+//             network?: { links: { from, to, carries, twoWay }[], app } }
 
 import { NextResponse } from "next/server";
 import {
@@ -20,6 +26,7 @@ import {
   parseCompanions,
   type CompanionPlan,
 } from "@/lib/create/companions";
+import { parseNetworkReply, type NetworkReply } from "@/lib/create/network-reply";
 
 const SYSTEM =
   "You decide whether an electronics product is one object or part of a multi-product system. " +
@@ -33,7 +40,13 @@ const SYSTEM =
   "When it is, give 1 to 3 companions, each a separate physical product with its own enclosure and board. " +
   "Never list a part, a module, an app, a website or a service — those are inside the product, not beside it. " +
   "name is at most 40 characters. " +
-  "why is one plain sentence saying what the companion is for, at most 120 characters.";
+  "why is one plain sentence saying what the companion is for, at most 120 characters. " +
+  'Also say how the products talk, in the same object: "product" is a short name for the main product, and ' +
+  '"links" is [{"from": string, "to": string, "carries": "commands" | "sensor" | "events" | "data", "twoWay": boolean}], ' +
+  "where from and to are a companion's name exactly as you gave it, or the main product's name. " +
+  "from is the one that starts the conversation: a remote sends commands to what it drives; a sensor node sends sensor readings to its base station. " +
+  "Leave out a companion that has no radio, like a charger, a dock, a case or a spare pack. " +
+  'When it is not a system, links is [] and "app" says what the product talks to: "phone" for a phone app, "cloud" when it must be reached from anywhere, or null when it talks to nothing.';
 
 // Strips a ```json fence if the model wrapped its answer in one.
 function unfence(text: string): string {
@@ -41,7 +54,9 @@ function unfence(text: string): string {
   return (fenced ? fenced[1] : text).trim();
 }
 
-async function classifyWithAI(prompt: string): Promise<CompanionPlan | null> {
+type Answer = CompanionPlan & { network?: NetworkReply };
+
+async function classifyWithAI(prompt: string): Promise<Answer | null> {
   // The anonymous model reasons before it answers, and under load that takes
   // 15–40 s on either endpoint — past the old 20 s cut-off, so the rule
   // answered about half the time. The OpenAI-shaped endpoint keeps the
@@ -76,7 +91,11 @@ async function classifyWithAI(prompt: string): Promise<CompanionPlan | null> {
     } catch {
       return null;
     }
-    return parseCompanions(raw);
+    const plan = parseCompanions(raw);
+    if (!plan) return null;
+    const product = typeof (raw as { product?: unknown })?.product === "string" ? (raw as { product: string }).product : undefined;
+    const network = parseNetworkReply(raw, plan.companions, product);
+    return network ? { ...plan, network } : plan;
   } catch {
     clearTimeout(timer);
     return null;
@@ -106,6 +125,6 @@ export async function POST(req: Request) {
   // table has never heard of. When it cannot answer, the rule does, and when
   // the rule has nothing either the answer is a single product, which is both
   // the honest default and the common case.
-  const plan = (await classifyWithAI(ask)) ?? classifyByRule(ask);
+  const plan: Answer = (await classifyWithAI(ask)) ?? classifyByRule(ask);
   return NextResponse.json(plan);
 }

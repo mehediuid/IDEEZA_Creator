@@ -25,7 +25,7 @@ export { ModalFrame, ConfirmDialog } from "@/components/ideeza/dialog";
 // Figma 07. Step 5's last sentence follows the canvas, not the frame's copy
 // (spec D11): arrows carry the payload, the protocol sits on the cards.
 const HOW_TO = [
-  { title: "Pick the protocol", body: "Use the protocol dropdown in the toolbar. All 12 are listed by name — Wi-Fi, Wi-Fi + MQTT, BLE, ESP-NOW, Zigbee, LoRa, Matter, CAN, RS-485, RS-232, I2C, SPI." },
+  { title: "Pick the protocol", body: "Use the protocol dropdown in the toolbar. All 14 are listed by name — Wi-Fi, Wi-Fi + MQTT, BLE, ESP-NOW, nRF24, Zigbee, LoRa, Cellular, Matter, CAN, RS-485, RS-232, I2C, SPI." },
   { title: "Switch to Draw link", body: "Press L, or click Draw link in the toolbar. A hint appears at the top of the canvas." },
   { title: "Click a port on the source", body: "Hover any box — 4 ports appear on its edges. Click the one you want the link to leave from." },
   { title: "Click a port on the target", body: "The arrow snaps into place and the side panel opens with the 3 questions." },
