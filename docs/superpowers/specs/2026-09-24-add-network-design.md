@@ -43,7 +43,7 @@ adding one adds its node. Closing after progress asks *Discard this network?*.
 
 ## Decisions (approved defaults)
 
-- **D1** Add Network disabled until the build is saved as a project; becomes View Network once a network exists.
+- **D1** Add Network disabled until the build is saved as a project; becomes View Network once a network exists. *Superseded 2026-09-30 (`2026-09-30-concept-network-design.md`): Add Network is off the build review; the network is worked out at the concept stage and written on Save.*
 - **D2** Done has Close · View Network (Figma's duplicate Done dropped).
 - **D3** Delete lives in the link panel ("Delete this link") + the Delete key; toolbar is Undo · Redo · How to draw.
 - **D4** Copy says *saved*, not *live*; the delete confirm's APK sentence is dropped (no APK is built).
@@ -52,7 +52,7 @@ adding one adds its node. Closing after progress asks *Discard this network?*.
 - **D7** Master change removes the old master's two-way links and makes the new master's link two-way; the warning lists the computed links and is skipped when none break.
 - **D8** "last edited <date>" without a person's name (no accounts).
 - **D9** Delete network sits in the Network settings dialog footer (left, danger).
-- **D10** No kebab menu on the project page; the Network section's Create Network is the one home.
+- **D10** No kebab menu on the project page; the Network section's Create Network is the one home. *Superseded 2026-09-30 (`2026-09-30-concept-network-design.md`): the concept stage's rail Network section is where a project's network starts; Create Network stays on the project page for a project without one.*
 - **D11** Arrow labels carry the payload; the protocol shows on the product card, the side panel and the legend. How-to-draw copy says so.
 - **D12** One network per project; persisted to `localStorage` like the rest of the project.
 

@@ -111,7 +111,8 @@ ideeza-creator-panel/
    │  │                      library (save/publish, version lock)
    │  ├─ network/            types, catalog (the Figma tables), derive (roles, auto-fill,
    │  │                      diff, master change, blockers), planner (rule map, layout,
-   │  │                      AI-answer validation), geometry, products, store
+   │  │                      AI-answer validation), geometry, products, store,
+   │  │                      from-concept (the concept network as the saved Network)
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
