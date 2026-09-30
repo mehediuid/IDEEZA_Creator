@@ -49,7 +49,6 @@ import { footerLineOf } from "@/lib/manual/save-step";
 import { isSampleModel, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
-import { NetworkAction } from "@/components/network/network-action";
 import {
   coversFor,
   FirmwarePreview,
@@ -315,12 +314,11 @@ function ReviewPanel({
         </div>
 
         {/* What this project could become next. A tier below the footer's
-            Save Project, so quiet. Add Network is live once the build is a
-            project; Create Mobile App has no engine behind it yet and says
-            so on the control, where a pointer, a keyboard and a touch
-            screen all reach it. */}
+            Save Project, so quiet. Create Mobile App has no engine behind it
+            yet and says so on the control, where a pointer, a keyboard and a
+            touch screen all reach it. The network is worked out at the concept
+            stage, in the rail's Network section. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <NetworkAction project={saved} />
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>

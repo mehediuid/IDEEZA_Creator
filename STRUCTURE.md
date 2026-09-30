@@ -82,7 +82,7 @@ ideeza-creator-panel/
    │  │                      map-editor (the connection canvas), link-panel, product-form,
    │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,
    │  │                      all-parameters), network-section (project page),
-   │  │                      network-action (review card), connection-map-page, summary, ui
+   │  │                      connection-map-page, summary, ui
    │  ├─ manual/             project-workspace (the editor gate: product scope, seed, banners) + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
    │  ├─ video-jobs/         render jobs provider, browser clip renderer, player, Generate dialog, indicator
