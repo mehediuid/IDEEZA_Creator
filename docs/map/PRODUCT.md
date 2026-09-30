@@ -16,7 +16,7 @@ Start here for any code change: open the area's router, then only the files it n
 | Demo wallet, minting (Lazy / Instant) | `src/components/wallet/`, `src/lib/wallet/`, `src/lib/brief/` | features/platform-and-projects.md › Mint |
 | Product video clip, readiness gate | `src/components/video-jobs/`, `src/lib/video/`, `src/lib/manual/readiness.ts` | features/platform-and-projects.md › Video |
 | Product-scoped editor, BUILDLOAD | `src/components/manual/`, `src/lib/manual/{editor-scope,editor-docs,build-load*}.ts`, `src/lib/pcb/store.tsx` | features/editor-modules.md; [pcb-architecture.md](../guides/pcb-architecture.md) › Persisted state |
-| Add Network & Connection Map | `src/components/network/`, `src/lib/network/` | features/platform-and-projects.md; spec `2026-09-24-add-network-design.md` |
+| Add Network & Connection Map | `src/components/network/`, `src/lib/network/`; the concept stage's Network section: `src/components/create/network-rail.tsx`, `src/lib/create/concept-network.ts` | features/platform-and-projects.md, features/ai-create-flow.md; specs `2026-09-24-add-network-design.md`, `2026-09-30-concept-network-design.md` |
 | Parts library, New Package flow, land patterns | `src/components/parts/`, `src/components/package/`, `src/lib/package/` | [features/parts-package.md](../guides/features/parts-package.md) |
 | Schematic + PCB editor | [src/components/pcb/README.md](../../src/components/pcb/README.md) | [pcb-architecture.md](../guides/pcb-architecture.md); features pcb-schematic / pcb-board / pcb-tools-menus-panels |
 | Code, 3D, Assembly, Wiring, Preview modules | `src/components/{code,3d,assembly,wiring,preview}/` | [features/editor-modules.md](../guides/features/editor-modules.md) (Assembly not inventoried) |

@@ -62,6 +62,15 @@ import {
   scrollWithin,
 } from "./anchors";
 import { ProjectRail, RailAnnouncer, useRailModel } from "./chat-rail";
+import { NetworkSection, RAIL_NETWORK_ID, type LinkChange } from "./network-rail";
+import {
+  asNetworkReply,
+  conceptNetworkOf,
+  linkEditFor,
+  protocolChange,
+  radioReset,
+} from "@/lib/create/concept-network";
+import { useProjectNetwork } from "@/lib/network/store";
 import { BuildStatus } from "./build-status";
 import { useBuildModel } from "./use-build-model";
 import { ChatThread, conceptLabels } from "./chat-thread";
@@ -315,6 +324,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     startBuild,
     setTurnConcept,
     setSpecEdits,
+    setNetworkEdit,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
   // Every concept render costs credits — the first draft, a refine and a
@@ -801,10 +811,15 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           ask("/api/concept/companions"),
           ask("/api/concept/summarize"),
         ]);
+        const companions = (plan?.companions as Companion[] | undefined) ?? [];
+        // How the model said the products talk — checked again here, since
+        // it is stored and read back (concept-network.ts). None from the rule.
+        const network = asNetworkReply(plan?.network) ?? undefined;
         setSetupDetails(cid, tid, {
           // No classification is not an error: it means no companions were
           // found, which is the ordinary single-product answer.
-          companions: (plan?.companions as Companion[] | undefined) ?? [],
+          companions,
+          ...(network ? { network } : null),
           productName:
             typeof summary?.title === "string" ? summary.title : undefined,
           // The description, not the parts line: this sits under the
@@ -1045,6 +1060,44 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // the row stays selected (select's rule). A docked sheet takes no focus —
   // the keyboard stays on the row — so the page's announcer says it opened.
   const railState = rail.state;
+
+  // How the project's products talk — the rail's Network section, read off
+  // the same project model as the rows and the sheet (concept-network.ts).
+  const conceptNet = React.useMemo(() => conceptNetworkOf(railState), [railState]);
+  const { network: savedNetwork } = useProjectNetwork(activeBuild?.projectId);
+  // Change link: the protocol goes to both products' radios through the
+  // spec-edit path a Wireless change takes; who sends and what travels go on
+  // the answer's network edits.
+  const handleLinkSave = React.useCallback(
+    (linkId: string, change: LinkChange) => {
+      const link = conceptNet.links.find((l) => l.id === linkId);
+      if (!chat || !answeredSetupId || !link || link.locked) return;
+      if (change.radio) {
+        for (const e of protocolChange(link, conceptNet.peers, change.radio)) {
+          setSpecEdits(chat.id, answeredSetupId, e.productId, e.edits);
+        }
+      }
+      setNetworkEdit(chat.id, answeredSetupId, linkId, linkEditFor(link, change));
+    },
+    [chat, answeredSetupId, conceptNet, setSpecEdits, setNetworkEdit],
+  );
+  const handleLinkReset = React.useCallback(
+    (linkId: string) => {
+      const link = conceptNet.links.find((l) => l.id === linkId);
+      if (!chat || !answeredSetupId || !link || link.locked) return;
+      for (const e of radioReset(link, conceptNet.peers)) setSpecEdits(chat.id, answeredSetupId, e.productId, e.edits);
+      setNetworkEdit(chat.id, answeredSetupId, linkId, null);
+    },
+    [chat, answeredSetupId, conceptNet, setSpecEdits, setNetworkEdit],
+  );
+  // The Wireless section's "Change it in Network": an overlay sheet goes (the
+  // product stays selected), a phone shows the Chat tab, and the keyboard
+  // lands on the section's heading once the dialog has handed it back.
+  const showNetwork = React.useCallback(() => {
+    if (!docked) setSpecSheet(null);
+    if (!sideBySide(split)) setPane("chat");
+    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(RAIL_NETWORK_ID)?.focus()));
+  }, [docked, split]);
   const sheetShowing = specSheet !== null ? focusedProduct : null;
   const selectProduct = React.useCallback(
     (productId: string) => {
@@ -1661,8 +1714,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       // The sheet follows the selection to the product it works with.
       onOpenProduct: (productId) => select(productId),
       fallback: !!concept?.fallback,
+      network: conceptNet.show && conceptNet.onLink.has(focusedProduct) ? { onJump: showNetwork } : undefined,
     };
-  }, [specSheet, focusedProduct, railState, labels, handleSpecChange, select, activeBuild]);
+  }, [specSheet, focusedProduct, railState, labels, handleSpecChange, select, activeBuild, conceptNet, showNetwork]);
   // select's other half (review M11): an open sheet whose product has nothing
   // to show — drawing again, failed, just added, being read — closes here,
   // whichever path moved the selection or the drawing, and stays closed.
@@ -1762,6 +1816,17 @@ export function ConceptChat({ chatId }: { chatId: string }) {
               activeBuild && statusOf(activeBuild) !== "ready" ? (
                 <BuildStatus job={activeBuild} statesOnly inChat />
               ) : undefined
+            }
+            network={
+              <NetworkSection
+                net={conceptNet}
+                // The project's Connection Map, once the build is saved and has one.
+                openHref={
+                  activeBuild?.projectId && savedNetwork ? `/projects/${activeBuild.projectId}/network` : null
+                }
+                onSave={handleLinkSave}
+                onReset={handleLinkReset}
+              />
             }
           />
         </div>

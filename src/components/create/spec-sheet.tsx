@@ -117,6 +117,9 @@ export type SheetProduct = {
   onOpenProduct?: (productId: string) => void;
   /** The parts are the generic stand-in; the header says so. */
   fallback: boolean;
+  /** On a link of the concept network: its radio is chosen there, and the
+   *  Wireless section shows it with the way to the rail's Network section. */
+  network?: { onJump: () => void };
 };
 
 /** Where the keyboard goes when the sheet is asked for: nowhere (a rail row

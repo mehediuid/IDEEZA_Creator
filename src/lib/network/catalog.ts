@@ -18,6 +18,7 @@ import type {
   SharesData,
   Topology,
 } from "./types";
+import type { RadioKey } from "../spec/types";
 
 export type ProtocolInfo = {
   key: ProtocolKey;
@@ -40,8 +41,10 @@ export const PROTOCOLS: ProtocolInfo[] = [
   { key: "WM", name: "Wi-Fi + MQTT", frequencies: ["2.4", "5"], frequencyNote: "2.4 GHz or 5 GHz", cloudBlock: "Required", useCase: "APK-controlled products via MQTT", repeater: true, radioLabel: null },
   { key: "BL", name: "BLE", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Optional (via GW)", useCase: "Battery sensors, mobile-direct pairing", repeater: true, radioLabel: "BLE" },
   { key: "EN", name: "ESP-NOW", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Blank (offline)", useCase: "ESP32 mesh, 1 ms latency, no router", repeater: true, radioLabel: null },
+  { key: "NR", name: "nRF24", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Via GW", useCase: "Direct link to a remote, about 100 m, no router", repeater: true, radioLabel: "nRF24" },
   { key: "ZB", name: "Zigbee / Thread", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Via coordinator", useCase: "Large mesh, low power, self-healing", repeater: true, radioLabel: "Zigbee" },
   { key: "LR", name: "LoRa / LoRaWAN", frequencies: ["868", "915", "433"], frequencyNote: "Sub-GHz 868 / 915 MHz", cloudBlock: "Via GW", useCase: "2–15 km outdoor fleet", repeater: true, radioLabel: "LoRa" },
+  { key: "CL", name: "Cellular", frequencies: ["cell"], frequencyNote: "Carrier bands (GSM / LTE)", cloudBlock: "Required", useCase: "Anywhere with phone signal, needs a SIM", repeater: false, radioLabel: "Cellular" },
   { key: "MT", name: "Matter / Thread", frequencies: ["2.4"], frequencyNote: "2.4 GHz", cloudBlock: "Optional", useCase: "Smart home, cloudless, IP-based", repeater: true, radioLabel: "Matter" },
   { key: "CN", name: "CAN Bus", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Industrial, automotive, 40 m bus", repeater: false, radioLabel: "CAN" },
   { key: "R5", name: "RS-485", frequencies: ["na"], frequencyNote: "N/A (wired)", cloudBlock: "Via GW", useCase: "Building automation, 1.2 km, 32 nodes", repeater: true, radioLabel: "RS-485" },
@@ -54,6 +57,41 @@ export const PROTOCOL_KEYS = PROTOCOLS.map((p) => p.key);
 
 export function protocolInfo(key: ProtocolKey): ProtocolInfo {
   return PROTOCOLS.find((p) => p.key === key) ?? PROTOCOLS[1];
+}
+
+/** The spec sheet's radio as a protocol — the one mapping the concept stage,
+ *  the save and the Connection Map all read, so a product's radio and its
+ *  network link can't name two different things. Null for no radio. */
+export const PROTOCOL_OF_RADIO: Record<Exclude<RadioKey, "none">, ProtocolKey> = {
+  wifi: "WF",
+  ble: "BL",
+  "esp-now": "EN",
+  nrf24: "NR",
+  lora: "LR",
+  zigbee: "ZB",
+  cellular: "CL",
+};
+
+export function protocolOfRadio(key: RadioKey | null): ProtocolKey | null {
+  return key && key !== "none" ? PROTOCOL_OF_RADIO[key] : null;
+}
+
+/** A protocol's short name — "nRF24", "BLE", "Wi-Fi" — for a line that
+ *  already says what it is for. */
+export function protocolShort(key: ProtocolKey): string {
+  const p = protocolInfo(key);
+  return p.radioLabel ?? p.name;
+}
+
+/** The band it runs on, in a few words — "2.4 GHz", "Sub-GHz". Empty for a
+ *  wired or on-board bus. */
+export function bandOf(key: ProtocolKey): string {
+  const f = protocolInfo(key).frequencies[0];
+  if (f === "2.4") return "2.4 GHz";
+  if (f === "5") return "5 GHz";
+  if (f === "cell") return "Carrier bands";
+  if (f === "na") return "";
+  return "Sub-GHz";
 }
 
 export type IntentInfo = {
@@ -83,6 +121,7 @@ export const FREQUENCIES: Option<Frequency>[] = [
   { value: "868", label: "Sub-GHz 868 MHz", sub: "LoRa EU" },
   { value: "915", label: "Sub-GHz 915 MHz", sub: "LoRa US" },
   { value: "433", label: "Sub-GHz 433 MHz", sub: "LoRa Asia" },
+  { value: "cell", label: "Carrier bands", sub: "GSM · LTE" },
   { value: "na", label: "N/A (wired)", sub: "CAN · RS-485 · I2C" },
 ];
 
@@ -203,7 +242,7 @@ export function labelOf<V extends string>(options: Option<V>[], value: V): strin
 export const DIALOG_FIELDS: { field: string; type: string; options: string; from: string }[] = [
   { field: "Topology", type: "Select", options: "Star · Mesh · Bus · P2P · Tree · Ring", from: "Q2 middleman answer" },
   { field: "Master", type: "Select", options: "This product · [product name] · Gateway Hub", from: "Q1 initiator answer" },
-  { field: "Network type", type: "Select", options: "the 12 protocols", from: "protocol chosen on the link" },
+  { field: "Network type", type: "Select", options: "the 14 protocols", from: "protocol chosen on the link" },
   { field: "Network Frequency", type: "Select", options: "2.4 GHz · 5 GHz · 868 · 915 · 433 MHz · N/A (wired)", from: "the protocol" },
   { field: "Add repeater", type: "Select", options: "None · 1 · 2 · 3 Repeaters · Mesh (self-healing)", from: "manual" },
   { field: "Cloud Name", type: "Text", options: "free text, same value on every product", from: "first entry, copied across" },

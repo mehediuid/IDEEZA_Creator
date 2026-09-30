@@ -63,6 +63,9 @@ import {
 } from "@/lib/manual/save-step";
 import { listingViewOf } from "@/lib/market/listing";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
+import { networkForSave } from "@/lib/network/from-concept";
+import { networkProducts } from "@/lib/network/products";
+import { readNetwork, saveNetwork } from "@/lib/network/store";
 import type { Listing, ListingMetadata, MarketData } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 
@@ -184,7 +187,7 @@ export function SaveStep({
 function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: SaveModeInfo; onClose: () => void }) {
   const router = useRouter();
   const { projects, saveBuild } = useManualProjects();
-  const { builds, setBuildProject } = useCreateHistory();
+  const { builds, setBuildProject, getChat } = useCreateHistory();
   const { data: market, writeListings } = useMarket();
   // The mode as the dialog opened: the save itself makes the build "saved" a
   // render before it settles, and the dialog must not change under it. The
@@ -254,6 +257,22 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     if (!pending) return;
     // The write held: now the build names its project, and the draft is done.
     if (job.projectId !== pending.projectId) setBuildProject(job.id, pending.projectId);
+    // A new project, or a rebuild's next version: the concept network becomes
+    // the project's network, unless it has one already — the Connection Map
+    // is the maker's (concept-network design S5).
+    const holder = projects.find((p) => p.id === pending.projectId);
+    if (holder && kind !== "join") {
+      const network = networkForSave({
+        existing: readNetwork(holder.id),
+        projectId: holder.id,
+        name: holder.name,
+        products: networkProducts(holder, buildsOf(holder, builds)),
+        job,
+        chat: getChat(job.chatId),
+        now: Date.now(),
+      });
+      if (network) saveNetwork(network);
+    }
     DRAFTS.delete(job.id);
     router.push(`/projects/${pending.projectId}?saved=${encodeURIComponent(job.id)}`);
   });

@@ -6,7 +6,7 @@
   // test pulls in imports other modules RELATIVELY; `paths` is here for the type checker only.
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "es2022"],
+    "lib": ["dom", "dom.iterable", "es2023"],
     "module": "commonjs",
     "moduleResolution": "node10",
     "jsx": "react-jsx",
@@ -22,5 +22,5 @@
       "@/*": ["../../src/*"]
     }
   },
-  "include": ["../../src/lib/manual/**/*", "../../src/lib/brief/**/*", "../../src/lib/wallet/**/*", "../../src/lib/market/**/*", "../../src/lib/video/**/*", "../../src/lib/ui/tab-keys.ts", "../../src/lib/create/save-footer.ts", "../../src/lib/network/products.ts"]
+  "include": ["../../src/lib/manual/**/*", "../../src/lib/brief/**/*", "../../src/lib/wallet/**/*", "../../src/lib/market/**/*", "../../src/lib/video/**/*", "../../src/lib/ui/tab-keys.ts", "../../src/lib/create/save-footer.ts", "../../src/lib/network/products.ts", "../../src/lib/create/concept-network.ts", "../../src/lib/create/companions.ts", "../../src/lib/network/from-concept.ts"]
 }
