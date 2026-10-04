@@ -3,10 +3,11 @@
 // IDEEZA 3D Module — application composer + scene state machine.
 // Every menu item, toolbar icon, panel control, dropdown, slider, and pill is
 // wired so the entire module is interactive end-to-end. localStorage persists
-// shapes + right-panel state so a refresh keeps your work.
+// shapes + right-panel state so a refresh keeps your work — per product
+// (`ideeza:3d:shapes:<projectId>:<productId>`, P2-EDITOR-3).
 
 import * as React from "react";
-import { useStepNav } from "@/components/manual/use-step-nav";
+import { useEditorScope, useStepNav } from "@/components/manual/use-step-nav";
 import { EditorShell } from "@/components/pcb/editor-shell";
 import { TopBar } from "@/components/pcb/top-bar";
 import { ThreeRail } from "@/components/3d/three-rail";
@@ -21,6 +22,11 @@ import { SketchMode, type Sketch } from "@/components/3d/sketch-mode";
 import { ThreeModals } from "@/components/3d/three-modals";
 import { AiGenerateModal } from "@/components/3d/ai-generate-modal";
 import { C } from "@/lib/pcb/colors";
+import { DEFAULT_SHAPES } from "@/lib/three/scene";
+import { editorDocKey } from "@/lib/manual/editor-scope";
+import { fingerprintOf } from "@/lib/manual/build-load";
+import { readSeed } from "@/lib/manual/build-load-io";
+import type { EditorScope } from "@/lib/manual/p2-types";
 
 type ThreeMode = "demo" | "sketch" | "fullview" | "preview";
 type ModalId =
@@ -115,14 +121,21 @@ const SHAPE_FROM_ACTION: Partial<Record<ThreeAction, ShapeType>> = {
   "shape:plane": "plane",
 };
 
-const SHAPES_KEY = "ideeza:3d:shapes";
-const RIGHT_KEY = "ideeza:3d:right";
+/** This product's scene documents. The pre-P2 global `ideeza:3d:*` keys are
+ *  never read here: they belong to no product until the maker brings them in
+ *  (P2-EDITOR-5). */
+function sceneKeys(scope: EditorScope | null) {
+  if (!scope) return null;
+  return {
+    shapes: editorDocKey("three.shapes", scope),
+    right: editorDocKey("three.right", scope),
+    sketches: editorDocKey("three.sketches", scope),
+  };
+}
 
-const DEFAULT_SHAPES: SceneShape[] = [{ ...makeShape("box", [0, 0, 0]), id: "default-cube" }];
-
-function readShapesFromStorage(): SceneShape[] {
+function readShapesFromStorage(key: string): SceneShape[] {
   try {
-    const raw = window.localStorage.getItem(SHAPES_KEY);
+    const raw = window.localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as SceneShape[];
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -131,9 +144,21 @@ function readShapesFromStorage(): SceneShape[] {
   return DEFAULT_SHAPES;
 }
 
-function readRightFromStorage(): RightPanelState {
+/** The scene is still exactly what the product's build seeded
+ *  (P2-BUILDLOAD-3): an enclosure sized in millimetres, far larger than the
+ *  default camera frames, so it opens fitted. */
+function isSeededScene(scope: EditorScope, key: string): boolean {
   try {
-    const raw = window.localStorage.getItem(RIGHT_KEY);
+    const fp = readSeed(scope, window.localStorage)?.seeded["three.shapes"];
+    return fp !== undefined && fp === fingerprintOf("three.shapes", window.localStorage.getItem(key));
+  } catch {
+    return false;
+  }
+}
+
+function readRightFromStorage(key: string): RightPanelState {
+  try {
+    const raw = window.localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw) as RightPanelState;
       if (parsed && parsed.effects && parsed.effects.length === DEFAULT_RIGHT_STATE.effects.length) {
@@ -146,6 +171,8 @@ function readRightFromStorage(): RightPanelState {
 
 export function ThreeApp() {
   const { go: goStep, activeProject } = useStepNav();
+  const editor = useEditorScope();
+  const keys = React.useMemo(() => sceneKeys(editor?.scope ?? null), [editor?.scope]);
   const [mode, setMode] = React.useState<ThreeMode>("demo");
   const [selectedPart, setSelectedPart] = React.useState<string | null>(null);
   // Initial render must match SSR — start with the deterministic default and
@@ -154,13 +181,17 @@ export function ThreeApp() {
   const [right, setRight] = React.useState<RightPanelState>(DEFAULT_RIGHT_STATE);
   const [hydrated, setHydrated] = React.useState(false);
 
-  React.useEffect(() => {
-    setShapes(readShapesFromStorage());
-    setRight(readRightFromStorage());
-    setHydrated(true);
-  }, []);
   const [resetTick, setResetTick] = React.useState(0);
   const [fitTick, setFitTick] = React.useState(0);
+  const scope = editor?.scope ?? null;
+  React.useEffect(() => {
+    if (!keys || !scope) return;
+    setShapes(readShapesFromStorage(keys.shapes));
+    setRight(readRightFromStorage(keys.right));
+    setHydrated(true);
+    // A seeded scene opens on its existing Fit, once.
+    if (isSeededScene(scope, keys.shapes)) setFitTick((t) => t + 1);
+  }, [keys, scope]);
   const [transformMode, setTransformMode] = React.useState<TransformMode>("translate");
   const [mouse, setMouse] = React.useState<{ x: number; y: number; z: number; distance: number } | null>(null);
   const [modal, setModal] = React.useState<ModalId>(null);
@@ -171,13 +202,13 @@ export function ThreeApp() {
   // Persistence — only after hydration so we don't overwrite localStorage with
   // the deterministic SSR default on the initial render.
   React.useEffect(() => {
-    if (!hydrated) return;
-    try { window.localStorage.setItem(SHAPES_KEY, JSON.stringify(shapes)); } catch {}
-  }, [shapes, hydrated]);
+    if (!hydrated || !keys) return;
+    try { window.localStorage.setItem(keys.shapes, JSON.stringify(shapes)); } catch {}
+  }, [shapes, hydrated, keys]);
   React.useEffect(() => {
-    if (!hydrated) return;
-    try { window.localStorage.setItem(RIGHT_KEY, JSON.stringify(right)); } catch {}
-  }, [right, hydrated]);
+    if (!hydrated || !keys) return;
+    try { window.localStorage.setItem(keys.right, JSON.stringify(right)); } catch {}
+  }, [right, hydrated, keys]);
 
   const flashToast = (msg: string) => {
     setToast(msg);
@@ -483,7 +514,7 @@ export function ThreeApp() {
         case "settings:theme":       flashToast("Theme follows IDEEZA system"); return;
         case "settings:resetView":   setResetTick((t) => t + 1); setTransformMode("none"); return;
         case "settings:resetScene": {
-          try { window.localStorage.removeItem(SHAPES_KEY); window.localStorage.removeItem(RIGHT_KEY); window.localStorage.removeItem("ideeza:3d:sketches"); } catch {}
+          try { if (keys) { window.localStorage.removeItem(keys.shapes); window.localStorage.removeItem(keys.right); window.localStorage.removeItem(keys.sketches); } } catch {}
           setShapes(DEFAULT_SHAPES);
           setRight(DEFAULT_RIGHT_STATE);
           setSelectedPart(null);
@@ -578,7 +609,7 @@ export function ThreeApp() {
               flashToast("No extrudable sketches");
             }
             // Clear sketches from storage so we don't re-extrude on next open.
-            try { window.localStorage.removeItem("ideeza:3d:sketches"); } catch {}
+            try { if (keys) window.localStorage.removeItem(keys.sketches); } catch {}
             setMode("demo");
             setTransformMode("translate");
           }}
@@ -764,10 +795,7 @@ export function ThreeApp() {
       <AiGenerateModal
         open={aiOpen}
         onClose={() => setAiOpen(false)}
-        projectId={activeProject?.id}
-        defaultPrompt={
-          activeProject?.productName?.trim() || activeProject?.name?.trim() || ""
-        }
+        defaultPrompt={editor?.productName || activeProject?.name?.trim() || ""}
       />
 
       {toast && (

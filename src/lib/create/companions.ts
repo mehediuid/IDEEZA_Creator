@@ -136,6 +136,19 @@ const RULES: Rule[] = [
     ],
   },
   {
+    // "A remote control and car", "a remote-controlled boat": the prompt names
+    // the handheld beside the vehicle. A phone or app remote is inside the
+    // product, not beside it.
+    match: /^(?=[\s\S]*\bremotes?\b)(?=[\s\S]*\b(cars?|trucks?|boats?|tanks?|rovers?|robots?|planes?|helicopters?)\b)/i,
+    unless: /\b(phones?|smartphones?|apps?)\b/i,
+    companions: [
+      {
+        name: "Remote controller",
+        why: "The vehicle is driven from a separate handheld unit with its own radio and battery.",
+      },
+    ],
+  },
+  {
     match: /\b(earbuds?|earphones?|earpieces?|in-ear|tws)\b/i,
     companions: [
       {

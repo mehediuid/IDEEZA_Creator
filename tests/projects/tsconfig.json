@@ -1,0 +1,26 @@
+{
+  // The node:test harness for the pure modules under src/lib.
+  //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
+  // (npm run test:projects). src/lib/<path>.ts compiles to .tmp-test/lib/<path>.js, which a test
+  // imports as ../../.tmp-test/lib/<path>.js. tsc leaves `@/…` specifiers as written, so a module a
+  // test pulls in imports other modules RELATIVELY; `paths` is here for the type checker only.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "es2023"],
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "rootDir": "../../src",
+    "outDir": "../../.tmp-test",
+    "paths": {
+      "@/*": ["../../src/*"]
+    }
+  },
+  "include": ["../../src/lib/manual/**/*", "../../src/lib/brief/**/*", "../../src/lib/wallet/**/*", "../../src/lib/market/**/*", "../../src/lib/video/**/*", "../../src/lib/ui/tab-keys.ts", "../../src/lib/create/save-footer.ts", "../../src/lib/network/products.ts", "../../src/lib/create/concept-network.ts", "../../src/lib/create/companions.ts", "../../src/lib/network/from-concept.ts"]
+}

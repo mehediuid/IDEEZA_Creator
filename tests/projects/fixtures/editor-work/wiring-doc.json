@@ -1,0 +1,11 @@
+{
+  "parts": [
+    { "id": "part_1", "kind": "led", "x": 10, "y": 10 },
+    { "id": "part_2", "kind": "button", "x": 40, "y": 10 },
+    { "id": "part_3", "kind": "buzzer", "x": 70, "y": 10 }
+  ],
+  "wires": [
+    { "id": "wire_1", "fromPart": "part_1", "fromPin": "a", "toPart": "part_2", "toPin": "b" },
+    { "id": "wire_2", "fromPart": "part_2", "fromPin": "a", "toPart": "part_3", "toPin": "b" }
+  ]
+}

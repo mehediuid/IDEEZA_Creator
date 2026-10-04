@@ -10,6 +10,8 @@ export function StateCard({
   body,
   action,
   className,
+  titleAs = "p",
+  titleRef,
 }: {
   tone: "empty" | "error";
   icon: React.ReactNode;
@@ -17,7 +19,14 @@ export function StateCard({
   body: string;
   action?: React.ReactNode;
   className?: string;
+  /** "h1" when the card is the whole page (a not-found state), so the page
+   *  keeps its one h1. */
+  titleAs?: "p" | "h1";
+  /** With titleAs="h1": the page moves focus to the title on arrival, so the
+   *  h1 takes tabIndex -1. */
+  titleRef?: React.Ref<HTMLHeadingElement>;
 }) {
+  const titleClass = "text-3xl font-semibold leading-3xl tracking-slight text-text-primary";
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
@@ -36,7 +45,13 @@ export function StateCard({
         {icon}
       </span>
       <div className="flex flex-col gap-[4px]">
-        <p className="text-3xl font-semibold leading-3xl tracking-slight text-text-primary">{title}</p>
+        {titleAs === "h1" ? (
+          <h1 ref={titleRef} tabIndex={-1} className={cn(titleClass, "outline-none")}>
+            {title}
+          </h1>
+        ) : (
+          <p className={titleClass}>{title}</p>
+        )}
         <p className="text-md leading-md text-text-secondary">{body}</p>
       </div>
       {action}

@@ -9,7 +9,10 @@ import { CreateHistoryProvider } from "@/lib/create/history";
 import { CreatePlanProvider } from "@/lib/create/plan";
 import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
+import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
+import { WalletProvider } from "@/components/wallet/wallet-provider";
+import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -30,10 +33,19 @@ function ToastLayer() {
       {/* At phone width it docks at the foot instead: top-centre it covered
           the menu button and the Canvas/Chat tabs, so nothing could be
           reached until the toast was dismissed. There it shares the foot
-          with a render toast, so it stands on top of one when one is up. */}
+          with a render toast, so it stands on top of one when one is up
+          (and of its "+N more videos" line under it, when there is one).
+          From `md` it used to sit at top-16px, which the project page's own
+          header then had to fit under — its title, action pair and Preview
+          as buyer all sit on that same first row (spec §3.3, COR-8), and a
+          two-line attention message reached as far as the button (COR-103,
+          "the attention toast never covers the header primary"). No
+          (create) page has a separate app bar above its own header (the
+          shell is sidebar + `main`, `(create)/layout.tsx`), so 132px clears
+          every page's first row instead of measuring one page at a time. */}
       <div
         id="ideeza-toast-layer"
-        className="pointer-events-none fixed bottom-[16px] left-1/2 z-toast flex -translate-x-1/2 flex-col items-center gap-[8px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] md:bottom-auto md:top-[16px]"
+        className="pointer-events-none fixed bottom-[16px] left-1/2 z-toast flex -translate-x-1/2 flex-col items-center gap-[8px] max-md:[body:has(.ix-render-toast)_&]:bottom-[88px] max-md:[body:has(.ix-render-toast):has(.ix-render-more)_&]:bottom-[120px] md:bottom-auto md:top-[132px]"
       >
         <div
           id="ideeza-toast-layer-attention"
@@ -78,30 +90,38 @@ export default function RootLayout({
                 now a thin view over the active project's flowState, so
                 ManualProjectsProvider must sit OUTSIDE it. */}
             <ManualProjectsProvider>
-              <ProductFlowProvider>
-                <VideoJobsProvider>
-                  {/* CreateHistoryProvider sits at the root so the home
-                      hero (in the dashboard layout) can mint a new chat
-                      session and route to it, AND the (create) routes
-                      can read/mutate the same store. CreatePlanProvider
-                      powers the QuotaCard on /history; CreditsProvider
-                      powers the Credits card beside it and is where a
-                      full-product build charges/refunds credits. */}
-                  <CreatePlanProvider>
-                    <CreditsProvider>
-                      <CreateHistoryProvider>
-                        {children}
-                        {/* A build is a background job: it has to keep
-                            running whatever page the user is on, so the
-                            worker lives here rather than on the build
-                            page. Renders nothing. */}
-                        <BuildSimulator />
-                        <GlobalRenderIndicator />
-                      </CreateHistoryProvider>
-                    </CreditsProvider>
-                  </CreatePlanProvider>
-                </VideoJobsProvider>
-              </ProductFlowProvider>
+              {/* MarketProvider: listings, sales, bids and support, read by the
+                  project page, My projects and Explore marketplace alike. */}
+              <MarketProvider>
+                <ProductFlowProvider>
+                  <VideoJobsProvider>
+                    {/* CreateHistoryProvider sits at the root so the home
+                        hero (in the dashboard layout) can mint a new chat
+                        session and route to it, AND the (create) routes
+                        can read/mutate the same store. CreatePlanProvider
+                        powers the QuotaCard on /history; CreditsProvider
+                        powers the Credits card beside it and is where a
+                        full-product build charges/refunds credits. */}
+                    <CreatePlanProvider>
+                      <CreditsProvider>
+                        <CreateHistoryProvider>
+                          {/* WalletProvider: the one Demo wallet dialog and
+                              useWalletRequest(), inside the projects and
+                              market stores its requests write to. */}
+                          <WalletProvider>{children}</WalletProvider>
+                          {/* A build is a background job: it has to keep
+                              running whatever page the user is on, so the
+                              worker lives here rather than on the build
+                              page. Renders nothing. */}
+                          <BuildSimulator />
+                          <GlobalRenderIndicator />
+                          <PlanRunner />
+                        </CreateHistoryProvider>
+                      </CreditsProvider>
+                    </CreatePlanProvider>
+                  </VideoJobsProvider>
+                </ProductFlowProvider>
+              </MarketProvider>
             </ManualProjectsProvider>
           </PcbProvider>
         </ThemeProvider>

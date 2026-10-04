@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:projects": "rm -rf .tmp-test && tsc -p tests/projects/tsconfig.json && node --test \"tests/projects/*.test.mjs\""
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.2.0",
@@ -19,6 +20,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.18.0",
+    "mp4-muxer": "5.2.2",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",

@@ -20,9 +20,10 @@ export const CREDITS_NOTICE_ID = "build-credits";
 /** The review wrapper a build's deliverables land in. */
 export const BUILD_REVIEW_ID = "build-review";
 
-/** The review's Open in editor (Open Project, once saved) — where a built
- *  product's spec changes, and where its sheet's jump lands. */
-export const OPEN_IN_EDITOR_ID = "build-open-in-editor";
+/** The review footer's one primary (P2-SAVE-1, P2-SAVE-10): Save Project
+ *  before the build is saved, Open project after. A built product's sheet
+ *  jumps here ("Show on canvas"), and the save step hands focus back to it. */
+export const REVIEW_PRIMARY_ID = "build-review-primary";
 
 /** The Add-a-product section (suggested chips, removed chips, the name field). */
 export const ADD_PRODUCT_ID = "add-product";

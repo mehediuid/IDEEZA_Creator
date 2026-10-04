@@ -2,7 +2,7 @@
 
 // BuildShell — /build/[jobId]. A build lives in its chat now, so this page
 // sends anyone whose browser still holds that chat straight there (keeping a
-// deep link's ?tab=). It stays a page of its own only for a build whose chat
+// deep link's ?tab=, and the Brief's ?save=1, P2-SAVE-13). It stays a page of its own only for a build whose chat
 // is gone: the rail lists the pipeline and the whole-build states, and the
 // canvas is the same review surface the chat shows.
 
@@ -35,12 +35,17 @@ function BuildShellInner({ jobId }: { jobId: string }) {
   // A build lives in its chat — the conversation, the rail and the composer
   // stay with it there. This page only remains for a build whose chat this
   // browser no longer holds; anything else goes home to the chat, keeping a
-  // deep link's tab.
+  // deep link's tab — and `save=1`, the Brief's hand-off for a build with no
+  // project, which opens the save step there (P2-SAVE-13).
   const chatId = job && getChat(job.chatId) ? job.chatId : null;
   React.useEffect(() => {
     if (!chatId) return;
+    const forward = new URLSearchParams();
     const tab = query.get("tab");
-    router.replace(`/chat/${chatId}${tab ? `?tab=${encodeURIComponent(tab)}` : ""}`);
+    if (tab) forward.set("tab", tab);
+    if (query.get("save") === "1") forward.set("save", "1");
+    const qs = forward.toString();
+    router.replace(`/chat/${chatId}${qs ? `?${qs}` : ""}`);
   }, [chatId, query, router]);
   useBuildModel(chatId ? null : job);
   // Shared between the rail and the canvas, so picking a product in one

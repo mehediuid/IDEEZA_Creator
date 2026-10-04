@@ -45,6 +45,10 @@ const TONES = {
     box: "border-[var(--color-border-error)] bg-[var(--color-bg-error-subtle)] text-[color:var(--color-text-error)]",
     boxed: true,
     glyph: "M15 9l-6 6M9 9l6 6M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    // The error red on its own fill reads 4.4:1 in light and 3.6:1 in dark,
+    // short of 4.5:1 for words. The glyph, the edge and the fill carry the
+    // tone (≥ 3:1 is enough for them); the sentence takes the page's ink.
+    words: "text-[color:var(--color-text-primary)]",
   },
 } as const;
 
@@ -60,10 +64,17 @@ export interface BannerProps {
    */
   title?: React.ReactNode;
   children: React.ReactNode;
+  /**
+   * A control the banner offers alongside its message — e.g. Preview as
+   * buyer's Exit preview (PPL-5), or a pending-version notice's Review
+   * version / Open chat (COR-18). Right-aligned, vertically centered with
+   * the text. Absent by default, so every existing Banner is unchanged.
+   */
+  action?: React.ReactNode;
   className?: string;
 }
 
-export function Banner({ tone, title, children, className }: BannerProps) {
+export function Banner({ tone, title, children, action, className }: BannerProps) {
   const t = TONES[tone];
   return (
     <div
@@ -98,8 +109,9 @@ export function Banner({ tone, title, children, className }: BannerProps) {
           <span className="mt-[var(--spacing-1)] block text-[length:var(--font-size-sm)] text-[color:var(--color-text-secondary)]">{children}</span>
         </span>
       ) : (
-        <span className="min-w-0 flex-1">{children}</span>
+        <span className={cn("min-w-0 flex-1", "words" in t && t.words)}>{children}</span>
       )}
+      {action && <span className="shrink-0 self-center">{action}</span>}
     </div>
   );
 }

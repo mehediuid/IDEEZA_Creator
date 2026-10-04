@@ -9,6 +9,7 @@
 // Function categories use Blockly's button handlers to create/list dynamics.
 
 import * as React from "react";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
 import { AiChatPanel, AI_BOT_ICON, hasAiHandoff } from "./ai-chat";
 import * as Blockly from "blockly/core";
 import "blockly/blocks";
@@ -16,6 +17,11 @@ import { javascriptGenerator } from "blockly/javascript";
 import { pythonGenerator } from "blockly/python";
 import * as En from "blockly/msg/en";
 import { C } from "@/lib/pcb/colors";
+import { Icon } from "@/components/dashboard/icon";
+import { StateCard } from "@/components/ideeza";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { editorDocKey } from "@/lib/manual/editor-scope";
+import type { EditorScope } from "@/lib/manual/p2-types";
 import { CODE_EVENT, type CodeAction } from "./code-menu-strip";
 
 Blockly.setLocale(En as unknown as { [key: string]: string });
@@ -157,7 +163,9 @@ const IdeezaTheme = Blockly.Theme.defineTheme("ideeza", {
   },
 });
 
-const STORAGE_KEY = "ideeza:code:blockly-workspace";
+/** The workspace is per product (`ideeza:code:blockly-workspace:<projectId>:<productId>`,
+ *  P2-EDITOR-3); the pre-P2 global one is the maker's to bring in (P2-EDITOR-5). */
+const blocklyKey = (scope: EditorScope | null) => (scope ? editorDocKey("code.blockly", scope) : null);
 
 function ChevronRight({ down }: { down?: boolean }) {
   return (
@@ -560,10 +568,28 @@ function CodePreviewCard({ code, lang, onLang }: { code: string; lang: "javascri
   );
 }
 
+/** Downloads a workspace's XML, as Settings ▸ Export Workspace… does. */
+function downloadXml(xml: string) {
+  const blob = new Blob([xml], { type: "application/xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ideeza-blockly.xml";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function BlocklyImpl() {
+  // The Code app is keyed by product, so this key is fixed for the mount.
+  const storageKey = blocklyKey(useEditorScope()?.scope ?? null);
   const wsHostRef = React.useRef<HTMLDivElement>(null);
   const wsRef = React.useRef<Blockly.WorkspaceSvg | null>(null);
   const [ws, setWs] = React.useState<Blockly.WorkspaceSvg | null>(null);
+  // C2: the saved XML Blockly couldn't load. While it is set nothing is
+  // saved, so the stored workspace stays exactly as it was; Export
+  // Workspace… hands it over as saved.
+  const unreadableRef = React.useRef<string | null>(null);
+  const [unreadable, setUnreadable] = React.useState(false);
 
   const [previewTab, setPreviewTab] = React.useState<PreviewTab>("blocks");
   const [lang, setLang] = React.useState<"javascript" | "python">("javascript");
@@ -600,22 +626,31 @@ export function BlocklyImpl() {
     wsRef.current = newWs;
     setWs(newWs);
 
+    let xml: string | null = null;
     try {
-      const xml = window.localStorage.getItem(STORAGE_KEY);
-      if (xml) {
-        const dom = Blockly.utils.xml.textToDom(xml);
-        Blockly.Xml.domToWorkspace(dom, newWs);
-      }
+      xml = storageKey ? window.localStorage.getItem(storageKey) : null;
     } catch {}
+    if (xml) {
+      try {
+        Blockly.Xml.domToWorkspace(Blockly.utils.xml.textToDom(xml), newWs);
+      } catch {
+        // Never save over a workspace that didn't load: what loaded before
+        // the throw is dropped, and the maker is told instead.
+        unreadableRef.current = xml;
+        newWs.clear();
+        setUnreadable(true);
+      }
+    }
 
     const regen = () => {
+      if (unreadableRef.current !== null) return;
       try {
         const gen = lang === "python" ? pythonGenerator : javascriptGenerator;
         setGenerated(gen.workspaceToCode(newWs));
       } catch {}
       try {
         const xml = Blockly.Xml.workspaceToDom(newWs);
-        window.localStorage.setItem(STORAGE_KEY, Blockly.Xml.domToText(xml));
+        if (storageKey) window.localStorage.setItem(storageKey, Blockly.Xml.domToText(xml));
       } catch {}
     };
     regen();
@@ -653,6 +688,11 @@ export function BlocklyImpl() {
       const cur = wsRef.current;
       if (!cur) return;
       const action = (e as CustomEvent<{ action: CodeAction }>).detail?.action;
+      const saved = unreadableRef.current;
+      if (saved !== null) {
+        if (action === "settings:exportXml") downloadXml(saved);
+        return;
+      }
       switch (action) {
         case "edit:undo": cur.undo(false); return;
         case "edit:redo": cur.undo(true); return;
@@ -704,17 +744,9 @@ export function BlocklyImpl() {
           return;
         }
         case "settings:clearWorkspace": cur.clear(); return;
-        case "settings:exportXml": {
-          const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(cur));
-          const blob = new Blob([xml], { type: "application/xml" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "ideeza-blockly.xml";
-          a.click();
-          URL.revokeObjectURL(url);
+        case "settings:exportXml":
+          downloadXml(Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(cur)));
           return;
-        }
         case "settings:importXml": {
           const input = document.createElement("input");
           input.type = "file";
@@ -744,7 +776,7 @@ export function BlocklyImpl() {
 
   const addBlock = (type: string, dropClientPos?: { x: number; y: number }) => {
     const cur = wsRef.current;
-    if (!cur || !wsHostRef.current) return;
+    if (!cur || !wsHostRef.current || unreadableRef.current !== null) return;
     try {
       const block = cur.newBlock(type);
       block.initSvg();
@@ -795,6 +827,7 @@ export function BlocklyImpl() {
     <div style={{ position: "absolute", inset: 0, display: "flex" }}>
       {/* LEFT LIBRARY PANEL */}
       <div
+        inert={unreadable}
         style={{
           width: 270,
           margin: "var(--spacing-4)",
@@ -905,7 +938,7 @@ export function BlocklyImpl() {
       </div>
 
       {/* CANVAS / PREVIEW AREA */}
-      <div style={{ flex: 1, position: "relative", margin: "var(--spacing-4) var(--spacing-4) var(--spacing-4) 0", borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
+      <div inert={unreadable} style={{ flex: 1, position: "relative", margin: "var(--spacing-4) var(--spacing-4) var(--spacing-4) 0", borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--color-bg-surface)", border: "var(--border-width-1) solid var(--color-border-subtle)" }}>
         <div
           ref={wsHostRef}
           onDragOver={onWorkspaceDragOver}
@@ -919,6 +952,16 @@ export function BlocklyImpl() {
         {previewTab === "code" && <CodePreviewCard code={generated} lang={lang} onLang={setLang} />}
         <PreviewTabs value={previewTab} onChange={setPreviewTab} />
       </div>
+      {unreadable && (
+        <div className="absolute inset-0 z-[var(--z-sticky)] flex items-center justify-center bg-bg-page px-[16px]">
+          <StateCard
+            tone="error"
+            icon={<Icon icon={AlertCircleIcon} size={32} />}
+            title="These blocks couldn't be opened"
+            body="Blockly couldn't read this product's saved workspace, so it's kept exactly as it was saved and nothing here changes it. Settings ▸ Export Workspace… downloads it."
+          />
+        </div>
+      )}
     </div>
   );
 }

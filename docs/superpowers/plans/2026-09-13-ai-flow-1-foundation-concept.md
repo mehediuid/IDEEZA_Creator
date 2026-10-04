@@ -213,5 +213,5 @@ Generate modal (560 px): ⓘ glyph (`--color-bg-info-subtle`/`--color-icon-info`
 - [ ] **Step 1: Refine overlay copy/composer/blur.**
 - [ ] **Step 2: Modal rebuild** + summarize fetch + startBuild wiring.
 - [ ] **Step 3: tsc + CDP**: open overlay from a card → title reads "Refining Concept 1"; open modal → five tiles, chips, width 560; confirm → a build with 5 items and `title` set appears in `ideeza:create:builds`.
-- [ ] **Step 4: Update CLAUDE.md §5 "AI create & build flow"** (credits ledger, five deliverables + queue, concept lineage labels, live render progress, card states, header-less chat, home hero) and STRUCTURE.md (new files: `lib/create/credits.tsx`, `lib/create/build-artifacts.ts`, `lib/voice/use-voice-input.ts`, `api/concept/summarize`).
+- [ ] **Step 4: Update CLAUDE.md §5 (now `docs/guides/features/ai-create-flow.md`) "AI create & build flow"** (credits ledger, five deliverables + queue, concept lineage labels, live render progress, card states, header-less chat, home hero) and STRUCTURE.md (new files: `lib/create/credits.tsx`, `lib/create/build-artifacts.ts`, `lib/voice/use-voice-input.ts`, `api/concept/summarize`).
 - [ ] **Step 5: Commit** `feat(create): refine overlay + Generate-full-product modal to Figma (Ai-Flow 05/09); docs`.

@@ -49,12 +49,14 @@ const RADIO_RULES: [RegExp, ProtocolKey[]][] = [
   [/esp8266|esp-?12|esp-?01/, ["WF", "EN"]],
   [/wi-?fi|wlan|cc3200|rtl87|atwinc|pico ?w/, ["WF"]],
   [/\bble\b|bluetooth|nrf52|hm-?10|hc-?0[56]/, ["BL"]],
+  [/nrf24/, ["NR"]],
   [/zigbee|xbee|cc2530|cc2652|efr32/, ["ZB"]],
   [/\bthread\b|matter/, ["MT"]],
   [/lora|sx12[5-8]\d|rfm9[5-8]|ra-0[12]/, ["LR"]],
   [/\bcan\b|can bus|mcp2515|tja10\d\d|sn65hvd23/, ["CN"]],
   [/rs-?485|max3?485/, ["R5"]],
   [/rs-?232|max3?232/, ["R2"]],
+  [/sim\d{3}|\bgsm\b|\blte\b|cellular/, ["CL"]],
 ];
 
 export function detectRadios(parts: PartLike[]): ProtocolKey[] {
@@ -202,28 +204,47 @@ const touches = (l: MapLink, id: string) => l.from === id || l.to === id;
 
 // ───────────────────────── roles (Figma Role rules) ─────────────────────────
 
+/** A link as the role rules read it from one end: as drawn, except that a
+ *  two-way link carrying commands goes from the one that gives them — the
+ *  telemetry back doesn't make the one that takes orders a peer. */
+function roleDirection(l: MapLink, id: string): "out" | "in" | "both" | null {
+  if (l.initiator === "both" && l.carries === "commands" && touches(l, id)) return starter(l) === id ? "out" : "in";
+  return directionAt(l, id);
+}
+
 export function pickMaster(productIds: string[], links: MapLink[]): string | null {
   const twoWay = (id: string, carries?: Carries[]) =>
     links.some(
       (l) =>
         touches(l, id) &&
-        l.initiator === "both" &&
+        roleDirection(l, id) === "both" &&
         (!carries || carries.includes(l.carries)),
     );
+  // With no two-way link, the product that only gives commands is the one
+  // its Slaves answer to — a remote and the car it drives.
+  const commands = (id: string) => {
+    const own = links.filter((l) => touches(l, id));
+    return own.length > 0 && own.every((l) => roleDirection(l, id) === "out") && own.some(givesCommands);
+  };
   return (
     productIds.find((id) => twoWay(id, ["sensor", "data+commands"])) ??
     productIds.find((id) => twoWay(id)) ??
+    productIds.find(commands) ??
     null
   );
 }
+
+const givesCommands = (l: MapLink) => l.carries === "commands" || l.carries === "data+commands";
 
 export function roleOf(id: string, links: MapLink[], masterId: string | null): Role {
   const own = links.filter((l) => touches(l, id));
   if (!own.length) return "Standby";
   if (new Set(own.map((l) => l.protocol)).size >= 2) return "Gateway";
-  const dirs = own.map((l) => directionAt(l, id));
+  const dirs = own.map((l) => roleDirection(l, id));
   if (dirs.includes("both")) return id === masterId ? "Master" : "Peer";
-  if (dirs.every((d) => d === "out")) return "Independent";
+  // Figma: "Outgoing only, carries events only" is Independent. One that
+  // sends commands is the Master of the product that receives them.
+  if (dirs.every((d) => d === "out")) return own.some(givesCommands) ? "Master" : "Independent";
   if (dirs.every((d) => d === "in")) return "Slave";
   return "Peer";
 }

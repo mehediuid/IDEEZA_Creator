@@ -2490,7 +2490,7 @@ Replace the whole `WHAT_SHIPS` block (its comment stays, reworded as below) with
 // Read from the spec the build was booked with, so the numbers here are the
 // numbers the maker saw on the card and at the gate. No download or export
 // control lives on this panel, so no line names a file you could take away
-// (CLAUDE.md §6, "no promises without delivery").
+// (AGENTS.md, Coding conventions: "Real logic, never stubs").
 export function coversFor(kind: BuildItemKind, product: ArtifactSource): string[] {
   const spec = specOfSource(product);
   const asked =
@@ -2804,7 +2804,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/components/projects/project-details.tsx`
-- Modify: `CLAUDE.md` (§5, own hunk only)
+- Modify: `CLAUDE.md` (§5, now `docs/guides/features/ai-create-flow.md`; own hunk only)
 - Modify: `STRUCTURE.md`
 - Modify: `docs/superpowers/specs/2026-09-25-product-spec-sheet-design.md` (the conflict indicator's place)
 
@@ -2828,11 +2828,11 @@ In `project-details.tsx`, import `productsOf` from `@/lib/create/history` (merge
 
 In the spec doc's "Closed card" bullet, replace "A **Size conflict** chip in the header when S3 applies." with "When S3 applies, the size fact itself turns to the error tone and reads *… · doesn't fit* (*… · Draft* once the maker chooses Draft) — the header already carries the name, *In build* and remove, and a fourth item there cut the name again." Commit it with this task.
 
-- [ ] **Step 3: STRUCTURE.md and CLAUDE.md §5**
+- [ ] **Step 3: STRUCTURE.md and CLAUDE.md §5 (now `docs/guides/features/ai-create-flow.md`)**
 
 STRUCTURE.md: under `src/lib/`, add a `spec/` line: "The product spec sheet — part bodies, packs, size/board/power math, hint and snapshot checks, the words (types, units, batteries, bodies, derive, hints, format)." Under `src/components/create/`, add `spec-panel.tsx` and `buttons.ts`.
 
-CLAUDE.md §5: after the "**The canvas grows, trims and chooses the project's products** …" bullet, add:
+CLAUDE.md §5 (now `docs/guides/features/ai-create-flow.md`): after the "**The canvas grows, trims and chooses the project's products** …" bullet, add:
 
 ```md
 - **Every concept card carries its spec sheet** (2026-09-25, `docs/superpowers/specs/2026-09-25-product-spec-sheet-design.md`). `src/lib/spec/` works out size, board, power and fit from the concept's parts (datasheet body table + packs); the summarize call also returns battery/material hints, read in the background as each drawing lands (one request at a time) and kept on the turn. The maker edits size, battery and material on the card (`answer.specs`); board, radio, parts and fab profile are read-only there. A size the parts can't fit holds the build until it is fixed or accepted as Draft. The build stores a snapshot (`BuildJob.spec`, `BuildProduct.spec`); review, the gate, confidence (power budget + fit, with passes shown) and the project page read it. Fab profile is the S7 default until a partner is named.

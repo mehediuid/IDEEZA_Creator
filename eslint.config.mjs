@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The node:test harness's compiled output (tests/projects/tsconfig.json).
+    ".tmp-test/**",
   ]),
   {
     // Verbatim ports of the prototype's display-only HTML string builders.

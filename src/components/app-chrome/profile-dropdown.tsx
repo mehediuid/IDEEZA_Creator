@@ -6,11 +6,14 @@
 // account / settings / sign-out items.
 //
 // Items show a small icon + label + optional secondary line (e.g., wallet
-// status). All click handlers are stubs for now — they emit a toast so the
-// dropdown feels alive. The two relocated actions (Earn IDZ + Connect Wallet)
-// keep their distinctive styling so the user still notices them.
+// status). The account items are still stubs — they emit a toast so the
+// dropdown feels alive. The wallet row is real (P2-MINT-2): it is the same
+// WalletMenuEntry the dashboard sidebar carries, and it opens the Demo
+// wallet dialog. The trigger is a keyboard button, so the entry — and the
+// dialog behind it — can be reached without a mouse.
 
 import * as React from "react";
+import { WalletMenuEntry } from "@/components/wallet/wallet-menu-entry";
 
 export function ProfileDropdown({
   trigger,
@@ -20,6 +23,7 @@ export function ProfileDropdown({
   const [open, setOpen] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (!open) return;
@@ -29,7 +33,10 @@ export function ProfileDropdown({
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -52,7 +59,25 @@ export function ProfileDropdown({
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
-      <div onClick={() => setOpen((v) => !v)} style={{ cursor: "pointer" }}>
+      {/* The pill is a <div> the TopBar passes in, so the button role lives
+          on this wrapper: Enter and Space open it as a click does. */}
+      <div
+        ref={triggerRef}
+        role="button"
+        tabIndex={0}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account menu"
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
+        className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+        style={{ cursor: "pointer" }}
+      >
         {trigger}
       </div>
 
@@ -152,27 +177,15 @@ export function ProfileDropdown({
             onClick={() => fire("Earn IDZ (will open the rewards page)")}
           />
 
-          {/* Featured row — Connect Wallet (relocated from TopBar) */}
-          <FeaturedItem
-            icon={
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--color-text-primary)"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="2" y="6" width="20" height="13" rx="3" />
-                <path d="M16 12h4" />
-                <circle cx="17" cy="12" r="1" fill="currentColor" />
-              </svg>
-            }
-            label="Connect wallet"
-            sub="Ethereum · Polygon · Solana"
-            onClick={() => fire("Wallet connect (opens chain picker)")}
+          {/* The wallet's one standing home in the editor chrome
+              (P2-MINT-2). Focus goes to the pill first, so the dialog hands
+              it back there — the entry closes with the menu. */}
+          <WalletMenuEntry
+            variant="dropdown"
+            onOpen={() => {
+              triggerRef.current?.focus();
+              setOpen(false);
+            }}
           />
 
           <Separator />

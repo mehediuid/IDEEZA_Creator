@@ -47,7 +47,7 @@ TypeScript, Tailwind preset over `src/styles/tokens.css`, `@hugeicons`.
 | `src/components/network/network-section.tsx` | project-page section (Figma 01 / 10) |
 | `src/components/network/connection-map-page.tsx` | Figma 11–17 |
 | `src/app/(create)/projects/[id]/network/page.tsx` | route |
-| edits | `review-outputs.tsx` (HeaderAction → live), `project-details.tsx` (section), `CLAUDE.md` §5, `STRUCTURE.md` |
+| edits | `review-outputs.tsx` (HeaderAction → live), `project-details.tsx` (section), `CLAUDE.md` §5 (now `docs/guides/features/platform-and-projects.md`), `STRUCTURE.md` |
 
 ## Tasks
 
@@ -75,4 +75,4 @@ TypeScript, Tailwind preset over `src/styles/tokens.css`, `@hugeicons`.
 
 ### Task 6: Verify + docs
 - [ ] CDP run in headless Chrome: seed project + build, run wizard via AI (with the model unreachable too → fallback banner), manual draw by port clicks, review edits, create, reload, map read/edit/save, master-change warning, settings, delete; dark + light screenshots beside the Figma frames.
-- [ ] lint (no new errors), `npm run build`, CLAUDE.md §5 + STRUCTURE.md. Commit.
+- [ ] lint (no new errors), `npm run build`, CLAUDE.md §5 (now `docs/guides/features/platform-and-projects.md`) + STRUCTURE.md. Commit.

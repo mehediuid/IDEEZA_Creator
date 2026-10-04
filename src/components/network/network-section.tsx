@@ -11,7 +11,7 @@ import Link from "next/link";
 import { ArrowRight01Icon, ConnectIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { cn } from "@/lib/utils";
-import type { BuildJob } from "@/lib/create/history";
+import type { BuildRef } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { protocolInfo } from "@/lib/network/catalog";
 import { linkTitle, nodeName, rolesOf } from "@/lib/network/derive";
@@ -24,14 +24,14 @@ import { RoleChip, SectionTitle, btn } from "./ui";
 
 export const networkHref = (projectId: string) => `/projects/${projectId}/network`;
 
-export function NetworkSection({ project, build }: { project: ManualProject; build: BuildJob | null }) {
+export function NetworkSection({ project, refs }: { project: ManualProject; refs: BuildRef[] }) {
   const router = useRouter();
   const { hydrated, network } = useProjectNetwork(project.id);
   const [open, setOpen] = React.useState(false);
-  const products = React.useMemo(() => networkProducts(project, build), [project, build]);
+  const products = React.useMemo(() => networkProducts(project, refs), [project, refs]);
 
   return (
-    <section aria-labelledby="network-heading" className="mt-16">
+    <section aria-labelledby="network-heading">
       <h2 id="network-heading" className="text-lg font-bold text-text-primary">
         Network
       </h2>
@@ -44,7 +44,11 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
           <p className="max-w-[56ch] text-sm text-text-secondary">
             A network records which products in this project talk to each other, over which protocol, and what each one does.
           </p>
-          <button type="button" className={cn(btn.primary, "mt-2")} onClick={() => setOpen(true)}>
+          <button
+            type="button"
+            className={cn(btn.quiet, "mt-2 max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]")}
+            onClick={() => setOpen(true)}
+          >
             Create Network
           </button>
         </div>
@@ -54,7 +58,7 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
       {open && (
         <AddNetworkDialog
           project={project}
-          build={build}
+          refs={refs}
           onClose={() => setOpen(false)}
           onViewNetwork={() => router.push(networkHref(project.id))}
         />
@@ -63,14 +67,21 @@ export function NetworkSection({ project, build }: { project: ManualProject; bui
   );
 }
 
-function NetworkSummary({
+export function NetworkSummary({
   project,
   network,
   products,
+  readOnly = false,
 }: {
   project: ManualProject;
   network: NonNullable<ReturnType<typeof useProjectNetwork>["network"]>;
   products: ReturnType<typeof networkProducts>;
+  /** Preview as buyer (COR-49): the summary without View Network, its one
+   *  write control — connections, products and roles are facts, so they
+   *  still show. The summary carries no violet in either mode: the page
+   *  keeps its one violet for its primary action, and a buyer's page has
+   *  none (PPL-6). */
+  readOnly?: boolean;
 }) {
   const members = products.filter((p) => network.productIds.includes(p.id));
   const roles = rolesOf(network.productIds, network.links, network.masterId);
@@ -83,10 +94,12 @@ function NetworkSummary({
           <p className="truncate text-md font-semibold text-text-primary">{network.name || "Unnamed Network"}</p>
           <p className="mt-1 text-sm text-text-secondary">{networkMeta(network)}</p>
         </div>
-        <Link href={networkHref(project.id)} className={cn(btn.quiet, "no-underline")}>
-          View Network
-          <Icon icon={ArrowRight01Icon} size={16} />
-        </Link>
+        {!readOnly && (
+          <Link href={networkHref(project.id)} className={cn(btn.quiet, "no-underline")}>
+            View Network
+            <Icon icon={ArrowRight01Icon} size={16} />
+          </Link>
+        )}
       </div>
       <div className="flex flex-col gap-4">
         <SectionTitle>Connections</SectionTitle>
@@ -97,7 +110,7 @@ function NetworkSummary({
                 <p className="truncate text-sm font-medium text-text-primary">{linkTitle(l, name)}</p>
                 <p className="truncate text-xs text-text-secondary">{l.label}</p>
               </div>
-              <span className="shrink-0 text-xs font-semibold text-text-brand">
+              <span className="shrink-0 text-xs font-semibold text-text-secondary">
                 {l.from === "app" || l.to === "app" ? "Cloud" : protocolInfo(l.protocol).name}
               </span>
             </li>
@@ -110,7 +123,7 @@ function NetworkSummary({
           {members.map((p) => (
             <li key={p.id} className={row}>
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">{p.name}</span>
-              <RoleChip role={roles[p.id] ?? "Standby"} />
+              <RoleChip role={roles[p.id] ?? "Standby"} quiet />
             </li>
           ))}
         </ul>

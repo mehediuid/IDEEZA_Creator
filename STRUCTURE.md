@@ -1,17 +1,24 @@
 # Project Structure
 
-Where everything lives in `ideeza-creator-panel`. For *what* the features do and
-the conventions, see **[CLAUDE.md](CLAUDE.md)**; this file is the map of *where*.
+Where everything lives in `ideeza-creator-panel`. For the rules and conventions see
+**[AGENTS.md](AGENTS.md)**, for *what* the features do the
+**[features guides](docs/guides/features/README.md)**, and for task routers
+**[docs/map/](docs/map/PRODUCT.md)**; this file is the map of *where*.
 Package manager: **pnpm** · framework: **Next.js 16 (App Router, modified)**.
 
 > Keep this current: when you add/move/rename a folder or a significant file,
-> update the tree below in the same change (mirrors CLAUDE.md §0).
+> update the tree below in the same change (mirrors [AGENTS.md › Keeping docs current](AGENTS.md#keeping-docs-current-required)).
 
 ```
 ideeza-creator-panel/
-├─ CLAUDE.md                 Project guide — features, conventions, UI/UX rules
-├─ AGENTS.md                 "This is NOT the Next.js you know" (read next/docs first)
+├─ AGENTS.md                 The one agent guide — Next.js rule, hard rules, conventions,
+│                            UI/UX rules, Project map (loaded every session)
+├─ CLAUDE.md                 `@AGENTS.md` — how Claude Code loads the guide
 ├─ STRUCTURE.md              This file
+├─ docs/                     map/ (task routers) · guides/ (features/, app map, PCB
+│                            architecture, UI/UX) · superpowers/ (specs, plans) · Part 4 spec
+├─ tests/projects/           node:test suites for pure src/lib modules (`npm run test:projects`)
+├─ scripts/                  generate-feed-images.mjs (Innovations feed art → public/innovations/)
 ├─ next.config.ts            Next config
 ├─ tailwind.config.ts        Tailwind config (+ src/styles/tailwind-preset.ts)
 ├─ tsconfig.json             TS config (verify with `tsc --noEmit -p tsconfig.json`)
@@ -22,7 +29,8 @@ ideeza-creator-panel/
    ├─ app/                   Next App Router — routes & layouts
    │  ├─ layout.tsx          Root layout (ThemeProvider, fonts, global CSS)
    │  ├─ api/                Server API routes (concept/generate · concept/summarize
-   │  │                      · refine · build/start · three/generate · and others)
+   │  │                      · refine · build/start · three/generate · business-plan/section
+   │  │                      · and others)
    │  ├─ (dashboard)/        Home + Parts + Innovations
    │  │   ├─ page.tsx                 "/"  — dashboard home (AI prompt hero)
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
@@ -30,13 +38,20 @@ ideeza-creator-panel/
    │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
    │  │   └─ innovations/[slug]/      community feed + detail
    │  ├─ (create)/           AI create flow
-   │  │   ├─ projects/[id]/           "/projects" — My projects + details
-   │  │   │   └─ network/             "/projects/<id>/network" — the Connection Map
+   │  │   ├─ projects/                    "/projects" — My projects (index)
+   │  │   │   └─ [id]/                    "/projects/<id>" — Project details
+   │  │   │       ├─ network/             "/projects/<id>/network" — the Connection Map
+   │  │   │       ├─ business-plan/       "/projects/<id>/business-plan" — the seven-section plan
+   │  │   │       └─ products/[productId]/  "/projects/<id>/products/<productId>" — the product page
+   │  │   ├─ marketplace/                 "/marketplace" — Explore marketplace
+   │  │   │   └─ [id]/                    the buyer view (+ products/[productId]/)
    │  │   ├─ history/                 "/history"  — past generations
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
-   │  ├─ project/[projectSlug]/[step]/   per-project editor host (PCB/Code/3D/…)
-   │  └─ pcb/ code/ 3d/ preview/ wiring/ brief/   module entry routes + pcb-editor.css
+   │  ├─ project/[projectSlug]/products/[productId]/[step]/   the product-scoped editor (PCB/Code/3D/…)
+   │  ├─ project/[projectSlug]/[step]/   legacy editor address (redirects to the resumed product) + the Brief
+   │  └─ pcb/ code/ 3d/ preview/ wiring/ brief/   legacy flat routes (each redirects to
+   │                                       /project/<slug>/<step>) + pcb-editor.css
    │
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
@@ -55,22 +70,30 @@ ideeza-creator-panel/
    │  │                      confirmation, and the chrome both editors share
    │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
-   │  ├─ projects/           my-projects, project-details
+   │  ├─ projects/           my-projects + project-card; details/ (the project page: shell, SLOTS,
+   │  │                      header, tabs, rail, activity/); product/ (the product page + Editor block);
+   │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
+   │  │                      and Virtual NFT); business-plan/ (chip runner + page) — see
+   │  │                      docs/guides/features/platform-and-projects.md
+   │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
+   │  │                      bid and support dialogs, demo-buyer banner
+   │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
    │  │                      network-settings-dialog, dialogs (frame, confirm, how-to-draw,
    │  │                      all-parameters), network-section (project page),
-   │  │                      network-action (review card), connection-map-page, summary, ui
-   │  ├─ manual/             manual project creation + step navigation
+   │  │                      connection-map-page, summary, ui
+   │  ├─ manual/             project-workspace (the editor gate: product scope, seed, banners) + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
-   │  ├─ video-jobs/         background render/video jobs + indicator
+   │  ├─ video-jobs/         render jobs provider, browser clip renderer, player, Generate dialog, indicator
    │  ├─ brief/              Add Brief: brief-app (the intent-aware sequence) + brief-rail,
    │  │                      step-1-idea · step-2-video (preview) · step-3-mint (the form) ·
-   │  │                      step-4-success, review-modal (preview / approve), regenerate-confirm,
+   │  │                      step-4-success, review-modal (the headline's video),
    │  │                      prompt-help-modal, ar-record-panel
    │  ├─ pcb/                ★ PCB module (schematic + PCB editor) — see below
    │  ├─ code/               Code module: Monaco dev-editor + Blockly + AI chat
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
+   │  ├─ assembly/           Assembly module: the board's placed parts as a check-off list
    │  ├─ preview/            Product Preview: three.js assembly, mates, instances
    │  ├─ wiring/             Wiring module: canvas, library, right panel, menu
    │  ├─ voice/              voice-listening (what a composer becomes while the mic is
@@ -88,7 +111,8 @@ ideeza-creator-panel/
    │  │                      library (save/publish, version lock)
    │  ├─ network/            types, catalog (the Figma tables), derive (roles, auto-fill,
    │  │                      diff, master change, blockers), planner (rule map, layout,
-   │  │                      AI-answer validation), geometry, products, store
+   │  │                      AI-answer validation), geometry, products, store,
+   │  │                      from-concept (the concept network as the saved Network)
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx
    │  │                      (credits ledger), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
@@ -104,11 +128,27 @@ ideeza-creator-panel/
    │  │                      bodies, derive, hints, catalog, edits, facts, format).
    │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
    │  │                      the wizard and the rail both read — + the stored-draft
-   │  │                      migration), gas.ts, wallet.ts, video-prompt.ts, qr.ts
+   │  │                      migration), project-brief.ts (the Brief read + the Outcome
+   │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (Step
+   │  │                      4's pure copy), gas.ts, wallet.ts, video-prompt.ts, qr.ts
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
-   │  ├─ manual/             projects.tsx (manual project store)
-   │  ├─ wiring/             types.ts
+   │  ├─ manual/             projects.tsx (manual project store), project-read.ts
+   │  │                      (backward-compatible pure readers — versions, sourceOf,
+   │  │                      coverOf), project-summary.ts (the one card/details
+   │  │                      derivation), permissions.ts (can/deleteBlockOf), editor-work.ts
+   │  │                      (editor progress facts), editor-scope/editor-docs (per-product editor
+   │  │                      keys + documents), build-load(-io) (BUILDLOAD), readiness, edit-gate,
+   │  │                      contributors, customers, ownership, journey(-store), business-plan(-store),
+   │  │                      legal, save-step
+   │  ├─ wiring/             types.ts, from-build.ts (a build's wiring document)
+   │  ├─ code/               files.ts (Code's file model + a build's firmware)
+   │  ├─ market/             Explore marketplace: listings, sales, bids, auctions, editions,
+   │  │                      fees, market-store (local "Testnet demo" data)
+   │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
+   │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
+   │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
+   │  ├─ key-store.ts · storage-status.ts   one live localStorage key; refused-write reporting
    │  ├─ feed.ts · feed-image-manifest.ts   community-feed data
    │  └─ utils.ts            shared helpers (cn, etc.)
    │
@@ -135,6 +175,9 @@ src/lib/pcb/
 ├─ suture-vias.ts       Stitching-via lattice planner (dialog preview + placement share it)
 ├─ pour.ts              Copper pour — region outline minus other-net copper (boolean)
 ├─ route-path.ts        Track path planner — corner style + obstacle policy
+├─ board-parts.ts        Board's placed parts, shared by Assembly and the Editor
+│                        rail's PCB fact (`boardPartsOf(doc)` — designator + footprint,
+│                        top/bottom side)
 ├─ inspector-schema.ts  Schema-driven Properties inspector (panels + typed fields)
 ├─ icons.tsx · hicons.ts  DsIcon + Hugeicon/raw-SVG dictionaries
 ├─ part-catalog.ts      Parts + Agile-Module catalogue; rail queries, favourites/recents,
@@ -158,7 +201,7 @@ src/components/pcb/
 ├─ splitter.tsx         Draggable panel edges (left/right/bottom → state.panelSizes)
 ├─ schem-canvas.tsx · pcb-canvas.tsx           schematic / PCB backdrops
 ├─ pcb-three-view*.tsx · pcb-meshes.tsx        3D board view (three.js)
-├─ left-rail.tsx        module switcher (PCB/Code/3D/Preview/Wiring/Brief)
+├─ left-rail.tsx        module switcher (PCB/Code/3D/Assembly/Wiring/Preview/Brief)
 ├─ left-panel.tsx + project-navigator.tsx      Sheets/Nets/Parts/Objects + Library
 ├─ library-panel.tsx    Common Library + All Library marketplace
 ├─ right-panel.tsx + schem-properties.tsx / pcb-properties.tsx   Properties/Filter/Layer

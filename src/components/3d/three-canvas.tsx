@@ -6,6 +6,11 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
+// The shape model lives in lib/three/scene.ts (so the build → editor seed and
+// its tests can build scenes without React); re-exported for the components.
+import type { SceneShape, ShapeType } from "@/lib/three/scene";
+
+export type { SceneShape, ShapeType };
 
 const ThreeViewportImpl = dynamic(
   () => import("./three-canvas-impl").then((m) => m.ThreeViewportImpl),
@@ -19,17 +24,6 @@ const ThreeViewportImpl = dynamic(
   }
 );
 
-export type ShapeType = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane";
-
-export type SceneShape = {
-  id: string;
-  type: ShapeType;
-  position: [number, number, number];
-  rotation: [number, number, number];
-  scale: [number, number, number];
-  hidden: boolean;
-  locked: boolean;
-};
 
 export type TransformMode = "none" | "translate" | "rotate" | "scale";
 

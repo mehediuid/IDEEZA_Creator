@@ -53,6 +53,8 @@ import { usePcbActions, usePcbState } from "@/lib/pcb/store";
 // flow from the one its button opens.
 import { STEPS as PKG_STEPS, STEP_LABEL as PKG_STEP_LABEL, type StepId } from "@/lib/package/types";
 import { useManualProjects } from "@/lib/manual/projects";
+import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
+import { useRouter } from "next/navigation";
 import { exportGerberViaKicad, GERBER_LAYERS } from "@/lib/pcb/kicad-export";
 import {
   collectPcbModel,
@@ -1868,7 +1870,10 @@ function ConvertConfirmModal() {
   const actions = usePcbActions();
   // The dialog runs the converter as a dry run and lists what it found. Same
   // function the Confirm executes, so the list can't promise something else.
-  const plan = React.useMemo(() => convertSchematicToPcb(state.objects), [state.objects]);
+  const plan = React.useMemo(
+    () => convertSchematicToPcb(state.objects, state.schematicSheets),
+    [state.objects, state.schematicSheets],
+  );
   const p = plan.plan;
   const cell: React.CSSProperties = {
     padding: "var(--spacing-3) var(--spacing-5)",
@@ -1966,7 +1971,10 @@ function ConvertConfirmModal() {
 function ImportChangesModal() {
   const state = usePcbState();
   const actions = usePcbActions();
-  const plan = React.useMemo(() => planImportChanges(state.objects), [state.objects]);
+  const plan = React.useMemo(
+    () => planImportChanges(state.objects, state.schematicSheets),
+    [state.objects, state.schematicSheets],
+  );
   const removed = plan.removedDesignators.length;
   const nothing = plan.merged.length === 0 && removed === 0;
   const cell: React.CSSProperties = {
@@ -2423,7 +2431,8 @@ const SAMPLE_PROJECTS = [
 
 function OpenProjectModal() {
   const actions = usePcbActions();
-  const { projects, selectProject } = useManualProjects();
+  const router = useRouter();
+  const { projects } = useManualProjects();
   const [workspace, setWorkspace] = React.useState("Personal");
   const [filter, setFilter] = React.useState("");
   const [selected, setSelected] = React.useState<string | null>(null);
@@ -2439,16 +2448,19 @@ function OpenProjectModal() {
   const q = filter.trim().toLowerCase();
   const shown = entries.filter((e) => !q || e.name.toLowerCase().includes(q));
 
-  // REAL open: activate the project in the manual-projects store and jump
-  // to its PCB editor. Sample rows have no local data — explain via toast.
+  // REAL open: the PCB editor of the product that project resumes
+  // (P2-EDITOR-2). The PCB store follows the route's product (P2-EDITOR-4),
+  // so this is an ordinary client navigation — the board on screen is saved
+  // to its own product before the next one loads. Sample rows have no local
+  // data — explain via toast.
   const openSelected = (newWindow: boolean) => {
     if (!selected) { actions.flashToast("Select a project first"); return; }
     const e = entries.find((x) => x.name === selected);
-    if (e?.id && e.slug) {
-      selectProject(e.id);
-      const url = `/project/${e.slug}/pcb`;
+    const project = e?.id ? projects.find((p) => p.id === e.id) : undefined;
+    if (project) {
+      const url = editorHref(project, resumeProductOf(project), "pcb");
       if (newWindow) window.open(url, "_blank");
-      else window.location.href = url;
+      else router.push(url);
       actions.closeModal();
     } else {
       actions.flashToast(`"${selected}" is a sample — no local data to open`);

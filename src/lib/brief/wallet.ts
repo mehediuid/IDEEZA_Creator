@@ -8,7 +8,9 @@ import type { Network } from "./types";
 
 const WALLET_KEY = "ideeza:brief:wallet";
 
-export type WalletCollection = { id: string; name: string; network: Network };
+/** `minted` (Phase 2, P2-MINT-8): how many tokens this collection has reserved so far, on this
+ *  network. `wallet/mint.ts`'s `nextTokenId(rows, name)` reads it; `bumpMinted` below writes it. */
+export type WalletCollection = { id: string; name: string; network: Network; minted?: number };
 
 type WalletStore = Partial<Record<Network, WalletCollection[]>>;
 
@@ -50,6 +52,10 @@ function seedFor(network: Network): WalletCollection[] {
   });
 }
 
+function validMinted(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : undefined;
+}
+
 function readStore(): WalletStore {
   if (typeof window === "undefined") return {};
   try {
@@ -77,7 +83,8 @@ function sanitize(rows: unknown, network: Network): WalletCollection[] | null {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
     if (typeof r.id !== "string" || typeof r.name !== "string") continue;
-    out.push({ id: r.id, name: r.name, network });
+    const minted = validMinted(r.minted);
+    out.push(minted === undefined ? { id: r.id, name: r.name, network } : { id: r.id, name: r.name, network, minted });
   }
   return out;
 }
@@ -118,4 +125,22 @@ export function addCollection(network: Network, name: string): WalletCollection 
   const store = readStore();
   writeStore({ ...store, [network]: [...rows, created] });
   return created;
+}
+
+/**
+ * Reserves the next token id in `name`'s collection on `network`, adding the
+ * collection first (idempotently) when a form named one that isn't in the
+ * store yet (P2-MINT-8). Returns the id it just reserved — `wallet/mint.ts`'s
+ * `nextTokenId(readCollections(network), name)` would have returned the same
+ * number just before this call, since a mint's request and its commit read
+ * and write in that order, one tab at a time.
+ */
+export function bumpMinted(network: Network, name: string): number {
+  const created = addCollection(network, name);
+  const rows = readCollections(network);
+  const next = (rows.find((c) => c.id === created.id)?.minted ?? 0) + 1;
+  const updated = rows.map((c) => (c.id === created.id ? { ...c, minted: next } : c));
+  const store = readStore();
+  writeStore({ ...store, [network]: updated });
+  return next;
 }

@@ -1,0 +1,7 @@
+{
+  "objects": [
+    { "id": "sch-text-112-116", "kind": "text", "x": 112, "y": 116, "scope": "schematic", "text": "Vbus" },
+    { "id": "sch-currentSource-140-180", "kind": "currentSource", "x": 140, "y": 180, "scope": "schematic", "text": "I_LOAD" },
+    { "id": "sch-w-140-160-140-132", "kind": "wire", "x": 140, "y": 160, "endX": 140, "endY": 132, "scope": "schematic" }
+  ]
+}

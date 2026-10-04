@@ -79,5 +79,5 @@ Preview step footer CTA when it is the last step before success (`stepsFor` says
 - [ ] **Step 1: Final CTAs + placeholders.**
 - [ ] **Step 2: Modal variants + product-card entry point.**
 - [ ] **Step 3: tsc + CDP**: give + share → Preview's CTA text; click → Success; product card click → modal titled "Auto-Generated Preview".
-- [ ] **Step 4: Update CLAUDE.md §5 "Add Brief"** (sequence, Give/Save forms, License, preview modal) and STRUCTURE.md.
+- [ ] **Step 4: Update CLAUDE.md §5 (now `docs/guides/features/editor-modules.md`) "Add Brief"** (sequence, Give/Save forms, License, preview modal) and STRUCTURE.md.
 - [ ] **Step 5: Commit** `feat(brief): Innovations flow CTAs and Auto-Generated Preview modal; docs`.

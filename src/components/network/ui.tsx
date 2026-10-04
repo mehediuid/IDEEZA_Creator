@@ -41,8 +41,11 @@ export function Chip({ children, tone = "neutral", className }: { children: Reac
   );
 }
 
-export function RoleChip({ role }: { role: Role }) {
-  return <Chip tone={role === "Master" ? "brand" : "neutral"}>{ROLE_LABEL[role]}</Chip>;
+/** Master in brand, the others neutral — the flow's own emphasis. `quiet`
+ *  drops the brand for a page that spends its one violet elsewhere (the
+ *  project page's Network summary). */
+export function RoleChip({ role, quiet = false }: { role: Role; quiet?: boolean }) {
+  return <Chip tone={role === "Master" && !quiet ? "brand" : "neutral"}>{ROLE_LABEL[role]}</Chip>;
 }
 
 /** One question's answers as pills — a real radio group, so arrow keys and

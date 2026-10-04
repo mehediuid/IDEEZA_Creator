@@ -37,6 +37,7 @@ import { cardFactsOf, chargesOf, packCellOf, standaloneOf, type SpecFactTone } f
 import { radioOf } from "../spec/format";
 import { pairsOf } from "./confidence";
 import type { BatteryKey, ResolvedSpec, SpecEdits } from "../spec/types";
+import type { SaveMode } from "../manual/save-step";
 
 type SetupTurn = Extract<ChatTurn, { role: "setup" }>;
 type AssistantTurn = Extract<ChatTurn, { role: "assistant" }>;
@@ -773,8 +774,10 @@ export type NextStepTone = "working" | "attention" | "neutral";
 export type JumpTarget =
   | { kind: "setup" }
   | { kind: "card" | "retry" | "spec"; productId: string }
-  // "editor": the build review's Open in editor — where a built product's
-  // spec changes now.
+  // "editor": a built product's spec changes in the editor now, and the
+  // editor opens a product of a saved project (decision 7) — so the jump lands
+  // on the review's one primary (REVIEW_PRIMARY_ID): Save Project before the
+  // build is saved, Open project after (P2-SAVE-11).
   | { kind: "build" | "credits" | "review" | "add" | "editor" };
 
 export type NextStep = {
@@ -797,8 +800,12 @@ export function nextStep(args: {
   hydrated: boolean;
   projectName?: string;
   savedName?: string;
+  /** Which save the ready build gets (save-step.ts `saveModeOf`, with the
+   *  lock applied) — the #8/#9 sentence follows it (P2-SAVE-11). Null or
+   *  absent reads as a new project. */
+  saveMode?: SaveMode | null;
 }): NextStep | null {
-  const { state, rows, job, balance, hydrated, projectName, savedName } = args;
+  const { state, rows, job, balance, hydrated, projectName, savedName, saveMode } = args;
   const setup = state.setup;
 
   // #1
@@ -883,20 +890,25 @@ export function nextStep(args: {
         targetLabel: "Show on canvas — the Build button",
       };
     }
-    // #9
-    if (job.projectId) {
-      const name = savedName || projectName || "your project";
+    // #9 — saved: the project page holds what comes next (P2-SAVE-9).
+    if (job.projectId || saveMode?.kind === "saved") {
+      const name =
+        savedName || (saveMode?.kind === "saved" ? saveMode.project.name : "") || projectName || "your project";
       return {
         tone: "neutral",
-        text: `Saved to ${name}. Add a brief to sell, give or keep it.`,
+        text: `Saved to ${name} — open the project for what's next.`,
         target: { kind: "review" },
         targetLabel: "Show on canvas — the build",
       };
     }
-    // #8
-    const text = projectName
-      ? `Build ready. Save it to ${projectName}, or open it in the editor.`
-      : "Build ready. Save it as a project, or open it in the editor.";
+    // #8 — by the save it gets (P2-SAVE-11). Nothing is saved without the
+    // save step, so there is no "or open it in the editor" any more.
+    const text =
+      saveMode?.kind === "join"
+        ? `Build ready. Save it to add it to ${saveMode.project.name}.`
+        : saveMode?.kind === "version"
+          ? `Build ready. Save it as version ${saveMode.version} of ${saveMode.project.name}.`
+          : "Build ready. Save it to name your project.";
     return { tone: "neutral", text, target: { kind: "review" }, targetLabel: "Show on canvas — the build" };
   }
 

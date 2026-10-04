@@ -545,7 +545,9 @@ export function firmwareFor(job: ArtifactSource): Firmware {
     lines: [
       ...includes,
       "",
-      "// pins match the PCB layout in the previous tab",
+      // The pins count up from 2 in parts order; nothing assigns them to
+      // the board's real pins, so the sketch says they are placeholders.
+      "// pin numbers are placeholders: match them to your board",
       ...defines,
       "",
       ...setup,

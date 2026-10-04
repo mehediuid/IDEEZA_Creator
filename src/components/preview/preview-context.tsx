@@ -7,8 +7,10 @@
 //                  placed components). Read-only: the PCB stays the canonical
 //                  source, /preview is a viewer.
 //   • Enclosure  — shapes from the 3D module (shared via the same
-//                  localStorage slot the /3d page reads/writes). Editable
+//                  localStorage slot the product's 3D page reads/writes,
+//                  `ideeza:3d:shapes:<projectId>:<productId>`). Editable
 //                  from the preview toolbar/Insert dropdown.
+// The canvas and the mates are the product's too (P2-EDITOR-3).
 //
 // Plus UI flags (showInstancesPanel / showPcb / showEnclosure),
 // camera ticks (resetTick / fitTick), a toast channel, and the
@@ -21,6 +23,9 @@ import {
   type ShapeType,
 } from "@/components/3d/three-canvas";
 import { usePcbState } from "@/lib/pcb/store";
+import { useEditorScope } from "@/components/manual/use-step-nav";
+import { editorDocKey } from "@/lib/manual/editor-scope";
+import { DocSaveQueue, globalTimers } from "@/lib/manual/editor-docs";
 import {
   derivePcb3D,
   type Pcb3DBoard,
@@ -45,9 +50,6 @@ export type InstanceInfo = {
   rootLabel: string;
 };
 
-const SHAPES_KEY = "ideeza:3d:shapes";
-const CANVAS_KEY = "ideeza:preview:canvas";
-const MATES_KEY = "ideeza:preview:mates";
 
 // ── Mate settings (SolidWorks-style, per selected instance) ────────────
 // Pure UI state for now: the panel records the designer's intent; actual
@@ -237,6 +239,22 @@ type Ctx = State & {
 const PreviewContext = React.createContext<Ctx | null>(null);
 
 export function PreviewProvider({ children }: { children: React.ReactNode }) {
+  // This product's documents. The app is keyed by product, so they are fixed
+  // for the mount; with no product (never, under the editor route) nothing
+  // is read or written.
+  const editor = useEditorScope();
+  const scope = editor?.scope ?? null;
+  const keys = React.useMemo(
+    () =>
+      scope
+        ? {
+            shapes: editorDocKey("three.shapes", scope),
+            canvas: editorDocKey("preview.canvas", scope),
+            mates: editorDocKey("preview.mates", scope),
+          }
+        : null,
+    [scope],
+  );
   // ── Enclosure (3D module's shapes) ──────────────────────────────────
   const [enclosureShapes, setEnclosureShapes] = React.useState<SceneShape[]>([]);
   const [canvas, setCanvas] = React.useState<PreviewCanvasState>(
@@ -247,40 +265,53 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
   const [mates, setMates] = React.useState<Record<string, MateSettings>>({});
   const [hydrated, setHydrated] = React.useState(false);
   React.useEffect(() => {
+    if (!keys) return;
     try {
-      const raw = window.localStorage.getItem(SHAPES_KEY);
+      const raw = window.localStorage.getItem(keys.shapes);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) setEnclosureShapes(parsed);
       }
     } catch {}
     try {
-      const rawC = window.localStorage.getItem(CANVAS_KEY);
+      const rawC = window.localStorage.getItem(keys.canvas);
       if (rawC) setCanvas(sanitizeCanvasState(JSON.parse(rawC)));
     } catch {}
     try {
-      const rawM = window.localStorage.getItem(MATES_KEY);
+      const rawM = window.localStorage.getItem(keys.mates);
       if (rawM) setMates(sanitizeMates(JSON.parse(rawM)));
     } catch {}
     setHydrated(true);
-  }, []);
+  }, [keys]);
+  // Debounced: the transform gizmo updates shapes on every drag frame, and
+  // serializing the whole list to localStorage at 60Hz stutters the drag.
+  const [shapesQueue] = React.useState(
+    () =>
+      new DocSaveQueue<string, SceneShape[]>(
+        200,
+        (key, shapes) => {
+          try {
+            window.localStorage.setItem(key, JSON.stringify(shapes));
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        globalTimers,
+      ),
+  );
   React.useEffect(() => {
-    if (!hydrated) return;
-    // Debounced: the transform gizmo updates shapes on every drag frame, and
-    // serializing the whole list to localStorage at 60Hz stutters the drag.
-    const t = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(SHAPES_KEY, JSON.stringify(enclosureShapes));
-      } catch {}
-    }, 200);
-    return () => window.clearTimeout(t);
-  }, [enclosureShapes, hydrated]);
+    if (!hydrated || !keys) return;
+    shapesQueue.schedule(keys.shapes, enclosureShapes);
+  }, [enclosureShapes, hydrated, keys, shapesQueue]);
+  // Leaving Preview writes the last edit, as Wiring does.
+  React.useEffect(() => () => void shapesQueue.flush(), [shapesQueue]);
   React.useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !keys) return;
     try {
-      window.localStorage.setItem(CANVAS_KEY, JSON.stringify(canvas));
+      window.localStorage.setItem(keys.canvas, JSON.stringify(canvas));
     } catch {}
-  }, [canvas, hydrated]);
+  }, [canvas, hydrated, keys]);
 
   const patchCanvas = React.useCallback(
     (p: Partial<PreviewCanvasState>) => setCanvas((c) => ({ ...c, ...p })),
@@ -289,11 +320,11 @@ export function PreviewProvider({ children }: { children: React.ReactNode }) {
 
   // ── Mates persistence ────────────────────────────────────────────────
   React.useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !keys) return;
     try {
-      window.localStorage.setItem(MATES_KEY, JSON.stringify(mates));
+      window.localStorage.setItem(keys.mates, JSON.stringify(mates));
     } catch {}
-  }, [mates, hydrated]);
+  }, [mates, hydrated, keys]);
 
   const setMate = React.useCallback(
     (id: string, patch: Partial<MateSettings>) => {

@@ -6,6 +6,11 @@
 // only what the scene alone knows: the part under the pointer, the part
 // clicked, and where the hovered and selected parts sit on screen, which the
 // panel's rings and tooltip are drawn from.
+//
+// It draws only when something moves (`frameloop="demand"`, v1 COR-104): a
+// still model costs no frames. Each part's glide and the camera's move ask
+// for the next frame until they settle; OrbitControls' damping asks for its
+// own; a change of hover or selection asks for one, so the rings follow.
 
 import * as React from "react";
 import * as THREE from "three";
@@ -30,6 +35,11 @@ const PRESET_DIR: Record<ViewPreset, THREE.Vector3> = {
 };
 // A click that travelled further than this was a drag of the camera.
 const CLICK_SLOP_PX = 4;
+// On demand, the first frame after a still spell sees the whole spell as its
+// delta; clamped, a glide starts from where it is instead of jumping to rest.
+const MAX_DT = 1 / 30;
+// Under this, a glide has arrived (scene units).
+const SETTLED = 1e-3;
 
 type Registry = Map<string, THREE.Group>;
 
@@ -72,6 +82,11 @@ function PartNode({
 }) {
   const ref = React.useRef<THREE.Group>(null);
   const placed = React.useRef(false);
+  const invalidate = useThree((s) => s.invalidate);
+  // A new target (explode, isolate) starts the glide.
+  React.useEffect(() => {
+    invalidate();
+  }, [target, invalidate]);
 
   React.useLayoutEffect(() => {
     const map = registry.current;
@@ -82,7 +97,7 @@ function PartNode({
     };
   }, [part.id, registry]);
 
-  useFrame((_, dt) => {
+  useFrame((_, delta) => {
     const g = ref.current;
     if (!g) return;
     if (!placed.current || reduced) {
@@ -90,9 +105,15 @@ function PartNode({
       placed.current = true;
       return;
     }
+    if (g.position.distanceTo(target) < SETTLED) {
+      g.position.copy(target);
+      return;
+    }
+    const dt = Math.min(delta, MAX_DT);
     g.position.x = THREE.MathUtils.damp(g.position.x, target.x, 10, dt);
     g.position.y = THREE.MathUtils.damp(g.position.y, target.y, 10, dt);
     g.position.z = THREE.MathUtils.damp(g.position.z, target.z, 10, dt);
+    invalidate();
   });
 
   return (
@@ -147,7 +168,7 @@ function CameraRig({
   controls: React.RefObject<OrbitControlsImpl | null>;
   dragging: React.RefObject<boolean>;
 }) {
-  const { camera, size } = useThree();
+  const { camera, size, invalidate } = useThree();
   const goal = React.useRef<{ position: THREE.Vector3; target: THREE.Vector3 } | null>(null);
   const aspect = size.width / Math.max(1, size.height);
   const boundsRef = React.useRef(bounds);
@@ -161,6 +182,7 @@ function CameraRig({
   // A preset or Home frames everything visible from that direction.
   React.useEffect(() => {
     goal.current = frameFor(boundsRef.current, PRESET_DIR[preset], aspect);
+    invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- aspect changes reframe below, not here
   }, [preset]);
 
@@ -170,6 +192,7 @@ function CameraRig({
     const c = controls.current;
     const dir = c ? camera.position.clone().sub(c.target).normalize() : PRESET_DIR[preset];
     goal.current = frameFor(boundsRef.current, dir, aspect);
+    invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reframe on shape change only
   }, [frameKey, aspect]);
 
@@ -187,10 +210,11 @@ function CameraRig({
       const k = command === "zoom-in" ? 0.8 : 1.25;
       goal.current = { target, position: target.clone().add(from.sub(target).multiplyScalar(k)) };
     }
+    invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one run per command, keyed by its nonce
   }, [nonce]);
 
-  useFrame((_, dt) => {
+  useFrame((_, delta) => {
     const g = goal.current;
     const c = controls.current;
     if (!g || !c) return;
@@ -203,10 +227,13 @@ function CameraRig({
       c.target.copy(g.target);
       goal.current = null;
     } else {
+      const dt = Math.min(delta, MAX_DT);
       camera.position.lerp(g.position, 1 - Math.exp(-8 * dt));
       c.target.lerp(g.target, 1 - Math.exp(-8 * dt));
-      if (camera.position.distanceTo(g.position) < 1e-3 && c.target.distanceTo(g.target) < 1e-3) {
+      if (camera.position.distanceTo(g.position) < SETTLED && c.target.distanceTo(g.target) < SETTLED) {
         goal.current = null;
+      } else {
+        invalidate();
       }
     }
     c.update();
@@ -227,8 +254,12 @@ function BoxTracker({
   selectedId: string | null;
   onBoxes: AssemblyViewerProps["onBoxes"];
 }) {
-  const { camera, size } = useThree();
+  const { camera, size, invalidate } = useThree();
   const last = React.useRef<{ hover?: ScreenBox; selected?: ScreenBox }>({});
+  // The rings are measured on a frame: a new hover or selection asks for one.
+  React.useEffect(() => {
+    invalidate();
+  }, [hoverId, selectedId, invalidate]);
   const box = React.useMemo(() => new THREE.Box3(), []);
   const v = React.useMemo(() => new THREE.Vector3(), []);
 
@@ -429,6 +460,7 @@ export function AssemblyViewerImpl(props: AssemblyViewerProps) {
       }}
     >
       <Canvas
+        frameloop="demand"
         dpr={[1, 2]}
         gl={{ alpha: true, antialias: true }}
         camera={{ fov: FOV, position: [8, 6.4, 8], near: 0.05, far: 500 }}

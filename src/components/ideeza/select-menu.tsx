@@ -53,7 +53,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi
 const Chevron = ({ open }: { open: boolean }) => (
   <svg
     aria-hidden
-    className="shrink-0 transition-transform duration-[var(--motion-duration-fast)]"
+    className="shrink-0 transition-transform [transition-duration:var(--motion-duration-fast)]"
     style={{ transform: open ? "rotate(180deg)" : undefined }}
     width={16}
     height={16}
@@ -152,7 +152,9 @@ export function SelectMenu<V extends string = string>({
     setOpen(false);
     setPos(null);
     setTip(-1);
-    if (restoreFocus) triggerRef.current?.focus();
+    // preventScroll: a trigger scrolled out of view mustn't pull the page back
+    // to it after a choice (the My projects list keeps its own scroll).
+    if (restoreFocus) triggerRef.current?.focus({ preventScroll: true });
   }, []);
 
   const choose = (i: number) => {
@@ -354,7 +356,7 @@ export function SelectMenu<V extends string = string>({
           setTip(-1);
         }}
         className={cn(
-          "flex items-center gap-[var(--spacing-4)] px-[var(--spacing-6)] py-[var(--spacing-4)] text-[length:var(--font-size-md)] transition-colors duration-[var(--motion-duration-fast)]",
+          "flex items-center gap-[var(--spacing-4)] px-[var(--spacing-6)] py-[var(--spacing-4)] text-[length:var(--font-size-md)] transition-colors [transition-duration:var(--motion-duration-fast)]",
           o.disabled
             ? "cursor-not-allowed text-[color:var(--color-text-disabled)]"
             : isSelected
@@ -425,7 +427,7 @@ export function SelectMenu<V extends string = string>({
         className={cn(
           // `button { border: 0 }` in the reset drops the border style, so a
           // bordered button has to name it.
-          "flex w-full items-center justify-between gap-[var(--spacing-5)] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] py-[var(--spacing-5)] text-left text-[length:var(--font-size-md)] outline-none transition-[border-color,box-shadow,background-color] duration-[var(--motion-duration-fast)]",
+          "flex w-full items-center justify-between gap-[var(--spacing-5)] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] py-[var(--spacing-5)] text-left text-[length:var(--font-size-md)] outline-none transition-[border-color,box-shadow,background-color] [transition-duration:var(--motion-duration-fast)]",
           disabled
             ? "cursor-not-allowed border-[var(--color-border-default)] bg-[var(--color-input-bg-disabled)] text-[color:var(--color-text-disabled)]"
             : "bg-[var(--color-input-bg)] text-[color:var(--color-text-primary)]",

@@ -3,33 +3,38 @@
 // ReviewOutputs — a build's own surface, live from the moment it starts (Ai-Flow
 // frames 15 / DL-02 / DL-03 / Wiring / Parts). One tab per deliverable the
 // build really produced, the artifact itself on the left, what it covers on
-// the right, and the two things a finished build can become:
+// the right, and the one thing a finished build becomes next:
 //
-//   • Save Project  — one click. The build becomes the project the maker chose
-//                     at the setup question (`projectFromBuild`), with every
-//                     product and its description, and the card then offers
-//                     the Brief (sell · give · keep private) and the editor.
-//   • Open in editor  — the same project, opened straight in the PCB editor.
+//   • Save Project — opens the save step (save-step.tsx, owner decision 5):
+//                    the project's name and details before anything is saved,
+//                    or the project the setup question chose, or — for a
+//                    rebuild — the version it becomes. Saving goes to the
+//                    project page, where the next step lives (P2-SAVE-9).
+//   • Open project — once saved, the one control (P2-SAVE-10). The Brief is
+//                    the project page's main button, and the editor opens a
+//                    product from its own page (decision 7), so neither is
+//                    carried here a second time.
 //
-// One project per build: `projectFromBuild` hands the same one back on every
-// later press. A piece that failed is retried from its own panel, here, rather
-// than from a page of its own.
+// Nothing makes a project without the save step. One project per build: the
+// provider's saveBuild hands the same one back on every later press, and a
+// rebuild of a chat already saved joins that project as its next version. A
+// piece that failed is retried from its own panel, here, rather than from a
+// page of its own.
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight02Icon,
   CheckmarkCircle02Icon,
   FloppyDiskIcon,
   HelpCircleIcon,
   MobileProgramming01Icon,
-  PencilEdit02Icon,
   Refresh01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { deriveAssembly } from "@/lib/three/assembly";
-import { ModelPanel } from "./model-panel/model-panel";
+import { ModelPanelLazy } from "./model-panel/model-panel-lazy";
 import {
   ITEM_LABELS,
   ITEM_KINDS,
@@ -39,11 +44,11 @@ import {
   type BuildItemKind,
   type BuildJob,
 } from "@/lib/create/history";
-import { stepHref, useManualProjects } from "@/lib/manual/projects";
+import { buildsOf } from "@/lib/manual/project-read";
+import { footerLineOf } from "@/lib/manual/save-step";
 import { isSampleModel, type ArtifactSource } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
 import { ConfidenceBadge, ConfidenceIssuesPanel } from "./confidence-badge";
-import { NetworkAction } from "@/components/network/network-action";
 import {
   coversFor,
   FirmwarePreview,
@@ -52,7 +57,10 @@ import {
   PcbPreview,
   WiringPreview,
 } from "./deliverable-previews";
-import { OPEN_IN_EDITOR_ID } from "./anchors";
+import { REVIEW_PRIMARY_ID } from "./anchors";
+import { LeaveButton } from "./leave-button";
+import { SaveStep, useSaveMode } from "./save-step";
+import { moveTab } from "@/lib/ui/tab-keys";
 
 export function ReviewOutputs({
   job,
@@ -97,10 +105,13 @@ function ReviewPanel({
   projectName?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const query = useSearchParams();
-  const { setBuildProject, retryBuildItem, setBuildModelFailed } =
-    useCreateHistory();
-  const { projects, projectFromBuild, selectProject } = useManualProjects();
+  const { builds, retryBuildItem, setBuildModelFailed } = useCreateHistory();
+  // Which save this build gets (saveModeOf, with the lock applied): the
+  // footer's sentence, its one control and the save step all read it. A
+  // rebuild of a chat already saved is that project's next version (COR-89).
+  const saveInfo = useSaveMode(job);
 
   // An artifact an older build never produced has nothing to review, so
   // it gets no tab — a deliverable panel for something that was never
@@ -192,13 +203,15 @@ function ReviewPanel({
   const shellNote = !isPrimary ? null : job.modelFailed ? "failed" : !job.modelGlbUrl ? "pending" : null;
   const showModel = shown === "3d" && shownItem?.status === "ready";
 
-  // The project this build already belongs to — the Brief's Step 1 (or
-  // Open in editor) is what put it there. A stored id whose project is gone
-  // reads as unsaved, so the footer can't point at a project that isn't
-  // in this browser any more.
-  const saved = React.useMemo(
-    () => (job.projectId ? projects.find((p) => p.id === job.projectId) ?? null : null),
-    [job.projectId, projects],
+  // The project this build already belongs to (holderOf: its projectId, or
+  // a project whose builds name it — a save whose builds-store write failed
+  // still reads as saved, so a reload never offers Save again). A stored id
+  // whose project is gone reads as unsaved, so the footer can't point at a
+  // project that isn't in this browser any more.
+  const saved = saveInfo?.mode.kind === "saved" ? saveInfo.mode.project : null;
+  const savedVersion = React.useMemo(
+    () => (saved ? (buildsOf(saved, builds).find((r) => r.buildId === job.id)?.version ?? null) : null),
+    [saved, job, builds],
   );
 
   // What the card is about. The project the maker named, which is what the
@@ -210,37 +223,40 @@ function ReviewPanel({
     job.projectChoiceName?.trim() ||
     job.title;
 
-  // Open in editor's project: created on the first press and handed back on
-  // every one after it. Selecting it is explicit — the editor pages work
-  // on the active project, so landing there means switching to it, but
-  // nothing else on this surface moves it under the user.
-  // Which footer control is taking the maker off this surface. All four
-  // navigate to a route whose payload has to be fetched, and the two editor
-  // ones pull the PCB module's chunk behind it, so the press is followed by
-  // a pause with nothing in it — the press has to say so or it reads as a
-  // click that missed. Never cleared: the navigation unmounts this surface.
-  const [leaving, setLeaving] = React.useState<null | "brief" | "editor">(null);
+  // Open project navigates to a route whose payload has to be fetched, so
+  // the press is followed by a pause with nothing in it — the press has to
+  // say so or it reads as a click that missed. Never cleared: the navigation
+  // unmounts this surface.
+  const [leaving, setLeaving] = React.useState(false);
+  const openProject = React.useCallback(() => {
+    if (!saved) return;
+    setLeaving(true);
+    router.push(`/projects/${saved.id}`);
+  }, [saved, router]);
 
-  const openInEditor = React.useCallback(() => {
-    setLeaving("editor");
-    const project = projectFromBuild(job);
-    if (project.id !== job.projectId) setBuildProject(job.id, project.id);
-    selectProject(project.id);
-    router.push(stepHref(project, "pcb"));
-  }, [job, projectFromBuild, setBuildProject, selectProject, router]);
+  // The save step (P2-SAVE-2). A build that stops being ready while it's open
+  // (a piece retried) closes it; what was typed is kept in the step's draft.
+  const [stepOpen, setStepOpen] = React.useState(false);
+  if (building && stepOpen) setStepOpen(false);
+  const unsaved = !building && saveInfo !== null && saveInfo.mode.kind !== "saved";
 
-  // Saving is the save — it used to open the Brief and ask "What's your idea?"
-  // and "sell, give or keep private?" before anything was saved at all. Which
-  // project it lands in was answered at the setup question.
-  const saveProject = React.useCallback(() => {
-    const project = projectFromBuild(job);
-    if (project.id !== job.projectId) setBuildProject(job.id, project.id);
-  }, [job, projectFromBuild, setBuildProject]);
-
-  const openBrief = React.useCallback(() => {
-    setLeaving("brief");
-    router.push(`/build/${job.id}/brief`);
-  }, [job.id, router]);
+  // `?save=1` (P2-SAVE-13): the Brief's address for a build with no project
+  // lands here and opens the step once; the parameter goes at once, so a
+  // reload or Back never opens it again.
+  const wantsSave = query.get("save") === "1";
+  const openFromLink = React.useEffectEvent((open: boolean) => {
+    if (open) setStepOpen(true);
+    const rest = new URLSearchParams(query.toString());
+    rest.delete("save");
+    const qs = rest.toString();
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  });
+  React.useEffect(() => {
+    // Wait while it builds; a saved build has nothing to open.
+    if (!wantsSave || building || saveInfo === null) return;
+    const frame = window.requestAnimationFrame(() => openFromLink(unsaved));
+    return () => window.cancelAnimationFrame(frame);
+  }, [wantsSave, building, saveInfo, unsaved]);
 
   // Every product's pieces, for the footer's count.
   const pieceCount = React.useMemo(
@@ -298,12 +314,11 @@ function ReviewPanel({
         </div>
 
         {/* What this project could become next. A tier below the footer's
-            Save Project, so quiet. Add Network is live once the build is a
-            project; Create Mobile App has no engine behind it yet and says
-            so on the control, where a pointer, a keyboard and a touch
-            screen all reach it. */}
+            Save Project, so quiet. Create Mobile App has no engine behind it
+            yet and says so on the control, where a pointer, a keyboard and a
+            touch screen all reach it. The network is worked out at the concept
+            stage, in the rail's Network section. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <NetworkAction project={saved} build={job} />
           <HeaderAction icon={MobileProgramming01Icon} label="Create Mobile App" />
         </div>
       </header>
@@ -426,7 +441,7 @@ function ReviewPanel({
               aria-labelledby={`review-tab-${shown}`}
               className="px-10 pb-10"
             >
-              <ModelPanel
+              <ModelPanelLazy
                 key={product.id}
                 assembly={assembly}
                 shellNote={shellNote}
@@ -510,104 +525,63 @@ function ReviewPanel({
           </div>
           )}
 
-          {!building && (
+          {!building && saveInfo && (
           <footer className="flex flex-wrap items-center justify-between gap-8 border-t border-solid border-border px-10 py-8">
-            {saved ? (
-              <>
-                <p className="inline-flex items-center gap-4 text-sm text-text-secondary">
+            {/* One live region for both states, mounted with the footer: a
+                region that appears already holding its words isn't read,
+                so the save is said when this same element's text changes.
+                Saved, the name is plain text — the button beside it goes
+                to the same place (P2-SAVE-10). */}
+            <p role="status" className="inline-flex items-center gap-4 text-sm text-text-secondary">
+              {saved ? (
+                <>
                   <Icon
                     icon={CheckmarkCircle02Icon}
                     size={16}
                     className="shrink-0 text-text-success"
                   />
-                  Saved to {saved.name}. Add a brief to sell, give or keep it
-                  private — or open the project to keep editing.
-                </p>
-                <div className="flex flex-wrap items-center gap-6">
-                  <LeaveButton
-                    tone="primary"
-                    busy={leaving === "brief"}
-                    blocked={leaving !== null}
-                    onClick={openBrief}
-                    icon={ArrowRight02Icon}
-                  >
-                    Add Brief
-                  </LeaveButton>
-                  <LeaveButton
-                    id={OPEN_IN_EDITOR_ID}
-                    tone="quiet"
-                    busy={leaving === "editor"}
-                    blocked={leaving !== null}
-                    onClick={openInEditor}
-                    icon={PencilEdit02Icon}
-                  >
-                    Open Project
-                  </LeaveButton>
-                </div>
-              </>
+                  <span>
+                    Saved to <strong className="font-semibold text-text-primary">{saved.name}</strong>
+                    {savedVersion != null ? ` as version ${savedVersion}.` : "."}
+                  </span>
+                </>
+              ) : (
+                <span>{footerLineOf(saveInfo.mode, pieceCount)}</span>
+              )}
+            </p>
+            {saved ? (
+              <LeaveButton
+                id={REVIEW_PRIMARY_ID}
+                tone="primary"
+                busy={leaving}
+                blocked={leaving}
+                onClick={openProject}
+                icon={ArrowRight02Icon}
+              >
+                Open project
+              </LeaveButton>
             ) : (
-              <>
-                <p className="text-sm text-text-secondary">
-                  {pieceCount === ITEM_KINDS.length
-                    ? "All five pieces are ready."
-                    : `All ${pieceCount} pieces are ready.`}{" "}
-                  {job.projectChoiceName?.trim() || job.projectChoiceId
-                    ? "Save it to the project you chose, or open it in the editor."
-                    : "Save it as a project, or open it in the editor."}
-                </p>
-                <div className="flex flex-wrap items-center gap-6">
-                  <button
-                    type="button"
-                    onClick={saveProject}
-                    disabled={leaving !== null}
-                    className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:opacity-60"
-                  >
-                    <Icon icon={FloppyDiskIcon} size={18} />
-                    Save Project
-                  </button>
-                  <LeaveButton
-                    id={OPEN_IN_EDITOR_ID}
-                    tone="quiet"
-                    busy={leaving === "editor"}
-                    blocked={leaving !== null}
-                    onClick={openInEditor}
-                    icon={PencilEdit02Icon}
-                  >
-                    Open in editor
-                  </LeaveButton>
-                </div>
-              </>
+              <button
+                id={REVIEW_PRIMARY_ID}
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setStepOpen(true)}
+                className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none ring-offset-bg-surface transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus"
+              >
+                <Icon icon={FloppyDiskIcon} size={18} />
+                Save Project
+              </button>
             )}
           </footer>
           )}
         </>
       )}
+      {saveInfo && (
+        // Opened only on an unsaved build, then kept open through its own
+        // save: the build reads as saved a render before the write settles.
+        <SaveStep open={stepOpen && !building} job={job} info={saveInfo} onClose={() => setStepOpen(false)} />
+      )}
     </section>
-  );
-}
-
-/** The tab pattern a tablist announces: one Tab stop (the selected tab), the
- *  arrows move the selection and focus with it, Home and End jump to the
- *  ends. Every tab used to be its own Tab stop and the arrows did nothing. */
-function moveTab(
-  e: React.KeyboardEvent<HTMLElement>,
-  ids: string[],
-  current: string,
-  select: (id: string) => void,
-) {
-  const at = ids.indexOf(current);
-  let next = -1;
-  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (at + 1) % ids.length;
-  else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
-    next = (at - 1 + ids.length) % ids.length;
-  else if (e.key === "Home") next = 0;
-  else if (e.key === "End") next = ids.length - 1;
-  if (next < 0) return;
-  e.preventDefault();
-  const list = e.currentTarget;
-  select(ids[next]);
-  requestAnimationFrame(() =>
-    list.querySelector<HTMLElement>(`[data-tab="${ids[next]}"]`)?.focus(),
   );
 }
 
@@ -627,56 +601,6 @@ function DeliverablePanel({
   if (kind === "parts") return <PartsPreview job={product} />;
   // The 3D tab is the model panel, which takes this panel's place above.
   return null;
-}
-
-/** A footer control that leaves this surface. It spins and says "Opening…"
- *  from the click, and every one of them is shut while any is under way —
- *  two navigations at once is not a thing the maker can have meant. */
-function LeaveButton({
-  id,
-  tone,
-  busy,
-  blocked,
-  onClick,
-  icon,
-  children,
-}: {
-  id?: string;
-  tone: "primary" | "quiet";
-  busy: boolean;
-  blocked: boolean;
-  onClick: () => void;
-  icon: IconValue;
-  children: React.ReactNode;
-}) {
-  const base =
-    "inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
-  const paint =
-    tone === "primary"
-      ? "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover"
-      : "border border-solid border-border bg-bg-surface text-text-primary hover:bg-bg-surface-raised";
-  return (
-    <button
-      id={id}
-      type="button"
-      onClick={onClick}
-      disabled={blocked}
-      aria-busy={busy}
-      className={[
-        base,
-        paint,
-        blocked ? (busy ? "cursor-wait opacity-80" : "opacity-60") : "",
-      ].join(" ")}
-    >
-      <span
-        aria-hidden
-        className={busy ? "inline-flex motion-safe:animate-spin" : "inline-flex"}
-      >
-        <Icon icon={busy ? Refresh01Icon : icon} size={18} />
-      </span>
-      {busy ? "Opening…" : children}
-    </button>
-  );
 }
 
 /** A next step this project could take, offered from the card's own header.

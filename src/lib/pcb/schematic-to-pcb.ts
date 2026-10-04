@@ -8,7 +8,9 @@
 // KiCad pipeline — it runs entirely in-app.
 //
 // Pipeline:
-//   1. nets      — union-find over wire vertices.
+//   1. nets      — union-find over wire vertices; wire roots whose ends carry
+//                  same-named net labels are one net, as in computeNets (a
+//                  local label's on its own sheet, as in buildNetlist).
 //   2. power     — nets touched by GND / +5V symbols (excluded from ratsnest).
 //   3. pins      — each part's schematic pins = wire vertices at its terminals,
 //                  each carrying the net (union-find root) it sits on.
@@ -46,6 +48,12 @@ const POWER: Record<string, string> = {
   vcc3v3: "+3V3",
   vcc: "VCC",
 };
+// Symbols that NAME the wire net they sit on — computeNets' label namers
+// (nets.ts NAMERS, priority 2). Two of these with one name are one net.
+const LABEL_KINDS = new Set(["netLabel", "globalLabel", "hierLabel", "net", "netBusLabel", "netFlag", "port"]);
+// The labels whose name is one net on EVERY sheet (buildNetlist's global
+// namers); the rest name a net on their own sheet only.
+const GLOBAL_LABEL_KINDS = new Set(["globalLabel", "hierLabel", "port"]);
 // Pad centre offsets (canvas px, relative to footprint centre) — must match the
 // land-pattern glyphs drawn in placed-objects.tsx so airwires land on pads.
 export const PAD_OFFSETS: Record<string, Pt[]> = {
@@ -59,6 +67,9 @@ export const PAD_OFFSETS: Record<string, Pt[]> = {
 };
 
 const ATTACH_R = 30; // px — how close a wire vertex must be to a part terminal
+// px — how close a net label must be to a wire to name it: ERC's own node
+// join (nets.ts CLUSTER_TOL), so Convert and ERC read one set of nets.
+const LABEL_R = 13;
 const key = (x: number, y: number) => `${Math.round(x)},${Math.round(y)}`;
 
 // Placement region (canvas coords). The editor board sits at (60,60) sized
@@ -201,28 +212,96 @@ export interface ConvertResult {
  * Build PCB 2D objects (footprints + pad-to-pad ratsnest) from the schematic.
  * Only schematic-scoped objects are read; the result is scope:"pcb" tagged
  * props.gen="convert" so a re-convert replaces the previous output.
+ * `sheets` is the schematic's sheet list, in order: an object with no
+ * `sheetId` is on the first, and a local net sharing its name with another
+ * net is named with its sheet's number, as buildNetlist names it.
  */
-export function convertSchematicToPcb(src: CanvasObject[]): ConvertResult {
+export function convertSchematicToPcb(src: CanvasObject[], sheets: readonly { id: string }[] = []): ConvertResult {
   const sch = src.filter((o) => (o.scope ?? "schematic") === "schematic");
   const wires = sch.filter((o) => o.kind === "wire" || o.kind === "bus");
   const parts = sch.filter((o) => FOOTPRINT[o.kind]);
   const powerSyms = sch.filter((o) => POWER[o.kind]);
+  const sheetOf = (o: CanvasObject) => o.sheetId ?? sheets[0]?.id ?? "";
 
   // 1. nets — union-find over wire vertices.
   const uf = new UF();
   for (const w of wires) uf.union(key(w.x, w.y), key(w.endX ?? w.x, w.endY ?? w.y));
-  const verts: Pt[] = [];
+  const verts: Array<Pt & { sheet: string }> = [];
   for (const w of wires) {
-    verts.push({ x: w.x, y: w.y });
-    verts.push({ x: w.endX ?? w.x, y: w.endY ?? w.y });
+    verts.push({ x: w.x, y: w.y, sheet: sheetOf(w) });
+    verts.push({ x: w.endX ?? w.x, y: w.endY ?? w.y, sheet: sheetOf(w) });
+  }
+
+  // 1b. net labels — a label names the wire it sits on (a wire end within
+  //     LABEL_R, else a point along the wire), on its own sheet, and every
+  //     wire root a name reaches is one net: a local label's on its sheet,
+  //     a global label's on every sheet (R3-34, as buildNetlist). Without
+  //     this a label-drawn sheet converted with no airwires, although ERC's
+  //     netlist joined the labels.
+  const firstOfName = new Map<string, string>(); // label net → a vertex key on it
+  const labelAt = (lb: CanvasObject): string | null => {
+    const sheet = sheetOf(lb);
+    let best: string | null = null, bd = LABEL_R * LABEL_R;
+    for (const v of verts) {
+      if (v.sheet !== sheet) continue;
+      const d = (v.x - lb.x) ** 2 + (v.y - lb.y) ** 2;
+      if (d <= bd) { bd = d; best = key(v.x, v.y); }
+    }
+    if (best) return best;
+    for (const w of wires) {
+      if (sheetOf(w) !== sheet) continue;
+      const ax = w.x, ay = w.y, bx = w.endX ?? w.x, by = w.endY ?? w.y;
+      const abx = bx - ax, aby = by - ay, L2 = abx * abx + aby * aby;
+      if (L2 < 1) continue;
+      const t = ((lb.x - ax) * abx + (lb.y - ay) * aby) / L2;
+      if (t < 0 || t > 1) continue;
+      if ((ax + t * abx - lb.x) ** 2 + (ay + t * aby - lb.y) ** 2 <= LABEL_R * LABEL_R) return key(ax, ay);
+    }
+    return null;
+  };
+  // `sheet` is null for a global label.
+  const labelled: Array<{ at: string; name: string; sheet: string | null }> = [];
+  for (const lb of sch) {
+    const name = LABEL_KINDS.has(lb.kind) ? (lb.text ?? "").trim() : "";
+    if (!name) continue;
+    const at = labelAt(lb);
+    if (!at) continue;
+    const sheet = GLOBAL_LABEL_KINDS.has(lb.kind) ? null : sheetOf(lb);
+    labelled.push({ at, name, sheet });
+    const net = sheet === null ? name : `${sheet}\u0000${name}`;
+    const first = firstOfName.get(net);
+    if (first === undefined) firstOfName.set(net, at);
+    else uf.union(at, first);
+  }
+  // Each net's label, once every label has joined its roots (first label wins).
+  const rootLabel = new Map<string, { name: string; sheet: string | null }>();
+  for (const l of labelled) {
+    const root = uf.find(l.at);
+    if (!rootLabel.has(root)) rootLabel.set(root, l);
+  }
+  // Two nets of one name stay two on the board: a local one takes its
+  // sheet's number, "2:SDA", as buildNetlist names it.
+  const netsOfName = new Map<string, number>();
+  for (const { name } of rootLabel.values()) netsOfName.set(name, (netsOfName.get(name) ?? 0) + 1);
+  const sheetOrder = sheets.map((s) => s.id);
+  const sheetNo = (id: string) => {
+    if (!sheetOrder.includes(id)) sheetOrder.push(id);
+    return sheetOrder.indexOf(id) + 1;
+  };
+  const rootName = new Map<string, string>();
+  for (const [root, { name, sheet }] of rootLabel) {
+    rootName.set(root, sheet !== null && netsOfName.get(name)! > 1 ? `${sheetNo(sheet)}:${name}` : name);
   }
 
   // 2. power nets — a root is power if a power symbol sits on one of its verts.
+  //    A supply's own text names it (a `vcc5v` reading "VBUS" is VBUS), as it
+  //    does in computeNets; a bare one is the symbol's default.
   const rootPower = new Map<string, string>();
   for (const ps of powerSyms) {
+    const name = (ps.text && ps.text.trim()) || POWER[ps.kind];
     for (const v of verts) {
       if ((v.x - ps.x) ** 2 + (v.y - ps.y) ** 2 <= ATTACH_R * ATTACH_R) {
-        rootPower.set(uf.find(key(v.x, v.y)), POWER[ps.kind]);
+        rootPower.set(uf.find(key(v.x, v.y)), name);
       }
     }
   }
@@ -310,11 +389,13 @@ export function convertSchematicToPcb(src: CanvasObject[]): ConvertResult {
       (netPads.get(root) ?? netPads.set(root, []).get(root)!).push(padAbs[i][k]);
     });
   });
-  let airwires = 0, netNo = 0;
+  // Airwires carry their net's label, else an automatic N1, N2… (counted
+  // over the unnamed nets only, so a label-free sheet reads as before).
+  let airwires = 0, netNo = 0, unnamed = 0;
   for (const [root, pts] of netPads) {
     if (pts.length < 2) continue;
     netNo++;
-    const netName = `N${netNo}`;
+    const netName = rootName.get(root) ?? `N${++unnamed}`;
     for (const [a, b] of mst(pts)) {
       out.push({
         id: `pcb-rats-${root}-${airwires}`,
@@ -470,8 +551,8 @@ export interface ImportChangesPlan {
   kept: number;
 }
 
-export function planImportChanges(src: CanvasObject[]): ImportChangesPlan {
-  const { objects: generated, plan } = convertSchematicToPcb(src);
+export function planImportChanges(src: CanvasObject[], sheets: readonly { id: string }[] = []): ImportChangesPlan {
+  const { objects: generated, plan } = convertSchematicToPcb(src, sheets);
   const genFoot = generated.filter((o) => o.props?.gen === "convert" && o.sourceId);
   const rest = generated.filter((o) => !(o.props?.gen === "convert" && o.sourceId));
   const existing = src.filter((o) => o.props?.gen === "convert" && o.sourceId);

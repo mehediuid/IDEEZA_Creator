@@ -13,7 +13,9 @@
 // `useCreateHistory()`.
 
 import * as React from "react";
+import { reportWrite } from "../storage-status";
 import type { Companion } from "./companions";
+import type { LinkEdit, NetworkEdits, NetworkReply } from "./network-reply";
 import {
   BRIEF_CHANGES,
   deriveTitle,
@@ -74,6 +76,10 @@ export type SetupAnswer = {
   /** The maker's spec edits per product — "primary" or a companion id. Kept
    *  per product, not per drawing, so a size set once survives a refine. */
   specs?: Record<string, SpecEdits>;
+  /** The maker's changes to the concept network's links — who sends and
+   *  what travels (concept-network.ts). The protocol is each product's own
+   *  radio, in `specs`. */
+  network?: NetworkEdits;
 };
 
 export type ChatTurn =
@@ -101,7 +107,14 @@ export type ChatTurn =
        *  turns that predate it. */
       productName?: string;
       productSummary?: string;
+      /** How the model said the products talk, from the same call as the
+       *  companions. Absent when it didn't answer; the rule answers then. */
+      network?: NetworkReply;
       answer?: SetupAnswer;
+      /** The project this chat was started for, from its page's "Add a
+       *  product" (`/?addTo=<id>`, P2-TABS-29). The question opens on it, so
+       *  the build it makes joins that project when it's saved. */
+      addTo?: string;
       ts: number;
     }
   | {
@@ -362,11 +375,15 @@ function loadJSON<T>(key: string, fallback: T): T {
   }
 }
 
-function saveJSON<T>(key: string, value: T) {
-  if (typeof window === "undefined") return;
+/** Writes one key; false when the browser refused it — storage full (COR-93). */
+function saveJSON<T>(key: string, value: T): boolean {
+  if (typeof window === "undefined") return true;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ─────────────────────────── helpers ───────────────────────────────
@@ -392,7 +409,9 @@ export function allItems(job: BuildJob): BuildItem[] {
 
 /** The products a build covers, primary first. §4.7 opens each into its
  *  own tabs, and §4.4.9 gives each its own badge, so both surfaces walk
- *  this rather than special-casing the primary. */
+ *  this rather than special-casing the primary. The primary carries the
+ *  job's own description, as a companion carries its own (COR-90): without
+ *  it every reader fell back to `summary`, which is the parts line. */
 export function productsOf(job: BuildJob): BuildProduct[] {
   return [
     {
@@ -402,6 +421,7 @@ export function productsOf(job: BuildJob): BuildProduct[] {
       conceptPrompt: job.conceptPrompt,
       title: job.title,
       summary: job.summary,
+      ...(job.description ? { description: job.description } : null),
       parts: job.parts,
       ...(job.spec ? { spec: job.spec } : null),
       items: job.items,
@@ -676,7 +696,9 @@ type Ctx = {
   builds: BuildJob[];
 
   // Chat ops
-  createChat: (initialPrompt: string) => ChatSession;
+  /** `addTo`: the project Home's "Adding to {project}" names (P2-TABS-29) —
+   *  the setup question opens on it. */
+  createChat: (initialPrompt: string, opts?: { addTo?: string }) => ChatSession;
   appendUserTurn: (chatId: string, text: string) => void;
   appendAssistantTurn: (
     chatId: string,
@@ -705,6 +727,7 @@ type Ctx = {
       companions: Companion[];
       productName?: string;
       productSummary?: string;
+      network?: NetworkReply;
     },
   ) => void;
   answerSetupTurn: (
@@ -726,6 +749,10 @@ type Ctx = {
   setTurnConcept: (chatId: string, turnId: string, concept: ConceptSummary) => void;
   /** The maker's spec edits for one product, on the answered question. */
   setSpecEdits: (chatId: string, turnId: string, productId: string, edits: SpecEdits) => void;
+  /** One concept-network link's edit, or null to put it back as suggested. */
+  setNetworkEdit: (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) => void;
+  /** Adds the concept network, or removes it — every link edit with it. */
+  setNetworkAdded: (chatId: string, turnId: string, added: boolean) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -828,19 +855,21 @@ export function CreateHistoryProvider({
     setHydrated(true);
   }, []);
 
-  // Persist on every change post-hydration so a refresh keeps state.
+  // Persist on every change post-hydration so a refresh keeps state. A write
+  // the browser refuses is reported, so the page can say so (COR-93).
   React.useEffect(() => {
     if (!hydrated) return;
-    saveJSON(CHATS_KEY, chats);
+    reportWrite(CHATS_KEY, saveJSON(CHATS_KEY, chats));
   }, [chats, hydrated]);
   React.useEffect(() => {
     if (!hydrated) return;
-    saveJSON(BUILDS_KEY, builds);
+    reportWrite(BUILDS_KEY, saveJSON(BUILDS_KEY, builds));
   }, [builds, hydrated]);
 
   // ── Chat ops ──────────────────────────────────────────────────
-  const createChat = React.useCallback((initialPrompt: string) => {
+  const createChat = React.useCallback((initialPrompt: string, opts?: { addTo?: string }) => {
     const now = Date.now();
+    const addTo = opts?.addTo?.trim();
     const id = makeId("chat");
     const session: ChatSession = {
       id,
@@ -855,6 +884,7 @@ export function CreateHistoryProvider({
           prompt: initialPrompt,
           status: "loading",
           companions: [],
+          ...(addTo ? { addTo } : null),
           ts: now + 1,
         },
       ],
@@ -980,6 +1010,7 @@ export function CreateHistoryProvider({
         companions: Companion[];
         productName?: string;
         productSummary?: string;
+        network?: NetworkReply;
       },
     ) => {
       setChats((arr) =>
@@ -1151,6 +1182,26 @@ export function CreateHistoryProvider({
             return on?.role === "assistant" ? asConceptSummary(on.concept)?.parts : undefined;
           }),
         },
+      })),
+    [patchSetupAnswer],
+  );
+
+  const setNetworkEdit = React.useCallback(
+    (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) =>
+      patchSetupAnswer(chatId, turnId, (a) => {
+        const links = { ...(a.network?.links ?? {}) };
+        if (edit) links[linkId] = edit;
+        else delete links[linkId];
+        return { ...a, network: { ...a.network, links } };
+      }),
+    [patchSetupAnswer],
+  );
+
+  const setNetworkAdded = React.useCallback(
+    (chatId: string, turnId: string, added: boolean) =>
+      patchSetupAnswer(chatId, turnId, (a) => ({
+        ...a,
+        network: added ? { links: a.network?.links ?? {}, added: true } : { links: {} },
       })),
     [patchSetupAnswer],
   );
@@ -1701,6 +1752,8 @@ export function CreateHistoryProvider({
     setSetupLeftOut,
     setTurnConcept,
     setSpecEdits,
+    setNetworkEdit,
+    setNetworkAdded,
     getChat,
     startBuild,
     updateBuildItem,

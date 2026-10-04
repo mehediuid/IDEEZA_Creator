@@ -1,108 +1,102 @@
 "use client";
 
-// Step 4 — Mint Success
+// Step 4 — Mint Success.
 //
-// Reached after Pay succeeds. The project is only considered "live" when BOTH
-// the mint is complete AND the linked video job has finished rendering. While
-// the render is still in flight, this screen shows "Mint complete · pending"
-// with progress; once the render flips to done (potentially while the user is
-// here OR on another page via the global indicator), the screen morphs into
-// its finished heading ("Listing is minted" for a sale: the marketplace is not
-// open yet, so nothing claims buyers can see it).
+// Reached once the commit's wallet request confirmed and its writes landed.
+// A Sell is listed on Explore marketplace (P2-LISTING-22), and a Sell or a
+// Give only commits once every product's video is ready (C5), so they arrive
+// here finished. Only a Save can mint while a video still renders: it shows
+// "Mint complete" and the renders' progress, then turns "Saved" as they land.
+//
+// Under the subline: the ownership proof (P2-MINT-6's MintProofCard); for a
+// Sell, the listing's terms as the listing record holds them now, and "View
+// on marketplace"; the ready products' posters, each opening its video; then
+// Go to My Projects and Showcase (P2-VIDEO-16).
 
 import * as React from "react";
+import Link from "next/link";
+import { EyeIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { type BriefState, type Intent } from "./brief-app";
+import { Icon } from "@/components/dashboard/icon";
+import { ProgressBar, TestnetDemoBadge } from "@/components/ideeza";
+import { dialogBlockerOf, ReadinessDialog } from "@/components/projects/details/readiness-dialog";
+import { useMinuteClock, useProjectPageData } from "@/components/projects/details/use-project-page-data";
+import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
+import { VideoPlayerDialog, useClipUrl } from "@/components/video-jobs/video-player";
+import { MintProofCard } from "@/components/wallet/mint-proof-card";
 import {
-  useVideoJobs,
-  progressOf,
-  etaLabel,
-  STAGE_LABELS,
-} from "@/components/video-jobs/video-jobs-provider";
+  LISTING_HOME_NOTE,
+  VIEW_ON_MARKETPLACE,
+  liveSubline,
+  pendingCardLine,
+  pendingSubline,
+  showcaseGateLine,
+} from "@/lib/brief/success-copy";
+import { can } from "@/lib/manual/permissions";
+import type { ProjectProduct } from "@/lib/manual/project-read";
+import { displayProductName } from "@/lib/manual/products-tab-view";
+import { useManualProjects } from "@/lib/manual/projects";
+import { SUCCESS_SHOWCASE, showcaseAnnouncement } from "@/lib/manual/showcase-copy";
+import { listingViewOf } from "@/lib/market/listing";
+import { termsLineOf } from "@/lib/market/listing-flow";
+import { useMarket } from "@/lib/market/market-store";
+import type { ListingMetadata } from "@/lib/market/types";
+import { productVideoStatus } from "@/lib/video/product-video";
+import { useProjectVideos } from "@/lib/video/store";
+import type { VideoTake } from "@/lib/video/types";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
-  sell: "Listing is minted",
-  give: "Drop is live",
+  sell: "Listed on the marketplace",
+  give: "Given to the community",
   save: "Saved",
 };
 
-/** The Innovations post is its own outcome — it happens on any of the three. */
-const POSTED = " Your post is up on Innovations.";
-
-/**
- * What the mint produced, read against the sequence this brief really ran: a
- * give or a save only makes a clip when it also posts to Innovations, so the
- * video is named only where there is one to name.
- */
-function liveSubline(intent: Intent, hasClip: boolean, share: boolean): string {
-  const base =
-    intent === "sell"
-      ? hasClip
-        ? "Your video is final and your listing is minted. It goes on sale when the marketplace opens."
-        : "Your listing is minted. It goes on sale when the marketplace opens."
-      : intent === "give"
-        ? hasClip
-          ? "Your video is final and the drop is open. Your community can claim it."
-          : "The drop is open. Your community can claim it."
-        : "Stored in your library. Pick it up any time.";
-  return share ? base + POSTED : base;
-}
-
-/** Minted, with the render still running — what happens without you. */
-function pendingSubline(intent: Intent, share: boolean): string {
-  const base =
-    intent === "sell"
-      ? "Your listing is minted. It goes on sale, with the video, when the marketplace opens."
-      : intent === "give"
-        ? "We’ll open the drop the moment the video finishes — no extra action needed."
-        : "Stored in your library. Pick it up any time.";
-  return share
-    ? intent === "save"
-      ? "Stored in your library. We’ll post it to Innovations the moment the video finishes."
-      : base + " The Innovations post goes up with it."
-    : base;
-}
-
-/**
- * The line under the storyboard, while the render is still running. It has to
- * agree with `pendingSubline` above it — a save that is already stored isn't
- * waiting to "go live" — and it must not name a numbered step: the steps have
- * names now, and the reminder email is set on the render card itself, not on
- * the form.
- */
-function pendingCardLine(intent: Intent, share: boolean, quality: string): string {
-  const clip = `your ${quality} 10s video`;
-  if (intent === "sell") return `Your listing is minted — its video lands as soon as ${clip} finishes.`;
-  if (intent === "give") return `The drop opens as soon as ${clip} finishes.`;
-  return share
-    ? `Your Innovations post goes up as soon as ${clip} finishes.`
-    : `It is replaced by ${clip} as soon as that finishes.`;
-}
+const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
 
 export function Step4Success({
   state,
   onBrowse,
   projectName,
+  projectId,
+  products,
 }: {
   state: BriefState;
   onBrowse: (href: string) => void;
   projectName: string;
+  /** The project this brief minted — what Showcase flags (COM-56). */
+  projectId: string | null;
+  /** Its current products, one video each. */
+  products: ProjectProduct[];
 }) {
-  const { jobs } = useVideoJobs();
+  const { jobs, now } = useVideoJobs();
+  const { record: videos } = useProjectVideos(projectId);
+  const { projects } = useManualProjects();
+  const { data: market } = useMarket();
+  const minute = useMinuteClock();
   const intent = (state.intent || "sell") as Intent;
-  const job = state.videoJobId
-    ? jobs.find((j) => j.id === state.videoJobId) || null
-    : null;
-  const willRenderVideo = !!state.videoJobId;
-  const videoDone = job?.stage === "done";
-  // The project is live when mint is complete AND (no video required OR video done).
-  const isLive = !willRenderVideo || videoDone;
+  const project = projectId ? (projects.find((p) => p.id === projectId) ?? null) : null;
+  const [watching, setWatching] = React.useState<{ take: VideoTake; name: string } | null>(null);
 
-  const heading = isLive
-    ? HEADING_LIVE_BY_INTENT[intent]
-    : "Mint complete";
-  const subline = isLive
-    ? liveSubline(intent, willRenderVideo || !!state.arClip, state.shareToNewsfeed)
-    : pendingSubline(intent, state.shareToNewsfeed);
+  const rows = products.map((p) => ({
+    product: p,
+    status: productVideoStatus(videos?.products[p.id], jobs, now),
+  }));
+  const rendering = rows.filter((r) => r.status.state === "rendering").length;
+  const ready = rows.flatMap((r) =>
+    r.status.state === "ready" ? [{ product: r.product, take: r.status.take }] : [],
+  );
+  // Live once nothing renders any more (only a Save can arrive with a render running).
+  const isLive = rendering === 0;
+  const heading = isLive ? HEADING_LIVE_BY_INTENT[intent] : "Mint complete";
+  const subline = isLive ? liveSubline(intent, ready.length > 0) : pendingSubline();
+
+  // The listing as its record holds it now, so an edit from the rail shows here too.
+  const listing =
+    intent === "sell" && projectId
+      ? listingViewOf(projectId, { ...market, now: minute, current: NO_METADATA })
+      : null;
+  const listed = listing && listing.kind !== "none" ? listing.listing : null;
+  const onMarket = listing?.kind === "live" || listing?.kind === "paused";
 
   return (
     <div className="flex w-full max-w-[560px] flex-col items-center gap-[24px] text-center">
@@ -117,124 +111,72 @@ export function Step4Success({
           height="32"
           viewBox="0 0 24 24"
           fill="none"
-          stroke={
-            isLive
-              ? "var(--color-text-success)"
-              : "var(--color-text-brand)"
-          }
+          stroke={isLive ? "var(--color-text-success)" : "var(--color-text-brand)"}
           strokeWidth="2.6"
           strokeLinecap="round"
           strokeLinejoin="round"
+          aria-hidden
         >
           <path d="M5 13l4 4 10-10" />
         </svg>
       </div>
 
       <div>
-        <h1 className="m-0 text-5xl font-bold tracking-tight text-text-primary">
-          {heading}
-        </h1>
-        <p className="mt-[6px] max-w-[460px] text-md text-text-secondary">
-          {subline}
-        </p>
+        <h1 className="m-0 text-5xl font-bold tracking-tight text-text-primary">{heading}</h1>
+        <p className="mt-[6px] max-w-[460px] text-md text-text-secondary">{subline}</p>
       </div>
 
-      {/* Inline progress while we wait for the video to finalize */}
-      {willRenderVideo && !isLive && job && (
-        <PendingCard job={job} />
-      )}
+      {project?.mint ? (
+        <MintProofCard record={project.mint} owner intent={intent} className="w-full text-left" />
+      ) : null}
 
-      {state.scenes.length > 0 && (
-        <div className="flex w-full flex-col gap-[14px] rounded-lg border border-solid border-border-subtle bg-bg-surface p-[18px] text-left">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="mb-[2px] text-sm font-medium text-text-tertiary">
-                {projectName || "Listing"}
-              </div>
-              <div className="text-lg font-bold text-text-primary">
-                {state.productName || "Untitled"}
-              </div>
-            </div>
-            {willRenderVideo && (
-              <span
-                className={[
-                  "inline-flex items-center gap-[6px] rounded-full px-[10px] py-[4px] text-sm font-semibold",
-                  isLive
-                    ? "bg-bg-success-subtle text-text-success"
-                    : "bg-bg-brand-subtle text-text-brand",
-                ].join(" ")}
-              >
-                {isLive ? (
-                  <>
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M5 13l4 4 10-10" />
-                    </svg>
-                    Live
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className="ix-s4-pulse h-[6px] w-[6px] rounded-full bg-bg-brand"
-                    />
-                    Pending video
-                  </>
-                )}
-              </span>
-            )}
+      {listed ? (
+        <section
+          aria-label="Listing"
+          className="flex w-full flex-col gap-[6px] rounded-lg border border-solid border-border bg-bg-surface p-[16px] text-left"
+        >
+          <div className="flex flex-wrap items-center gap-[8px]">
+            <h2 className="m-0 text-md font-semibold text-text-primary">Listing</h2>
+            <TestnetDemoBadge />
           </div>
-
-          {/* Storyboard scenes — internal-only preview while we wait, full
-              video replaces it once live. */}
-          <div className="grid grid-cols-3 gap-[8px]">
-            {state.scenes.map((scene, i) => (
-              <SceneCard key={scene.id} scene={scene} index={i} />
-            ))}
-          </div>
-
-          {willRenderVideo && !isLive && (
-            <div className="flex items-center gap-[8px] rounded-md border border-solid border-border-subtle bg-bg-page px-[12px] py-[10px] text-sm leading-relaxed text-text-secondary">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="shrink-0"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4 M12 16h.01" />
-              </svg>
-              <span>
-                Storyboard is your private preview for now.{" "}
-                {pendingCardLine(
-                  intent,
-                  state.shareToNewsfeed,
-                  state.quality === "low" ? "480p" : "720p",
-                )}{" "}
-                We&rsquo;ll tell you here when it lands — and email you, if you
-                asked for that when the render started.
-              </span>
-            </div>
+          <p className="m-0 text-md font-medium tabular-nums text-text-primary">{termsLineOf(listed)}</p>
+          <p className="m-0 text-sm text-text-secondary">{LISTING_HOME_NOTE}</p>
+          {/* Only while there is a listing to see: a removed or ended one opens nothing there. */}
+          {onMarket && (
+            <Link
+              href={`/marketplace/${projectId}`}
+              className="mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {VIEW_ON_MARKETPLACE}
+            </Link>
           )}
-        </div>
+        </section>
+      ) : null}
+
+      {!isLive && <PendingCard rows={rows} rendering={rendering} />}
+
+      {ready.length > 0 && (
+        <section aria-label="Videos" className="flex w-full flex-col gap-[10px] text-left">
+          <div className="text-sm font-medium text-text-tertiary">{projectName || "Videos"}</div>
+          <ul role="list" className="m-0 grid list-none grid-cols-2 gap-[8px] p-0 sm:grid-cols-3">
+            {ready.map(({ product, take }) => (
+              <li key={product.id}>
+                <PosterTile
+                  take={take}
+                  name={displayProductName(product.name)}
+                  onOpen={() => setWatching({ take, name: displayProductName(product.name) })}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <div className="flex w-full flex-col items-stretch gap-[10px]">
         <button
+          type="button"
           onClick={() => onBrowse("/projects")}
-          className="inline-flex items-center justify-center gap-[8px] rounded-3xl border-none bg-bg-brand px-[24px] py-[14px] text-md font-bold text-text-on-brand"
+          className="inline-flex items-center justify-center gap-[8px] rounded-3xl border-none bg-bg-brand px-[24px] py-[14px] text-md font-bold text-text-on-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2"
         >
           <svg
             width="16"
@@ -245,86 +187,193 @@ export function Step4Success({
             strokeWidth="1.9"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden
           >
             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           </svg>
           Go to My Projects
         </button>
 
+        {projectId && <SuccessShowcase projectId={projectId} />}
+
         <div className="flex items-center justify-center">
-          <a
-            onClick={() => onBrowse("/")}
-            className="cursor-pointer rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline"
+          <Link
+            href="/"
+            className="rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             Back to home
-          </a>
+          </Link>
         </div>
       </div>
 
-      <style>{`
-        @keyframes ix-s4-pulse-kf { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
-        .ix-s4-pulse { animation: ix-s4-pulse-kf 1.4s ease-in-out infinite; }
-      `}</style>
+      {projectId && (
+        <VideoPlayerDialog
+          open={watching !== null}
+          take={watching?.take ?? null}
+          productName={watching?.name ?? ""}
+          projectId={projectId}
+          onClose={() => setWatching(null)}
+        />
+      )}
     </div>
   );
 }
 
+/** A ready product's poster; pressing it opens the video (P2-VIDEO-16). */
+function PosterTile({ take, name, onOpen }: { take: VideoTake; name: string; onOpen: () => void }) {
+  const clip = useClipUrl(take.id);
+  const [broken, setBroken] = React.useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Play ${name} video`}
+      className="group relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md border-0 bg-bg-surface-raised p-0 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+    >
+      {clip.state === "ready" && !broken ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={clip.posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={() => setBroken(true)} />
+      ) : null}
+      <span className="relative inline-flex h-[32px] w-[32px] items-center justify-center rounded-full bg-bg-surface text-text-brand shadow-2">
+        <Icon icon={PlayIcon} size={14} />
+      </span>
+      <span className="absolute inset-x-0 bottom-0 truncate bg-[color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent)] px-[6px] py-[3px] text-left text-xs font-semibold text-[var(--color-white)]">
+        {name}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Showcase, offered the moment the outcome is chosen (COM-56): after any of
+ * the three intents. It flags the project (COR-105) — the Showcase badge and
+ * the Showcase tab of My projects follow it — and posts nothing, because the
+ * Innovations feed isn't open. A mint with Share to Innovations ticked
+ * arrives already showcased (the Brief's commit writes the same flag), so the
+ * step opens on the status row and nothing takes focus until a press.
+ *
+ * P2-VIDEO-16: it runs the same gate as the Outcome block's Showcase — every
+ * product needs a ready video. Ready, one press flips it. Blocked, the press
+ * opens the readiness dialog over this step, where the videos can be made
+ * without leaving it; its CTA then showcases.
+ */
+function SuccessShowcase({ projectId }: { projectId: string }) {
+  const data = useProjectPageData(projectId, "project");
+  const { setShowcase } = useManualProjects();
+  const [said, setSaid] = React.useState("");
+  const [gateOpen, setGateOpen] = React.useState(false);
+  const lineId = React.useId();
+  const doneId = React.useId();
+  const showRef = React.useRef<HTMLButtonElement>(null);
+  const undoRef = React.useRef<HTMLButtonElement>(null);
+  const project = data.state === "ready" ? data.project : null;
+  const on = typeof project?.showcasedAt === "number";
+  // The control that replaces the one just pressed takes focus once it has rendered.
+  const focusNext = React.useRef<"show" | "undo" | null>(null);
+  React.useEffect(() => {
+    const target =
+      focusNext.current === "undo" ? undoRef.current : focusNext.current === "show" ? showRef.current : null;
+    focusNext.current = null;
+    target?.focus();
+  }, [on]);
+
+  if (data.state !== "ready" || !project) return null;
+  const { view, brief } = data;
+  const status = view.summary.status;
+  if (!can({ kind: "local-owner" }, "project.showcase", { status })) return null;
+  const readiness = view.videos.readiness.showcase;
+  const blocked = dialogBlockerOf(readiness) !== null;
+
+  const flip = (next: boolean) => {
+    focusNext.current = next ? "undo" : "show";
+    setShowcase(project.id, next);
+    setSaid(showcaseAnnouncement(next, project.name));
+  };
+
+  return (
+    <div className="flex w-full flex-col items-stretch gap-3">
+      {on ? (
+        <div className="flex min-h-[44px] items-center gap-4 rounded-3xl border border-solid border-border-subtle bg-bg-surface py-2 pl-10 pr-2 text-left">
+          <span aria-hidden className="inline-flex shrink-0 text-[color:var(--color-icon-info)]">
+            <Icon icon={EyeIcon} size={18} />
+          </span>
+          <p id={doneId} className="m-0 min-w-0 flex-1 text-md text-text-primary">
+            {SUCCESS_SHOWCASE.done}
+          </p>
+          <button
+            ref={undoRef}
+            type="button"
+            onClick={() => flip(false)}
+            aria-describedby={doneId}
+            className="inline-flex min-h-[44px] shrink-0 items-center rounded-3xl px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            {SUCCESS_SHOWCASE.undo}
+          </button>
+        </div>
+      ) : (
+        <>
+          <button
+            ref={showRef}
+            type="button"
+            onClick={() => (blocked ? setGateOpen(true) : flip(true))}
+            aria-describedby={lineId}
+            className="inline-flex min-h-[44px] items-center justify-center gap-4 rounded-3xl border border-solid border-border bg-bg-surface px-12 py-6 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <Icon icon={EyeIcon} size={16} />
+            {SUCCESS_SHOWCASE.action}
+          </button>
+          <p id={lineId} className="m-0 text-sm text-text-secondary">
+            {blocked ? showcaseGateLine(readiness.counts.ready, readiness.counts.total) : SUCCESS_SHOWCASE.line}
+          </p>
+        </>
+      )}
+      <p role="status" className="sr-only">
+        {said}
+      </p>
+      {gateOpen && (
+        <ReadinessDialog
+          purpose="showcase"
+          project={project}
+          view={view}
+          brief={brief}
+          onPass={() => {
+            setGateOpen(false);
+            flip(true);
+          }}
+          onClose={() => {
+            setGateOpen(false);
+            requestAnimationFrame(() => showRef.current?.focus());
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** A Save's videos still rendering: each one's progress, and that they need no one to wait. */
 function PendingCard({
-  job,
+  rows,
+  rendering,
 }: {
-  job: NonNullable<ReturnType<typeof useVideoJobs>["jobs"][number]>;
+  rows: { product: ProjectProduct; status: ReturnType<typeof productVideoStatus> }[];
+  rendering: number;
 }) {
-  const { total, etaSec } = progressOf(job);
   return (
     <div className="flex w-full flex-col gap-[10px] rounded-lg border border-solid border-border-brand bg-bg-brand-subtle p-[16px] text-left">
-      <div className="flex items-center justify-between">
-        <div className="text-md font-bold text-text-brand">
-          Video is rendering · {STAGE_LABELS[job.stage]}
-        </div>
-        <div className="tabular-nums text-sm font-semibold text-text-brand">
-          {etaLabel(etaSec)} left
-        </div>
-      </div>
-      <div className="h-[6px] overflow-hidden rounded-full bg-bg-surface">
-        <div
-          // Scaled, not resized: a transform moves on the compositor, where an
-          // animated width re-lays the row out every half second.
-          className="h-full w-full origin-left bg-bg-brand transition-transform duration-slower ease-linear"
-          style={{ transform: `scaleX(${total / 100})` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function SceneCard({
-  scene,
-  index,
-}: {
-  scene: BriefState["scenes"][number];
-  index: number;
-}) {
-  // Only the brand gradient tokens exist (CLAUDE.md §7 — an agent never mints
-  // a design token), so the three-tone poster art becomes an alternation of
-  // the two rather than a third invented ramp.
-  const gradientClass =
-    index % 2 === 0 ? "bg-[image:var(--gradient-brand)]" : "bg-[image:var(--gradient-ai)]";
-  return (
-    <div
-      className={[
-        "relative aspect-[9/16] overflow-hidden rounded-md shadow-3",
-        gradientClass,
-      ].join(" ")}
-    >
-      {/* A dark scrim behind the caption instead of a text-shadow — the
-          caption is white regardless of theme, since it sits on imagery. */}
-      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(to_top,color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent),transparent)]" />
-      <div className="absolute left-[6px] top-[6px] rounded-sm bg-[color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent)] px-[6px] py-[2px] text-xs font-semibold text-[var(--color-white)]">
-        {scene.timeRange}
-      </div>
-      <div className="absolute bottom-[6px] left-[6px] right-[6px] line-clamp-3 text-xs font-medium leading-[1.3] text-[var(--color-white)]">
-        {scene.visual}
-      </div>
+      <div className="text-md font-bold text-text-brand">{pendingCardLine(rendering)}</div>
+      <ul role="list" className="m-0 flex list-none flex-col gap-[8px] p-0">
+        {rows.map(({ product, status }) =>
+          status.state === "rendering" ? (
+            <li key={product.id} className="flex flex-col gap-[4px]">
+              <div className="flex items-center justify-between gap-[8px] text-sm font-semibold text-text-brand">
+                <span className="truncate">{displayProductName(product.name)}</span>
+                <span className="tabular-nums">{status.eta} left</span>
+              </div>
+              <ProgressBar value={status.progress} label={`${displayProductName(product.name)} video`} />
+            </li>
+          ) : null,
+        )}
+      </ul>
     </div>
   );
 }

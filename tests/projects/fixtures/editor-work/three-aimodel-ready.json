@@ -1,0 +1,6 @@
+{
+  "prompt": "a small drone chassis",
+  "imageUrl": "/api/concept/image/abc123",
+  "glbUrl": "/api/three/model/abc123.glb",
+  "provider": "meshy"
+}
