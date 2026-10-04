@@ -110,7 +110,6 @@ src/
                     routing, copper pour, boolean geometry, exporters
   styles/           tokens.css · reset.css · Tailwind preset
 scripts/            One-off maintenance scripts
-docs/agent-rules/   Binding rules for AI agents working in this repo
 ```
 
 The full annotated tree lives in [STRUCTURE.md](STRUCTURE.md).
@@ -121,8 +120,7 @@ The full annotated tree lives in [STRUCTURE.md](STRUCTURE.md).
   inventory** and the source of truth for what exists and works. Sections 6 and 7
   hold the coding and UI/UX conventions.
 - [STRUCTURE.md](STRUCTURE.md): where everything lives.
-- [AGENTS.md](AGENTS.md) and [docs/agent-rules/](docs/agent-rules/00-index.md):
-  scope, code, verification, UI/UX and Figma-to-code rules.
+- [AGENTS.md](AGENTS.md): scope, code, verification and UI/UX rules.
 
 ## Contributing
 
