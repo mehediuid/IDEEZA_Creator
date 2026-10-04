@@ -116,11 +116,16 @@ The full annotated tree lives in [STRUCTURE.md](STRUCTURE.md).
 
 ## Documentation
 
-- [CLAUDE.md](CLAUDE.md): the project guide. Section 5 is the **living feature
-  inventory** and the source of truth for what exists and works. Sections 6 and 7
-  hold the coding and UI/UX conventions.
+- [AGENTS.md](AGENTS.md): the project guide, with the scope, code,
+  verification and UI/UX rules. `CLAUDE.md` loads it.
+- [docs/guides/features/](docs/guides/features/README.md): the **living feature
+  inventory**, one guide per area, and the source of truth for what exists and
+  works.
+- [docs/guides/ui-ux.md](docs/guides/ui-ux.md): the reasoning behind the UI/UX
+  rules.
+- [docs/map/](docs/map/PRODUCT.md): where the code, operations and docs for
+  each area live.
 - [STRUCTURE.md](STRUCTURE.md): where everything lives.
-- [AGENTS.md](AGENTS.md): scope, code, verification and UI/UX rules.
 
 ## Contributing
 
@@ -134,6 +139,6 @@ The full annotated tree lives in [STRUCTURE.md](STRUCTURE.md).
 - **Menus never clip.** Flyouts portal to `<body>` with `position: fixed` and
   clamp into the viewport.
 - **Definition of done:** `tsc --noEmit` passes **and** the behaviour is
-  verified in a real browser. Update the feature inventory in `CLAUDE.md` in
-  the same change.
+  verified in a real browser. Update the feature inventory in
+  `docs/guides/features/` in the same change.
 - Keep diffs minimal and scoped to the task. No new dependencies without asking.
