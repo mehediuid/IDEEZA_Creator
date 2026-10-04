@@ -204,19 +204,27 @@ const touches = (l: MapLink, id: string) => l.from === id || l.to === id;
 
 // ───────────────────────── roles (Figma Role rules) ─────────────────────────
 
+/** A link as the role rules read it from one end: as drawn, except that a
+ *  two-way link carrying commands goes from the one that gives them — the
+ *  telemetry back doesn't make the one that takes orders a peer. */
+function roleDirection(l: MapLink, id: string): "out" | "in" | "both" | null {
+  if (l.initiator === "both" && l.carries === "commands" && touches(l, id)) return starter(l) === id ? "out" : "in";
+  return directionAt(l, id);
+}
+
 export function pickMaster(productIds: string[], links: MapLink[]): string | null {
   const twoWay = (id: string, carries?: Carries[]) =>
     links.some(
       (l) =>
         touches(l, id) &&
-        l.initiator === "both" &&
+        roleDirection(l, id) === "both" &&
         (!carries || carries.includes(l.carries)),
     );
   // With no two-way link, the product that only gives commands is the one
   // its Slaves answer to — a remote and the car it drives.
   const commands = (id: string) => {
     const own = links.filter((l) => touches(l, id));
-    return own.length > 0 && own.every((l) => directionAt(l, id) === "out") && own.some(givesCommands);
+    return own.length > 0 && own.every((l) => roleDirection(l, id) === "out") && own.some(givesCommands);
   };
   return (
     productIds.find((id) => twoWay(id, ["sensor", "data+commands"])) ??
@@ -232,7 +240,7 @@ export function roleOf(id: string, links: MapLink[], masterId: string | null): R
   const own = links.filter((l) => touches(l, id));
   if (!own.length) return "Standby";
   if (new Set(own.map((l) => l.protocol)).size >= 2) return "Gateway";
-  const dirs = own.map((l) => directionAt(l, id));
+  const dirs = own.map((l) => roleDirection(l, id));
   if (dirs.includes("both")) return id === masterId ? "Master" : "Peer";
   // Figma: "Outgoing only, carries events only" is Independent. One that
   // sends commands is the Master of the product that receives them.

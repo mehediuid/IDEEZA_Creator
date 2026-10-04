@@ -12,6 +12,7 @@ import {
   connectsLine,
   endsLine,
   linkEditFor,
+  networkReset,
   parseNetworkReply,
   problemLine,
   protocolChange,
@@ -249,12 +250,59 @@ test("a protocol change writes SpecEdits.radio on both products, and their parts
   assert.deepEqual(protocolChange(l, [car, remote], "nrf24"), []);
 });
 
-test("Back to suggested puts an edited radio back to the concept's", () => {
+test("Back to suggested puts back only the radios Change link set", () => {
   const edited = { ...remote, edits: { radio: "ble", basedOn: "t-remote-controller" } };
-  const [l] = conceptLinks([car, edited], {});
-  const reset = radioReset(l, [car, edited]);
+  const carBle = { ...car, edits: { radio: "ble", basedOn: "t-primary" } };
+  const id = "primary~remote-controller";
+  const [l] = conceptLinks([carBle, edited], { edits: { added: true, links: { [id]: { radioOn: ["remote-controller"] } } } });
+  assert.equal(l.edited, true);
+  const reset = radioReset(l, [carBle, edited]);
   assert.deepEqual(reset.map((r) => r.productId), ["remote-controller"]);
   assert.equal(reset[0].edits.radio, undefined);
+});
+
+test("a radio set on the sheet is no edit to the link — Back to suggested isn't offered", () => {
+  const edited = { ...remote, edits: { radio: "ble", basedOn: "t-remote-controller" } };
+  const [l] = conceptLinks([car, edited], {});
+  assert.equal(l.edited, false);
+  assert.deepEqual(radioReset(l, [car, edited]), []);
+});
+
+test("Remove network puts back every radio Change link set, each product once", () => {
+  const base = end("base-station", "Base station", [ESP32, NRF], { edits: { radio: "ble", basedOn: "t-base-station" } });
+  const carBle = { ...car, edits: { radio: "ble", basedOn: "t-primary" } };
+  const remoteBle = { ...remote, edits: { radio: "ble", basedOn: "t-remote-controller" } };
+  const peers = [carBle, remoteBle, base];
+  const links = conceptLinks(peers, {
+    edits: {
+      added: true,
+      links: {
+        "primary~remote-controller": { radioOn: ["primary", "remote-controller"] },
+        "base-station~primary": { radioOn: ["primary"] },
+      },
+    },
+  });
+  const reset = networkReset({ links, peers });
+  assert.deepEqual(reset.map((r) => r.productId).sort(), ["primary", "remote-controller"]);
+  assert.ok(reset.every((r) => r.edits.radio === undefined));
+});
+
+test("a controller drawn backwards by the model is normalized: commands from it, telemetry back", () => {
+  const drone = end("primary", "Compact Drone", [ESP32, p("Brushless motors (x4)", "Actuator"), p("MPU-6050 IMU", "Sensor"), NRF]);
+  const ctl = end("remote-controller", "Remote Controller", [ATMEGA, STICK, NRF]);
+  const links = conceptLinks([drone, ctl], {
+    reply: { links: [{ from: "primary", to: "remote-controller", carries: "sensor", twoWay: false }], app: null },
+  });
+  const [l] = links;
+  assert.deepEqual([l.from, l.to, l.carries, l.twoWay], ["remote-controller", "primary", "commands", true]);
+  assert.equal(endsLine(l, [drone, ctl]), "Remote Controller ↔ Compact Drone");
+  assert.equal(travelsLine(l, [drone, ctl]), "Steering and throttle commands, with telemetry back");
+  assert.equal(rolesLine(l, rolesOf(links), [drone, ctl]), "Remote Controller: Master · Compact Drone: Slave");
+  // From the controller already, but carrying readings: it carries commands.
+  const [fwd] = conceptLinks([drone, ctl], {
+    reply: { links: [{ from: "remote-controller", to: "primary", carries: "sensor", twoWay: false }], app: null },
+  });
+  assert.deepEqual([fwd.from, fwd.carries, fwd.twoWay], ["remote-controller", "commands", false]);
 });
 
 test("a direction and what-travels edit applies over the suggestion, and the suggestion is no edit", () => {
@@ -309,7 +357,21 @@ test("the section: shown with the link once answered, working while a product is
   assert.equal(ready.show, true);
   assert.equal(ready.working, false);
   assert.equal(ready.links.length, 1);
-  assert.deepEqual([...ready.onLink].sort(), ["primary", "remote-controller"]);
+  // Optional: offered, not added — no product's radio is the network's yet.
+  assert.equal(ready.added, false);
+  assert.equal(ready.onLink.size, 0);
+  const added = conceptNetworkOf(
+    projectState(
+      chatWith([drawn("a1", undefined, [ESP32, MOTOR, DRIVER, NRF]), drawn("a2", "remote-controller", [ATMEGA, STICK, NRF])], {
+        projectId: "",
+        projectName: "Car",
+        picked: ["remote-controller"],
+        network: { added: true, links: {} },
+      }),
+    ),
+  );
+  assert.equal(added.added, true);
+  assert.deepEqual([...added.onLink].sort(), ["primary", "remote-controller"]);
   const drawing = conceptNetworkOf(
     projectState(chatWith([drawn("a1", undefined, [ESP32, MOTOR, DRIVER, NRF]), drawn("a2", "remote-controller", [], "pending")])),
   );
@@ -343,9 +405,11 @@ function savedCar() {
   return { job, proj, products: networkProducts(proj, buildsOf(proj, [job])) };
 }
 
+const ADDED = { projectId: "", projectName: "Car", picked: ["remote-controller"], network: { added: true, links: {} } };
+
 test("the concept network becomes a Network that passes sanitizeNetwork", () => {
   const { job, proj, products } = savedCar();
-  const chat = chatWith([]);
+  const chat = chatWith([], ADDED);
   const { links, ends } = builtLinks(job, chat);
   const net = networkFromConcept({ projectId: proj.id, name: proj.name, products, links, ends, now: T });
   assert.ok(net);
@@ -366,12 +430,15 @@ test("the concept network becomes a Network that passes sanitizeNetwork", () => 
   assert.deepEqual(net.nodes.map((n) => n.id).sort(), ["p-car", "p-remote-controller"]);
 });
 
-test("Save writes the network only when the project has none", () => {
+test("Save writes the network only when the maker added it, and the project has none", () => {
   const { job, proj, products } = savedCar();
-  const input = { projectId: proj.id, name: proj.name, products, job, chat: chatWith([]), now: T };
+  const input = { projectId: proj.id, name: proj.name, products, job, chat: chatWith([], ADDED), now: T };
   const fresh = networkForSave({ ...input, existing: null });
   assert.ok(fresh);
   assert.equal(networkForSave({ ...input, existing: fresh }), null);
+  // Never added (the default): nothing is written.
+  assert.equal(networkForSave({ ...input, chat: chatWith([]), existing: null }), null);
+  assert.equal(networkForSave({ ...input, chat: null, existing: null }), null);
 });
 
 test("Save: a lone lamp's phone app link is a ctrl network with an app box and no broker", () => {
@@ -384,7 +451,8 @@ test("Save: a lone lamp's phone app link is a ctrl network with an app box and n
     products: [row("r1", "Lamp", "", "b2", "primary", T)],
   });
   const products = networkProducts(proj, buildsOf(proj, [job]));
-  const net = networkForSave({ existing: null, projectId: "p2", name: "Lamp", products, job, chat: null, now: T });
+  const chat = { ...chatWith([], { projectId: "", projectName: "Lamp", picked: [], network: { added: true, links: {} } }), id: "c2" };
+  const net = networkForSave({ existing: null, projectId: "p2", name: "Lamp", products, job, chat, now: T });
   assert.equal(net.intent, "ctrl");
   assert.deepEqual(net.nodes.map((n) => n.kind).sort(), ["app", "product"]);
   assert.deepEqual([net.links[0].from, net.links[0].to, net.links[0].initiator], ["p-lamp", "app", "both"]);
@@ -408,7 +476,7 @@ test("Save: a link whose ends don't agree on a radio is left for the Connection 
     products: [row("r1", "Car", "", "b3", "primary", T), row("r2", "Remote controller", "", "b3", "remote-controller", T)],
   });
   const products = networkProducts(proj, buildsOf(proj, [job]));
-  assert.equal(networkForSave({ existing: null, projectId: "p3", name: "Car", products, job, chat: null, now: T }), null);
+  assert.equal(networkForSave({ existing: null, projectId: "p3", name: "Car", products, job, chat: chatWith([], ADDED), now: T }), null);
   void CELL;
   void part;
 });

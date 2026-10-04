@@ -19,7 +19,10 @@ import type { Intent, MapLink, NetProduct, Network, ProtocolKey } from "./types"
 /** The concept links between the products a build made, as the chat left
  *  them: the model's answer and the maker's edits on its setup turn, and the
  *  build's own parts — what was built, which is what the network runs on. */
-export function builtLinks(job: BuildJob, chat: ChatSession | null): { links: ConceptLink[]; ends: NetEnd[] } {
+export function builtLinks(
+  job: BuildJob,
+  chat: ChatSession | null,
+): { links: ConceptLink[]; ends: NetEnd[]; added: boolean } {
   const ends: NetEnd[] = productsOf(job).map((p) => ({
     id: p.id,
     name: p.id === "primary" ? job.title : p.name,
@@ -35,7 +38,7 @@ export function builtLinks(job: BuildJob, chat: ChatSession | null): { links: Co
     edits: setup?.answer?.network,
     prompt: setup?.prompt ?? job.conceptPrompt,
   });
-  return { links, ends };
+  return { links, ends, added: setup?.answer?.network?.added === true };
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -128,9 +131,10 @@ export function networkFromConcept(input: {
   return sanitizeNetwork(network, input.projectId);
 }
 
-/** What Save writes: the network for this project, or null — when the
- *  project has one already (the Connection Map is the maker's), or when the
- *  concept had no link to give it. */
+/** What Save writes: the network for this project, or null — when the maker
+ *  never added one at the concept stage (it is optional), when the project
+ *  has one already (the Connection Map is the maker's), or when the concept
+ *  had no link to give it. */
 export function networkForSave(input: {
   existing: Network | null;
   projectId: string;
@@ -141,6 +145,6 @@ export function networkForSave(input: {
   now: number;
 }): Network | null {
   if (input.existing) return null;
-  const { links, ends } = builtLinks(input.job, input.chat);
-  return networkFromConcept({ ...input, links, ends });
+  const { links, ends, added } = builtLinks(input.job, input.chat);
+  return added ? networkFromConcept({ ...input, links, ends }) : null;
 }

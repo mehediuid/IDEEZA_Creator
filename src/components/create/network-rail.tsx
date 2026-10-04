@@ -51,15 +51,32 @@ const QUIET =
 /** What Change link saves. `radio` is null when the ends share none to pick. */
 export type LinkChange = { radio: RadioKey | null; from: string; twoWay: boolean; carries: Carries };
 
+const ADD_ID = `${RAIL_NETWORK_ID}-add`;
+const LINKS_ID = `${RAIL_NETWORK_ID}-links`;
+
+/** After a render: the keyboard to the first of `ids` that is on the page. */
+const focusFirst = (...selectors: string[]) =>
+  requestAnimationFrame(() => {
+    for (const sel of selectors) {
+      const el = document.querySelector<HTMLElement>(sel);
+      if (el) return el.focus();
+    }
+  });
+
 export function NetworkSection({
   net,
   openHref,
+  onAdd,
+  onRemove,
   onSave,
   onReset,
 }: {
   net: ConceptNetwork;
   /** The saved project's Connection Map, once it has a network. */
   openHref?: string | null;
+  /** The network is optional: the maker adds it here, and can remove it. */
+  onAdd: () => void;
+  onRemove: () => void;
   onSave: (linkId: string, change: LinkChange) => void;
   onReset: (linkId: string) => void;
 }) {
@@ -67,6 +84,14 @@ export function NetworkSection({
   const [said, setSaid] = React.useState("");
   const link = editing ? (net.links.find((l) => l.id === editing) ?? null) : null;
   if (!net.show) return null;
+  const locked = net.links.some((l) => l.locked);
+  // One product's link is to the phone app or the cloud.
+  const lone = net.links.length > 0 && net.links.every((l) => [l.from, l.to].some((e) => e === APP || e === CLOUD));
+  const offer = !lone
+    ? "Connect your products — worked out from your prompt."
+    : net.links.some((l) => l.from === CLOUD || l.to === CLOUD)
+      ? "Connect it to the cloud — worked out from your prompt."
+      : "Connect it to a phone app — worked out from your prompt.";
   return (
     <section aria-labelledby={RAIL_NETWORK_ID} className="flex flex-col">
       <div className="flex items-baseline gap-[12px] px-[18px] pb-[6px] pt-[18px]">
@@ -77,9 +102,39 @@ export function NetworkSection({
         >
           Network
         </h3>
+        {net.added && !locked && (
+          <button
+            type="button"
+            onClick={() => {
+              onRemove();
+              setSaid("Network removed. The radios it changed are back to their own.");
+              focusFirst(`#${ADD_ID}`, `#${RAIL_NETWORK_ID}`);
+            }}
+            className={`-mr-[6px] ml-auto ${QUIET}`}
+          >
+            Remove network
+          </button>
+        )}
       </div>
-      {net.links.length > 0 && (
-        <ul role="list" className="mx-[10px] flex flex-col">
+      {!net.added && net.links.length > 0 && (
+        <div className="flex flex-col items-start gap-[8px] px-[18px]">
+          <p className="text-sm text-text-secondary">{offer}</p>
+          <button
+            id={ADD_ID}
+            type="button"
+            onClick={() => {
+              onAdd();
+              setSaid("Network added.");
+              focusFirst(`#${LINKS_ID} [data-change-link]`, `#${RAIL_NETWORK_ID}`);
+            }}
+            className={`${OUTLINE_BUTTON} ${TAP}`}
+          >
+            Add network
+          </button>
+        </div>
+      )}
+      {net.added && net.links.length > 0 && (
+        <ul id={LINKS_ID} role="list" className="mx-[10px] flex flex-col">
           {net.links.map((l) => (
             <LinkRow
               key={l.id}
@@ -162,6 +217,7 @@ function LinkRow({
         <div className="mt-[6px] flex flex-wrap items-center gap-x-[12px] gap-y-[4px]">
           <button
             type="button"
+            data-change-link
             onClick={onChange}
             aria-label={`Change link — ${ends}`}
             className={`${OUTLINE_BUTTON} ${TAP}`}

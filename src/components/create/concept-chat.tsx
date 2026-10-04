@@ -67,6 +67,7 @@ import {
   asNetworkReply,
   conceptNetworkOf,
   linkEditFor,
+  networkReset,
   protocolChange,
   radioReset,
 } from "@/lib/create/concept-network";
@@ -325,6 +326,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     setTurnConcept,
     setSpecEdits,
     setNetworkEdit,
+    setNetworkAdded,
   } = useCreateHistory();
   const { incrementPrompt } = useCreatePlan();
   // Every concept render costs credits — the first draft, a refine and a
@@ -1072,12 +1074,11 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     (linkId: string, change: LinkChange) => {
       const link = conceptNet.links.find((l) => l.id === linkId);
       if (!chat || !answeredSetupId || !link || link.locked) return;
-      if (change.radio) {
-        for (const e of protocolChange(link, conceptNet.peers, change.radio)) {
-          setSpecEdits(chat.id, answeredSetupId, e.productId, e.edits);
-        }
-      }
-      setNetworkEdit(chat.id, answeredSetupId, linkId, linkEditFor(link, change));
+      const set = change.radio ? protocolChange(link, conceptNet.peers, change.radio) : [];
+      for (const e of set) setSpecEdits(chat.id, answeredSetupId, e.productId, e.edits);
+      // The radios this set are kept on the link, so Back to suggested and
+      // Remove network put back only what Change link changed.
+      setNetworkEdit(chat.id, answeredSetupId, linkId, linkEditFor(link, change, set.map((e) => e.productId)));
     },
     [chat, answeredSetupId, conceptNet, setSpecEdits, setNetworkEdit],
   );
@@ -1090,6 +1091,16 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     },
     [chat, answeredSetupId, conceptNet, setSpecEdits, setNetworkEdit],
   );
+  // The network is optional: added here, and removed with every change it
+  // made — its link edits and the radios Change link set.
+  const handleNetworkAdd = React.useCallback(() => {
+    if (chat && answeredSetupId) setNetworkAdded(chat.id, answeredSetupId, true);
+  }, [chat, answeredSetupId, setNetworkAdded]);
+  const handleNetworkRemove = React.useCallback(() => {
+    if (!chat || !answeredSetupId || conceptNet.links.some((l) => l.locked)) return;
+    for (const e of networkReset(conceptNet)) setSpecEdits(chat.id, answeredSetupId, e.productId, e.edits);
+    setNetworkAdded(chat.id, answeredSetupId, false);
+  }, [chat, answeredSetupId, conceptNet, setSpecEdits, setNetworkAdded]);
   // The Wireless section's "Change it in Network": an overlay sheet goes (the
   // product stays selected), a phone shows the Chat tab, and the keyboard
   // lands on the section's heading once the dialog has handed it back.
@@ -1824,6 +1835,8 @@ export function ConceptChat({ chatId }: { chatId: string }) {
                 openHref={
                   activeBuild?.projectId && savedNetwork ? `/projects/${activeBuild.projectId}/network` : null
                 }
+                onAdd={handleNetworkAdd}
+                onRemove={handleNetworkRemove}
                 onSave={handleLinkSave}
                 onReset={handleLinkReset}
               />

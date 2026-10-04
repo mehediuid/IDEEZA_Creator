@@ -4,6 +4,8 @@
 
 ## Owner decisions
 
+> **2026-10-04 (owner): the network is optional.** The section offers it (*Add network*) instead of filling it in; until added, Wireless stays editable and Save writes nothing. *Remove network* resets it (link edits cleared, Change link's radios put back). *Back to suggested* only on a changed link. A controller companion's link is always controller → product commands.
+
 1. Remove **Add Network** from the build review (`review-outputs.tsx`), on both `/chat/<id>` and `/build/<jobId>`.
 2. The network is **project level**. Add one **Network** section to the concept stage's **left Project panel** (`ProjectRail`, `src/components/create/chat-rail.tsx`), directly under **Products**.
    - It is filled in **from the prompt**. For "I want a remote control and car" it shows Remote controller → Car.

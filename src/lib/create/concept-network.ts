@@ -163,8 +163,10 @@ export type ConceptLink = {
   radioText: string | null;
   middle: "direct" | "cloud";
   problem: LinkProblem | null;
-  /** Differs from the suggestion — its direction, what travels, or a radio
-   *  the maker picked on either end. */
+  /** The maker's edit to it — its direction, what travels, or the radios
+   *  Change link set. */
+  edit: LinkEdit | null;
+  /** Differs from the suggestion: Back to suggested is offered. */
   edited: boolean;
   /** An end is built, so the link is what was built. */
   locked: boolean;
@@ -205,6 +207,22 @@ function radioOfLink(
   return { radio: null, protocol: null, radioText: null, problem: { kind: "mismatch" } };
 }
 
+/** A controller companion's link as it has to read: the controller starts
+ *  it and sends commands. The model sometimes draws it backwards — the
+ *  product reporting telemetry to its remote — and then the link is two-way:
+ *  commands from the controller, telemetry back. */
+export function normalizeSeed(seed: LinkSeed, byId: Map<string, NetEnd>): LinkSeed {
+  const isController = (id: string) => {
+    const p = byId.get(id);
+    return !!p && !p.primary && COMMANDER.test(p.name) && !NO_LINK.test(p.name);
+  };
+  const a = isController(seed.from);
+  const b = isController(seed.to);
+  if (a === b || !endIsProduct(seed.from) || !endIsProduct(seed.to)) return seed;
+  if (a) return seed.carries === "commands" || seed.carries === "data+commands" ? seed : { ...seed, carries: "commands" };
+  return { from: seed.to, to: seed.from, carries: "commands", twoWay: true };
+}
+
 /** Every link the project's products make, suggested and then as the maker
  *  changed it: the model's links between products the project holds, the
  *  rule's for each companion the model said nothing about, and — with no
@@ -212,7 +230,7 @@ function radioOfLink(
  *  or the cloud, when it has a radio. */
 export function conceptLinks(
   peers: NetEnd[],
-  input: { reply?: NetworkReply | null; edits?: NetworkEdits | null; prompt?: string; radioEdited?: (id: string) => boolean },
+  input: { reply?: NetworkReply | null; edits?: NetworkEdits | null; prompt?: string },
 ): ConceptLink[] {
   const byId = new Map(peers.map((p) => [p.id, p]));
   const reply = input.reply ?? null;
@@ -225,7 +243,7 @@ export function conceptLinks(
     seeds.push({ seed, source });
   };
   for (const seed of reply?.links ?? []) {
-    if (byId.has(seed.from) && byId.has(seed.to)) add(seed, "ai");
+    if (byId.has(seed.from) && byId.has(seed.to)) add(normalizeSeed(seed, byId), "ai");
   }
   const covered = new Set(seeds.flatMap(({ seed }) => [seed.from, seed.to]));
   for (const p of peers) {
@@ -260,8 +278,8 @@ export function conceptLinks(
       source,
       ...radioOfLink(seed, byId),
       middle: seed.to === CLOUD || seed.from === CLOUD ? "cloud" : "direct",
-      edited:
-        from !== seed.from || twoWay !== seed.twoWay || carries !== seed.carries || ends.some((e) => !!input.radioEdited?.(e)),
+      edit,
+      edited: !!edit,
       locked: ends.some((e) => byId.get(e)?.locked),
     };
   });
@@ -418,6 +436,9 @@ export function rolesLine(link: ConceptLink, roles: Map<string, Role>, peers: Ne
 export type ConceptNetwork = {
   /** The rail shows its Network section. */
   show: boolean;
+  /** The maker added it. Until then the section only offers it: nothing is
+   *  read-only on the sheet and Save writes no network. */
+  added: boolean;
   /** A product is still being drawn or read, so its links aren't known yet. */
   working: boolean;
   links: ConceptLink[];
@@ -435,27 +456,25 @@ export function conceptNetworkOf(state: ProjectState): ConceptNetwork {
   const setup = state.setup;
   const answered = setup?.status === "answered" && !!state.answer;
   const working = state.products.some((t) => t.status === "pending" || (t.status === "ready" && !state.specs.get(t.id)));
-  const radioEdited = (id: string) => {
-    const p = peers.find((x) => x.id === id);
-    return !!p && sectionEdited(p.edits, "connects", p.conceptParts);
-  };
+  const added = state.answer?.network?.added === true;
   const links = answered
     ? conceptLinks(peers, {
         reply: asNetworkReply(setup?.network),
         edits: state.answer?.network,
         prompt: setup?.prompt,
-        radioEdited,
       })
     : [];
-  // With no radio anywhere there is no link to show, and the section hides.
-  const show = answered && peers.length > 0 && (links.length > 0 || working);
+  // With no radio anywhere there is no link to show, and the section hides —
+  // as it does once a build holds the products, if it was never added.
+  const show = answered && peers.length > 0 && (links.length > 0 || working) && (added || state.locked.size === 0);
   return {
     show,
+    added,
     working,
     links,
     peers,
     roles: rolesOf(links),
-    onLink: new Set(links.flatMap((l) => [l.from, l.to]).filter(endIsProduct)),
+    onLink: added ? new Set(links.flatMap((l) => [l.from, l.to]).filter(endIsProduct)) : new Set(),
   };
 }
 
@@ -502,24 +521,40 @@ export function protocolChange(
   });
 }
 
-/** Back to suggested: each end's radio back to its concept's, as the Wireless
- *  section's Reset puts it. */
+/** Back to suggested: the radios Change link set on this link's ends, back
+ *  to their concept's as the Wireless section's Reset puts them. A radio set
+ *  on the sheet before the network was added is the maker's, and stays. */
 export function radioReset(link: ConceptLink, peers: NetPeer[]): { productId: string; edits: SpecEdits }[] {
+  const on = new Set(link.edit?.radioOn ?? []);
   return [link.from, link.to].flatMap((id) => {
     const p = peers.find((x) => x.id === id);
-    if (!p || !sectionEdited(p.edits, "connects", p.conceptParts)) return [];
+    if (!p || !on.has(id) || !sectionEdited(p.edits, "connects", p.conceptParts)) return [];
     return [{ productId: p.id, edits: sheetEdit(p, resetSection(p.edits, "connects", p.conceptParts)) }];
   });
 }
 
+/** Remove network: every radio Change link set, put back — each product
+ *  once, whichever links set it. */
+export function networkReset(net: Pick<ConceptNetwork, "links" | "peers">): { productId: string; edits: SpecEdits }[] {
+  const seen = new Set<string>();
+  return net.links.flatMap((l) => radioReset(l, net.peers)).filter((r) => !seen.has(r.productId) && !!seen.add(r.productId));
+}
+
 /** What the maker set, as an edit over the suggestion — null when it is the
- *  suggestion, so the link reads as suggested again. */
-export function linkEditFor(link: ConceptLink, set: { from: string; twoWay: boolean; carries: Carries }): LinkEdit | null {
+ *  suggestion, so the link reads as suggested again. `radioOn` adds the
+ *  products whose radio this save set to the ones set before. */
+export function linkEditFor(
+  link: ConceptLink,
+  set: { from: string; twoWay: boolean; carries: Carries },
+  radioOn: string[] = [],
+): LinkEdit | null {
   const s = link.suggested;
   const out: LinkEdit = {};
   if (set.from !== s.from || set.twoWay !== s.twoWay) out.direction = { from: set.from, twoWay: set.twoWay };
   if (set.carries !== s.carries) out.carries = set.carries;
-  return out.direction || out.carries ? out : null;
+  const on = [...new Set([...(link.edit?.radioOn ?? []), ...radioOn])];
+  if (on.length) out.radioOn = on;
+  return out.direction || out.carries || out.radioOn ? out : null;
 }
 
 export const CARRIES_LABEL: Record<Carries, string> = {
