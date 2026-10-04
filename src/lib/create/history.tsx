@@ -751,6 +751,8 @@ type Ctx = {
   setSpecEdits: (chatId: string, turnId: string, productId: string, edits: SpecEdits) => void;
   /** One concept-network link's edit, or null to put it back as suggested. */
   setNetworkEdit: (chatId: string, turnId: string, linkId: string, edit: LinkEdit | null) => void;
+  /** Adds the concept network, or removes it — every link edit with it. */
+  setNetworkAdded: (chatId: string, turnId: string, added: boolean) => void;
   getChat: (chatId: string) => ChatSession | null;
 
   // Build ops
@@ -1190,8 +1192,17 @@ export function CreateHistoryProvider({
         const links = { ...(a.network?.links ?? {}) };
         if (edit) links[linkId] = edit;
         else delete links[linkId];
-        return { ...a, network: { links } };
+        return { ...a, network: { ...a.network, links } };
       }),
+    [patchSetupAnswer],
+  );
+
+  const setNetworkAdded = React.useCallback(
+    (chatId: string, turnId: string, added: boolean) =>
+      patchSetupAnswer(chatId, turnId, (a) => ({
+        ...a,
+        network: added ? { links: a.network?.links ?? {}, added: true } : { links: {} },
+      })),
     [patchSetupAnswer],
   );
 
@@ -1742,6 +1753,7 @@ export function CreateHistoryProvider({
     setTurnConcept,
     setSpecEdits,
     setNetworkEdit,
+    setNetworkAdded,
     getChat,
     startBuild,
     updateBuildItem,

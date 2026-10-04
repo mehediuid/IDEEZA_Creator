@@ -20,11 +20,18 @@ export type LinkSeed = { from: string; to: string; carries: Carries; twoWay: boo
  *  is what a lone product talks to. */
 export type NetworkReply = { links: LinkSeed[]; app: AppKind | null };
 
-/** The maker's change to one link, over the suggestion: who sends, and what
- *  travels. Absent fields follow the suggestion. */
-export type LinkEdit = { direction?: { from: string; twoWay: boolean }; carries?: Carries };
-/** On the setup answer, by link id. */
-export type NetworkEdits = { links: Record<string, LinkEdit> };
+/** The maker's change to one link, over the suggestion: who sends, what
+ *  travels, and the products whose radio Change link set — the radios Back to
+ *  suggested and Remove network put back. Absent fields follow the
+ *  suggestion. */
+export type LinkEdit = {
+  direction?: { from: string; twoWay: boolean };
+  carries?: Carries;
+  radioOn?: string[];
+};
+/** On the setup answer. The network is optional: nothing about it shows, is
+ *  read-only or is saved until the maker adds it (`added`). Edits by link id. */
+export type NetworkEdits = { added?: boolean; links: Record<string, LinkEdit> };
 
 export const CARRIES: Carries[] = ["commands", "sensor", "events", "data+commands"];
 
@@ -105,5 +112,9 @@ export function asLinkEdit(raw: unknown): LinkEdit | null {
     out.direction = { from: d.from, twoWay: d.twoWay };
   }
   if (CARRIES.includes(raw.carries as Carries)) out.carries = raw.carries as Carries;
-  return out.direction || out.carries ? out : null;
+  if (Array.isArray(raw.radioOn)) {
+    const on = raw.radioOn.filter((x): x is string => typeof x === "string");
+    if (on.length) out.radioOn = on;
+  }
+  return out.direction || out.carries || out.radioOn ? out : null;
 }
