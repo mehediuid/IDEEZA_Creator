@@ -24,7 +24,8 @@ import { RailFact, RailFacts } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { editionChainOf, editionOffersOf, isProjectScope, KIND_WORD, TIER_HELP, trackCardOf, USE_WORD } from "@/lib/market/editions";
+import { editionChainOf, editionOffersOf, isProjectScope, TIER_HELP, trackCardOf } from "@/lib/market/editions";
+import { KIND_LABEL, USE_LABEL } from "@/lib/market/sell-flow";
 import { PROJECT_SCOPE, type EditionTrack, type Listing } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
@@ -96,12 +97,14 @@ export function EditionOffers({
                 ) : (
                   <OfferFrame track={t as Listed} view={view}>
                     <RailFacts>
-                      <RailFact label="Regular price">
+                      <RailFact label="Price">
                         <span className="tabular-nums">{formatAmount(t.listing!.regular, t.listing!.token)}</span>
                       </RailFact>
-                      <RailFact label="Extended price">
-                        <span className="tabular-nums">{formatAmount(t.listing!.extended, t.listing!.token)}</span>
-                      </RailFact>
+                      {t.listing!.extended !== t.listing!.regular && (
+                        <RailFact label="With future updates">
+                          <span className="tabular-nums">{formatAmount(t.listing!.extended, t.listing!.token)}</span>
+                        </RailFact>
+                      )}
                     </RailFacts>
                   </OfferFrame>
                 )}
@@ -114,16 +117,18 @@ export function EditionOffers({
   );
 }
 
+/** "Virtual NFT · Personal use" and "3 of 10 sold": the plain words the owner's Sell tab uses. */
 function OfferFrame({ track, view, children }: { track: Listed; view: SlotProps["view"]; children: React.ReactNode }) {
   const card = trackCardOf(track, view.sales);
+  const name = `${KIND_LABEL[track.kind]} · ${USE_LABEL[track.use]}`;
   return (
     <section
-      aria-label={`${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]}`}
+      aria-label={name}
       className="flex flex-col gap-5 rounded-lg border border-solid border-border p-6"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="text-md font-semibold text-text-primary">{`${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]}`}</span>
-        <span className="text-sm tabular-nums text-text-secondary">{card.soldLine}</span>
+        <span className="text-md font-semibold text-text-primary">{name}</span>
+        <span className="text-sm tabular-nums text-text-secondary">{card.soldOut ? "Sold out" : `${card.sold} of ${card.total} sold`}</span>
       </div>
       {children}
     </section>
@@ -153,6 +158,8 @@ function BuyableOffer({
   // The track's own listing is live while this offer shows (only the lock hides it).
   const canBuy = !card.soldOut && can(viewer, "listing.buy", { ...view.canCtx, listingLive: true });
   const busy = busyId === track.id;
+  // One price when "with future updates" costs the same: no choice to make.
+  const oneTier = track.listing.extended === track.listing.regular;
 
   const pick = (i: number) => {
     setTier(TIERS[i]);
@@ -161,9 +168,12 @@ function BuyableOffer({
 
   return (
     <OfferFrame track={track} view={view}>
+      {oneTier ? (
+        <p className="m-0 text-sm leading-relaxed text-text-secondary">Includes every future version of this design.</p>
+      ) : (
       <div className="flex flex-col gap-2">
         <span id={labelId} className="text-sm font-medium text-text-secondary">
-          Tier
+          Choose
         </span>
         <div role="radiogroup" aria-labelledby={labelId} className="flex flex-col gap-3">
           {TIERS.map((t, i) => {
@@ -207,6 +217,7 @@ function BuyableOffer({
           })}
         </div>
       </div>
+      )}
       {canBuy ? (
         <Button
           type="button"
@@ -219,7 +230,7 @@ function BuyableOffer({
             if (busy) return;
             // Safari doesn't focus a clicked button.
             e.currentTarget.focus();
-            const done = await buy(track, tier);
+            const done = await buy(track, oneTier ? "extended" : tier);
             if (done) announce(done);
           }}
         >

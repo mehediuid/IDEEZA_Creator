@@ -222,10 +222,10 @@ const TRACK_GONE = "The creator took these NFTs off the marketplace.";
 const UNIT_TAKEN = "Another buyer took that NFT a moment ago. Close this and buy again to get the next one.";
 
 export type EditionTier = "regular" | "extended";
-export const TIER_WORD: Record<EditionTier, string> = { regular: "Regular", extended: "Extended" };
+export const TIER_WORD: Record<EditionTier, string> = { regular: "This version", extended: "With future updates" };
 export const TIER_LINE: Record<EditionTier, string> = {
-  regular: "Regular (this version only)",
-  extended: "Extended (includes future versions)",
+  regular: "This version only",
+  extended: "With every future version",
 };
 
 /** Why a track can't be bought right now, read from the stores as they are. */
