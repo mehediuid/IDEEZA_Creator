@@ -1,26 +1,35 @@
-// Build and Earn P1-3: the "Sell the design" / "Sell the product" guided flows
-// over the existing edition tracks (src/lib/market/sell-flow.ts).
+// Build and Earn P1-3: the "Sell copies" guided flow over the existing edition
+// tracks (src/lib/market/sell-flow.ts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  FLOW_KIND,
+  KIND_LABEL,
+  KIND_SUB,
+  MORE_FIELDS,
   NOTE_MAX,
   NO_INCOME_LINE,
-  ROYALTY_BEST_EFFORT,
+  ROYALTY_DEFAULT,
+  ROYALTY_HINT,
   SELL_STEPS,
-  buyerGetsOf,
+  STEP_LABEL,
+  USE_LABEL,
   draftOf,
+  editionUsesOf,
+  effectiveTermsOf,
   entryStateOf,
+  firstOpenKindOf,
+  firstOpenUseOf,
   firstProblemOf,
+  kindChoicesOf,
   normalizeSellTerms,
-  productChoicesOf,
+  reviewSummaryOf,
   sellChecksOf,
+  sellingLinesOf,
   signStepsOf,
-  signSummaryOf,
   stepProblemOf,
   trackStateOf,
-  editionUsesOf,
+  withKind,
   withShipPlan,
 } = await import("../../.tmp-test/lib/market/sell-flow.js");
 
@@ -45,9 +54,11 @@ const LIVE = { kind: "live", listing: MAIN, auction: null };
 const PAUSED = { kind: "paused", listing: MAIN, changed: [] };
 const NONE = { kind: "none" };
 const REMOVED = { kind: "ended", listing: MAIN, why: "removed" };
-const PRODUCTS = [
-  { id: "prd_1", name: "Rider" },
-  { id: "prd_2", name: "Dock" },
+const ALL_LISTED = [
+  track({ id: "a", listing: LISTED }),
+  track({ id: "b", use: "commercial", listing: LISTED }),
+  track({ id: "c", kind: "physical", listing: LISTED }),
+  track({ id: "d", kind: "physical", use: "commercial", listing: LISTED }),
 ];
 
 function sale(trackId, at = 5) {
@@ -55,18 +66,18 @@ function sale(trackId, at = 5) {
 }
 
 function ctx(overrides = {}) {
-  return { kind: "virtual", network: "baseSepolia", tracks: [], products: PRODUCTS, askOwner: false, ...overrides };
+  return { productId: "prd_1", network: "baseSepolia", tracks: [], askOwner: false, ...overrides };
 }
 
 function ready(overrides = {}) {
   return {
-    productId: "prd_1",
+    kind: "virtual",
     use: "private",
     count: "10",
     token: "ETH",
     regular: "0.01",
-    extended: "0.02",
-    royalties: "5",
+    extended: "",
+    royalties: "10",
     note: "",
     checks: { leadTime: false, refund: false, seller: false },
     owner: false,
@@ -74,9 +85,9 @@ function ready(overrides = {}) {
     ...overrides,
   };
 }
+const SHIP = { note: "I print and post each one.", checks: { leadTime: true, refund: true, seller: true } };
 
 const ENTRY = {
-  flow: "design",
   productId: "prd_1",
   projectName: "Car",
   minted: true,
@@ -88,14 +99,19 @@ const ENTRY = {
   tracks: [],
 };
 
-// ───────────────────────── flows and steps ─────────────────────────
+// ───────────────────────── words and steps ─────────────────────────
 
-test("the design flow sells virtual tracks and the product flow physical ones", () => {
-  assert.deepEqual(FLOW_KIND, { design: "virtual", product: "physical" });
+test("plain words: Design files and Built product, Personal use and Business use", () => {
+  assert.deepEqual(KIND_LABEL, { virtual: "Design files", physical: "Built product" });
+  assert.deepEqual(USE_LABEL, { private: "Personal use", commercial: "Business use" });
+  assert.equal(KIND_SUB.virtual, "Buyers get a licence and download the files.");
+  assert.equal(KIND_SUB.physical, "You make each one and ship it to the buyer.");
 });
 
-test("the steps run Product → Use → Supply → Price tiers → Terms → Readiness → Sign", () => {
-  assert.deepEqual([...SELL_STEPS], ["product", "use", "supply", "price", "terms", "readiness", "sign"]);
+test("the steps run What → Copies and price → Review", () => {
+  assert.deepEqual([...SELL_STEPS], ["what", "price", "review"]);
+  assert.deepEqual(STEP_LABEL, { what: "What are you selling?", price: "Copies and price", review: "Review" });
+  assert.deepEqual([...MORE_FIELDS], ["extended", "use", "royalties"]);
 });
 
 // ───────────────────────── track state ─────────────────────────
@@ -117,207 +133,271 @@ test("signStepsOf: a new use is created then listed; a created one is only liste
   assert.deepEqual(signStepsOf({ kind: "listed", track: track({ listing: LISTED }) }), []);
 });
 
-// ───────────────────────── product and use choices ─────────────────────────
+// ───────────────────────── kind and use choices ─────────────────────────
 
-test("productChoicesOf: each product's two uses in words; a product whose uses are both on sale is closed", () => {
-  const tracks = [
-    track({ id: "a", listing: LISTED }),
-    track({ id: "b", use: "commercial", listing: LISTED, supply: { total: 1 } }),
-    track({ id: "c", productId: "prd_2", supply: { total: 30 } }),
-    track({ id: "d", productId: "prd_2", kind: "physical", listing: LISTED }),
-  ];
-  const choices = productChoicesOf(PRODUCTS, tracks, [sale("a"), sale("b")], "virtual");
-  assert.deepEqual(choices, [
-    { id: "prd_1", name: "Rider", open: false, lines: ["Private use · Listed · 1/10 sold", "Commercial use · Sold out"] },
-    { id: "prd_2", name: "Dock", open: true, lines: ["Private use · Not listed · 30 NFTs", "Commercial use · Not created"] },
+test("kindChoicesOf: a kind closes once both its uses are on sale", () => {
+  assert.deepEqual(kindChoicesOf([], "prd_1"), [
+    { kind: "virtual", open: true },
+    { kind: "physical", open: true },
   ]);
+  const tracks = [track({ listing: LISTED }), track({ id: "b", use: "commercial", listing: LISTED })];
+  assert.deepEqual(kindChoicesOf(tracks, "prd_1"), [
+    { kind: "virtual", open: false },
+    { kind: "physical", open: true },
+  ]);
+  // Created but unlisted stays open: the flow lists it.
+  assert.equal(kindChoicesOf([track({ listing: LISTED }), track({ id: "b", use: "commercial" })], "prd_1")[0].open, true);
+  assert.equal(firstOpenKindOf(tracks, "prd_1"), "physical");
+  assert.equal(firstOpenKindOf(ALL_LISTED, "prd_1"), null);
+  // Another product's tracks don't count.
+  assert.equal(kindChoicesOf(tracks, "prd_2")[0].open, true);
 });
 
 test("editionUsesOf: a created use continues to its listing; a listed one is closed", () => {
-  const tracks = [track({ supply: { total: 12 } }), track({ id: "b", use: "commercial", listing: LISTED })];
+  const created = track({ supply: { total: 12 } });
+  const tracks = [created, track({ id: "b", use: "commercial", listing: LISTED })];
   const [priv, com] = editionUsesOf(tracks, "prd_1", "virtual");
-  assert.equal(priv.use, "private");
-  assert.equal(priv.open, true);
-  assert.equal(priv.sub, "Created with 12 NFTs, not listed yet.");
+  assert.deepEqual(priv, { use: "private", state: { kind: "created", track: created }, open: true });
   assert.equal(com.open, false);
-  assert.equal(com.sub, "Already on sale. Change it from its listing.");
-  const fresh = editionUsesOf([], "prd_1", "physical");
-  assert.ok(fresh.every((c) => c.open && c.state.kind === "new"));
-  assert.notEqual(fresh[0].sub, fresh[1].sub);
+  assert.ok(editionUsesOf([], "prd_1", "physical").every((c) => c.open && c.state.kind === "new"));
+  assert.equal(firstOpenUseOf([track({ listing: LISTED })], "prd_1", "virtual"), "commercial");
+  assert.equal(firstOpenUseOf([], "prd_1", null), null);
 });
 
-// ───────────────────────── the entry card ─────────────────────────
+// ───────────────────────── the product's row ─────────────────────────
 
-test("entryStateOf: the edition gates replace the start, first match wins", () => {
+test("sellingLinesOf: nothing listed is [] (Not selling); unlisted tracks say nothing", () => {
+  assert.deepEqual(sellingLinesOf("prd_1", [], []), []);
+  assert.deepEqual(sellingLinesOf("prd_1", [track()], []), []);
+});
+
+test("sellingLinesOf: one short line per listed track — sold count and price, or Sold out", () => {
+  const tracks = [
+    track({ id: "v", supply: { total: 30 }, listing: { ...LISTED, token: "MATIC", regular: "0.050" } }),
+    track({ id: "p", kind: "physical", supply: { total: 1 }, listing: LISTED }),
+    track({ id: "other", productId: "prd_2", listing: LISTED }),
+  ];
+  const sales = [sale("v", 1), sale("v", 2), sale("v", 3), sale("p")];
+  assert.deepEqual(sellingLinesOf("prd_1", tracks, sales), ["Design files · 3 of 30 sold · 0.05 MATIC", "Built product · Sold out"]);
+});
+
+test("sellingLinesOf: the use is named only when both uses of a kind are listed", () => {
+  const tracks = [track({ id: "b", use: "commercial", listing: LISTED }), track({ id: "a", listing: LISTED })];
+  assert.deepEqual(sellingLinesOf("prd_1", tracks, []), [
+    "Design files · Personal use · 0 of 10 sold · 0.01 ETH",
+    "Design files · Business use · 0 of 10 sold · 0.01 ETH",
+  ]);
+});
+
+test("entryStateOf: the edition gates replace the button, first match wins, in plain words", () => {
   assert.deepEqual(entryStateOf({ ...ENTRY, minted: false, given: true }), {
     kind: "blocked",
-    reason: "Mint Car first — its NFTs use the project's collection and blockchain.",
+    reason: "Mint Car first. Copies are sold from its collection.",
     link: "mint",
   });
-  assert.deepEqual(entryStateOf({ ...ENTRY, given: true }), {
+  assert.deepEqual(entryStateOf({ ...ENTRY, given: true, manage: false }), {
     kind: "blocked",
-    reason: "Car was given to the community, so licences for it aren't sold.",
+    reason: "Car was given to the community, so copies aren't sold.",
     link: null,
   });
-  assert.equal(entryStateOf({ ...ENTRY, manage: false }).reason, "Car was sold in full — its NFTs can't be changed.");
+  assert.deepEqual(entryStateOf({ ...ENTRY, manage: false, chainKnown: false }), {
+    kind: "blocked",
+    reason: "Car was sold in full, so you can't sell copies of it.",
+    link: null,
+  });
   assert.equal(
-    entryStateOf({ ...ENTRY, chainKnown: false }).reason,
-    "This mint's collection isn't known, so its NFTs can't be created. Check it in the Brief.",
+    entryStateOf({ ...ENTRY, chainKnown: false, dropped: true }).reason,
+    "This mint's collection isn't known, so copies can't be made. Check it in the Brief.",
   );
-  assert.equal(entryStateOf({ ...ENTRY, dropped: true }).kind, "blocked");
+  assert.deepEqual(entryStateOf({ ...ENTRY, dropped: true, mainView: NONE }), {
+    kind: "blocked",
+    reason: "A later version dropped this product, so it can't sell new copies.",
+    link: null,
+  });
+  for (const s of [entryStateOf({ ...ENTRY, minted: false }), entryStateOf({ ...ENTRY, given: true })]) {
+    assert.doesNotMatch(s.reason, /NFT|—/);
+  }
 });
 
 test("entryStateOf: no live or paused Main listing says so plainly, with the Project NFT link", () => {
   for (const mainView of [NONE, REMOVED, { kind: "ended", listing: MAIN, why: "noBids" }]) {
     assert.deepEqual(entryStateOf({ ...ENTRY, mainView }), {
       kind: "blocked",
-      reason: "List Car on the marketplace first — its NFTs are sold on the project's listing.",
+      reason: "List Car on the marketplace first. Copies are sold from its listing.",
       link: "projectNft",
     });
   }
 });
 
-test("entryStateOf: live opens the flow; paused opens it with the hidden-on-Explore note", () => {
-  const live = entryStateOf(ENTRY);
-  assert.deepEqual(live, { kind: "open", note: null });
-  assert.equal(entryStateOf({ ...ENTRY, tracks: [track()] }).kind, "open");
-  const paused = entryStateOf({ ...ENTRY, mainView: PAUSED });
-  assert.equal(paused.kind, "open");
-  assert.equal(paused.note, "Car's listing is paused, so these NFTs stay hidden on Explore marketplace until it's live again.");
-});
-
-test("entryStateOf: both uses on sale leaves nothing to start", () => {
-  const tracks = [track({ listing: LISTED }), track({ id: "b", use: "commercial", listing: LISTED })];
-  const s = entryStateOf({ ...ENTRY, tracks });
-  assert.equal(s.kind, "full");
-  assert.equal(s.line, "Both Private use and Commercial use are on sale.");
-  // The other flow of the same product is untouched.
-  assert.equal(entryStateOf({ ...ENTRY, flow: "product", tracks }).kind, "open");
+test("entryStateOf: live or paused opens the flow while a kind is open; all four on sale is full", () => {
+  assert.deepEqual(entryStateOf(ENTRY), { kind: "open" });
+  assert.deepEqual(entryStateOf({ ...ENTRY, mainView: PAUSED }), { kind: "open" });
+  assert.deepEqual(entryStateOf({ ...ENTRY, tracks: ALL_LISTED.slice(0, 3) }), { kind: "open" });
+  assert.deepEqual(entryStateOf({ ...ENTRY, tracks: ALL_LISTED }), { kind: "full", line: "Already on sale. Change it under Manage." });
 });
 
 // ───────────────────────── the draft ─────────────────────────
 
-test("draftOf: the Main listing's token when the chain has it, the first open use, the stored plan", () => {
-  const d = draftOf({ productId: "prd_1", kind: "virtual", network: "baseSepolia", mainToken: "USDC", tracks: [], plan: null });
-  assert.equal(d.token, "USDC");
+test("draftOf: the first open kind and use, the Main listing's token, 10 copies, 10 % royalties", () => {
+  const d = draftOf({ productId: "prd_1", network: "baseSepolia", mainToken: "USDC", tracks: [], plan: null });
+  assert.equal(d.kind, "virtual");
   assert.equal(d.use, "private");
+  assert.equal(d.token, "USDC");
   assert.equal(d.count, "10");
+  assert.equal(d.royalties, String(ROYALTY_DEFAULT));
+  assert.equal(d.extended, "");
   assert.equal(d.note, "");
-  assert.equal(draftOf({ productId: "prd_1", kind: "virtual", network: "baseSepolia", mainToken: "MATIC", tracks: [], plan: null }).token, "ETH");
-  const taken = [track({ listing: LISTED })];
-  assert.equal(draftOf({ productId: "prd_1", kind: "virtual", network: "baseSepolia", mainToken: null, tracks: taken, plan: null }).use, "commercial");
+  assert.equal(draftOf({ productId: "prd_1", network: "baseSepolia", mainToken: "MATIC", tracks: [], plan: null }).token, "ETH");
+  const virtualFull = ALL_LISTED.slice(0, 2);
+  const p = draftOf({ productId: "prd_1", network: "mumbai", mainToken: null, tracks: virtualFull, plan: null });
+  assert.equal(p.kind, "physical");
+  assert.equal(p.token, "MATIC");
+  assert.equal(draftOf({ productId: "prd_1", network: "baseSepolia", mainToken: null, tracks: ALL_LISTED, plan: null }).kind, null);
+});
+
+test("draftOf: the product's stored make-and-ship plan fills the note and its promises", () => {
   const plan = { note: "Printed in my shop", leadTime: true, refund: true, seller: true, at: 3 };
-  const p = draftOf({ productId: "prd_1", kind: "physical", network: "baseSepolia", mainToken: null, tracks: [], plan });
-  assert.equal(p.note, "Printed in my shop");
-  assert.deepEqual(p.checks, { leadTime: true, refund: true, seller: true });
+  const d = draftOf({ productId: "prd_1", network: "baseSepolia", mainToken: null, tracks: [], plan });
+  assert.equal(d.note, "Printed in my shop");
+  assert.deepEqual(d.checks, { leadTime: true, refund: true, seller: true });
+});
+
+test("withKind: the use stays while it's open for the new kind, else the first open one", () => {
+  const tracks = [track({ kind: "physical", listing: LISTED })];
+  assert.deepEqual(withKind(ready(), "physical", tracks, "prd_1"), ready({ kind: "physical", use: "commercial" }));
+  assert.deepEqual(withKind(ready({ use: "commercial" }), "physical", tracks, "prd_1"), ready({ kind: "physical", use: "commercial" }));
+  assert.equal(withKind(ready({ use: "commercial" }), "virtual", tracks, "prd_1").use, "commercial");
+});
+
+test("effectiveTermsOf: an empty future-updates price is the price; empty royalties are 10", () => {
+  assert.deepEqual(effectiveTermsOf({ regular: " 0.05 ", extended: "", royalties: "" }), { regular: "0.05", extended: "0.05", royaltyPct: 10 });
+  assert.deepEqual(effectiveTermsOf({ regular: "0.05", extended: " 0.08 ", royalties: "4" }), {
+    regular: "0.05",
+    extended: "0.08",
+    royaltyPct: 4,
+  });
+  assert.ok(Number.isNaN(effectiveTermsOf({ regular: "1", extended: "", royalties: "x" }).royaltyPct));
 });
 
 // ───────────────────────── each step's first problem ─────────────────────────
 
-test("product step: a product must be chosen, and one of its uses still open", () => {
-  assert.deepEqual(stepProblemOf("product", ready({ productId: null }), ctx()), {
-    step: "product",
-    field: "product",
-    message: "Choose a product.",
+test("what step: a kind must be chosen, and still open", () => {
+  assert.deepEqual(stepProblemOf("what", ready({ kind: null }), ctx()), {
+    step: "what",
+    field: "kind",
+    message: "Choose what you're selling.",
   });
-  const tracks = [track({ listing: LISTED }), track({ id: "b", use: "commercial", listing: LISTED })];
-  assert.equal(stepProblemOf("product", ready(), ctx({ tracks })).message, "Both uses of Rider are already on sale.");
-  assert.equal(stepProblemOf("product", ready({ productId: "gone" }), ctx()).message, "Choose a product.");
-  assert.equal(stepProblemOf("product", ready(), ctx()), null);
+  const tracks = ALL_LISTED.slice(0, 2);
+  assert.equal(stepProblemOf("what", ready(), ctx({ tracks })).message, "Design files is already on sale.");
+  assert.equal(stepProblemOf("what", ready({ kind: "physical" }), ctx({ tracks })), null);
+  assert.equal(stepProblemOf("what", ready(), ctx()), null);
 });
 
-test("use step: a use must be chosen and not already on sale", () => {
-  assert.equal(stepProblemOf("use", ready({ use: null }), ctx()).message, "Choose a use.");
-  const tracks = [track({ listing: LISTED })];
-  assert.deepEqual(stepProblemOf("use", ready(), ctx({ tracks })), {
-    step: "use",
-    field: "use",
-    message: "Private use is already on sale.",
-  });
-});
-
-test("supply step: a new use takes 1–10,000; a created one keeps its supply", () => {
+test("price step: copies 1–10,000 while the track is new; a created one keeps its count", () => {
   for (const count of ["", "0", "10001", "abc"]) {
-    assert.deepEqual(stepProblemOf("supply", ready({ count }), ctx()), {
-      step: "supply",
+    assert.deepEqual(stepProblemOf("price", ready({ count }), ctx()), {
+      step: "price",
       field: "count",
       message: "Enter a whole number from 1 to 10,000.",
     });
   }
-  assert.equal(stepProblemOf("supply", ready({ count: "1" }), ctx()), null);
-  assert.equal(stepProblemOf("supply", ready({ count: "" }), ctx({ tracks: [track()] })), null);
+  assert.equal(stepProblemOf("price", ready({ count: "1" }), ctx()), null);
+  assert.equal(stepProblemOf("price", ready({ count: "" }), ctx({ tracks: [track()] })), null);
 });
 
-test("price step: the token, then the existing price rules, each on its own field", () => {
+test("price step: the token, then the price, each on its own field", () => {
   assert.deepEqual(stepProblemOf("price", ready({ token: null }), ctx()), { step: "price", field: "token", message: "Choose a token." });
   assert.equal(stepProblemOf("price", ready({ token: "MATIC" }), ctx()).field, "token");
-  assert.deepEqual(stepProblemOf("price", ready({ regular: "" }), ctx()), {
-    step: "price",
-    field: "regular",
-    message: "Enter a price above 0.",
-  });
-  assert.equal(stepProblemOf("price", ready({ extended: "0" }), ctx()).field, "extended");
+  for (const regular of ["", "0", "."]) {
+    assert.deepEqual(stepProblemOf("price", ready({ regular }), ctx()), { step: "price", field: "regular", message: "Enter a price above 0." });
+  }
   assert.deepEqual(stepProblemOf("price", ready({ regular: "0.0000001" }), ctx()), {
     step: "price",
     field: "regular",
     message: "Use at most 6 decimal places.",
   });
+});
+
+test("price step: More options — the future-updates price, the use and the royalties", () => {
+  assert.equal(stepProblemOf("price", ready({ extended: "" }), ctx()), null);
   assert.deepEqual(stepProblemOf("price", ready({ extended: "0.005" }), ctx()), {
     step: "price",
     field: "extended",
-    message: "Extended can't cost less than Regular.",
+    message: "Can't be less than the price.",
   });
-  // Royalties aren't this step's.
-  assert.equal(stepProblemOf("price", ready({ royalties: "" }), ctx()), null);
-});
-
-test("terms step: royalties 2–10 %, then the lazy-mint box", () => {
-  for (const royalties of ["", "1", "11"]) {
-    assert.deepEqual(stepProblemOf("terms", ready({ royalties }), ctx()), {
-      step: "terms",
+  assert.equal(stepProblemOf("price", ready({ extended: "0" }), ctx()).field, "extended");
+  assert.deepEqual(stepProblemOf("price", ready({ extended: "0.0100001" }), ctx()), {
+    step: "price",
+    field: "extended",
+    message: "Use at most 6 decimal places.",
+  });
+  assert.equal(stepProblemOf("price", ready({ extended: "0.02" }), ctx()), null);
+  assert.deepEqual(stepProblemOf("price", ready(), ctx({ tracks: [track({ listing: LISTED })] })), {
+    step: "price",
+    field: "use",
+    message: "Personal use is already on sale.",
+  });
+  assert.equal(stepProblemOf("price", ready({ use: null }), ctx()).field, "use");
+  for (const royalties of ["1", "11", "x"]) {
+    assert.deepEqual(stepProblemOf("price", ready({ royalties }), ctx()), {
+      step: "price",
       field: "royalties",
       message: "Royalties are 2–10 %.",
     });
   }
-  assert.deepEqual(stepProblemOf("terms", ready({ lazy: false }), ctx()), {
-    step: "terms",
-    field: "lazy",
-    message: "Tick the box to confirm lazy minting.",
-  });
-  assert.equal(stepProblemOf("terms", ready(), ctx()), null);
+  assert.equal(stepProblemOf("price", ready({ royalties: "" }), ctx()), null);
+  assert.equal(stepProblemOf("price", ready({ royalties: "2" }), ctx()), null);
 });
 
-test("terms step: physical needs the make-and-ship note, then each checklist promise", () => {
-  const phys = ctx({ kind: "physical" });
-  assert.deepEqual(stepProblemOf("terms", ready({ note: "   " }), phys), {
-    step: "terms",
+test("price step: the fields in the order they show — the main fields before More options", () => {
+  const draft = ready({ regular: "", extended: "0", royalties: "1" });
+  assert.equal(stepProblemOf("price", draft, ctx()).field, "regular");
+  assert.equal(stepProblemOf("price", { ...draft, regular: "1" }, ctx()).field, "extended");
+  assert.equal(stepProblemOf("price", { ...draft, regular: "1", extended: "" }, ctx()).field, "royalties");
+  // The physical note shows above More options.
+  assert.equal(stepProblemOf("price", ready({ kind: "physical", extended: "0" }), ctx()).field, "note");
+});
+
+test("price step: a built product needs the make-and-ship note, then each promise", () => {
+  const phys = (o = {}) => ready({ kind: "physical", ...o });
+  assert.deepEqual(stepProblemOf("price", phys({ note: "   " }), ctx()), {
+    step: "price",
     field: "note",
     message: "Say how you'll make and ship it.",
   });
-  const noted = { note: "I print and post each one." };
-  assert.equal(stepProblemOf("terms", ready(noted), phys).field, "leadTime");
-  assert.equal(stepProblemOf("terms", ready({ ...noted, checks: { leadTime: true, refund: false, seller: false } }), phys).field, "refund");
-  assert.equal(stepProblemOf("terms", ready({ ...noted, checks: { leadTime: true, refund: true, seller: false } }), phys).field, "seller");
-  assert.equal(stepProblemOf("terms", ready({ ...noted, checks: { leadTime: true, refund: true, seller: true } }), phys), null);
-  // The design flow asks none of it.
-  assert.equal(stepProblemOf("terms", ready({ note: "" }), ctx()), null);
+  const noted = { note: SHIP.note };
+  assert.equal(stepProblemOf("price", phys(noted), ctx()).field, "leadTime");
+  assert.equal(stepProblemOf("price", phys({ ...noted, checks: { leadTime: true, refund: false, seller: false } }), ctx()).field, "refund");
+  assert.equal(stepProblemOf("price", phys({ ...noted, checks: { leadTime: true, refund: true, seller: false } }), ctx()).field, "seller");
+  assert.equal(stepProblemOf("price", phys(SHIP), ctx()), null);
+  // Design files ask none of it.
+  assert.equal(stepProblemOf("price", ready({ note: "" }), ctx()), null);
 });
 
-test("terms step: the ownership box only while ownership isn't confirmed", () => {
-  assert.deepEqual(stepProblemOf("terms", ready(), ctx({ askOwner: true })), {
-    step: "terms",
+test("review step: the ownership box only while ownership isn't confirmed, then the lazy-mint box", () => {
+  assert.deepEqual(stepProblemOf("review", ready(), ctx({ askOwner: true })), {
+    step: "review",
     field: "owner",
     message: "Confirm you're the rightful owner of this project.",
   });
-  assert.equal(stepProblemOf("terms", ready({ owner: true }), ctx({ askOwner: true })), null);
+  assert.equal(stepProblemOf("review", ready({ owner: true }), ctx({ askOwner: true })), null);
+  assert.deepEqual(stepProblemOf("review", ready({ lazy: false }), ctx()), {
+    step: "review",
+    field: "lazy",
+    message: "Tick the box to confirm how copies are minted.",
+  });
+  assert.equal(stepProblemOf("review", ready(), ctx()), null);
 });
 
-test("firstProblemOf: the earliest step before the one asked, in step order", () => {
-  const draft = ready({ use: null, regular: "" });
-  assert.equal(firstProblemOf(draft, ctx(), "use"), null);
-  assert.equal(firstProblemOf(draft, ctx(), "sign").step, "use");
-  assert.equal(firstProblemOf(ready({ regular: "" }), ctx(), "sign").step, "price");
-  assert.equal(firstProblemOf(ready(), ctx(), "sign"), null);
+test("firstProblemOf: the earliest problem in step order", () => {
+  assert.equal(firstProblemOf(ready({ kind: null, regular: "" }), ctx()).step, "what");
+  assert.equal(firstProblemOf(ready({ regular: "", lazy: false }), ctx()).step, "price");
+  assert.equal(firstProblemOf(ready({ lazy: false }), ctx()).field, "lazy");
+  assert.equal(firstProblemOf(ready(), ctx()), null);
+  // Listed in another tab since: the kind is closed.
+  assert.equal(firstProblemOf(ready(), ctx({ tracks: ALL_LISTED.slice(0, 2) })).step, "what");
+  // A price-step problem without a kind belongs to the first step.
+  assert.equal(stepProblemOf("price", ready({ kind: null }), ctx()).step, "what");
 });
 
 // ───────────────────────── readiness ─────────────────────────
@@ -346,36 +426,36 @@ test("sellChecksOf: everything ready passes", () => {
   );
 });
 
-test("sellChecksOf: no Main listing blocks with the list gate's copy and the Project NFT fix", () => {
+test("sellChecksOf: no Main listing blocks with the Project NFT fix", () => {
   const r = sellChecksOf(checks({ mainView: NONE }));
   assert.equal(r.ok, false);
-  assert.equal(r.blocker, "List Car on the marketplace first — its NFTs are sold on the project's listing.");
+  assert.equal(r.blocker, "List Car on the marketplace first. Copies are sold from its listing.");
   assert.equal(r.checks[0].fix, "projectNft");
   assert.equal(r.checks[0].ok, false);
 });
 
-test("sellChecksOf: a paused Main listing passes, saying the NFTs stay hidden", () => {
+test("sellChecksOf: a paused Main listing passes, saying the copies stay hidden", () => {
   const r = sellChecksOf(checks({ mainView: PAUSED }));
   assert.equal(r.ok, true);
   assert.match(r.checks[0].detail, /hidden on Explore marketplace/);
 });
 
-test("sellChecksOf: the product's video rule and the ownership box, each with its fix", () => {
+test("sellChecksOf: the product's video rule with its fix; ownership points at the box below", () => {
   const v = sellChecksOf(checks({ video: { ok: false, reason: "1 product still needs an AI video." } }));
   assert.equal(v.ok, false);
   assert.equal(v.blocker, "1 product still needs an AI video.");
   assert.equal(v.checks[1].fix, "video");
   const o = sellChecksOf(checks({ ownershipConfirmed: false }));
   assert.equal(o.ok, false);
-  assert.equal(o.checks[2].fix, "terms");
+  assert.equal(o.checks[2].fix, null);
+  assert.equal(o.blocker, "Tick the box below to confirm it.");
   const ticked = sellChecksOf(checks({ ownershipConfirmed: false, draft: ready({ owner: true }) }));
   assert.equal(ticked.ok, true);
-  assert.equal(ticked.checks[2].detail, "Saved when you list.");
+  assert.equal(ticked.checks[2].detail, "Saved when you sell.");
 });
 
-test("sellChecksOf: physical adds the make-and-ship row", () => {
-  const plan = { note: "Made to order", checks: { leadTime: true, refund: true, seller: true } };
-  const ok = sellChecksOf(checks({ kind: "physical", draft: ready(plan) }));
+test("sellChecksOf: a built product adds the make-and-ship row, fixed back on step 2", () => {
+  const ok = sellChecksOf(checks({ kind: "physical", draft: ready(SHIP) }));
   assert.deepEqual(
     ok.checks.map((c) => c.id),
     ["listing", "video", "ownership", "shipping"],
@@ -383,41 +463,35 @@ test("sellChecksOf: physical adds the make-and-ship row", () => {
   assert.equal(ok.ok, true);
   const missing = sellChecksOf(checks({ kind: "physical", draft: ready({ note: "x" }) }));
   assert.equal(missing.ok, false);
-  assert.equal(missing.checks[3].fix, "terms");
+  assert.equal(missing.checks[3].fix, "price");
+  assert.ok(missing.checks.every((c) => c.fix !== "terms"));
 });
 
 // ───────────────────────── copy ─────────────────────────
 
 test("royalties are best effort and nothing promises income", () => {
-  assert.match(ROYALTY_BEST_EFFORT, /best effort/i);
+  assert.equal(ROYALTY_HINT, "A share of resales, if marketplaces honour it.");
   assert.match(NO_INCOME_LINE, /no(thing)? .*promise/i);
-  for (const line of [ROYALTY_BEST_EFFORT, NO_INCOME_LINE]) assert.doesNotMatch(line, /profit|return on|guaranteed income/i);
+  for (const line of [ROYALTY_HINT, NO_INCOME_LINE]) assert.doesNotMatch(line, /profit|return on|guaranteed income/i);
 });
 
-test("buyerGetsOf: what a buyer gets differs by kind and use", () => {
-  const lines = ["virtual", "physical"].flatMap((k) => ["private", "commercial"].map((u) => buyerGetsOf(k, u, "Rider")));
-  assert.equal(new Set(lines).size, 4);
-  assert.match(buyerGetsOf("virtual", "private", "Rider"), /design files/);
-  assert.match(buyerGetsOf("physical", "private", "Rider"), /make and ship/);
-});
-
-test("signSummaryOf: the listing in rows, royalties best effort, and the physical note", () => {
-  const rows = signSummaryOf({
-    kind: "physical",
-    productName: "Rider",
-    draft: ready({ note: "Printed in my shop." }),
-    count: 10,
-    collection: "Car Collection",
-    networkLabel: "Base Sepolia",
+test("reviewSummaryOf: what, copies, price and network", () => {
+  const rows = reviewSummaryOf({ draft: ready({ regular: "0.050" }), count: 10, networkLabel: "Base Sepolia" });
+  assert.deepEqual(rows, [
+    { label: "What", value: "Design files · Personal use" },
+    { label: "Copies", value: "10" },
+    { label: "Price", value: "0.05 ETH" },
+    { label: "Network", value: "Base Sepolia" },
+  ]);
+  const both = reviewSummaryOf({
+    draft: ready({ kind: "physical", use: "commercial", token: "USDC", regular: "5", extended: "8" }),
+    count: 3,
+    networkLabel: "N",
   });
-  const byLabel = Object.fromEntries(rows.map((r) => [r.label, r.value]));
-  assert.equal(byLabel.NFT, "Physical NFT · Private use");
-  assert.equal(byLabel["Number of NFTs"], "10");
-  assert.equal(byLabel["Regular price"], "0.01 ETH");
-  assert.equal(byLabel.Royalties, "5% of resales, best effort");
-  assert.equal(byLabel["How you'll make and ship it"], "Printed in my shop.");
-  const virtual = signSummaryOf({ kind: "virtual", productName: "Rider", draft: ready(), count: 3, collection: "C", networkLabel: "N" });
-  assert.ok(!virtual.some((r) => r.label === "How you'll make and ship it"));
+  assert.equal(both[0].value, "Built product · Business use");
+  assert.equal(both[2].value, "5 USDC · 8 USDC with future updates");
+  // The same price typed twice reads once.
+  assert.equal(reviewSummaryOf({ draft: ready({ extended: "0.010" }), count: 1, networkLabel: "N" })[2].value, "0.01 ETH");
 });
 
 // ───────────────────────── the stored make-and-ship plan ─────────────────────────
