@@ -245,7 +245,7 @@ test("headerText · the sold buyer-link part (§3.2): the owner's link to the Cu
   assert.deepEqual(headerText(s).soldBuyerLink, {
     before: "Sold 10% to ",
     label: "Mira (demo buyer)",
-    href: "/projects/proj_car?tab=customers&sale=sale_a",
+    href: "/projects/proj_car/earn/customers?sale=sale_a",
     after: " · Sep 28, 2026",
   });
   const link = headerText(s).soldBuyerLink;

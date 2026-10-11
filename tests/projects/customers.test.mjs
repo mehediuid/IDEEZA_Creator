@@ -253,7 +253,7 @@ test("customersEmptyCopy: each status and the product scope", () => {
   assert.equal(customersEmptyCopy({ scope: { kind: "project" }, status: "given", projectId: "p1" }).title, "No customers");
   const product = customersEmptyCopy({ scope: { kind: "product", productId: "prd_ctrl" }, status: "listed", projectId: "p1", productName: "RC Controller" });
   assert.equal(product.title, "No customers for this product yet");
-  assert.deepEqual(product.link, { label: "Project customers", href: "/projects/p1?tab=customers" });
+  assert.deepEqual(product.link, { label: "Project customers", href: "/projects/p1/earn/customers" });
 });
 
 // ─────────────────────────── pageOfSale (#12) ───────────────────────────

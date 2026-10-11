@@ -58,7 +58,7 @@ export function EditionSummary({
       </div>
       {rows.length === 0 ? (
         <p className="m-0 text-md leading-relaxed text-text-secondary">
-          {`No ${KIND_WORD[kind]} NFTs yet. Create them on each product's page.`}
+          {`No ${KIND_WORD[kind]} NFTs yet. Create them in Earn › Editions.`}
         </p>
       ) : (
         <ul role="list" className="m-0 flex list-none flex-col gap-6 p-0">

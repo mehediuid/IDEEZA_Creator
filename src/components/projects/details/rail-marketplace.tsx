@@ -62,6 +62,7 @@ import type { SlotProps } from "./slots";
 import { NftTypeTabs } from "../editions/edition-summary";
 import { writeTracks } from "../editions/create-dialog";
 import { unlistProjectTracks } from "@/lib/market/editions";
+import { earnHref } from "@/lib/manual/earn-route";
 
 type Dialog = "edit" | "remove" | "bids" | "close" | null;
 
@@ -79,7 +80,7 @@ const PILL_TONE: Record<PillTone, string> = {
 };
 
 const LINK =
-  "inline-flex items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
+  "inline-flex items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 /** A card's lead line when it has no control: a focus target, not a Tab stop. */
 const LEAD = "m-0 rounded-sm text-md font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
 
@@ -237,7 +238,7 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
         <>
           <Facts facts={card.facts} />
           <Link
-            href={`/projects/${project.id}?tab=customers`}
+            href={earnHref(project.id, "customers")}
             scroll={false}
             id={MARKETPLACE_FOCUS_ID}
             className={LINK}
@@ -269,7 +270,7 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
           onDone={(m) => {
             // The Main listing is gone: its editions' listings go with it (their NFTs and sales stay).
             const w = editionsListed > 0 ? writeTracks(project.id, (all) => unlistProjectTracks(all, project.id).tracks) : null;
-            done(w && !w.ok ? `${m} ${w.message} Remove the NFT listings on each product's page.` : m, LISTING_TRIGGER_ID);
+            done(w && !w.ok ? `${m} ${w.message} Remove the NFT listings in Earn › Editions.` : m, LISTING_TRIGGER_ID);
           }}
         />
       )}

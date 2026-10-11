@@ -13,6 +13,7 @@ import type { EditionKind, EditionUse, Sale, UtilityBenefit } from "../market/ty
 import { NETWORKS, type Network, type Token } from "../brief/types";
 import { formatDate, formatDateTime, type ProjectStatus } from "./project-summary";
 import type { ManualProject } from "./projects";
+import { earnHref } from "./earn-route";
 
 // The buyer's label ("Mira (demo buyer)") is the wallet identities' own
 // (spec §3.5.3); re-exported so ownership.ts and the panels keep one import.
@@ -231,7 +232,7 @@ export function customersEmptyCopy(ctx: {
     return {
       title: "No customers for this product yet",
       body: `People who buy ${ctx.productName ?? "this product"}'s physical or virtual NFTs show up here. Main NFT sales are on the project's Customers tab.`,
-      link: { label: "Project customers", href: `/projects/${ctx.projectId}?tab=customers` },
+      link: { label: "Project customers", href: earnHref(ctx.projectId, "customers") },
     };
   }
   if (ctx.status === "given") {
