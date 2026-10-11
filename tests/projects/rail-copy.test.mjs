@@ -7,6 +7,7 @@ import {
   DEMO_MINT_FOOTNOTE,
   MINTED_FOOTNOTE,
   SALE_IN_MARKETPLACE,
+  aboutRowsOf,
   detailsRows,
   formatAmount,
   outcomeView,
@@ -351,4 +352,30 @@ test("P2-CONTRIB-9 · Details starts with Ownership while someone else holds a s
   assert.ok(!buyer.some((r) => r.key === "ownership"));
   // Without the ownership input the rows are v1's.
   assert.equal(detailsRows(base)[0].key, "source");
+});
+
+test("aboutRowsOf: the owner's About — Created, Parts, Network, Team, Stored; no links (owner, 2026-10-11)", () => {
+  const made = at(2026, 9, 28, 18, 46);
+  const rows = aboutRowsOf({ createdAt: made, parts: 14, network: { protocol: "nRF24", links: 1 }, team: 0 });
+  assert.deepEqual(
+    rows.map((r) => [r.label, plainText(r.value)]),
+    [
+      ["Created", "Sep 28, 2026"],
+      ["Parts", "14 parts"],
+      ["Network", "nRF24 · 1 link"],
+      ["Team", "Just you"],
+      ["Stored", "This browser only"],
+    ],
+  );
+  assert.ok(rows.every((r) => !r.link), "no row links anywhere");
+  const hand = aboutRowsOf({ createdAt: made, parts: null, network: null, team: 2 });
+  assert.deepEqual(
+    hand.map((r) => [r.label, plainText(r.value)]),
+    [
+      ["Created", "Sep 28, 2026"],
+      ["Network", "Not added"],
+      ["Team", "You and 2 others"],
+      ["Stored", "This browser only"],
+    ],
+  );
 });

@@ -97,7 +97,7 @@ function ProductsSlot({ project, view, viewer, now }: SlotProps) {
 // C7's Details block takes its own props; it mounts through this, as the slot
 // contract asks. The other rail blocks are SlotProps components.
 function DetailsSlot({ project, view, viewer }: SlotProps) {
-  return <RailDetails project={project} summary={view.summary} viewer={viewer} />;
+  return <RailDetails project={project} summary={view.summary} products={view.products} viewer={viewer} />;
 }
 
 // C6's wiring. Every build the project holds, so each product's parts come

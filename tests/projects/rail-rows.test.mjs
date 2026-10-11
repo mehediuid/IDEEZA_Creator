@@ -220,15 +220,15 @@ test("versionGroupsOf: the Car example — one lineage, newest first, Added / Dr
   assert.equal(groups.length, 1);
   const [g] = groups;
   assert.equal(g.key, "chat_car");
-  assert.equal(g.heading, "Chat “Car”");
+  assert.equal(g.heading, "From chat “Car”");
   assert.equal(g.chatHref, "/chat/chat_car");
   assert.deepEqual(g.rows.map((r) => r.title), ["Version 2 · current", "Version 1"]);
   const [r2, r1] = g.rows;
   assert.equal(r2.key, "b_car_2");
   assert.deepEqual(r2.saved, [{ kind: "text", text: "Saved " }, time(SEP26_1612, "Sep 26, 2026 · 4:12 PM")]);
   assert.deepEqual(r1.saved, [{ kind: "text", text: "Saved " }, time(SEP22_902, "Sep 22, 2026 · 9:02 AM")]);
-  assert.equal(r2.pieces, "15 of 15 pieces ready");
-  assert.equal(r2.buildHref, "/build/b_car_2");
+  assert.equal(r2.pieces, "All 15 pieces ready");
+  assert.equal(r2.buildHref, null, "the chat is here: its heading link opens the build, so no Open build twice");
   assert.equal(r2.gone, false);
   assert.deepEqual(r2.lines, [
     { label: "Added", items: [{ name: "Spare Battery Pack", href: "/projects/proj_car/products/prd_spare001?v=2" }] },
@@ -289,6 +289,11 @@ test("versionGroupsOf: a chat not in this browser is a plain heading (COR-78)", 
   assert.equal(orphan.heading, "Chat not in this browser");
   assert.equal(orphan.key, "no-chat:b_gone");
   assert.equal(orphan.chatHref, null);
+  // The build is here but its chat isn't: Open build is the only way to it, and /build/<id> renders it.
+  const kept = { ...old, buildId: "b_kept", job: { id: "b_kept" }, pieces: { ready: 5, total: 5, retry: false } };
+  const [k] = versionGroupsOf([[kept]], [lineage("chat_old", null)], "proj_car");
+  assert.equal(k.rows[0].buildHref, "/build/b_kept");
+  assert.equal(k.rows[0].pieces, "All 5 pieces ready");
 });
 
 test("versionGroupsOf: a build that needs a retry says so; empty lineages are skipped", () => {

@@ -232,9 +232,11 @@ export type VersionRow = {
   title: string;
   /** "Saved Sep 26, 2026 · 4:12 PM"; null when the save time was never recorded. */
   saved: MetaPart[] | null;
-  /** "15 of 15 pieces ready" · "Needs a retry"; null when the build is gone. */
+  /** "All 15 pieces ready" · "12 of 15 pieces ready" · "Needs a retry"; null when the build is gone. */
   pieces: string | null;
-  /** Open build ↗; null when the build isn't in this browser. */
+  /** Open build — only while the lineage's chat is gone: /build/<id> forwards to the chat when it
+   *  is here, so the group's "From chat" link already opens it (owner, 2026-10-11: no link twice,
+   *  none dead). Null too when the build isn't in this browser. */
   buildHref: string | null;
   /** The build isn't in this browser: the row says so and lists no products. */
   gone: boolean;
@@ -246,7 +248,7 @@ export type VersionRow = {
 
 export type VersionGroup = {
   key: string;
-  /** Chat “Car” · Chat “Car” · not in this browser · Chat not in this browser */
+  /** From chat “Car” · Chat “Car” · not in this browser · Chat not in this browser */
   heading: string;
   /** /chat/<id> while the chat is in this browser; plain text otherwise (COR-78). */
   chatHref: string | null;
@@ -286,7 +288,7 @@ export function versionGroupsOf(
         head.chatId === null
           ? "Chat not in this browser"
           : chat
-            ? `Chat “${head.lineage}”`
+            ? `From chat “${head.lineage}”`
             : `Chat “${head.lineage}” · not in this browser`;
       return {
         key: head.chatId ?? `no-chat:${head.buildId}`,
@@ -321,9 +323,11 @@ export function versionGroupsOf(
             pieces: v.pieces
               ? v.pieces.retry
                 ? "Needs a retry"
-                : `${v.pieces.ready} of ${v.pieces.total} pieces ready`
+                : v.pieces.ready === v.pieces.total
+                  ? `All ${v.pieces.total} pieces ready`
+                  : `${v.pieces.ready} of ${v.pieces.total} pieces ready`
               : null,
-            buildHref: gone ? null : `/build/${encodeURIComponent(v.buildId)}`,
+            buildHref: gone || chat ? null : `/build/${encodeURIComponent(v.buildId)}`,
             gone,
             lines,
           };
