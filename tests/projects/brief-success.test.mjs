@@ -232,7 +232,8 @@ test("the mint showcases at the mint time itself: one moment for mintedAt and sh
   const app = read("brief-app.tsx");
   const writes = slice(app, "const writeAll = (at: number", "let result: RequestResult | null = null;");
   assert.match(writes, /mintedAt: at\b/);
-  assert.match(writes, /if \(s\.shareToNewsfeed && cur\.showcasedAt == null\) setShowcase\(cur\.id, true, at\);/);
+  // Shared at the mint once every video is ready (a private mint never waits for them; owner, 2026-10-12).
+  assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) setShowcase\(cur\.id, true, at\);/);
   assert.doesNotMatch(writes, /Date\.now\(\)/, "the writes take the proof's time, never a second clock read");
   assert.match(app, /commit: \(proof\) => writeAll\(proof\.at, proof\)/);
   // The store writes the time it is handed; a press with none is stamped now.

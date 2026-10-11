@@ -3,9 +3,16 @@
 //
 //   L0 Engineering                 always yours, never gated
 //   L1 Drafts (plan, splits)       no wallet; something built to earn from
-//   L2 Mint                        wallet connected, ownership confirmed, videos ready
-//   L3 Sell & editions             minted, license set, payout wallet set
+//   L2 Mint                        nothing more: the mint asks the rest in place
+//   L3 Sell & editions             minted, ownership confirmed, videos ready,
+//                                  license set, payout wallet set
 //   L4 Physical editions & payouts identity verified (demo)
+//
+// Owner, 2026-10-12: nothing stands between a built project and its mint — not
+// the videos (they're for selling and sharing), not the wallet (every signing
+// request opens the Demo wallet at its connect phase, so the wallet is asked
+// for the moment the maker presses Mint), not ownership (the mint's Details
+// step asks it, one tick, in place).
 //
 // The level is cumulative: the highest level whose steps, and every lower
 // level's, are all in place. Every commerce commit point asks `commitCheck`
@@ -68,8 +75,8 @@ export type LevelInfo = {
 export const EARN_LEVELS: readonly LevelInfo[] = [
   { level: 0, name: "Engineering", opens: "Build, version and showcase your project.", gate: "Always open" },
   { level: 1, name: "Drafts", opens: "Write the business plan and set the splits.", gate: "No wallet" },
-  { level: 2, name: "Mint", opens: "Mint your project.", gate: "Wallet" },
-  { level: 3, name: "Sell & editions", opens: "List the project and sell virtual editions.", gate: "Wallet" },
+  { level: 2, name: "Mint", opens: "Mint your project.", gate: "Built" },
+  { level: 3, name: "Sell & editions", opens: "List the project and sell virtual editions.", gate: "Minted" },
   { level: 4, name: "Physical editions & payouts", opens: "Sell physical editions and request payouts.", gate: "Identity" },
 ];
 
@@ -82,32 +89,26 @@ export const LADDER_STEPS: readonly LadderStep[] = [
     fix: { kind: "products", label: "Open products" },
   },
   {
-    id: "wallet",
-    level: 2,
-    label: "Demo wallet connected",
-    reason: "Connect the demo wallet. Minting and listing sign with it.",
-    fix: { kind: "wallet", label: "Connect wallet" },
+    id: "minted",
+    level: 3,
+    label: "Minted",
+    reason: "Mint your project first. It keeps your name on it before anyone sees it.",
+    fix: { kind: "mint", label: "Go to mint" },
   },
+  // No "wallet" step: a signing request connects the wallet itself, when the maker signs.
   {
     id: "ownership",
-    level: 2,
+    level: 3,
     label: "Ownership confirmed",
     reason: "Confirm you are the rightful owner of this idea.",
     fix: { kind: "ownership", label: "Confirm ownership" },
   },
   {
     id: "videos",
-    level: 2,
+    level: 3,
     label: "Product videos ready",
     reason: "Every product needs a finished AI video.",
     fix: { kind: "media", label: "Make videos" },
-  },
-  {
-    id: "minted",
-    level: 3,
-    label: "Minted",
-    reason: "Mint your project first. It keeps your name on it before anyone sees it.",
-    fix: { kind: "mint", label: "Go to mint" },
   },
   {
     id: "license",

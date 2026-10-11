@@ -49,7 +49,8 @@ const BLOCKCHAIN_PLACEHOLDER = "Choose your prefer blockchain";
 const SAVE_SIGNATURE_LINE =
   "Saved with a free signature — nothing is charged. You can mint it on chain when you list it.";
 /** Under the story of a private mint posted to Innovations: the post needs its videos. */
-const SHOWCASE_NOTE = "A post needs a video for every product — the review checks them before you sign.";
+const SHOWCASE_NOTE =
+  "It's shared once every product has a video — the mint doesn't wait for them, and you can make them after.";
 /** Amount fields show a wrong typed value at once; the rest after they're left (P2-LISTING-5). */
 const AT_ONCE: ReadonlySet<ListingField> = new Set<ListingField>(["price", "minBid", "auctionBuyNow"]);
 
@@ -88,7 +89,10 @@ export function StepDetails({
   creatorPct,
   mintStatus,
   mintAddress,
+  videosReady = true,
 }: {
+  /** Every current product has a ready video: Share to Innovations then shares at the mint. */
+  videosReady?: boolean;
   state: MintState;
   onChange: (patch: Partial<MintState>) => void;
   onBack: () => void;
@@ -239,7 +243,9 @@ export function StepDetails({
             <div className="flex flex-col gap-[10px]">
               <OwnerAndShare state={state} onChange={onChange} />
             </div>
-            {state.shareToNewsfeed && <StoryPanel state={state} onChange={onChange} note={SHOWCASE_NOTE} />}
+            {state.shareToNewsfeed && (
+              <StoryPanel state={state} onChange={onChange} note={videosReady ? undefined : SHOWCASE_NOTE} />
+            )}
           </div>
         )}
 

@@ -36,19 +36,21 @@ test("five levels, L0 to L4, in order, with the spec's names", () => {
   );
 });
 
-test("each level's steps are the spec's: L2 wallet/ownership/videos, L3 minted/license/payout, L4 identity", () => {
+test("each level's steps (owner, 2026-10-12): nothing between a build and its mint; L3 minted/ownership/videos/license/payout, L4 identity", () => {
   const at = (n) => LADDER_STEPS.filter((s) => s.level === n).map((s) => s.id);
   assert.deepEqual(at(0), []);
   assert.deepEqual(at(1), ["built"]);
-  assert.deepEqual(at(2), ["wallet", "ownership", "videos"]);
-  assert.deepEqual(at(3), ["minted", "license", "payout"]);
+  assert.deepEqual(at(2), [], "no wallet, ownership or videos before the mint: the mint asks them in place");
+  assert.deepEqual(at(3), ["minted", "ownership", "videos", "license", "payout"]);
   assert.deepEqual(at(4), ["identity"]);
+  assert.ok(!LADDER_STEPS.some((s) => s.id === "wallet"), "a signing request connects the wallet itself");
 });
 
-test("L1 needs no wallet: nothing commerce-side, only something built", () => {
+test("a built project reaches the mint with no wallet, no ownership tick and no videos", () => {
   const r = earnLevelOf(facts({ walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, payoutWalletSet: false, identityVerified: false }));
-  assert.equal(r.level, 1);
+  assert.equal(r.level, 2);
   assert.equal(EARN_LEVELS[1].gate, "No wallet");
+  assert.equal(commitCheck("mint", facts({ walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false })).ok, true);
 });
 
 test("every step has a label, a reason and a fix", () => {
@@ -78,15 +80,15 @@ test("the ladder is cumulative: verified identity on an unminted project is stil
   assert.equal(r.next.level, 3);
 });
 
-test("a missing L2 step caps the level at 1 whatever comes later", () => {
-  const r = earnLevelOf(facts({ walletConnected: false }));
-  assert.equal(r.level, 1);
-  assert.deepEqual(ids(r.next.missing), ["wallet"]);
+test("a missing L3 step caps the level at 2 whatever comes later", () => {
+  const r = earnLevelOf(facts({ videosReady: false }));
+  assert.equal(r.level, 2);
+  assert.deepEqual(ids(r.next.missing), ["videos"]);
 });
 
 test("next lists every missing step of the next level, in table order", () => {
-  const r = earnLevelOf(facts({ walletConnected: false, videosReady: false, ownershipConfirmed: false }));
-  assert.deepEqual(ids(r.next.missing), ["wallet", "ownership", "videos"]);
+  const r = earnLevelOf(facts({ walletConnected: false, videosReady: false, ownershipConfirmed: false, licenseSet: false }));
+  assert.deepEqual(ids(r.next.missing), ["ownership", "videos", "license"]);
 });
 
 test("payout wallet is set at mint: unminted, it isn't listed as its own step", () => {
@@ -119,16 +121,16 @@ test("requireLevel: met → ok", () => {
 });
 
 test("requireLevel: not met → every missing step up to the level, lower levels first", () => {
-  const r = requireLevel(3, facts({ walletConnected: false, licenseSet: false }));
+  const r = requireLevel(3, facts({ built: false, licenseSet: false }));
   assert.equal(r.ok, false);
   assert.equal(r.level, 3);
-  assert.equal(r.current, 1);
-  assert.deepEqual(ids(r.missing), ["wallet", "license"]);
+  assert.equal(r.current, 0);
+  assert.deepEqual(ids(r.missing), ["built", "license"]);
 });
 
 test("requireLevel never asks for a step above the level", () => {
-  const r = requireLevel(2, facts({ walletConnected: false, identityVerified: false, minted: false }));
-  assert.deepEqual(ids(r.missing), ["wallet"]);
+  const r = requireLevel(2, facts({ built: false, identityVerified: false, minted: false, videosReady: false }));
+  assert.deepEqual(ids(r.missing), ["built"]);
 });
 
 test("COMMIT_LEVEL: mint L2, list and virtual editions L3, physical editions and payouts L4", () => {
@@ -150,28 +152,28 @@ test("commitCheck: mint skips L3's steps (minting is what sets them)", () => {
 });
 
 test("commitCheck: a step the caller already gates itself can be left out", () => {
-  const f = facts({ walletConnected: false, ownershipConfirmed: false });
-  assert.deepEqual(ids(commitCheck("mint", f).missing), ["wallet", "ownership"]);
-  assert.deepEqual(ids(commitCheck("mint", f, { handled: ["ownership"] }).missing), ["wallet"]);
-  assert.deepEqual(commitCheck("mint", facts({ ownershipConfirmed: false }), { handled: ["ownership"] }), { ok: true });
+  const f = facts({ ownershipConfirmed: false, licenseSet: false });
+  assert.deepEqual(ids(commitCheck("list", f).missing), ["ownership", "license"]);
+  assert.deepEqual(ids(commitCheck("list", f, { handled: ["ownership"] }).missing), ["license"]);
+  assert.deepEqual(commitCheck("list", facts({ ownershipConfirmed: false }), { handled: ["ownership"] }), { ok: true });
 });
 
 test("commitCheck: the mint flow's Sell, at the list level, leaves only what it doesn't gate itself", () => {
   // Nothing is minted until the commit; the flow's gate, its Details' license and its commit answer the rest.
   const handled = ["ownership", "videos", "license", "minted", "payout"];
   const draft = facts({ walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, payoutWalletSet: false });
-  assert.deepEqual(ids(commitCheck("list", draft).missing), ["wallet", "ownership", "videos", "minted", "license"]);
-  assert.deepEqual(ids(commitCheck("list", draft, { handled }).missing), ["wallet"]);
+  assert.deepEqual(ids(commitCheck("list", draft).missing), ["minted", "ownership", "videos", "license"]);
+  assert.deepEqual(commitCheck("list", draft, { handled }), { ok: true }, "the wallet is the signing request's own first step");
   assert.deepEqual(commitCheck("list", facts({ minted: false, licenseSet: false, payoutWalletSet: false }), { handled }), { ok: true });
 });
 
 test("commitStepsOf: every step up to the point's level, done or not; none missing is commitCheck's ok", () => {
-  assert.deepEqual(ids(commitStepsOf("mint", facts())), ["built", "wallet", "ownership", "videos"]);
-  assert.deepEqual(ids(commitStepsOf("list", facts())), ["built", "wallet", "ownership", "videos", "minted", "license", "payout"]);
+  assert.deepEqual(ids(commitStepsOf("mint", facts())), ["built"]);
+  assert.deepEqual(ids(commitStepsOf("list", facts())), ["built", "minted", "ownership", "videos", "license", "payout"]);
   assert.deepEqual(ids(commitStepsOf("payout", facts())).at(-1), "identity");
   // The payout wallet waits for the mint, as in the level's own list.
   const unminted = commitStepsOf("list", facts({ minted: false, payoutWalletSet: false }));
-  assert.deepEqual(ids(unminted), ["built", "wallet", "ownership", "videos", "minted", "license"]);
+  assert.deepEqual(ids(unminted), ["built", "minted", "ownership", "videos", "license"]);
   assert.deepEqual(unminted.filter((s) => !s.ok).map((s) => s.id), ["minted"]);
   const keys = Object.keys(ALL);
   for (const point of Object.keys(COMMIT_LEVEL)) {
@@ -249,15 +251,16 @@ test("earnFactsOf: no license, no KYC record", () => {
 
 test("levelStepsOf: a level's own steps with their state, done ones included", async () => {
   const { levelStepsOf } = await import("../../.tmp-test/lib/commerce/ladder.js");
-  const rows = levelStepsOf(2, facts({ walletConnected: false, reasons: { videos: "x" } }));
-  assert.deepEqual(rows.map((r) => [r.id, r.ok]), [["wallet", false], ["ownership", true], ["videos", true]]);
+  const rows = levelStepsOf(3, facts({ licenseSet: false, reasons: { videos: "x" } }));
+  assert.deepEqual(rows.map((r) => [r.id, r.ok]), [["minted", true], ["ownership", true], ["videos", true], ["license", false], ["payout", true]]);
   assert.equal(rows[2].reason, "Every product needs a finished AI video.", "a done step keeps its default words");
+  assert.deepEqual(levelStepsOf(2, facts()), [], "the mint's level asks nothing of its own");
 });
 
 test("levelStepsOf: payout waits for the mint, as `next` does", async () => {
   const { levelStepsOf } = await import("../../.tmp-test/lib/commerce/ladder.js");
-  assert.deepEqual(levelStepsOf(3, facts({ minted: false, payoutWalletSet: false })).map((r) => r.id), ["minted", "license"]);
-  assert.deepEqual(levelStepsOf(3, facts()).map((r) => r.id), ["minted", "license", "payout"]);
+  assert.deepEqual(levelStepsOf(3, facts({ minted: false, payoutWalletSet: false })).map((r) => r.id), ["minted", "ownership", "videos", "license"]);
+  assert.deepEqual(levelStepsOf(3, facts()).map((r) => r.id), ["minted", "ownership", "videos", "license", "payout"]);
   assert.deepEqual(levelStepsOf(0, facts()), []);
 });
 
@@ -298,12 +301,12 @@ test("ladder × Sell gate: two products without videos and no ownership fail bot
   assert.equal(f.videosReady, false);
   assert.equal(f.ownershipConfirmed, false);
   const r = earnLevelOf(f);
-  assert.equal(r.level, 1);
+  assert.equal(r.level, 2, "neither keeps the project from its mint");
   assert.deepEqual(ids(r.next.missing), ["ownership", "videos"]);
   assert.equal(r.next.missing.find((s) => s.id === "videos").reason, "2 products still need an AI video.");
 });
 
-test("ladder × Sell gate: every video ready and ownership confirmed passes L2", () => {
+test("ladder × Sell gate: every video ready and ownership confirmed passes L3", () => {
   const f = fromGate(gateFacts({ videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), p2: readyVideo("t2") } } }));
   assert.equal(f.videosReady, true);
   assert.equal(f.ownershipConfirmed, true);

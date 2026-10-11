@@ -6,7 +6,9 @@
 // - Edit name and description — the one editor for both (edit-details.tsx);
 // - Share to Innovations / Stop sharing — what Showcase was: a flag that puts
 //   the project on the Innovations page for this browser (no sale, no wallet).
-//   A Draft shows it unavailable, "Mint it first"; sharing first runs the
+//   On a Draft it reads "Mint it first · Go to mint" and opens the mint
+//   (owner, 2026-10-12: never a greyed item that leaves the maker guessing);
+//   sharing first runs the
 //   videos-and-ownership gate (P2-VIDEO-15), opening the ReadinessDialog when
 //   something is missing. "Stop sharing" is never gated;
 // - Activity — the phase-and-status notes drawer (P2-TABS-5), with its count;
@@ -20,6 +22,7 @@
 // ⋯, so the dialog hands focus back there.
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Activity01Icon,
   Delete02Icon,
@@ -33,6 +36,7 @@ import { DeleteProjectDialog } from "@/components/projects/delete-project-dialog
 import { activitiesFor } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { isPreview } from "@/lib/manual/buyer-preview";
+import { earnMintHref } from "@/lib/manual/earn-route";
 import { can, deleteBlockOf } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -69,6 +73,7 @@ export function ProjectMenu({
   onEdit: () => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) {
+  const router = useRouter();
   const { setShowcase } = useManualProjects();
   const { record } = useJourney(project.id);
   const [open, setOpen] = React.useState(false);
@@ -84,7 +89,7 @@ export function ProjectMenu({
   const readiness = view.videos.readiness.showcase;
   const shareCopy = outcomeView(view.commerce, view.summary, readiness).minted?.showcase ?? null;
   const shared = view.summary.showcase;
-  // A Draft shows it unavailable ("Mint it first"); a project sold in full doesn't show it.
+  // A Draft's item opens the mint; a project sold in full doesn't show it.
   const canShare = can(viewer, "project.showcase", view.canCtx);
   const shareShown = canShare || (shareCopy === null && view.lock === null && can(viewer, "facts.seeOwnerOnly"));
   const block = deleteBlockOf(view.deleteFacts);
@@ -113,10 +118,9 @@ export function ProjectMenu({
               : {
                   id: "share",
                   label: "Share to Innovations",
-                  sub: shareCopy ? "Show it on the Innovations page" : undefined,
-                  unavailable: shareCopy ? undefined : "Mint it first",
+                  sub: shareCopy ? "Show it on the Innovations page" : "Mint it first · Go to mint",
                   icon: News01Icon,
-                  run: share,
+                  run: shareCopy ? share : () => router.push(earnMintHref(project.id)),
                 },
           ]
         : []),

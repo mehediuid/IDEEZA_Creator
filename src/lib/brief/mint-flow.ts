@@ -195,8 +195,10 @@ export function adoptBuildIntent(projectRaw: string | null, buildRaw: string | n
 /** Which readiness gate the commit runs (P2-VIDEO-17): Sell and Give, and a
  *  Save posted to Innovations (a showcase). A plain Save may skip its videos. */
 export function gatePurposeOf(intent: Intent | null, shareToNewsfeed: boolean): ReadinessPurpose | null {
-  if (intent === "sell" || intent === "give") return intent;
-  return intent === "save" && shareToNewsfeed ? "showcase" : null;
+  void shareToNewsfeed;
+  // A private mint is never held for videos (owner, 2026-10-12): Share to Innovations then
+  // shares at the commit only when every video is ready, else it waits for them.
+  return intent === "sell" || intent === "give" ? intent : null;
 }
 
 /** The status the commit will produce — what the readiness facts read in the flow. */

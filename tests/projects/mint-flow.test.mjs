@@ -250,7 +250,8 @@ test("gatePurposeOf and statusAfterCommit keep the Brief's rules (P2-VIDEO-17)",
   assert.equal(gatePurposeOf("sell", false), "sell");
   assert.equal(gatePurposeOf("give", true), "give");
   assert.equal(gatePurposeOf("save", false), null);
-  assert.equal(gatePurposeOf("save", true), "showcase");
+  // A private mint is never held for videos, shared to Innovations or not (owner, 2026-10-12).
+  assert.equal(gatePurposeOf("save", true), null);
   assert.equal(gatePurposeOf(null, true), null);
   assert.equal(statusAfterCommit("sell"), "listed");
   assert.equal(statusAfterCommit("give"), "given");
@@ -302,14 +303,11 @@ test("reviewMissing: details first, then the wallet (never for a Save), then the
     "1 product still needs an AI video.",
   );
   assert.equal(reviewMissing({ intent: "sell", details: null, shortfall: null, readiness: readiness(sell, ["p1", "p2"]) }), null);
-  // A Save posted to Innovations runs the showcase gate; a plain one runs none.
+  // A Save runs no gate, posted to Innovations or not: the mint never waits for videos (owner, 2026-10-12).
   const save = { ...DEFAULT_MINT_STATE, intent: "save", collection: "Garden", confirmOwnership: true };
   assert.equal(reviewMissing({ intent: "save", details: null, shortfall: null, readiness: readiness(save, []) }), null);
   const posted = { ...save, shareToNewsfeed: true };
-  assert.equal(
-    reviewMissing({ intent: "save", details: null, shortfall: null, readiness: readiness(posted, []) }),
-    "2 products still need an AI video.",
-  );
+  assert.equal(reviewMissing({ intent: "save", details: null, shortfall: null, readiness: readiness(posted, []) }), null);
 });
 
 test("earnMintHref: the static mint route under Earn", () => {

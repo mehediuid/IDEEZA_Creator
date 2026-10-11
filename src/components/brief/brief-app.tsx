@@ -187,11 +187,13 @@ export function BriefApp({ projectId }: { projectId: string }) {
     }),
     [factsOf, state, videos, jobs, videoNow, purpose],
   );
-  // The latest jobs, for a commit's recheck that runs seconds after the press.
+  // The latest jobs and videos, for a commit's recheck that runs seconds after the press.
   const jobsRef = React.useRef(jobs);
+  const videosRef = React.useRef(videos);
   React.useEffect(() => {
     jobsRef.current = jobs;
-  }, [jobs]);
+    videosRef.current = videos;
+  }, [jobs, videos]);
   const latestProjects = React.useRef(projects);
   React.useEffect(() => {
     latestProjects.current = projects;
@@ -302,9 +304,15 @@ export function BriefApp({ projectId }: { projectId: string }) {
         markStepCompleted(cur.id, "brief");
         setStatus(cur.id, "completed");
         if (typeof cur.ownerConfirmedAt !== "number") setOwnerConfirmed(cur.id, at);
-        // Share to Innovations ticked: the mint showcases the project (COR-105). A
-        // project already showcased keeps the time it was first shown.
-        if (s.shareToNewsfeed && cur.showcasedAt == null) setShowcase(cur.id, true, at);
+        // Share to Innovations ticked: the mint shares the project (COR-105) — once every
+        // product's video is ready; a private mint never waits for them, so without them it
+        // stays unshared and the success step offers Share. A project already shared keeps
+        // the time it was first shown.
+        const shareReady = readinessOf(
+          factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }),
+          "showcase",
+        ).rules.every((r) => r.ok);
+        if (s.shareToNewsfeed && shareReady && cur.showcasedAt == null) setShowcase(cur.id, true, at);
         mintedAt = at;
         return { ok: true };
       };
@@ -416,6 +424,7 @@ export function BriefApp({ projectId }: { projectId: string }) {
             creatorPct={creatorPct}
             mintStatus={mintStatus}
             mintAddress={project.mint?.wallet.address}
+            videosReady={gate.readiness.rules.find((r) => r.id === "videos")?.ok === true}
           />
         )}
         {step === "review" && (
