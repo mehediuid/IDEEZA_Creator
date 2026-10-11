@@ -150,6 +150,12 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
         info: `${productName} needs an AI video first.`,
         cta: "Continue",
       };
+    case "videos":
+      return {
+        title: "Product videos",
+        info: "Every product needs an AI video before the project can be minted, shared or sold.",
+        cta: "Continue",
+      };
   }
 }
 

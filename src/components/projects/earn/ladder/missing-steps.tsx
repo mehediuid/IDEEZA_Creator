@@ -3,10 +3,11 @@
 // The ladder's missing steps, each with its one-tap fix (Build and Earn P1-4).
 // One row component for the Earn overview's track and every commit point, so
 // a step reads and fixes the same wherever it's asked:
-// - Open products, Make videos in Media, Go to mint, Set payout wallet: links
-//   to the one place that step is done. Minting starts from Earn › Project
-//   NFT (the Brief entry, the mint flow's home), and the payout wallet lives
-//   in its Outcome block.
+// - Open products, Go to mint, Set payout wallet: links to the one place that
+//   step is done. Minting starts from Earn › Project NFT (the Brief entry, the
+//   mint flow's home), and the payout wallet lives in its Outcome block.
+// - Make videos: opens the products' videos in a dialog right here, where
+//   each one is generated (make-videos.tsx; owner, 2026-10-12).
 // - Connect wallet: opens the Demo wallet dialog.
 // - Confirm ownership: writes `ownerConfirmedAt` at once, the readiness gate's
 //   own write.
@@ -26,6 +27,7 @@ import type { LadderStep } from "@/lib/commerce/ladder";
 import { earnHref } from "@/lib/manual/earn-route";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
+import { MakeVideosButton } from "../../make-videos";
 import { LicenseDialog } from "./license-dialog";
 import { VerifyIdentityDialog } from "./verify-identity-dialog";
 
@@ -63,9 +65,14 @@ export function StepFix({ step, project, brief, announce, onCover, describedBy }
       );
     case "media":
       return (
-        <Link href={`/projects/${encodeURIComponent(project.id)}?tab=media`} className={FIX} aria-describedby={describedBy}>
-          {label}
-        </Link>
+        <MakeVideosButton
+          projectId={project.id}
+          label={label}
+          className={FIX}
+          describedBy={describedBy}
+          announce={announce}
+          onOpenChange={onCover}
+        />
       );
     case "mint":
     case "payout":

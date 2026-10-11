@@ -8,7 +8,8 @@
 //   terms Details set.
 // - The gate (P2-VIDEO-17): one row per current product with its video's
 //   state, live. Videos are made in the project's Media tab, so a missing one
-//   offers "Make videos in Media"; a render still running never counts (C5).
+//   offers "Make videos", which opens the products' videos in a dialog over
+//   the review (make-videos.tsx); a render still running never counts (C5).
 //   A plain private mint runs no gate — its videos are optional.
 // - The cost box (Sell and Give), the wallet fact line, and for a Sell what
 //   each sale pays out.
@@ -23,10 +24,9 @@
 //   royalties read as a share of resales, if marketplaces honour it.
 
 import * as React from "react";
-import Link from "next/link";
 import { Image01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
+import { ProgressBar, TestnetDemoBadge } from "@/components/ideeza";
 import { MintCostRows, WalletFactLine } from "@/components/wallet/mint-cost";
 import { StatusGlyph, useClipUrl } from "@/components/video-jobs/video-player";
 import { briefStateOf, type MintState } from "@/lib/brief/mint-flow";
@@ -42,6 +42,7 @@ import { readyCountLine, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
 import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { LevelCheck, useCommitCheck } from "@/components/projects/earn/ladder/level-check";
+import { MakeVideosButton } from "@/components/projects/make-videos";
 import type { BriefGate } from "./brief-app";
 import { BriefCard, Spinner, TAP, primaryCta } from "./brief-card";
 
@@ -57,7 +58,7 @@ const SHARED_AS: Record<Intent, string> = {
   save: "Kept private",
 };
 
-export const MAKE_VIDEOS = "Make videos in Media";
+export const MAKE_VIDEOS = "Make videos";
 const VIDEOS_OPTIONAL = "Videos are optional when you keep it private.";
 const VIDEOS_READY = "Every product has its video.";
 /** The flow's own ownership confirm and its readiness gate already ask these. */
@@ -160,7 +161,6 @@ export function StepReview({
   const videosLine = !gated
     ? VIDEOS_OPTIONAL
     : (readiness.rules.find((r) => r.id === "videos" && !r.ok)?.reason ?? VIDEOS_READY);
-  const mediaHref = `/projects/${encodeURIComponent(project.id)}?tab=media`;
 
   return (
     <BriefCard onBack={minting ? undefined : onBack}>
@@ -208,16 +208,8 @@ export function StepReview({
           ) : null}
           <p className="m-0 text-sm text-text-secondary">{videosLine}</p>
           {counts.missing > 0 ? (
-            <Link
-              href={mediaHref}
-              className={cn(
-                buttonVariants({ hierarchy: "secondary", size: "md" }),
-                TAP,
-                "self-start no-underline hover:text-[color:var(--color-button-secondary-text)]",
-              )}
-            >
-              {MAKE_VIDEOS}
-            </Link>
+            // The videos open over the review: the maker never leaves the mint (owner, 2026-10-12).
+            <MakeVideosButton projectId={project.id} label={MAKE_VIDEOS} className={cn(TAP, "self-start")} />
           ) : null}
         </section>
 

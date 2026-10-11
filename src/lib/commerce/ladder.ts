@@ -100,7 +100,7 @@ export const LADDER_STEPS: readonly LadderStep[] = [
     level: 2,
     label: "Product videos ready",
     reason: "Every product needs a finished AI video.",
-    fix: { kind: "media", label: "Make videos in Media" },
+    fix: { kind: "media", label: "Make videos" },
   },
   {
     id: "minted",

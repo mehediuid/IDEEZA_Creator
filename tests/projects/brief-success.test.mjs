@@ -139,7 +139,7 @@ test("the old Brief addresses redirect to the mint flow; it opens per useBriefOp
   assert.match(read("brief-app.tsx"), /const leave = \(\) => router\.push\(earnHref\(projectId, "sell"\)\);/);
 });
 
-test("the video step left the Brief: the review shows the gate and sends a missing video to Media (P1-2, P2-VIDEO-17)", () => {
+test("the video step left the Brief: the review shows the gate and opens the products' videos for a missing one (P1-2, P2-VIDEO-17)", () => {
   for (const gone of ["step-2-video.tsx", "ar-record-panel.tsx", "review-modal.tsx", "regenerate-confirm.tsx", "step-1-idea.tsx", "step-3-mint.tsx", "brief-rail.tsx"]) {
     assert.equal(existsSync(briefPath(gone)), false, `${gone} is deleted`);
   }
@@ -148,9 +148,10 @@ test("the video step left the Brief: the review shows the gate and sends a missi
   for (const src of [app, review, read("step-details.tsx")]) {
     assert.doesNotMatch(src, /startProductVideo\(|<VideoForm\b|createJob\(|markMinted\(|generateStoryboard|mediaType|videoPrompt/);
   }
-  assert.match(review, /export const MAKE_VIDEOS = "Make videos in Media";/);
-  assert.match(review, /`\/projects\/\$\{encodeURIComponent\(project\.id\)\}\?tab=media`/);
-  assert.match(review, /\{counts\.missing > 0 \? \(\s*<Link\s+href=\{mediaHref\}/);
+  assert.match(review, /export const MAKE_VIDEOS = "Make videos";/);
+  // A missing video opens the products' videos over the review — the maker never leaves the mint (owner, 2026-10-12).
+  assert.match(review, /<MakeVideosButton projectId=\{project\.id\} label=\{MAKE_VIDEOS\}/);
+  assert.doesNotMatch(review, /\?tab=media/);
   assert.match(review, /<VideoRow key=\{row\.productId\} row=\{row\} \/>/);
   // The gate the review reads is the Brief's own: Sell, Give, or a private mint posted to Innovations.
   assert.match(app, /const purpose = gatePurposeOf\(state\.intent, state\.shareToNewsfeed\);/);

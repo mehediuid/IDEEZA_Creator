@@ -631,7 +631,7 @@ export function listingMetadataOf(p: ManualProject, products: ProjectProduct[], 
 }
 
 /** Every readiness purpose, in the rule table's order (P2-VIDEO-13). */
-export const READINESS_PURPOSES: readonly ReadinessPurpose[] = ["showcase", "sell", "give", "relist", "edition"];
+export const READINESS_PURPOSES: readonly ReadinessPurpose[] = ["showcase", "sell", "give", "relist", "edition", "videos"];
 
 /** Everything the project page reads, derived once (COR-74; Phase 2 §3.7). No section
  *  derives state on its own; the product page reads `products` and `versions` from the same
