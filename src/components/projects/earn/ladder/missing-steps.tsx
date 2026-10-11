@@ -1,0 +1,147 @@
+"use client";
+
+// The ladder's missing steps, each with its one-tap fix (Build and Earn P1-4).
+// One row component for the Earn overview's track and every commit point, so
+// a step reads and fixes the same wherever it's asked:
+// - Open products, Make videos in Media, Go to mint, Set payout wallet: links
+//   to the one place that step is done (the payout wallet lives in the
+//   Outcome block of Earn › Project NFT).
+// - Connect wallet: opens the Demo wallet dialog.
+// - Confirm ownership: writes `ownerConfirmedAt` at once, the readiness gate's
+//   own write.
+// - Choose a license, Verify identity: open their dialogs.
+// Every fix is secondary: the page's one violet control stays its own.
+
+import * as React from "react";
+import Link from "next/link";
+import { CircleIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { Button, buttonVariants } from "@/components/ideeza";
+import { useWalletRequest } from "@/components/wallet/wallet-provider";
+import type { StoredDraft } from "@/lib/brief/project-brief";
+import type { LadderStep } from "@/lib/commerce/ladder";
+import { earnHref } from "@/lib/manual/earn-route";
+import { stepHref, useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { cn } from "@/lib/utils";
+import { LicenseDialog } from "./license-dialog";
+import { VerifyIdentityDialog } from "./verify-identity-dialog";
+
+const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+const FIX = cn(buttonVariants({ hierarchy: "secondary", size: "md" }), "shrink-0 whitespace-nowrap max-sm:w-full", TAP);
+
+type FixContext = {
+  project: Pick<ManualProject, "id" | "slug">;
+  brief: StoredDraft | null;
+  /** The page's polite live region, for a fix that changes state in place. */
+  announce?: (message: string) => void;
+};
+
+/** One missing step's fix control. */
+export function StepFix({ step, project, brief, announce, describedBy }: FixContext & { step: LadderStep; describedBy?: string }) {
+  const { openManage } = useWalletRequest();
+  const { setOwnerConfirmed } = useManualProjects();
+  const [dialog, setDialog] = React.useState<"license" | "identity" | null>(null);
+  const label = step.fix.label;
+
+  switch (step.fix.kind) {
+    case "products":
+      return (
+        <Link href={`/projects/${encodeURIComponent(project.id)}`} className={FIX} aria-describedby={describedBy}>
+          {label}
+        </Link>
+      );
+    case "media":
+      return (
+        <Link href={`/projects/${encodeURIComponent(project.id)}?tab=media`} className={FIX} aria-describedby={describedBy}>
+          {label}
+        </Link>
+      );
+    case "mint":
+      return (
+        <Link href={stepHref(project.slug, "brief")} className={FIX} aria-describedby={describedBy}>
+          {label}
+        </Link>
+      );
+    case "payout":
+      return (
+        <Link href={earnHref(project.id, "sell")} className={FIX} aria-describedby={describedBy}>
+          {label}
+        </Link>
+      );
+    case "wallet":
+      return (
+        <Button type="button" hierarchy="secondary" size="md" className={FIX} aria-describedby={describedBy} onClick={openManage}>
+          {label}
+        </Button>
+      );
+    case "ownership":
+      return (
+        <Button
+          type="button"
+          hierarchy="secondary"
+          size="md"
+          className={FIX}
+          aria-describedby={describedBy}
+          onClick={() => {
+            setOwnerConfirmed(project.id, Date.now());
+            announce?.("Ownership confirmed.");
+          }}
+        >
+          {label}
+        </Button>
+      );
+    case "license":
+      return (
+        <>
+          <Button type="button" hierarchy="secondary" size="md" className={FIX} aria-describedby={describedBy} onClick={() => setDialog("license")}>
+            {label}
+          </Button>
+          <LicenseDialog
+            open={dialog === "license"}
+            projectId={project.id}
+            current={brief?.state.license ?? null}
+            onClose={() => setDialog(null)}
+            onSaved={announce}
+          />
+        </>
+      );
+    case "identity":
+      return (
+        <>
+          <Button type="button" hierarchy="secondary" size="md" className={FIX} aria-describedby={describedBy} onClick={() => setDialog("identity")}>
+            {label}
+          </Button>
+          <VerifyIdentityDialog open={dialog === "identity"} onClose={() => setDialog(null)} onVerified={announce} />
+        </>
+      );
+  }
+}
+
+/** The missing steps as rows: an open circle, the step, why, and its fix. */
+export function MissingSteps({ steps, ...ctx }: FixContext & { steps: readonly LadderStep[] }) {
+  const base = React.useId();
+  return (
+    <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-solid border-border p-0">
+      {steps.map((s) => {
+        const reasonId = `${base}-${s.id}`;
+        return (
+          <li key={s.id} className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
+            <span aria-hidden className="inline-flex shrink-0 self-start pt-px text-text-tertiary">
+              <Icon icon={CircleIcon} size={20} />
+            </span>
+            <span className="flex min-w-0 flex-1 basis-[200px] flex-col gap-1">
+              <span className="text-md font-semibold text-text-primary">
+                {s.label}
+                <span className="sr-only">, not done yet</span>
+              </span>
+              <span id={reasonId} className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
+                {s.reason}
+              </span>
+            </span>
+            <StepFix step={s} describedBy={reasonId} {...ctx} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

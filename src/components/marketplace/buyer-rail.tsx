@@ -27,7 +27,8 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, Banner, Button, TestnetDemoBadge } from "@/components/ideeza";
+import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
@@ -85,41 +86,44 @@ function ListingFacts({ listing, view, auction }: { listing: Listing; view: Proj
           : `Minted on ${networkLabelOf(listing.network)}`;
   const ended = auction?.phase === "ended";
   return (
-    <RailFacts>
-      <RailFact label="Listing type">{listing.type === "auction" ? "Auction" : "Buy now"}</RailFact>
-      {listing.type === "auction" && auction ? (
-        <RailFact label={auction.top ? "Current bid" : "Starting bid"}>
-          <span className="font-semibold tabular-nums">
-            {formatAmount(auction.top?.amount ?? listing.minBid ?? "0", listing.token)}
-          </span>
-        </RailFact>
-      ) : (
-        <RailFact label="Price">
-          <span className="font-semibold tabular-nums">{formatAmount(listing.price ?? "0", listing.token)}</span>
-        </RailFact>
-      )}
-      <RailFact label="Selling percentage">
-        <span className="tabular-nums">{listing.percentSelling}%</span>
-      </RailFact>
-      {listing.type === "auction" && auction && (
-        <RailFact label={ended ? "Ended" : "Ends"}>
-          <span className="tabular-nums">
-            <time dateTime={new Date(listing.endsAt ?? listing.listedAt).toISOString()}>
-              {formatDateTime(listing.endsAt ?? listing.listedAt)}
-            </time>
-          </span>
-          {!ended && (
-            <span className="ml-2 inline-flex align-middle">
-              <Badge tone={auction.phase === "endingSoon" ? "warning" : "neutral"}>{timeLeftLabel(auction.msLeft)}</Badge>
+    <>
+      <RailFacts>
+        <RailFact label="Listing type">{listing.type === "auction" ? "Auction" : "Buy now"}</RailFact>
+        {listing.type === "auction" && auction ? (
+          <RailFact label={auction.top ? "Current bid" : "Starting bid"}>
+            <span className="font-semibold tabular-nums">
+              {formatAmount(auction.top?.amount ?? listing.minBid ?? "0", listing.token)}
             </span>
-          )}
+          </RailFact>
+        ) : (
+          <RailFact label="Price">
+            <span className="font-semibold tabular-nums">{formatAmount(listing.price ?? "0", listing.token)}</span>
+          </RailFact>
+        )}
+        <RailFact label="Selling percentage">
+          <span className="tabular-nums">{listing.percentSelling}%</span>
         </RailFact>
-      )}
-      <RailFact label="Royalties">{listing.royaltiesPct}% on resales</RailFact>
-      <RailFact label="Minting">{minting}</RailFact>
-      <RailFact label="Collection">{listing.collection || "—"}</RailFact>
-      <RailFact label="Blockchain">{networkLabelOf(listing.network)}</RailFact>
-    </RailFacts>
+        {listing.type === "auction" && auction && (
+          <RailFact label={ended ? "Ended" : "Ends"}>
+            <span className="tabular-nums">
+              <time dateTime={new Date(listing.endsAt ?? listing.listedAt).toISOString()}>
+                {formatDateTime(listing.endsAt ?? listing.listedAt)}
+              </time>
+            </span>
+            {!ended && (
+              <span className="ml-2 inline-flex align-middle">
+                <Badge tone={auction.phase === "endingSoon" ? "warning" : "neutral"}>{timeLeftLabel(auction.msLeft)}</Badge>
+              </span>
+            )}
+          </RailFact>
+        )}
+        <RailFact label="Royalties">{royaltyText(listing.royaltiesPct)}</RailFact>
+        <RailFact label="Minting">{minting}</RailFact>
+        <RailFact label="Collection">{listing.collection || "—"}</RailFact>
+        <RailFact label="Blockchain">{networkLabelOf(listing.network)}</RailFact>
+      </RailFacts>
+      <Banner tone="info">{SHARE_SALE_NOTE}</Banner>
+    </>
   );
 }
 
