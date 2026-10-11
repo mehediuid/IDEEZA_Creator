@@ -49,7 +49,7 @@ ideeza-creator-panel/
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
    │  ├─ project/[projectSlug]/products/[productId]/[step]/   the product-scoped editor (PCB/Code/3D/…)
-   │  ├─ project/[projectSlug]/[step]/   legacy editor address (redirects to the resumed product) + the Brief
+   │  ├─ project/[projectSlug]/[step]/   legacy editor address (redirects to the resumed product; brief → the mint flow)
    │  └─ pcb/ code/ 3d/ preview/ wiring/ brief/   legacy flat routes (each redirects to
    │                                       /project/<slug>/<step>) + pcb-editor.css
    │
@@ -73,7 +73,10 @@ ideeza-creator-panel/
    │  ├─ projects/           my-projects + project-card; details/ (the project page: shell, SLOTS,
    │  │                      header, tabs, rail, activity/); product/ (the product page + Editor block);
    │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
-   │  │                      and Virtual NFT); business-plan/ (chip runner + page) — see
+   │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell copies
+   │  │                      flow; earn/ladder/ the gating ladder's track, commit
+   │  │                      checks, Verify identity (demo), Choose a license, Request payout);
+   │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
    │  │                      bid and support dialogs, demo-buyer banner
@@ -86,10 +89,10 @@ ideeza-creator-panel/
    │  ├─ manual/             project-workspace (the editor gate: product scope, seed, banners) + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
    │  ├─ video-jobs/         render jobs provider, browser clip renderer, player, Generate dialog, indicator
-   │  ├─ brief/              Add Brief: brief-app (the intent-aware sequence) + brief-rail,
-   │  │                      step-1-idea · step-2-video (preview) · step-3-mint (the form) ·
-   │  │                      step-4-success, review-modal (the headline's video),
-   │  │                      prompt-help-modal, ar-record-panel
+   │  ├─ brief/              the mint flow (the Brief, in Earn): mint-page (the route's states),
+   │  │                      brief-app (the steps + the commit), brief-card (frame, step line),
+   │  │                      step-choose · step-details · step-review · step-success,
+   │  │                      use-brief-opens, prompt-help-modal (the Generate form's)
    │  ├─ pcb/                ★ PCB module (schematic + PCB editor) — see below
    │  ├─ code/               Code module: Monaco dev-editor + Blockly + AI chat
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
@@ -126,11 +129,12 @@ ideeza-creator-panel/
    │  │                      menu copy and part/radio/MCU tables, edit helpers and
    │  │                      what-it-does/pairing facts (types, units, batteries,
    │  │                      bodies, derive, hints, catalog, edits, facts, format).
-   │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
-   │  │                      the wizard and the rail both read — + the stored-draft
-   │  │                      migration), project-brief.ts (the Brief read + the Outcome
-   │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (Step
-   │  │                      4's pure copy), gas.ts, wallet.ts, video-prompt.ts, qr.ts
+   │  ├─ brief/              types.ts (the stored BriefState + its migration, the stored step),
+   │  │                      mint-flow.ts (the mint flow's state, steps, draft read/write and
+   │  │                      gates), project-brief.ts (the Brief read + the Outcome
+   │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (the
+   │  │                      success step's pure copy), video-prompt.ts; gas.ts and wallet.ts re-export
+   │  │                      commerce/gas.ts and commerce/collections.ts
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store), project-read.ts
@@ -140,11 +144,18 @@ ideeza-creator-panel/
    │  │                      (editor progress facts), editor-scope/editor-docs (per-product editor
    │  │                      keys + documents), build-load(-io) (BUILDLOAD), readiness, edit-gate,
    │  │                      contributors, customers, ownership, journey(-store), business-plan(-store),
-   │  │                      legal, save-step
+   │  │                      legal, save-step; guards.ts + use-write-guard.tsx (the write/delete guard
+   │  │                      registry), record-hooks.ts, engineering-state.ts, public.ts (commerce's
+   │  │                      one import of engineering)
    │  ├─ wiring/             types.ts, from-build.ts (a build's wiring document)
    │  ├─ code/               files.ts (Code's file model + a build's firmware)
+   │  ├─ commerce/           the commerce layer (Build and Earn P1-1): guards, edit-gate, state
+   │  │                      (commercialStateOf), record + migrate (ideeza:commerce:<id>,
+   │  │                      commerce-split@1), gas, collections, ladder (earnLevelOf, commit levels),
+   │  │                      kyc (the demo identity check), payout, license, share-copy, use-commerce;
+   │  │                      market/ and wallet/ are its sub-layers
    │  ├─ market/             Explore marketplace: listings, sales, bids, auctions, editions,
-   │  │                      fees, market-store (local "Testnet demo" data)
+   │  │                      sell-flow (the Sell copies flow's steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)

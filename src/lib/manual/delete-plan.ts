@@ -144,7 +144,7 @@ export function deletePlanOf(input: DeletePlanInput): DeletePlan {
         : "The network — no links drawn yet",
     );
   }
-  if (input.showcased) goes.push("Showcase — it leaves your Showcase tab");
+  if (input.showcased) goes.push("Its place on Innovations — it stops showing there");
   const ended = input.endedListings ?? 0;
   if (ended > 0) goes.push(`Its marketplace history — ${ended} ended ${ended === 1 ? "listing" : "listings"}`);
 

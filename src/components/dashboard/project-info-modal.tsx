@@ -40,7 +40,6 @@ import {
   type DetailsField,
   type ProjectDetailsFieldsHandle,
 } from "@/components/projects/project-details-fields";
-import { projectLockOf } from "@/lib/manual/edit-gate";
 import { editorHref, productResumeOf, resumeProductOf } from "@/lib/manual/editor-scope";
 import { checkDescription, checkProjectName } from "@/lib/manual/project-header";
 import {
@@ -49,7 +48,7 @@ import {
   PROJECT_NAME_MAX,
   useManualProjects,
 } from "@/lib/manual/projects";
-import { useMarket } from "@/lib/market/market-store";
+import { useGuards } from "@/lib/manual/use-write-guard";
 
 const NEW_SENTINEL = "__new__";
 const CHOOSE_FIRST = "Choose a project, or create a new one.";
@@ -69,8 +68,8 @@ export function ProjectInfoModal({
 function ProjectInfoDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { projects, createProject, selectProject } = useManualProjects();
-  const { data: market } = useMarket();
-  const openable = React.useMemo(() => projects.filter((p) => projectLockOf(p, market.sales) === null), [projects, market]);
+  const guards = useGuards();
+  const openable = React.useMemo(() => projects.filter((p) => guards.lockOf(p) === null), [projects, guards]);
 
   const [choice, setChoice] = React.useState<string>("");
   const [name, setName] = React.useState("");

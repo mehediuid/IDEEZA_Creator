@@ -41,7 +41,8 @@ test("SLOTS takes `banners` (not the v1 `banner`), one key per line (§3.10)", (
   const slots = slotsOf(read(DETAILS + "project-page.tsx"));
   assert.match(slots, /\n  banners: \[\n/);
   assert.doesNotMatch(slots, /\n  banner:/);
-  assert.match(slots, /\n  headerParts: \{\n    titleRow: \[\n/);
+  assert.match(slots, /\n  headerParts: \{\n    statusRow: \[\n/);
+  assert.doesNotMatch(slots, /titleRow|ActivitySlot/, "Activity is the ⋯ menu's (owner, 2026-10-11)");
 });
 
 test("isBuyerPreview( survives only to choose the buyer-preview banner (§3.8.1)", () => {
@@ -106,12 +107,73 @@ test("the product page carries Open in editor and the Editor block, both gated o
   assert.match(block, /\{caption\}/, "the seed caption slot TB2 fills");
 });
 
-test("the product strip reads PRODUCT_SLOTS for its people tabs and Media, with the strip's order (P2-EDITOR-16, 18)", () => {
+test("the product strip reads PRODUCT_SLOTS for its people tab and Media, with the strip's order (P2-EDITOR-16, 18)", () => {
   const tabs = read(PRODUCT + "product-tabs.tsx");
-  assert.match(tabs, /panels\.contributors !== undefined/);
-  assert.match(tabs, /panels\.customers !== undefined && can\(viewer, "customers\.see"\)/);
+  assert.match(tabs, /panels\.contributors !== undefined &&\s*buyerSide\(viewer\) &&/, "Contributors is the buyer's side only (P0)");
+  assert.match(tabs, /customers: false,/, "Customers moved to Earn (P0)");
   assert.match(tabs, /label="Product sections"/);
-  assert.match(tabs, /onTab\(id === "media" \? null : id\)/, "Media is never written to ?tab=");
+  assert.match(tabs, /onTab\(id === tabs\[0\] \? null : id\)/, "the first tab is never written to ?tab=");
+  assert.match(tabs, /mediaFirst: buyerSide\(viewer\),/, "a buyer's side opens on Media; the owner's on the pieces");
+});
+
+test("P0: the product page is engineering for the owner — no Customers panel, and Editions only on the buyer's side", () => {
+  const slots = read(PRODUCT + "product-slots.tsx");
+  assert.doesNotMatch(slots, /customers:|ProductCustomers/);
+  assert.match(slots, /return buyerSide\(props\.viewer\) \? <EditionBlock \{\.\.\.props\} \/> : null;/);
+  const page = read(PRODUCT + "product-page.tsx");
+  assert.match(page, /<VersionSelect/);
+  assert.match(page, /<ProductRail slot=\{slot\} built=\{bp\} confidence=\{confidence\} partChanges=\{partChanges\} \/>/, "Specs and Build check are the rail's");
+  assert.match(page, /<ProductMenu slot=\{slot\}/, "the owner's ⋯ menu");
+  assert.match(page, /\{lockLine && <LockLine line=\{lockLine\} \/>\}/);
+});
+
+test("P0: SLOTS is the engineering page — Team, and the commerce blocks only on the buyer's side; Share and Delete are the ⋯ menu's", () => {
+  const src = read(DETAILS + "project-page.tsx");
+  const slots = slotsOf(src);
+  for (const key of ["team: TeamSlot", "marketplace: MarketplaceSlot", "legal: LegalSlot", "UtilityPillSlot"]) {
+    assert.ok(slots.includes(key), key);
+  }
+  assert.doesNotMatch(slots, /\b(outcome|customers|contributors|actions|showcase|manage)\s*:/);
+  assert.doesNotMatch(slots, /BusinessPlanChip|ListingFlow|UtilityPill,/);
+  for (const slot of ["MarketplaceSlot", "LegalSlot", "UtilityPillSlot"]) {
+    assert.match(src, new RegExp(`function ${slot}\\(props: SlotProps\\) \\{\\s*return buyerSide\\(props\\.viewer\\) \\?`), slot);
+  }
+  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "details", "legal", "versions", "log"\]/);
+  // Explore marketplace keeps reading the same slots (P2-MARKETPLACE-8).
+  const market = read("components/marketplace/market-slots.tsx");
+  for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: BuyerRail"]) {
+    assert.ok(market.includes(key), key);
+  }
+});
+
+test("P0: the header's one door to Earn — no pair, no Preview as buyer, and one violet at most", () => {
+  const header = read(DETAILS + "header.tsx");
+  assert.doesNotMatch(header, /Preview as buyer"|>\s*Preview as buyer|ListingFlow|actions\?\.\[/);
+  assert.match(header, /earnButtonOf\(\{/);
+  assert.match(header, /reviewPending: review !== null/, "Review version keeps the violet while it is pending");
+  assert.match(header, /tone=\{earn\.violet && !publishOptions \? "primary" : "quiet"\}/, "Publish takes the violet while it shows");
+  assert.match(header, /tone=\{review \? "quiet" : "primary"\}/, "and gives it to Review version while that is pending");
+  assert.match(header, /stageLineOf\(view\.engineering, summary\)/, "the stage line reads the engineering axis");
+  assert.match(header, /commercial: earnSource\.commercial,/, "the Earn button reads the commercial axis");
+  assert.match(header, /facts: ladder\.ready \? ladder\.facts : null,/, "and the ladder, once its stores have hydrated");
+  assert.match(header, /const engineering = context === "project" && !buyerSide\(viewer\);/);
+  assert.match(header, /earnHref\(project\.id, "customers"\)/, "the lock line links to the sale in Earn");
+  assert.equal(header.match(/tone="primary"/g)?.length, 1, "Review version is the header's only fixed violet");
+});
+
+test("a ?sale= deep link keeps its focus: the row is focused a frame after the page's own arrival focus", () => {
+  const panel = read(DETAILS + "customers-tab.tsx");
+  const arrival = read(DETAILS + "arrival.tsx");
+  // The page's h1 focus runs in a parent's effect, after the panel's own effect.
+  assert.match(arrival, /titleRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(panel, /deepLinked\.current = true;[\s\S]*?requestAnimationFrame\(\(\) => \{\s*if \(btn\.isConnected\) btn\.focus\(\);/);
+  assert.doesNotMatch(panel, /\n\s*btn\.focus\(\);\n\s*\}\);/, "never focused in the same effect pass");
+});
+
+test("P0: the moved addresses redirect on the server before the page renders", () => {
+  const page = read("app/(create)/projects/[id]/page.tsx");
+  assert.match(page, /const moved = projectRedirectOf\(id, await searchParams\);\s*if \(moved\) redirect\(moved\);/);
+  assert.match(read("lib/manual/project-summary.ts"), /return earnHref\(projectId, "sell", \{ list: "1" \}\);/);
 });
 
 test("the Add a product tile is the owner's first tile, a link to /?addTo= behind the edit gate (P2-TABS-29)", () => {
@@ -122,14 +184,20 @@ test("the Add a product tile is the owner's first tile, a link to /?addTo= behin
   assert.match(read(DETAILS + "project-page.tsx"), /canAddProduct=\{can\(viewer, "product\.add", view\.canCtx\)\}/);
 });
 
-test("no ⋮ menu and no Premium Parts tab on either page (P2-TABS-30)", () => {
+test("no Premium Parts tab on either page (P2-TABS-30); the project's one ⋯ menu is the header's (owner, 2026-10-11)", () => {
   for (const path of [DETAILS + "header.tsx", DETAILS + "shell.tsx", PRODUCT + "product-page.tsx", PRODUCT + "product-tabs.tsx"]) {
     const src = read(path);
     assert.doesNotMatch(src, /⋮|MoreVertical|"More"|"Options"|Premium Parts/, path);
   }
+  const menu = read(DETAILS + "project-menu.tsx");
+  assert.match(menu, /aria-label="Project actions"\s+aria-haspopup="menu"/);
+  for (const item of ["Edit name and description", "Share to Innovations", "Stop sharing", "Activity", "Delete project…"]) {
+    assert.ok(menu.includes(`"${item}"`), item);
+  }
+  assert.match(read(DETAILS + "header.tsx"), /<ProjectMenu \{\.\.\.slotProps\}/);
 });
 
-test("the Contributors and Media phone targets are 44 px at phone width and on a coarse pointer (pd2 final re-verify)", () => {
+test("the Contributors, Team and Media phone targets are 44 px at phone width and on a coarse pointer (pd2 final re-verify)", () => {
   const PHONE = /max-md:min-h-\[var\(--touch-min\)\] \[@media\(pointer:coarse\)\]:min-h-\[var\(--touch-min\)\]/;
   const contrib = read(DETAILS + "contributors-tab.tsx");
   assert.match(contrib, new RegExp(`const PHONE_TAP = "${PHONE.source}"`), "Add contributor's phone rule");
@@ -137,8 +205,11 @@ test("the Contributors and Media phone targets are 44 px at phone width and on a
   assert.match(contrib, /const CARD_ACTION = "min-h-\[var\(--touch-min\)\] min-w-\[var\(--touch-min\)\]/, "a card row action is 44 px both ways (Edit)");
   assert.match(contrib, /\[@media\(pointer:coarse\)\]:min-w-\[var\(--touch-min\)\]/, "and a table row action on a coarse pointer");
   assert.match(read(DETAILS + "media-tab.tsx"), /max-md:size-\[var\(--touch-min\)\] \[@media\(pointer:coarse\)\]:size-\[var\(--touch-min\)\]/, "Use as cover");
-  assert.match(read("components/projects/delete-project-dialog.tsx"), new RegExp(`\\{block\\.link && \\([\\s\\S]{0,120}onClick=\\{openContributors\\}[\\s\\S]{0,400}${PHONE.source}`), "the blocked Delete's Open Contributors");
-  assert.match(read(DETAILS + "rail-details.tsx"), new RegExp(`onClick=\\{goToContributors\\}[\\s\\S]{0,300}${PHONE.source}`), "the Details row's Open Contributors");
+  assert.match(read(DETAILS + "project-menu.tsx"), /"flex min-h-\[44px\] w-full items-start/, "every ⋯ menu item, Delete project… among them, is 44 px tall");
+  const team = read(DETAILS + "team-tab.tsx");
+  assert.match(team, new RegExp(`const PHONE_TAP = "${PHONE.source}"`), "the Team tab's phone rule");
+  assert.match(team, /PHONE_TAP,\s*\)\}\s*>\s*Open Splits/, "the empty state's Open Splits carries it");
+  assert.match(team, /className=\{cn\(QUIET_LINK, PHONE_TAP\)\}/, "and the roster's Splits link");
   assert.match(read("components/network/network-section.tsx"), new RegExp(`cn\\(btn\\.quiet, "mt-2 ${PHONE.source}"\\)`), "the Network tab's Create Network");
   // My projects' and Explore's search: the input is one text row inside a 44 px box; the box focuses it.
   const search = read("components/ideeza/search-input.tsx");

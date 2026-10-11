@@ -9,7 +9,7 @@
 import type { Coin, DemoBuyerId, MintType } from "../wallet/types";
 import type { Network, Token } from "../brief/types";
 import { toMicros } from "../wallet/money";
-import type { Bid, EditionKind, EditionUse, Sale, SaleItem, SupportRequest, UtilityBenefit } from "./types";
+import { PROJECT_SCOPE, type Bid, type EditionKind, type EditionUse, type Sale, type SaleItem, type SupportRequest, type UtilityBenefit } from "./types";
 
 const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 
@@ -197,8 +197,9 @@ export function mainSalesOf(projectId: string, sales: Sale[]): Sale[] {
  *  (P2-MARKETPLACE-18's "in {n} purchases"). `null` when they hold nothing.
  *
  *  With `opts.productId` it answers for that one product's files (R5-20):
- *  an edition NFT of it is a holding too, listed in `editions` — `sales` and
- *  `sharePct` stay the Main share. Without it `editions` is always []. */
+ *  an edition NFT of it, or of the whole project (`PROJECT_SCOPE`), is a
+ *  holding too, listed in `editions` — `sales` and `sharePct` stay the Main
+ *  share. Without it `editions` is always []. */
 export function holdingOf(
   projectId: string,
   buyerId: DemoBuyerId,
@@ -211,7 +212,11 @@ export function holdingOf(
     productId === undefined
       ? []
       : sales.filter(
-          (s) => s.projectId === projectId && s.buyerId === buyerId && s.item.nft !== "main" && s.item.productId === productId,
+          (s) =>
+            s.projectId === projectId &&
+            s.buyerId === buyerId &&
+            s.item.nft !== "main" &&
+            (s.item.productId === productId || s.item.productId === PROJECT_SCOPE),
         );
   if (!mine.length && !editions.length) return null;
   const sharePct = mine.reduce((sum, s) => sum + (s.item.nft === "main" ? s.item.sharePct : 0), 0);

@@ -1,64 +1,60 @@
 "use client";
 
-// The rail's Details block (COR-55): where the project came from, the day it
-// was made when that isn't the meta line's date, and where it is kept. The
-// build's chat isn't here: each lineage's chat heads its group in the
-// Versions block (owner decision O9), so the chat has one home on the page.
-// A buyer's preview keeps Source and Created and drops Stored (PPL-7).
+// The rail's About block (COR-55; "Details" until 2026-10-11).
 //
-// P2-CONTRIB-9 adds the first row: [Ownership | Your role], from
-// `view.ownership` and the viewer — `detailsRows` (rail-copy.ts, T10) already
-// builds it through `ownershipRow` (ownership.ts, T05); this file only wires
-// `ownership`/`viewer` in and draws the row's quiet "See contributors" link,
-// which selects the Contributors tab and brings it into view. Nothing here
-// derives ownership itself (COR-74).
+// The owner reads what the header doesn't already say (`aboutRowsOf`, owner
+// 2026-10-11: "show the data that's actually needed"): Created, Parts (over
+// the built products the page shows), Network (its type and links, or Not
+// added), Team (Just you, or You and n others) and Stored (this browser
+// only). No row is a link: each is a fact, and its tab is one press away.
+//
+// A buyer's preview and Explore marketplace keep v1's rows (`detailsRows`):
+// Source, and Created when it isn't the meta line's date — never Stored, the
+// team or the network (PPL-7). Nothing here derives project state itself
+// (COR-74): the parts come from the page's products, the network from its store.
 
 import * as React from "react";
-import { usePathname, useSearchParams } from "next/navigation";
 import { can, type Viewer } from "@/lib/manual/permissions";
-import { withTab } from "@/lib/manual/project-route";
+import type { ProjectProduct } from "@/lib/manual/project-read";
 import type { ProjectSummary } from "@/lib/manual/project-summary";
 import type { ManualProject } from "@/lib/manual/projects";
-import { detailsRows } from "@/lib/manual/rail-copy";
+import { aboutRowsOf, detailsRows, type DetailRow } from "@/lib/manual/rail-copy";
+import { PROTOCOLS } from "@/lib/network/catalog";
+import { useProjectNetwork } from "@/lib/network/store";
 import { RailBlock, RailFact, RailFacts, RailValue } from "./rail-block";
-
-/** Selects the Contributors tab (the same pushState the tab strip and the
- *  previews use, so `useSearchParams` picks it up with no server round
- *  trip) and scrolls its tab button into view once the panel below it has
- *  switched. */
-function useGoToContributors(): () => void {
-  const pathname = usePathname();
-  const search = useSearchParams();
-  return React.useCallback(() => {
-    const qs = withTab(search.toString(), "contributors");
-    window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    requestAnimationFrame(() => {
-      document.getElementById("tab-contributors")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
-    });
-  }, [pathname, search]);
-}
 
 export function RailDetails({
   project,
   summary,
+  products,
   viewer,
 }: {
   project: ManualProject;
   summary: ProjectSummary;
+  products: ProjectProduct[];
   viewer: Viewer;
 }) {
-  const goToContributors = useGoToContributors();
-  const rows = detailsRows({
-    source: summary.source,
-    when: summary.when,
-    createdAt: project.createdAt,
-    ownerFacts: can(viewer, "facts.seeOwnerOnly"),
-    ownership: summary.ownership,
-    viewer,
-  });
+  const owner = can(viewer, "facts.seeOwnerOnly");
+  const { network } = useProjectNetwork(owner ? project.id : null);
+
+  const rows: DetailRow[] = React.useMemo(() => {
+    if (!owner) {
+      return detailsRows({ source: summary.source, when: summary.when, createdAt: project.createdAt, ownerFacts: false });
+    }
+    // The parts of the products the page shows as they are now: built, and in their lineage's current version.
+    const built = products.filter((p) => p.built && !p.dropped);
+    const protocol = network ? (PROTOCOLS.find((x) => x.key === network.protocol) ?? null) : null;
+    return aboutRowsOf({
+      createdAt: project.createdAt,
+      parts: built.length ? built.reduce((n, p) => n + (p.built?.product.parts.length ?? 0), 0) : null,
+      network: network ? { protocol: protocol?.radioLabel ?? protocol?.name ?? "Custom", links: network.links.length } : null,
+      team: (project.contributors ?? []).length,
+    });
+  }, [owner, summary.source, summary.when, project.createdAt, project.contributors, products, network]);
+
+  if (rows.length === 0) return null;
   return (
-    <RailBlock title="Details">
+    <RailBlock title="About">
       <RailFacts>
         {rows.map((r) => (
           <RailFact key={r.key} label={r.label}>
@@ -66,15 +62,6 @@ export function RailDetails({
               <RailValue parts={r.value} />
             </span>
             {r.note && <span className="mt-1 block text-sm font-regular text-text-secondary">{r.note}</span>}
-            {r.link && (
-              <button
-                type="button"
-                onClick={goToContributors}
-                className="mt-1 block text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
-              >
-                {r.link.label}
-              </button>
-            )}
           </RailFact>
         ))}
       </RailFacts>

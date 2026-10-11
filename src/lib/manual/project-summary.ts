@@ -21,7 +21,9 @@ import type { ListingView, MarketData, Sale } from "../market/types";
 import { listingStatusLine, listingViewOf } from "../market/listing";
 import type { MintView } from "../wallet/types";
 import { mintPhrase, mintViewOf } from "../wallet/mint";
-import { stepHref, type ManualProject } from "./projects";
+import { commercialFactsOf, commercialStateOf, type CommercialState } from "../commerce/state";
+import type { ManualProject } from "./projects";
+import { earnHref, earnMintHref } from "./earn-route";
 import {
   buildsOf,
   coverOf,
@@ -72,9 +74,10 @@ export const STATUS_ICON: Record<ProjectStatus, IconName> = {
 // a live listing whose own line says how it sells (P2-LISTING-23).
 
 export type ShowcaseBadge = { word: string; icon: IconName; ariaLabel: string };
-/** The Showcase badge: its own word and icon, info tone, beside the chip
- *  (LST-65, COR-9). It is not a control; its accessible name is "Showcased". */
-export const SHOWCASE_BADGE: ShowcaseBadge = { word: "Showcase", icon: "eye", ariaLabel: "Showcased" };
+/** The Showcase badge: its own word and icon, info tone, beside the header's chip
+ *  (LST-65, COR-9); a My projects card shows the eye alone, inside its chip. It is not a
+ *  control; its accessible name is "Showcased". */
+export const SHOWCASE_BADGE: ShowcaseBadge = { word: "Shared", icon: "eye", ariaLabel: "Shared to Innovations" };
 
 /** No marketplace record at all — what a caller that hasn't read the market store passes. */
 export const EMPTY_MARKET: MarketData = { listings: [], sales: [], bids: [], support: [], unreadable: false };
@@ -85,9 +88,15 @@ const NO_LISTING: ListingView = { kind: "none" };
  *  without them a project is never Listed, Paused or Sold. */
 export type StatusFacts = { listing?: ListingView; sales?: readonly Sale[] };
 
-function hasMainSale(projectId: string, sales: readonly Sale[]): boolean {
-  return sales.some((s) => s.projectId === projectId && s.item.nft === "main");
-}
+/** The commercial axis in My projects' words: both kinds of sale read Sold. */
+const STATUS_OF: Record<Exclude<CommercialState, "none">, ProjectStatus> = {
+  listed: "listed",
+  paused: "paused",
+  soldPartial: "sold",
+  soldOut: "sold",
+  given: "given",
+  minted: "private",
+};
 
 /**
  * §3.2's one precedence, first match wins:
@@ -99,14 +108,13 @@ function hasMainSale(projectId: string, sales: readonly Sale[]): boolean {
  *    A v1 sell with no listing reads Private (P2-LISTING-24): nothing was ever on a marketplace;
  * 6. `status: "completed"` with no readable mint → minted (unreadable, v1);
  * 7. draft.
+ * Derived from the two axes (Build and Earn P1-1): steps 1–5 are `commercialStateOf`; the
+ * engineering axis never moved the status (a Draft is "not minted"), so it has no say here,
+ * and only the v1 record's own `status` tells 6 from 7.
  */
 export function projectStatus(p: ManualProject, draft: StoredDraft | null, facts: StatusFacts = {}): ProjectStatus {
-  const listing = facts.listing ?? NO_LISTING;
-  if (listing.kind === "live") return "listed";
-  if (listing.kind === "paused") return "paused";
-  if (listing.kind === "sold" || hasMainSale(p.id, facts.sales ?? [])) return "sold";
-  const minted = p.mint !== undefined || (draft?.state.mintedAt ?? null) !== null;
-  if (minted) return draft?.state.intent === "give" ? "given" : "private";
+  const state = commercialStateOf(commercialFactsOf(p, draft, facts));
+  if (state !== "none") return STATUS_OF[state];
   return p.status === "completed" ? "minted" : "draft"; // "minted" = the record is unreadable (LST-9)
 }
 
@@ -130,7 +138,7 @@ export function projectSourceOf(refs: BuildRef[]): ProjectSource {
 export const BUILD_GONE_TIP =
   "The build this project came from isn't stored in this browser any more. Its products are still listed.";
 
-/** LST-38 / COR-55: the card's meta tag and the rail's Source row, the same words. */
+/** COR-55: the rail's Source row. The My projects card no longer shows the source. */
 export function sourceTag(source: ProjectSource): { label: string; tip: string | null } {
   switch (source.kind) {
     case "build":
@@ -154,9 +162,9 @@ export type NextAction =
   | { kind: "view-brief"; label: "View brief"; href: string }
   | { kind: "add-to-marketplace"; label: "Add to marketplace" | "List another share"; href: string; blocked?: string };
 
-/** The header pair. `card` is what the My projects card shows: `first` when it is the
- *  page's violet step, else null (§2.5 — a card never shows "View …"). */
-export type ActionPair = { first: NextAction | null; second: NextAction | null; violet: boolean; card: NextAction | null };
+/** The header pair. The My projects card shows no button: its hint line (`hintOf`) words the
+ *  step instead. */
+export type ActionPair = { first: NextAction | null; second: NextAction | null; violet: boolean };
 
 /** A newer build of the project's chat, not saved anywhere yet (COR-18). */
 export type PendingVersion = { buildId: string; n: number; status: BuildStatus };
@@ -165,20 +173,19 @@ export type PendingVersion = { buildId: string; n: number; status: BuildStatus }
 export const NO_SHARE_TO_SELL = "You hold no share of this project to sell.";
 
 function pairOf(first: NextAction | null, second: NextAction | null, violet: boolean): ActionPair {
-  return { first, second, violet, card: violet ? first : null };
+  return { first, second, violet };
 }
 
-/** The listing flow's entry (§3.6.3). On the project page the header renders
- *  `slots.actions["add-to-marketplace"]` in the button's place and opens the flow there; the
- *  card links here, and the page reads `?list=1` once on arrival. */
+/** The listing flow's entry (§3.6.3), in Earn › Sell since Build and Earn P0: that
+ *  section renders the flow and reads `?list=1` once on arrival. */
 export function listFlowHref(projectId: string): string {
-  return `/projects/${projectId}?list=1`;
+  return earnHref(projectId, "sell", { list: "1" });
 }
 
 /**
  * The one next-step chooser (§3.5, Phase 2 §2.2 and §3.6.3). The header shows
- * the pair and the card shows `card`, so the two can't differ (COR-11).
- * Showcase never changes it (§3.8). At most one violet.
+ * the pair and the card's hint reads it (`hintOf`), so the two can't differ
+ * (COR-11). Showcase never changes it (§3.8). At most one violet.
  *
  * | status | first | second | violet |
  * |---|---|---|---|
@@ -213,7 +220,7 @@ export function nextAction(
     locked?: boolean;
   },
 ): ActionPair {
-  const briefHref = stepHref(p, "brief");
+  const briefHref = earnMintHref(p.id);
   const viewBrief: NextAction | null =
     facts.brief?.state.mintedAt != null ? { kind: "view-brief", label: "View brief", href: briefHref } : null;
   const creatorPct = facts.creatorPct ?? 100;
@@ -426,7 +433,7 @@ export type ProjectSummary = {
   status: ProjectStatus;
   statusWord: string; // STATUS_WORD[status]
   statusLine: string; // §3.2, as the owner reads it
-  showcase: { at: number } | null; // showcaseOf() — the badge and the Showcase tab
+  showcase: { at: number } | null; // showcaseOf() — the badge, the eye on the card's chip and the Showcase only filter
   products: { id: string; name: string; description: string }[]; // the current version + products a later version dropped (COR-42)
   productCount: number; // products.length — never a count of builds
   source: ProjectSource;
@@ -568,16 +575,6 @@ export function countLabel(n: number): string {
   return `${n} ${n === 1 ? "product" : "products"}`;
 }
 
-/** LST-37: "4 products · RC Car Controller, Remote Controller +2". An unnamed
- *  product reads "not named yet", never "Untitled product". */
-export function productLine(s: Pick<ProjectSummary, "products">): string {
-  const n = s.products.length;
-  const names = s.products.slice(0, 2).map((x) => x.name.trim() || "not named yet");
-  if (!names.length) return countLabel(n);
-  const more = n - names.length;
-  return `${countLabel(n)} · ${names.join(", ")}${more > 0 ? ` +${more}` : ""}`;
-}
-
 /** "Version 2" · "3 builds" · null. */
 export function versionLabel(v: ProjectSummary["version"]): string | null {
   if (!v) return null;
@@ -589,16 +586,17 @@ export type TimeText = { text: string; dateTime: string; title: string };
 export type MetaPart = { kind: "text"; text: string } | { kind: "time"; time: TimeText };
 export type ChipText = { word: string; icon: IconName; badge: ShowcaseBadge | null; line: string };
 
+/** The card shows three things (owner, 2026-10-11): the chip, the title, one line — and the hint
+ *  at its foot. The source, the version and the status line stay on the project page. */
 export type CardText = {
   chip: ChipText;
   count: string;
-  productLine: string; // LST-37
-  meta: MetaPart[]; // LST-38 · LST-41 · LST-42: "AI build · Saved 4:12 PM · Version 2"
-  metaText: string;
-  sourceTip: string | null; // the tooltip on "AI build · not in this browser"
-  version: string | null;
-  /** LST-40 / §2.5: `next.card`, "{label} for {project}"; null when the pair has no violet step. */
-  action: (NextAction & { ariaLabel: string }) | null;
+  /** LST-41: "Saved 4:12 PM", a <time> whose title is the full date. */
+  time: TimeText;
+  /** The one line: "4 products · Saved 4:12 PM". */
+  line: string;
+  /** `hintOf`: "Next: sell", "On the marketplace", … */
+  hint: string;
 };
 
 /** P2-CONTRIB-10's lead segment: "Created by you · Owned by Ana Silva". The name links to the
@@ -650,24 +648,51 @@ function metaTextOf(parts: MetaPart[]): string {
   return parts.map((m) => (m.kind === "time" ? m.time.text : m.text)).join(" · ");
 }
 
+/**
+ * The card's hint (owner, 2026-10-11): the next step when there is one, else the outcome. It
+ * reads the pair, so it never names a step the project page doesn't offer (COR-11). It is text,
+ * not a control: the whole card opens the project.
+ *
+ * | status | hint |
+ * |---|---|
+ * | draft, a newer version ready | Next: review version {n} |
+ * | draft | Next: mint |
+ * | private, the maker can sell | Next: sell |
+ * | private, the maker holds 0 % | Minted privately |
+ * | given | Given to the community |
+ * | listed | On the marketplace |
+ * | paused | Listing paused |
+ * | sold, the maker still holds a share | Next: sell another share |
+ * | sold in full | Sold out |
+ * | minted, record unreadable | Record not in this browser |
+ *
+ * A draft whose products lack a ready video still reads "Next: mint": the summary carries no
+ * video facts, and the Brief's readiness gate says what is missing when the maker gets there.
+ */
+export function hintOf(s: Pick<ProjectSummary, "status" | "next" | "pendingVersion">): string {
+  const first = s.next.first;
+  switch (s.status) {
+    case "draft":
+      return s.pendingVersion?.status === "ready" ? `Next: review version ${s.pendingVersion.n}` : "Next: mint";
+    case "private":
+      return first?.kind === "add-to-marketplace" && !first.blocked ? "Next: sell" : "Minted privately";
+    case "given":
+      return "Given to the community";
+    case "listed":
+      return "On the marketplace";
+    case "paused":
+      return "Listing paused";
+    case "sold":
+      return first?.kind === "add-to-marketplace" ? "Next: sell another share" : "Sold out";
+    case "minted":
+      return "Record not in this browser";
+  }
+}
+
 export function cardText(s: ProjectSummary, now: number): CardText {
-  const tag = sourceTag(s.source);
-  const version = versionLabel(s.version);
-  const meta: MetaPart[] = [
-    { kind: "text", text: tag.label },
-    { kind: "time", time: timeOf(s, formatShortDate(s.when.at, now)) },
-  ];
-  if (version) meta.push({ kind: "text", text: version });
-  return {
-    chip: chipOf(s),
-    count: countLabel(s.productCount),
-    productLine: productLine(s),
-    meta,
-    metaText: metaTextOf(meta),
-    sourceTip: tag.tip,
-    version,
-    action: s.next.card ? { ...s.next.card, ariaLabel: `${s.next.card.label} for ${s.name}` } : null,
-  };
+  const count = countLabel(s.productCount);
+  const time = timeOf(s, formatShortDate(s.when.at, now));
+  return { chip: chipOf(s), count, time, line: `${count} · ${time.text}`, hint: hintOf(s) };
 }
 
 const LOCAL_OWNER: Viewer = { kind: "local-owner" };
@@ -698,7 +723,7 @@ export function headerText(s: ProjectSummary, ctx: HeaderCtx = {}): HeaderText {
       ? {
           before: s.sold.owner.before,
           label: buyer.label,
-          href: `/projects/${s.id}?tab=customers&sale=${encodeURIComponent(buyer.saleId)}`,
+          href: earnHref(s.id, "customers", { sale: buyer.saleId }),
           after: s.sold.owner.after,
         }
       : null;
@@ -759,11 +784,11 @@ export function matchProject(
 
 /** List view state in the URL (LST-28): written with `replace`, defaults left out. */
 export type ListQuery = {
-  tab: "all" | "draft" | "private" | "given" | "listed" | "sold" | "showcase"; // showcase = membership (LST-10)
+  tab: "all" | "draft" | "minted" | "listed" | "sold"; // minted = private · given · unreadable; listed = live · paused
   q: string;
   sort: "updated" | "newest" | "oldest" | "name";
-  source: "any" | "build" | "hand";
+  showcase: boolean; // the Showcase only filter: membership, on any tab (LST-10)
   page: number; // 1-based
 };
 export const PAGE_SIZE = 12;
-// e.g. /projects?tab=draft&q=remote&sort=name&source=hand&page=2
+// e.g. /projects?tab=minted&q=remote&sort=name&showcase=1&page=2

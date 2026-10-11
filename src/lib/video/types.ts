@@ -8,9 +8,10 @@
 
 import type { ProductSource } from "../manual/projects";
 import type { VideoJobStage } from "./jobs";
+import type { Storyboard } from "./storyboard";
 
 export const VIDEO_QUALITY = {
-  low: { label: "Low", resolution: "360p", width: 640, height: 360, seconds: 10, tag: "Free", available: true },
+  low: { label: "Low", resolution: "480p", width: 854, height: 480, seconds: 10, tag: "Free", available: true },
   high: { label: "High", resolution: "720p", width: 1280, height: 720, seconds: 10, tag: "Upgrade", available: false },
 } as const;
 /** The same values as the Brief's `Quality`. */
@@ -32,6 +33,12 @@ export type VideoTake = {
   n: number;
   /** Kept for the model; the local renderer doesn't draw it. */
   prompt: string;
+  /** The sound the maker asked for (owner, 2026-10-12); "" when left to AI. Kept for the model. */
+  audioPrompt?: string;
+  /** "Auto generate": the video and/or the audio left to AI. */
+  auto?: { video: boolean; audio: boolean };
+  /** The three scenes the maker reviewed before Generate; each scene's speech is its on-screen line. */
+  storyboard?: Storyboard;
   lines: OnScreenLines;
   quality: VideoQuality;
   /** The build product whose image the frames used; null = no image. */
@@ -47,7 +54,16 @@ export type ProductVideo = {
   takes: VideoTake[];
   /** Only ever a ready take. */
   inUseId: string | null;
-  draft?: { prompt: string; lines: OnScreenLines; quality: VideoQuality };
+  draft?: VideoDraft;
+};
+
+/** What the maker typed into Generate video, kept between visits. */
+export type VideoDraft = {
+  prompt: string;
+  lines: OnScreenLines;
+  quality: VideoQuality;
+  audioPrompt?: string;
+  auto?: { video: boolean; audio: boolean };
 };
 
 export type ProjectVideos = { version: 1; projectId: string; products: Record<string, ProductVideo> };

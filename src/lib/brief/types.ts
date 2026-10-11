@@ -1,11 +1,11 @@
 // Brief module — the state model, its vocabulary and the migration that brings
 // an older stored draft up to it.
 //
-// This lives in `lib` rather than in `brief-app.tsx` so `normalizeBrief` is a
-// pure function with no React/DOM in its import graph: the wizard, the steps
-// and a plain node script can all read the same model.
-// `brief-app.tsx` re-exports everything here, so `./brief-app` imports keep
-// working unchanged.
+// This lives in `lib` so `normalizeBrief` is a pure function with no React/DOM
+// in its import graph: the mint flow, the project's Brief read and a plain
+// node script all read the same model. The stored draft keeps every field
+// below; the mint flow (`mint-flow.ts`, Build and Earn P1-2) edits only its
+// commerce half and leaves the rest as stored.
 
 import type { UtilityBenefit } from "../market/types";
 import type { MintType } from "../wallet/types";
@@ -163,6 +163,8 @@ export type BriefState = {
   network: Network;
   collection: string;
   story: string;
+  /** The Innovations post's status — an Activity stage id; "" until picked (owner, 2026-10-12). */
+  shareStage: string;
   license: License | null;
   // Sell-only
   listingType: ListingType;
@@ -215,6 +217,7 @@ export const DEFAULT_STATE: BriefState = {
   network: "baseSepolia",
   collection: "",
   story: "",
+  shareStage: "",
   license: null,
   listingType: "buyNow",
   token: "ETH",
@@ -396,6 +399,7 @@ export function normalizeBrief(parsed: unknown): BriefState {
     network,
     collection: str(s.collection, DEFAULT_STATE.collection),
     story: str(s.story, DEFAULT_STATE.story),
+    shareStage: str(s.shareStage, DEFAULT_STATE.shareStage),
     license:
       typeof s.license === "string" &&
       (LICENSE_IDS as readonly string[]).includes(s.license)
@@ -422,43 +426,22 @@ export function normalizeBrief(parsed: unknown): BriefState {
   };
 }
 
-// ── Step sequencing ────────────────────────────────────────────────────────
-// The Brief doesn't run one fixed wizard: what a maker is doing decides which
-// steps they are asked for, and in which order.
+// ── The stored step ────────────────────────────────────────────────────────
+// The step a draft stores, in the vocabulary of the Brief's old steps: the
+// status line and the Outcome copy read it. The mint flow maps its own steps
+// onto it (`storedStepOf`) and stores them beside it as `mintStep`.
 
 export type BriefStepId = "idea" | "preview" | "form" | "success";
 
-/** The form step's own name, per intent — the rail and the CTA both use it. */
+/** The old form step's name, per intent — the Outcome copy names a stored "form" step by it. */
 export const BRIEF_FORM_LABEL: Record<Intent, string> = {
   sell: "Ready to sell",
   give: "Give to community",
   save: "Save as Private",
 };
 
-/**
- * The steps this brief really runs, in order (Phase 2 spec §2.6).
- *
- * Selling and giving both publish the project, and every product needs its
- * video before either commits (decision 6, P2-VIDEO-17), so the preview comes
- * before the terms. Saving keeps the project private: its clip is optional,
- * so the preview comes after the form.
- */
-export function stepsFor(intent: Intent | null): BriefStepId[] {
-  if (!intent) return ["idea"];
-  if (intent === "sell" || intent === "give") return ["idea", "preview", "form", "success"];
-  // Save gets the preview too, after the form — the clip is optional for a
-  // private build, and asking for one before the maker has said what they are
-  // doing with the design is asking for work nobody may ever look at.
-  // Skipping is a card on the step, not the absence of the step.
-  return ["idea", "form", "preview", "success"];
-}
-
-/**
- * Every step there is, in the order they can appear. A sequence is a subset of
- * this, so it is what places a step the running sequence doesn't hold (the
- * regenerate hand-off forces "preview" whatever the intent) — and, because
- * drafts used to store the step as 1–4, what a stored number means.
- */
+/** The old steps, in order — and, because drafts used to store the step as
+ *  1–4, what a stored number means. */
 export const STEP_ORDER: readonly BriefStepId[] = [
   "idea",
   "preview",

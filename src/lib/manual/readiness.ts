@@ -66,6 +66,9 @@ const RULES_OF: Record<ReadinessPurpose, ReadinessRuleId[]> = {
   give: ["videos", "ownership", "license"],
   relist: ["videos", "ownership"],
   edition: ["videos", "ownership"],
+  // The videos alone: the Earn ladder's "Make a video for each product" and the mint's review
+  // open the dialog for this one rule (owner, 2026-10-12).
+  videos: ["videos"],
 };
 
 function videosReason(facts: ReadinessFacts, products: ProductReadiness[], counts: Readiness["counts"]): string {

@@ -1,6 +1,7 @@
 // Explore marketplace's grid (Phase 2 spec §3.5.5, P2-MARKETPLACE-4…7): the
 // For sale · Sold · Purchased tabs, search, the type filter, sort, paging
-// and the URL codec. Pages hold 12 items, the My projects rule (LST-28): the
+// and the URL codec. A project with copies on sale is an item too, with or
+// without a Main listing (owner, 2026-10-11: copies are listed on their own). Pages hold 12 items, the My projects rule (LST-28): the
 // URL only ever carries a param that differs from its default.
 //
 // Pure, relative imports only, so node:test loads the compiled module.
@@ -9,22 +10,43 @@ import type { Amount, DemoBuyerId } from "../wallet/types";
 import type { Token } from "../brief/types";
 import { compareAmounts, formatAmount } from "../wallet/money";
 import { auctionStateOf } from "./auction";
-import type { AuctionState, Bid, Listing, Sale } from "./types";
-import { formatDate, formatDateTime } from "../manual/project-summary";
+import { liveTracksOf } from "./editions";
+import type { AuctionState, Bid, EditionKind, EditionTrack, Listing, Sale } from "./types";
+import { formatDate, formatDateTime } from "../manual/public";
 
 export const PAGE_SIZE = 12;
 
 /** The project fields the grid reads — whatever `projectSummary` (T10)
  *  already derives, kept minimal here so this module doesn't import the
  *  whole summary graph. */
-export type MarketProjectLike = { id: string; name: string; cover: string | null; productCount: number };
+export type MarketProjectLike = {
+  id: string;
+  name: string;
+  cover: string | null;
+  productCount: number;
+  /** Sold in full (`summary.lock !== null`): its copies are off the marketplace. */
+  locked?: boolean;
+};
+
+/** A project's copies on sale now, of the whole project or of its products: listed, not sold out. */
+export type CopyOffer = {
+  count: number;
+  kinds: EditionKind[];
+  /** The lowest price, in the first token by name (no rate between test tokens). */
+  from: { amount: Amount; token: Token };
+  /** The newest listing among them. */
+  listedAt: number;
+};
 
 export type MarketItem = {
   projectId: string;
   name: string;
   cover: string | null;
   productCount: number;
-  listing: Listing;
+  /** The Main listing; null for a project that sells only copies. */
+  listing: Listing | null;
+  /** Its copies on sale, beside a live Main listing or alone; null on a sold card. */
+  copies: CopyOffer | null;
   status: "live" | "ended" | "sold";
   sale: Sale | null;
   auction: AuctionState | null;
@@ -34,9 +56,24 @@ export type MarketItem = {
   sortAt: number;
 };
 
-/** One card per live (or ended-unclosed) listing, one per sale, filtered by
- *  the active buyer's holdings for Purchased. Paused and removed listings
- *  are never items here (P2-MARKETPLACE-4): they appear in no tab. */
+/** The copies a project has on sale, or null. None once it's sold in full (R1-2). */
+export function copyOfferOf(tracks: readonly EditionTrack[], sales: Sale[], locked: boolean): CopyOffer | null {
+  const live = liveTracksOf(tracks, sales, locked);
+  if (!live.length) return null;
+  const listings = live.map((t) => t.listing as NonNullable<EditionTrack["listing"]>);
+  const token = listings.map((l) => l.token).sort()[0] as Token;
+  const amount = listings
+    .filter((l) => l.token === token)
+    .map((l) => l.regular)
+    .sort(compareAmounts)[0];
+  const kinds = (["physical", "virtual"] as EditionKind[]).filter((k) => live.some((t) => t.kind === k));
+  return { count: live.length, kinds, from: { amount, token }, listedAt: Math.max(...listings.map((l) => l.listedAt)) };
+}
+
+/** One card per live (or ended-unclosed) listing, one per sale, and one per project whose copies
+ *  are on sale without a live Main card, filtered by the active buyer's holdings for Purchased.
+ *  Paused and removed listings are never items here (P2-MARKETPLACE-4): they appear in no tab,
+ *  but a project's copies still do. `tracks` is every project's copy tracks. */
 export function marketItemsOf(
   listings: Listing[],
   projects: MarketProjectLike[],
@@ -44,8 +81,18 @@ export function marketItemsOf(
   bids: Bid[],
   buyerId: DemoBuyerId | null,
   now: number,
+  tracks: readonly EditionTrack[] = [],
 ): MarketItem[] {
   const byProject = new Map(projects.map((p) => [p.id, p]));
+  const offers = new Map<string, CopyOffer>();
+  for (const p of projects) {
+    const offer = copyOfferOf(
+      tracks.filter((t) => t.projectId === p.id),
+      sales,
+      p.locked === true,
+    );
+    if (offer) offers.set(p.id, offer);
+  }
   const out: MarketItem[] = [];
   for (const listing of listings) {
     const sale = sales.find((s) => s.listingId === listing.id && s.item.nft === "main") ?? null;
@@ -65,11 +112,29 @@ export function marketItemsOf(
       cover: project.cover,
       productCount: project.productCount,
       listing,
+      copies: sale ? null : (offers.get(project.id) ?? null),
       status,
       sale,
       auction,
       holding,
       sortAt: sale ? sale.at : listing.listedAt,
+    });
+  }
+  for (const [projectId, copies] of offers) {
+    if (out.some((i) => i.projectId === projectId && i.status !== "sold")) continue;
+    const project = byProject.get(projectId) as MarketProjectLike;
+    out.push({
+      projectId,
+      name: project.name,
+      cover: project.cover,
+      productCount: project.productCount,
+      listing: null,
+      copies,
+      status: "live",
+      sale: null,
+      auction: null,
+      holding: null,
+      sortAt: copies.listedAt,
     });
   }
   return out;
@@ -92,9 +157,17 @@ export type MarketFilterResult = {
 };
 
 function priceAmountOf(item: MarketItem): Amount {
+  if (!item.listing) return item.copies?.from.amount ?? "0";
   if (item.listing.type === "buyNow") return item.listing.price ?? "0";
   return item.auction?.top?.amount ?? item.listing.minBid ?? "0";
 }
+
+function priceTokenOf(item: MarketItem): Token {
+  return item.listing?.token ?? item.copies?.from.token ?? "ETH";
+}
+
+/** A copies card is bought now, at a fixed price. */
+const typeOf = (item: MarketItem): "buyNow" | "auction" => item.listing?.type ?? "buyNow";
 
 /** For sale · Sold · Purchased (P2-MARKETPLACE-4…5). Auctions that have
  *  ended but aren't closed yet sort last within For sale. Price sorts order
@@ -112,7 +185,7 @@ export function filterMarket(items: MarketItem[], query: MarketQuery): MarketFil
   if (q) pool = pool.filter((i) => i.name.toLowerCase().includes(q));
 
   if (query.tab !== "purchased" && query.type !== "all") {
-    pool = pool.filter((i) => i.listing.type === query.type);
+    pool = pool.filter((i) => typeOf(i) === query.type);
   }
 
   const sorted = [...pool];
@@ -130,7 +203,7 @@ export function filterMarket(items: MarketItem[], query: MarketQuery): MarketFil
   } else if (query.sort === "priceAsc" || query.sort === "priceDesc") {
     const dir = query.sort === "priceAsc" ? 1 : -1;
     sorted.sort((a, b) => {
-      const tokenCmp = (a.listing.token as Token).localeCompare(b.listing.token as Token);
+      const tokenCmp = priceTokenOf(a).localeCompare(priceTokenOf(b));
       if (tokenCmp !== 0) return tokenCmp;
       return dir * compareAmounts(priceAmountOf(a), priceAmountOf(b));
     });
@@ -163,8 +236,26 @@ function buyerName(id: DemoBuyerId): string {
  *  the listing. `tab` defaults to "forSale": a sold item the active buyer
  *  also holds reads differently on Purchased ("You own …") than on Sold
  *  ("Sold for … to …"), so callers on the Purchased tab pass it. */
+const KIND_COPIES: Record<EditionKind, string> = { physical: "Physical", virtual: "Virtual" };
+
+/** "From 0.05 MATIC" when there's more than one offer, else the one price. */
+function copiesPriceOf(c: CopyOffer): string {
+  const price = formatAmount(c.from.amount, c.from.token);
+  return c.count > 1 ? `From ${price}` : price;
+}
+
+/** A Main card's extra line while copies are on sale too: "Copies from 0.05 MATIC". */
+export function copiesLineOf(item: MarketItem): string | null {
+  if (!item.listing || !item.copies) return null;
+  return `Copies from ${formatAmount(item.copies.from.amount, item.copies.from.token)}`;
+}
+
 export function listingCardText(item: MarketItem, now: number, tab: MarketQuery["tab"] = "forSale"): ListingCardText {
   const l = item.listing;
+  if (!l) {
+    const c = item.copies as CopyOffer;
+    return { price: copiesPriceOf(c), sub: `${c.kinds.map((k) => KIND_COPIES[k]).join(" and ")} copies · not the project itself` };
+  }
   if (tab === "purchased" && item.holding) {
     return {
       price: `You own ${item.holding.sharePct}%`,

@@ -1,6 +1,6 @@
 // C7c + T26 — the Brief (COM-21, COM-56, COR-105; Phase 2 P2-SAVE-12, P2-MINT-6, P2-VIDEO-16/17,
-// P2-LISTING-22). The copy helpers are pure (compiled by A1's tsconfig); the wiring checks read the
-// component sources.
+// P2-LISTING-22), as Earn's mint flow since Build and Earn P1-2. The copy helpers are pure (compiled
+// by A1's tsconfig); the wiring checks read the component sources.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -17,6 +17,7 @@ import { commitCtaLabel } from "../../.tmp-test/lib/wallet/mint.js";
 
 const briefPath = (name) => new URL(`../../src/components/brief/${name}`, import.meta.url);
 const read = (name) => readFileSync(briefPath(name), "utf8");
+const readSrc = (path) => readFileSync(new URL(`../../src/${path}`, import.meta.url), "utf8");
 const CLAIMS = /Innovations|claim it|is up\b|drop is (open|live)/i;
 
 /** The body of `const <name> = …` up to the next top-level marker. */
@@ -56,7 +57,7 @@ test("a Save's pending lines count its renders; the Showcase gate line counts it
 });
 
 test("the step keeps none of the old claims (COM-21)", () => {
-  const src = read("step-4-success.tsx");
+  const src = read("step-success.tsx");
   for (const claim of [
     "Your post is up on Innovations",
     "post it to Innovations",
@@ -71,13 +72,15 @@ test("the step keeps none of the old claims (COM-21)", () => {
 });
 
 test("Showcase comes from the shared copy, asks can(), runs the gate and writes the project's flag (COM-56, P2-VIDEO-16)", () => {
-  const src = read("step-4-success.tsx");
+  const src = read("step-success.tsx");
   assert.match(src, /SUCCESS_SHOWCASE\.action/);
   assert.match(src, /SUCCESS_SHOWCASE\.done/);
   assert.match(src, /can\(\{ kind: "local-owner" \}, "project\.showcase"/);
-  assert.match(src, /setShowcase\(project\.id, next\)/);
+  assert.match(src, /setShowcase\(project\.id, next, undefined, post\)/, "the share carries its post");
   assert.match(src, /readiness\.showcase/);
-  assert.match(src, /<ReadinessDialog\s+purpose="showcase"/);
+  // Always the share dialog: the videos, then the story and status (owner, 2026-10-12).
+  assert.match(src, /onClick=\{\(\) => setGateOpen\(true\)\}/);
+  assert.match(src, /<ShareDialog/);
   assert.match(src, /showcaseGateLine\(/);
   assert.doesNotMatch(src, /shareToNewsfeed/, "Showcase is read from showcasedAt, never from the Brief's tick");
   // The storyboard scene cards are gone; ready posters open the video.
@@ -87,58 +90,87 @@ test("Showcase comes from the shared copy, asks can(), runs the gate and writes 
 });
 
 test("the Brief hands the success step the project it minted", () => {
-  assert.match(read("brief-app.tsx"), /projectId=\{scopeProjectId\}/);
+  assert.match(read("brief-app.tsx"), /<StepSuccess[\s\S]*?projectId=\{scope\}/);
 });
 
-test("Step 1 reads the project back and never asks for it (P2-SAVE-12)", () => {
-  const src = read("step-1-idea.tsx");
-  for (const gone of ["SelectMenu", "Choose Project", "NewProjectPanel", "NEW PROJECT DETAILS", "Adding to", "DecidedProject", "Rename"]) {
-    assert.ok(!src.includes(gone), `Step 1 still has "${gone}"`);
+test("Choose reads the project back from its engineering record and never edits it (P1-2, P2-SAVE-12)", () => {
+  const src = read("step-choose.tsx");
+  for (const gone of ["<input", "<textarea", "SelectMenu", "Choose Project", "Rename", "productDescription", "otherProducts"]) {
+    assert.ok(!src.includes(gone), `Choose still has "${gone}"`);
   }
-  assert.match(src, /function ProjectRow\(/);
-  // Continue's missing chain starts at the product name.
-  assert.match(src, /const missing = !productName\.trim\(\)\s*\?\s*"Add a product name to continue\."/);
-  // C9: the Save chip.
+  // The project page owns the words; Choose links there.
+  assert.match(src, /project\.description\.trim\(\) \|\| "No description yet\."/);
+  assert.match(src, /Edit on the project page/);
+  // The three choices, in the spec's order, with their chips (C9: the private one's).
+  const ids = [...src.matchAll(/id: "(save|give|sell)",/g)].map((m) => m[1]);
+  assert.deepEqual(ids, ["save", "give", "sell"]);
+  assert.match(src, /label: "Keep private"/);
+  assert.match(src, /label: "Give to the community"/);
   assert.match(src, /requirement: "Free signature · no KYC"/);
   assert.doesNotMatch(src, /No wallet · no KYC/);
 
+  // The flow writes nothing to the project's words: no product merge, no name sync.
   const app = read("brief-app.tsx");
-  const cont = slice(app, "const continueFromIdea = () => {", "const commit = async () => {");
-  for (const gone of ["createProject", "attachBuild", "setBuildProject", "seedDraft", "router.push"]) {
-    assert.ok(!cont.includes(gone), `continueFromIdea still calls ${gone}`);
+  for (const gone of ["mergeProductEdits", "productName", "productDescription", "otherProducts", "createProject", "attachBuild", "seedDraft"]) {
+    assert.ok(!app.includes(gone), `the flow still touches ${gone}`);
   }
-  assert.doesNotMatch(app, /seedFromBuild|projectChoice === "new"|withDefaultProjectChoice/);
-  // A legacy build-keyed draft is carried once, then cleared.
-  const adopt = slice(app, "function adoptBuildDraft(", "// `from` names the build");
-  assert.match(adopt, /carryIntoKeptDraft\(/);
-  assert.match(adopt, /clearDraft\(buildDraftScope\(buildId\)\)/);
-  // Step 1's detail: "{k} products", plus " · version {n}" on a build (from buildsOf).
-  assert.match(app, /`\$\{products\} · version \$\{version\}`/);
+  // Every draft write keeps the stored fields the flow doesn't own.
+  assert.match(app, /mintDraftJson\(window\.localStorage\.getItem\(key\), state, step\)/);
 });
 
-test("the Brief makes one real video per product, no timer-only jobs (P2-VIDEO-17, errata 56)", () => {
-  const app = read("brief-app.tsx");
-  const step2 = read("step-2-video.tsx");
-  for (const src of [app, step2]) {
-    assert.doesNotMatch(src, /createJob\(|markMinted\(|generateStoryboard|Generate storyboard|setTimeout\(\s*\(\)\s*=>\s*\{\s*setGeneratingStoryboard/);
-  }
-  assert.match(step2, /startProductVideo\(/);
-  assert.match(step2, /<VideoForm\b/);
-  assert.match(step2, /aria-expanded=\{expanded\}/);
-  assert.match(step2, /hierarchy="secondary"[\s\S]{0,600}Generate video\n/);
-  assert.match(step2, /Videos · \{ready\} of \{rows\.length\} ready/);
-  assert.match(step2, /"1 product still needs a video\."/);
-  for (const lock of ["A listing needs a video for every product", "A drop needs a video for every product", "A showcase needs a video for every product"]) {
-    assert.ok(step2.includes(lock), `missing the lock "${lock}"`);
-  }
-  assert.doesNotMatch(step2, /Audio prompt|Auto Generate Audio|Email me when ready/);
-  assert.equal(existsSync(briefPath("regenerate-confirm.tsx")), false, "regenerate-confirm.tsx is deleted");
-  assert.doesNotMatch(read("review-modal.tsx"), /RegenerateConfirm/);
+test("the old Brief addresses redirect to the mint flow; it opens per useBriefOpens (P1-2, R2-8)", () => {
+  const route = readSrc("app/(create)/projects/[id]/earn/mint/page.tsx");
+  assert.match(route, /<MintPage id=\{id\} \/>/);
+  const page = read("mint-page.tsx");
+  assert.match(page, /useBriefOpens\(project\)/);
+  assert.match(page, /<ProjectNotFound id=\{id\} \/>/);
+  assert.match(page, /earnHref\(project\.id, "sell"\)/, "minted without a Brief: the way out is Earn › Sell");
+
+  const build = readSrc("app/(create)/build/[jobId]/brief/page.tsx");
+  assert.doesNotMatch(build, /BriefApp/);
+  assert.match(build, /holderId \? earnMintHref\(holderId\) : `\/build\/\$\{jobId\}\?save=1`/);
+  // A legacy build-keyed draft carries its intent once, then is removed.
+  assert.match(build, /adoptBuildIntent\(/);
+  assert.match(build, /storage\.removeItem\(buildKey\)/);
+
+  const workspace = readSrc("components/manual/project-workspace.tsx");
+  assert.doesNotMatch(workspace, /BriefApp|useBriefOpens/);
+  assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(earnMintHref\(projectId\)\);/);
+
+  // Back from Choose is Earn › Sell.
+  assert.match(read("brief-app.tsx"), /const leave = \(\) => router\.push\(earnHref\(projectId, "sell"\)\);/);
 });
 
-test("the form: one Minting type field, never for a Save; the listing form for a Sell (P2-MINT-6, P2-LISTING-22)", () => {
-  const src = read("step-3-mint.tsx");
-  const save = slice(src, '{intent === "save" && (', "{/* Money shows");
+test("the video step left the Brief: the review shows the gate and opens the products' videos for a missing one (P1-2, P2-VIDEO-17)", () => {
+  for (const gone of ["step-2-video.tsx", "ar-record-panel.tsx", "review-modal.tsx", "regenerate-confirm.tsx", "step-1-idea.tsx", "step-3-mint.tsx", "brief-rail.tsx"]) {
+    assert.equal(existsSync(briefPath(gone)), false, `${gone} is deleted`);
+  }
+  const app = read("brief-app.tsx");
+  const review = read("step-review.tsx");
+  for (const src of [app, review, read("step-details.tsx")]) {
+    assert.doesNotMatch(src, /startProductVideo\(|<VideoForm\b|createJob\(|markMinted\(|generateStoryboard|mediaType|videoPrompt/);
+  }
+  assert.match(review, /export const MAKE_VIDEOS = "Make videos";/);
+  // A missing video opens the products' videos over the review — the maker never leaves the mint (owner, 2026-10-12).
+  assert.match(review, /<MakeVideosButton projectId=\{project\.id\} label=\{MAKE_VIDEOS\}/);
+  assert.doesNotMatch(review, /\?tab=media/);
+  assert.match(review, /<VideoRow key=\{row\.productId\} row=\{row\} \/>/);
+  // The gate the review reads is the Brief's own: Sell, Give, or a private mint posted to Innovations.
+  assert.match(app, /const purpose = gatePurposeOf\(state\.intent, state\.shareToNewsfeed\);/);
+  assert.match(app, /readiness: readinessOf\(factsOf\(state, \{ videos, jobs, now: videoNow \}\), purpose \?\? "sell"\)/);
+});
+
+test("one violet control per step: only the frame's primary CTA is filled violet", () => {
+  for (const name of ["step-choose.tsx", "step-details.tsx", "step-review.tsx"]) {
+    const src = read(name);
+    assert.doesNotMatch(src, /bg-bg-brand(?![-\w])/, `${name} draws its own violet fill`);
+    assert.equal([...src.matchAll(/primaryCta\(/g)].length, 1, `${name} has one primary CTA`);
+  }
+});
+
+test("the details: one Minting type field, never for a Save; the listing form for a Sell (P2-MINT-6, P2-LISTING-22)", () => {
+  const src = read("step-details.tsx");
+  const save = slice(src, '{intent === "save" && (', "Continue to review");
   assert.doesNotMatch(save, /MintTypeField/);
   assert.match(save, /Saved with a free signature|SAVE_SIGNATURE_LINE/);
   const sell = slice(src, '{intent === "sell" && (', '{intent === "give" && (');
@@ -146,10 +178,20 @@ test("the form: one Minting type field, never for a Save; the listing form for a
   assert.doesNotMatch(sell, /MintTypeField/, "Minting type is ListingFields' field 4, never rendered twice");
   const give = slice(src, '{intent === "give" && (', '{intent === "save" && (');
   assert.match(give, /<MintTypeField/);
-  // The gas checkbox is gone; the CTA is commitCtaLabel's.
-  assert.doesNotMatch(src, /I understand a network gas fee is added at mint/);
-  assert.match(src, /commitCtaLabel\(intent, type,/);
-  assert.match(src, /const type = intent === "save" \? "lazy" : state\.mintType;/);
+  // The license is a Give's term, and a Sell's: it lists at once, and listing needs one (the ladder's L3).
+  assert.match(give, /label="License"/);
+  assert.match(sell, /label="License"/);
+  assert.doesNotMatch(save, /label="License"/);
+  // The review checks a Sell at the list level, with the steps the flow gates itself handled.
+  const review0 = read("step-review.tsx");
+  assert.match(review0, /const LIST_HANDLED = \["ownership", "videos", "license", "minted", "payout"\] as const;/);
+  assert.match(review0, /selling \? "list" : "mint",/);
+  assert.match(review0, /\{ handled: selling \? LIST_HANDLED : MINT_HANDLED \}/);
+  // The gas checkbox is gone; the CTA is commitCtaLabel's, on the review.
+  const review = read("step-review.tsx");
+  for (const step of [src, review]) assert.doesNotMatch(step, /I understand a network gas fee is added at mint/);
+  assert.match(review, /commitCtaLabel\(intent, type, \{ last: true,/);
+  assert.match(read("brief-app.tsx"), /const type: MintType = state\.intent === "save" \? "lazy" : state\.mintType;/);
   assert.equal(commitCtaLabel("save", "lazy", { last: true, fromPreview: true, innovations: false }), "Sign and save");
   assert.equal(commitCtaLabel("sell", "lazy", { last: true, fromPreview: false, innovations: false }), "Sign and list");
   assert.equal(commitCtaLabel("give", "instant", { last: true, fromPreview: false, innovations: false }), "Pay and give");
@@ -157,7 +199,7 @@ test("the form: one Minting type field, never for a Save; the listing form for a
 
 test("a Sell commit writes the MintRecord, then the listing, then the draft's mintedAt; a refused listing un-mints (P2-LISTING-22, §3.9)", () => {
   const app = read("brief-app.tsx");
-  const commit = slice(app, "const commit = async () => {", "const goNext = () => {");
+  const commit = slice(app, "const commit = async () => {", "const goBack = () => {");
   assert.doesNotMatch(commit, /setTimeout/, "the 1.4 s timer is gone: the wallet request is the wait");
   assert.match(commit, /await request\(req,/);
   const writes = slice(commit, "const writeAll = (", "let result: RequestResult | null = null;");
@@ -166,7 +208,7 @@ test("a Sell commit writes the MintRecord, then the listing, then the draft's mi
     "setMint(cur.id, record)",
     "writeListings(listings)",
     "bumpMinted(network, collection)",
-    "writeDraft(scope, { ...s, mintedAt: at }",
+    "writeDraft(scope, { ...s, mintedAt: carryOn ? (s.mintedAt ?? at) : at }",
     'markStepCompleted(cur.id, "brief")',
     'setStatus(cur.id, "completed")',
   ];
@@ -191,11 +233,13 @@ test("a Sell commit writes the MintRecord, then the listing, then the draft's mi
 test("the mint showcases at the mint time itself: one moment for mintedAt and showcasedAt (COR-105)", () => {
   const app = read("brief-app.tsx");
   const writes = slice(app, "const writeAll = (at: number", "let result: RequestResult | null = null;");
-  assert.match(writes, /mintedAt: at\b/);
-  assert.match(writes, /if \(s\.shareToNewsfeed && cur\.showcasedAt == null\) setShowcase\(cur\.id, true, at\);/);
+  // A fresh mint stamps the proof's time; a minted project carried on keeps its first one.
+  assert.match(writes, /mintedAt: carryOn \? \(s\.mintedAt \?\? at\) : at\b/);
+  // Shared at the mint once every video is ready (a private mint never waits for them; owner, 2026-10-12).
+  assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) \{\s*setShowcase\(cur\.id, true, at, \{ story: s\.story\.trim\(\), stage:/);
   assert.doesNotMatch(writes, /Date\.now\(\)/, "the writes take the proof's time, never a second clock read");
   assert.match(app, /commit: \(proof\) => writeAll\(proof\.at, proof\)/);
   // The store writes the time it is handed; a press with none is stamped now.
   const store = readFileSync(new URL("../../src/lib/manual/projects.tsx", import.meta.url), "utf8");
-  assert.match(store, /\(id: string, on: boolean, at\?: number\) =>\s*updateProject\(id, \{ showcasedAt: on \? \(at \?\? Date\.now\(\)\) : null \}\)/);
+  assert.match(store, /\(id: string, on: boolean, at\?: number, post\?: SharePost\) =>\s*updateProject\(id, \{ showcasedAt: on \? \(at \?\? Date\.now\(\)\) : null, \.\.\.\(post \? \{ post \} : null\) \}\)/);
 });

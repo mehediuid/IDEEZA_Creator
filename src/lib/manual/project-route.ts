@@ -1,30 +1,66 @@
-// The project page's URL state and names (spec §5.3, §5.5; Phase 2 §2.2):
-// which tab the address asks for, which tabs a viewer sees, which record it
-// names, and the document titles. Pure, so node:test covers it
+// The project page's URL state and names (spec §5.3, §5.5; Phase 2 §2.2;
+// Build and Earn P0): which tab the address asks for, which tabs a viewer
+// sees, the old addresses that now live in Earn, which record it names, and
+// the document titles. Pure, so node:test covers it
 // (tests/projects/project-route.test.mjs). `?view=buyer` and
 // `?view=contributor&as=<id>` are the previews' own parameters
 // (lib/manual/buyer-preview.ts); withTab keeps them, like every other parameter.
 
+import { earnHref } from "./earn-route";
 import { can, type Viewer } from "./permissions";
 
-/** The page tabs, in strip order (COR-19; Phase 2 §2.2). The people tabs were appended, so a tab
- *  a maker has learned never moved. The strip is the same in every project state; only the
- *  viewer changes which appear (`projectTabsFor`). */
-export const PROJECT_TABS = ["products", "media", "network", "contributors", "customers"] as const;
+/** The page tabs, in strip order (COR-19; Phase 2 §2.2; Build and Earn P0). The page is
+ *  engineering only: Customers moved to Earn, and Contributors became Team — name and role,
+ *  the ownership % moved to Earn › Splits. The strip is the same in every project state; only
+ *  the viewer changes which appear (`projectTabsFor`). */
+export const PROJECT_TABS = ["products", "media", "network", "team"] as const;
 export type ProjectTabId = (typeof PROJECT_TABS)[number];
 
 export const PROJECT_TAB_LABEL: Record<ProjectTabId, string> = {
   products: "Products",
   media: "Media",
   network: "Network",
-  contributors: "Contributors",
-  customers: "Customers",
+  team: "Team",
 };
 
+/** Old `?tab=` values that still open a tab: the Contributors tab is Team now (P0). */
+const TAB_ALIAS: Readonly<Record<string, ProjectTabId>> = { contributors: "team" };
+
 /** `?tab=` → the tab it asks for. Products is the default, so it is never
- *  written (COR-20), and an unknown value reads as Products. */
+ *  written (COR-20); `?tab=contributors` opens Team, and an unknown value reads
+ *  as Products. `?tab=customers` never gets here: the route sends it to Earn
+ *  (`projectRedirectOf`). */
 export function parseProjectTab(raw: string | null): ProjectTabId {
-  return raw !== null && (PROJECT_TABS as readonly string[]).includes(raw) ? (raw as ProjectTabId) : "products";
+  if (raw === null) return "products";
+  if ((PROJECT_TABS as readonly string[]).includes(raw)) return raw as ProjectTabId;
+  return TAB_ALIAS[raw] ?? "products";
+}
+
+/** The buyer's side of commerce: Preview as buyer (`?view=buyer`) and a demo buyer on Explore
+ *  marketplace. They read the page as it was before Build and Earn — the status chip and line,
+ *  the Marketplace and Legal blocks, the product's editions — because the public listing pages
+ *  are not changed in P0. The owner and a contributor preview read the engineering page. */
+export function buyerSide(viewer: Viewer): boolean {
+  return viewer.kind === "owner-preview" || viewer.kind === "demo-buyer";
+}
+
+/** The addresses on `/projects/<id>` that moved to Earn (P0): `?list=1` opens the listing flow
+ *  in Earn › Sell, and `?tab=customers` is Earn › Money › Customers, a `sale=` deep link kept.
+ *  Null when the address stays on the page. Takes the route's `searchParams` as Next hands them. */
+export function projectRedirectOf(
+  projectId: string,
+  query: Readonly<Record<string, string | string[] | undefined>>,
+): string | null {
+  const one = (key: string) => {
+    const v = query[key];
+    return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+  };
+  if (one("list") === "1") return earnHref(projectId, "sell", { list: "1" });
+  if (one("tab") === "customers") {
+    const sale = one("sale");
+    return earnHref(projectId, "customers", sale ? { sale } : undefined);
+  }
+  return null;
 }
 
 /**
@@ -34,9 +70,8 @@ export function parseProjectTab(raw: string | null): ProjectTabId {
  * - Network: the owner and a contributor preview always (Create Network is its own empty
  *   state); a buyer preview or a demo buyer only once there is a network to read (COR-49) —
  *   `networkReadable` is "the store is read and this project has one".
- * - Contributors: the owner (the roster) and a contributor preview (read-only) always; a buyer
- *   preview or a demo buyer as a team credit, only with ≥ 1 contributor (C18).
- * - Customers: the owner only (`customers.see`; customers are private, C25).
+ * - Team: the owner and a contributor preview always (an empty Team teaches where people are
+ *   added); a buyer preview or a demo buyer only with ≥ 1 contributor (C18).
  */
 export function projectTabsFor(viewer: Viewer, facts: { networkReadable: boolean; contributors: number }): ProjectTabId[] {
   const visitorLike = viewer.kind === "owner-preview" || viewer.kind === "demo-buyer";
@@ -47,10 +82,8 @@ export function projectTabsFor(viewer: Viewer, facts: { networkReadable: boolean
         return true;
       case "network":
         return !visitorLike || facts.networkReadable;
-      case "contributors":
+      case "team":
         return can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && facts.contributors > 0);
-      case "customers":
-        return can(viewer, "customers.see");
     }
   });
 }

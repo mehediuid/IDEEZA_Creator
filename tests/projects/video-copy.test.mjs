@@ -68,9 +68,9 @@ test("statusCopy: P2-VIDEO-4's table", () => {
 });
 
 test("lines: meta, take label, stage line, title", () => {
-  assert.equal(copy.clipMetaLine(take(), "29 Sep 2026"), "10-second silent clip · 360p · Take 2 · Made 29 Sep 2026");
+  assert.equal(copy.clipMetaLine(take(), "29 Sep 2026"), "10-second silent clip · 480p · Take 2 · Made 29 Sep 2026");
   assert.equal(copy.clipMetaLine(take({ quality: "high" }), "x"), "10-second silent clip · 720p · Take 2 · Made x");
-  assert.equal(copy.takeLabel(take(), "29 Sep 2026"), "Take 2 · 360p · 29 Sep 2026");
+  assert.equal(copy.takeLabel(take(), "29 Sep 2026"), "Take 2 · 480p · 29 Sep 2026");
   assert.equal(copy.stageLine(2, "queued"), "Take 2 · Stage 1 of 5 · Queued");
   assert.equal(copy.stageLine(2, "encoding"), "Take 2 · Stage 5 of 5 · Encoding & finalising");
   assert.equal(copy.renderTitle("Rider", "Car"), "Rider · Car");
@@ -78,9 +78,9 @@ test("lines: meta, take label, stage line, title", () => {
 
 test("readinessCopy: P2-VIDEO-14's table with relist and edition", () => {
   assert.deepEqual(copy.readinessCopy("showcase"), {
-    title: "Showcase project",
-    info: "To showcase this project, every product needs an AI video.",
-    cta: "Showcase project",
+    title: "Share to Innovations",
+    info: "Every product needs an AI video, and the post needs your story and the project's status.",
+    cta: "Share to Innovations",
   });
   assert.equal(copy.readinessCopy("sell").cta, "Continue to listing");
   assert.equal(copy.readinessCopy("sell").title, "Add to marketplace");

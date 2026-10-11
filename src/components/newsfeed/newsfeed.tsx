@@ -8,6 +8,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FeedControls } from "./feed-controls";
 import { ProjectGrid } from "./project-grid";
+import { SharedByYou } from "./shared-by-you";
 import { parseFeedParams, toUrlQuery, type FeedParams } from "@/lib/feed";
 
 export function Newsfeed() {
@@ -41,6 +42,7 @@ export function Newsfeed() {
       </header>
 
       <div className="flex flex-col gap-[24px]">
+        <SharedByYou />
         <FeedControls params={params} onChange={updateParams} />
         <ProjectGrid params={params} onClearFilters={clearFilters} />
       </div>

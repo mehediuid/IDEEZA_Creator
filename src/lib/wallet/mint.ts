@@ -5,12 +5,10 @@
 //
 // Pure, relative imports only.
 
-import { estimateGas } from "../brief/gas";
+import { estimateGas } from "../commerce/gas";
 import { NETWORKS, type Intent, type Network } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
-import type { ManualProject } from "../manual/projects";
-import type { MetaPart } from "../manual/project-summary";
-import { formatDate, formatDateTime, formatShortDate } from "../manual/project-summary";
+import { formatDate, formatDateTime, formatShortDate, type ManualProject, type MetaPart } from "../manual/public";
 import type { Sale } from "../market/types";
 import { DEMO_ACCOUNTS } from "./identities";
 import { formatAmount } from "./money";
@@ -210,7 +208,8 @@ export function walletFactOf(
   const identity = `maker-${account.index}` as const;
   const state = w.identities[identity];
   if (!state?.connected) {
-    return { heading, line: `No wallet connected — you'll connect the demo wallet when you ${verb}.`, tone: "info" };
+    // The signing request opens on its connect step: nothing to do before pressing the button.
+    return { heading, line: `No wallet connected yet — you'll connect the demo wallet when you ${verb}.`, tone: "info" };
   }
   if (state.network !== ctx.network) {
     return {

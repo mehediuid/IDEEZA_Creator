@@ -1,6 +1,15 @@
 "use client";
 
-// ProjectPage is /projects/[id] (spec §5.3; Phase 2 §2.2, §3.10).
+// ProjectPage is /projects/[id] (spec §5.3; Phase 2 §2.2, §3.10; Build and
+// Earn P0). For the owner it is the engineering page: the header with its
+// stage line, the one "Earn from this project" button and the ⋯ menu (Edit
+// name and description, Share to Innovations, Activity, Delete project), the
+// tabs Products · Media · Network · Team, and the rail About · Versions ·
+// Recent. Everything that makes money lives in Earn (/projects/<id>/earn).
+// The buyer's side (`buyerSide`: Preview as buyer) still reads the page as
+// before — the Marketplace and Legal blocks, the Utility pill — because the
+// public listing pages are not changed in P0, and Explore marketplace's
+// MARKET_SLOTS reuses these same slots.
 // - Every store read and the one derivation are `useProjectPageData`'s: the
 //   projects, the builds, video jobs, the Brief draft, the market, the product
 //   videos, the journey, the editions, the business plan and the network, and
@@ -19,14 +28,11 @@ import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { useCreateHistory } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
-import { parseProjectTab } from "@/lib/manual/project-route";
+import { buyerSide, parseProjectTab } from "@/lib/manual/project-route";
 import { useJourney } from "@/lib/manual/journey-store";
 import { productsTabView } from "@/lib/manual/products-tab-view";
 import { BuyerPreviewBanner, isBuyerPreview, previewQuery } from "./buyer-preview";
-import { CustomersPanel } from "./customers-tab";
-import { ProjectActivityChip } from "./activity-chip";
 import { ContributorPreviewBanner } from "./contributor-preview-banner";
-import { ContributorsTab } from "./contributors-tab";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { NetworkTab } from "./network-tab";
@@ -35,19 +41,15 @@ import { ProductsTab } from "./products-tab";
 import { RailDetails } from "./rail-details";
 import { RailLegal } from "./rail-legal";
 import { RailLog } from "./rail-log";
-import { RailManage } from "./rail-manage";
-import { RailOutcome } from "./rail-outcome";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import { SavedBanner } from "./saved-banner";
 import { DescriptionCoachmark } from "./description-coachmark";
 import type { HeaderSlotProps, ProjectSlots, SlotProps } from "./slots";
 import { useProjectPageData } from "./use-project-page-data";
-import { BusinessPlanChip } from "./business-plan-chip";
 import { BuyerRail } from "@/components/marketplace/buyer-rail";
-import { ListingFlow } from "@/components/projects/listing/listing-flow";
 import { UtilityPill } from "@/components/projects/listing/utility-pill";
-import { RailMarketplace } from "./rail-marketplace";
+import { TeamTab } from "./team-tab";
 
 // ─────────────────────────── the slot adapters ───────────────────────────
 
@@ -60,9 +62,9 @@ function MediaSlot({ project, view, brief, viewer, announce }: SlotProps) {
   );
 }
 
-// The header renders the page's own headerParts and actions in its rows (§3.10).
+// The header renders the page's own headerParts in its rows (§3.10).
 function HeaderSlot(props: HeaderSlotProps) {
-  return <ProjectHeader {...props} parts={SLOTS.headerParts} actions={SLOTS.actions} />;
+  return <ProjectHeader {...props} parts={SLOTS.headerParts} />;
 }
 
 // C3's wiring. Every card links to its product page with the preview carried
@@ -92,16 +94,10 @@ function ProductsSlot({ project, view, viewer, now }: SlotProps) {
   );
 }
 
-// C7's two rail blocks take their own props; they mount through these, as the
-// slot contract asks. The other four rail blocks are SlotProps components.
-// Showcase speaks through the shell's one live region (COR-101). T24 also
-// reads `view` itself: its precomputed `videos.readiness.showcase` gates the
-// Showcase toggle, and the same `view` feeds the readiness dialog it opens.
-function OutcomeSlot({ view, viewer, announce }: SlotProps) {
-  return <RailOutcome summary={view.summary} commerce={view.commerce} viewer={viewer} view={view} announce={announce} />;
-}
+// C7's Details block takes its own props; it mounts through this, as the slot
+// contract asks. The other rail blocks are SlotProps components.
 function DetailsSlot({ project, view, viewer }: SlotProps) {
-  return <RailDetails project={project} summary={view.summary} viewer={viewer} />;
+  return <RailDetails project={project} summary={view.summary} products={view.products} viewer={viewer} />;
 }
 
 // C6's wiring. Every build the project holds, so each product's parts come
@@ -115,47 +111,34 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
-// T18's wiring: the project-scoped Customers panel (P2-CUSTOMERS-1…11, 18).
-// `view.customers` is already the project-scope `customersOf` (project-summary.ts);
-// `view.marketUnreadable` is the sales store's own read.
-function CustomersSlot({ project, view, now, announce }: SlotProps) {
-  return (
-    <CustomersPanel
-      customers={view.customers}
-      scope={{ kind: "project" }}
-      projectId={project.id}
-      projectName={project.name}
-      status={view.summary.status}
-      unreadable={view.marketUnreadable}
-      now={now}
-      announce={announce}
-    />
-  );
-}
-
-// T20's wiring: the Activity chip (P2-TABS-5), in the title row.
-function ActivitySlot(props: SlotProps) {
-  return <ProjectActivityChip {...props} />;
-}
-
 // T17's wiring (P2-CONTRIB-12): the contributor-preview banner is its own
 // entry in `banners`, after the buyer-preview banner.
 function ContributorPreviewBannerSlot({ viewer }: SlotProps) {
   return viewer.kind === "contributor-preview" ? <ContributorPreviewBanner viewer={viewer} /> : null;
 }
 
-// T17's wiring (P2-CONTRIB-1…13): the roster, its dialog and removal all live
-// in ContributorsTab, fed by `view.ownership` and `view.canCtx` (COR-74).
-function ContributorsSlot(props: SlotProps) {
-  return <ContributorsTab {...props} />;
+// P0's wiring: Team, name and role for every viewer (team-tab.tsx). The roster
+// with its ownership % is Earn › Splits.
+function TeamSlot(props: SlotProps) {
+  return <TeamTab {...props} />;
 }
 
-// The rail Marketplace block, one slot for every viewer: the owner's card and its
-// listing operations (T22: P2-LISTING-1, -2, -8…16), and for everyone else the
-// read-only buyer rail — facts and "Open in Explore marketplace", never a Buy or
-// Bid button (T23: P2-MARKETPLACE-10, P2-LISTING-21).
+// The rail Marketplace block, the buyer's side only (`buyerSide`): the read-only
+// buyer rail — facts and "Open in Explore marketplace", never a Buy or Bid
+// button (T23: P2-MARKETPLACE-10, P2-LISTING-21). The owner's card and its
+// listing operations (rail-marketplace.tsx's ListingBody) live in Earn › Sell (P0).
 function MarketplaceSlot(props: SlotProps) {
-  return can(props.viewer, "facts.seeOwnerOnly") ? <RailMarketplace {...props} /> : <BuyerRail {...props} />;
+  return buyerSide(props.viewer) ? <BuyerRail {...props} /> : null;
+}
+
+// The Legal block, the buyer's side only: the owner edits it in Earn › Rights (P0).
+function LegalSlot(props: SlotProps) {
+  return buyerSide(props.viewer) ? <RailLegal {...props} /> : null;
+}
+
+// The Utility NFT pill, the buyer's side only: the owner reads holder benefits in Earn (P0).
+function UtilityPillSlot(props: SlotProps) {
+  return buyerSide(props.viewer) ? <UtilityPill {...props} /> : null;
 }
 
 // ─────────────────────────── the page's composition ───────────────────────────
@@ -170,35 +153,25 @@ export const SLOTS: ProjectSlots = {
   notice: SavedBanner,
   header: HeaderSlot,
   headerParts: {
-    titleRow: [
-      ActivitySlot,
-      BusinessPlanChip,
-    ],
     statusRow: [
-      UtilityPill,
+      UtilityPillSlot,
     ],
     afterDescription: [
       DescriptionCoachmark,
     ],
   },
-  actions: {
-    "add-to-marketplace": ListingFlow,
-  },
   tabs: {
     products: ProductsSlot,
     media: MediaSlot,
     network: NetworkSlot,
-    contributors: ContributorsSlot,
-    customers: CustomersSlot,
+    team: TeamSlot,
   },
   rail: {
     marketplace: MarketplaceSlot,
-    outcome: OutcomeSlot,
     details: DetailsSlot,
-    legal: RailLegal,
+    legal: LegalSlot,
     versions: RailVersions,
     log: RailLog,
-    manage: RailManage,
   },
 };
 

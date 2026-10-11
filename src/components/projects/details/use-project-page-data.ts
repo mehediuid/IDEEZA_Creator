@@ -35,6 +35,7 @@ import { resolveProject } from "@/lib/manual/project-route";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { useEditions } from "@/lib/market/editions-store";
 import { useMarket } from "@/lib/market/market-store";
+import type { EditionTrack, MarketData } from "@/lib/market/types";
 import { useProjectNetwork } from "@/lib/network/store";
 import { useProjectVideos } from "@/lib/video/store";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
@@ -45,8 +46,9 @@ export type ProjectPageContext = "project" | "market";
 export type ProjectPageData =
   /** A store hasn't been read yet: show the skeleton (COR-2). */
   | { state: "loading" }
-  /** Nothing at this address. In the "market" context that includes a project that has
-   *  never had a listing, so a private project never leaks through a typed URL (P2-MARKETPLACE-8). */
+  /** Nothing at this address. In the "market" context that includes a project with no Main
+   *  listing, no listed copy and no copy sold, so a private project never leaks through a typed
+   *  URL (P2-MARKETPLACE-8). */
   | { state: "missing" }
   | {
       state: "ready";
@@ -75,6 +77,16 @@ export function useMinuteClock(): number {
     subscribe,
     () => Math.floor(Date.now() / MINUTE) * MINUTE,
     () => 0,
+  );
+}
+
+/** On Explore marketplace: a Main listing ever made, a copy listed now, or a copy sold —
+ *  copies are listed on their own (owner, 2026-10-11). */
+function onMarket(projectId: string, market: MarketData, editions: readonly EditionTrack[]): boolean {
+  return (
+    market.listings.some((l) => l.projectId === projectId) ||
+    editions.some((t) => t.listing !== null) ||
+    market.sales.some((s) => s.projectId === projectId && s.item.nft !== "main")
   );
 }
 
@@ -153,9 +165,7 @@ export function useProjectPageData(id: string, context: ProjectPageContext): Pro
     network.hydrated;
   if (!read) return { state: "loading" };
   if (!project) return { state: "missing" };
-  if (context === "market" && !market.data.listings.some((l) => l.projectId === project.id)) {
-    return { state: "missing" };
-  }
+  if (context === "market" && !onMarket(project.id, market.data, editions.record)) return { state: "missing" };
   // The Brief draft is read one render after the stores. Until then the page
   // keeps its skeleton rather than flash a Draft it may not be.
   if (!view || brief === undefined) return { state: "loading" };

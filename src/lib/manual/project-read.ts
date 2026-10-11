@@ -45,6 +45,7 @@ import type { Amount, Charge, MintView } from "../wallet/types";
 import { DEMO_ACCOUNTS } from "../wallet/identities";
 import type { Token } from "../brief/types";
 import type { BusinessPlan } from "./business-plan";
+import { engineeringStateOf, type EngineeringState } from "./engineering-state";
 import { currentStage, type ProjectJourney, type StageDef } from "./journey";
 import type { Customers } from "./customers";
 import { otherOwnersOf } from "./ownership";
@@ -630,7 +631,7 @@ export function listingMetadataOf(p: ManualProject, products: ProjectProduct[], 
 }
 
 /** Every readiness purpose, in the rule table's order (P2-VIDEO-13). */
-export const READINESS_PURPOSES: readonly ReadinessPurpose[] = ["showcase", "sell", "give", "relist", "edition"];
+export const READINESS_PURPOSES: readonly ReadinessPurpose[] = ["showcase", "sell", "give", "relist", "edition", "videos"];
 
 /** Everything the project page reads, derived once (COR-74; Phase 2 §3.7). No section
  *  derives state on its own; the product page reads `products` and `versions` from the same
@@ -645,6 +646,8 @@ export type ProjectView = {
   log: ProjectLogEntry[];
   /** §5.1.3 — the same object the My projects card renders. */
   summary: ProjectSummary;
+  /** The engineering axis (Build and Earn P1-1): the header's stage line reads it. */
+  engineering: EngineeringState;
   /** §5.1.4 — the Outcome block. */
   commerce: ProjectCommerce;
   // ── Phase 2 (§3.7) ──
@@ -761,6 +764,7 @@ export function projectView(
     pending: pendingVersionsOf(refs, ctx.builds, ctx.projects),
     log: projectLogOf(p, ctx.brief?.state ?? null, { market, editions, plan: ctx.plan ?? null, owner }),
     summary,
+    engineering: engineeringStateOf(p, { builds: ctx.builds, projects: ctx.projects }),
     commerce: commerceOf(p, ctx.brief, market.sales),
   };
 

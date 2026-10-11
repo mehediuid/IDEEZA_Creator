@@ -9,14 +9,15 @@
 // switcher) updates at once. An empty name is refused and the row keeps its
 // name.
 //
-// A rename changes what buyers see, so it goes through the edit gate
-// (P2-LISTING-13): on a live Buy now listing it asks to pause the listing
-// first; during an auction it's refused, with the reason on the control.
+// A rename changes what buyers see, so it goes through the write guards
+// (P2-LISTING-13, lib/manual/use-write-guard.tsx): on a live Buy now listing
+// it asks to pause the listing first; during an auction it's refused, with
+// the reason on the control.
 
 import * as React from "react";
-import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { useManualProjects } from "@/lib/manual/projects";
 import { productRowsOf } from "@/lib/manual/project-read";
+import { useWriteGuard } from "@/lib/manual/use-write-guard";
 
 export const UNNAMED_PRODUCT = "Not named yet";
 
@@ -30,7 +31,7 @@ export function ProductNameField({
   maxWidth?: number | string;
 }) {
   const { activeProject, activeProductId, renameProduct } = useManualProjects();
-  const gate = useProjectEditGate(activeProject?.id ?? null);
+  const gate = useWriteGuard(activeProject?.id ?? null);
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);

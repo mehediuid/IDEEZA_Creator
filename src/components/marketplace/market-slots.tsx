@@ -9,7 +9,7 @@
 // - the header in its "market" context (market-header.tsx);
 // - tabs as a buyer sees them (`projectTabsFor`): Products, whose cards open
 //   `/marketplace/<id>/products/<productId>`, Media, Network when there is
-//   one, and the team credit when there are contributors;
+//   one, and Team (name and role) when there are contributors;
 // - the rail: the buyer rail first, then Details, Legal (only when filled) and
 //   the Project log (public lines only). Outcome, Versions and Manage are the
 //   owner's and are absent.
@@ -59,7 +59,7 @@ export const MARKET_SLOTS: ProjectSlots = {
     products: MarketProductsSlot,
     media: SLOTS.tabs.media,
     network: SLOTS.tabs.network,
-    contributors: SLOTS.tabs.contributors,
+    team: SLOTS.tabs.team,
   },
   rail: {
     marketplace: BuyerRail,

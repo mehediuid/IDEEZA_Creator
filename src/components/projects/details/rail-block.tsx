@@ -30,6 +30,11 @@ export const RAIL_MIN = 1024;
 
 const StackedContext = React.createContext(false);
 
+/** True where the blocks are a page's content rather than its record (the Earn
+ *  sections): stacked, they stay open under a plain h2 instead of folding. */
+const UnfoldedContext = React.createContext(false);
+export const RailBlocksUnfolded = UnfoldedContext.Provider;
+
 /** True inside a block once the rail has dissolved into the page. */
 export function useRailStacked(): boolean {
   return React.useContext(StackedContext);
@@ -76,7 +81,8 @@ export function RailBlock({
   const [open, setOpen] = React.useState(false);
   const headingId = React.useId();
   const panelId = React.useId();
-  const folds = stacked && collapsible;
+  const unfolded = React.useContext(UnfoldedContext);
+  const folds = stacked && collapsible && !unfolded;
   return (
     <section
       aria-labelledby={headingId}
@@ -120,6 +126,23 @@ export function RailBlock({
         <StackedContext.Provider value={stacked}>{children}</StackedContext.Provider>
       </div>
     </section>
+  );
+}
+
+/** A block's body outside a RailBlock (an Earn card): its facts and controls lay out as the
+ *  rail's do — side by side from a 1024 px page container, stacked below it — read by the
+ *  same probe. */
+export function RailStackScope({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { probe, stacked } = useStackedProbe();
+  return (
+    <div className={cn("relative", className)}>
+      <span
+        ref={probe}
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 h-0 w-px [@container(max-width:1023px)]:w-[2px]"
+      />
+      <StackedContext.Provider value={stacked}>{children}</StackedContext.Provider>
+    </div>
   );
 }
 

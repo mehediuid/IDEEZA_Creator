@@ -13,11 +13,12 @@
 // - Preview as buyer (`?view=buyer`) and a contributor preview that may see
 //   the listing read the same facts with no button, the Testnet demo badge,
 //   and a quiet "Open in Explore marketplace" (preview stays read-only, PPL-6).
-// - A project never listed has no block.
-//
-// - Below the Main NFT, the project's listed Physical and Virtual NFTs
-//   (edition-offers.tsx, T27): a tier choice and a quiet Buy now for a demo
-//   buyer, the prices alone in a preview; hidden while Main is paused.
+// - Below the Main NFT, the project's listed Physical and Virtual NFTs, of the
+//   whole project and of each product (edition-offers.tsx, T27): a tier choice
+//   and a quiet Buy now for a demo buyer, the prices alone in a preview. They
+//   don't need the Main NFT (owner, 2026-10-11): with no Main listing the block
+//   holds the copies alone. Only the lock (sold in full) hides them.
+// - A project with neither has no block.
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -27,7 +28,8 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Button, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, Banner, Button, TestnetDemoBadge } from "@/components/ideeza";
+import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
@@ -85,41 +87,44 @@ function ListingFacts({ listing, view, auction }: { listing: Listing; view: Proj
           : `Minted on ${networkLabelOf(listing.network)}`;
   const ended = auction?.phase === "ended";
   return (
-    <RailFacts>
-      <RailFact label="Listing type">{listing.type === "auction" ? "Auction" : "Buy now"}</RailFact>
-      {listing.type === "auction" && auction ? (
-        <RailFact label={auction.top ? "Current bid" : "Starting bid"}>
-          <span className="font-semibold tabular-nums">
-            {formatAmount(auction.top?.amount ?? listing.minBid ?? "0", listing.token)}
-          </span>
-        </RailFact>
-      ) : (
-        <RailFact label="Price">
-          <span className="font-semibold tabular-nums">{formatAmount(listing.price ?? "0", listing.token)}</span>
-        </RailFact>
-      )}
-      <RailFact label="Selling percentage">
-        <span className="tabular-nums">{listing.percentSelling}%</span>
-      </RailFact>
-      {listing.type === "auction" && auction && (
-        <RailFact label={ended ? "Ended" : "Ends"}>
-          <span className="tabular-nums">
-            <time dateTime={new Date(listing.endsAt ?? listing.listedAt).toISOString()}>
-              {formatDateTime(listing.endsAt ?? listing.listedAt)}
-            </time>
-          </span>
-          {!ended && (
-            <span className="ml-2 inline-flex align-middle">
-              <Badge tone={auction.phase === "endingSoon" ? "warning" : "neutral"}>{timeLeftLabel(auction.msLeft)}</Badge>
+    <>
+      <RailFacts>
+        <RailFact label="Listing type">{listing.type === "auction" ? "Auction" : "Buy now"}</RailFact>
+        {listing.type === "auction" && auction ? (
+          <RailFact label={auction.top ? "Current bid" : "Starting bid"}>
+            <span className="font-semibold tabular-nums">
+              {formatAmount(auction.top?.amount ?? listing.minBid ?? "0", listing.token)}
             </span>
-          )}
+          </RailFact>
+        ) : (
+          <RailFact label="Price">
+            <span className="font-semibold tabular-nums">{formatAmount(listing.price ?? "0", listing.token)}</span>
+          </RailFact>
+        )}
+        <RailFact label="Selling percentage">
+          <span className="tabular-nums">{listing.percentSelling}%</span>
         </RailFact>
-      )}
-      <RailFact label="Royalties">{listing.royaltiesPct}% on resales</RailFact>
-      <RailFact label="Minting">{minting}</RailFact>
-      <RailFact label="Collection">{listing.collection || "—"}</RailFact>
-      <RailFact label="Blockchain">{networkLabelOf(listing.network)}</RailFact>
-    </RailFacts>
+        {listing.type === "auction" && auction && (
+          <RailFact label={ended ? "Ended" : "Ends"}>
+            <span className="tabular-nums">
+              <time dateTime={new Date(listing.endsAt ?? listing.listedAt).toISOString()}>
+                {formatDateTime(listing.endsAt ?? listing.listedAt)}
+              </time>
+            </span>
+            {!ended && (
+              <span className="ml-2 inline-flex align-middle">
+                <Badge tone={auction.phase === "endingSoon" ? "warning" : "neutral"}>{timeLeftLabel(auction.msLeft)}</Badge>
+              </span>
+            )}
+          </RailFact>
+        )}
+        <RailFact label="Royalties">{royaltyText(listing.royaltiesPct)}</RailFact>
+        <RailFact label="Minting">{minting}</RailFact>
+        <RailFact label="Collection">{listing.collection || "—"}</RailFact>
+        <RailFact label="Blockchain">{networkLabelOf(listing.network)}</RailFact>
+      </RailFacts>
+      <Banner tone="info">{SHARE_SALE_NOTE}</Banner>
+    </>
   );
 }
 
@@ -168,7 +173,15 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   const listing = view.listing.kind === "none" ? null : view.listing.listing;
   // Called on every render (hooks can't wait on the viewer): the auction card's clock.
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
-  if (viewer.kind === "local-owner" || !listing || !can(viewer, "listing.seePublic", view.canCtx)) return null;
+  if (viewer.kind === "local-owner" || !can(viewer, "listing.seePublic", view.canCtx)) return null;
+  const copies = view.lock === null && view.editions.some((t) => t.listing !== null);
+  if (!listing) {
+    return copies ? (
+      <RailBlock title="Marketplace" meta="Copies" collapsible={false}>
+        <EditionOffers project={project} view={view} viewer={viewer} announce={announce} alone />
+      </RailBlock>
+    ) : null;
+  }
   const live = view.listing.kind === "live";
   const auction = live && listing.type === "auction" ? auctionStateOf(listing, view.bids, clock) : null;
   const meta = live

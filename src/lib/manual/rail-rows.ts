@@ -5,7 +5,7 @@
 // module without a bundler.
 
 import { NETWORKS, type Intent, type Network } from "../brief/types";
-import type { EditionKind, EditionUse, ListingChange, ListingEvent } from "../market/types";
+import { PROJECT_SCOPE, type EditionKind, type EditionUse, type ListingChange, type ListingEvent } from "../market/types";
 import { buyerLabel } from "../wallet/identities";
 import { formatAmount } from "../wallet/money";
 import { shortAddress } from "../wallet/demo-wallet";
@@ -21,8 +21,8 @@ export const NOT_READ = "—";
 /** The Versions block shows this many versions, then "Show all ({n})" (§5.1.10). */
 export const VERSIONS_SHOWN = 5;
 
-/** The Project log shows this many entries, then "Show all ({n})" (COR-52). */
-export const LOG_SHOWN = 6;
+/** The rail's Recent block (the project log) shows this many entries, then "Show all ({n})" (COR-52; owner, 2026-10-11: a short rail). */
+export const LOG_SHOWN = 3;
 
 /** A date in the one formatter, "Sep 26, 2026 · 9:09 PM", inside `<time>` (COR-52, COR-107). */
 function when(at: number): MetaPart {
@@ -146,7 +146,8 @@ export type LogLineOptions = {
 export function logLinesOf(entries: ProjectLogEntry[], opts: LogLineOptions = {}): LogLine[] {
   const showNetwork = opts.network ?? true;
   const owner = opts.owner ?? showNetwork;
-  const productName = (id: string) => opts.products?.find((p) => p.id === id)?.name.trim() || null;
+  const productName = (id: string) =>
+    id === PROJECT_SCOPE ? "Whole project" : opts.products?.find((p) => p.id === id)?.name.trim() || null;
   const net = (n: Network) => (showNetwork ? ` · ${networkLabel(n)}` : "");
 
   return entries.flatMap((e): LogLine[] => {
@@ -157,7 +158,7 @@ export function logLinesOf(entries: ProjectLogEntry[], opts: LogLineOptions = {}
       case "created":
         return line("", "Created by hand");
       case "showcased":
-        return line("", "Showcased");
+        return line("", "Shared to Innovations");
       case "minted":
         return line("", `Minted · ${STATUS_WORD[LEGACY_MINTED_AS[e.intent]]}${net(e.network)}`);
       case "lazyMinted": {
@@ -231,9 +232,11 @@ export type VersionRow = {
   title: string;
   /** "Saved Sep 26, 2026 · 4:12 PM"; null when the save time was never recorded. */
   saved: MetaPart[] | null;
-  /** "15 of 15 pieces ready" · "Needs a retry"; null when the build is gone. */
+  /** "All 15 pieces ready" · "12 of 15 pieces ready" · "Needs a retry"; null when the build is gone. */
   pieces: string | null;
-  /** Open build ↗; null when the build isn't in this browser. */
+  /** Open build — only while the lineage's chat is gone: /build/<id> forwards to the chat when it
+   *  is here, so the group's "From chat" link already opens it (owner, 2026-10-11: no link twice,
+   *  none dead). Null too when the build isn't in this browser. */
   buildHref: string | null;
   /** The build isn't in this browser: the row says so and lists no products. */
   gone: boolean;
@@ -245,7 +248,7 @@ export type VersionRow = {
 
 export type VersionGroup = {
   key: string;
-  /** Chat “Car” · Chat “Car” · not in this browser · Chat not in this browser */
+  /** From chat “Car” · Chat “Car” · not in this browser · Chat not in this browser */
   heading: string;
   /** /chat/<id> while the chat is in this browser; plain text otherwise (COR-78). */
   chatHref: string | null;
@@ -285,7 +288,7 @@ export function versionGroupsOf(
         head.chatId === null
           ? "Chat not in this browser"
           : chat
-            ? `Chat “${head.lineage}”`
+            ? `From chat “${head.lineage}”`
             : `Chat “${head.lineage}” · not in this browser`;
       return {
         key: head.chatId ?? `no-chat:${head.buildId}`,
@@ -320,9 +323,11 @@ export function versionGroupsOf(
             pieces: v.pieces
               ? v.pieces.retry
                 ? "Needs a retry"
-                : `${v.pieces.ready} of ${v.pieces.total} pieces ready`
+                : v.pieces.ready === v.pieces.total
+                  ? `All ${v.pieces.total} pieces ready`
+                  : `${v.pieces.ready} of ${v.pieces.total} pieces ready`
               : null,
-            buildHref: gone ? null : `/build/${encodeURIComponent(v.buildId)}`,
+            buildHref: gone || chat ? null : `/build/${encodeURIComponent(v.buildId)}`,
             gone,
             lines,
           };

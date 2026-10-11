@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 const { parseBriefDraft, readBriefDraft, commerceOf, showcaseBackfillOf } = await import(
   "../../.tmp-test/lib/brief/project-brief.js"
 );
-const { DEFAULT_STATE, briefDraftKey, normalizeBrief, stepsFor } = await import("../../.tmp-test/lib/brief/types.js");
+const { DEFAULT_STATE, briefDraftKey, normalizeBrief } = await import("../../.tmp-test/lib/brief/types.js");
 
 const NOW = Date.UTC(2026, 8, 26, 12, 0);
 const MINTED = Date.UTC(2026, 8, 22, 21, 9);
@@ -88,13 +88,6 @@ test("Phase 2 draft fields: normalizeBrief({}) gives a lazy mint, 10 % selling a
   );
   // `understandGas` stays parseable and is ignored.
   assert.equal(normalizeBrief({ understandGas: true }).understandGas, true);
-});
-
-test("stepsFor: Give runs the preview before the form, like Sell; Save keeps it after (§2.6, P2-VIDEO-17)", () => {
-  assert.deepEqual(stepsFor("give"), ["idea", "preview", "form", "success"]);
-  assert.deepEqual(stepsFor("sell"), ["idea", "preview", "form", "success"]);
-  assert.deepEqual(stepsFor("save"), ["idea", "form", "preview", "success"]);
-  assert.deepEqual(stepsFor(null), ["idea"]);
 });
 
 test("readBriefDraft reads the project's own key; no browser, or a throwing storage, reads as null", () => {

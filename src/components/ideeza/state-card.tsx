@@ -16,7 +16,7 @@ export function StateCard({
   tone: "empty" | "error";
   icon: React.ReactNode;
   title: string;
-  body: string;
+  body?: string;
   action?: React.ReactNode;
   className?: string;
   /** "h1" when the card is the whole page (a not-found state), so the page
@@ -52,7 +52,7 @@ export function StateCard({
         ) : (
           <p className={titleClass}>{title}</p>
         )}
-        <p className="text-md leading-md text-text-secondary">{body}</p>
+        {body && <p className="text-md leading-md text-text-secondary">{body}</p>}
       </div>
       {action}
     </div>

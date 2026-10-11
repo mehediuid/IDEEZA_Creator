@@ -49,8 +49,11 @@ export type ReadinessDialogProps = {
   brief: StoredDraft | null;
   /** The product an `edition` gate is about (P2-VIDEO-13 C: edition reads one product). */
   product?: ProjectProduct;
-  /** A caller's own rows after the products (LISTING's metadata row on a relist). */
+  /** A caller's own rows after the products (LISTING's metadata row on a relist; the share's story and status). */
   extra?: React.ReactNode;
+  /** Why the caller's own rows hold the CTA, once nothing here does; pressing then calls `onExtraBlocked`. */
+  extraBlocker?: string | null;
+  onExtraBlocked?: () => void;
   onPass: () => void;
   onClose: () => void;
 };
@@ -63,7 +66,18 @@ export function dialogBlockerOf(readiness: Readiness): string | null {
   return readiness.rules.find((r) => !r.ok && (r.fixedIn === "gate" || r.id === "videos"))?.reason ?? null;
 }
 
-export function ReadinessDialog({ purpose, project: given, view, brief, product, extra, onPass, onClose }: ReadinessDialogProps) {
+export function ReadinessDialog({
+  purpose,
+  project: given,
+  view,
+  brief,
+  product,
+  extra,
+  extraBlocker = null,
+  onExtraBlocked,
+  onPass,
+  onClose,
+}: ReadinessDialogProps) {
   const { projects, setOwnerConfirmed } = useManualProjects();
   // The live record: ticking the box writes to it, and the rule reads it back.
   const project = projects.find((p) => p.id === given.id) ?? given;
@@ -114,6 +128,10 @@ export function ReadinessDialog({ purpose, project: given, view, brief, product,
   };
 
   const pressCta = () => {
+    if (!blocker && extraBlocker) {
+      onExtraBlocked?.();
+      return;
+    }
     if (!blocker) {
       onPass();
       return;
@@ -142,17 +160,17 @@ export function ReadinessDialog({ purpose, project: given, view, brief, product,
                 type="button"
                 hierarchy="primary"
                 size="lg"
-                aria-disabled={blocker ? true : undefined}
-                aria-describedby={blocker ? hintId : undefined}
+                aria-disabled={blocker || extraBlocker ? true : undefined}
+                aria-describedby={blocker || extraBlocker ? hintId : undefined}
                 className={cn(TAP, "aria-disabled:cursor-not-allowed aria-disabled:opacity-60")}
                 onClick={pressCta}
               >
                 {copy.cta}
               </Button>
             </div>
-            {blocker && (
+            {(blocker || extraBlocker) && (
               <p id={hintId} className="text-right text-sm text-text-secondary">
-                {blocker}
+                {blocker ?? extraBlocker}
               </p>
             )}
           </div>

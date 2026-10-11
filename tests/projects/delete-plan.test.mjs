@@ -118,7 +118,7 @@ test("a mint record asks for the typed name and says nothing on a chain changes"
   const kept = deletePlanOf(input({ status: "private", draft: minted("save"), showcased: true }));
   assert.deepEqual(kept.goes.slice(1), [
     `The brief — kept private, minted ${on}`,
-    "Showcase — it leaves your Showcase tab",
+    "Its place on Innovations — it stops showing there",
   ]);
   assert.equal(kept.typed, true);
 
@@ -162,7 +162,7 @@ test("Delete is blocked while Listed, with the reason and the way out (COR-70, P
   assert.deepEqual(deleteBlockOf({ ...FREE, listed: true }), {
     id: "listed", // A4b's DeleteBlock carries its rule id
     reason: "A listed project can't be deleted.",
-    detail: "Remove the listing first — it's in the Marketplace block.",
+    detail: "Remove the listing first — it's in Earn › Sell.",
   });
   assert.equal(deleteBlockOf(FREE), null);
 });

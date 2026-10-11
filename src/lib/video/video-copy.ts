@@ -29,13 +29,18 @@ export function honestyLine(productName: string): string {
 }
 
 export const SILENT_NOTE = "The video is silent.";
+
+/** Under the storyboard (owner, 2026-10-12): what the browser can make of it today. */
+export function storyboardHonesty(productName: string): string {
+  return `This preview is made in your browser from ${productName}'s image, with each scene's speech shown on screen. The AI video and audio models aren't connected yet — your prompts and this storyboard are kept with the video for them.`;
+}
 export const CANNOT_PLAY_COPY = "This browser can't play this video file.";
 export const PROMPT_BLOCKER = "Write what the video should show.";
 export const HIGH_LOCKED_NOTE = "720p comes with the Builder plan, which isn't on sale yet.";
 export const PROMPT_PLACEHOLDER = "Describe the shot — the product, the setting, how the camera moves";
 export const RENDER_KEEPS_RUNNING = "You can close this — the render keeps running, and its progress shows in the corner.";
 export const NO_VIDEO_PRODUCT =
-  "No video yet — every product needs one before the project can be showcased, sold or given.";
+  "No video yet — every product needs one before the project can be shared, sold or given.";
 export const LINE_MAX = 60;
 
 export function resolutionOf(q: VideoQuality): string {
@@ -126,9 +131,9 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
   switch (purpose) {
     case "showcase":
       return {
-        title: "Showcase project",
-        info: "To showcase this project, every product needs an AI video.",
-        cta: "Showcase project",
+        title: "Share to Innovations",
+        info: "Every product needs an AI video, and the post needs your story and the project's status.",
+        cta: "Share to Innovations",
       };
     case "sell":
       return {
@@ -148,6 +153,12 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
       return {
         title: `Add ${productName} NFTs to the marketplace`,
         info: `${productName} needs an AI video first.`,
+        cta: "Continue",
+      };
+    case "videos":
+      return {
+        title: "Product videos",
+        info: "Every product needs an AI video before the project can be minted, shared or sold.",
         cta: "Continue",
       };
   }

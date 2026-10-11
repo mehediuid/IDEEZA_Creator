@@ -1,8 +1,9 @@
-// Showcase's words (owner decision O5; COM-12, COM-55, COM-56), for both of
-// its homes — the rail's Outcome row and the Brief's success step — so the
-// two can't drift. Honest NOW: Showcase is a flag on the project in this
-// browser, a badge and a tab. Innovations is a sample feed with no write
-// path, so no line here says a post exists, is live, or is on Innovations.
+// Sharing's words (owner decision O5; COM-12, COM-55, COM-56; owner,
+// 2026-10-11: "Showcase" read as silly — it is "Share to Innovations" now),
+// for every home — the project's ⋯ menu, the Earn Outcome row and the Brief's
+// success step — so they can't drift. Honest NOW: sharing is a flag on the
+// project in this browser; Innovations shows it under "Shared by you" at the
+// top of the page (the sample feed below it has no write path).
 //
 // Value imports are relative: tsc leaves `@/` as it is in its output, and
 // node:test loads the compiled module without a bundler.
@@ -22,28 +23,28 @@ export function plainText(parts: MetaPart[]): string {
 
 export type ShowcaseRowCopy = {
   on: boolean;
-  label: "Showcase";
-  /** "Not showcased" | "Showcased since Sep 26, 2026" (the date in <time>). */
+  label: "Innovations";
+  /** "Not shared" | "Shared since Sep 26, 2026" (the date in <time>). */
   value: MetaPart[];
   note: string;
-  /** P2-VIDEO-15: the one product named in `note` ("Showcased — {Product} has no video yet."),
+  /** P2-VIDEO-15: the one product named in `note` ("Shared — {Product} has no video yet."),
    *  which the row renders as a link to its page. */
   noteLink?: { text: string; href: string };
-  action: "Showcase project" | "Stop showcasing";
+  action: "Share to Innovations" | "Stop sharing";
 };
 
 /** What the Showcase gate (`view.videos.readiness.showcase`, P2-VIDEO-13) says about the videos. */
 export type ShowcaseGate = { readiness: Readiness; projectId: string };
 
-const NOT_SHOWCASED_NOTE = "Showcasing lists it under Showcase in My projects. Nothing is posted until Innovations opens.";
-const SHOWCASED_NOTE = "Nothing is posted — the Innovations feed isn't open yet.";
+const NOT_SHOWCASED_NOTE = "Sharing shows it at the top of the Innovations page.";
+const SHOWCASED_NOTE = "It shows at the top of the Innovations page.";
 
 /**
  * COM-12's row and COM-55's control, from `summary.showcase` — showcasedAt, never the Brief's tick.
  * With the gate (P2-VIDEO-15) the note tells the videos' story:
- * - not showcased, the videos rule failing: "Showcasing needs an AI video for every product — {ready} of {total} have one.";
- * - showcased, but a current product has no ready video: "Showcased — {Product} has no video yet."
- *   ({Product} links to its page), or "Showcased — {n} products have no video yet.". The flag stays
+ * - not shared, the videos rule failing: "Sharing needs an AI video for every product — {ready} of {total} have one.";
+ * - shared, but a current product has no ready video: "Shared — {Product} has no video yet."
+ *   ({Product} links to its page), or "Shared — {n} products have no video yet.". The flag stays
  *   on; nothing is removed for the maker.
  * Otherwise the v1 notes stand.
  */
@@ -53,48 +54,48 @@ export function showcaseRow(showcase: { at: number } | null, gate?: ShowcaseGate
     const videosFail = r ? r.rules.some((x) => x.id === "videos" && !x.ok) : false;
     return {
       on: false,
-      label: "Showcase",
-      value: [{ kind: "text", text: "Not showcased" }],
+      label: "Innovations",
+      value: [{ kind: "text", text: "Not shared" }],
       note:
         r && videosFail
-          ? `Showcasing needs an AI video for every product — ${r.counts.ready} of ${r.counts.total} have one.`
+          ? `Sharing needs an AI video for every product — ${r.counts.ready} of ${r.counts.total} have one.`
           : NOT_SHOWCASED_NOTE,
-      action: "Showcase project",
+      action: "Share to Innovations",
     };
   }
   const missing = r ? r.products.filter((x) => x.video.state !== "ready") : [];
   const on = {
     on: true,
-    label: "Showcase" as const,
-    value: [{ kind: "text" as const, text: "Showcased since " }, timePart(showcase.at, formatDate(showcase.at))],
-    action: "Stop showcasing" as const,
+    label: "Innovations" as const,
+    value: [{ kind: "text" as const, text: "Shared since " }, timePart(showcase.at, formatDate(showcase.at))],
+    action: "Stop sharing" as const,
   };
   if (gate && missing.length === 1) {
     const [one] = missing;
     const name = one.name.trim() || "Not named yet";
     return {
       ...on,
-      note: `Showcased — ${name} has no video yet.`,
+      note: `Shared — ${name} has no video yet.`,
       noteLink: {
         text: name,
         href: `/projects/${encodeURIComponent(gate.projectId)}/products/${encodeURIComponent(one.productId)}`,
       },
     };
   }
-  if (missing.length > 1) return { ...on, note: `Showcased — ${missing.length} products have no video yet.` };
+  if (missing.length > 1) return { ...on, note: `Shared — ${missing.length} products have no video yet.` };
   return { ...on, note: SHOWCASED_NOTE };
 }
 
 /** COM-56 — the Brief's success step, after any intent. */
 export const SUCCESS_SHOWCASE = {
-  action: "Showcase this project",
-  line: "It goes under Showcase in My projects now. Nothing is posted until Innovations opens.",
-  done: "Showcased — it's on your Showcase tab.",
+  action: "Share to Innovations",
+  line: "It shows at the top of the Innovations page. You can stop sharing any time.",
+  done: "Shared to Innovations.",
   undo: "Undo",
 } as const;
 
 /** The polite announcement after either control flips it (COM-55, COM-56). */
-export function showcaseAnnouncement(on: boolean, name: string): string {
+export function shareAnnouncement(on: boolean, name: string): string {
   const n = name.trim() || "this project";
-  return on ? `Showcased ${n}` : `Stopped showcasing ${n}`;
+  return on ? `Shared ${n} to Innovations` : `Stopped sharing ${n}`;
 }

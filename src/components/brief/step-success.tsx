@@ -1,6 +1,7 @@
 "use client";
 
-// Step 4 — Mint Success.
+// Success — the mint flow's last step (Build and Earn P1-2), as the Brief's
+// Step 4 was.
 //
 // Reached once the commit's wallet request confirmed and its writes landed.
 // A Sell is listed on Explore marketplace (P2-LISTING-22), and a Sell or a
@@ -16,10 +17,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { EyeIcon, PlayIcon } from "@hugeicons/core-free-icons";
-import { type BriefState, type Intent } from "./brief-app";
 import { Icon } from "@/components/dashboard/icon";
 import { ProgressBar, TestnetDemoBadge } from "@/components/ideeza";
-import { dialogBlockerOf, ReadinessDialog } from "@/components/projects/details/readiness-dialog";
+import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
+import { ShareDialog } from "@/components/projects/share-dialog";
 import { useMinuteClock, useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { VideoPlayerDialog, useClipUrl } from "@/components/video-jobs/video-player";
@@ -32,11 +33,14 @@ import {
   pendingSubline,
   showcaseGateLine,
 } from "@/lib/brief/success-copy";
+import type { MintState } from "@/lib/brief/mint-flow";
+import type { Intent } from "@/lib/brief/types";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
-import { SUCCESS_SHOWCASE, showcaseAnnouncement } from "@/lib/manual/showcase-copy";
+import type { SharePost } from "@/lib/manual/share-post";
+import { SUCCESS_SHOWCASE, shareAnnouncement } from "@/lib/manual/showcase-copy";
 import { listingViewOf } from "@/lib/market/listing";
 import { termsLineOf } from "@/lib/market/listing-flow";
 import { useMarket } from "@/lib/market/market-store";
@@ -44,6 +48,7 @@ import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
+import { TAP } from "./brief-card";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   sell: "Listed on the marketplace",
@@ -53,14 +58,14 @@ const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
 
 const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
 
-export function Step4Success({
+export function StepSuccess({
   state,
   onBrowse,
   projectName,
   projectId,
   products,
 }: {
-  state: BriefState;
+  state: Pick<MintState, "intent">;
   onBrowse: (href: string) => void;
   projectName: string;
   /** The project this brief minted — what Showcase flags (COM-56). */
@@ -145,7 +150,7 @@ export function Step4Success({
           {onMarket && (
             <Link
               href={`/marketplace/${projectId}`}
-              className="mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+              className={`mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
             >
               {VIEW_ON_MARKETPLACE}
             </Link>
@@ -199,7 +204,7 @@ export function Step4Success({
         <div className="flex items-center justify-center">
           <Link
             href="/"
-            className="rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            className={`inline-flex items-center rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
           >
             Back to home
           </Link>
@@ -252,9 +257,10 @@ function PosterTile({ take, name, onOpen }: { take: VideoTake; name: string; onO
  * arrives already showcased (the Brief's commit writes the same flag), so the
  * step opens on the status row and nothing takes focus until a press.
  *
- * P2-VIDEO-16: it runs the same gate as the Outcome block's Showcase — every
- * product needs a ready video. Ready, one press flips it. Blocked, the press
- * opens the readiness dialog over this step, where the videos can be made
+ * P2-VIDEO-16 and the owner, 2026-10-12: a press always opens the share
+ * dialog over this step (share-dialog.tsx) — the products' videos, made there
+ * when one is missing, then the post's story and status — and its Share
+ * shares with that post. The videos can be made
  * without leaving it; its CTA then showcases.
  */
 function SuccessShowcase({ projectId }: { projectId: string }) {
@@ -284,10 +290,10 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
   const readiness = view.videos.readiness.showcase;
   const blocked = dialogBlockerOf(readiness) !== null;
 
-  const flip = (next: boolean) => {
+  const flip = (next: boolean, post?: SharePost) => {
     focusNext.current = next ? "undo" : "show";
-    setShowcase(project.id, next);
-    setSaid(showcaseAnnouncement(next, project.name));
+    setShowcase(project.id, next, undefined, post);
+    setSaid(shareAnnouncement(next, project.name));
   };
 
   return (
@@ -315,7 +321,8 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
           <button
             ref={showRef}
             type="button"
-            onClick={() => (blocked ? setGateOpen(true) : flip(true))}
+            // Always the share dialog: the videos, then the post's story and status (owner, 2026-10-12).
+            onClick={() => setGateOpen(true)}
             aria-describedby={lineId}
             className="inline-flex min-h-[44px] items-center justify-center gap-4 rounded-3xl border border-solid border-border bg-bg-surface px-12 py-6 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
           >
@@ -331,14 +338,13 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
         {said}
       </p>
       {gateOpen && (
-        <ReadinessDialog
-          purpose="showcase"
+        <ShareDialog
           project={project}
           view={view}
           brief={brief}
-          onPass={() => {
+          onShared={(post) => {
             setGateOpen(false);
-            flip(true);
+            flip(true, post);
           }}
           onClose={() => {
             setGateOpen(false);

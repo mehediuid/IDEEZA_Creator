@@ -204,6 +204,7 @@ test("editRequestOf: a lazy listing signs for free; an on-chain one pays the net
   assert.equal(lazy.kind, "signature");
   assert.equal(lazy.purpose, "editListing");
   assert.equal(lazy.summary.find((x) => x.label === "Price").value, "0.05 MATIC → 0.06 MATIC");
+  assert.equal(lazy.summary.find((x) => x.label === "Royalties").value, "10% · a share of resales, if marketplaces honour it");
   const onChain = flow.editRequestOf(listing({ mintingType: "instant" }), "Car", next);
   assert.equal(onChain.kind, "transaction");
   assert.equal(onChain.note, "Changing an on-chain listing costs a network fee.");
@@ -250,7 +251,7 @@ test("marketplaceCardOf Buy now: price, payout per sale, share, royalties, minti
   assert.equal(factOf(card, "Price"), "0.05 MATIC");
   assert.equal(factOf(card, "You receive"), "0.04875 MATIC per sale");
   assert.equal(factOf(card, "Selling percentage"), "10%");
-  assert.equal(factOf(card, "Royalties"), "10% on resales");
+  assert.equal(factOf(card, "Royalties"), "10% · a share of resales, if marketplaces honour it");
   assert.equal(factOf(card, "Minting"), "Lazy — minted on chain when it first sells");
   assert.match(factOf(card, "On the marketplace"), /^since /);
 });

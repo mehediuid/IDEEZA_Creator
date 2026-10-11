@@ -5,11 +5,12 @@
 // The editor opens a PRODUCT, not a project (owner decision 7, P2-EDITOR-1):
 // /project/<slug>/products/<productId>/<step>. The URL is the source of
 // truth. The gate, in order:
-//   1. not hydrated (projects, marketplace) → "Loading project…";
+//   1. not hydrated (projects, the guards' records) → "Loading project…";
 //   2. unknown slug → My projects;
 //   3. locked (sold in full, §3.8.5) → "{project} was sold in full"; and,
 //      as delete does, unreadable marketplace records lock it too — they
-//      can't say whether it was sold;
+//      can't say whether it was sold. Both come from the write guards
+//      commerce registers (lib/manual/use-write-guard.tsx);
 //   4. a legacy /project/<slug>/<step> → the product it resumes (P2-EDITOR-2);
 //   5. unknown product → "This product isn't in {project}" — never another
 //      product silently, or the maker would edit the wrong one;
@@ -23,31 +24,27 @@
 // remounts every editor. Under the top bar it shows what the seed brought in
 // (P2-BUILDLOAD-12), then "Bring it in" (P2-EDITOR-5): one banner at a time.
 //
-// The Brief (/project/<slug>/brief) is the project's: it has no product,
-// and a locked project keeps it (View brief stays, §3.8.5). The route
-// matches the page's buttons (R2-8, `useBriefOpens`): a draft's Brief, or a
-// Brief that minted (its read-only success step). A project minted without
-// one — from its page — says it has no Brief and links back, and never
-// opens an editable Step 1.
+// The Brief's old address (/project/<slug>/brief) redirects to the
+// project's mint flow, /projects/<id>/earn/mint (Build and Earn P1-2), which
+// decides what opens there.
 
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { HelpCircleIcon, LockIcon, NoteRemoveIcon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
-import { useBriefOpens } from "@/components/brief/use-brief-opens";
-import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { useCreateHistory } from "@/lib/create/history";
 import { pendingNoticeOf, type SeedEditor } from "@/lib/manual/build-load";
 import { ensureSeeded, readSeed, type EnsureResult, type SeedBuilt } from "@/lib/manual/build-load-io";
 import { useManualProjects, type ManualFlowState } from "@/lib/manual/projects";
 import { buildsOf, productRowsOf, productsOfProject } from "@/lib/manual/project-read";
+import { earnMintHref } from "@/lib/manual/earn-route";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
 import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
-import { useMarket } from "@/lib/market/market-store";
+import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
 import { cn } from "@/lib/utils";
 import { BringInBanner, EditorBannerProvider, focusEditorBanners } from "./bring-in-banner";
@@ -133,19 +130,13 @@ const WiringApp = dynamic(
   () => import("@/components/wiring/wiring-app").then((m) => m.WiringApp),
   { ssr: false, loading },
 );
-const BriefApp = dynamic(
-  () => import("@/components/brief/brief-app").then((m) => m.BriefApp),
-  { ssr: false, loading },
-);
-
-const APP_BY_STEP: Record<keyof ManualFlowState, React.ComponentType> = {
+const APP_BY_STEP: Record<EditorStep, React.ComponentType> = {
   pcb: PcbApp,
   code: CodeApp,
   three: ThreeApp,
   assembly: AssemblyApp,
   wiring: WiringApp,
   preview: PreviewApp,
-  brief: BriefApp,
 };
 
 const OWNER = { kind: "local-owner" } as const;
@@ -189,23 +180,20 @@ export function ProjectWorkspace({
     findBySlug,
     activeProjectId,
     activeProductId,
-    selectProject,
     selectEditorScope,
     touchOpened,
   } = useManualProjects();
-  const market = useMarket();
   const { hydrated: historyHydrated, builds } = useCreateHistory();
   const pcb = usePcbActions();
   const pcbScope = usePcbDocScope();
   const project = findBySlug(slug);
-  const gate = useProjectEditGate(project?.id ?? null);
+  const gate = useWriteGuard(project?.id ?? null);
 
   const isBrief = step === "brief";
-  const ready = hydrated && market.hydrated;
-  const briefOpens = useBriefOpens(isBrief && ready ? (project ?? null) : null);
+  const ready = hydrated && gate.ready;
   // The lock (decision 12): Open in editor is refused, so the route is too.
   // Unreadable market records read as "no sales", so they lock it as well.
-  const marketUnreadable = !isBrief && !!project && market.data.unreadable;
+  const marketUnreadable = !isBrief && !!project && gate.unreadable;
   const locked =
     marketUnreadable ||
     (!isBrief &&
@@ -236,11 +224,10 @@ export function ProjectWorkspace({
     if (resumeHref) router.replace(resumeHref + window.location.search);
   }, [ready, project, resumeHref, router]);
 
-  // The Brief works on the project.
+  // The Brief is Earn's mint flow now.
   React.useEffect(() => {
-    if (!ready || !projectId || !isBrief) return;
-    if (activeProjectId !== projectId) selectProject(projectId);
-  }, [ready, projectId, isBrief, activeProjectId, selectProject]);
+    if (ready && projectId && isBrief) router.replace(earnMintHref(projectId));
+  }, [ready, projectId, isBrief, router]);
 
   // The build a row is, read when the scope is applied — never a dependency,
   // so a build running elsewhere doesn't re-apply an open product.
@@ -334,22 +321,7 @@ export function ProjectWorkspace({
     );
   }
 
-  if (isBrief) {
-    // Hold the Brief until the active project matches the URL — avoids a
-    // frame of the previous project's chrome while selectProject settles.
-    if (activeProjectId !== project.id || briefOpens === undefined) return <BlankShell label="Opening project…" />;
-    if (!briefOpens) {
-      return (
-        <EditorStateCard
-          icon={NoteRemoveIcon}
-          title={`${project.name} has no Brief`}
-          body="It was minted without one, so there's no Brief to open. Everything about it is on its project page."
-          backHref={projectHref}
-        />
-      );
-    }
-    return <BriefApp key={project.id} />;
-  }
+  if (isBrief) return <BlankShell label="Opening the mint flow…" />;
 
   if (legacyRoute) return <BlankShell label="Opening product…" />;
   if (!row) {
@@ -370,7 +342,7 @@ export function ProjectWorkspace({
   // published value), so the banner's storage read runs once per product.
   const scope = pcbScope!;
 
-  const App = APP_BY_STEP[step];
+  const App = APP_BY_STEP[step as EditorStep];
   const bringInEditor = step === "code" ? "code" : step === "three" ? "three" : null;
   const productName = row.name.trim() || "Not named yet";
 

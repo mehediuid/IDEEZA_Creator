@@ -166,7 +166,7 @@ export type OutcomeSummary = Pick<ProjectSummary, "status" | "showcase"> & Parti
 /** The Outcome block, in words (§4.1's Outcome column; P2-MINT-10, P2-LISTING-23, P2-VIDEO-15).
  *  `showcaseGate` is `view.videos.readiness.showcase`: without it the Showcase row reads v1's notes. */
 export function outcomeView(c: ProjectCommerce, s: OutcomeSummary, showcaseGate?: Readiness): OutcomeView {
-  const meta = [STATUS_WORD[s.status], ...(s.showcase ? ["Showcased"] : [])].join(" · ");
+  const meta = [STATUS_WORD[s.status], ...(s.showcase ? ["Shared"] : [])].join(" · ");
   const demo = c.record !== null;
   const undecided = (subline: string): OutcomeView => ({ subline, clipLine: null, minted: null, mint: c.mint, demo, meta });
   const showcase = showcaseRow(
@@ -220,7 +220,7 @@ export function outcomeView(c: ProjectCommerce, s: OutcomeSummary, showcaseGate?
 }
 
 export type DetailRow = {
-  key: "ownership" | "source" | "created" | "stored";
+  key: "ownership" | "source" | "created" | "stored" | "parts" | "network" | "team";
   label: string;
   value: MetaPart[];
   note?: string;
@@ -259,5 +259,34 @@ export function detailsRows(input: {
     rows.push({ key: "created", label: "Created", value: [timePart(input.createdAt, created)] });
   }
   if (input.ownerFacts) rows.push({ key: "stored", label: "Stored", value: [text("In this browser")] });
+  return rows;
+}
+
+/** The owner's About block (owner, 2026-10-11: "show the data that's actually needed"): what
+ *  the header doesn't already say — the day it was made, how many parts its built products
+ *  use, its network, who works on it and where it is kept. No row links anywhere: every one
+ *  is a fact, and its tab is one press away. `parts` is null when nothing is built (a
+ *  hand-made project has no bill of materials here); `network` is null when none was added. */
+export function aboutRowsOf(input: {
+  createdAt: number;
+  parts: number | null;
+  network: { protocol: string; links: number } | null;
+  /** Contributors besides the owner. */
+  team: number;
+}): DetailRow[] {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const rows: DetailRow[] = [{ key: "created", label: "Created", value: [timePart(input.createdAt, formatDate(input.createdAt))] }];
+  if (input.parts !== null) rows.push({ key: "parts", label: "Parts", value: [text(plural(input.parts, "part", "parts"))] });
+  rows.push({
+    key: "network",
+    label: "Network",
+    value: [text(input.network ? `${input.network.protocol} · ${plural(input.network.links, "link", "links")}` : "Not added")],
+  });
+  rows.push({
+    key: "team",
+    label: "Team",
+    value: [text(input.team === 0 ? "Just you" : `You and ${plural(input.team, "other", "others")}`)],
+  });
+  rows.push({ key: "stored", label: "Stored", value: [text("This browser only")] });
   return rows;
 }

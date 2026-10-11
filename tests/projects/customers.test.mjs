@@ -253,7 +253,7 @@ test("customersEmptyCopy: each status and the product scope", () => {
   assert.equal(customersEmptyCopy({ scope: { kind: "project" }, status: "given", projectId: "p1" }).title, "No customers");
   const product = customersEmptyCopy({ scope: { kind: "product", productId: "prd_ctrl" }, status: "listed", projectId: "p1", productName: "RC Controller" });
   assert.equal(product.title, "No customers for this product yet");
-  assert.deepEqual(product.link, { label: "Project customers", href: "/projects/p1?tab=customers" });
+  assert.deepEqual(product.link, { label: "Project customers", href: "/projects/p1/earn/money#customers" });
 });
 
 // ─────────────────────────── pageOfSale (#12) ───────────────────────────
@@ -297,4 +297,23 @@ test("soldLineOf: a visitor never learns who or how much", () => {
 
 test("soldLineOf: null with no Main sale", () => {
   assert.equal(soldLineOf({ mainSale: null, mainSaleCount: 0, soldSharePct: 0 }, "owner", dateOf), null);
+});
+
+test("customersOf / customerRowText: a copy of the whole project lists under the project, named by it", () => {
+  const whole = {
+    ...S3,
+    id: "sale_w",
+    listingId: "ed_w",
+    at: Date.parse("2026-09-29T10:00:00"),
+    item: { nft: "virtual", trackId: "ed_w", productId: "project", productName: "Car", use: "private", tier: "regular", serial: 1 },
+  };
+  const c = customersOf(PROJECT, [...ALL, whole]);
+  assert.equal(c.rows[0].saleId, "sale_w");
+  assert.equal(c.saleCount, 4);
+  assert.equal(c.mainSaleCount, 1);
+  const text = customerRowText(c.rows[0], { projectName: "Car", now: Date.parse("2026-10-01T00:00:00") });
+  assert.equal(text.item, "Car · Virtual");
+  assert.equal(text.share, null);
+  // A product's scope keeps its own copies only.
+  assert.equal(customersOf(PROJECT, [...ALL, whole], { scope: { kind: "product", productId: "prd_car" } }).saleCount, 1);
 });

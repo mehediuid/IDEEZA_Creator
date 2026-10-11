@@ -54,7 +54,7 @@ export type EditorDoc =
   | "preview.canvas"
   | "preview.mates";
 
-export type ReadinessPurpose = "showcase" | "sell" | "give" | "relist" | "edition";
+export type ReadinessPurpose = "showcase" | "sell" | "give" | "relist" | "edition" | "videos";
 export type ReadinessRuleId = "minted" | "videos" | "ownership" | "license";
 export type ProductReadiness = { productId: string; name: string; thumb: string | null; video: ProductVideoStatus };
 export type ReadinessRule = {

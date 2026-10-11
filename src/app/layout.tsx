@@ -12,7 +12,9 @@ import { ManualProjectsProvider } from "@/lib/manual/projects";
 import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
 import { WalletProvider } from "@/components/wallet/wallet-provider";
+import { VideosDialogHost } from "@/components/projects/make-videos";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
+import { CommerceRoot } from "@/components/commerce/commerce-root";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -93,6 +95,10 @@ export default function RootLayout({
               {/* MarketProvider: listings, sales, bids and support, read by the
                   project page, My projects and Explore marketplace alike. */}
               <MarketProvider>
+                {/* CommerceRoot: commerce's guards and record hooks, which
+                    engineering asks without importing commerce, and the
+                    commerce-split@1 storage migration. Renders nothing. */}
+                <CommerceRoot />
                 <ProductFlowProvider>
                   <VideoJobsProvider>
                     {/* CreateHistoryProvider sits at the root so the home
@@ -108,7 +114,13 @@ export default function RootLayout({
                           {/* WalletProvider: the one Demo wallet dialog and
                               useWalletRequest(), inside the projects and
                               market stores its requests write to. */}
-                          <WalletProvider>{children}</WalletProvider>
+                          <WalletProvider>
+                            {children}
+                            {/* The products' videos dialog a missing-video step
+                                opens (make-videos.tsx): here, so it outlives the
+                                step's row when the last video lands. */}
+                            <VideosDialogHost />
+                          </WalletProvider>
                           {/* A build is a background job: it has to keep
                               running whatever page the user is on, so the
                               worker lives here rather than on the build

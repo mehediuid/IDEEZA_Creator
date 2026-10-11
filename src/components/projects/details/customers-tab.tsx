@@ -56,6 +56,7 @@ export function CustomersPanel({
   unreadable,
   now,
   announce,
+  embedded = false,
 }: {
   customers: Customers;
   scope: CustomerScope;
@@ -69,6 +70,9 @@ export function CustomersPanel({
   unreadable: boolean;
   now: number;
   announce: (message: string) => void;
+  /** Inside a section that has its own heading and explanation (Earn › Money › Customers): no
+   *  h2 of its own, and the empty state is one plain line, "No customers yet." */
+  embedded?: boolean;
 }) {
   const search = useSearchParams();
   // Read once, on arrival: P2-CUSTOMERS-11. A later render of this panel (a
@@ -94,18 +98,24 @@ export function CustomersPanel({
     if (!btn) return;
     deepLinked.current = true;
     btn.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
-    btn.focus();
+    // A frame later: the page's arrival focus (usePageArrival) is a parent's effect, which runs
+    // after this one and would otherwise take the focus back to the h1.
+    requestAnimationFrame(() => {
+      if (btn.isConnected) btn.focus();
+    });
   });
 
   const wideCols = scope.kind === "project" ? 6 : 5;
   const captionText = `Customers of ${projectName}, newest first`;
 
   return (
-    <div className="flex flex-col gap-16">
-      <div className="flex flex-wrap items-center gap-8">
-        <h2 className="text-lg font-bold text-text-primary">Customers</h2>
-        <TestnetDemoBadge />
-      </div>
+    <div className={cn("flex flex-col", embedded ? "gap-8" : "gap-16")}>
+      {!embedded && (
+        <div className="flex flex-wrap items-center gap-8">
+          <h2 className="text-lg font-bold text-text-primary">Customers</h2>
+          <TestnetDemoBadge />
+        </div>
+      )}
 
       {unreadable ? (
         <StateCard
@@ -116,7 +126,13 @@ export function CustomersPanel({
           className="mx-auto"
         />
       ) : customers.rows.length === 0 ? (
-        <EmptyState scope={scope} status={status} projectId={projectId} productName={productName} />
+        embedded ? (
+          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+            {`${customersEmptyCopy({ scope, status, projectId, productName }).title}.`}
+          </p>
+        ) : (
+          <EmptyState scope={scope} status={status} projectId={projectId} productName={productName} />
+        )
       ) : (
         <>
           <div className="flex flex-col gap-2">

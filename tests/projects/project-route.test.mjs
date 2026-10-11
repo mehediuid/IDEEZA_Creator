@@ -11,22 +11,22 @@ import {
   productDocTitle,
   marketDocTitle,
   projectTabsFor,
+  buyerSide,
+  projectRedirectOf,
 } from "../../.tmp-test/lib/manual/project-route.js";
 import { nextTabIndex, revealDelta } from "../../.tmp-test/lib/ui/tab-keys.js";
 
-test("the strip is Products · Media · Network · Contributors · Customers, in that order (COR-19, P2-TABS-1)", () => {
-  assert.deepEqual([...PROJECT_TABS], ["products", "media", "network", "contributors", "customers"]);
-  assert.deepEqual(
-    PROJECT_TABS.map((id) => PROJECT_TAB_LABEL[id]),
-    ["Products", "Media", "Network", "Contributors", "Customers"],
-  );
+test("the strip is Products · Media · Network · Team, in that order (COR-19, P2-TABS-1, Build and Earn P0)", () => {
+  assert.deepEqual([...PROJECT_TABS], ["products", "media", "network", "team"]);
+  assert.deepEqual(PROJECT_TABS.map((id) => PROJECT_TAB_LABEL[id]), ["Products", "Media", "Network", "Team"]);
 });
 
-test("?tab= reads every strip id; anything else is Products (COR-20)", () => {
+test("?tab= reads every strip id; the old ?tab=contributors opens Team; anything else is Products (COR-20, P0)", () => {
   assert.equal(parseProjectTab("media"), "media");
   assert.equal(parseProjectTab("network"), "network");
-  assert.equal(parseProjectTab("contributors"), "contributors");
-  assert.equal(parseProjectTab("customers"), "customers");
+  assert.equal(parseProjectTab("team"), "team");
+  assert.equal(parseProjectTab("contributors"), "team");
+  assert.equal(parseProjectTab("customers"), "products", "the route sends it to Earn before the page reads it");
   assert.equal(parseProjectTab("products"), "products");
   assert.equal(parseProjectTab(null), "products");
   assert.equal(parseProjectTab(""), "products");
@@ -42,19 +42,45 @@ test("projectTabsFor: the tabs each viewer sees, in strip order (P2-TABS-1 as ch
   const none = { networkReadable: false, contributors: 0 };
   const full = { networkReadable: true, contributors: 2 };
 
-  // The owner: every tab, in every state.
-  assert.deepEqual(projectTabsFor(owner, none), ["products", "media", "network", "contributors", "customers"]);
-  assert.deepEqual(projectTabsFor(owner, full), ["products", "media", "network", "contributors", "customers"]);
-  // A buyer preview or a demo buyer: Network only once there is one to read, a team credit with ≥ 1
-  // contributor, and never Customers (C25).
+  // The owner: every tab, in every state — Team even with nobody on it (its empty state teaches).
+  assert.deepEqual(projectTabsFor(owner, none), ["products", "media", "network", "team"]);
+  assert.deepEqual(projectTabsFor(owner, full), ["products", "media", "network", "team"]);
+  // A buyer preview or a demo buyer: Network only once there is one to read, Team with ≥ 1
+  // contributor (C18).
   for (const v of [buyerPreview, demoBuyer]) {
     assert.deepEqual(projectTabsFor(v, none), ["products", "media"], v.kind);
-    assert.deepEqual(projectTabsFor(v, full), ["products", "media", "network", "contributors"], v.kind);
+    assert.deepEqual(projectTabsFor(v, full), ["products", "media", "network", "team"], v.kind);
     assert.deepEqual(projectTabsFor(v, { networkReadable: true, contributors: 0 }), ["products", "media", "network"], v.kind);
   }
-  // A contributor preview: the roster read-only and Network always, no Customers.
-  assert.deepEqual(projectTabsFor(member, none), ["products", "media", "network", "contributors"]);
-  assert.deepEqual(projectTabsFor({ ...member, role: "coOwner", share: 30 }, full), ["products", "media", "network", "contributors"]);
+  // A contributor preview: Team and Network always.
+  assert.deepEqual(projectTabsFor(member, none), ["products", "media", "network", "team"]);
+  assert.deepEqual(projectTabsFor({ ...member, role: "coOwner", share: 30 }, full), ["products", "media", "network", "team"]);
+});
+
+test("the buyer's side is Preview as buyer and a demo buyer; the owner and a contributor preview read the engineering page (P0)", () => {
+  assert.equal(buyerSide({ kind: "owner-preview" }), true);
+  assert.equal(buyerSide({ kind: "demo-buyer", buyerId: "buyer-mira" }), true);
+  assert.equal(buyerSide({ kind: "local-owner" }), false);
+  assert.equal(buyerSide({ kind: "contributor-preview", contributorId: "ctb_a", name: "Ana", role: "editor", share: 0 }), false);
+});
+
+test("the addresses that moved to Earn redirect there; everything else stays on the page (P0)", () => {
+  // ?list=1 → Earn › Sell, which opens the listing flow once.
+  assert.equal(projectRedirectOf("proj_car", { list: "1" }), "/projects/proj_car/earn/sell?list=1");
+  assert.equal(projectRedirectOf("proj_car", { list: "1", tab: "media" }), "/projects/proj_car/earn/sell?list=1");
+  // ?tab=customers → Earn › Money › Customers, keeping a sale= deep link and nothing else.
+  assert.equal(projectRedirectOf("proj_car", { tab: "customers" }), "/projects/proj_car/earn/money#customers");
+  assert.equal(
+    projectRedirectOf("proj_car", { tab: "customers", sale: "sale_a", view: "buyer" }),
+    "/projects/proj_car/earn/money?sale=sale_a#customers",
+  );
+  assert.equal(projectRedirectOf("proj_car", { tab: ["customers", "media"], sale: ["sale_b"] }), "/projects/proj_car/earn/money?sale=sale_b#customers");
+  // An id is encoded once, by the Earn route contract.
+  assert.equal(projectRedirectOf("a b", { list: "1" }), "/projects/a%20b/earn/sell?list=1");
+  // Not moved: Team (and its old name), the previews, a saved build, list values other than "1".
+  for (const q of [{}, { tab: "contributors" }, { tab: "team" }, { view: "buyer" }, { saved: "job_1" }, { list: "0" }, { list: undefined }]) {
+    assert.equal(projectRedirectOf("proj_car", q), null, JSON.stringify(q));
+  }
 });
 
 test("a tab the strip doesn't list falls back to Products (COR-19, COR-49)", () => {
@@ -68,6 +94,7 @@ test("choosing a tab rewrites ?tab= only, and Products is never written (COR-20)
   assert.equal(withTab("", "media"), "tab=media");
   assert.equal(withTab("?tab=media", "products"), "");
   assert.equal(withTab("view=buyer", "network"), "view=buyer&tab=network");
+  assert.equal(withTab("tab=contributors", "team"), "tab=team");
   assert.equal(withTab("?view=buyer", "media"), "view=buyer&tab=media");
   assert.equal(withTab("tab=media&view=buyer", "network"), "tab=network&view=buyer");
   assert.equal(withTab("tab=media&view=buyer", "products"), "view=buyer");

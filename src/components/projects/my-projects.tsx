@@ -7,21 +7,23 @@
 // (`useCreateHistory`), the preview clips (`useVideoJobs`) and one brief draft
 // per project (`readBriefDraft`) — through one derivation, `projectSummary()`,
 // which the details header shares (LST-32). One pure pass, `filterProjects()`,
-// turns the summaries into the tab counts, the search, the Source facet, the
+// turns the summaries into the tab counts, the search, the Showcase filter, the
 // order and the page.
 //
-// The tabs are the outcome — All · Draft · Private · Given · Listed · Sold — then
-// Showcase, which is membership, not a state (owner decision O5, LST-4).
+// The tabs are the outcome — All · Draft · Minted · Listed · Sold (owner,
+// 2026-10-11). Showcase is membership, not a state (owner decision O5), so it is
+// a filter beside Sort: Showcase only.
 //
-// The view lives in the URL (LST-28): tab, q, sort, source and page, written
-// with replaceState and defaults left out. The scroller is the (create)
+// The view lives in the URL (LST-28): tab, q, sort, showcase and page, written
+// with replaceState and defaults left out; an old tab=private|given|showcase
+// still opens (parseListQuery). The scroller is the (create)
 // layout's <main>, which Next's own restoration doesn't cover, so the list
 // also puts its scroll offset back when Back returns to it.
 
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { EyeIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ProjectNotice } from "@/components/projects/project-notice";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
@@ -36,7 +38,6 @@ import { projectSummary, type ListQuery } from "@/lib/manual/project-summary";
 import {
   LIST_TABS,
   SORT_OPTIONS,
-  SOURCE_OPTIONS,
   countLine,
   filterProjects,
   listQueryString,
@@ -49,11 +50,17 @@ import {
 } from "@/lib/manual/project-list";
 import { useManualProjects } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
-import { ProjectCard, ProjectCardSkeleton, NoProjectsState, NoMatchState, EmptyTabState } from "./project-card";
+import {
+  ProjectCard,
+  ProjectCardSkeleton,
+  NoProjectsState,
+  NoMatchState,
+  EmptyTabState,
+  NoShowcaseState,
+} from "./project-card";
 import { Pagination } from "./pagination";
 
 const PANEL_ID = "projects-panel";
-const SOURCE_ID = "projects-source";
 const tabId = (tab: ListTab) => `projects-tab-${tab}`;
 
 // ───────────────────────── brief drafts ─────────────────────────
@@ -296,7 +303,6 @@ export function MyProjects() {
   };
 
   const tabLabel = LIST_TABS.find((t) => t.id === view.tab)?.label ?? "All";
-  const sourceLabel = SOURCE_OPTIONS.find((o) => o.value === view.source)?.label ?? "";
   const noProjects = result !== null && result.total === 0;
 
   return (
@@ -343,8 +349,8 @@ export function MyProjects() {
               {tabLabel} projects
             </h2>
 
-            {/* Toolbar: search, then Source and Sort. Below a 720 px content box
-                search takes the row and the two menus share the next (LST-57). */}
+            {/* Toolbar: search, then Showcase only and Sort. Below a 720 px content
+                box search takes the row and the other two share the next (LST-57). */}
             <div className="mt-[16px] grid grid-cols-2 gap-[12px] [@container(min-width:720px)]:flex [@container(min-width:720px)]:items-center">
               <form
                 role="search"
@@ -370,15 +376,22 @@ export function MyProjects() {
                   containerClassName="min-h-[44px] [&>button]:before:-inset-[15.5px]"
                 />
               </form>
-              <SelectMenu
-                id={SOURCE_ID}
-                ariaLabel="Source"
-                value={view.source}
-                onChange={(source) => changeView({ source })}
-                options={SOURCE_OPTIONS}
-                placeholder="Any source"
-                className="[&>button]:min-h-[44px] [@container(min-width:720px)]:ml-auto [@container(min-width:720px)]:w-[176px] [@container(min-width:720px)]:shrink-0"
-              />
+              {/* A filter, not a tab: membership on any outcome (LST-10). Pressed reads as
+                  the active tab does; the field-shaped border matches Sort beside it. */}
+              <button
+                type="button"
+                aria-pressed={view.showcase}
+                onClick={() => changeView({ showcase: !view.showcase })}
+                className={cn(
+                  "inline-flex min-h-[44px] items-center justify-center gap-[8px] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] text-[length:var(--font-size-md)] font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(min-width:720px)]:ml-auto [@container(min-width:720px)]:shrink-0",
+                  view.showcase
+                    ? "border-transparent bg-bg-brand-subtle text-text-brand"
+                    : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
+                )}
+              >
+                <Icon icon={EyeIcon} size={16} />
+                Shared only
+              </button>
               <SelectMenu
                 ariaLabel="Sort"
                 value={view.sort}
@@ -389,28 +402,11 @@ export function MyProjects() {
               />
             </div>
 
-            {/* The count line on the left, the active facet as a removable chip on the right (LST-18, LST-26). */}
-            <div
-              ref={resultsRef}
-              className="mt-[16px] flex scroll-mt-[16px] flex-wrap items-center justify-between gap-x-[12px] gap-y-[8px]"
-            >
+            {/* The count line (LST-26). */}
+            <div ref={resultsRef} className="mt-[16px] scroll-mt-[16px]">
               <p aria-live="polite" aria-atomic="true" className="text-md font-medium text-text-secondary">
                 {result ? countLine(result) : "—"}
               </p>
-              {view.source !== "any" ? (
-                <button
-                  type="button"
-                  aria-label={`Remove the Source filter: ${sourceLabel}`}
-                  onClick={() => {
-                    changeView({ source: "any" });
-                    document.getElementById(SOURCE_ID)?.focus();
-                  }}
-                  className="inline-flex h-[28px] items-center gap-[6px] rounded-full border border-solid border-border bg-bg-surface pl-[10px] pr-[8px] text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(max-width:559px)]:h-[44px]"
-                >
-                  Source: {sourceLabel}
-                  <Icon icon={Cancel01Icon} size={14} />
-                </button>
-              ) : null}
             </div>
 
             {!result ? (
@@ -428,44 +424,34 @@ export function MyProjects() {
                 ))}
               </ul>
             ) : result.rows.length === 0 ? (
-              // LST-53 (the outcome tab itself holds nothing) only when the tab's
-              // own count is zero; otherwise the search or the Source filter
-              // emptied it (LST-54), and the state names which one to undo.
-              view.tab === "all" || result.counts[view.tab] > 0 ? (
+              // LST-53 when the outcome tab itself holds nothing; else the search
+              // emptied it (LST-54); else the Showcase filter did.
+              view.tab !== "all" && result.counts[view.tab] === 0 ? (
+                <EmptyTabState tab={view.tab} />
+              ) : view.q.trim() ? (
                 // Each way out removes the button that was pressed, so focus
                 // goes to the search box rather than falling to the body.
                 <NoMatchState
                   query={view.q}
-                  tabLabel={tabLabel}
+                  scopeLabel={view.showcase ? `${tabLabel} (Shared only)` : tabLabel}
                   onClearSearch={() => {
                     setText("");
                     write({ ...view, q: "", page: 1 });
                     searchRef.current?.focus();
                   }}
-                  // The same words over every project: the tab and the Source
+                  // The same words over every project: the tab and the Showcase
                   // filter both go, whichever of them narrowed the list.
                   onSearchAll={
-                    view.q.trim() && (view.tab !== "all" || view.source !== "any")
+                    view.tab !== "all" || view.showcase
                       ? () => {
-                          changeView({ tab: "all", source: "any" });
+                          changeView({ tab: "all", showcase: false });
                           searchRef.current?.focus();
-                        }
-                      : undefined
-                  }
-                  source={
-                    view.source !== "any"
-                      ? {
-                          label: sourceLabel,
-                          onClear: () => {
-                            changeView({ source: "any" });
-                            searchRef.current?.focus();
-                          },
                         }
                       : undefined
                   }
                 />
               ) : (
-                <EmptyTabState tab={view.tab as Exclude<ListTab, "all">} />
+                <NoShowcaseState tabLabel={result.showcased > 0 ? tabLabel : null} />
               )
             ) : (
               <>
@@ -542,41 +528,39 @@ function ProjectTabs({
         // "—" until the projects and every brief draft have been read (LST-7).
         const n = counts ? counts[t.id] : null;
         return (
-          <React.Fragment key={t.id}>
-            {t.divider ? <span aria-hidden className="mx-[4px] h-[20px] w-px shrink-0 bg-border" /> : null}
-            <button
-              ref={(el) => {
-                if (el) refs.current.set(t.id, el);
-                else refs.current.delete(t.id);
-              }}
-              id={tabId(t.id)}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-controls={PANEL_ID}
-              aria-label={`${t.label}, ${n === null ? "not counted yet" : tabCountLabel(n)}`}
-              tabIndex={active ? 0 : -1}
-              onClick={() => onChange(t.id)}
-              onKeyDown={(e) => onKeyDown(e, t.id)}
+          <button
+            key={t.id}
+            ref={(el) => {
+              if (el) refs.current.set(t.id, el);
+              else refs.current.delete(t.id);
+            }}
+            id={tabId(t.id)}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-controls={PANEL_ID}
+            aria-label={`${t.label}, ${n === null ? "not counted yet" : tabCountLabel(n)}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onChange(t.id)}
+            onKeyDown={(e) => onKeyDown(e, t.id)}
+            className={cn(
+              "inline-flex h-[36px] items-center gap-[8px] rounded-full border border-solid px-[14px] text-md font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(max-width:559px)]:h-[44px]",
+              active
+                ? "border-transparent bg-bg-brand-subtle text-text-brand"
+                : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
+            )}
+          >
+            {t.label}
+            <span
+              aria-hidden
               className={cn(
-                "inline-flex h-[36px] items-center gap-[8px] rounded-full border border-solid px-[14px] text-md font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(max-width:559px)]:h-[44px]",
-                active
-                  ? "border-transparent bg-bg-brand-subtle text-text-brand"
-                  : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
+                "inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-[6px] text-sm font-semibold tabular-nums",
+                active ? "bg-bg-brand text-text-on-brand" : "bg-bg-subtle text-text-secondary",
               )}
             >
-              {t.label}
-              <span
-                aria-hidden
-                className={cn(
-                  "inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-[6px] text-sm font-semibold tabular-nums",
-                  active ? "bg-bg-brand text-text-on-brand" : "bg-bg-subtle text-text-secondary",
-                )}
-              >
-                {n ?? "—"}
-              </span>
-            </button>
-          </React.Fragment>
+              {n ?? "—"}
+            </span>
+          </button>
         );
       })}
     </div>

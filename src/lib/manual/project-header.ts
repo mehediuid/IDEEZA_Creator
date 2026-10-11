@@ -1,12 +1,17 @@
 // The project header's own words and rules (spec §5.4) — what `headerText()`
 // in project-summary.ts doesn't print: the inline editors' checks (CNT-2,
-// CNT-5) and the pending-version notices (COR-18). The chip, status line,
-// meta line and action pair are `headerText()`'s; nothing here repeats them.
+// CNT-5), the pending-version notices (COR-18), and the engineering header's
+// stage line and meta line (Build and Earn P0). The chip, status line, meta
+// line and action pair a buyer reads are `headerText()`'s; nothing here
+// repeats them. The Earn button reads commerce, so it is earn-view.ts's
+// (`earnButtonOf`).
 //
 // Pure. Value imports are relative, so `node --test` loads the compiled
 // module as it is (harness notes).
 
+import type { EngineeringState } from "./engineering-state";
 import { piecesOf, type Lineage, type PendingBuild } from "./project-read";
+import { countLabel, formatDate, formatDateTime, type MetaPart, type ProjectSummary } from "./project-summary";
 
 /** CNT-5 / COR-93: the store kept the change in memory, but localStorage refused it. */
 export const WRITE_FAILED = "This browser's storage is full — the change wasn't saved.";
@@ -127,4 +132,36 @@ export function pendingNoticesOf(
       action: null,
     };
   });
+}
+
+// ─────────────────────────── the engineering header (Build and Earn P0) ───────────────────────────
+
+const STAGE_WORD: Record<EngineeringState["state"], string> = { building: "Building", empty: "Made by hand", built: "Built" };
+
+/**
+ * The stage line, in the status chip's old place: what the project is as engineering, from the
+ * engineering axis (`engineeringStateOf`, `view.engineering`) and the summary's counts.
+ * "Built · 3 products · v2".
+ * - The stage: "Building" while a newer version of a lineage builds or waits to; "Made by hand"
+ *   for a project no build stands behind; "Built" otherwise.
+ * - The products, counted as the card counts them.
+ * - The version: "v{n}" for one lineage ("v1" before a second version), "{k} builds" across
+ *   several lineages (the summary's count); none for a project made by hand.
+ */
+export function stageLineOf(e: Pick<EngineeringState, "state" | "version">, s: Pick<ProjectSummary, "productCount" | "version">): string {
+  const version = e.state === "empty" ? null : s.version?.kind === "builds" ? `${s.version.k} builds` : `v${Math.max(1, e.version)}`;
+  return [STAGE_WORD[e.state], countLabel(s.productCount), ...(version ? [version] : [])].join(" · ");
+}
+
+/** The engineering meta line: the stage line already counts the products and names the
+ *  version, so this keeps the rest of COR-10's line — "Saved Sep 26, 2026[ · build not in this
+ *  browser][ · Stage Prototype]". No ownership lead: who holds what is Earn › Splits. */
+export function engineeringMetaOf(s: Pick<ProjectSummary, "when" | "source">, stage: { short: string } | null): MetaPart[] {
+  const at = s.when.at;
+  const meta: MetaPart[] = [
+    { kind: "time", time: { text: `${s.when.label} ${formatDate(at)}`, dateTime: new Date(at).toISOString(), title: formatDateTime(at) } },
+  ];
+  if (s.source.kind === "build-gone") meta.push({ kind: "text", text: "build not in this browser" });
+  if (stage) meta.push({ kind: "text", text: `Stage ${stage.short}` });
+  return meta;
 }

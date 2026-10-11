@@ -15,8 +15,6 @@
 
 import * as React from "react";
 import NextLink from "next/link";
-import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { can } from "@/lib/manual/permissions";
 import {
   VERSIONS_SHOWN,
@@ -70,9 +68,8 @@ function VersionList({ groups, total }: { groups: VersionGroup[]; total: number 
           <div key={g.key} className="flex flex-col gap-6">
             <h3 className="text-sm font-medium leading-sm text-text-secondary">
               {g.chatHref ? (
-                <NextLink href={g.chatHref} className={cn(RAIL_LINK, "inline-flex items-center gap-2")}>
+                <NextLink href={g.chatHref} className={cn(RAIL_LINK, "inline-flex items-center", stacked && "min-h-[var(--touch-min)]")}>
                   {g.heading}
-                  <Icon icon={ArrowUpRight01Icon} size={14} />
                 </NextLink>
               ) : (
                 g.heading
@@ -112,7 +109,6 @@ function VersionList({ groups, total }: { groups: VersionGroup[]; total: number 
                               )}
                             >
                               Open build
-                              <Icon icon={ArrowUpRight01Icon} size={14} />
                             </NextLink>
                           )}
                         </>

@@ -29,6 +29,7 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ConfirmDialog, ModalFrame, buttonVariants } from "@/components/ideeza";
 import { cn } from "@/lib/utils";
+import { earnHref } from "@/lib/manual/earn-route";
 import { onProjectDeleted } from "@/lib/manual/events";
 import { useManualProjects } from "@/lib/manual/projects";
 import {
@@ -379,7 +380,7 @@ function ReadyDialog({ projectId, version, onClose }: { projectId: string; versi
             <Button type="button" hierarchy="ghost" onClick={() => setConfirming(true)}>
               Discard
             </Button>
-            <Link href={`/projects/${projectId}/business-plan`} onClick={onClose} className={cn(buttonVariants({ hierarchy: "primary" }))}>
+            <Link href={earnHref(projectId, "plan")} onClick={onClose} className={cn(buttonVariants({ hierarchy: "primary" }))}>
               Open full plan
             </Link>
           </div>
@@ -433,8 +434,8 @@ export function PlanRunner() {
         const proj = projectsRef.current.find((p) => p.id === c.projectId);
         const homes = [`/projects/${c.projectId}`, proj ? `/projects/${proj.slug}` : null].filter((p): p is string => p !== null);
         if (homes.some((p) => pathRef.current === p)) setReady({ projectId: c.projectId, version: c.version });
-        // On the plan page itself the plan is already on screen; "Open" would lead back to it.
-        else if (!homes.some((p) => pathRef.current === `${p}/business-plan`)) setToast(c.projectId);
+        // On Earn › Business plan the plan is already on screen; "Open" would lead back to it.
+        else if (![c.projectId, proj?.slug].some((k) => k && pathRef.current === earnHref(k, "plan"))) setToast(c.projectId);
       }),
     [],
   );
@@ -458,7 +459,7 @@ export function PlanRunner() {
           >
             <span className="text-sm text-text-primary">Business plan ready</span>
             <Link
-              href={`/projects/${toast}/business-plan`}
+              href={earnHref(toast, "plan")}
               className="inline-flex min-h-[32px] items-center rounded-md text-sm font-semibold text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
               onClick={() => setToast(null)}
             >

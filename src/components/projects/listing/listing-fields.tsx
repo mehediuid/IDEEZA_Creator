@@ -8,7 +8,10 @@
 // In Figma order: Blockchain · Collection (locked to the mint on the page,
 // editable in the Brief) · Listing type · Minting type (MINT's shared field) ·
 // Token and Price, or Token, Minimum bid, Buy now price and Auction ends ·
-// Selling percentage · Royalties · Holder benefits · the ownership box.
+// Selling percentage · the share-sale note · Royalties · Holder benefits · the
+// ownership box. The note and the royalty hint are `share-copy.ts`'s (P1-4):
+// a share sale promises no return, and royalties are a share of resales, if
+// marketplaces honour them.
 // Edit locks the first four (143717) and keeps the rest editable.
 //
 // The rules and their copy are `listingProblems` (listing-form.ts): the
@@ -18,9 +21,10 @@
 import * as React from "react";
 import { Calendar03Icon, Cancel01Icon, LockIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Checkbox, IconButton, SelectMenu, TextInput, type SelectOption } from "@/components/ideeza";
+import { Banner, Checkbox, IconButton, SelectMenu, TextInput, type SelectOption } from "@/components/ideeza";
 import { MintTypeField } from "@/components/wallet/mint-type-field";
 import { LISTING_TYPES, NETWORKS, TOKENS_BY_NETWORK, type ListingType, type Network, type Token } from "@/lib/brief/types";
+import { ROYALTY_MEANING, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { ListingInput } from "@/lib/market/listing-form";
 import { sellingSteps } from "@/lib/market/listing-form";
 import {
@@ -348,10 +352,12 @@ export function ListingFields({
         error={errors.percentSelling}
       />
 
+      <Banner tone="info">{SHARE_SALE_NOTE}</Banner>
+
       <Field
         label="Royalties (%)"
         controlId={ids.royalties}
-        hint="Between 2 and 10% — one decimal place."
+        hint={`${ROYALTY_MEANING} Between 2 and 10%, one decimal place.`}
         hintId={`${ids.hint}-royalties`}
         error={errors.royalties}
         errorId={errId("royalties")}

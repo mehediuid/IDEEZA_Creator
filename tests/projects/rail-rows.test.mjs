@@ -72,7 +72,7 @@ test("logLinesOf: created, minted and showcased only, each over its date (COR-52
     { kind: "created", at: SEP20_1005 },
   ]);
   assert.deepEqual(lines, [
-    { key: `showcased:${SEP26_1000}`, title: "Showcased", note: null, when: [time(SEP26_1000, "Sep 26, 2026 · 10:00 AM")] },
+    { key: `showcased:${SEP26_1000}`, title: "Shared to Innovations", note: null, when: [time(SEP26_1000, "Sep 26, 2026 · 10:00 AM")] },
     {
       key: `minted:${SEP22_2109}`,
       // A v1 Sell never reached a marketplace: it reads Private, as the chip does (P2-LISTING-24),
@@ -107,7 +107,7 @@ test("logLinesOf: network: false leaves the chain out of a mint (PPL-7, Preview 
   );
   assert.equal(minted.title, "Minted · Private");
   assert.equal(minted.note, null);
-  assert.equal(showcased.title, "Showcased");
+  assert.equal(showcased.title, "Shared to Innovations");
   // The default is the owner's line, chain included.
   assert.equal(logLinesOf([{ kind: "minted", at: 2, intent: "sell", network: "baseSepolia" }])[0].title, "Minted · Private · Base Sepolia (Testnet)");
 });
@@ -220,15 +220,15 @@ test("versionGroupsOf: the Car example — one lineage, newest first, Added / Dr
   assert.equal(groups.length, 1);
   const [g] = groups;
   assert.equal(g.key, "chat_car");
-  assert.equal(g.heading, "Chat “Car”");
+  assert.equal(g.heading, "From chat “Car”");
   assert.equal(g.chatHref, "/chat/chat_car");
   assert.deepEqual(g.rows.map((r) => r.title), ["Version 2 · current", "Version 1"]);
   const [r2, r1] = g.rows;
   assert.equal(r2.key, "b_car_2");
   assert.deepEqual(r2.saved, [{ kind: "text", text: "Saved " }, time(SEP26_1612, "Sep 26, 2026 · 4:12 PM")]);
   assert.deepEqual(r1.saved, [{ kind: "text", text: "Saved " }, time(SEP22_902, "Sep 22, 2026 · 9:02 AM")]);
-  assert.equal(r2.pieces, "15 of 15 pieces ready");
-  assert.equal(r2.buildHref, "/build/b_car_2");
+  assert.equal(r2.pieces, "All 15 pieces ready");
+  assert.equal(r2.buildHref, null, "the chat is here: its heading link opens the build, so no Open build twice");
   assert.equal(r2.gone, false);
   assert.deepEqual(r2.lines, [
     { label: "Added", items: [{ name: "Spare Battery Pack", href: "/projects/proj_car/products/prd_spare001?v=2" }] },
@@ -289,6 +289,11 @@ test("versionGroupsOf: a chat not in this browser is a plain heading (COR-78)", 
   assert.equal(orphan.heading, "Chat not in this browser");
   assert.equal(orphan.key, "no-chat:b_gone");
   assert.equal(orphan.chatHref, null);
+  // The build is here but its chat isn't: Open build is the only way to it, and /build/<id> renders it.
+  const kept = { ...old, buildId: "b_kept", job: { id: "b_kept" }, pieces: { ready: 5, total: 5, retry: false } };
+  const [k] = versionGroupsOf([[kept]], [lineage("chat_old", null)], "proj_car");
+  assert.equal(k.rows[0].buildHref, "/build/b_kept");
+  assert.equal(k.rows[0].pieces, "All 5 pieces ready");
 });
 
 test("versionGroupsOf: a build that needs a retry says so; empty lineages are skipped", () => {
@@ -301,7 +306,7 @@ test("versionGroupsOf: a build that needs a retry says so; empty lineages are sk
 
 test("firstVersions: five versions per project across lineages, then Show all (§5.1.10)", () => {
   assert.equal(VERSIONS_SHOWN, 5);
-  assert.equal(LOG_SHOWN, 6);
+  assert.equal(LOG_SHOWN, 3);
   const run = (chatId, n) =>
     Array.from({ length: n }, (_, i) => ({
       ...v1, chatId, lineage: chatId, version: n - i, current: i === 0, buildId: `${chatId}_${n - i}`, diff: null,

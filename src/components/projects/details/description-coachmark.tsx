@@ -13,7 +13,8 @@
 //   running (description-editor.tsx's `openDescriptionEditor`).
 // - "Not now" writes `descriptionHint = { dismissedAt, productCount }`. It
 //   comes back only once the project has more products than it had then. A
-//   description saved after a run of Update with AI dismisses it too.
+//   description saved in the edit dialog, or written when the project was
+//   saved, dismisses it the same way (owner, 2026-10-12).
 //
 // Both buttons are quiet: the page's one violet is the header's action pair.
 

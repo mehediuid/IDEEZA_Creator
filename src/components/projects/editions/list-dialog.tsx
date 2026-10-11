@@ -1,9 +1,10 @@
 "use client";
 
 // "Add {Use} {Kind} NFT to the marketplace" (Figma 41505:138424, 139900;
-// P2-TABS-26 as changed in spec §4.9). The track card opens it only once the
-// project's Main listing is live or paused (`listGate`) and this product's
-// video passes the strict "edition" readiness (the block runs both first).
+// P2-TABS-26 as changed in spec §4.9). The track card opens it once the
+// scope's videos pass readiness (the block runs it first). The Main listing is
+// never asked: copies are listed on their own (owner, 2026-10-11); only the
+// lock (sold in full) refuses it.
 //
 // - Use and Number of NFTs are locked. Token comes from the project's chain,
 //   then the Regular and Extended prices, each with its "?", and Royalties
@@ -13,7 +14,7 @@
 // - Add to marketplace validates on press (`checkEditionListing`): the first
 //   problem shows under its field and under the button, and focus goes there.
 //   Then ONE wallet request, the maker's free signature (§3.9 "List edition");
-//   its `commit` re-reads the tracks and the Main listing, then writes once.
+//   its `commit` re-reads the tracks and the lock, then writes once.
 //
 // `EditionTermsFields` is also Edit's (edit-dialog.tsx), so the two can't drift.
 
@@ -21,19 +22,20 @@ import * as React from "react";
 import { Banner, ModalFrame, SelectMenu, TestnetDemoBadge, TextInput, type SelectOption } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { ROYALTY_MAX, ROYALTY_MIN, TOKENS_BY_NETWORK, type Network, type Token } from "@/lib/brief/types";
-import { useManualProjects } from "@/lib/manual/projects";
+import { projectLockOf } from "@/lib/commerce/edit-gate";
+import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import {
   checkEditionListing,
   KIND_WORD,
-  listGate,
   listTrack,
+  lockedListReason,
   TIER_HELP,
   USE_WORD,
   wholeNumberOf,
   type TrackTerms,
 } from "@/lib/market/editions";
 import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
-import { listingViewOf } from "@/lib/market/listing";
+import { EXTENDED_BELOW, PRICE_LABEL } from "@/lib/market/sell-flow";
 import { readMarketNow } from "@/lib/market/market-store";
 import type { EditionTrack, Listing } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
@@ -56,7 +58,6 @@ export type TermsInput = { token: Token | null; regular: string; extended: strin
 export type TermsField = "token" | "regular" | "extended" | "royalties" | "confirm" | "owner";
 
 const OWNER_REASON = "Confirm you're the rightful owner of this project.";
-const NO_METADATA = { name: "", description: "", products: [], cover: null, at: 0 };
 
 /** Digits and one dot. */
 function decimal(raw: string): string {
@@ -101,7 +102,7 @@ export function termsProblem(
             : message.startsWith("Royalties")
               ? "royalties"
               : "confirm";
-    return { field, message };
+    return { field, message: field === "extended" && message === "Extended can't cost less than Regular." ? EXTENDED_BELOW : message };
   }
   if (opts.askOwner && !opts.owner) return { field: "owner", message: OWNER_REASON };
   return null;
@@ -121,10 +122,10 @@ export function EachSale({ input }: { input: TermsInput }) {
   const token = input.token;
   const rows: string[] = [`${FEE_LABEL} · taken from the price of each sale`];
   if (token && positive(input.regular) && places(input.regular) <= 6) {
-    rows.push(`You receive ${formatAmount(payoutOf(input.regular.trim()), token)} per NFT (Regular)`);
+    rows.push(`You receive ${formatAmount(payoutOf(input.regular.trim()), token)} per copy`);
   }
   if (token && positive(input.extended) && places(input.extended) <= 6) {
-    rows.push(`You receive ${formatAmount(payoutOf(input.extended.trim()), token)} per NFT (Extended)`);
+    rows.push(`You receive ${formatAmount(payoutOf(input.extended.trim()), token)} per copy with future updates`);
   }
   return (
     <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
@@ -217,7 +218,7 @@ export function EditionTermsFields({
       <div className="grid grid-cols-1 gap-8 [@media(min-width:480px)]:grid-cols-2 [@media(min-width:480px)]:gap-6">
         <PriceField
           id={`${idPrefix}-regular`}
-          label="Regular price"
+          label={PRICE_LABEL.regular}
           help={TIER_HELP.regular}
           value={value.regular}
           onChange={(regular) => onChange({ regular })}
@@ -225,7 +226,7 @@ export function EditionTermsFields({
         />
         <PriceField
           id={`${idPrefix}-extended`}
-          label="Extended price"
+          label={PRICE_LABEL.extended}
           help={TIER_HELP.extended}
           value={value.extended}
           onChange={(extended) => onChange({ extended })}
@@ -284,8 +285,8 @@ export function listRequestOf(f: {
     summary: [
       { label: "Product", value: `${f.productName} · ${f.projectName}` },
       { label: "NFT", value: `${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]} · ${track.supply.total} NFTs` },
-      { label: "Regular price", value: formatAmount(terms.regular, terms.token) },
-      { label: "Extended price", value: formatAmount(terms.extended, terms.token) },
+      { label: PRICE_LABEL.regular, value: formatAmount(terms.regular, terms.token) },
+      { label: PRICE_LABEL.extended, value: formatAmount(terms.extended, terms.token) },
       { label: "Royalties", value: `${terms.royaltyPct}% on resales` },
       { label: "Collection", value: f.collection },
       { label: "Network", value: networkLabelOf(f.network) },
@@ -299,23 +300,15 @@ export function listRequestOf(f: {
   };
 }
 
-/** The Main listing as the market holds it now: edition listings need it live or paused. */
-export function mainGateNow(projectId: string, projectName: string): string | null {
-  const m = readMarketNow();
-  const view = listingViewOf(projectId, {
-    listings: m.listings,
-    sales: m.sales,
-    bids: m.bids,
-    now: Date.now(),
-    current: NO_METADATA,
-  });
-  const gate = listGate(view, projectName);
-  return gate.kind === "blocked" ? gate.reason : null;
+export type LockProject = Pick<ManualProject, "id" | "name" | "createdAt" | "contributors">;
+
+/** The lock as the market holds it now: a project sold in full lists no copies. */
+export function lockGateNow(project: LockProject): string | null {
+  return lockedListReason(projectLockOf(project, readMarketNow().sales) !== null, project.name);
 }
 
 export function ListDialog({
-  projectId,
-  projectName,
+  project,
   productName,
   track,
   chain,
@@ -324,8 +317,8 @@ export function ListDialog({
   onClose,
   onDone,
 }: {
-  projectId: string;
-  projectName: string;
+  project: LockProject;
+  /** The scope's name: the product's, or the project's for a whole-project copy. */
   productName: string;
   track: EditionTrack;
   chain: { network: Network; collection: string };
@@ -338,6 +331,8 @@ export function ListDialog({
 }) {
   const { request } = useWalletRequest();
   const { setOwnerConfirmed } = useManualProjects();
+  const projectId = project.id;
+  const projectName = project.name;
   const tokens = TOKENS_BY_NETWORK[chain.network];
   const [input, setInput] = React.useState<TermsInput>(() => ({
     token: main && tokens.includes(main.token) ? main.token : tokens[0],
@@ -385,9 +380,9 @@ export function ListDialog({
     });
     setBusy(true);
     const result = await request(req, {
-      recheck: () => mainGateNow(projectId, projectName),
+      recheck: () => lockGateNow(project),
       commit: (proof) => {
-        const gate = mainGateNow(projectId, projectName);
+        const gate = lockGateNow(project);
         if (gate) return { ok: false, message: gate };
         const w = writeTracks(projectId, (tracks) => listTrack(tracks, track.id, terms, proof.at));
         if (!w.ok) return { ok: false, message: w.message };

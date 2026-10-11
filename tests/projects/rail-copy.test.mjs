@@ -7,6 +7,7 @@ import {
   DEMO_MINT_FOOTNOTE,
   MINTED_FOOTNOTE,
   SALE_IN_MARKETPLACE,
+  aboutRowsOf,
   detailsRows,
   formatAmount,
   outcomeView,
@@ -16,7 +17,7 @@ import { demoAddress } from "../../.tmp-test/lib/wallet/demo-wallet.js";
 import {
   SUCCESS_SHOWCASE,
   plainText,
-  showcaseAnnouncement,
+  shareAnnouncement,
   showcaseRow,
 } from "../../.tmp-test/lib/manual/showcase-copy.js";
 import { BUILD_GONE_TIP } from "../../.tmp-test/lib/manual/project-summary.js";
@@ -103,12 +104,12 @@ test("Private, not showcased: Mint first, network, collection, the Showcase row,
   const first = v.minted.rows[0].value[1];
   assert.equal(first.kind, "time");
   assert.equal(first.time.dateTime, new Date(MINTED).toISOString());
-  assert.equal(plainText(v.minted.showcase.value), "Not showcased");
+  assert.equal(plainText(v.minted.showcase.value), "Not shared");
   assert.equal(
     v.minted.showcase.note,
-    "Showcasing lists it under Showcase in My projects. Nothing is posted until Innovations opens.",
+    "Sharing shows it at the top of the Innovations page.",
   );
-  assert.equal(v.minted.showcase.action, "Showcase project");
+  assert.equal(v.minted.showcase.action, "Share to Innovations");
   assert.equal(v.minted.footnote, MINTED_FOOTNOTE);
   assert.equal(MINTED_FOOTNOTE, "Recorded in this browser only — nothing is written to a blockchain yet.");
   assert.equal(v.meta, "Private");
@@ -117,11 +118,11 @@ test("Private, not showcased: Mint first, network, collection, the Showcase row,
 test("Private, showcased: its own subline, 'Showcased since', Stop showcasing (COM-11, COM-12, COM-55)", () => {
   const v = outcomeView(minted("private", "save"), { status: "private", showcase: { at: SHOWN } });
   assert.equal(v.subline, "Minted and kept by you — not given away or for sale.");
-  assert.equal(plainText(v.minted.showcase.value), "Showcased since Sep 26, 2026");
+  assert.equal(plainText(v.minted.showcase.value), "Shared since Sep 26, 2026");
   assert.equal(v.minted.showcase.value.at(-1).kind, "time");
-  assert.equal(v.minted.showcase.note, "Nothing is posted — the Innovations feed isn't open yet.");
-  assert.equal(v.minted.showcase.action, "Stop showcasing");
-  assert.equal(v.meta, "Private · Showcased");
+  assert.equal(v.minted.showcase.note, "It shows at the top of the Innovations page.");
+  assert.equal(v.minted.showcase.action, "Stop sharing");
+  assert.equal(v.meta, "Private · Shared");
 });
 
 test("Given: the license with its one-liner; nobody 'can claim it' (COM-10)", () => {
@@ -140,7 +141,7 @@ test("A sell mint has no Price or Royalties row — they are the Marketplace blo
   const v = outcomeView(minted("listed", "sell"), { status: "private", showcase: { at: SHOWN } });
   assert.equal(v.subline, "Minted and kept by you — not given away or for sale.");
   assert.ok(!v.minted.rows.some((r) => ["price", "royalties"].includes(r.key)));
-  assert.equal(v.meta, "Private · Showcased");
+  assert.equal(v.meta, "Private · Shared");
   // With a listing of any status, the subline points at the block.
   for (const kind of ["live", "paused", "ended", "sold"]) {
     const w = outcomeView(minted("listed", "sell"), { status: "listed", showcase: null, listing: { kind } });
@@ -210,7 +211,7 @@ test("Unreadable record: its own line, no terms, still the Showcase row and the 
   );
   assert.equal(v.subline, "The brief record can't be read in this browser, so its terms aren't shown.");
   assert.deepEqual(v.minted.rows, []);
-  assert.equal(v.minted.showcase.action, "Showcase project");
+  assert.equal(v.minted.showcase.action, "Share to Innovations");
   assert.equal(v.minted.footnote, MINTED_FOOTNOTE);
   assert.equal(v.meta, "Minted");
 });
@@ -244,20 +245,20 @@ test("P2-VIDEO-15 · the Showcase row's notes follow the gate", () => {
   const blocked = gate([product("p1", "Car", "ready"), product("p2", "Remote", "none")]);
   assert.equal(
     outcomeView(minted("private", "save"), s(null), blocked).minted.showcase.note,
-    "Showcasing needs an AI video for every product — 1 of 2 have one.",
+    "Sharing needs an AI video for every product — 1 of 2 have one.",
   );
   const on = outcomeView(minted("private", "save"), s({ at: SHOWN }), blocked).minted.showcase;
-  assert.equal(on.note, "Showcased — Remote has no video yet.");
+  assert.equal(on.note, "Shared — Remote has no video yet.");
   assert.deepEqual(on.noteLink, { text: "Remote", href: "/projects/proj_car/products/p2" });
-  assert.equal(on.action, "Stop showcasing");
+  assert.equal(on.action, "Stop sharing");
   const two = gate([product("p1", "Car", "none"), product("p2", "Remote", "failed")]);
-  assert.equal(outcomeView(minted("private", "save"), s({ at: SHOWN }), two).minted.showcase.note, "Showcased — 2 products have no video yet.");
+  assert.equal(outcomeView(minted("private", "save"), s({ at: SHOWN }), two).minted.showcase.note, "Shared — 2 products have no video yet.");
   const ready = gate([product("p1", "Car", "ready")]);
   assert.equal(
     outcomeView(minted("private", "save"), s(null), ready).minted.showcase.note,
-    "Showcasing lists it under Showcase in My projects. Nothing is posted until Innovations opens.",
+    "Sharing shows it at the top of the Innovations page.",
   );
-  assert.equal(outcomeView(minted("private", "save"), s({ at: SHOWN }), ready).minted.showcase.note, "Nothing is posted — the Innovations feed isn't open yet.");
+  assert.equal(outcomeView(minted("private", "save"), s({ at: SHOWN }), ready).minted.showcase.note, "It shows at the top of the Innovations page.");
 });
 
 test("Money: the token on every amount, trimmed, grouped, at most 6 decimals (COM-16)", () => {
@@ -289,19 +290,19 @@ test("No line claims a post, a live listing or a claimable drop (COM-12, COM-21,
   }
 });
 
-test("The success step's Showcase words and the announcements (COM-55, COM-56)", () => {
+test("The success step's sharing words and the announcements (COM-55, COM-56; owner, 2026-10-11: Share to Innovations)", () => {
   assert.deepEqual(
     { ...SUCCESS_SHOWCASE },
     {
-      action: "Showcase this project",
-      line: "It goes under Showcase in My projects now. Nothing is posted until Innovations opens.",
-      done: "Showcased — it's on your Showcase tab.",
+      action: "Share to Innovations",
+      line: "It shows at the top of the Innovations page. You can stop sharing any time.",
+      done: "Shared to Innovations.",
       undo: "Undo",
     },
   );
-  assert.equal(showcaseAnnouncement(true, " Car "), "Showcased Car");
-  assert.equal(showcaseAnnouncement(false, "Car"), "Stopped showcasing Car");
-  assert.equal(showcaseAnnouncement(true, "  "), "Showcased this project");
+  assert.equal(shareAnnouncement(true, " Car "), "Shared Car to Innovations");
+  assert.equal(shareAnnouncement(false, "Car"), "Stopped sharing Car");
+  assert.equal(shareAnnouncement(true, "  "), "Shared this project to Innovations");
 });
 
 test("Details: Source in A3's words, Created only when it isn't the meta line's date, Stored for the owner (COR-55, PPL-7)", () => {
@@ -351,4 +352,30 @@ test("P2-CONTRIB-9 · Details starts with Ownership while someone else holds a s
   assert.ok(!buyer.some((r) => r.key === "ownership"));
   // Without the ownership input the rows are v1's.
   assert.equal(detailsRows(base)[0].key, "source");
+});
+
+test("aboutRowsOf: the owner's About — Created, Parts, Network, Team, Stored; no links (owner, 2026-10-11)", () => {
+  const made = at(2026, 9, 28, 18, 46);
+  const rows = aboutRowsOf({ createdAt: made, parts: 14, network: { protocol: "nRF24", links: 1 }, team: 0 });
+  assert.deepEqual(
+    rows.map((r) => [r.label, plainText(r.value)]),
+    [
+      ["Created", "Sep 28, 2026"],
+      ["Parts", "14 parts"],
+      ["Network", "nRF24 · 1 link"],
+      ["Team", "Just you"],
+      ["Stored", "This browser only"],
+    ],
+  );
+  assert.ok(rows.every((r) => !r.link), "no row links anywhere");
+  const hand = aboutRowsOf({ createdAt: made, parts: null, network: null, team: 2 });
+  assert.deepEqual(
+    hand.map((r) => [r.label, plainText(r.value)]),
+    [
+      ["Created", "Sep 28, 2026"],
+      ["Network", "Not added"],
+      ["Team", "You and 2 others"],
+      ["Stored", "This browser only"],
+    ],
+  );
 });

@@ -1,23 +1,19 @@
 "use client";
 
-// /projects/[id]/business-plan (P2-TABS-17…19): a thin server page
-// (src/app/(create)/projects/[id]/business-plan/page.tsx) renders this.
+// The business plan (P2-TABS-17…19), now Earn › Business plan: the title row
+// (versions, Edit, Regenerate, Print or save as PDF), the sections with their
+// sticky index, and Delete. It renders inside the Earn layout, which owns the
+// page frame, the h1 and the owner-only gate, so the title here is an h2, and
+// `empty` stands in while there is no plan to show (the section's Generate
+// state). /projects/[id]/business-plan redirects here.
 
 import * as React from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { LockIcon, Note01Icon, PrinterIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { LockIcon, PrinterIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Button, ConfirmDialog, Select, StateCard, buttonVariants } from "@/components/ideeza";
-import { Breadcrumb } from "../details/breadcrumb";
-import { PAGE_CONTAINER, PAGE_CONTENT } from "../details/frame";
-import { ProjectSkeleton } from "../details/page-states";
-import { useViewer } from "../details/buyer-preview";
-import { projectLockOf } from "@/lib/manual/edit-gate";
-import { useManualProjects } from "@/lib/manual/projects";
-import { useMarket } from "@/lib/market/market-store";
-import { resolveProject } from "@/lib/manual/project-route";
+import { Button, ConfirmDialog, Select } from "@/components/ideeza";
+import type { ManualProject } from "@/lib/manual/projects";
 import { formatDate } from "@/lib/manual/project-summary";
+import { useGuards } from "@/lib/manual/use-write-guard";
 import { useBusinessPlan } from "@/lib/manual/business-plan-store";
 import { clearBusinessPlan, regeneratePlanRun, restorePlanVersion, retryPlanSection, useIsPlanLive } from "./plan-runner";
 import { PlanSectionView } from "./plan-section";
@@ -28,17 +24,23 @@ import { PlanVersionsMenu, RegenerateConfirm } from "./plan-versions";
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const RESTORE_MID_RUN = "Restore is available once the plan has finished writing.";
 
-export function BusinessPlanPage({ id }: { id: string }) {
-  const router = useRouter();
-  const { hydrated, projects } = useManualProjects();
-  const project = resolveProject(projects, id);
-  const viewer = useViewer();
-  const { hydrated: planHydrated, record: plan } = useBusinessPlan(project?.id ?? null);
-  const live = useIsPlanLive(project?.id ?? null);
-  // Sold in full, the plan is read-only like the rest of the project. The
-  // lock reads the market's sales, so the page waits for that store as well.
-  const { hydrated: marketHydrated, data: market } = useMarket();
-  const lockReason = project ? (projectLockOf(project, market.sales)?.line ?? null) : null;
+export function BusinessPlanPanel({
+  project,
+  empty,
+  onDeleted,
+}: {
+  project: ManualProject;
+  /** Shown while there is no plan, or no version of it, to show. */
+  empty: React.ReactNode;
+  /** After Delete: the plan is gone and `empty` is back; the caller places the focus. */
+  onDeleted: () => void;
+}) {
+  const { record: plan } = useBusinessPlan(project.id);
+  const live = useIsPlanLive(project.id);
+  // Sold in full, the plan is read-only like the rest of the project: the
+  // guards' lock, the one every engineering gate asks.
+  const guards = useGuards();
+  const lockReason = (guards.ready ? guards.lockOf(project)?.reason : null) ?? null;
   const locked = lockReason !== null;
   const lockId = React.useId();
 
@@ -47,52 +49,9 @@ export function BusinessPlanPage({ id }: { id: string }) {
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
 
   const titleRef = React.useRef<HTMLHeadingElement | null>(null);
-  React.useEffect(() => {
-    titleRef.current?.focus({ preventScroll: true });
-  }, [project?.id]);
 
-  if (!hydrated || !planHydrated || !marketHydrated) return <ProjectSkeleton />;
-  if (!project) {
-    return (
-      <div className={PAGE_CONTAINER}>
-        <div className="flex justify-center px-8 py-40">
-          <StateCard tone="empty" icon={<Icon icon={Note01Icon} size={32} />} title="We couldn't find this project" body={`Nothing in this browser matches ${id}.`} />
-        </div>
-      </div>
-    );
-  }
-
-  const isOwner = viewer.kind === "local-owner";
   const current = plan?.versions.find((v) => v.n === plan.current) ?? null;
-
-  if (!isOwner || !plan || !current) {
-    return (
-      <div className={PAGE_CONTAINER}>
-        <div className={PAGE_CONTENT}>
-          <Breadcrumb
-            trail={[
-              { label: "My projects", href: "/projects" },
-              { label: project.name, href: `/projects/${project.id}` },
-              { label: "Business plan" },
-            ]}
-          />
-          <div className="mt-16 flex justify-center">
-            <StateCard
-              tone="empty"
-              icon={<Icon icon={Note01Icon} size={32} />}
-              title="No business plan yet"
-              body={`There's no business plan for ${project.name} yet.`}
-              action={
-                <Link href={`/projects/${project.id}`} className={buttonVariants({ hierarchy: "primary" })}>
-                  Back to {project.name}
-                </Link>
-              }
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!plan || !current) return <>{empty}</>;
 
   const doneCount = current.sections.filter((s) => s.state === "done").length;
   const midRun = !!plan.run;
@@ -100,7 +59,7 @@ export function BusinessPlanPage({ id }: { id: string }) {
   const deletePlan = () => {
     clearBusinessPlan(project.id);
     setConfirmingDelete(false);
-    router.push(`/projects/${project.id}`);
+    onDeleted();
   };
 
   // View (the version on screen) and Restore both land on the page's title,
@@ -111,21 +70,13 @@ export function BusinessPlanPage({ id }: { id: string }) {
   };
 
   return (
-    <div className={PAGE_CONTAINER}>
-      <div className={PAGE_CONTENT}>
-        <Breadcrumb
-          trail={[
-            { label: "My projects", href: "/projects" },
-            { label: project.name, href: `/projects/${project.id}` },
-            { label: "Business plan" },
-          ]}
-        />
-
-        <div className="mt-10 flex flex-wrap items-start justify-between gap-6">
+    <>
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <h1 ref={titleRef} tabIndex={-1} className="text-3xl font-semibold text-text-primary outline-none">
+            <h2 ref={titleRef} tabIndex={-1} className="m-0 text-xl font-bold leading-xl text-text-primary outline-none">
               Business plan
-            </h1>
+            </h2>
             <p className="mt-2 text-sm text-text-secondary">
               {project.name} · Version {current.n} · Generated {formatDate(current.createdAt)} · {doneCount} sections
             </p>
@@ -263,6 +214,6 @@ export function BusinessPlanPage({ id }: { id: string }) {
       <ConfirmDialog open={confirmingDelete} title="Delete this business plan?" confirmLabel="Delete" onConfirm={deletePlan} onCancel={() => setConfirmingDelete(false)}>
         This deletes every version of this project&apos;s business plan. This can&apos;t be undone.
       </ConfirmDialog>
-    </div>
+    </>
   );
 }

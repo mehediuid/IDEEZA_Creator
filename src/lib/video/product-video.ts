@@ -12,6 +12,7 @@ import type { ProductSource } from "../manual/projects";
 import { productRowsOf, type ProjectProduct } from "../manual/project-read";
 import type { StoredDraft } from "../brief/project-brief";
 import { etaLabel, progressOf, type VideoJob } from "./jobs";
+import { sanitizeStoryboard, type Storyboard } from "./storyboard";
 import {
   TAKES_MAX,
   type OnScreenLines,
@@ -50,6 +51,11 @@ function sanitizeSource(raw: unknown): ProductSource | null {
   return { buildId: raw.buildId, productId: raw.productId };
 }
 
+function sanitizeAuto(raw: unknown): { video: boolean; audio: boolean } | null {
+  if (!isObj(raw)) return null;
+  return { video: raw.video === true, audio: raw.audio === true };
+}
+
 function sanitizeTake(raw: unknown, productId: string): VideoTake | null {
   if (!isObj(raw) || typeof raw.id !== "string" || typeof raw.n !== "number") return null;
   const take: VideoTake = {
@@ -62,6 +68,11 @@ function sanitizeTake(raw: unknown, productId: string): VideoTake | null {
     source: sanitizeSource(raw.source),
     createdAt: num(raw.createdAt, Date.now()),
   };
+  if (typeof raw.audioPrompt === "string") take.audioPrompt = raw.audioPrompt;
+  const auto = sanitizeAuto(raw.auto);
+  if (auto) take.auto = auto;
+  const storyboard = sanitizeStoryboard(raw.storyboard);
+  if (storyboard) take.storyboard = storyboard;
   if (typeof raw.readyAt === "number") take.readyAt = raw.readyAt;
   if (isObj(raw.clip) && typeof raw.clip.mime === "string") {
     take.clip = {
@@ -94,6 +105,9 @@ function sanitizeProductVideo(raw: unknown, productId: string): ProductVideo | n
       lines: sanitizeLines(raw.draft.lines),
       quality: isQuality(raw.draft.quality) ? raw.draft.quality : "low",
     };
+    if (typeof raw.draft.audioPrompt === "string") video.draft.audioPrompt = raw.draft.audioPrompt;
+    const auto = sanitizeAuto(raw.draft.auto);
+    if (auto) video.draft.auto = auto;
   }
   return video;
 }
@@ -184,6 +198,9 @@ export function startTake(
     lines: OnScreenLines;
     quality: VideoQuality;
     source: ProductSource | null;
+    audioPrompt?: string;
+    auto?: { video: boolean; audio: boolean };
+    storyboard?: Storyboard;
   },
   now: number,
   id: string,
@@ -199,6 +216,9 @@ export function startTake(
     quality: input.quality,
     source: input.source,
     createdAt: now,
+    ...(input.audioPrompt !== undefined ? { audioPrompt: input.audioPrompt } : null),
+    ...(input.auto ? { auto: input.auto } : null),
+    ...(input.storyboard ? { storyboard: input.storyboard } : null),
   };
   const next = [...takes, take];
   const evicted: string[] = [];
