@@ -1,16 +1,21 @@
 // Task C2a — the project header's own words: the rename and description
-// checks (CNT-2, CNT-5) and the pending-version notices (COR-18, COR-101).
+// checks (CNT-2, CNT-5), the pending-version notices (COR-18, COR-101), and
+// Build and Earn P0's stage line, meta line and Earn button.
 // The Open in editor hint (COR-12) is deleted (P2-BUILDLOAD-14).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as header from "../../.tmp-test/lib/manual/project-header.js";
 import {
   DESCRIPTION_SAVED,
+  EARN_LABEL,
   WRITE_FAILED,
   checkDescription,
   checkProjectName,
+  earnButtonOf,
+  engineeringMetaOf,
   pendingNoticesOf,
   renamedMessage,
+  stageLineOf,
 } from "../../.tmp-test/lib/manual/project-header.js";
 
 const KINDS = ["3d", "pcb", "code", "wiring", "parts"];
@@ -137,3 +142,90 @@ test("COR-18: a partial or failed version asks for a retry in its chat; a queued
   assert.equal(queued.text, "Version 2 is waiting to build.");
   assert.equal(queued.action, null);
 });
+
+// ─────────────────────────── the engineering header (Build and Earn P0) ───────────────────────────
+
+const BUILD = { kind: "build", builds: 1 };
+
+test("P0 · the stage line: stage · products · version, from the summary's own facts", () => {
+  const s = (over = {}) => ({ source: BUILD, productCount: 3, version: { kind: "single", v: 2 }, pendingVersion: null, ...over });
+  assert.equal(stageLineOf(s()), "Built · 3 products · v2");
+  // One version so far reads v1; several lineages read their build count.
+  assert.equal(stageLineOf(s({ productCount: 1, version: null })), "Built · 1 product · v1");
+  assert.equal(stageLineOf(s({ productCount: 4, version: { kind: "builds", k: 3 } })), "Built · 4 products · 3 builds");
+  // A build that is no longer in this browser is still a build.
+  assert.equal(stageLineOf(s({ source: { kind: "build-gone" }, version: null })), "Built · 3 products · v1");
+  // By hand: no version.
+  assert.equal(stageLineOf(s({ source: { kind: "hand" }, productCount: 1, version: null })), "Made by hand · 1 product");
+  // A newer version building or waiting to: Building, the saved version still named.
+  for (const status of ["running", "queued"]) {
+    assert.equal(stageLineOf(s({ pendingVersion: { buildId: "b3", n: 3, status } })), "Building · 3 products · v2", status);
+  }
+  // Ready, partial or failed: the saved project is still Built (the notices say the rest).
+  for (const status of ["ready", "partial", "failed"]) {
+    assert.equal(stageLineOf(s({ pendingVersion: { buildId: "b3", n: 3, status } })), "Built · 3 products · v2", status);
+  }
+});
+
+test("P0 · the engineering meta line drops what the stage line says and the ownership lead", () => {
+  const at = new Date(2026, 8, 26, 16, 12).getTime();
+  const meta = engineeringMetaOf({ when: { label: "Saved", at }, source: BUILD }, { short: "Prototype" });
+  assert.deepEqual(
+    meta.map((m) => (m.kind === "time" ? m.time.text : m.text)),
+    ["Saved Sep 26, 2026", "Stage Prototype"],
+  );
+  assert.equal(meta[0].time.dateTime, new Date(at).toISOString());
+  assert.equal(meta[0].time.title, "Sep 26, 2026 · 4:12 PM");
+  const gone = engineeringMetaOf({ when: { label: "Created", at }, source: { kind: "build-gone" } }, null);
+  assert.deepEqual(gone.map((m) => (m.kind === "time" ? m.time.text : m.text)), ["Created Sep 26, 2026", "build not in this browser"]);
+});
+
+const rule = (id, ok) => ({ id, ok, fixedIn: "gate", reason: ok ? null : "x" });
+const SELL_READY = { ok: true, rules: [rule("videos", true), rule("ownership", true)] };
+const SELL_HALF = { ok: false, rules: [rule("videos", false), rule("ownership", true)] };
+const SELL_NONE = { ok: false, rules: [rule("videos", false), rule("ownership", false)] };
+const LOCK = { kind: "soldInFull", at: 1, buyers: ["Mira"], line: "Sold in full…" };
+const earnOf = (over = {}) =>
+  earnButtonOf({ projectId: "proj_car", status: "draft", lock: null, soldSharePct: 0, readiness: SELL_NONE, reviewPending: false, ...over });
+
+test("P0 · the Earn button: not ready counts the sell rules that pass, quiet, and still opens Earn", () => {
+  assert.deepEqual(earnOf(), {
+    state: "notReady",
+    label: EARN_LABEL,
+    sub: "0 of 2 ready",
+    violet: false,
+    href: "/projects/proj_car/earn",
+  });
+  assert.equal(EARN_LABEL, "Earn from this project");
+  assert.equal(earnOf({ readiness: SELL_HALF }).sub, "1 of 2 ready");
+  assert.equal(earnOf({ status: "private", readiness: SELL_HALF }).state, "notReady");
+});
+
+test("P0 · the Earn button: ready is the page's one violet — unless Review version holds it", () => {
+  const ready = earnOf({ readiness: SELL_READY });
+  assert.deepEqual([ready.state, ready.sub, ready.violet], ["ready", null, true]);
+  assert.equal(earnOf({ status: "private", readiness: SELL_READY }).violet, true);
+  const behindReview = earnOf({ readiness: SELL_READY, reviewPending: true });
+  assert.deepEqual([behindReview.state, behindReview.violet], ["ready", false]);
+});
+
+test("P0 · the Earn button: an active listing, a partial sale or a gift is quiet with its live fact", () => {
+  for (const readiness of [SELL_READY, SELL_NONE]) {
+    assert.deepEqual(pick(earnOf({ status: "listed", readiness })), ["active", "Listed", false]);
+    assert.deepEqual(pick(earnOf({ status: "paused", readiness })), ["active", "Listing paused", false]);
+    assert.deepEqual(pick(earnOf({ status: "sold", soldSharePct: 40, readiness })), ["active", "Sold 40%", false]);
+    assert.deepEqual(pick(earnOf({ status: "given", readiness })), ["active", "Given to the community", false]);
+  }
+});
+
+test("P0 · the Earn button: sold in full wins over everything, quiet, and opens Earn read-only", () => {
+  for (const status of ["sold", "listed"]) {
+    const b = earnOf({ status, lock: LOCK, soldSharePct: 100, readiness: SELL_READY });
+    assert.deepEqual(pick(b), ["soldInFull", "Sold in full", false], status);
+    assert.equal(b.href, "/projects/proj_car/earn");
+  }
+});
+
+function pick(b) {
+  return [b.state, b.sub, b.violet];
+}

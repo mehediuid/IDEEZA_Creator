@@ -22,7 +22,8 @@ import { listingStatusLine, listingViewOf } from "../market/listing";
 import type { MintView } from "../wallet/types";
 import { mintPhrase, mintViewOf } from "../wallet/mint";
 import { commercialFactsOf, commercialStateOf, type CommercialState } from "../commerce/state";
-import { stepHref, type ManualProject } from "./projects";
+import type { ManualProject } from "./projects";
+import { earnHref, earnMintHref } from "./earn-route";
 import {
   buildsOf,
   coverOf,
@@ -175,11 +176,10 @@ function pairOf(first: NextAction | null, second: NextAction | null, violet: boo
   return { first, second, violet };
 }
 
-/** The listing flow's entry (§3.6.3). On the project page the header renders
- *  `slots.actions["add-to-marketplace"]` in the button's place and opens the flow there; a
- *  link here opens it too, the page reading `?list=1` once on arrival. */
+/** The listing flow's entry (§3.6.3), in Earn › Project NFT since Build and Earn P0: that
+ *  section renders the flow and reads `?list=1` once on arrival. */
 export function listFlowHref(projectId: string): string {
-  return `/projects/${projectId}?list=1`;
+  return earnHref(projectId, "sell", { list: "1" });
 }
 
 /**
@@ -220,7 +220,7 @@ export function nextAction(
     locked?: boolean;
   },
 ): ActionPair {
-  const briefHref = stepHref(p, "brief");
+  const briefHref = earnMintHref(p.id);
   const viewBrief: NextAction | null =
     facts.brief?.state.mintedAt != null ? { kind: "view-brief", label: "View brief", href: briefHref } : null;
   const creatorPct = facts.creatorPct ?? 100;
@@ -723,7 +723,7 @@ export function headerText(s: ProjectSummary, ctx: HeaderCtx = {}): HeaderText {
       ? {
           before: s.sold.owner.before,
           label: buyer.label,
-          href: `/projects/${s.id}?tab=customers&sale=${encodeURIComponent(buyer.saleId)}`,
+          href: earnHref(s.id, "customers", { sale: buyer.saleId }),
           after: s.sold.owner.after,
         }
       : null;

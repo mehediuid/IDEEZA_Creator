@@ -1,30 +1,38 @@
 "use client";
 
-// ProjectHeader — the top of /projects/[id] (spec §5.4; Phase 2 §2.2). In
-// reading order, at every width:
-// 1. the title row: the h1 and its rename pencil, then `headerParts.titleRow`
-//    (the Activity chip and its "?", the Business plan chip, right-aligned);
-// 2. the status row: the status chip, the Showcase badge,
-//    `headerParts.statusRow` (the Utility NFT pill) and, in a contributor
-//    preview, the role chip (P2-CONTRIB-13);
-// 3. the status line — in the owner's Sold line the buyer is a link to their
-//    Customers row — then the lock line once the project is sold in full;
-// 4. the meta line: [Created by you · Owned by X] · … · Stage {short};
-// 5. the description, then `headerParts.afterDescription` (its coachmark);
-// 6. the action pair, then Preview as buyer (quiet, last); then one notice
-//    per newer build of a chat that isn't saved yet.
-// The pair sits after the description at every width now: the title row
-// holds the chips, and the one next step reads last, just before the tabs.
+// ProjectHeader — the top of /projects/[id] (spec §5.4; Phase 2 §2.2; Build
+// and Earn P0). It has two readings.
 //
-// Every string here is `headerText()`'s (project-summary.ts) and the pair is
-// its `pair` — `nextAction()`'s, the same object the My projects card shows
-// (COR-11, LST-32). Nothing here derives a status, a line or an action of its
-// own. Every `can()` passes `view.canCtx`, so the 100 % lock refuses rename,
-// description and the listing start here as everywhere (§3.8.5). There is no
-// ⋮ and no Share (COR-14, P2-TABS-30), and no Open in editor: it lives on the
-// product page (P2-EDITOR-12). "Add to marketplace" / "List another share" is
-// `actions["add-to-marketplace"]` (T22), rendered in the pair's place with
-// the pair's tone; with no such entry it renders nothing.
+// The engineering header — the owner and a contributor preview — in reading
+// order, at every width:
+// 1. the title row: the h1 and its rename pencil, then `headerParts.titleRow`
+//    (the Activity chip and its "?");
+// 2. the stage line in the status chip's old place ("Built · 3 products ·
+//    v2", `stageLineOf`), the Showcase badge, `headerParts.statusRow` and, in a
+//    contributor preview, the role chip (P2-CONTRIB-13);
+// 3. the lock line once the project is sold in full, with its link to the
+//    sale in Earn;
+// 4. the meta line: Saved {date} · … · Stage {short} (`engineeringMetaOf`);
+// 5. the description, then `headerParts.afterDescription` (its coachmark);
+// 6. Review version {n} while a draft has a newer version ready, then the one
+//    "Earn from this project" button (`earnButtonOf`) and its short fact; then
+//    one notice per newer build of a chat that isn't saved yet.
+// The status chip, the status line, the Brief and listing pair and Preview as
+// buyer moved to Earn (/projects/<id>/earn); the page has one violet — Review
+// version while it is pending, else Earn once it is ready.
+//
+// The buyer's side (`buyerSide`: Preview as buyer, and Explore marketplace's
+// "market" context) reads the header as before: the status chip, the
+// Showcase badge, `headerParts.statusRow` (the Utility NFT pill), the status
+// line, the meta line ([Created by you · Owned by X] · … · Stage {short} — on
+// Explore marketplace "Created by you · Listed {date}"), the description. It
+// offers no control: `can()` refuses a visitor and a buyer every one (PPL-6).
+//
+// Every string here is `headerText()`'s (project-summary.ts) or
+// project-header.ts's. Every `can()` passes `view.canCtx`, so the 100 % lock
+// refuses rename and description here as everywhere (§3.8.5). There is no ⋮
+// and no Share (COR-14, P2-TABS-30), and no Open in editor: it lives on the
+// product page (P2-EDITOR-12).
 //
 // The h1's arrival focus (COR-7) and the page's one polite live region
 // (COR-101) are the shell's (usePageArrival, shell.tsx): `titleRef` and
@@ -32,34 +40,33 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight02Icon, BubbleChatIcon, EyeIcon, Tag01Icon, UserIcon } from "@hugeicons/core-free-icons";
-import { Icon, type IconValue } from "@/components/dashboard/icon";
+import { useRouter } from "next/navigation";
+import { ArrowRight02Icon, BubbleChatIcon, Coins01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { Badge, Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
 import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
 import { LockLine } from "@/components/projects/product/product-states";
 import { roleChipOf } from "@/lib/manual/contributors";
-import { useManualProjects } from "@/lib/manual/projects";
-import { headerText, type NextAction } from "@/lib/manual/project-summary";
-import { withTab } from "@/lib/manual/project-route";
-import { can, hasAudience } from "@/lib/manual/permissions";
-import { pendingNoticesOf, type PendingNotice } from "@/lib/manual/project-header";
-import { BUYER_PREVIEW_ENTRY, isPreview, useEnterPreview, useFocusAfterPreview } from "./buyer-preview";
+import { earnHref } from "@/lib/manual/earn-route";
+import { headerText, type MetaPart } from "@/lib/manual/project-summary";
+import { buyerSide } from "@/lib/manual/project-route";
+import { can } from "@/lib/manual/permissions";
+import {
+  earnButtonOf,
+  engineeringMetaOf,
+  pendingNoticesOf,
+  stageLineOf,
+  type PendingNotice,
+} from "@/lib/manual/project-header";
+import { BUYER_PREVIEW_ENTRY, isPreview, useFocusAfterPreview } from "./buyer-preview";
 import { ProjectDescription } from "./description-editor";
 import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
 
-/** Preview as buyer's id: Exit preview hands focus back to it (PPL-5). */
+/** Preview as buyer's id (PPL-5). The button lives in Earn's header now; Exit preview still
+ *  hands focus to it when it is on the page, else to the h1. */
 export const PREVIEW_TRIGGER_ID = "preview-as-buyer-trigger";
-
-const ACTION_ICON: Record<NextAction["kind"], IconValue> = {
-  "review-version": ArrowRight02Icon,
-  "continue-brief": ArrowRight02Icon,
-  "add-brief": ArrowRight02Icon,
-  "view-brief": ArrowRight02Icon,
-  "add-to-marketplace": Tag01Icon,
-};
 
 /** Full width and 44 px at phone width (COR-11, PPL-4); their own width from a 520 px header. */
 const HEADER_BUTTON = "h-[44px] w-full justify-center [@container(min-width:520px)]:w-auto";
@@ -76,117 +83,69 @@ export function ProjectHeader({
   titleRef,
   announce,
   parts,
-  actions,
   context = "project",
 }: SlotProps & {
   /** The shell's h1 ref (COR-7), forwarded to ProjectTitle. */
   titleRef: React.RefObject<HTMLHeadingElement | null>;
   /** The page's `headerParts` (§3.10): each renders from the same SlotProps. */
   parts?: ProjectSlots["headerParts"];
-  /** The page's `actions` (§3.10): the listing start, T22. */
-  actions?: ProjectSlots["actions"];
   /** "market" on Explore marketplace's buyer view: the meta line leads with "Created by you · Listed {date}". */
   context?: "project" | "market";
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const search = useSearchParams();
-  const { selectProject } = useManualProjects();
   // Which control is taking the maker off the page. Never cleared: the navigation unmounts it.
   const [leaving, setLeaving] = React.useState<string | null>(null);
+  const earnFactId = React.useId();
 
   const slotProps: SlotProps = { project, view, viewer, brief, now, announce };
   const { summary, canCtx } = view;
   const text = headerText(summary, { viewer, stage: view.stage, context });
   const owner = can(viewer, "facts.seeOwnerOnly");
+  const engineering = context === "project" && !buyerSide(viewer);
 
-  // The pair shows only what this viewer may do (PPL-6: absent, not disabled).
-  const allowed = (a: NextAction) => {
-    switch (a.kind) {
-      case "review-version":
-        return can(viewer, "product.add", canCtx);
-      case "add-to-marketplace":
-        // A blocked start (co-owners hold everything) still shows, aria-disabled with its reason.
-        return a.blocked ? can(viewer, "facts.seeOwnerOnly") : can(viewer, "listing.create", canCtx);
-      default:
-        return can(viewer, "project.brief", canCtx);
-    }
-  };
-  const first = text.pair.first && allowed(text.pair.first) ? text.pair.first : null;
-  const second = first && text.pair.second && allowed(text.pair.second) ? text.pair.second : null;
-  const preview = can(viewer, "preview.enter") && hasAudience(summary.status, summary.showcase);
-  // A Draft's line is the maker's own workflow ("Brief in progress · …"); a buyer sees the chip alone.
-  // A minted line stays — "Listed" never stands without its subline (COR-76).
-  const showLine = owner || summary.status !== "draft";
+  // What is left of the pair on the engineering page: Review version {n}, the page's violet.
+  const review =
+    engineering && text.pair.first?.kind === "review-version" && can(viewer, "product.add", canCtx) ? text.pair.first : null;
+  const earn =
+    engineering && owner
+      ? earnButtonOf({
+          projectId: project.id,
+          status: summary.status,
+          lock: summary.lock,
+          soldSharePct: summary.customers.soldSharePct,
+          readiness: view.videos.readiness.sell,
+          reviewPending: review !== null,
+        })
+      : null;
+  // A buyer reads a Draft as the chip alone; a minted line stays — "Listed" never stands without its subline (COR-76).
+  const showLine = !engineering && summary.status !== "draft";
   const role = roleChipOf(viewer);
-  // A2's PendingBuild ↔ A3's PendingVersion: the header's primary opens `pendingVersion.buildId`.
-  const reviewedInHeader =
-    first?.kind === "review-version" ? (summary.pendingVersion?.buildId ?? null) : null;
+  // A2's PendingBuild ↔ A3's PendingVersion: the header's Review version opens `pendingVersion.buildId`.
+  const reviewedInHeader = review ? (summary.pendingVersion?.buildId ?? null) : null;
   const notices = owner ? pendingNoticesOf(view.pending, view.lineages, reviewedInHeader) : [];
 
   const leave = (key: string, href: string) => {
     setLeaving(key);
-    // The Brief works on the active project; choosing it first skips the workspace's "Opening project…" frame.
-    if (href.startsWith("/project/")) selectProject(project.id);
     router.push(href);
   };
-  const enterPreview = useEnterPreview();
-  // PPL-5: Exit preview hands focus back to this button when it entered the
-  // preview — or to the h1 when the project offers no preview button of its
-  // own (a bare ?view=buyer link), or the control that entered isn't here.
+  // PPL-5: Exit preview hands focus back to Preview as buyer when it entered the
+  // preview and is on the page — else to the h1 (a bare ?view=buyer link, or
+  // the button in Earn's header).
   useFocusAfterPreview(
     !isPreview(viewer),
     () => document.getElementById(PREVIEW_TRIGGER_ID) ?? titleRef.current,
     { claims: (from) => from === BUYER_PREVIEW_ENTRY },
   );
 
-  const Action = actions?.["add-to-marketplace"];
-  const actionButton = (a: NextAction, key: "first" | "second", primary: boolean) => {
-    if (a.kind === "add-to-marketplace") {
-      return Action ? <Action key={key} {...slotProps} action={a} violet={primary} className={HEADER_BUTTON} /> : null;
-    }
-    return (
-      <LeaveButton
-        key={key}
-        tone={primary ? "primary" : "quiet"}
-        busy={leaving === key}
-        blocked={leaving !== null}
-        onClick={() => leave(key, a.href)}
-        icon={ACTION_ICON[a.kind]}
-        className={HEADER_BUTTON}
-      >
-        {a.label}
-      </LeaveButton>
-    );
-  };
-  const pairButtons = [
-    first ? actionButton(first, "first", text.pair.violet) : null,
-    second ? actionButton(second, "second", false) : null,
-  ].filter((b) => b !== null);
-
-  // P2-CONTRIB-10: "Created by you · Owned by Ana Silva" — the name a link to the roster when the
-  // viewer may see it. On Explore marketplace: "Created by you · Listed Sep 28, 2026" (§2.4).
-  const tabHref = (tab: "contributors") => {
-    const qs = withTab(search.toString(), tab);
-    return qs ? `${pathname}?${qs}` : pathname;
-  };
+  // P2-CONTRIB-10 on the buyer's side: "Owned by Ana Silva" (a visitor never sees the roster, so
+  // the name is never a link). On Explore marketplace: "Created by you · Listed Sep 28, 2026" (§2.4).
   const lead: React.ReactNode[] = [];
-  if (text.createdBy) lead.push(text.createdBy);
-  else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
-  if (text.ownedBy) {
-    lead.push(
-      <>
-        Owned by{" "}
-        {text.ownedBy.linkTab ? (
-          <Link href={tabHref(text.ownedBy.linkTab)} scroll={false} className={INLINE_LINK}>
-            {text.ownedBy.ownedBy}
-          </Link>
-        ) : (
-          text.ownedBy.ownedBy
-        )}
-      </>,
-    );
+  if (!engineering) {
+    if (text.createdBy) lead.push(text.createdBy);
+    else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
+    if (text.ownedBy) lead.push(`Owned by ${text.ownedBy.ownedBy}`);
   }
+  const meta: MetaPart[] = engineering ? engineeringMetaOf(summary, view.stage) : text.meta;
 
   return (
     <header className="flex flex-col gap-8 [container-type:inline-size]">
@@ -204,7 +163,11 @@ export function ProjectHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
-          <StatusChip status={summary.status} word={text.chip.word} />
+          {engineering ? (
+            <p className="min-w-0 font-medium text-text-primary">{stageLineOf(summary)}</p>
+          ) : (
+            <StatusChip status={summary.status} word={text.chip.word} />
+          )}
           {text.chip.badge && <ShowcaseChip />}
           {parts?.statusRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
           {role && (
@@ -214,27 +177,20 @@ export function ProjectHeader({
           )}
         </div>
 
-        {showLine && (
-          <p className="min-w-0 text-md text-text-secondary">
-            {text.soldBuyerLink ? (
-              <>
-                {text.soldBuyerLink.before}
-                <Link href={text.soldBuyerLink.href} scroll={false} className={INLINE_LINK}>
-                  {text.soldBuyerLink.label}
-                </Link>
-                {text.soldBuyerLink.after}
-              </>
-            ) : (
-              text.chip.line
-            )}
-          </p>
+        {showLine && <p className="min-w-0 text-md text-text-secondary">{text.chip.line}</p>}
+        {text.lockLine && (
+          <LockLine line={text.lockLine}>
+            {" "}
+            <Link href={earnHref(project.id, "customers")} className={INLINE_LINK}>
+              See the sale
+            </Link>
+          </LockLine>
         )}
-        {text.lockLine && <LockLine line={text.lockLine} />}
 
         <p className="text-sm text-text-secondary">
           {[
             ...lead,
-            ...text.meta.map((m, i) =>
+            ...meta.map((m, i) =>
               m.kind === "time" ? (
                 <time key={`t${i}`} dateTime={m.time.dateTime} title={m.time.title}>
                   {m.time.text}
@@ -259,24 +215,45 @@ export function ProjectHeader({
         {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
       </div>
 
-      {(pairButtons.length > 0 || preview) && (
+      {(review || earn) && (
         <div
           data-header-actions
           className="flex max-w-full flex-col gap-4 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center"
         >
-          {pairButtons}
-          {preview && (
+          {review && (
             <LeaveButton
-              id={PREVIEW_TRIGGER_ID}
-              tone="quiet"
-              busy={false}
+              tone="primary"
+              busy={leaving === "review"}
               blocked={leaving !== null}
-              onClick={enterPreview}
-              icon={EyeIcon}
+              onClick={() => leave("review", review.href)}
+              icon={ArrowRight02Icon}
               className={HEADER_BUTTON}
             >
-              Preview as buyer
+              {review.label}
             </LeaveButton>
+          )}
+          {earn && (
+            <div
+              data-earn-state={earn.state}
+              className="flex flex-col gap-2 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:items-center [@container(min-width:520px)]:gap-4"
+            >
+              <LeaveButton
+                tone={earn.violet ? "primary" : "quiet"}
+                busy={leaving === "earn"}
+                blocked={leaving !== null}
+                onClick={() => leave("earn", earn.href)}
+                icon={Coins01Icon}
+                className={HEADER_BUTTON}
+                aria-describedby={earn.sub ? earnFactId : undefined}
+              >
+                {earn.label}
+              </LeaveButton>
+              {earn.sub && (
+                <span id={earnFactId} className="text-sm text-text-secondary">
+                  {earn.sub}
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

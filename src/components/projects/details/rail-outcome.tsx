@@ -1,45 +1,38 @@
 "use client";
 
-// The rail's Outcome block (COM-3…22, COM-55): what the Brief made of this
-// project, read-only, first in the rail. It has no chip of its own and no
-// Brief control — the outcome, its terms and the mint are chosen only in the
-// Brief, whose one door on this page is the header (COM-18). Its one control
-// is Showcase, a flag on the project rather than a Brief term (owner
-// decision O5), and this row is that control's only home on the page.
-// Owner-only: a buyer's preview drops the whole block (PPL-7). The page shows
-// its skeleton until the Brief draft is read, so this block never waits.
-// What Showcase changes is said in the page's one live region (COR-101).
+// The Outcome block (COM-3…22): what the Brief made of this project,
+// read-only. It has no chip of its own and no Brief control — the outcome,
+// its terms and the mint are chosen only in the Brief (COM-18). Owner-only: a
+// buyer's preview drops the whole block (PPL-7). Its page shows its skeleton
+// until the Brief draft is read, so this block never waits.
 //
-// Phase 2 (T24, P2-MINT-10/11, P2-VIDEO-14/15): the mint rows now carry T02's
-// proof (token, signature or transaction, payout wallet), each demo fact
-// labelled [Testnet demo]; the Payout wallet row gets its P2-MINT-11 change
-// control while the mint is lazy, through T13's `useMint().changePayoutWallet`;
-// and Showcase now runs T06's `readinessOf` first, opening T14's
-// `ReadinessDialog` (its first caller) when a current product still needs a
-// video. `view` (the page's one derivation, COR-74) is read only for its
-// precomputed `videos.readiness.showcase` and to hand the dialog what it
-// needs — nothing here re-derives project state of its own.
+// Build and Earn P0: the block left the engineering page's rail for Earn ›
+// Project NFT, and its Showcase row stayed behind as the rail's own Showcase
+// block (rail-showcase.tsx) — Showcase needs no wallet.
+//
+// Phase 2 (T24, P2-MINT-10/11): the mint rows carry T02's proof (token,
+// signature or transaction, payout wallet), each demo fact labelled
+// [Testnet demo]; the Payout wallet row gets its P2-MINT-11 change control
+// while the mint is lazy, through T13's `useMint().changePayoutWallet`. `view`
+// (the page's one derivation, COR-74) is read only for its precomputed
+// `videos.readiness.showcase`, which the block's words still take.
 
 import * as React from "react";
-import { ArrowDown01Icon, Copy01Icon, EyeIcon, EyeOffIcon, HexagonIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Copy01Icon, HexagonIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { IconButton, Link, TestnetDemoBadge } from "@/components/ideeza";
+import { IconButton, TestnetDemoBadge } from "@/components/ideeza";
 import { useMint } from "@/components/wallet/use-mint";
-import { useProjectBrief, type ProjectCommerce } from "@/lib/brief/project-brief";
+import type { ProjectCommerce } from "@/lib/brief/project-brief";
 import { can, type Viewer } from "@/lib/manual/permissions";
-import type { Readiness } from "@/lib/manual/p2-types";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { ProjectSummary } from "@/lib/manual/project-summary";
-import { useManualProjects } from "@/lib/manual/projects";
 import { outcomeView, type OutcomeRow, type OutcomeView } from "@/lib/manual/rail-copy";
-import { showcaseAnnouncement, type ShowcaseRowCopy } from "@/lib/manual/showcase-copy";
 import { makerId } from "@/lib/wallet/demo-wallet";
 import { DEMO_ACCOUNTS } from "@/lib/wallet/identities";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import type { MintRecord, MintStatus } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { RailBlock, RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
-import { ReadinessDialog } from "./readiness-dialog";
 
 export function RailOutcome({
   summary,
@@ -51,27 +44,16 @@ export function RailOutcome({
   summary: ProjectSummary;
   commerce: ProjectCommerce;
   viewer: Viewer;
-  /** The page's one derivation (COR-74). Only `videos.readiness.showcase` is read directly
-   *  here; the object itself is handed to the readiness gate dialog when it opens. */
+  /** The page's one derivation (COR-74). Only `videos.readiness.showcase` is read. */
   view: ProjectView;
   /** The shell's one polite live region (SlotProps.announce). */
   announce: (message: string) => void;
 }) {
   if (!can(viewer, "facts.seeOwnerOnly")) return null;
-  const readiness = view.videos.readiness.showcase;
-  const outcome = outcomeView(commerce, summary, readiness);
+  const outcome = outcomeView(commerce, summary, view.videos.readiness.showcase);
   return (
     <RailBlock title="Outcome" meta={outcome.meta}>
-      <OutcomeBody
-        outcome={outcome}
-        commerce={commerce}
-        projectId={summary.id}
-        name={summary.name}
-        canShowcase={can(viewer, "project.showcase", view.canCtx)}
-        readiness={readiness}
-        view={view}
-        announce={announce}
-      />
+      <OutcomeBody outcome={outcome} commerce={commerce} projectId={summary.id} announce={announce} />
     </RailBlock>
   );
 }
@@ -80,24 +62,17 @@ function OutcomeBody({
   outcome,
   commerce,
   projectId,
-  name,
-  canShowcase,
-  readiness,
-  view,
   announce,
 }: {
   outcome: OutcomeView;
   commerce: ProjectCommerce;
   projectId: string;
-  name: string;
-  canShowcase: boolean;
-  readiness: Readiness;
-  view: ProjectView;
   announce: (message: string) => void;
 }) {
   const stacked = useRailStacked();
   const minted = outcome.minted;
-  const facts = minted ? (
+  // An unreadable mint has no rows left to show now that Showcase is its own block.
+  const facts = minted?.rows.length ? (
     <RailFacts>
       {minted.rows.map((row) => (
         <OutcomeFact
@@ -110,15 +85,6 @@ function OutcomeBody({
           announce={announce}
         />
       ))}
-      <ShowcaseFact
-        copy={minted.showcase}
-        projectId={projectId}
-        name={name}
-        allowed={canShowcase}
-        readiness={readiness}
-        view={view}
-        announce={announce}
-      />
     </RailFacts>
   ) : null;
   return (
@@ -272,113 +238,5 @@ function PayoutWalletControl({ projectId, record }: { projectId: string; record:
     >
       {`Use ${label} instead`}
     </button>
-  );
-}
-
-/** The Showcase row's note (COM-12), with P2-VIDEO-15's one-product link spliced in. */
-function ShowcaseNote({ note, link }: { note: string; link?: { text: string; href: string } }) {
-  const i = link ? note.indexOf(link.text) : -1;
-  if (!link || i < 0) return <>{note}</>;
-  return (
-    <>
-      {note.slice(0, i)}
-      <Link href={link.href} color="brand" size="sm" className="font-medium">
-        {link.text}
-      </Link>
-      {note.slice(i + link.text.length)}
-    </>
-  );
-}
-
-/** COM-12's row with COM-55's control. The button stays the same element as its label flips,
- *  so focus stays on it; the change is said politely in the page's one live region.
- *
- *  P2-VIDEO-15: "Showcase project" first runs `readinessOf(…, "showcase")` (`readiness`, the
- *  page's own `view.videos.readiness.showcase`). Ready, it flips at once, as v1 did. Blocked,
- *  it opens T14's `ReadinessDialog` — this is that dialog's first caller (P2-VIDEO-14) — and
- *  closing it by any means returns focus to this button. "Stop showcasing" is never gated. */
-function ShowcaseFact({
-  copy,
-  projectId,
-  name,
-  allowed,
-  readiness,
-  view,
-  announce,
-}: {
-  copy: ShowcaseRowCopy;
-  projectId: string;
-  name: string;
-  allowed: boolean;
-  readiness: Readiness;
-  view: ProjectView;
-  announce: (message: string) => void;
-}) {
-  const { projects, setShowcase } = useManualProjects();
-  const brief = useProjectBrief(projectId);
-  const stacked = useRailStacked();
-  const noteId = React.useId();
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-  const [gateOpen, setGateOpen] = React.useState(false);
-  const project = projects.find((p) => p.id === projectId) ?? null;
-
-  const doShowcase = () => {
-    setShowcase(projectId, true);
-    announce(showcaseAnnouncement(true, name));
-  };
-
-  const press = () => {
-    if (copy.on) {
-      setShowcase(projectId, false);
-      announce(showcaseAnnouncement(false, name));
-      return;
-    }
-    if (readiness.ok || !project) {
-      doShowcase();
-      return;
-    }
-    setGateOpen(true);
-  };
-
-  return (
-    <RailFact label={copy.label} icon={EyeIcon}>
-      <span className="block">
-        <RailValue parts={copy.value} />
-      </span>
-      <span id={noteId} className="mt-1 block text-sm font-regular text-text-secondary">
-        <ShowcaseNote note={copy.note} link={copy.noteLink} />
-      </span>
-      {allowed && (
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={press}
-          aria-describedby={noteId}
-          className={cn(
-            "mt-4 inline-flex items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
-            stacked ? "min-h-[44px]" : "min-h-[40px]",
-          )}
-        >
-          <Icon icon={copy.on ? EyeOffIcon : EyeIcon} size={18} />
-          {copy.action}
-        </button>
-      )}
-      {allowed && gateOpen && project && (
-        <ReadinessDialog
-          purpose="showcase"
-          project={project}
-          view={view}
-          brief={brief ?? null}
-          onPass={() => {
-            doShowcase();
-            setGateOpen(false);
-          }}
-          onClose={() => {
-            setGateOpen(false);
-            buttonRef.current?.focus();
-          }}
-        />
-      )}
-    </RailFact>
   );
 }

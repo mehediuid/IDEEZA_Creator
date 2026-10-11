@@ -18,6 +18,7 @@ export const COMMERCE_FILES = [
 ];
 export const ENGINEERING_COMPOSITION = [
   "src/lib/manual/delete-plan.ts",
+  "src/lib/manual/earn-view.ts",
   "src/lib/manual/p2-types.ts",
   "src/lib/manual/permissions.ts",
   "src/lib/manual/project-read.ts",

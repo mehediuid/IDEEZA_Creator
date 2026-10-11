@@ -1,15 +1,10 @@
-// /projects/[id]/business-plan (P2-TABS-17). A thin server wrapper, same
-// shape as /projects/[id]/page.tsx: the id is resolved against the
-// ManualProjects store inside BusinessPlanPage, which owns its own loading,
-// not-found and no-plan-yet states.
+// /projects/[id]/business-plan (P2-TABS-17) moved to Earn › Business plan;
+// an old link lands there.
 
-import type { Metadata } from "next";
-import * as React from "react";
-import { BusinessPlanPage } from "@/components/projects/business-plan/plan-page";
-
-export const metadata: Metadata = { title: "Business plan · IDEEZA" };
+import { redirect } from "next/navigation";
+import { earnHref } from "@/lib/manual/earn-route";
 
 export default async function ProjectBusinessPlanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <BusinessPlanPage id={id} />;
+  redirect(earnHref(decodeURIComponent(id), "plan"));
 }

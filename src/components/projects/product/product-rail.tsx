@@ -3,7 +3,9 @@
 // The product page's rail (P2-EDITOR-19, P2-TABS-3 as changed; spec §2.3), in
 // order:
 // 1. Marketplace: Physical NFT · Virtual NFT editions — PRODUCT_SLOTS.rail
-//    (T27). In a preview it shows only listed tracks, else it is absent.
+//    (T27), the buyer's side only since Build and Earn P0 (the owner's
+//    controls are Earn › Editions): it shows only listed tracks, else it is
+//    absent.
 // 2. Editor: six rows into this product's editor, and the seed caption
 //    (P2-EDITOR-11). Absent in every preview and on a locked project.
 // From a 1024 px page container it is the 360 px column right of the tabs;

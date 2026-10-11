@@ -16,6 +16,7 @@
 // not a simulation. Both draw from the same filtered rows.
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { PlusSignIcon, UserGroupIcon, UserIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, ConfirmDialog, SearchInput, StateCard, TestnetDemoBadge } from "@/components/ideeza";
@@ -70,7 +71,19 @@ function useVariantButtonRefs() {
   return { set, find };
 }
 
-export function ContributorsTab({ project, view, viewer, announce }: SlotProps) {
+export function ContributorsTab({
+  project,
+  view,
+  viewer,
+  announce,
+  previewHref,
+}: SlotProps & {
+  /** Where a row's "Preview" opens the contributor's view: Earn › Splits passes the
+   *  project page's address, since the Earn area itself is the owner's alone. Without
+   *  it the preview opens on this page, as `?view=contributor&as=<id>`. */
+  previewHref?: (contributorId: string) => string;
+}) {
+  const router = useRouter();
   const { removeContributor } = useManualProjects();
   const contributors = project.contributors ?? [];
 
@@ -103,7 +116,7 @@ export function ContributorsTab({ project, view, viewer, announce }: SlotProps) 
   );
 
   const openEdit = (c: Contributor) => setDialog({ mode: "edit", contributor: c });
-  const openPreview = (c: Contributor) => enterContributorPreview(c.id);
+  const openPreview = (c: Contributor) => (previewHref ? router.push(previewHref(c.id)) : enterContributorPreview(c.id));
 
   const focusAfterRemoval = (removedId: string) => {
     const ordered = [...contributors].sort((a, b) => a.addedAt - b.addedAt);

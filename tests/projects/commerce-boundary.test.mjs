@@ -17,6 +17,7 @@ const SRC = join(ROOT, "src");
 /** Engineering files that compose both layers for a surface: they may import commerce for good. */
 const COMPOSITION = [
   "src/lib/manual/delete-plan.ts", // what a delete removes, the mint and the Brief among it
+  "src/lib/manual/earn-view.ts", // the Earn area's facts, read off the page's one derivation
   "src/lib/manual/p2-types.ts", // the shared Phase 2 shapes (a buyer holder names a demo buyer)
   "src/lib/manual/permissions.ts", // the one can() table for both layers' actions
   "src/lib/manual/project-read.ts", // the project page's one derivation
