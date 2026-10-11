@@ -1,14 +1,13 @@
 // The Earn area's pure facts (docs/superpowers/specs/2026-10-11-build-earn-p0-design.md,
-// "Earn area"): the owner-only gate, the document title, the Overview's gate badges, the Project NFT section's pair and the Editions section's products.
+// "Earn area"): the owner-only gate, the document title, the Overview's next-step card, the Project NFT section's pair and the Editions section's products.
 // Compiled by tests/projects/tsconfig.json:
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  EARN_OPTIONS,
-  GATE_TEXT,
   canOpenEarn,
   earnDocTitle,
+  earnNextOf,
   earnPairOf,
   editionProductsOf,
 } from "../../.tmp-test/lib/manual/earn-view.js";
@@ -55,24 +54,27 @@ test("the Earn links the area reads: ?list=1 on Project NFT and a sale on Custom
   assert.equal(earnHref("proj_car"), "/projects/proj_car/earn");
 });
 
-// ─────────────────────────── the option cards ───────────────────────────
+// ─────────────────────────── the next-step card ───────────────────────────
 
-test("Sell carries the Wallet badge, Editions Wallet and the identity check for physical; the plan, splits and customers need no wallet", () => {
-  const gates = Object.fromEntries(EARN_OPTIONS.map((o) => [o.section, o.gate]));
-  assert.deepEqual(gates, { sell: "wallet", editions: "walletIdentity", plan: "none", splits: "none", customers: "none" });
-  assert.equal(GATE_TEXT.wallet.label, "Wallet");
-  assert.equal(GATE_TEXT.walletIdentity.label, "Wallet · ID for physical");
-  assert.match(GATE_TEXT.walletIdentity.meaning, /identity check/);
-  assert.equal(GATE_TEXT.none.label, "No wallet");
-});
-
-test("the cards follow the sub-navigation's order and copy is sentence case with no em-dash", () => {
-  const order = EARN_GROUPS.flatMap((g) => g.sections).filter((s) => EARN_OPTIONS.some((o) => o.section === s));
-  assert.deepEqual(EARN_OPTIONS.map((o) => o.section), order);
-  for (const o of EARN_OPTIONS) {
-    assert.match(o.title, /^[A-Z][a-z ]+$/, o.title);
-    assert.doesNotMatch(o.body, /—/, o.body);
+test("the Overview's one card: mint, then list, then where each later state is managed", () => {
+  assert.deepEqual(earnNextOf("proj_car", "none"), {
+    title: "Mint your project NFT",
+    point: "mint",
+    action: { label: "Start mint", href: "/projects/proj_car/earn/mint" },
+  });
+  assert.deepEqual(earnNextOf("proj_car", "minted"), {
+    title: "List your project for sale",
+    point: "list",
+    action: { label: "Add to marketplace", href: "/projects/proj_car/earn/sell?list=1" },
+  });
+  for (const state of ["given", "listed", "paused", "soldPartial", "soldOut"]) {
+    const n = earnNextOf("proj_car", state);
+    assert.equal(n.point, null, state);
+    assert.match(n.action.href, /^\/projects\/proj_car\/earn\/(sell|customers)$/, state);
+    assert.match(n.title, /^[A-Z][^—]*$/, n.title);
   }
+  assert.equal(earnNextOf("proj_car", "soldOut").action.label, "See customers");
+  assert.equal(earnNextOf("proj_car", "paused").action.label, "Relist in Project NFT");
 });
 
 // ─────────────────────────── the Project NFT pair ───────────────────────────

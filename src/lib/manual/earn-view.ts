@@ -1,6 +1,6 @@
 // The Earn area's pure facts (docs/superpowers/specs/2026-10-11-build-earn-p0-design.md,
 // "Earn area"): the project page's door to it (the Earn button), who may open
-// it, its document title, the Overview's option cards with their gate badges,
+// it, its document title, the Overview's one next-step card,
 // the Project NFT section's action pair, and which products the Editions
 // section lists. The Overview's "Ready to earn" is the gating ladder's
 // (lib/commerce/ladder.ts, Build and Earn P1-4), and so is the Earn button's
@@ -10,10 +10,10 @@
 // Value imports are relative, so node:test loads the compiled module.
 
 import type { StoredDraft } from "../brief/project-brief";
-import { commitStepsOf, type EarnFacts } from "../commerce/ladder";
+import { commitStepsOf, type CommitPoint, type EarnFacts } from "../commerce/ladder";
 import type { CommercialState } from "../commerce/state";
 import type { EditionTrack } from "../market/types";
-import { EARN_SECTION_LABEL, earnHref, type EarnSection } from "./earn-route";
+import { EARN_SECTION_LABEL, earnHref, earnMintHref, type EarnSection } from "./earn-route";
 import { can, roleOf, type CanContext, type Viewer } from "./permissions";
 import type { ProjectProduct } from "./project-read";
 import { nextAction, type ActionPair, type NextAction, type ProjectSummary } from "./project-summary";
@@ -103,29 +103,38 @@ export function earnDocTitle(section: EarnSection, projectName: string): string 
 
 // ─────────────────────────── the Overview ───────────────────────────
 
-/** A section's gate badge: listing, minting and editions sign with the demo wallet, and physical
- *  editions also ask the demo identity check (the ladder's L4); the rest need none. */
-export type EarnGate = "wallet" | "walletIdentity" | "none";
+/**
+ * The Overview's one card (owner, 2026-10-11: the overview shows only what to do next; the
+ * sub-navigation already lists every way to earn). `point` is the commit point whose steps the
+ * card lists, the same count the project page's Earn button shows; null where nothing is left to
+ * unlock, and the card then names the state and where to look. `action` is that step's home.
+ */
+export type EarnNext = { title: string; point: CommitPoint | null; action: { label: string; href: string } };
 
-export const GATE_TEXT: Record<EarnGate, { label: string; meaning: string }> = {
-  wallet: { label: "Wallet", meaning: "Needs the demo wallet" },
-  walletIdentity: {
-    label: "Wallet · ID for physical",
-    meaning: "Needs the demo wallet; physical editions also need the demo identity check",
-  },
-  none: { label: "No wallet", meaning: "No wallet needed" },
-};
-
-export type EarnOption = { section: EarnSection; title: string; body: string; gate: EarnGate };
-
-/** The Overview's option cards, in the sub-navigation's order. Rights has no card: it is reached from the sub-navigation. */
-export const EARN_OPTIONS: readonly EarnOption[] = [
-  { section: "sell", title: "Sell the project", body: "Mint the Project NFT and list it at a fixed price or at auction.", gate: "wallet" },
-  { section: "editions", title: "Sell editions", body: "Sell Physical and Virtual NFTs of each product.", gate: "walletIdentity" },
-  { section: "plan", title: "Business plan", body: "AI writes a seven-section plan you can edit and print.", gate: "none" },
-  { section: "splits", title: "Splits", body: "Set who owns what share of the project.", gate: "none" },
-  { section: "customers", title: "Customers", body: "See every sale and who bought it.", gate: "none" },
-];
+export function earnNextOf(projectId: string, commercial: CommercialState): EarnNext {
+  const sell = earnHref(projectId, "sell");
+  const customers = earnHref(projectId, "customers");
+  switch (commercial) {
+    case "none":
+      return { title: "Mint your project NFT", point: "mint", action: { label: "Start mint", href: earnMintHref(projectId) } };
+    case "minted":
+      return {
+        title: "List your project for sale",
+        point: "list",
+        action: { label: "Add to marketplace", href: earnHref(projectId, "sell", { list: "1" }) },
+      };
+    case "given":
+      return { title: "Given to the community", point: null, action: { label: "Open Project NFT", href: sell } };
+    case "listed":
+      return { title: "Your project is on the marketplace", point: null, action: { label: "Open Project NFT", href: sell } };
+    case "paused":
+      return { title: "Your listing is paused", point: null, action: { label: "Relist in Project NFT", href: sell } };
+    case "soldPartial":
+      return { title: "Part of your project is sold", point: null, action: { label: "See customers", href: customers } };
+    case "soldOut":
+      return { title: "Sold in full", point: null, action: { label: "See customers", href: customers } };
+  }
+}
 
 // ─────────────────────────── Project NFT ───────────────────────────
 
