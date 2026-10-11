@@ -54,6 +54,7 @@ import type { Readiness } from "@/lib/manual/p2-types";
 import { buildsOf, listingMetadataOf, productRowsOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { currentProductsOf, readinessOf, type ReadinessFacts } from "@/lib/manual/readiness";
+import { sharePostIn } from "@/lib/manual/share-post";
 import { createListing, listingViewOf } from "@/lib/market/listing";
 import { cleanBenefits, listRequestOf, listedMintingType } from "@/lib/market/listing-flow";
 import { listingInputFromBrief, type ListingInput } from "@/lib/market/listing-form";
@@ -330,7 +331,9 @@ export function BriefApp({ projectId }: { projectId: string }) {
           factsOf(s, { videos: videosRef.current, jobs: jobsRef.current, now: at }),
           "showcase",
         ).rules.every((r) => r.ok);
-        if (s.shareToNewsfeed && shareReady && cur.showcasedAt == null) setShowcase(cur.id, true, at);
+        if (s.shareToNewsfeed && shareReady && cur.showcasedAt == null) {
+          setShowcase(cur.id, true, at, { story: s.story.trim(), stage: sharePostIn({ story: "", stage: s.shareStage })?.stage ?? null });
+        }
         mintedAt = at;
         return { ok: true };
       };

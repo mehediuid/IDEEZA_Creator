@@ -163,6 +163,8 @@ export type BriefState = {
   network: Network;
   collection: string;
   story: string;
+  /** The Innovations post's status — an Activity stage id; "" until picked (owner, 2026-10-12). */
+  shareStage: string;
   license: License | null;
   // Sell-only
   listingType: ListingType;
@@ -215,6 +217,7 @@ export const DEFAULT_STATE: BriefState = {
   network: "baseSepolia",
   collection: "",
   story: "",
+  shareStage: "",
   license: null,
   listingType: "buyNow",
   token: "ETH",
@@ -396,6 +399,7 @@ export function normalizeBrief(parsed: unknown): BriefState {
     network,
     collection: str(s.collection, DEFAULT_STATE.collection),
     story: str(s.story, DEFAULT_STATE.story),
+    shareStage: str(s.shareStage, DEFAULT_STATE.shareStage),
     license:
       typeof s.license === "string" &&
       (LICENSE_IDS as readonly string[]).includes(s.license)

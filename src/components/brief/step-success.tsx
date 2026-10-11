@@ -19,7 +19,8 @@ import Link from "next/link";
 import { EyeIcon, PlayIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ProgressBar, TestnetDemoBadge } from "@/components/ideeza";
-import { dialogBlockerOf, ReadinessDialog } from "@/components/projects/details/readiness-dialog";
+import { dialogBlockerOf } from "@/components/projects/details/readiness-dialog";
+import { ShareDialog } from "@/components/projects/share-dialog";
 import { useMinuteClock, useProjectPageData } from "@/components/projects/details/use-project-page-data";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { VideoPlayerDialog, useClipUrl } from "@/components/video-jobs/video-player";
@@ -38,6 +39,7 @@ import { can } from "@/lib/manual/permissions";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
+import type { SharePost } from "@/lib/manual/share-post";
 import { SUCCESS_SHOWCASE, shareAnnouncement } from "@/lib/manual/showcase-copy";
 import { listingViewOf } from "@/lib/market/listing";
 import { termsLineOf } from "@/lib/market/listing-flow";
@@ -255,9 +257,10 @@ function PosterTile({ take, name, onOpen }: { take: VideoTake; name: string; onO
  * arrives already showcased (the Brief's commit writes the same flag), so the
  * step opens on the status row and nothing takes focus until a press.
  *
- * P2-VIDEO-16: it runs the same gate as the Outcome block's Showcase — every
- * product needs a ready video. Ready, one press flips it. Blocked, the press
- * opens the readiness dialog over this step, where the videos can be made
+ * P2-VIDEO-16 and the owner, 2026-10-12: a press always opens the share
+ * dialog over this step (share-dialog.tsx) — the products' videos, made there
+ * when one is missing, then the post's story and status — and its Share
+ * shares with that post. The videos can be made
  * without leaving it; its CTA then showcases.
  */
 function SuccessShowcase({ projectId }: { projectId: string }) {
@@ -287,9 +290,9 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
   const readiness = view.videos.readiness.showcase;
   const blocked = dialogBlockerOf(readiness) !== null;
 
-  const flip = (next: boolean) => {
+  const flip = (next: boolean, post?: SharePost) => {
     focusNext.current = next ? "undo" : "show";
-    setShowcase(project.id, next);
+    setShowcase(project.id, next, undefined, post);
     setSaid(shareAnnouncement(next, project.name));
   };
 
@@ -318,7 +321,8 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
           <button
             ref={showRef}
             type="button"
-            onClick={() => (blocked ? setGateOpen(true) : flip(true))}
+            // Always the share dialog: the videos, then the post's story and status (owner, 2026-10-12).
+            onClick={() => setGateOpen(true)}
             aria-describedby={lineId}
             className="inline-flex min-h-[44px] items-center justify-center gap-4 rounded-3xl border border-solid border-border bg-bg-surface px-12 py-6 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
           >
@@ -334,14 +338,13 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
         {said}
       </p>
       {gateOpen && (
-        <ReadinessDialog
-          purpose="showcase"
+        <ShareDialog
           project={project}
           view={view}
           brief={brief}
-          onPass={() => {
+          onShared={(post) => {
             setGateOpen(false);
-            flip(true);
+            flip(true, post);
           }}
           onClose={() => {
             setGateOpen(false);

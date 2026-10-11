@@ -76,9 +76,11 @@ test("Showcase comes from the shared copy, asks can(), runs the gate and writes 
   assert.match(src, /SUCCESS_SHOWCASE\.action/);
   assert.match(src, /SUCCESS_SHOWCASE\.done/);
   assert.match(src, /can\(\{ kind: "local-owner" \}, "project\.showcase"/);
-  assert.match(src, /setShowcase\(project\.id, next\)/);
+  assert.match(src, /setShowcase\(project\.id, next, undefined, post\)/, "the share carries its post");
   assert.match(src, /readiness\.showcase/);
-  assert.match(src, /<ReadinessDialog\s+purpose="showcase"/);
+  // Always the share dialog: the videos, then the story and status (owner, 2026-10-12).
+  assert.match(src, /onClick=\{\(\) => setGateOpen\(true\)\}/);
+  assert.match(src, /<ShareDialog/);
   assert.match(src, /showcaseGateLine\(/);
   assert.doesNotMatch(src, /shareToNewsfeed/, "Showcase is read from showcasedAt, never from the Brief's tick");
   // The storyboard scene cards are gone; ready posters open the video.
@@ -234,10 +236,10 @@ test("the mint showcases at the mint time itself: one moment for mintedAt and sh
   // A fresh mint stamps the proof's time; a minted project carried on keeps its first one.
   assert.match(writes, /mintedAt: carryOn \? \(s\.mintedAt \?\? at\) : at\b/);
   // Shared at the mint once every video is ready (a private mint never waits for them; owner, 2026-10-12).
-  assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) setShowcase\(cur\.id, true, at\);/);
+  assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) \{\s*setShowcase\(cur\.id, true, at, \{ story: s\.story\.trim\(\), stage:/);
   assert.doesNotMatch(writes, /Date\.now\(\)/, "the writes take the proof's time, never a second clock read");
   assert.match(app, /commit: \(proof\) => writeAll\(proof\.at, proof\)/);
   // The store writes the time it is handed; a press with none is stamped now.
   const store = readFileSync(new URL("../../src/lib/manual/projects.tsx", import.meta.url), "utf8");
-  assert.match(store, /\(id: string, on: boolean, at\?: number\) =>\s*updateProject\(id, \{ showcasedAt: on \? \(at \?\? Date\.now\(\)\) : null \}\)/);
+  assert.match(store, /\(id: string, on: boolean, at\?: number, post\?: SharePost\) =>\s*updateProject\(id, \{ showcasedAt: on \? \(at \?\? Date\.now\(\)\) : null, \.\.\.\(post \? \{ post \} : null\) \}\)/);
 });

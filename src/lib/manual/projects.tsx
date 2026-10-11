@@ -45,6 +45,7 @@ import {
 } from "./contributors";
 import { normalizeLegal } from "./legal";
 import { dispatchProjectDeleted } from "./events";
+import { sharePostIn, type SharePost } from "./share-post";
 import { deleteBlockOfGuards } from "./guards";
 import { readThroughHooks, wroteThroughHooks } from "./record-hooks";
 import { normalizeMintRecord } from "../wallet/mint";
@@ -165,6 +166,8 @@ export type ManualProject = {
   legal?: ProjectLegal;
   /** The description coachmark, dismissed (P2-TABS-22). */
   descriptionHint?: DescriptionHint;
+  /** The Innovations post a share carries: the maker's story and the project's status (owner, 2026-10-12). */
+  post?: SharePost;
 };
 
 /** What updateProject takes. Its product rows may come without ids (the Brief's Step 1 writes
@@ -502,6 +505,7 @@ const KEPT_FIELDS = {
   ownerConfirmedAt: ownerConfirmedIn,
   legal: legalIn,
   descriptionHint: descriptionHintIn,
+  post: sharePostIn,
 } satisfies { [K in keyof ManualProject]?: (raw: unknown) => ManualProject[K] };
 
 // Normalize projects loaded from storage: backfill slugs (unique within the
@@ -1133,7 +1137,8 @@ type Ctx = {
    *  Date.now(); off writes null. Through updateProject, so it bumps
    *  updatedAt like any other maker's edit — unlike backfillShowcase, which
    *  records an old fact rather than one made now. */
-  setShowcase: (id: string, on: boolean, at?: number) => void;
+  /** `post`: the story and status the share carries to Innovations. */
+  setShowcase: (id: string, on: boolean, at?: number, post?: SharePost) => void;
   markStepCompleted: (id: string, step: keyof ManualFlowState) => void;
   setStatus: (id: string, status: ManualProjectStatus) => void;
   /** COR-105's one-time backfill: a project minted with Share to Innovations
@@ -1353,8 +1358,8 @@ export function ManualProjectsProvider({
 
   // Showcase's one control: on is the time handed in, else now; off is null (COM-55).
   const setShowcase = React.useCallback(
-    (id: string, on: boolean, at?: number) =>
-      updateProject(id, { showcasedAt: on ? (at ?? Date.now()) : null }),
+    (id: string, on: boolean, at?: number, post?: SharePost) =>
+      updateProject(id, { showcasedAt: on ? (at ?? Date.now()) : null, ...(post ? { post } : null) }),
     [updateProject],
   );
 

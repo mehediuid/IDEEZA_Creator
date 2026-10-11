@@ -44,7 +44,7 @@ import { outcomeView } from "@/lib/manual/rail-copy";
 import { shareAnnouncement } from "@/lib/manual/showcase-copy";
 import { cn } from "@/lib/utils";
 import { ActivityDrawer } from "./activity/drawer";
-import { ReadinessDialog } from "./readiness-dialog";
+import { ShareDialog } from "../share-dialog";
 import type { SlotProps } from "./slots";
 
 type Item = {
@@ -100,11 +100,7 @@ export function ProjectMenu({
       announce(shareAnnouncement(false, project.name));
       return;
     }
-    if (readiness.ok) {
-      setShowcase(project.id, true);
-      announce(shareAnnouncement(true, project.name));
-      return;
-    }
+    // Always the share dialog: the videos, then the post's story and status (owner, 2026-10-12).
     setLayer("share");
   };
 
@@ -253,13 +249,12 @@ export function ProjectMenu({
         now={now}
       />
       {layer === "share" && (
-        <ReadinessDialog
-          purpose="showcase"
+        <ShareDialog
           project={project}
           view={view}
           brief={brief}
-          onPass={() => {
-            setShowcase(project.id, true);
+          onShared={(post) => {
+            setShowcase(project.id, true, undefined, post);
             announce(shareAnnouncement(true, project.name));
             setLayer(null);
           }}

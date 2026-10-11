@@ -23,6 +23,8 @@ import {
 import type { Readiness, ReadinessPurpose } from "../manual/p2-types";
 import type { ProjectStatus } from "../manual/project-summary";
 import { listingInputFromBrief, listingProblems } from "../market/listing-form";
+import type { StageId } from "../manual/journey";
+import { sharePostBlocker } from "../manual/share-post";
 
 // ── The state ────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,7 @@ export const MINT_STATE_KEYS = [
   "network",
   "collection",
   "story",
+  "shareStage",
   "license",
   "listingType",
   "token",
@@ -232,6 +235,11 @@ export function detailsMissing(
     if (first) return first;
   }
   if (s.intent === "save" && !s.confirmOwnership) return OWNERSHIP_REASON;
+  // Shared to Innovations: the post needs its story and status (owner, 2026-10-12).
+  if (s.shareToNewsfeed) {
+    const post = sharePostBlocker({ story: s.story, stage: s.shareStage ? (s.shareStage as StageId) : null });
+    if (post) return post;
+  }
   const rule = f.readiness?.rules.find((r) => !r.ok && r.fixedIn === "form")?.reason;
   if (rule) return rule;
   return s.intent === "sell" && !s.license ? SELL_LICENSE_REASON : null;

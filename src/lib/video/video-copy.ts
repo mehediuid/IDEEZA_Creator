@@ -132,7 +132,7 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
     case "showcase":
       return {
         title: "Share to Innovations",
-        info: "To share this project to Innovations, every product needs an AI video.",
+        info: "Every product needs an AI video, and the post needs your story and the project's status.",
         cta: "Share to Innovations",
       };
     case "sell":
