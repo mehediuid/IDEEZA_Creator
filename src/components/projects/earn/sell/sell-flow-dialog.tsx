@@ -76,10 +76,10 @@ import {
 import { useSellTerms, writeShipPlan } from "./use-sell-terms";
 
 const INTRO: Record<SellStep, string> = {
-  product: "Choose which product these NFTs are for.",
-  use: "Choose what buyers may do with what they get.",
+  product: "Each product sells its own NFTs.",
+  use: "What buyers may do with what they get.",
   supply: "How many NFTs to offer.",
-  price: "Two prices: Regular for this version, Extended for every version after it too.",
+  price: "What one NFT costs, in two tiers.",
   terms: "What buyers get, the royalties, and what you confirm.",
   readiness: "What this listing needs before you sign.",
   sign: "Check it, then sign in your demo wallet.",

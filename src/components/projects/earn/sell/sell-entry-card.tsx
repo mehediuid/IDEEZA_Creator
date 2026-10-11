@@ -16,6 +16,8 @@
 //   in plain words — no disabled card — and a missing listing links to
 //   Earn › Project NFT.
 // - Both uses on sale: it says so; their rows below hold every control.
+// - Physical: the stored "How you'll make and ship it" note, once a listing
+//   has been signed with it.
 //
 // After a listing is signed, the sentence is said in the page's live region,
 // shown under the card, and focus moves to the new row's Edit.
@@ -36,6 +38,7 @@ import { entryStateOf, FLOW_KIND, FLOW_TITLE, flowBlurbOf, type SellFlow } from 
 import { cn } from "@/lib/utils";
 import { focusSoon } from "../../listing/listing-dialog";
 import { SellFlowDialog } from "./sell-flow-dialog";
+import { useSellTerms } from "./use-sell-terms";
 
 const CARD = "flex w-full flex-col gap-3 rounded-2xl border border-solid border-border bg-bg-surface p-8 text-left";
 const PRESSABLE =
@@ -62,10 +65,11 @@ export function SellEntryCard({
   children?: React.ReactNode;
 }) {
   const brief = useProjectBrief(project.id) ?? null;
+  const plan = useSellTerms(project.id).physical[product.id];
   const [open, setOpen] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
   const titleId = React.useId();
-  const cardRef = React.useRef<HTMLButtonElement>(null);
+  const cardId = `sell-${flow}-${product.id}`;
   const kind = FLOW_KIND[flow];
   const name = displayProductName(product.name);
   const main = view.listing.kind === "none" ? null : view.listing.listing;
@@ -101,12 +105,19 @@ export function SellEntryCard({
     </span>
   );
   const blurb = <span className="text-sm leading-relaxed text-text-secondary">{flowBlurbOf(flow, name)}</span>;
+  // The physical flow's stored note: what the maker promised buyers of this product.
+  const shipNote = kind === "physical" && plan && (
+    <span className="flex flex-col gap-1 border-l-2 border-solid border-border pl-4 text-sm leading-relaxed">
+      <span className="font-semibold text-text-primary">How you&apos;ll make and ship it</span>
+      <span className="whitespace-pre-line break-words text-text-secondary">{plan.note}</span>
+    </span>
+  );
 
   return (
     <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-6">
       {state.kind === "open" ? (
         <button
-          ref={cardRef}
+          id={cardId}
           type="button"
           aria-haspopup="dialog"
           onClick={() => {
@@ -117,12 +128,14 @@ export function SellEntryCard({
         >
           {head}
           {blurb}
+          {shipNote}
           {state.note && <span className="text-sm leading-relaxed text-text-secondary">{state.note}</span>}
         </button>
       ) : (
         <div className={CARD}>
           {head}
           {blurb}
+          {shipNote}
           <p className="m-0 text-sm leading-relaxed text-text-primary">{state.kind === "blocked" ? state.reason : state.line}</p>
           {state.kind === "blocked" && state.link === "projectNft" && (
             <Link href={earnHref(project.id, "sell")} className={LINK}>
@@ -149,7 +162,10 @@ export function SellEntryCard({
           project={project}
           view={view}
           productId={product.id}
-          onClose={() => setOpen(false)}
+          onClose={() => {
+            setOpen(false);
+            focusSoon(cardId);
+          }}
           onDone={(message, track) => {
             setOpen(false);
             setNote(message);

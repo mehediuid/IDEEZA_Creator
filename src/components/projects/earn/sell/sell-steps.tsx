@@ -201,7 +201,7 @@ export function UseStep({ draft, change, problem, prefix, choices }: StepProps &
   return (
     <ChoiceGroup
       id={`${prefix}-use`}
-      label="Who may use what buyers get?"
+      label="Which use?"
       choices={choices}
       value={draft.use}
       onChange={(use) => change({ use })}
