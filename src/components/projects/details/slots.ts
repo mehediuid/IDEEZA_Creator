@@ -43,13 +43,16 @@ export type HeaderSlotProps = SlotProps & {
 export type PanelSlot = React.ComponentType<SlotProps>;
 
 /** The rail's blocks, in order (COR-54; Phase 2 spec §2.2, §3.10). The v1
- *  `editor` block moves to the product page (decision 7). */
-export const RAIL_ORDER = ["marketplace", "outcome", "details", "legal", "versions", "log", "manage"] as const;
+ *  `editor` block moves to the product page (decision 7). Build and Earn P0:
+ *  the owner's rail is Details · Versions · Showcase · Log · Manage — Outcome
+ *  moved to Earn, and Marketplace and Legal stay only for the buyer's side
+ *  (`buyerSide`), which reads Marketplace · Details · Legal · Log. */
+export const RAIL_ORDER = ["marketplace", "details", "legal", "versions", "showcase", "log", "manage"] as const;
 export type RailBlockId = (typeof RAIL_ORDER)[number];
 
-/** The header's "Add to marketplace" / "List another share" (§3.6.3): the
- *  header renders `slots.actions["add-to-marketplace"]` in the pair's place,
- *  with the pair's tone and the header's button class (T22). */
+/** The listing start's props — "Add to marketplace" / "List another share"
+ *  (§3.6.3, T22). It left the page's header in Build and Earn P0; Earn ›
+ *  Project NFT renders it with the pair's tone and a button class. */
 export type ActionSlotProps = SlotProps & {
   action: Extract<NextAction, { kind: "add-to-marketplace" }>;
   violet: boolean;
@@ -67,21 +70,19 @@ export type ProjectSlots = {
   notice?: React.ComponentType<SlotProps>;
   /** Everything between the breadcrumb and the tab strip (COR-8…18, CNT-1…7). */
   header: React.ComponentType<HeaderSlotProps>;
-  /** Parts the header renders in its rows: the title row (Activity, Business plan chips),
-   *  the status row (Utility NFT pill) and after the description (its coachmark). */
+  /** Parts the header renders in its rows: the title row (the Activity chip), the status
+   *  row (the buyer's Utility NFT pill) and after the description (its coachmark). */
   headerParts?: {
     titleRow?: React.ComponentType<SlotProps>[];
     statusRow?: React.ComponentType<SlotProps>[];
     afterDescription?: React.ComponentType<SlotProps>[];
   };
-  actions?: { "add-to-marketplace"?: React.ComponentType<ActionSlotProps> };
   /** One panel per tab (COR-19). A tab without a panel is not in the strip. */
   tabs: {
     products: PanelSlot;
     media?: PanelSlot;
     network?: PanelSlot;
-    contributors?: PanelSlot;
-    customers?: PanelSlot;
+    team?: PanelSlot;
   };
   /** Rendered in RAIL_ORDER inside the rail surface. Each block wraps itself in
    *  <RailBlock>; a block with nothing real in it returns null, which leaves no

@@ -89,21 +89,25 @@ const UNBUILT: Record<Exclude<ProjectProduct["state"], "built">, string> = {
 
 /** A product no build stands behind has no version and no pieces: one line under
  *  the header says why, in the card's own words (COR-24, P2-EDITOR-9). Its page
- *  still has Media, Contributors and Customers. */
+ *  still has Media. */
 export function UnbuiltNote({ state }: { state: ProjectProduct["state"] }) {
   if (state === "built") return null;
   return <p className="text-md text-text-secondary">{UNBUILT[state]}</p>;
 }
 
-/** §3.8.5's owner line on a project sold in full, under the status line of both pages:
- *  everything is read-only, so the product page has no Open in editor and no Editor block. */
-export function LockLine({ line }: { line: string }) {
+/** §3.8.5's owner line on a project sold in full, on both pages: everything is read-only, so
+ *  the product page has no Open in editor and no Editor block. `children` follow the line —
+ *  the project page's link to the sale in Earn (Build and Earn P0). */
+export function LockLine({ line, children }: { line: string; children?: React.ReactNode }) {
   return (
     <p className="flex min-w-0 items-start gap-3 text-md font-medium text-text-primary">
       <span aria-hidden className="inline-flex pt-[2px] text-text-secondary">
         <Icon icon={LockIcon} size={16} />
       </span>
-      <span className="min-w-0">{line}</span>
+      <span className="min-w-0">
+        {line}
+        {children}
+      </span>
     </p>
   );
 }

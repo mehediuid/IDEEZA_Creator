@@ -280,7 +280,7 @@ const FIXTURES = [
     card: "1 product · Saved Sep 20",
     header: "1 product · Saved Sep 20, 2026",
     pair: {
-      first: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil?list=1" },
+      first: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil/earn/sell?list=1" },
       second: viewBrief("plant-soil-monitor"),
       violet: true,
     },
@@ -429,7 +429,7 @@ test("§4.1 row 6 · Private, and its showcased form; showcasing never changes t
   assert.equal(s.showcase, null);
   assert.equal(s.mintedAt, MINTED);
   // Phase 2 §2.2: a Private project's violet step is Add to marketplace, with View brief beside it.
-  const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_lamp?list=1" };
+  const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_lamp/earn/sell?list=1" };
   assert.deepEqual(s.next, { first: add, second: viewBrief("night-light"), violet: true });
 
   const shown = sum({ ...minted, showcasedAt: NOW }, d);

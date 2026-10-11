@@ -124,7 +124,12 @@ const PART = {
     tall: "[@container(min-width:1024px)]:row-start-2 [@container(min-width:1024px)]:row-span-2",
   },
   rest: {
-    base: "min-w-0 [@container(min-width:1024px)]:col-start-2 [&:not(:has(>:not(:empty)))]:hidden",
+    // With no Marketplace block (every owner page since Build and Earn P0, and a buyer's page on
+    // a project never listed) the rest of the rail takes the block's place at the top.
+    base: cn(
+      "min-w-0 [@container(min-width:1024px)]:col-start-2 [&:not(:has(>:not(:empty)))]:hidden",
+      "[@container(min-width:1024px)]:[[data-rail-lead]:empty~&]:row-start-1 [@container(min-width:1024px)]:[[data-rail-lead]:empty~&]:row-span-3",
+    ),
     short: "[@container(min-width:1024px)]:row-start-2 [@container(min-width:1024px)]:row-span-2",
     tall: "[@container(min-width:1024px)]:row-start-3",
   },

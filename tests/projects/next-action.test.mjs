@@ -56,7 +56,7 @@ const summaryOf = (p, brief, m = EMPTY_MARKET, extra = {}) =>
 const pairOf = (p, brief, m = EMPTY_MARKET, extra = {}) => summaryOf(p, brief, m, extra).next;
 
 const BRIEF = "/project/car/brief";
-const LIST = "/projects/proj_car?list=1";
+const LIST = "/projects/proj_car/earn/sell?list=1"; // listFlowHref: Earn › Project NFT (Build and Earn P0)
 const viewBrief = { kind: "view-brief", label: "View brief", href: BRIEF };
 const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: LIST };
 const violet = (first, second = null) => ({ first, second, violet: true });

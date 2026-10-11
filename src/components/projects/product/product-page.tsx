@@ -7,8 +7,9 @@
 //   Activity chip), the Build check, the version select, ★ Open in editor (the
 //   page's one violet, C16), the lock line, the version notice or the source
 //   line; the identity row; then the tab strip and its panel (product-tabs.tsx);
-// - the rail: the Marketplace block (T27), then the Editor block
-//   (product-rail.tsx), right of the tabs from a 1024 px page container.
+// - the rail: the Marketplace block (T27, the buyer's side only since Build
+//   and Earn P0), then the Editor block (product-rail.tsx), right of the tabs
+//   from a 1024 px page container.
 //
 // Every read is `useProjectPageData`'s — the project page's own derivation —
 // so the two pages can't disagree (COR-74), and every `can()` passes
