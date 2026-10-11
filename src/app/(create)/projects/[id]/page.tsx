@@ -4,7 +4,7 @@
 // matches, and otherwise the page's shell (spec §5.3).
 //
 // The addresses that moved to Earn in Build and Earn P0 redirect before
-// anything renders (`projectRedirectOf`): `?list=1` → Earn › Project NFT with
+// anything renders (`projectRedirectOf`): `?list=1` → Earn › Sell with
 // the listing flow, `?tab=customers[&sale=]` → Earn › Customers.
 
 import type { Metadata } from "next";

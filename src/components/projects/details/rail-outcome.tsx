@@ -1,14 +1,16 @@
 "use client";
 
-// The Outcome block (COM-3…22): what the Brief made of this project,
-// read-only. It has no chip of its own and no Brief control — the outcome,
-// its terms and the mint are chosen only in the Brief (COM-18). Owner-only: a
-// buyer's preview drops the whole block (PPL-7). Its page shows its skeleton
-// until the Brief draft is read, so this block never waits.
+// The Outcome (COM-3…22): what the Brief made of this project, read-only.
+// It has no chip of its own and no Brief control — the outcome, its terms and
+// the mint are chosen only in the Brief (COM-18). Owner-only: a buyer's
+// preview never sees it (PPL-7). Its page shows its skeleton until the Brief
+// draft is read, so it never waits.
 //
-// Build and Earn P0: the block left the engineering page's rail for Earn ›
-// Project NFT, and its Showcase row stayed behind as the rail's own Showcase
-// block (rail-showcase.tsx) — Showcase needs no wallet.
+// Build and Earn P0: the block left the engineering page's rail for Earn, and
+// its Showcase row stayed behind as the rail's own Showcase block
+// (rail-showcase.tsx) — Showcase needs no wallet. Since the Earn redesign
+// (owner, 2026-10-11) Earn › Sell's "Your project" card shows only its mint
+// proof, quiet, behind "Mint details" (`MintDetails`).
 //
 // Phase 2 (T24, P2-MINT-10/11): the mint rows carry T02's proof (token,
 // signature or transaction, payout wallet), each demo fact labelled
@@ -26,90 +28,69 @@ import type { ProjectCommerce } from "@/lib/brief/project-brief";
 import { can, type Viewer } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { ProjectSummary } from "@/lib/manual/project-summary";
-import { outcomeView, type OutcomeRow, type OutcomeView } from "@/lib/manual/rail-copy";
+import { outcomeView, type OutcomeRow } from "@/lib/manual/rail-copy";
 import { makerId } from "@/lib/wallet/demo-wallet";
 import { DEMO_ACCOUNTS } from "@/lib/wallet/identities";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 import type { MintRecord, MintStatus } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
-import { RailBlock, RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
+import { RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
 
-export function RailOutcome({
+/** "Mint details": the mint's proof rows (the Testnet demo badge on the Mint row, the payout
+ *  wallet and its change control), its footnote and the caller's `children`, behind a native
+ *  disclosure, closed. Owner-only; null until something is minted. */
+export function MintDetails({
   summary,
   commerce,
   viewer,
   view,
   announce,
+  children,
 }: {
   summary: ProjectSummary;
   commerce: ProjectCommerce;
   viewer: Viewer;
-  /** The page's one derivation (COR-74). Only `videos.readiness.showcase` is read. */
   view: ProjectView;
-  /** The shell's one polite live region (SlotProps.announce). */
   announce: (message: string) => void;
+  children?: React.ReactNode;
 }) {
   if (!can(viewer, "facts.seeOwnerOnly")) return null;
   const outcome = outcomeView(commerce, summary, view.videos.readiness.showcase);
-  return (
-    <RailBlock title="Outcome" meta={outcome.meta}>
-      <OutcomeBody outcome={outcome} commerce={commerce} projectId={summary.id} announce={announce} />
-    </RailBlock>
-  );
-}
-
-function OutcomeBody({
-  outcome,
-  commerce,
-  projectId,
-  announce,
-}: {
-  outcome: OutcomeView;
-  commerce: ProjectCommerce;
-  projectId: string;
-  announce: (message: string) => void;
-}) {
-  const stacked = useRailStacked();
   const minted = outcome.minted;
-  // An unreadable mint has no rows left to show now that Showcase is its own block.
-  const facts = minted?.rows.length ? (
-    <RailFacts>
-      {minted.rows.map((row) => (
-        <OutcomeFact
-          key={row.key}
-          row={row}
-          mintStatus={outcome.mint}
-          demo={outcome.demo}
-          record={commerce.record}
-          projectId={projectId}
-          announce={announce}
-        />
-      ))}
-    </RailFacts>
-  ) : null;
+  if (!minted) return null;
   return (
-    <>
-      <p className="m-0 text-md leading-relaxed text-text-secondary">{outcome.subline}</p>
-      {outcome.clipLine && <p className="m-0 text-sm leading-relaxed text-text-secondary">{outcome.clipLine}</p>}
-      {facts &&
-        (stacked ? (
-          <details className="group">
-            <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-4 rounded-md text-md font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus [&::-webkit-details-marker]:hidden">
-              Minted details
-              <span
-                aria-hidden
-                className="inline-flex text-text-tertiary transition-transform duration-normal ease-decelerate group-open:rotate-180 motion-reduce:transition-none"
-              >
-                <Icon icon={ArrowDown01Icon} size={16} />
-              </span>
-            </summary>
-            <div className="pt-4">{facts}</div>
-          </details>
+    <details className="group">
+      <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-3 rounded-md text-md font-semibold text-text-primary outline-none hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus [&::-webkit-details-marker]:hidden">
+        Mint details
+        <span
+          aria-hidden
+          className="inline-flex text-text-tertiary transition-transform duration-normal ease-decelerate group-open:rotate-180 motion-reduce:transition-none"
+        >
+          <Icon icon={ArrowDown01Icon} size={16} />
+        </span>
+      </summary>
+      <div className="flex flex-col gap-6 pt-4">
+        {minted.rows.length ? (
+          <RailFacts>
+            {minted.rows.map((row) => (
+              <OutcomeFact
+                key={row.key}
+                row={row}
+                mintStatus={outcome.mint}
+                demo={outcome.demo}
+                record={commerce.record}
+                projectId={summary.id}
+                announce={announce}
+              />
+            ))}
+          </RailFacts>
         ) : (
-          facts
-        ))}
-      {minted && <p className="m-0 text-sm leading-relaxed text-text-tertiary">{minted.footnote}</p>}
-    </>
+          <p className="m-0 text-md leading-relaxed text-text-secondary">{outcome.subline}</p>
+        )}
+        <p className="m-0 text-sm leading-relaxed text-text-tertiary">{minted.footnote}</p>
+        {children}
+      </div>
+    </details>
   );
 }
 

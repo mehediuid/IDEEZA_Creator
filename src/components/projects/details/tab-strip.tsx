@@ -19,6 +19,8 @@
 //   where the strip is swiped.
 // - The page owns the URL and the one tabpanel: tabs are id="tab-{id}" and
 //   the panel is id="panel-{id}".
+// - Its tab, selected and fade classes are exported for a strip of page links
+//   that looks the same: the Earn tabs (earn/earn-nav.tsx).
 
 import * as React from "react";
 import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
@@ -28,13 +30,13 @@ import { cn } from "@/lib/utils";
 
 export type TabDef<T extends string> = { id: T; label: string };
 
-const TAB =
+export const TAB =
   "inline-flex h-[36px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-8 text-md font-semibold leading-md outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus max-md:h-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)]";
-const TAB_ON = "border-text-primary bg-bg-subtle text-text-primary";
-const TAB_OFF = "border-transparent text-text-secondary hover:bg-bg-subtle hover:text-text-primary";
+export const TAB_ON = "border-text-primary bg-bg-subtle text-text-primary";
+export const TAB_OFF = "border-transparent text-text-secondary hover:bg-bg-subtle hover:text-text-primary";
 
 /** The fade over an edge the strip can scroll past (a mask, so it reads on any surface). */
-const FADE = {
+export const FADE = {
   start: "[mask-image:linear-gradient(to_left,black_calc(100%_-_var(--spacing-24)),transparent)]",
   end: "[mask-image:linear-gradient(to_right,black_calc(100%_-_var(--spacing-24)),transparent)]",
   both: "[mask-image:linear-gradient(to_right,transparent,black_var(--spacing-24),black_calc(100%_-_var(--spacing-24)),transparent)]",

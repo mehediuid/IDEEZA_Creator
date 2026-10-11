@@ -219,7 +219,7 @@ test("entryStateOf: the edition gates replace the button, first match wins, in p
   }
 });
 
-test("entryStateOf: no live or paused Main listing says so plainly, with the Project NFT link", () => {
+test("entryStateOf: no live or paused Main listing says so plainly, with the Your project link", () => {
   for (const mainView of [NONE, REMOVED, { kind: "ended", listing: MAIN, why: "noBids" }]) {
     assert.deepEqual(entryStateOf({ ...ENTRY, mainView }), {
       kind: "blocked",
@@ -426,7 +426,7 @@ test("sellChecksOf: everything ready passes", () => {
   );
 });
 
-test("sellChecksOf: no Main listing blocks with the Project NFT fix", () => {
+test("sellChecksOf: no Main listing blocks with the Your project fix", () => {
   const r = sellChecksOf(checks({ mainView: NONE }));
   assert.equal(r.ok, false);
   assert.equal(r.blocker, "List Car on the marketplace first. Copies are sold from its listing.");

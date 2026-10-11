@@ -27,6 +27,20 @@ export const KIND_SUB: Record<EditionKind, string> = {
   physical: "You make each one and ship it to the buyer.",
 };
 export const USE_LABEL: Record<EditionUse, string> = { private: "Personal use", commercial: "Business use" };
+/** The two prices, for the maker: the price, and the price with future updates. */
+export const PRICE_LABEL = { regular: "Price", extended: "Price with future updates" } as const;
+/** `checkEditionListing`'s tier message, in the same words. */
+export const EXTENDED_BELOW = "Can't be less than the price.";
+
+/** A track by kind and use: "Design files · Personal use". */
+export function trackNameOf(t: { kind: EditionKind; use: EditionUse }): string {
+  return `${KIND_LABEL[t.kind]} · ${USE_LABEL[t.use]}`;
+}
+
+/** A track card's sold line: "Copies sold 3 of 30", or "Sold out". */
+export function copiesSoldLineOf(card: { sold: number; total: number; soldOut: boolean }): string {
+  return card.soldOut ? "Sold out" : `Copies sold ${card.sold} of ${card.total}`;
+}
 
 export const ALREADY_ON_SALE = "Already on sale";
 export const NOT_SELLING = "Not selling";
@@ -120,7 +134,7 @@ export function sellingLinesOf(productId: string, tracks: EditionTrack[], sales:
 }
 
 export type EntryState =
-  /** `link`: where the fix is — Earn's mint flow, or Earn › Project NFT for the Main listing. */
+  /** `link`: where the fix is — Earn's mint flow, or Earn › Sell's "Your project" card for the Main listing. */
   | { kind: "blocked"; reason: string; link: "mint" | "projectNft" | null }
   | { kind: "open" }
   | { kind: "full"; line: string };
@@ -292,7 +306,7 @@ export function stepProblemOf(step: SellStep, draft: SellDraft, ctx: SellCtx): S
       }
       const extended = checkEditionListing({ regular: t.regular, extended: t.extended, royaltiesPct: ROYALTY_DEFAULT, confirmed: true });
       if (extended) {
-        return problem("extended", extended === "Extended can't cost less than Regular." ? "Can't be less than the price." : extended);
+        return problem("extended", extended === "Extended can't cost less than Regular." ? EXTENDED_BELOW : extended);
       }
       if (state.kind === "listed") return problem("use", `${USE_LABEL[draft.use]} is already on sale.`);
       const royalties = checkEditionListing({ regular: t.regular, extended: t.extended, royaltiesPct: t.royaltyPct, confirmed: true });
@@ -323,7 +337,7 @@ export type SellCheck = {
   ok: boolean;
   title: string;
   detail: string | null;
-  /** The one-tap fix: Earn › Project NFT, the product's video, or back to Copies and price.
+  /** The one-tap fix: Earn › Sell's "Your project" card, the product's video, or back to Copies and price.
    *  Ownership has none: its box is on Review, under the rows. */
   fix: "projectNft" | "video" | "price" | null;
 };

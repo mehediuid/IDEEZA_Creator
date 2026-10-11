@@ -9,7 +9,7 @@ Moved verbatim from `CLAUDE.md` §5 on 2026-09-29 and split by area; each sectio
 | Area | Guide | Sections |
 |---|---|---|
 | Global shell, `/parts` home, Add Network & Connection Map, My projects / Project details, History, Innovations, minting | [platform-and-projects.md](platform-and-projects.md) | Platform & shell · Add Network & Connection Map · Projects, history & community |
-| The Earn area: `/projects/<id>/earn` and its sections (Project NFT, Editions, Business plan, Splits, Customers, Rights) | [earn-layer.md](earn-layer.md) | Earn area · Sections |
+| The Earn area: `/projects/<id>/earn` and its tabs (Overview, Sell, Business plan, Money) | [earn-layer.md](earn-layer.md) | Earn area · Tabs |
 | Home prompt → concept chat → build → review, credits, companions, spec sheet, 3D tab, voice | [ai-create-flow.md](ai-create-flow.md) | AI create & build flow |
 | `/parts`, `/parts/[id]`, the New Package flow, land patterns | [parts-package.md](parts-package.md) | Part authoring — New Package flow |
 | Schematic canvas, palette, sheets, connectivity, ERC, netlist, annotation, sheet export | [pcb-schematic.md](pcb-schematic.md) | PCB module — schematic editor · Schematic connectivity, ERC, netlist & annotation |

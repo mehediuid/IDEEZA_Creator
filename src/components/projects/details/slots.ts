@@ -52,7 +52,7 @@ export type RailBlockId = (typeof RAIL_ORDER)[number];
 
 /** The listing start's props — "Add to marketplace" / "List another share"
  *  (§3.6.3, T22). It left the page's header in Build and Earn P0; Earn ›
- *  Project NFT renders it with the pair's tone and a button class. */
+ *  Sell renders it with the pair's tone and a button class. */
 export type ActionSlotProps = SlotProps & {
   action: Extract<NextAction, { kind: "add-to-marketplace" }>;
   violet: boolean;

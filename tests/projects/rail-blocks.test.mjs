@@ -48,10 +48,18 @@ test("Details carries no chat link — Built in lives in the Versions block (COR
 });
 
 test("the blocks frame themselves in the shared RailBlock, whose probe matches RAIL_MIN (COR-54, COR-56)", () => {
-  assert.match(read("rail-outcome.tsx"), /<RailBlock/);
   assert.match(read("rail-showcase.tsx"), /<RailBlock title="Showcase"/);
   assert.match(read("rail-details.tsx"), /<RailBlock/);
   const frame = read("rail-block.tsx");
   assert.match(frame, /export const RAIL_MIN = 1024;/);
-  assert.match(frame, /\[@container\(max-width:1023px\)\]:w-\[2px\]/, "the probe's literal is RAIL_MIN − 1");
+  // The block's probe and RailStackScope's (an Earn card's facts) both carry RAIL_MIN − 1.
+  assert.equal(frame.match(/\[@container\(max-width:1023px\)\]:w-\[2px\]/g)?.length, 2, "the probe's literal is RAIL_MIN − 1");
+});
+
+test("the mint's proof is Earn › Sell's quiet Mint details, owner-only, closed (owner, 2026-10-11)", () => {
+  const src = read("rail-outcome.tsx");
+  assert.match(src, /export function MintDetails\(/);
+  assert.match(src, /<details className="group[^"]*">\s*<summary[^>]*>\s*Mint details/);
+  assert.doesNotMatch(src, /<details[^>]* open/, "closed by default");
+  assert.doesNotMatch(src, /RailOutcome|"Outcome"/, "no Outcome block or word left");
 });

@@ -5,9 +5,11 @@
 // parts since Build and Earn:
 //
 // - `EditionTracks` — the owner's rows of one kind, under a product row's
-//   Manage disclosure in Earn › Editions (earn/editions.tsx). A track card:
-//   "NFTs sold {s}/{t}" (or "Sold out"), its use pill, "+{n} new" after Add
-//   copies until the next sale, and either Add to marketplace or the listed
+//   Manage disclosure in Earn › Sell › Copies of each product
+//   (earn/editions.tsx). A track card, in the maker's words (sell-flow.ts):
+//   "Copies sold {s} of {t}" (or "Sold out"), its use pill ("Personal use",
+//   "Business use"), "Price" and "Price with future updates", "+{n} new"
+//   after Add copies until the next sale, and either Add to marketplace or the listed
 //   prices with Edit · Remove listing · Add copies. Add to marketplace asks
 //   `listGate` (the Main listing live or paused) and then the strict
 //   "edition" readiness of this product only (errata 16) before the listing
@@ -49,6 +51,7 @@ import {
   unlistTrack,
   USE_WORD,
 } from "@/lib/market/editions";
+import { copiesSoldLineOf, KIND_LABEL, PRICE_LABEL, trackNameOf, USE_LABEL } from "@/lib/market/sell-flow";
 import type { EditionKind, EditionTrack, EditionUse, Listing } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
@@ -161,7 +164,7 @@ function ChainFacts({ chain }: { chain: { network: Network; collection: string }
   );
 }
 
-/** The owner's rows of one kind for one product, with their dialogs (Earn › Editions). */
+/** The owner's rows of one kind for one product, with their dialogs (Earn › Sell › Copies of each product). */
 export function EditionTracks({
   kind,
   project,
@@ -221,7 +224,7 @@ export function EditionTracks({
       setRemoveError(w.message);
       return;
     }
-    done(`${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT removed from the marketplace.`, `${firstControlId(track.id)}-list`);
+    done(`${trackNameOf(track)} removed from the marketplace.`, `${firstControlId(track.id)}-list`);
   };
 
   if (blocked || ofKind.length === 0) return null;
@@ -237,7 +240,7 @@ export function EditionTracks({
             {note}
           </p>
         )}
-        <ul role="list" aria-label={`${KIND_WORD[kind]} NFTs of ${name}`} className="m-0 flex list-none flex-col gap-6 p-0">
+        <ul role="list" aria-label={`${KIND_LABEL[kind]} of ${name}`} className="m-0 flex list-none flex-col gap-6 p-0">
           {ofKind.map((t) => (
             <li key={t.id}>
               <TrackCard
@@ -305,7 +308,7 @@ export function EditionTracks({
       {d?.kind === "remove" && (
         <ConfirmDialog
           open
-          title={`Remove ${USE_WORD[d.track.use]} ${KIND_WORD[d.track.kind]} NFT from the marketplace?`}
+          title={`Remove ${trackNameOf(d.track)} from the marketplace?`}
           confirmLabel="Remove listing"
           onCancel={() => setDialog(null)}
           onConfirm={() => confirmRemove(d.track)}
@@ -323,26 +326,27 @@ export function EditionTracks({
   );
 }
 
-function TrackHead({ track, view }: { track: EditionTrack; view: ProductSlotProps["view"] }) {
+/** `plain`: the owner's card in the maker's words (Personal use, Copies sold 3 of 30); a buyer's keeps editions.ts's. */
+function TrackHead({ track, view, plain = false }: { track: EditionTrack; view: ProductSlotProps["view"]; plain?: boolean }) {
   const card = trackCardOf(track, view.sales);
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Badge tone="neutral">{USE_WORD[track.use]}</Badge>
+      <Badge tone="neutral">{plain ? USE_LABEL[track.use] : USE_WORD[track.use]}</Badge>
       <span className={cn("text-md font-semibold tabular-nums", card.soldOut ? "text-text-success" : "text-text-primary")}>
-        {card.soldLine}
+        {plain ? copiesSoldLineOf(card) : card.soldLine}
       </span>
       {card.newBadge && <Badge tone="info">{card.newBadge}</Badge>}
     </div>
   );
 }
 
-function Prices({ listing }: { listing: NonNullable<EditionTrack["listing"]> }) {
+function Prices({ listing, plain = false }: { listing: NonNullable<EditionTrack["listing"]>; plain?: boolean }) {
   return (
     <RailFacts>
-      <RailFact label="Regular price">
+      <RailFact label={plain ? PRICE_LABEL.regular : "Regular price"}>
         <span className="tabular-nums">{formatAmount(listing.regular, listing.token)}</span>
       </RailFact>
-      <RailFact label="Extended price">
+      <RailFact label={plain ? PRICE_LABEL.extended : "Extended price"}>
         <span className="tabular-nums">{formatAmount(listing.extended, listing.token)}</span>
       </RailFact>
       <RailFact label="Royalties">{listing.royaltyPct}% on resales</RailFact>
@@ -378,14 +382,11 @@ function TrackCard({
       ? `Hidden on Explore marketplace while ${projectName}'s listing is paused.`
       : `Hidden on Explore marketplace until ${projectName} is listed again.`;
   return (
-    <section
-      aria-label={`${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT`}
-      className="flex flex-col gap-5 rounded-lg border border-solid border-border p-6"
-    >
-      <TrackHead track={track} view={view} />
+    <section aria-label={trackNameOf(track)} className="flex flex-col gap-5 rounded-lg border border-solid border-border p-6">
+      <TrackHead track={track} view={view} plain />
       {track.listing ? (
         <>
-          <Prices listing={track.listing} />
+          <Prices listing={track.listing} plain />
           {hidden && <p className="m-0 text-sm text-text-secondary">{hiddenLine}</p>}
           <div className="flex flex-wrap gap-4">
             <Button id={`${id}-edit`} type="button" hierarchy="secondary" size="md" className={TAP} onClick={onEdit}>

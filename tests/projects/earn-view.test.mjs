@@ -1,17 +1,33 @@
 // The Earn area's pure facts (docs/superpowers/specs/2026-10-11-build-earn-p0-design.md,
-// "Earn area"): the owner-only gate, the document title, the Overview's next-step card, the Project NFT section's pair and the Editions section's products.
+// "Earn area", and the owner's 2026-10-11 redesign): the four tabs and their addresses, the old
+// section addresses' redirects, the owner-only gate, the document title, the header's status
+// pill, the Overview's path, card and facts, and Sell's "Your project" card, pair and copies.
 // Compiled by tests/projects/tsconfig.json:
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   canOpenEarn,
+  EARN_STATUS_WORD,
+  EARN_STEPS,
   earnDocTitle,
+  earnLiveFactsOf,
   earnNextOf,
   earnPairOf,
+  earnPathOf,
+  earnStatusOf,
   editionProductsOf,
+  yourProjectLineOf,
 } from "../../.tmp-test/lib/manual/earn-view.js";
-import { EARN_GROUPS, EARN_SECTIONS, earnHref } from "../../.tmp-test/lib/manual/earn-route.js";
+import {
+  EARN_PARTS,
+  EARN_SECTION_LABEL,
+  EARN_SECTIONS,
+  earnHref,
+  earnMintHref,
+  earnSectionRedirectOf,
+  isEarnSection,
+} from "../../.tmp-test/lib/manual/earn-route.js";
 import { EMPTY_MARKET, NO_SHARE_TO_SELL, projectSummary } from "../../.tmp-test/lib/manual/project-summary.js";
 import { normalizeBrief, normalizeStep } from "../../.tmp-test/lib/brief/types.js";
 import { demoAddress } from "../../.tmp-test/lib/wallet/demo-wallet.js";
@@ -25,8 +41,47 @@ const LISTED = at(2026, 10, 9, 10, 0);
 const OWNER = { kind: "local-owner" };
 const BUYER_PREVIEW = { kind: "owner-preview" };
 const CONTRIBUTOR = { kind: "contributor-preview", contributorId: "ctb_ana", name: "Ana Silva", role: "coOwner", share: 30 };
+const STATES = ["none", "minted", "given", "listed", "paused", "soldPartial", "soldOut"];
 
-// ─────────────────────────── the gate and the title ───────────────────────────
+// ─────────────────────────── the tabs and their addresses ───────────────────────────
+
+test("four tabs, in order: Overview · Sell · Business plan · Money", () => {
+  assert.deepEqual([...EARN_SECTIONS], ["overview", "sell", "plan", "money"]);
+  assert.deepEqual(EARN_SECTIONS.map((s) => EARN_SECTION_LABEL[s]), ["Overview", "Sell", "Business plan", "Money"]);
+  for (const old of ["editions", "splits", "customers", "rights"]) assert.equal(isEarnSection(old), false, old);
+});
+
+test("a tab's address is its path; a part of a tab adds its id as the hash, after any query", () => {
+  assert.equal(earnHref("proj_car"), "/projects/proj_car/earn");
+  assert.equal(earnHref("proj_car", "overview"), "/projects/proj_car/earn");
+  assert.equal(earnHref("proj_car", "sell", { list: "1" }), "/projects/proj_car/earn/sell?list=1");
+  assert.equal(earnHref("proj_car", "plan"), "/projects/proj_car/earn/plan");
+  assert.equal(earnHref("proj_car", "money"), "/projects/proj_car/earn/money");
+  assert.equal(earnHref("proj_car", "copies"), "/projects/proj_car/earn/sell#copies");
+  assert.equal(earnHref("proj_car", "splits"), "/projects/proj_car/earn/money#splits");
+  assert.equal(earnHref("proj_car", "rights"), "/projects/proj_car/earn/money#rights");
+  assert.equal(earnHref("proj_car", "customers", { sale: "sale_a" }), "/projects/proj_car/earn/money?sale=sale_a#customers");
+  assert.equal(earnHref("a b", "customers"), "/projects/a%20b/earn/money#customers");
+  assert.deepEqual(EARN_PARTS, { copies: "sell", splits: "money", customers: "money", rights: "money" });
+  assert.ok(earnMintHref("proj_car").startsWith(earnHref("proj_car")), "the mint flow is under Earn");
+});
+
+test("the old section addresses redirect to their part of a tab; customers keeps sale= and nothing else", () => {
+  assert.equal(earnSectionRedirectOf("proj_car", "editions"), "/projects/proj_car/earn/sell#copies");
+  assert.equal(earnSectionRedirectOf("proj_car", "splits"), "/projects/proj_car/earn/money#splits");
+  assert.equal(earnSectionRedirectOf("proj_car", "rights"), "/projects/proj_car/earn/money#rights");
+  assert.equal(earnSectionRedirectOf("proj_car", "customers"), "/projects/proj_car/earn/money#customers");
+  assert.equal(earnSectionRedirectOf("proj_car", "customers", { sale: "sale_a" }), "/projects/proj_car/earn/money?sale=sale_a#customers");
+  assert.equal(earnSectionRedirectOf("proj_car", "customers", { sale: ["sale_b", "sale_c"] }), "/projects/proj_car/earn/money?sale=sale_b#customers");
+  assert.equal(earnSectionRedirectOf("proj_car", "customers", { sale: "sale_a", view: "buyer" }), "/projects/proj_car/earn/money?sale=sale_a#customers");
+  assert.equal(earnSectionRedirectOf("proj_car", "splits", { sale: "sale_a" }), "/projects/proj_car/earn/money#splits", "sale= is only Customers'");
+  // The tabs themselves, an unknown segment and an inherited key are not moved.
+  for (const seg of ["overview", "sell", "plan", "money", "mint", "nope", "constructor", "toString"]) {
+    assert.equal(earnSectionRedirectOf("proj_car", seg, { sale: "sale_a" }), null, seg);
+  }
+});
+
+// ─────────────────────────── the gate, the title and the status pill ───────────────────────────
 
 test("only the owner opens the Earn area; every preview reads the gate state", () => {
   assert.equal(canOpenEarn(OWNER), true);
@@ -35,49 +90,88 @@ test("only the owner opens the Earn area; every preview reads the gate state", (
   assert.equal(canOpenEarn({ kind: "demo-buyer", buyerId: "buyer-mira" }), false);
 });
 
-test("the document title names the section, then Earn, then the project", () => {
+test("the document title names the tab, then Earn, then the project", () => {
   assert.equal(earnDocTitle("overview", "Smart planter"), "Earn · Smart planter · IDEEZA");
-  assert.equal(earnDocTitle("sell", "Smart planter"), "Project NFT · Earn · Smart planter · IDEEZA");
+  assert.equal(earnDocTitle("sell", "Smart planter"), "Sell · Earn · Smart planter · IDEEZA");
   assert.equal(earnDocTitle("plan", "Smart planter"), "Business plan · Earn · Smart planter · IDEEZA");
+  assert.equal(earnDocTitle("money", "Smart planter"), "Money · Earn · Smart planter · IDEEZA");
 });
 
-test("the sub-navigation's groups hold every section once, overview first", () => {
-  const flat = EARN_GROUPS.flatMap((g) => g.sections);
-  assert.deepEqual([...flat].sort(), [...EARN_SECTIONS].sort());
-  assert.equal(flat[0], "overview");
-  assert.equal(EARN_GROUPS[0].label, null);
+test("the header's one status pill says the commercial state in a maker's words", () => {
+  assert.deepEqual(EARN_STATUS_WORD, {
+    none: "Not for sale yet",
+    minted: "Minted",
+    listed: "On the marketplace",
+    paused: "Listing paused",
+    soldPartial: "Part sold",
+    soldOut: "Sold out",
+    given: "Given away",
+  });
+  assert.deepEqual(earnStatusOf("none"), { word: "Not for sale yet", tone: "neutral" });
+  assert.deepEqual(earnStatusOf("minted"), { word: "Minted", tone: "neutral" });
+  assert.deepEqual(earnStatusOf("paused"), { word: "Listing paused", tone: "neutral" });
+  for (const s of ["listed", "soldPartial", "soldOut", "given"]) assert.equal(earnStatusOf(s).tone, "success", s);
+  for (const s of STATES) assert.doesNotMatch(earnStatusOf(s).word, /brief|nft|outcome/i, s);
 });
 
-test("the Earn links the area reads: ?list=1 on Project NFT and a sale on Customers", () => {
-  assert.equal(earnHref("proj_car", "sell", { list: "1" }), "/projects/proj_car/earn/sell?list=1");
-  assert.equal(earnHref("proj_car", "customers", { sale: "sale_a" }), "/projects/proj_car/earn/customers?sale=sale_a");
-  assert.equal(earnHref("proj_car"), "/projects/proj_car/earn");
+// ─────────────────────────── the Overview ───────────────────────────
+
+test("the path is Mint → Sell → Get paid, every step before the maker's place done", () => {
+  assert.deepEqual(EARN_STEPS.map((s) => s.label), ["Mint", "Sell", "Get paid"]);
+  const states = (c) => earnPathOf(c).map((s) => s.state);
+  assert.deepEqual(states("none"), ["current", "todo", "todo"]);
+  for (const c of ["minted", "listed", "paused", "given"]) assert.deepEqual(states(c), ["done", "current", "todo"], c);
+  for (const c of ["soldPartial", "soldOut"]) assert.deepEqual(states(c), ["done", "done", "current"], c);
+  assert.deepEqual(earnPathOf("none").map((s) => s.n), [1, 2, 3]);
 });
 
-// ─────────────────────────── the next-step card ───────────────────────────
-
-test("the Overview's one card: mint, then list, then where each later state is managed", () => {
+test("the Overview's card: mint, then sell, each with its why; later states say where they're managed", () => {
   assert.deepEqual(earnNextOf("proj_car", "none"), {
-    title: "Mint your project NFT",
+    step: "mint",
+    title: "Mint your project",
+    why: "Minting creates a record that you own this design. It's free here and signed in the demo wallet.",
     point: "mint",
+    verb: "mint",
     action: { label: "Start mint", href: "/projects/proj_car/earn/mint" },
   });
   assert.deepEqual(earnNextOf("proj_car", "minted"), {
-    title: "List your project for sale",
+    step: "sell",
+    title: "Sell your project",
+    why: "List the whole project, or sell copies of each product.",
     point: "list",
+    verb: "sell",
     action: { label: "Add to marketplace", href: "/projects/proj_car/earn/sell?list=1" },
   });
   for (const state of ["given", "listed", "paused", "soldPartial", "soldOut"]) {
     const n = earnNextOf("proj_car", state);
     assert.equal(n.point, null, state);
-    assert.match(n.action.href, /^\/projects\/proj_car\/earn\/(sell|customers)$/, state);
+    assert.equal(n.verb, null, state);
+    assert.equal(n.step, earnPathOf(state).find((s) => s.state === "current").id, `${state}: the card is the path's current step`);
+    assert.match(n.action.href, /^\/projects\/proj_car\/earn\/(sell|money#customers)$/, state);
     assert.match(n.title, /^[A-Z][^—]*$/, n.title);
+    assert.match(n.why, /^[A-Z][^—]*\.$/, n.why);
   }
-  assert.equal(earnNextOf("proj_car", "soldOut").action.label, "See customers");
-  assert.equal(earnNextOf("proj_car", "paused").action.label, "Relist in Project NFT");
+  assert.equal(earnNextOf("proj_car", "soldOut").action.label, "See customers and payouts");
+  assert.equal(earnNextOf("proj_car", "paused").action.label, "Relist in Sell");
+  for (const s of STATES) {
+    const n = earnNextOf("proj_car", s);
+    assert.doesNotMatch(`${n.title} ${n.why} ${n.action.label}`, /brief|outcome|project nft/i, s);
+  }
 });
 
-// ─────────────────────────── the Project NFT pair ───────────────────────────
+// ─────────────────────────── Sell › Your project ───────────────────────────
+
+test("Your project says its state in plain words until a live, paused or sold listing's own card does", () => {
+  assert.equal(yourProjectLineOf("none", "none"), "Not minted yet.");
+  assert.equal(yourProjectLineOf("minted", "none"), "Minted. Not on the marketplace yet.");
+  assert.equal(yourProjectLineOf("minted", "ended"), "Minted. Not on the marketplace now.");
+  assert.equal(yourProjectLineOf("given", "none"), "Minted and given to the community.");
+  assert.equal(yourProjectLineOf("soldPartial", "ended"), "Part sold. Not on the marketplace now.");
+  for (const kind of ["live", "paused", "sold"]) assert.equal(yourProjectLineOf("listed", kind), null, kind);
+  assert.equal(yourProjectLineOf("soldOut", "sold"), null);
+});
+
+// ─────────────────────────── Sell › Your project's pair ───────────────────────────
 
 const FLOW = { pcb: false, code: false, three: false, assembly: false, wiring: false, preview: false, brief: false };
 const project = (over = {}) => ({
@@ -163,14 +257,56 @@ test("a preview gets no pair at all (PPL-6)", () => {
   assert.deepEqual(kinds(pairFor(project({ status: "draft" }), null, { viewer: CONTRIBUTOR }).pair), [null, null, true]);
 });
 
-// ─────────────────────────── Editions ───────────────────────────
+// ─────────────────────────── Sell › Copies of each product ───────────────────────────
 
 const product = (id, name, dropped = null) => ({ id, name, description: "", built: null, state: "hand", version: null, dropped });
 
-test("Editions lists every current product, and a dropped one only while it has editions", () => {
+test("Copies lists every current product, and a dropped one only while it has editions", () => {
   const dropped = { lastIn: 1, current: 2 };
   const products = [product("p1", "Planter"), product("p2", "Hub", dropped), product("p3", "Old lid", dropped)];
   const track = { id: "trk_1", projectId: "proj_car", productId: "p2", kind: "physical", use: "private" };
   assert.deepEqual(editionProductsOf(products, []).map((p) => p.id), ["p1"]);
   assert.deepEqual(editionProductsOf(products, [track]).map((p) => p.id), ["p1", "p2"]);
+});
+
+// ─────────────────────────── the Overview's live facts ───────────────────────────
+
+test("the live card's facts: price, copies sold of the copies made, customers, and what the sales earned", () => {
+  const live = { kind: "live", listing: listing(), auction: null };
+  const track = (id, total) => ({ id, projectId: "proj_car", productId: "p1", kind: "virtual", use: "private", supply: { total } });
+  const copy = (id, trackId, payout) => sale({ id, item: { nft: "virtual", trackId }, price: "0.02", payout });
+  const facts = earnLiveFactsOf({
+    projectId: "proj_car",
+    commercial: "listed",
+    listing: live,
+    sales: [copy("s1", "t1", "0.0195"), copy("s2", "t1", "0.0195"), sale({ id: "s3", projectId: "proj_other" })],
+    editions: [track("t1", 5), track("t2", 3), { ...track("t9", 50), projectId: "proj_other" }],
+    buyers: 1,
+  });
+  assert.deepEqual(facts, [
+    { label: "Price", value: "0.05 MATIC" },
+    { label: "Copies sold", value: "2 of 8" },
+    { label: "Customers", value: "1" },
+    { label: "Earned", value: "0.039 MATIC" },
+  ]);
+  const given = earnLiveFactsOf({ projectId: "proj_car", commercial: "given", listing: { kind: "none" }, sales: [], editions: [], buyers: 0 });
+  assert.deepEqual(given.map((f) => f.value), ["Free", "0", "0", "Nothing yet"]);
+  const auction = earnLiveFactsOf({
+    projectId: "proj_car",
+    commercial: "listed",
+    listing: { kind: "live", listing: listing({ type: "auction", price: undefined, minBid: "0.1" }), auction: null },
+    sales: [],
+    editions: [],
+    buyers: 0,
+  });
+  assert.equal(auction[0].value, "Auction from 0.1 MATIC");
+  const sold = earnLiveFactsOf({
+    projectId: "proj_car",
+    commercial: "soldPartial",
+    listing: { kind: "sold", listing: listing(), sale: sale() },
+    sales: [sale()],
+    editions: [],
+    buyers: 1,
+  });
+  assert.deepEqual(sold.map((f) => f.value), ["0.05 MATIC", "0", "1", "0.04875 MATIC"]);
 });

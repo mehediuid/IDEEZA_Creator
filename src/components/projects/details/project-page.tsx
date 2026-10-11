@@ -133,7 +133,7 @@ function TeamSlot(props: SlotProps) {
 // The rail Marketplace block, the buyer's side only (`buyerSide`): the read-only
 // buyer rail — facts and "Open in Explore marketplace", never a Buy or Bid
 // button (T23: P2-MARKETPLACE-10, P2-LISTING-21). The owner's card and its
-// listing operations (RailMarketplace) live in Earn › Project NFT (P0).
+// listing operations (rail-marketplace.tsx's ListingBody) live in Earn › Sell (P0).
 function MarketplaceSlot(props: SlotProps) {
   return buyerSide(props.viewer) ? <BuyerRail {...props} /> : null;
 }

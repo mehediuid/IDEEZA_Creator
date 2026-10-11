@@ -168,9 +168,9 @@ export function PlanSectionView({
   return (
     <section aria-labelledby={headingId} className="scroll-mt-24 border-b border-solid border-border-subtle py-8 last:border-b-0">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id={headingId} className="text-xl font-semibold text-text-primary">
+        <h3 id={headingId} className="m-0 text-lg font-semibold leading-lg text-text-primary">
           {section.title}
-        </h2>
+        </h3>
         {section.state === "done" && (
           <Badge tone={section.origin === "ai" ? "neutral" : "info"} className="shrink-0">
             {provenanceLabel(section.origin)}

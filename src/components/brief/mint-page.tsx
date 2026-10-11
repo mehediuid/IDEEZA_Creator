@@ -5,7 +5,7 @@
 // then:
 // - no project → the project page's own not-found state;
 // - a project minted without a Brief (from its page) → says so and links to
-//   Earn › Project NFT, never an editable Choose on a minted, perhaps locked,
+//   Earn › Sell, never an editable Choose on a minted, perhaps locked,
 //   project (R2-8, `useBriefOpens`);
 // - otherwise the flow: a draft's next step, or a minted Brief's read-only
 //   success step.
@@ -76,7 +76,7 @@ function NoBrief({ name, href }: { name: string; href: string }) {
         titleRef={titleRef}
         icon={<Icon icon={NoteRemoveIcon} size={32} />}
         title={`${name} is already minted`}
-        body="It was minted from its page, so there's no mint flow to open. Its proof and its sale are in Earn › Project NFT."
+        body="It was minted from its page, so there's no mint flow to open. Its proof and its sale are in Earn › Sell."
         action={
           <Link
             href={href}
@@ -85,7 +85,7 @@ function NoBrief({ name, href }: { name: string; href: string }) {
               "no-underline hover:text-[color:var(--color-button-secondary-text)] [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]",
             )}
           >
-            Open Project NFT
+            Open Sell
           </Link>
         }
       />

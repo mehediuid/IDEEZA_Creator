@@ -1,8 +1,8 @@
 // The Earn area's pure facts (docs/superpowers/specs/2026-10-11-build-earn-p0-design.md,
 // "Earn area"): the project page's door to it (the Earn button), who may open
-// it, its document title, the Overview's one next-step card,
-// the Project NFT section's action pair, and which products the Editions
-// section lists. The Overview's "Ready to earn" is the gating ladder's
+// it, its document title and status pill, the Overview's path and its one
+// current-step card, the Sell tab's action pair, and which products its
+// copies list. The Overview's missing steps are the gating ladder's
 // (lib/commerce/ladder.ts, Build and Earn P1-4), and so is the Earn button's
 // count. Every fact is read off the page's one derivation (`projectView`,
 // COR-74) and the ladder's facts; nothing here derives project state of its own.
@@ -11,8 +11,10 @@
 
 import type { StoredDraft } from "../brief/project-brief";
 import { commitStepsOf, type CommitPoint, type EarnFacts } from "../commerce/ladder";
+import { earnedOf, payoutLinesText } from "../commerce/payout";
 import type { CommercialState } from "../commerce/state";
-import type { EditionTrack } from "../market/types";
+import type { EditionTrack, ListingView, Sale } from "../market/types";
+import { formatAmount } from "../wallet/money";
 import { EARN_SECTION_LABEL, earnHref, earnMintHref, type EarnSection } from "./earn-route";
 import { can, roleOf, type CanContext, type Viewer } from "./permissions";
 import type { ProjectProduct } from "./project-read";
@@ -95,51 +97,165 @@ export function canOpenEarn(viewer: Viewer): boolean {
   return roleOf(viewer) === "owner";
 }
 
-/** "Project NFT · Earn · {project} · IDEEZA"; the overview is "Earn · {project} · IDEEZA". */
+/** "Sell · Earn · {project} · IDEEZA"; the overview is "Earn · {project} · IDEEZA". */
 export function earnDocTitle(section: EarnSection, projectName: string): string {
   const lead = section === "overview" ? "Earn" : `${EARN_SECTION_LABEL[section]} · Earn`;
   return `${lead} · ${projectName} · IDEEZA`;
 }
 
+/** The Earn header's one status pill, in a maker's words, from the commercial axis. */
+export const EARN_STATUS_WORD: Record<CommercialState, string> = {
+  none: "Not for sale yet",
+  minted: "Minted",
+  listed: "On the marketplace",
+  paused: "Listing paused",
+  soldPartial: "Part sold",
+  soldOut: "Sold out",
+  given: "Given away",
+};
+
+/** The pill's word and tone: success once something is minted and live, neutral before that and while paused. */
+export function earnStatusOf(commercial: CommercialState): { word: string; tone: "neutral" | "success" } {
+  const quiet = commercial === "none" || commercial === "minted" || commercial === "paused";
+  return { word: EARN_STATUS_WORD[commercial], tone: quiet ? "neutral" : "success" };
+}
+
 // ─────────────────────────── the Overview ───────────────────────────
 
+/** The Overview's path, in order: ① Mint → ② Sell → ③ Get paid. */
+export type EarnStepId = "mint" | "sell" | "paid";
+export const EARN_STEPS: readonly { id: EarnStepId; label: string }[] = [
+  { id: "mint", label: "Mint" },
+  { id: "sell", label: "Sell" },
+  { id: "paid", label: "Get paid" },
+];
+
+const STEP_OF: Record<CommercialState, EarnStepId> = {
+  none: "mint",
+  minted: "sell",
+  listed: "sell",
+  paused: "sell",
+  given: "sell",
+  soldPartial: "paid",
+  soldOut: "paid",
+};
+
+export type EarnPathStep = { id: EarnStepId; label: string; n: number; state: "done" | "current" | "todo" };
+
+/** The path with the maker's place on it: every step before the current one is done. */
+export function earnPathOf(commercial: CommercialState): EarnPathStep[] {
+  const at = EARN_STEPS.findIndex((s) => s.id === STEP_OF[commercial]);
+  return EARN_STEPS.map((s, i) => ({ ...s, n: i + 1, state: i < at ? "done" : i === at ? "current" : "todo" }));
+}
+
 /**
- * The Overview's one card (owner, 2026-10-11: the overview shows only what to do next; the
- * sub-navigation already lists every way to earn). `point` is the commit point whose steps the
- * card lists, the same count the project page's Earn button shows; null where nothing is left to
- * unlock, and the card then names the state and where to look. `action` is that step's home.
+ * The Overview's one card, the current step on the path (owner, 2026-10-11: the overview says
+ * why to mint and what comes next). `point` is the commit point whose missing steps come first
+ * ("Before you can {verb}"), the same count the project page's Earn button shows; `action` is
+ * the step's own button, shown only once none is missing. Once something is live `point` is
+ * null: the card says the state, its facts (`earnLiveFactsOf`) and links to where it's managed.
  */
-export type EarnNext = { title: string; point: CommitPoint | null; action: { label: string; href: string } };
+export type EarnNext = {
+  step: EarnStepId;
+  title: string;
+  /** One sentence: why this step, or what the state means. */
+  why: string;
+  point: CommitPoint | null;
+  /** Finishes "Before you can …"; null with no point. */
+  verb: string | null;
+  action: { label: string; href: string };
+};
 
 export function earnNextOf(projectId: string, commercial: CommercialState): EarnNext {
+  const step = STEP_OF[commercial];
   const sell = earnHref(projectId, "sell");
   const customers = earnHref(projectId, "customers");
+  const live = (title: string, why: string, label: string, href: string): EarnNext => ({
+    step,
+    title,
+    why,
+    point: null,
+    verb: null,
+    action: { label, href },
+  });
   switch (commercial) {
     case "none":
-      return { title: "Mint your project NFT", point: "mint", action: { label: "Start mint", href: earnMintHref(projectId) } };
+      return {
+        step,
+        title: "Mint your project",
+        why: "Minting creates a record that you own this design. It's free here and signed in the demo wallet.",
+        point: "mint",
+        verb: "mint",
+        action: { label: "Start mint", href: earnMintHref(projectId) },
+      };
     case "minted":
       return {
-        title: "List your project for sale",
+        step,
+        title: "Sell your project",
+        why: "List the whole project, or sell copies of each product.",
         point: "list",
+        verb: "sell",
         action: { label: "Add to marketplace", href: earnHref(projectId, "sell", { list: "1" }) },
       };
-    case "given":
-      return { title: "Given to the community", point: null, action: { label: "Open Project NFT", href: sell } };
     case "listed":
-      return { title: "Your project is on the marketplace", point: null, action: { label: "Open Project NFT", href: sell } };
+      return live("Your project is on the marketplace", "Buyers can find it on Explore marketplace. You get paid when it sells.", "Manage in Sell", sell);
     case "paused":
-      return { title: "Your listing is paused", point: null, action: { label: "Relist in Project NFT", href: sell } };
+      return live("Your listing is paused", "Buyers can't see or buy it until you relist it.", "Relist in Sell", sell);
+    case "given":
+      return live("Given to the community", "It's free for everyone, so there is nothing to sell.", "See it in Sell", sell);
     case "soldPartial":
-      return { title: "Part of your project is sold", point: null, action: { label: "See customers", href: customers } };
+      return live("Part of your project is sold", "Each sale paid your payout wallet. You can still sell the share you hold.", "See customers and payouts", customers);
     case "soldOut":
-      return { title: "Sold in full", point: null, action: { label: "See customers", href: customers } };
+      return live("Sold in full", "It belongs to its buyers now, so the project is read-only.", "See customers and payouts", customers);
   }
 }
 
-// ─────────────────────────── Project NFT ───────────────────────────
+export type EarnFact = { label: string; value: string };
 
 /**
- * The Project NFT section's pair: the header's `nextAction`, minus Review
+ * The live card's facts row: the project's price, the copies sold, the customers and what the
+ * sales earned so far (each sale's payout, summed per token, as Payouts sums it).
+ */
+export function earnLiveFactsOf(i: {
+  projectId: string;
+  commercial: CommercialState;
+  listing: ListingView;
+  sales: readonly Sale[];
+  editions: readonly EditionTrack[];
+  /** Distinct buyers (`view.customers.buyerCount`). */
+  buyers: number;
+}): EarnFact[] {
+  const sales = i.sales.filter((s) => s.projectId === i.projectId);
+  const copies = sales.filter((s) => s.item.nft !== "main").length;
+  const supply = i.editions.filter((t) => t.projectId === i.projectId).reduce((n, t) => n + t.supply.total, 0);
+  const earned = earnedOf(sales, i.projectId);
+  return [
+    { label: "Price", value: priceOf(i.listing, i.commercial) },
+    { label: "Copies sold", value: supply > 0 ? `${copies} of ${supply}` : `${copies}` },
+    { label: "Customers", value: `${i.buyers}` },
+    { label: "Earned", value: earned.length ? payoutLinesText(earned) : "Nothing yet" },
+  ];
+}
+
+function priceOf(view: ListingView, commercial: CommercialState): string {
+  switch (view.kind) {
+    case "live":
+    case "paused": {
+      const l = view.listing;
+      return l.type === "auction" ? `Auction from ${formatAmount(l.minBid ?? "0", l.token)}` : formatAmount(l.price ?? "0", l.token);
+    }
+    case "sold":
+      return formatAmount(view.sale.price, view.sale.token);
+    case "none":
+    case "ended":
+      return commercial === "given" ? "Free" : "Not listed";
+  }
+}
+
+// ─────────────────────────── Sell › Your project ───────────────────────────
+
+/**
+ * Sell's "Your project" card's pair: the header's `nextAction`, minus Review
  * version, which is engineering's and stays on the project page. A draft
  * with a version waiting therefore still gets its Brief entry here. Then the
  * header's own filter (PPL-6: absent, not disabled): a blocked listing start
@@ -176,7 +292,28 @@ export function earnPairOf(
   return { first, second, violet: pair.violet };
 }
 
-// ─────────────────────────── Editions ───────────────────────────
+/** "Your project"'s one sentence: what it is. */
+export const YOUR_PROJECT_LEAD = "Your whole project as one item on the marketplace. Buyers can buy all of it, or the share you choose to sell.";
+
+/** "Your project"'s state in plain words while no listing card says it: a live, paused or sold
+ *  Main listing is shown by the listing's own card, and this is null then. */
+export function yourProjectLineOf(commercial: CommercialState, listing: ListingView["kind"]): string | null {
+  if (listing === "live" || listing === "paused" || listing === "sold") return null;
+  switch (commercial) {
+    case "none":
+      return "Not minted yet.";
+    case "given":
+      return "Minted and given to the community.";
+    case "soldOut":
+      return "Sold in full.";
+    case "soldPartial":
+      return "Part sold. Not on the marketplace now.";
+    default:
+      return listing === "ended" ? "Minted. Not on the marketplace now." : "Minted. Not on the marketplace yet.";
+  }
+}
+
+// ─────────────────────────── Sell › Copies of each product ───────────────────────────
 
 /** One row per current product, plus a dropped one that still has editions — the same set the
  *  Marketplace block's Physical and Virtual summaries read (edition-summary.tsx). */

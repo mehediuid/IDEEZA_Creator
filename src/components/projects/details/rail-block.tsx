@@ -129,6 +129,23 @@ export function RailBlock({
   );
 }
 
+/** A block's body outside a RailBlock (an Earn card): its facts and controls lay out as the
+ *  rail's do — side by side from a 1024 px page container, stacked below it — read by the
+ *  same probe. */
+export function RailStackScope({ children, className }: { children: React.ReactNode; className?: string }) {
+  const { probe, stacked } = useStackedProbe();
+  return (
+    <div className={cn("relative", className)}>
+      <span
+        ref={probe}
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 h-0 w-px [@container(max-width:1023px)]:w-[2px]"
+      />
+      <StackedContext.Provider value={stacked}>{children}</StackedContext.Provider>
+    </div>
+  );
+}
+
 /** A block's facts: label beside value in the rail, label over value once stacked (COM-22). */
 export function RailFacts({ children }: { children: React.ReactNode }) {
   const stacked = useRailStacked();

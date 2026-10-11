@@ -1,5 +1,5 @@
 // /projects/[id]/earn/mint — the mint flow (the Brief, Build and Earn P1-2), opened from
-// Earn › Project NFT. A static segment, so it wins over `earn/[section]`. Thin server
+// Earn › Sell. A static segment, so it wins over `earn/[section]`. Thin server
 // wrapper: the project and its draft are read from this browser's stores inside MintPage,
 // which shows its own loading, not-found and already-minted states.
 
