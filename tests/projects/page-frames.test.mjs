@@ -157,6 +157,15 @@ test("P0: the header's one door to Earn — no pair, no Preview as buyer, and on
   assert.equal(header.match(/tone="primary"/g)?.length, 1, "Review version is the header's only fixed violet");
 });
 
+test("a ?sale= deep link keeps its focus: the row is focused a frame after the page's own arrival focus", () => {
+  const panel = read(DETAILS + "customers-tab.tsx");
+  const arrival = read(DETAILS + "arrival.tsx");
+  // The page's h1 focus runs in a parent's effect, after the panel's own effect.
+  assert.match(arrival, /titleRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(panel, /deepLinked\.current = true;[\s\S]*?requestAnimationFrame\(\(\) => \{\s*if \(btn\.isConnected\) btn\.focus\(\);/);
+  assert.doesNotMatch(panel, /\n\s*btn\.focus\(\);\n\s*\}\);/, "never focused in the same effect pass");
+});
+
 test("P0: the moved addresses redirect on the server before the page renders", () => {
   const page = read("app/(create)/projects/[id]/page.tsx");
   assert.match(page, /const moved = projectRedirectOf\(id, await searchParams\);\s*if \(moved\) redirect\(moved\);/);

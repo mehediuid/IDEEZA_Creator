@@ -94,7 +94,11 @@ export function CustomersPanel({
     if (!btn) return;
     deepLinked.current = true;
     btn.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
-    btn.focus();
+    // A frame later: the page's arrival focus (usePageArrival) is a parent's effect, which runs
+    // after this one and would otherwise take the focus back to the h1.
+    requestAnimationFrame(() => {
+      if (btn.isConnected) btn.focus();
+    });
   });
 
   const wideCols = scope.kind === "project" ? 6 : 5;
