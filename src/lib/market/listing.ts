@@ -9,9 +9,7 @@
 //
 // Pure, relative imports only.
 
-import { formatDate } from "../manual/project-summary";
-import type { ProjectLogEntry } from "../manual/project-read";
-import type { Readiness } from "../manual/p2-types";
+import { formatDate, type ProjectLogEntry, type Readiness } from "../manual/public";
 import { NETWORKS, LISTING_TYPES, TOKENS_BY_NETWORK } from "../brief/types";
 import { normalizeAmount } from "../wallet/money";
 import { auctionStateOf, timeLeftLabel } from "./auction";

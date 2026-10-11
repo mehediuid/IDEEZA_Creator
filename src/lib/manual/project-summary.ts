@@ -21,6 +21,7 @@ import type { ListingView, MarketData, Sale } from "../market/types";
 import { listingStatusLine, listingViewOf } from "../market/listing";
 import type { MintView } from "../wallet/types";
 import { mintPhrase, mintViewOf } from "../wallet/mint";
+import { commercialFactsOf, commercialStateOf, type CommercialState } from "../commerce/state";
 import { stepHref, type ManualProject } from "./projects";
 import {
   buildsOf,
@@ -86,9 +87,15 @@ const NO_LISTING: ListingView = { kind: "none" };
  *  without them a project is never Listed, Paused or Sold. */
 export type StatusFacts = { listing?: ListingView; sales?: readonly Sale[] };
 
-function hasMainSale(projectId: string, sales: readonly Sale[]): boolean {
-  return sales.some((s) => s.projectId === projectId && s.item.nft === "main");
-}
+/** The commercial axis in My projects' words: both kinds of sale read Sold. */
+const STATUS_OF: Record<Exclude<CommercialState, "none">, ProjectStatus> = {
+  listed: "listed",
+  paused: "paused",
+  soldPartial: "sold",
+  soldOut: "sold",
+  given: "given",
+  minted: "private",
+};
 
 /**
  * §3.2's one precedence, first match wins:
@@ -100,14 +107,13 @@ function hasMainSale(projectId: string, sales: readonly Sale[]): boolean {
  *    A v1 sell with no listing reads Private (P2-LISTING-24): nothing was ever on a marketplace;
  * 6. `status: "completed"` with no readable mint → minted (unreadable, v1);
  * 7. draft.
+ * Derived from the two axes (Build and Earn P1-1): steps 1–5 are `commercialStateOf`; the
+ * engineering axis never moved the status (a Draft is "not minted"), so it has no say here,
+ * and only the v1 record's own `status` tells 6 from 7.
  */
 export function projectStatus(p: ManualProject, draft: StoredDraft | null, facts: StatusFacts = {}): ProjectStatus {
-  const listing = facts.listing ?? NO_LISTING;
-  if (listing.kind === "live") return "listed";
-  if (listing.kind === "paused") return "paused";
-  if (listing.kind === "sold" || hasMainSale(p.id, facts.sales ?? [])) return "sold";
-  const minted = p.mint !== undefined || (draft?.state.mintedAt ?? null) !== null;
-  if (minted) return draft?.state.intent === "give" ? "given" : "private";
+  const state = commercialStateOf(commercialFactsOf(p, draft, facts));
+  if (state !== "none") return STATUS_OF[state];
   return p.status === "completed" ? "minted" : "draft"; // "minted" = the record is unreadable (LST-9)
 }
 

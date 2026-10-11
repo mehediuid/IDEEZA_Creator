@@ -37,8 +37,7 @@ import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
 import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
-import { projectLockOf } from "@/lib/manual/edit-gate";
-import { useMarket } from "@/lib/market/market-store";
+import { useGuards } from "@/lib/manual/use-write-guard";
 import {
   companionNameOf,
   composerTarget,
@@ -341,9 +340,9 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   // The projects a single-product build could join. A multi-product build
   // always makes a new one (§4.4.8 puts a system in one project), so this
   // list is only ever offered for the single case. A project sold in full
-  // takes nothing (decision 12), so it isn't offered.
+  // takes nothing (decision 12), so it isn't offered: the guards' `lockOf`.
   const { projects } = useManualProjects();
-  const { data: market } = useMarket();
+  const guards = useGuards();
   // A chat started from a project's "Add a product" (`/?addTo=`, P2-TABS-29)
   // opens its question on that project.
   const addTo = React.useMemo(() => {
@@ -352,7 +351,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
   }, [chat]);
   const setupProjects = React.useMemo(
     () =>
-      projects.filter((p) => projectLockOf(p, market.sales) === null).map((p) => {
+      projects.filter((p) => guards.lockOf(p) === null).map((p) => {
         const n = p.products?.length || 1;
         return {
           id: p.id,
@@ -363,7 +362,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           ...(p.id === addTo ? { preselect: true } : null),
         };
       }),
-    [projects, market, addTo],
+    [projects, guards, addTo],
   );
 
   const [confirmFor, setConfirmFor] = React.useState<{

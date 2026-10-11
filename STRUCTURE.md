@@ -130,7 +130,8 @@ ideeza-creator-panel/
    │  │                      the wizard and the rail both read — + the stored-draft
    │  │                      migration), project-brief.ts (the Brief read + the Outcome
    │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (Step
-   │  │                      4's pure copy), gas.ts, wallet.ts, video-prompt.ts, qr.ts
+   │  │                      4's pure copy), video-prompt.ts, qr.ts; gas.ts and wallet.ts re-export
+   │  │                      commerce/gas.ts and commerce/collections.ts
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store), project-read.ts
@@ -140,9 +141,14 @@ ideeza-creator-panel/
    │  │                      (editor progress facts), editor-scope/editor-docs (per-product editor
    │  │                      keys + documents), build-load(-io) (BUILDLOAD), readiness, edit-gate,
    │  │                      contributors, customers, ownership, journey(-store), business-plan(-store),
-   │  │                      legal, save-step
+   │  │                      legal, save-step; guards.ts + use-write-guard.tsx (the write/delete guard
+   │  │                      registry), record-hooks.ts, engineering-state.ts, public.ts (commerce's
+   │  │                      one import of engineering)
    │  ├─ wiring/             types.ts, from-build.ts (a build's wiring document)
    │  ├─ code/               files.ts (Code's file model + a build's firmware)
+   │  ├─ commerce/           the commerce layer (Build and Earn P1-1): guards, edit-gate, state
+   │  │                      (commercialStateOf), record + migrate (ideeza:commerce:<id>,
+   │  │                      commerce-split@1), gas, collections; market/ and wallet/ are its sub-layers
    │  ├─ market/             Explore marketplace: listings, sales, bids, auctions, editions,
    │  │                      fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests

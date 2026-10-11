@@ -10,7 +10,7 @@ import type { Token } from "../brief/types";
 import { compareAmounts, formatAmount } from "../wallet/money";
 import { auctionStateOf } from "./auction";
 import type { AuctionState, Bid, Listing, Sale } from "./types";
-import { formatDate, formatDateTime } from "../manual/project-summary";
+import { formatDate, formatDateTime } from "../manual/public";
 
 export const PAGE_SIZE = 12;
 

@@ -16,8 +16,11 @@
 // two modes that change an existing project (P2-SAVE-5/6 as changed):
 // - a project sold in full takes nothing: it is never offered to join, and a
 //   rebuild of it saves as a new project, with saveBlockOf's line;
-// - a live Buy-now listing asks the pause confirm first
-//   (useProjectEditGate's guard); a running auction refuses, with its reason.
+// - a live Buy-now listing asks the pause confirm first; a running auction
+//   refuses, with its reason.
+// Both are the write guards commerce registers (lib/manual/use-write-guard.tsx):
+// the lock comes from `useGuards().lockOf`, and the pause and its undo are the
+// listing guard's own confirm step.
 //
 // Saving writes ONE record (the provider's saveBuild), waits for the store's
 // write to settle (useStoreWrite: 250 ms, projectWriteRefused), and only then
@@ -38,10 +41,8 @@ import {
   type ProjectDetailsFieldsHandle,
 } from "@/components/projects/project-details-fields";
 import { useStoreWrite } from "@/components/projects/details/use-store-write";
-import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { useProjectBrief } from "@/lib/brief/project-brief";
 import { useCreateHistory, type BuildJob } from "@/lib/create/history";
-import { projectLockOf } from "@/lib/manual/edit-gate";
 import { can } from "@/lib/manual/permissions";
 import { buildsOf, coverOf } from "@/lib/manual/project-read";
 import { formatShortDate, projectStatus } from "@/lib/manual/project-summary";
@@ -61,12 +62,13 @@ import {
   type SaveDraft,
   type SaveMode,
 } from "@/lib/manual/save-step";
+import { useGuards, useWriteGuard, type Guards } from "@/lib/manual/use-write-guard";
 import { listingViewOf } from "@/lib/market/listing";
-import { readMarketNow, useMarket } from "@/lib/market/market-store";
+import { useMarket } from "@/lib/market/market-store";
 import { networkForSave } from "@/lib/network/from-concept";
 import { networkProducts } from "@/lib/network/products";
 import { readNetwork, saveNetwork } from "@/lib/network/store";
-import type { Listing, ListingMetadata, MarketData } from "@/lib/market/types";
+import type { ListingMetadata } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 
 // ─────────────────────────── the mode, with the lock applied ───────────────────────────
@@ -83,10 +85,10 @@ export type SaveModeInfo = {
 const OWNER = { kind: "local-owner" } as const;
 
 /** The projects a build may join: `can(owner, "product.add")` under each one's lock
- *  (`projectLockOf`, decision 12; P2-SAVE-5 as changed). Every chooser that offers existing
+ *  (the guards' `lockOf`, decision 12; P2-SAVE-5 as changed). Every chooser that offers existing
  *  projects leaves a locked one out. */
-function joinableOf(projects: readonly ManualProject[], market: MarketData): ManualProject[] {
-  return projects.filter((p) => can(OWNER, "product.add", { locked: projectLockOf(p, market.sales) !== null }));
+function joinableOf(projects: readonly ManualProject[], guards: Guards): ManualProject[] {
+  return projects.filter((p) => can(OWNER, "product.add", { locked: guards.lockOf(p) !== null }));
 }
 
 /**
@@ -96,7 +98,7 @@ function joinableOf(projects: readonly ManualProject[], market: MarketData): Man
 export function useSaveMode(job: BuildJob | null): SaveModeInfo | null {
   const { projects } = useManualProjects();
   const { builds, chats } = useCreateHistory();
-  const { data: market } = useMarket();
+  const guards = useGuards();
   const chatId = job?.chatId;
   const jobId = job?.id;
   const lineage = React.useMemo(
@@ -106,13 +108,13 @@ export function useSaveMode(job: BuildJob | null): SaveModeInfo | null {
   return React.useMemo(() => {
     if (!job) return null;
     const base = saveModeOf(job, lineage, projects, builds, chats);
-    const joinable = joinableOf(projects, market);
+    const joinable = joinableOf(projects, guards);
     const single = (job.companions?.length ?? 0) === 0;
     if (base.kind === "version" || base.kind === "join") {
-      const lock = projectLockOf(base.project, market.sales);
+      const lock = guards.lockOf(base.project);
       if (lock) {
         // The link to that project is broken for this build: it saves as a new one.
-        const block = saveBlockOf(base, { kind: "locked", reason: lock.line });
+        const block = saveBlockOf(base, lock);
         const canJoin = base.kind === "join" && single && joinable.length > 0;
         return { mode: { kind: "new", choiceGone: false, canJoin }, lineage, broken: block?.reason ?? null };
       }
@@ -121,20 +123,7 @@ export function useSaveMode(job: BuildJob | null): SaveModeInfo | null {
       return { mode: { ...base, canJoin: false }, lineage, broken: null };
     }
     return { mode: base, lineage, broken: null };
-  }, [job, lineage, projects, builds, chats, market]);
-}
-
-/**
- * Puts back each of `before` (the project's live listings as the save was
- * pressed) that reads paused now — the pause the confirm wrote for a save
- * that was then refused. False when that write is refused too.
- */
-function unpauseOf(before: readonly Listing[], write: (next: Listing[]) => { ok: boolean }): boolean {
-  if (!before.length) return true;
-  const was = new Map(before.map((l) => [l.id, l]));
-  const now = readMarketNow().listings;
-  if (!now.some((l) => was.has(l.id) && l.status === "paused")) return true;
-  return write(now.map((l) => (l.status === "paused" ? (was.get(l.id) ?? l) : l))).ok;
+  }, [job, lineage, projects, builds, chats, guards]);
 }
 
 // ─────────────────────────── the draft ───────────────────────────
@@ -188,7 +177,8 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const router = useRouter();
   const { projects, saveBuild } = useManualProjects();
   const { builds, setBuildProject, getChat } = useCreateHistory();
-  const { data: market, writeListings } = useMarket();
+  const { data: market } = useMarket();
+  const guards = useGuards();
   // The mode as the dialog opened: the save itself makes the build "saved" a
   // render before it settles, and the dialog must not change under it. The
   // one change it takes is the lock: a sale in another tab that sells the
@@ -207,7 +197,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   // "That project isn't in this browser any more." — a join or version target
   // gone at submit (P2-SAVE-15): the dialog goes on in new mode.
   const [gone, setGone] = React.useState<string | null>(null);
-  const joinable = React.useMemo(() => joinableOf(projects, market), [projects, market]);
+  const joinable = React.useMemo(() => joinableOf(projects, guards), [projects, guards]);
   const version = !gone && info.mode.kind === "version" ? info.mode : null;
   const joining = !version && !gone && draft.mode === "join";
   const joinTarget = joining && draft.joinId ? (joinable.find((p) => p.id === draft.joinId) ?? null) : null;
@@ -220,7 +210,7 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
   const [changing, setChanging] = React.useState(false);
   const choosing = kind === "join" && (changing || !joinTarget);
 
-  const gate = useProjectEditGate(kind === "new" ? null : (target?.id ?? null));
+  const gate = useWriteGuard(kind === "new" ? null : (target?.id ?? null));
   const blocked = kind !== "new" && target ? gate.reasonOf("addProduct") : null;
   const confirming = React.isValidElement<{ open?: boolean }>(gate.dialog) && gate.dialog.props.open === true;
 
@@ -357,9 +347,9 @@ function SaveDialog({ job, info: infoProp, onClose }: { job: BuildJob; info: Sav
     }
     const input: SaveInput =
       kind === "version" ? { kind: "version", projectId: target.id } : { kind: "join", projectId: target.id };
-    // A live Buy-now listing is paused before the save runs; a refused save puts it back.
-    const live = readMarketNow().listings.filter((l) => l.projectId === target.id && l.status === "live");
-    const outcome = gate.guard("addProduct", () => commit(input, () => unpauseOf(live, writeListings)));
+    // A live Buy-now listing is paused before the save runs; a refused save puts it back
+    // through the pause's undo.
+    const outcome = gate.guard("addProduct", (undo) => commit(input, undo));
     if (outcome.kind === "refused") setRefusal(outcome.reason);
   };
 
