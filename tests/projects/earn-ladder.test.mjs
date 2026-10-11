@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { EARN_LEVELS, COMMIT_LEVEL, earnLevelOf, requireLevel, commitCheck, earnFactsOf, LADDER_STEPS } = await import(
+const { EARN_LEVELS, COMMIT_LEVEL, earnLevelOf, requireLevel, commitCheck, commitStepsOf, earnFactsOf, LADDER_STEPS } = await import(
   "../../.tmp-test/lib/commerce/ladder.js"
 );
 
@@ -154,6 +154,32 @@ test("commitCheck: a step the caller already gates itself can be left out", () =
   assert.deepEqual(ids(commitCheck("mint", f).missing), ["wallet", "ownership"]);
   assert.deepEqual(ids(commitCheck("mint", f, { handled: ["ownership"] }).missing), ["wallet"]);
   assert.deepEqual(commitCheck("mint", facts({ ownershipConfirmed: false }), { handled: ["ownership"] }), { ok: true });
+});
+
+test("commitCheck: the mint flow's Sell, at the list level, leaves only what it doesn't gate itself", () => {
+  // Nothing is minted until the commit; the flow's gate, its Details' license and its commit answer the rest.
+  const handled = ["ownership", "videos", "license", "minted", "payout"];
+  const draft = facts({ walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, payoutWalletSet: false });
+  assert.deepEqual(ids(commitCheck("list", draft).missing), ["wallet", "ownership", "videos", "minted", "license"]);
+  assert.deepEqual(ids(commitCheck("list", draft, { handled }).missing), ["wallet"]);
+  assert.deepEqual(commitCheck("list", facts({ minted: false, licenseSet: false, payoutWalletSet: false }), { handled }), { ok: true });
+});
+
+test("commitStepsOf: every step up to the point's level, done or not; none missing is commitCheck's ok", () => {
+  assert.deepEqual(ids(commitStepsOf("mint", facts())), ["built", "wallet", "ownership", "videos"]);
+  assert.deepEqual(ids(commitStepsOf("list", facts())), ["built", "wallet", "ownership", "videos", "minted", "license", "payout"]);
+  assert.deepEqual(ids(commitStepsOf("payout", facts())).at(-1), "identity");
+  // The payout wallet waits for the mint, as in the level's own list.
+  const unminted = commitStepsOf("list", facts({ minted: false, payoutWalletSet: false }));
+  assert.deepEqual(ids(unminted), ["built", "wallet", "ownership", "videos", "minted", "license"]);
+  assert.deepEqual(unminted.filter((s) => !s.ok).map((s) => s.id), ["minted"]);
+  const keys = Object.keys(ALL);
+  for (const point of Object.keys(COMMIT_LEVEL)) {
+    for (let mask = 0; mask < 1 << keys.length; mask++) {
+      const f = Object.fromEntries(keys.map((k, i) => [k, (mask & (1 << i)) !== 0]));
+      assert.equal(commitStepsOf(point, f).every((st) => st.ok), commitCheck(point, f).ok, `${point} ${mask}`);
+    }
+  }
 });
 
 // ─────────────────────────── earnFactsOf ───────────────────────────

@@ -55,7 +55,7 @@ import {
   USE_WORD,
 } from "@/lib/market/editions";
 import { listingViewOf } from "@/lib/market/listing";
-import { projectLockOf } from "@/lib/manual/edit-gate";
+import { projectLockOf } from "@/lib/commerce/edit-gate";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";

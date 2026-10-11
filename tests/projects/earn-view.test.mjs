@@ -57,10 +57,12 @@ test("the Earn links the area reads: ?list=1 on Project NFT and a sale on Custom
 
 // ─────────────────────────── the option cards ───────────────────────────
 
-test("Sell and Editions carry the Wallet badge; the plan, splits and customers need no wallet", () => {
+test("Sell carries the Wallet badge, Editions Wallet and the identity check for physical; the plan, splits and customers need no wallet", () => {
   const gates = Object.fromEntries(EARN_OPTIONS.map((o) => [o.section, o.gate]));
-  assert.deepEqual(gates, { sell: "wallet", editions: "wallet", plan: "none", splits: "none", customers: "none" });
+  assert.deepEqual(gates, { sell: "wallet", editions: "walletIdentity", plan: "none", splits: "none", customers: "none" });
   assert.equal(GATE_TEXT.wallet.label, "Wallet");
+  assert.equal(GATE_TEXT.walletIdentity.label, "Wallet · ID for physical");
+  assert.match(GATE_TEXT.walletIdentity.meaning, /identity check/);
   assert.equal(GATE_TEXT.none.label, "No wallet");
 });
 

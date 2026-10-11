@@ -35,7 +35,7 @@ const ENGINEERING_EXCEPTIONS = {
   "src/lib/manual/journey.ts":
     "TODO(P2): give the Activity price snapshot engineering's own edition and token shapes, or move the snapshot into lib/commerce.",
   "src/lib/manual/edit-gate.ts":
-    "TODO(P2): delete this re-export shim once project-summary.ts, plan-page, purchase-dialog, global-render-indicator and the tests import lib/commerce/edit-gate.",
+    "TODO(P2): delete this re-export shim once project-summary.ts and the tests import lib/commerce/edit-gate.",
 };
 
 /** Temporary exceptions on the commerce side: none. */

@@ -8,8 +8,9 @@
 //   commit always agree. Each row says its state with a glyph and a word for
 //   assistive tech, never colour alone.
 // - The cards are links to their sections, each with its gate badge: Wallet
-//   where the demo wallet signs (listing, minting, editions), No wallet
-//   where none is needed.
+//   where the demo wallet signs (listing, minting), "Wallet · ID for
+//   physical" for editions (physical ones also ask the demo identity check),
+//   No wallet where none is needed.
 // - Nothing here is violet: every next step has its one home in a section,
 //   so the overview only points at them.
 
@@ -67,7 +68,7 @@ export function EarnOverview({ project, view, brief, now, announce }: SlotProps)
 function GateBadge({ gate }: { gate: EarnGate }) {
   const t = GATE_TEXT[gate];
   return (
-    <Badge tone="neutral" icon={gate === "wallet" ? <Icon icon={Wallet01Icon} size={12} /> : undefined}>
+    <Badge tone="neutral" icon={gate !== "none" ? <Icon icon={Wallet01Icon} size={12} /> : undefined}>
       <span aria-hidden>{t.label}</span>
       <span className="sr-only">{t.meaning}</span>
     </Badge>

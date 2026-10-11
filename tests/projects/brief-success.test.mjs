@@ -175,9 +175,15 @@ test("the details: one Minting type field, never for a Save; the listing form fo
   assert.doesNotMatch(sell, /MintTypeField/, "Minting type is ListingFields' field 4, never rendered twice");
   const give = slice(src, '{intent === "give" && (', '{intent === "save" && (');
   assert.match(give, /<MintTypeField/);
-  // The license is a Give's term.
+  // The license is a Give's term, and a Sell's: it lists at once, and listing needs one (the ladder's L3).
   assert.match(give, /label="License"/);
-  assert.doesNotMatch(sell + save, /label="License"/);
+  assert.match(sell, /label="License"/);
+  assert.doesNotMatch(save, /label="License"/);
+  // The review checks a Sell at the list level, with the steps the flow gates itself handled.
+  const review0 = read("step-review.tsx");
+  assert.match(review0, /const LIST_HANDLED = \["ownership", "videos", "license", "minted", "payout"\] as const;/);
+  assert.match(review0, /selling \? "list" : "mint",/);
+  assert.match(review0, /\{ handled: selling \? LIST_HANDLED : MINT_HANDLED \}/);
   // The gas checkbox is gone; the CTA is commitCtaLabel's, on the review.
   const review = read("step-review.tsx");
   for (const step of [src, review]) assert.doesNotMatch(step, /I understand a network gas fee is added at mint/);

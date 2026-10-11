@@ -18,11 +18,24 @@ import { cn } from "@/lib/utils";
 import { MissingSteps } from "./missing-steps";
 import { useEarnFacts, type EarnFactsSource } from "./use-earn-facts";
 
-/** Until the wallet and identity stores hydrate, nothing is reported missing. */
-export function useCommitCheck(point: CommitPoint, source: EarnFactsSource, opts?: { handled?: readonly LadderStepId[] }): Check {
+/** The check and whether it has run: until the wallet and identity stores hydrate, nothing is
+ *  reported missing and `ready` is false, so a surface that opens on arrival waits for it. */
+export function useCommitGate(
+  point: CommitPoint,
+  source: EarnFactsSource,
+  opts?: { handled?: readonly LadderStepId[] },
+): { check: Check; ready: boolean } {
   const { facts, ready } = useEarnFacts(source);
   const handled = opts?.handled;
-  return React.useMemo(() => (ready ? commitCheck(point, facts, { handled }) : { ok: true }), [ready, point, facts, handled]);
+  return React.useMemo(
+    () => ({ check: ready ? commitCheck(point, facts, { handled }) : { ok: true }, ready }),
+    [ready, point, facts, handled],
+  );
+}
+
+/** Until the wallet and identity stores hydrate, nothing is reported missing. */
+export function useCommitCheck(point: CommitPoint, source: EarnFactsSource, opts?: { handled?: readonly LadderStepId[] }): Check {
+  return useCommitGate(point, source, opts).check;
 }
 
 export function LevelCheck({

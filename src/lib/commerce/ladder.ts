@@ -223,6 +223,20 @@ export function commitCheck(point: CommitPoint, f: EarnFacts, opts: { handled?: 
   return missing.length ? { ...r, missing } : { ok: true };
 }
 
+/**
+ * Every step a commit point needs, done or not, lower levels first: the
+ * steps `commitCheck` asks, whole, for counting them ("3 of 4 ready"). A step
+ * whose prerequisite is missing waits for it, as in `levelStepsOf`. None of
+ * them missing is exactly `commitCheck(point, f).ok`.
+ */
+export function commitStepsOf(point: CommitPoint, f: EarnFacts): (LadderStep & { ok: boolean })[] {
+  const steps: (LadderStep & { ok: boolean })[] = [];
+  for (const info of EARN_LEVELS) {
+    if (info.level >= 1 && info.level <= COMMIT_LEVEL[point]) steps.push(...levelStepsOf(info.level, f));
+  }
+  return steps;
+}
+
 /** What `earnFactsOf` reads. Structural, so the project page's `view` parts fit as they are. */
 export type EarnFactsInput = {
   /** The project's products; `dropped === null` is a current one. */
