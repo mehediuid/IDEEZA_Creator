@@ -45,6 +45,7 @@ test("projectStorageKeys(id, rowIds) holds the scoped editor keys, the 4 legacy 
     "ideeza:project:journey:proj_a",
     "ideeza:project:bizplan:proj_a",
     "ideeza:project:editions:proj_a",
+    "ideeza:project:edition-terms:proj_a",
   ]) {
     assert.ok(keys.includes(k), k);
   }
@@ -82,6 +83,7 @@ test("the sweep removes exactly the project's P2 keys and nothing else", () => {
     "ideeza:project:journey:proj_a",
     "ideeza:project:bizplan:proj_a",
     "ideeza:project:editions:proj_a",
+    "ideeza:project:edition-terms:proj_a",
   ];
   const store = memoryStore({
     "ideeza:manual:projects": "[]",

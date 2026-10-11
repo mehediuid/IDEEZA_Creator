@@ -73,7 +73,8 @@ ideeza-creator-panel/
    │  ├─ projects/           my-projects + project-card; details/ (the project page: shell, SLOTS,
    │  │                      header, tabs, rail, activity/); product/ (the product page + Editor block);
    │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
-   │  │                      and Virtual NFT); business-plan/ (chip runner + page) — see
+   │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell the design /
+   │  │                      Sell the product flows); business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
    │  │                      bid and support dialogs, demo-buyer banner
@@ -144,7 +145,7 @@ ideeza-creator-panel/
    │  ├─ wiring/             types.ts, from-build.ts (a build's wiring document)
    │  ├─ code/               files.ts (Code's file model + a build's firmware)
    │  ├─ market/             Explore marketplace: listings, sales, bids, auctions, editions,
-   │  │                      fees, market-store (local "Testnet demo" data)
+   │  │                      sell-flow (the edition flows' steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
