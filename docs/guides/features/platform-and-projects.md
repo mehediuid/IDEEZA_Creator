@@ -67,4 +67,4 @@ Built to the spec `docs/superpowers/specs/2026-09-24-add-network-design.md` (dec
 ### History, Innovations, minting
 - **History** (`create/history-*`): Model Generations · Project/Product Generations.
 - **Innovations** community feed (`components/newsfeed`): Discover/Following, category filters, project cards with **minted badge**, empty states; Explore marketplace.
-- **On-chain minting** via the Brief module (idea → video → **mint** → success); "no wallet/KYC to start, only when you sell".
+- **On-chain minting** via the mint flow in Earn (choose → details → **review and sign** → success); "no wallet/KYC to start, only when you sell".

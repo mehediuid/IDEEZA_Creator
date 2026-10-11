@@ -21,7 +21,8 @@ import type { ListingView, MarketData, Sale } from "../market/types";
 import { listingStatusLine, listingViewOf } from "../market/listing";
 import type { MintView } from "../wallet/types";
 import { mintPhrase, mintViewOf } from "../wallet/mint";
-import { stepHref, type ManualProject } from "./projects";
+import type { ManualProject } from "./projects";
+import { earnHref, earnMintHref } from "./earn-route";
 import {
   buildsOf,
   coverOf,
@@ -35,7 +36,6 @@ import { ownedBySegment, ownershipOf } from "./ownership";
 import { lockOf } from "./edit-gate";
 import { can, type Viewer } from "./permissions";
 import type { OwnershipSplit, ProjectLock } from "./p2-types";
-import { earnHref } from "./earn-route";
 
 // ─────────────────────────── the status ───────────────────────────
 
@@ -214,7 +214,7 @@ export function nextAction(
     locked?: boolean;
   },
 ): ActionPair {
-  const briefHref = stepHref(p, "brief");
+  const briefHref = earnMintHref(p.id);
   const viewBrief: NextAction | null =
     facts.brief?.state.mintedAt != null ? { kind: "view-brief", label: "View brief", href: briefHref } : null;
   const creatorPct = facts.creatorPct ?? 100;

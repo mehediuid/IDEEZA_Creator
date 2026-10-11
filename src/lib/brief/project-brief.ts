@@ -90,7 +90,7 @@ export function showcaseBackfillOf(p: ManualProject, d: StoredDraft | null): num
  * The project's draft, for a component (COM-1): `undefined` until this
  * browser's storage has been read — on the server and on the hydrating render —
  * then the draft or `null`. It is read through `useSyncExternalStore`, the
- * repo's way to read a client-only value (step-3-mint's clock, parts-library):
+ * repo's way to read a client-only value (`useMinuteClock`, parts-library):
  * the raw string is the snapshot, so an unchanged draft never re-renders, and
  * a mint in another tab (`storage`) or on coming back to this one (`focus`)
  * shows without polling (LST-61).

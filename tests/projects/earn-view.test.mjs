@@ -153,7 +153,7 @@ const sale = (over = {}) => ({
   benefits: [], txHash: `0x${"b".repeat(64)}`, demo: true, ...over,
 });
 const SELL = draft({ intent: "sell", mintedAt: MINTED, network: "mumbai" });
-const BRIEF = "/project/car/brief";
+const BRIEF = "/projects/proj_car/earn/mint";
 const build = (id, chatId, createdAt, over = {}) => ({
   id, chatId, conceptImageUrl: "", conceptPrompt: "", title: "RC Car", summary: "", parts: [], conceptNumber: "1",
   status: "running", estimateMin: 1, creditsCharged: true, creditsRefunded: false,
