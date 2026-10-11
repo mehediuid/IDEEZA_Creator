@@ -74,7 +74,9 @@ ideeza-creator-panel/
    │  │                      header, tabs, rail, activity/); product/ (the product page + Editor block);
    │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
    │  │                      and Virtual NFT); earn/ (the Earn area; earn/sell/ the Sell the design /
-   │  │                      Sell the product flows); business-plan/ (chip runner + page) — see
+   │  │                      Sell the product flows; earn/ladder/ the gating ladder's track, commit
+   │  │                      checks, Verify identity (demo), Choose a license, Request payout);
+   │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
    │  │                      bid and support dialogs, demo-buyer banner
@@ -149,7 +151,9 @@ ideeza-creator-panel/
    │  ├─ code/               files.ts (Code's file model + a build's firmware)
    │  ├─ commerce/           the commerce layer (Build and Earn P1-1): guards, edit-gate, state
    │  │                      (commercialStateOf), record + migrate (ideeza:commerce:<id>,
-   │  │                      commerce-split@1), gas, collections; market/ and wallet/ are its sub-layers
+   │  │                      commerce-split@1), gas, collections, ladder (earnLevelOf, commit levels),
+   │  │                      kyc (the demo identity check), payout, license, share-copy, use-commerce;
+   │  │                      market/ and wallet/ are its sub-layers
    │  ├─ market/             Explore marketplace: listings, sales, bids, auctions, editions,
    │  │                      sell-flow (the edition flows' steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
