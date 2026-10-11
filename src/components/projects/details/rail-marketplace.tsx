@@ -21,8 +21,8 @@
 // marketplace" after Remove. Every card carries MARKETPLACE_FOCUS_ID on that
 // first control — on its lead line when it has none (Ended, None) — so a
 // write that changes the card (Close auction → Sold or Ended) still lands the
-// keyboard here. Removing the Main listing also takes its copies' listings
-// off the marketplace, and the confirm says so (spec C23).
+// keyboard here. Removing the Main listing leaves the copies' listings as they
+// are: copies are listed on their own (owner, 2026-10-11).
 
 import * as React from "react";
 import Link from "next/link";
@@ -54,8 +54,6 @@ import { RelistPanel } from "../listing/relist";
 import { RemoveListingDialog } from "../listing/remove-listing-dialog";
 import { RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
 import type { SlotProps } from "./slots";
-import { writeTracks } from "../editions/create-dialog";
-import { unlistProjectTracks } from "@/lib/market/editions";
 import { earnHref } from "@/lib/manual/earn-route";
 
 type Dialog = "edit" | "remove" | "bids" | "close" | null;
@@ -83,7 +81,6 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
   const listing: Listing | null = "listing" in view.listing ? view.listing.listing : null;
   const manage = can(viewer, "listing.manage", view.canCtx);
   const closeHintId = React.useId();
-  const editionsListed = view.editions.filter((t) => t.listing !== null).length;
 
   // 40 px beside the page, 44 px once stacked or on a coarse pointer (P2-LISTING-8).
   const button = cn(
@@ -247,13 +244,8 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
         <RemoveListingDialog
           projectName={project.name}
           listing={listing}
-          extra={editionsListed > 0 ? <p>{editionsRemovedLine(editionsListed)}</p> : undefined}
           onClose={closeDialog}
-          onDone={(m) => {
-            // The Main listing is gone: its editions' listings go with it (their NFTs and sales stay).
-            const w = editionsListed > 0 ? writeTracks(project.id, (all) => unlistProjectTracks(all, project.id).tracks) : null;
-            done(w && !w.ok ? `${m} ${w.message} Remove the copies' listings in Earn › Sell.` : m, LISTING_TRIGGER_ID);
-          }}
+          onDone={(m) => done(m, LISTING_TRIGGER_ID)}
         />
       )}
       {dialog === "bids" && listing && (
@@ -281,13 +273,6 @@ function pausedFacts(card: Extract<MarketplaceCard, { kind: "paused" }>) {
       <p className="m-0 text-sm text-text-secondary">{card.terms}</p>
     </>
   );
-}
-
-/** The Remove confirm names the copies' listings that go with the Main one (TABS T3). */
-function editionsRemovedLine(n: number): string {
-  return n === 1
-    ? "The listing of its copies comes off the marketplace too. Copies already sold are kept."
-    : `The ${n} listings of its copies come off the marketplace too. Copies already sold are kept.`;
 }
 
 const STATE_ICON: Partial<Record<MarketplaceCard["kind"], IconValue>> = {

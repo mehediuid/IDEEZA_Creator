@@ -5,7 +5,7 @@
 // module without a bundler.
 
 import { NETWORKS, type Intent, type Network } from "../brief/types";
-import type { EditionKind, EditionUse, ListingChange, ListingEvent } from "../market/types";
+import { PROJECT_SCOPE, type EditionKind, type EditionUse, type ListingChange, type ListingEvent } from "../market/types";
 import { buyerLabel } from "../wallet/identities";
 import { formatAmount } from "../wallet/money";
 import { shortAddress } from "../wallet/demo-wallet";
@@ -146,7 +146,8 @@ export type LogLineOptions = {
 export function logLinesOf(entries: ProjectLogEntry[], opts: LogLineOptions = {}): LogLine[] {
   const showNetwork = opts.network ?? true;
   const owner = opts.owner ?? showNetwork;
-  const productName = (id: string) => opts.products?.find((p) => p.id === id)?.name.trim() || null;
+  const productName = (id: string) =>
+    id === PROJECT_SCOPE ? "Whole project" : opts.products?.find((p) => p.id === id)?.name.trim() || null;
   const net = (n: Network) => (showNetwork ? ` · ${networkLabel(n)}` : "");
 
   return entries.flatMap((e): LogLine[] => {

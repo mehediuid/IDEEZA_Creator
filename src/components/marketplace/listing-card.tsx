@@ -10,7 +10,9 @@
 // The title is the card's only control: a link to the buyer view with a
 // stretched hit area. Every card leads to one place, so a second control would
 // repeat the link. Its words — the price block — are `listingCardText`'s
-// (market-list.ts); the chip reads the item's own facts.
+// (market-list.ts); the chip reads the item's own facts. A project selling only
+// copies reads "Copies", its lowest price and which copies; a Main card with
+// copies on sale too adds "Copies from …".
 
 import * as React from "react";
 import Link from "next/link";
@@ -18,7 +20,7 @@ import { CpuIcon, ImageNotFound01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, type BadgeTone } from "@/components/ideeza";
 import { timeLeftLabel } from "@/lib/market/auction";
-import { listingCardText, type MarketItem, type MarketQuery } from "@/lib/market/market-list";
+import { copiesLineOf, listingCardText, type MarketItem, type MarketQuery } from "@/lib/market/market-list";
 
 const CHIP = "h-[22px] items-center gap-[4px] px-[8px] py-0 text-sm font-semibold leading-none";
 
@@ -27,6 +29,7 @@ function chipOf(item: MarketItem, tab: MarketQuery["tab"]): { word: string; tone
   if (tab === "purchased") return { word: "Purchased", tone: "success" };
   if (item.status === "sold") return { word: "Sold", tone: "success" };
   if (item.status === "ended") return { word: "Auction ended", tone: "neutral" };
+  if (!item.listing) return { word: "Copies", tone: "neutral" };
   if (item.listing.type === "auction" && item.auction) {
     return {
       word: `Auction · ${timeLeftLabel(item.auction.msLeft)}`,
@@ -56,6 +59,7 @@ export function ListingCard({
   const [imgOk, setImgOk] = React.useState(true);
   const hasCover = Boolean(item.cover);
   const text = listingCardText(item, now, tab);
+  const copies = tab === "forSale" ? copiesLineOf(item) : null;
   const chip = chipOf(item, tab);
   const chipEl = (
     <Badge tone={chip.tone} className={CHIP}>
@@ -106,6 +110,7 @@ export function ListingCard({
           <p className="mt-[4px] truncate text-md text-text-tertiary">By you · {productsLabel(item.productCount)}</p>
           <p className="mt-[8px] text-lg font-semibold tabular-nums text-text-primary">{text.price}</p>
           {text.sub && <p className="mt-[2px] text-md tabular-nums text-text-secondary">{text.sub}</p>}
+          {copies && <p className="mt-[2px] text-md tabular-nums text-text-secondary">{copies}</p>}
           {tab === "forSale" && heldPct !== null && heldPct > 0 && (
             <p className="mt-[8px]">
               <Badge tone="info" className={CHIP}>

@@ -1,11 +1,12 @@
 "use client";
 
 // The buyer rail's edition offers (Figma 41505:134786; spec §2.4, TABS T2,
-// P2-TABS-26 "Done"): every listed Physical or Virtual NFT of the project,
-// under its product, below the Main NFT's card in the same Marketplace block.
-// A paused or removed Main listing hides them all (`editionsHiddenWith`), and
-// so does the lock: once the project is sold in full, its NFTs aren't for
-// sale (R1-2).
+// P2-TABS-26 "Done"): every listed Physical or Virtual NFT, the whole
+// project's copies first ("Whole project"), then each product's, below the
+// Main NFT's card in the same Marketplace block — or alone, when the Main NFT
+// was never listed: copies sell on their own (owner, 2026-10-11). Only the
+// lock hides them: once the project is sold in full, its NFTs aren't for sale
+// (R1-2).
 //
 // - A card per track: "{Kind} NFT · {Use}", "NFTs sold {s}/{t}" (or "Sold
 //   out"), and the tier — Regular (this version only) or Extended (every
@@ -23,8 +24,8 @@ import { RailFact, RailFacts } from "@/components/projects/details/rail-block";
 import type { SlotProps } from "@/components/projects/details/slots";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
-import { editionChainOf, editionOffersOf, KIND_WORD, TIER_HELP, trackCardOf, USE_WORD } from "@/lib/market/editions";
-import type { EditionTrack, Listing } from "@/lib/market/types";
+import { editionChainOf, editionOffersOf, isProjectScope, KIND_WORD, TIER_HELP, trackCardOf, USE_WORD } from "@/lib/market/editions";
+import { PROJECT_SCOPE, type EditionTrack, type Listing } from "@/lib/market/types";
 import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
@@ -37,20 +38,29 @@ const LINK =
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 
-export function EditionOffers({ project, view, viewer, announce }: Pick<SlotProps, "project" | "view" | "viewer" | "announce">) {
-  const products = React.useMemo(
-    () => view.products.map((p) => ({ id: p.id, name: displayProductName(p.name) })),
-    [view.products],
+export function EditionOffers({
+  project,
+  view,
+  viewer,
+  announce,
+  alone = false,
+}: Pick<SlotProps, "project" | "view" | "viewer" | "announce"> & {
+  /** No Main NFT card above it: no rule between them. */
+  alone?: boolean;
+}) {
+  const scopes = React.useMemo(
+    () => [{ id: PROJECT_SCOPE, name: project.name }, ...view.products.map((p) => ({ id: p.id, name: displayProductName(p.name) }))],
+    [project.name, view.products],
   );
   const titleId = React.useId();
-  const groups = editionOffersOf(products, view.editions, view.listing, view.lock !== null);
+  const groups = editionOffersOf(scopes, view.editions, view.lock !== null);
   const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, null);
   if (!groups.length || !chain) return null;
   const buyerId = viewer.kind === "demo-buyer" ? viewer.buyerId : null;
 
   return (
-    <section aria-labelledby={titleId} className="flex flex-col gap-6 border-t border-solid border-border pt-8">
+    <section aria-labelledby={titleId} className={cn("flex flex-col gap-6", !alone && "border-t border-solid border-border pt-8")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 id={titleId} className="m-0 text-md font-bold text-text-primary">
           Physical and Virtual NFTs
@@ -59,7 +69,12 @@ export function EditionOffers({ project, view, viewer, announce }: Pick<SlotProp
       </div>
       {groups.map((g) => (
         <div key={g.productId} className="flex flex-col gap-4">
-          {buyerId ? (
+          {isProjectScope(g.productId) ? (
+            <h4 className="m-0 flex flex-col gap-1 text-md font-semibold text-text-primary">
+              <span className="text-sm font-medium text-text-secondary">Whole project</span>
+              <span className="break-words">{g.name}</span>
+            </h4>
+          ) : buyerId ? (
             <Link href={`/marketplace/${project.id}/products/${g.productId}`} className={cn(LINK, TAP, "self-start break-words")}>
               {g.name}
             </Link>
@@ -135,7 +150,7 @@ function BuyableOffer({
   const refs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const labelId = React.useId();
   const card = trackCardOf(track, view.sales);
-  // The track's own listing is live while this offer shows (it's hidden with a paused or removed Main).
+  // The track's own listing is live while this offer shows (only the lock hides it).
   const canBuy = !card.soldOut && can(viewer, "listing.buy", { ...view.canCtx, listingLive: true });
   const busy = busyId === track.id;
 

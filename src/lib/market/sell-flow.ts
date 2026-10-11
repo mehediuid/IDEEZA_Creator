@@ -1,38 +1,47 @@
-// "Sell copies" (Build and Earn P1-3): one guided flow over the existing
-// edition tracks (editions.ts), opened from a product's row in Earn › Editions.
-// "Design files" sells a Virtual track (a licence plus the design files),
-// "Built product" a Physical one (the maker makes and ships each copy).
+// "Sell copies" (Build and Earn P1-3, owner's selling rules 2026-10-11): one
+// guided flow over the edition tracks (editions.ts), opened from a Physical or
+// Virtual row in Earn › Sell, of the whole project (`PROJECT_SCOPE`) or of one
+// product. The row presets the kind, so the flow is Copies and price → Review.
+// "Virtual NFT" sells a licence plus the design files, "Physical NFT" a built
+// unit the maker makes and ships.
 //
-// What → Copies and price → Review. Nothing here is a new rule: the gates are
-// `editionGate` and `listGate`, the copies and price checks are
+// Nothing here is a new rule: the gates are `editionGate` and the lock (copies
+// never need the Main listing), the copies and price checks are
 // `checkCreateTrack` and `checkEditionListing` (over `effectiveTermsOf`, which
 // fills the optional fields), and Review makes the same wallet requests the
 // Create and Add to marketplace dialogs make. The flow only adds what P1-3
-// asks of a physical edition: the required "How you'll make and ship it" note
-// and its three promises, kept per product under `SELL_TERMS_KEY`.
+// asks of a physical copy: the required "How you'll make and ship it" note
+// and its three promises, kept per scope under `SELL_TERMS_KEY`.
 //
 // Pure, relative imports only, so node:test loads the compiled module.
 
 import { TOKENS_BY_NETWORK, type Network, type Token } from "../brief/types";
 import { formatAmount } from "../wallet/money";
-import { checkCreateTrack, checkEditionListing, editionGate, listGate, trackCardOf, tracksOf, wholeNumberOf } from "./editions";
-import type { EditionKind, EditionTrack, EditionUse, ListingView, Sale } from "./types";
+import { checkCreateTrack, checkEditionListing, editionGate, soldOf, trackCardOf, tracksOf, wholeNumberOf } from "./editions";
+import type { EditionKind, EditionTrack, EditionUse, Sale } from "./types";
 
 // ───────────────────────── plain words ─────────────────────────
 
-/** The flow's and the Editions page's words for a kind and a use. Buyer pages keep editions.ts's. */
-export const KIND_LABEL: Record<EditionKind, string> = { virtual: "Design files", physical: "Built product" };
-export const KIND_SUB: Record<EditionKind, string> = {
-  virtual: "Buyers get a licence and download the files.",
-  physical: "You make each one and ship it to the buyer.",
-};
+/** The Sell tab's and the flow's words for a kind and a use. Buyer pages keep editions.ts's. */
+export const KIND_LABEL: Record<EditionKind, string> = { virtual: "Virtual NFT", physical: "Physical NFT" };
 export const USE_LABEL: Record<EditionUse, string> = { private: "Personal use", commercial: "Business use" };
 /** The two prices, for the maker: the price, and the price with future updates. */
 export const PRICE_LABEL = { regular: "Price", extended: "Price with future updates" } as const;
 /** `checkEditionListing`'s tier message, in the same words. */
 export const EXTENDED_BELOW = "Can't be less than the price.";
 
-/** A track by kind and use: "Design files · Personal use". */
+/** "What you can sell": the three things, what each is, and where it applies. */
+export const SELL_RULES: { id: "main" | EditionKind; title: string; line: string; where: string }[] = [
+  { id: "main", title: "Main NFT", line: "The project itself. The buyer gets everything inside it: every product, file and version.", where: "Whole project only" },
+  { id: "physical", title: "Physical NFT", line: "A built unit. You make each one and ship it to the buyer.", where: "Whole project or one product" },
+  { id: "virtual", title: "Virtual NFT", line: "The design files with a licence. Buyers download them.", where: "Whole project or one product" },
+];
+export const SELL_RULES_LEAD =
+  "Each one is listed on its own. You can sell Physical or Virtual copies without listing the Main NFT, and copies never sell the project itself.";
+export const MAIN_SALE_NOTE = "Selling the Main NFT sells the project.";
+export const MAIN_SALE_DETAIL = "When all of it is sold, the buyer owns everything and your copy listings stop.";
+
+/** A track by kind and use: "Virtual NFT · Personal use". */
 export function trackNameOf(t: { kind: EditionKind; use: EditionUse }): string {
   return `${KIND_LABEL[t.kind]} · ${USE_LABEL[t.use]}`;
 }
@@ -49,17 +58,13 @@ export const ROYALTY_HINT = "A share of resales, if marketplaces honour it.";
 export const NO_INCOME_LINE = "Listing doesn't mean anything will sell, and nothing here promises you income.";
 export const NOTE_MAX = 1000;
 
-const KINDS: EditionKind[] = ["virtual", "physical"];
 const USES: EditionUse[] = ["private", "commercial"];
-
-const listFirstOf = (projectName: string) => `List ${projectName} on the marketplace first. Copies are sold from its listing.`;
 
 // ───────────────────────── steps ─────────────────────────
 
-export const SELL_STEPS = ["what", "price", "review"] as const;
+export const SELL_STEPS = ["price", "review"] as const;
 export type SellStep = (typeof SELL_STEPS)[number];
 export const STEP_LABEL: Record<SellStep, string> = {
-  what: "What are you selling?",
   price: "Copies and price",
   review: "Review",
 };
@@ -71,6 +76,7 @@ export type TrackState =
   | { kind: "created"; track: EditionTrack }
   | { kind: "listed"; track: EditionTrack };
 
+/** `productId` is the scope: a product's id, or `PROJECT_SCOPE`. */
 export function trackStateOf(tracks: EditionTrack[], productId: string, kind: EditionKind, use: EditionUse): TrackState {
   const track = tracksOf(productId, tracks).find((t) => t.kind === kind && t.use === use);
   if (!track) return { kind: "new" };
@@ -83,14 +89,7 @@ export function signStepsOf(state: TrackState): ("create" | "list")[] {
   return state.kind === "created" ? ["list"] : [];
 }
 
-// ───────────────────────── kind and use choices ─────────────────────────
-
-export type KindChoice = { kind: EditionKind; open: boolean };
-
-/** Step 1's two options: a kind stays open while one of its uses isn't on sale. */
-export function kindChoicesOf(tracks: EditionTrack[], productId: string): KindChoice[] {
-  return KINDS.map((kind) => ({ kind, open: USES.some((u) => trackStateOf(tracks, productId, kind, u).kind !== "listed") }));
-}
+// ───────────────────────── use choices ─────────────────────────
 
 export type UseChoice = { use: EditionUse; state: TrackState; open: boolean };
 
@@ -102,47 +101,40 @@ export function editionUsesOf(tracks: EditionTrack[], productId: string, kind: E
   });
 }
 
-export function firstOpenKindOf(tracks: EditionTrack[], productId: string): EditionKind | null {
-  return kindChoicesOf(tracks, productId).find((c) => c.open)?.kind ?? null;
-}
-
-export function firstOpenUseOf(tracks: EditionTrack[], productId: string, kind: EditionKind | null): EditionUse | null {
-  if (!kind) return null;
+export function firstOpenUseOf(tracks: EditionTrack[], productId: string, kind: EditionKind): EditionUse | null {
   return editionUsesOf(tracks, productId, kind).find((c) => c.open)?.use ?? null;
 }
 
-// ───────────────────────── the product's row ─────────────────────────
+// ───────────────────────── a Physical or Virtual row ─────────────────────────
 
-/** A row's status: one line per listed track ("Design files · 3 of 30 sold · 0.05 MATIC"), or []
- *  for "Not selling". The use is named only when both uses of a kind are listed. */
-export function sellingLinesOf(productId: string, tracks: EditionTrack[], sales: Sale[]): string[] {
-  const lines: string[] = [];
-  for (const kind of KINDS) {
-    const listed = tracksOf(productId, tracks)
-      .filter((t) => t.kind === kind && t.listing)
-      .sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
-    for (const t of listed) {
-      const card = trackCardOf(t, sales);
-      const what = listed.length > 1 ? `${KIND_LABEL[kind]} · ${USE_LABEL[t.use]}` : KIND_LABEL[kind];
-      const listing = t.listing as NonNullable<EditionTrack["listing"]>;
-      lines.push(
-        card.soldOut ? `${what} · Sold out` : `${what} · ${card.sold} of ${card.total} sold · ${formatAmount(listing.regular, listing.token)}`,
-      );
-    }
-  }
-  return lines;
+/** The row's state lines: one per listed track of this kind ("3 of 30 sold · 0.05 MATIC"), or []
+ *  for "Not selling". The use is named only when both uses are listed. */
+export function sellingLinesOf(productId: string, kind: EditionKind, tracks: EditionTrack[], sales: Sale[]): string[] {
+  const listed = tracksOf(productId, tracks)
+    .filter((t) => t.kind === kind && t.listing)
+    .sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
+  return listed.map((t) => {
+    const card = trackCardOf(t, sales);
+    const listing = t.listing as NonNullable<EditionTrack["listing"]>;
+    const line = card.soldOut ? "Sold out" : `${card.sold} of ${card.total} sold · ${formatAmount(listing.regular, listing.token)}`;
+    return listed.length > 1 ? `${USE_LABEL[t.use]} · ${line}` : line;
+  });
 }
 
-export type EntryState =
-  /** `link`: where the fix is — Earn's mint flow, or Earn › Sell's "Your project" card for the Main listing. */
-  | { kind: "blocked"; reason: string; link: "mint" | "projectNft" | null }
-  | { kind: "open" }
-  | { kind: "full"; line: string };
+export type CopyRowState =
+  /** No Sell. `link`: the fix is Earn's mint flow, and the row's Sell goes there. */
+  | { kind: "blocked"; line: string; link: "mint" | null }
+  /** Sell opens the flow (picking up at the listing when a track is made but not listed). */
+  | { kind: "sell"; line: string }
+  /** Something is on sale: Manage opens its controls. `more`: the use still open, sold from there. */
+  | { kind: "manage"; lines: string[]; more: EditionUse | null };
 
-/** The row's action: the edition block's gates, first match wins (each replaces the button,
- *  no disabled button), then the Main listing (`listGate`), then whether a kind is open. */
-export function entryStateOf(f: {
+/** A Physical or Virtual row of a scope, first match wins. The Main listing is never asked:
+ *  copies are listed and sold on their own (owner, 2026-10-11). */
+export function copyRowStateOf(f: {
+  /** A product's id, or `PROJECT_SCOPE`. */
   productId: string;
+  kind: EditionKind;
   projectName: string;
   minted: boolean;
   given: boolean;
@@ -151,22 +143,25 @@ export function entryStateOf(f: {
   chainKnown: boolean;
   /** A product a later version dropped keeps its tracks but takes no new ones. */
   dropped: boolean;
-  mainView: ListingView;
   tracks: EditionTrack[];
-}): EntryState {
-  const blocked = (reason: string, link: "mint" | "projectNft" | null = null): EntryState => ({ kind: "blocked", reason, link });
+  sales: Sale[];
+}): CopyRowState {
+  const blocked = (line: string, link: "mint" | null = null): CopyRowState => ({ kind: "blocked", line, link });
   const gate = editionGate({ minted: f.minted, intent: f.given ? "give" : null, projectName: f.projectName });
   if (gate.kind === "blocked") {
-    return f.minted
-      ? blocked(`${f.projectName} was given to the community, so copies aren't sold.`)
-      : blocked(`Mint ${f.projectName} first. Copies are sold from its collection.`, "mint");
+    return f.minted ? blocked("Given to the community, so copies aren't sold.") : blocked("Not minted yet", "mint");
   }
-  if (!f.manage) return blocked(`${f.projectName} was sold in full, so you can't sell copies of it.`);
-  if (!f.chainKnown) return blocked("This mint's collection isn't known, so copies can't be made. Check it in the Brief.");
+  if (!f.manage) return blocked("Stopped · the project was sold");
+  if (!f.chainKnown) return blocked("This mint's collection isn't known. Check it in the Brief.");
+  const lines = sellingLinesOf(f.productId, f.kind, f.tracks, f.sales);
+  if (lines.length) {
+    return { kind: "manage", lines, more: f.dropped ? null : firstOpenUseOf(f.tracks, f.productId, f.kind) };
+  }
   if (f.dropped) return blocked("A later version dropped this product, so it can't sell new copies.");
-  if (listGate(f.mainView, f.projectName).kind === "blocked") return blocked(listFirstOf(f.projectName), "projectNft");
-  if (!kindChoicesOf(f.tracks, f.productId).some((c) => c.open)) return { kind: "full", line: `${ALREADY_ON_SALE}. Change it under Manage.` };
-  return { kind: "open" };
+  const sold = tracksOf(f.productId, f.tracks)
+    .filter((t) => t.kind === f.kind)
+    .reduce((n, t) => n + soldOf(t.id, f.sales), 0);
+  return { kind: "sell", line: sold ? `${NOT_SELLING} · ${sold} sold` : NOT_SELLING };
 }
 
 // ───────────────────────── the draft ─────────────────────────
@@ -174,7 +169,8 @@ export function entryStateOf(f: {
 export type SellChecks = { leadTime: boolean; refund: boolean; seller: boolean };
 
 export type SellDraft = {
-  kind: EditionKind | null;
+  /** Preset by the row. */
+  kind: EditionKind;
   use: EditionUse | null;
   /** Copies, typed, digits only. Asked only while the track is new. */
   count: string;
@@ -194,7 +190,6 @@ export type SellDraft = {
 };
 
 export type SellField =
-  | "kind"
   | "use"
   | "count"
   | "token"
@@ -212,7 +207,11 @@ export type SellField =
 export const MORE_FIELDS: readonly SellField[] = ["extended", "use", "royalties"];
 
 export function draftOf(f: {
+  /** The scope: a product's id, or `PROJECT_SCOPE`. */
   productId: string;
+  kind: EditionKind;
+  /** The use to start on, while it's open (Manage's "Sell … too"). */
+  use?: EditionUse | null;
   network: Network;
   /** The Main listing's token: the default when this chain has it. */
   mainToken: Token | null;
@@ -221,10 +220,10 @@ export function draftOf(f: {
   plan: ShipPlan | null;
 }): SellDraft {
   const tokens = TOKENS_BY_NETWORK[f.network];
-  const kind = firstOpenKindOf(f.tracks, f.productId);
+  const open = editionUsesOf(f.tracks, f.productId, f.kind).find((c) => c.use === f.use)?.open;
   return {
-    kind,
-    use: firstOpenUseOf(f.tracks, f.productId, kind),
+    kind: f.kind,
+    use: f.use && open ? f.use : firstOpenUseOf(f.tracks, f.productId, f.kind),
     count: "10",
     token: f.mainToken && tokens.includes(f.mainToken) ? f.mainToken : tokens[0],
     regular: "",
@@ -235,12 +234,6 @@ export function draftOf(f: {
     owner: false,
     lazy: false,
   };
-}
-
-/** The draft with `kind` chosen: its use stays while it's open for that kind, else the first open one. */
-export function withKind(draft: SellDraft, kind: EditionKind, tracks: EditionTrack[], productId: string): SellDraft {
-  const open = editionUsesOf(tracks, productId, kind).find((c) => c.use === draft.use)?.open;
-  return { ...draft, kind, use: open ? draft.use : firstOpenUseOf(tracks, productId, kind) };
 }
 
 /** What is checked and stored: an empty "Price with future updates" is the price, empty royalties 10 %. */
@@ -262,6 +255,7 @@ export function effectiveTermsOf(draft: Pick<SellDraft, "regular" | "extended" |
 // ───────────────────────── each step's first problem ─────────────────────────
 
 export type SellCtx = {
+  /** The scope: a product's id, or `PROJECT_SCOPE`. */
   productId: string;
   network: Network;
   /** The tracks as stored now. */
@@ -273,21 +267,15 @@ export type SellCtx = {
 export type SellProblem = { step: SellStep; field: SellField; message: string };
 
 const OWNER_REASON = "Confirm you're the rightful owner of this project.";
-const CHOOSE_KIND = "Choose what you're selling.";
 
 /** The step's first problem, in the order its fields show, or null. */
 export function stepProblemOf(step: SellStep, draft: SellDraft, ctx: SellCtx): SellProblem | null {
   const problem = (field: SellField, message: string): SellProblem => ({ step, field, message });
   switch (step) {
-    case "what": {
-      if (!draft.kind) return problem("kind", CHOOSE_KIND);
-      if (!kindChoicesOf(ctx.tracks, ctx.productId).some((c) => c.kind === draft.kind && c.open)) {
-        return problem("kind", `${KIND_LABEL[draft.kind]} is already on sale.`);
-      }
-      return null;
-    }
     case "price": {
-      if (!draft.kind) return { step: "what", field: "kind", message: CHOOSE_KIND };
+      if (!editionUsesOf(ctx.tracks, ctx.productId, draft.kind).some((c) => c.open)) {
+        return problem("use", `${KIND_LABEL[draft.kind]} copies are already on sale.`);
+      }
       if (!draft.use) return problem("use", "Choose a use.");
       const state = trackStateOf(ctx.tracks, ctx.productId, draft.kind, draft.use);
       if (state.kind === "new") {
@@ -331,46 +319,34 @@ export function firstProblemOf(draft: SellDraft, ctx: SellCtx): SellProblem | nu
 
 // ───────────────────────── readiness ─────────────────────────
 
-export type SellCheckId = "listing" | "video" | "ownership" | "shipping";
+export type SellCheckId = "video" | "ownership" | "shipping";
 export type SellCheck = {
   id: SellCheckId;
   ok: boolean;
   title: string;
   detail: string | null;
-  /** The one-tap fix: Earn › Sell's "Your project" card, the product's video, or back to Copies and price.
+  /** The one-tap fix: the AI video, or back to Copies and price.
    *  Ownership has none: its box is on Review, under the rows. */
-  fix: "projectNft" | "video" | "price" | null;
+  fix: "video" | "price" | null;
 };
 
-/** Review's rows: the list gate, the "edition" readiness rules for this product, and
- *  (physical) the make-and-ship plan. `blocker` is the first failing row's reason. */
+/** Review's rows: the readiness rules for this scope — one product's video ("edition"), or every
+ *  product's for the whole project ("sell") — and (physical) the make-and-ship plan. Never the
+ *  Main listing. `blocker` is the first failing row's reason. */
 export function sellChecksOf(f: {
   kind: EditionKind;
-  projectName: string;
-  productName: string;
-  mainView: ListingView;
-  /** `readinessOf(…, "edition")`'s videos rule for this product. */
+  /** Whose video: the product's name, or "Each product" for the whole project. */
+  videoSubject: string;
+  /** The readiness videos rule for this scope. */
   video: { ok: boolean; reason: string | null };
   ownershipConfirmed: boolean;
   draft: SellDraft;
 }): { ok: boolean; checks: SellCheck[]; blocker: string | null } {
   const checks: SellCheck[] = [];
-  if (listGate(f.mainView, f.projectName).kind === "blocked") {
-    checks.push({ id: "listing", ok: false, title: `${f.projectName} isn't listed`, detail: listFirstOf(f.projectName), fix: "projectNft" });
-  } else {
-    const paused = f.mainView.kind === "paused";
-    checks.push({
-      id: "listing",
-      ok: true,
-      title: paused ? `${f.projectName}'s listing is paused` : `${f.projectName}'s listing is live`,
-      detail: paused ? "Copies stay hidden on Explore marketplace until it's live again." : null,
-      fix: null,
-    });
-  }
   checks.push(
     f.video.ok
-      ? { id: "video", ok: true, title: `${f.productName} has its AI video`, detail: null, fix: null }
-      : { id: "video", ok: false, title: `${f.productName} needs an AI video`, detail: f.video.reason, fix: "video" },
+      ? { id: "video", ok: true, title: `${f.videoSubject} has its AI video`, detail: null, fix: null }
+      : { id: "video", ok: false, title: `${f.videoSubject} needs an AI video`, detail: f.video.reason, fix: "video" },
   );
   if (f.ownershipConfirmed) {
     checks.push({ id: "ownership", ok: true, title: "Ownership confirmed", detail: null, fix: null });
@@ -400,15 +376,15 @@ export function sellChecksOf(f: {
 
 // ───────────────────────── Review ─────────────────────────
 
-/** Review's short summary: what, copies, price, network. */
-export function reviewSummaryOf(f: { draft: SellDraft; count: number; networkLabel: string }): { label: string; value: string }[] {
+/** Review's short summary: what, copies, price, network. `what` is "the whole project" or the product's name. */
+export function reviewSummaryOf(f: { draft: SellDraft; what: string; count: number; networkLabel: string }): { label: string; value: string }[] {
   const { draft } = f;
   const token = draft.token ?? "ETH";
   const t = effectiveTermsOf(draft);
   const price = formatAmount(t.regular, token);
   const extended = formatAmount(t.extended, token);
   return [
-    { label: "What", value: [draft.kind && KIND_LABEL[draft.kind], draft.use && USE_LABEL[draft.use]].filter(Boolean).join(" · ") },
+    { label: "Selling", value: [`${KIND_LABEL[draft.kind]} copies of ${f.what}`, draft.use && USE_LABEL[draft.use]].filter(Boolean).join(" · ") },
     { label: "Copies", value: String(f.count) },
     { label: "Price", value: extended === price ? price : `${price} · ${extended} with future updates` },
     { label: "Network", value: f.networkLabel },
@@ -417,7 +393,8 @@ export function reviewSummaryOf(f: { draft: SellDraft; count: number; networkLab
 
 // ───────────────────────── the stored make-and-ship plan ─────────────────────────
 
-/** Per project, beside its tracks: `ideeza:project:edition-terms:<projectId>`. */
+/** Per project, beside its tracks: `ideeza:project:edition-terms:<projectId>`, one plan per scope
+ *  (a product's id, or `PROJECT_SCOPE`). */
 export const SELL_TERMS_KEY = (projectId: string) => `ideeza:project:edition-terms:${projectId}`;
 
 export type ShipPlan = { note: string; leadTime: true; refund: true; seller: true; at: number };

@@ -1,14 +1,17 @@
-// The product page's Physical / Virtual NFT tracks (Phase 2 spec §3.5.5,
-// P2-TABS-24…28): a lazy-minted batch per kind × use, gated by the project's
-// mint and listing state, listed against the project's own collection and
-// chain. Every track and sale here is a labelled "Testnet demo" record.
+// The Physical / Virtual NFT tracks (Phase 2 spec §3.5.5, P2-TABS-24…28): a
+// lazy-minted batch per kind × use, of one product or of the whole project
+// (`PROJECT_SCOPE`), listed against the project's own collection and chain.
+// Copies are listed and sold on their own (owner, 2026-10-11): no Main
+// listing is needed, and a paused or removed Main hides none of them. Only
+// the lock (the project sold in full) stops them. Every track and sale here
+// is a labelled "Testnet demo" record.
 //
 // Pure, relative imports only, so node:test loads the compiled module.
 
 import type { Intent, Network } from "../brief/types";
 import { ROYALTY_MAX, ROYALTY_MIN } from "../brief/types";
 import { normalizeAmount, toMicros } from "../wallet/money";
-import type { EditionKind, EditionTrack, EditionUse, Listing, ListingView, Sale } from "./types";
+import { PROJECT_SCOPE, type EditionKind, type EditionTrack, type EditionUse, type Listing, type Sale } from "./types";
 import { randomId } from "./sales";
 
 // ───────────────────────── normalizer ─────────────────────────
@@ -43,7 +46,8 @@ function listingIn(v: unknown): TrackListing | null {
   return { token: token as TrackListing["token"], regular, extended, royaltyPct, listedAt, updatedAt };
 }
 
-/** Every stored `EditionTrack`, malformed rows dropped — never repaired. */
+/** Every stored `EditionTrack`, malformed rows dropped — never repaired. A project-scope track
+ *  is one whose `productId` is `PROJECT_SCOPE`, so tracks stored before it read unchanged. */
 export function normalizeEditions(v: unknown): EditionTrack[] {
   if (!Array.isArray(v)) return [];
   const out: EditionTrack[] = [];
@@ -74,8 +78,17 @@ export function normalizeEditions(v: unknown): EditionTrack[] {
 
 // ───────────────────────── reads ─────────────────────────
 
+/** A scope's tracks: one product's, or the whole project's (`PROJECT_SCOPE`). */
 export function tracksOf(productId: string, tracks: EditionTrack[]): EditionTrack[] {
   return tracks.filter((t) => t.productId === productId);
+}
+
+export const isProjectScope = (productId: string): boolean => productId === PROJECT_SCOPE;
+
+/** What a buyer can buy now: listed and not sold out, none while the project is sold in full. */
+export function liveTracksOf(tracks: readonly EditionTrack[], sales: Sale[], locked: boolean): EditionTrack[] {
+  if (locked) return [];
+  return tracks.filter((t) => t.listing !== null && soldOf(t.id, sales) < t.supply.total);
 }
 
 /** How many units of a track have sold (CUSTOMERS' sales for this track,
@@ -100,27 +113,10 @@ export function editionGate(ctx: { minted: boolean; intent: Intent | null; proje
   return { kind: "ok" };
 }
 
-/** Whether a track can be *listed* (P2-TABS-26): the project's Main NFT
- *  listing must be live or paused — editions share the project's public
- *  page, collection and chain, so they can't be listed on their own. */
-export function listGate(mainView: ListingView, projectName: string): EditionGate {
-  if (mainView.kind === "live" || mainView.kind === "paused") return { kind: "ok" };
-  return {
-    kind: "blocked",
-    reason: `List ${projectName} on the marketplace first — its NFTs are sold on the project's listing.`,
-  };
-}
-
-/** Pausing or removing the Main listing hides or removes its editions
- *  (TABS C19-3): hidden while Main has never been listed, is paused, or was
- *  explicitly removed. An auction that simply lapsed with no bids, or a
- *  Main sale, leaves editions exactly as they were — unless that sale sold
- *  the project in full: `locked` (`view.lock !== null`) hides them all, since
- *  the maker has nothing left to sell them from (R1-2). */
-export function editionsHiddenWith(mainView: ListingView, locked = false): boolean {
-  if (locked) return true;
-  if (mainView.kind === "none" || mainView.kind === "paused") return true;
-  return mainView.kind === "ended" && mainView.why === "removed";
+/** Why a track can't be listed now, or null: only the lock (`view.lock !== null`) stops it,
+ *  since the maker has nothing left to sell copies of (R1-2). The Main listing's state never does. */
+export function lockedListReason(locked: boolean, projectName: string): string | null {
+  return locked ? `${projectName} was sold in full, so its copies can't be listed.` : null;
 }
 
 // ───────────────────────── create ─────────────────────────
@@ -250,7 +246,7 @@ export function addToSupply(tracks: EditionTrack[], trackId: string, n: number, 
   return mapTrack(tracks, trackId, (t) => ({ ...t, supply: { total: t.supply.total + n, lastAdded: { n, at: now } } }));
 }
 
-/** Removing the Main listing removes its editions' listings too (spec C23, TABS T3). */
+/** A Main sale that sells the project in full takes every copy listing off with it (R1-2). */
 export function unlistProjectTracks(tracks: EditionTrack[], projectId: string): { tracks: EditionTrack[]; removed: number } {
   let removed = 0;
   const next = tracks.map((t) => {
@@ -351,16 +347,16 @@ export function editionSummaryOf(
   return rows;
 }
 
-/** A buyer's offers (spec §2.4, TABS T2): every listed track whose Main listing
- *  doesn't hide it, grouped by product in the products' order. None while the
- *  project is `locked` (sold in full, R1-2). */
+/** A buyer's offers (spec §2.4, TABS T2): every listed track, grouped by scope in the order
+ *  given — the caller puts the whole project (`PROJECT_SCOPE`, the project's name) before its
+ *  products. Whatever the Main listing's state; none while the project is `locked` (sold in
+ *  full, R1-2). */
 export function editionOffersOf(
   products: { id: string; name: string }[],
   tracks: EditionTrack[],
-  mainView: ListingView,
   locked = false,
 ): { productId: string; name: string; tracks: EditionTrack[] }[] {
-  if (editionsHiddenWith(mainView, locked)) return [];
+  if (locked) return [];
   const order: Record<EditionKind, number> = { physical: 0, virtual: 1 };
   const useOrder: Record<EditionUse, number> = { private: 0, commercial: 1 };
   return products

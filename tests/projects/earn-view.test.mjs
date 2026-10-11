@@ -17,7 +17,7 @@ import {
   earnPathOf,
   earnStatusOf,
   editionProductsOf,
-  yourProjectLineOf,
+  mainRowStateOf,
 } from "../../.tmp-test/lib/manual/earn-view.js";
 import {
   EARN_PARTS,
@@ -123,6 +123,9 @@ test("the steps are Mint → Sell; minted is at Sell, and anything live has both
   assert.deepEqual(states("minted"), ["done", "current"]);
   for (const c of ["listed", "paused", "given", "soldPartial", "soldOut"]) assert.deepEqual(states(c), ["done", "done"], c);
   assert.deepEqual(earnPathOf("none").map((s) => s.n), [1, 2]);
+  // Copies on sale without the Main NFT: something is live, so both are done.
+  assert.deepEqual(earnPathOf("minted", true).map((s) => s.state), ["done", "done"]);
+  assert.deepEqual(earnPathOf("none", true).map((s) => s.state), ["current", "todo"]);
 });
 
 test("the Overview's card: mint, then sell, each with its why; later states say where they're managed", () => {
@@ -137,11 +140,16 @@ test("the Overview's card: mint, then sell, each with its why; later states say 
   assert.deepEqual(earnNextOf("proj_car", "minted"), {
     step: "sell",
     title: "Sell your project",
-    why: "List the whole project, or sell copies of each product.",
+    why: "Sell the whole project as its Main NFT, or Physical and Virtual copies of it or of each product.",
     point: "list",
     verb: "sell",
-    action: { label: "Add to marketplace", href: "/projects/proj_car/earn/sell?list=1" },
+    action: { label: "Choose what to sell", href: "/projects/proj_car/earn/sell" },
   });
+  // Copies on sale with no Main listing: the live card, managed in Sell.
+  const copies = earnNextOf("proj_car", "minted", true);
+  assert.equal(copies.point, null);
+  assert.equal(copies.title, "Your copies are on the marketplace");
+  assert.deepEqual(copies.action, { label: "Manage in Sell", href: "/projects/proj_car/earn/sell" });
   for (const state of ["given", "listed", "paused", "soldPartial", "soldOut"]) {
     const n = earnNextOf("proj_car", state);
     assert.equal(n.point, null, state);
@@ -160,16 +168,24 @@ test("the Overview's card: mint, then sell, each with its why; later states say 
   }
 });
 
-// ─────────────────────────── Sell › Your project ───────────────────────────
+// ─────────────────────────── Sell › Whole project's Main row ───────────────────────────
 
-test("Your project says its state in plain words until a live, paused or sold listing's own card does", () => {
-  assert.equal(yourProjectLineOf("none", "none"), "Not minted yet.");
-  assert.equal(yourProjectLineOf("minted", "none"), "Minted. Not on the marketplace yet.");
-  assert.equal(yourProjectLineOf("minted", "ended"), "Minted. Not on the marketplace now.");
-  assert.equal(yourProjectLineOf("given", "none"), "Minted and given to the community.");
-  assert.equal(yourProjectLineOf("soldPartial", "ended"), "Part sold. Not on the marketplace now.");
-  for (const kind of ["live", "paused", "sold"]) assert.equal(yourProjectLineOf("listed", kind), null, kind);
-  assert.equal(yourProjectLineOf("soldOut", "sold"), null);
+test("the Main NFT row: its state in words and one button — Sell (mint or listing), Manage, or greyed", () => {
+  const row = (o = {}) => mainRowStateOf({ status: "private", listing: { kind: "none" }, locked: false, canList: true, manage: true, ...o });
+  assert.deepEqual(row({ status: "draft" }), { line: "Not minted yet", live: false, action: "mint", label: "Sell" });
+  assert.deepEqual(row(), { line: "Not selling", live: false, action: "list", label: "Sell" });
+  assert.equal(row({ canList: false }).action, "none");
+  assert.equal(row({ listing: { kind: "ended", why: "removed" } }).line, "Not selling · the last listing ended");
+  const live = row({ status: "listed", listing: { kind: "live", listing: listing(), auction: null } });
+  assert.deepEqual(live, { line: "Listed · 0.05 MATIC · 10%", live: true, action: "manage", label: "Manage" });
+  assert.equal(row({ status: "paused", listing: { kind: "paused", listing: listing(), changed: [] } }).action, "manage");
+  assert.deepEqual(row({ status: "sold", locked: true, listing: { kind: "sold", listing: listing(), sale: sale() } }), {
+    line: "Sold in full · the buyer owns the project",
+    live: false,
+    action: "disabled",
+    label: "Sold",
+  });
+  assert.equal(row({ status: "given" }).action, "disabled");
 });
 
 // ─────────────────────────── Sell › Your project's pair ───────────────────────────
@@ -258,7 +274,7 @@ test("a preview gets no pair at all (PPL-6)", () => {
   assert.deepEqual(kinds(pairFor(project({ status: "draft" }), null, { viewer: CONTRIBUTOR }).pair), [null, null, true]);
 });
 
-// ─────────────────────────── Sell › Copies of each product ───────────────────────────
+// ─────────────────────────── Sell › One product at a time ───────────────────────────
 
 const product = (id, name, dropped = null) => ({ id, name, description: "", built: null, state: "hand", version: null, dropped });
 
@@ -272,7 +288,7 @@ test("Copies lists every current product, and a dropped one only while it has ed
 
 // ─────────────────────────── the Overview's live facts ───────────────────────────
 
-test("the live card's facts: price, copies sold of the copies made, customers, and what the sales earned", () => {
+test("the live card's facts: price, copies sold of the copies made (project and products), customers, and what the sales earned", () => {
   const live = { kind: "live", listing: listing(), auction: null };
   const track = (id, total) => ({ id, projectId: "proj_car", productId: "p1", kind: "virtual", use: "private", supply: { total } });
   const copy = (id, trackId, payout) => sale({ id, item: { nft: "virtual", trackId }, price: "0.02", payout });
@@ -280,13 +296,13 @@ test("the live card's facts: price, copies sold of the copies made, customers, a
     projectId: "proj_car",
     commercial: "listed",
     listing: live,
-    sales: [copy("s1", "t1", "0.0195"), copy("s2", "t1", "0.0195"), sale({ id: "s3", projectId: "proj_other" })],
-    editions: [track("t1", 5), track("t2", 3), { ...track("t9", 50), projectId: "proj_other" }],
+    sales: [copy("s1", "t1", "0.0195"), copy("s2", "tw", "0.0195"), sale({ id: "s3", projectId: "proj_other" })],
+    editions: [track("t1", 5), track("t2", 3), { ...track("tw", 2), productId: "project" }, { ...track("t9", 50), projectId: "proj_other" }],
     buyers: 1,
   });
   assert.deepEqual(facts, [
     { label: "Price", value: "0.05 MATIC" },
-    { label: "Copies sold", value: "2 of 8" },
+    { label: "Copies sold", value: "2 of 10" },
     { label: "Customers", value: "1" },
     { label: "Earned", value: "0.039 MATIC" },
   ]);

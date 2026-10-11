@@ -1,9 +1,10 @@
 "use client";
 
 // "Add {Use} {Kind} NFT to the marketplace" (Figma 41505:138424, 139900;
-// P2-TABS-26 as changed in spec §4.9). The track card opens it only once the
-// project's Main listing is live or paused (`listGate`) and this product's
-// video passes the strict "edition" readiness (the block runs both first).
+// P2-TABS-26 as changed in spec §4.9). The track card opens it once the
+// scope's videos pass readiness (the block runs it first). The Main listing is
+// never asked: copies are listed on their own (owner, 2026-10-11); only the
+// lock (sold in full) refuses it.
 //
 // - Use and Number of NFTs are locked. Token comes from the project's chain,
 //   then the Regular and Extended prices, each with its "?", and Royalties
@@ -13,7 +14,7 @@
 // - Add to marketplace validates on press (`checkEditionListing`): the first
 //   problem shows under its field and under the button, and focus goes there.
 //   Then ONE wallet request, the maker's free signature (§3.9 "List edition");
-//   its `commit` re-reads the tracks and the Main listing, then writes once.
+//   its `commit` re-reads the tracks and the lock, then writes once.
 //
 // `EditionTermsFields` is also Edit's (edit-dialog.tsx), so the two can't drift.
 
@@ -21,12 +22,13 @@ import * as React from "react";
 import { Banner, ModalFrame, SelectMenu, TestnetDemoBadge, TextInput, type SelectOption } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { ROYALTY_MAX, ROYALTY_MIN, TOKENS_BY_NETWORK, type Network, type Token } from "@/lib/brief/types";
-import { useManualProjects } from "@/lib/manual/projects";
+import { projectLockOf } from "@/lib/commerce/edit-gate";
+import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import {
   checkEditionListing,
   KIND_WORD,
-  listGate,
   listTrack,
+  lockedListReason,
   TIER_HELP,
   USE_WORD,
   wholeNumberOf,
@@ -34,7 +36,6 @@ import {
 } from "@/lib/market/editions";
 import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
 import { EXTENDED_BELOW, PRICE_LABEL } from "@/lib/market/sell-flow";
-import { listingViewOf } from "@/lib/market/listing";
 import { readMarketNow } from "@/lib/market/market-store";
 import type { EditionTrack, Listing } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
@@ -57,7 +58,6 @@ export type TermsInput = { token: Token | null; regular: string; extended: strin
 export type TermsField = "token" | "regular" | "extended" | "royalties" | "confirm" | "owner";
 
 const OWNER_REASON = "Confirm you're the rightful owner of this project.";
-const NO_METADATA = { name: "", description: "", products: [], cover: null, at: 0 };
 
 /** Digits and one dot. */
 function decimal(raw: string): string {
@@ -300,23 +300,15 @@ export function listRequestOf(f: {
   };
 }
 
-/** The Main listing as the market holds it now: edition listings need it live or paused. */
-export function mainGateNow(projectId: string, projectName: string): string | null {
-  const m = readMarketNow();
-  const view = listingViewOf(projectId, {
-    listings: m.listings,
-    sales: m.sales,
-    bids: m.bids,
-    now: Date.now(),
-    current: NO_METADATA,
-  });
-  const gate = listGate(view, projectName);
-  return gate.kind === "blocked" ? gate.reason : null;
+export type LockProject = Pick<ManualProject, "id" | "name" | "createdAt" | "contributors">;
+
+/** The lock as the market holds it now: a project sold in full lists no copies. */
+export function lockGateNow(project: LockProject): string | null {
+  return lockedListReason(projectLockOf(project, readMarketNow().sales) !== null, project.name);
 }
 
 export function ListDialog({
-  projectId,
-  projectName,
+  project,
   productName,
   track,
   chain,
@@ -325,8 +317,8 @@ export function ListDialog({
   onClose,
   onDone,
 }: {
-  projectId: string;
-  projectName: string;
+  project: LockProject;
+  /** The scope's name: the product's, or the project's for a whole-project copy. */
   productName: string;
   track: EditionTrack;
   chain: { network: Network; collection: string };
@@ -339,6 +331,8 @@ export function ListDialog({
 }) {
   const { request } = useWalletRequest();
   const { setOwnerConfirmed } = useManualProjects();
+  const projectId = project.id;
+  const projectName = project.name;
   const tokens = TOKENS_BY_NETWORK[chain.network];
   const [input, setInput] = React.useState<TermsInput>(() => ({
     token: main && tokens.includes(main.token) ? main.token : tokens[0],
@@ -386,9 +380,9 @@ export function ListDialog({
     });
     setBusy(true);
     const result = await request(req, {
-      recheck: () => mainGateNow(projectId, projectName),
+      recheck: () => lockGateNow(project),
       commit: (proof) => {
-        const gate = mainGateNow(projectId, projectName);
+        const gate = lockGateNow(project);
         if (gate) return { ok: false, message: gate };
         const w = writeTracks(projectId, (tracks) => listTrack(tracks, track.id, terms, proof.at));
         if (!w.ok) return { ok: false, message: w.message };

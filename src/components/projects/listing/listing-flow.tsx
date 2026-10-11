@@ -45,7 +45,20 @@ const PRIMARY =
   "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface";
 const QUIET = "border border-solid border-border bg-bg-surface text-text-primary hover:bg-bg-surface-raised";
 
-export function ListingFlow({ project, view, brief, now, announce, action, violet, className }: ActionSlotProps) {
+export function ListingFlow({
+  project,
+  view,
+  brief,
+  now,
+  announce,
+  action,
+  violet,
+  className,
+  label,
+}: ActionSlotProps & {
+  /** The button's words in place of the action's: Earn › Sell's Main row says "Sell". */
+  label?: string;
+}) {
   const search = useSearchParams();
   const pathname = usePathname();
   const { check: ladder, ready } = useCommitGate("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
@@ -88,7 +101,7 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
           className={cn(BASE, violet && !blocked ? PRIMARY : QUIET, blocked && "cursor-not-allowed opacity-60", className)}
         >
           <Icon icon={Tag01Icon} size={18} />
-          {action.label}
+          {label ?? action.label}
         </button>
       )}
       {blocked && (

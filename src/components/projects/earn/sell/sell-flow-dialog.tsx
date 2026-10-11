@@ -1,24 +1,25 @@
 "use client";
 
-// "Sell copies of {product}" (Build and Earn P1-3): one guided flow over the
-// existing edition tracks, opened from the product's row in Earn › Editions.
-// What are you selling? → Copies and price → Review, in one ModalFrame (size
-// sm, like every edition dialog).
+// "Sell {kind} copies of {the whole project | product}" (Build and Earn P1-3,
+// the owner's selling rules 2026-10-11): one guided flow over the edition
+// tracks, opened from a Physical or Virtual row in Earn › Sell, which presets
+// the kind: Copies and price → Review, in one ModalFrame (size sm, like every
+// edition dialog). It works for the whole project (`PROJECT_SCOPE`) as for
+// one product, and never needs the Main listing.
 //
 // - Each step's Next checks that step only (`stepProblemOf`): the first
 //   problem shows under its field and under the button, and focus goes there
 //   (More options opens first when the field is inside it). Back keeps
 //   everything typed. Closing with anything entered asks first.
-// - Review lists the summary, then the edition rules unchanged
-//   (`sellChecksOf`): the project's Main listing live or paused (`listGate`,
-//   with a link to Earn › Sell), this product's AI video (the "edition"
-//   readiness, fixed here with the Generate dialog on top), ownership, and for
-//   a built product the make-and-ship note and its promises (fixed back on
-//   step 2). It also asks the ladder (Build and Earn P1-4): L3 for design
-//   files, L4 (the demo identity check) for a built product. Sign and sell
-//   waits, aria-disabled, until every row and level passes; pressing it then
-//   goes to the first fix.
-// - Sign and sell re-reads the tracks and the market, then makes the existing
+// - Review lists the summary, then the readiness rules (`sellChecksOf`): the
+//   AI video of this product ("edition" readiness), or of every product for
+//   the whole project ("sell"), fixed here with the Generate dialog on top;
+//   ownership; and for a physical copy the make-and-ship note and its
+//   promises (fixed back on step 1). It also asks the ladder (Build and Earn
+//   P1-4): L3 for virtual copies, L4 (the demo identity check) for physical.
+//   Sign and sell waits, aria-disabled, until every row and level passes;
+//   pressing it then goes to the first fix.
+// - Sign and sell re-reads the tracks and the lock, then makes the existing
 //   wallet requests in order: "Create {n} lazy NFTs" (`createEditions`) when
 //   the use is new, then "Sign the listing" (`listEdition`), with the terms
 //   `effectiveTermsOf` fills in. Each `commit` re-reads and writes once, as
@@ -45,8 +46,6 @@ import {
   effectiveTermsOf,
   firstProblemOf,
   KIND_LABEL,
-  KIND_SUB,
-  kindChoicesOf,
   MORE_FIELDS,
   reviewSummaryOf,
   SELL_STEPS,
@@ -55,7 +54,6 @@ import {
   stepProblemOf,
   trackStateOf,
   USE_LABEL,
-  withKind,
   type SellCtx,
   type SellDraft,
   type SellField,
@@ -68,14 +66,15 @@ import { formatAmount } from "@/lib/wallet/money";
 import { networkLabelOf } from "@/lib/wallet/request-view";
 import { cn } from "@/lib/utils";
 import { createdLine, createRequestOf, failureCopy, TAP, writeTracks } from "../../editions/create-dialog";
-import { listRequestOf, mainGateNow } from "../../editions/list-dialog";
-import { PriceStep, ReviewStep, WhatStep, type Choice } from "./sell-steps";
+import type { CopyScope } from "../../editions/edition-block";
+import { listRequestOf, lockGateNow } from "../../editions/list-dialog";
+import { PriceStep, ReviewStep, type Choice } from "./sell-steps";
 import { useSellTerms, writeShipPlan } from "./use-sell-terms";
 import { LevelCheck, useCommitCheck } from "../ladder/level-check";
 import { earnSourceOf } from "../ladder/use-earn-facts";
 
 const LADDER_HANDLED = ["videos", "ownership", "wallet"] as const;
-const LADDER_WHAT: Record<EditionKind, string> = { virtual: "sell design files", physical: "sell built products" };
+const LADDER_WHAT: Record<EditionKind, string> = { virtual: "sell virtual copies", physical: "sell physical copies" };
 
 /** Where a problem sends focus: the field, or the checked (else first) option of a group. */
 function focusField(prefix: string, field: SellField) {
@@ -92,21 +91,24 @@ function focusField(prefix: string, field: SellField) {
 export function SellFlowDialog({
   project: given,
   view,
-  productId,
+  scope,
+  kind,
+  use,
   onClose,
   onDone,
-  onListingFix,
 }: {
   project: ManualProject;
-  /** The page's one derivation: the Main listing, the mint, the products. */
+  /** The page's one derivation: the mint, the products, the tracks. */
   view: ProjectView;
-  /** The product whose row opened the flow. */
-  productId: string;
+  /** Whose copies: the whole project, or the product whose row opened the flow. */
+  scope: CopyScope;
+  /** Preset by the row. */
+  kind: EditionKind;
+  /** The use to start on (Manage's "Sell … copies too"); else the first open one. */
+  use?: EditionUse | null;
   onClose: () => void;
   /** After the listing is signed: the sentence the page says, and the listed track. */
   onDone: (message: string, track: EditionTrack) => void;
-  /** "Go to Your project" on Review: the Main listing isn't live, and it starts on the same tab. */
-  onListingFix: () => void;
 }) {
   const { request } = useWalletRequest();
   const { projects, setOwnerConfirmed } = useManualProjects();
@@ -120,13 +122,18 @@ export function SellFlowDialog({
 
   const main = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, view.mint.status === "legacy" && brief ? brief.state : null);
-  const product = view.products.find((p) => p.id === productId) ?? null;
-  const productName = product ? displayProductName(product.name) : "";
+  const productId = scope.id;
+  const product = scope.product;
+  const productName = product ? displayProductName(product.name) : scope.name;
+  /** "the whole project", or the product's name. */
+  const what = product ? productName : "the whole project";
 
-  const [step, setStep] = React.useState<SellStep>("what");
+  const [step, setStep] = React.useState<SellStep>("price");
   const [draft, setDraft] = React.useState<SellDraft>(() =>
     draftOf({
       productId,
+      kind,
+      use,
       network: chain?.network ?? "baseSepolia",
       mainToken: main?.token ?? null,
       tracks,
@@ -142,7 +149,6 @@ export function SellFlowDialog({
   const [generating, setGenerating] = React.useState<VideoTarget | null>(null);
   const [discarding, setDiscarding] = React.useState(false);
   const [fixOpen, setFixOpen] = React.useState(false);
-  const kind: EditionKind = draft.kind ?? "virtual";
   const ladder = useCommitCheck(kind === "physical" ? "editionPhysical" : "editionVirtual", earnSourceOf(project, view, brief), {
     handled: LADDER_HANDLED,
   });
@@ -155,20 +161,20 @@ export function SellFlowDialog({
   const facts = readinessFactsOf(project, view, brief, videos, jobs, now);
   const askOwner = !facts.ownershipConfirmed;
   const ctx: SellCtx = { productId, network: chain?.network ?? "baseSepolia", tracks, askOwner };
-  const videoRule = product ? readinessOf({ ...facts, product }, "edition").rules.find((r) => r.id === "videos") : undefined;
+  // One product's video, or every product's for the whole project.
+  const scopeReadiness = product ? readinessOf({ ...facts, product }, "edition") : readinessOf(facts, "sell");
+  const videoRule = scopeReadiness.rules.find((r) => r.id === "videos");
   const readiness = sellChecksOf({
     kind,
-    projectName: project.name,
-    productName,
-    mainView: view.listing,
+    videoSubject: product ? productName : "Each product",
     video: { ok: videoRule?.ok ?? false, reason: videoRule?.reason ?? null },
     ownershipConfirmed: facts.ownershipConfirmed,
     draft,
   });
-  const state = draft.kind && draft.use ? trackStateOf(tracks, productId, draft.kind, draft.use) : { kind: "new" as const };
+  const state = draft.use ? trackStateOf(tracks, productId, kind, draft.use) : { kind: "new" as const };
   const index = SELL_STEPS.indexOf(step);
 
-  // A new step's heading takes focus, so it is said ("Step 2 of 3: Copies and price").
+  // A new step's heading takes focus, so it is said ("Step 2 of 2: Review").
   const firstRender = React.useRef(true);
   React.useEffect(() => {
     if (firstRender.current) {
@@ -187,10 +193,6 @@ export function SellFlowDialog({
   };
   const change = (patch: Partial<SellDraft>) => {
     setDraft((d) => ({ ...d, ...patch }));
-    edited();
-  };
-  const chooseKind = (k: EditionKind) => {
-    setDraft((d) => withKind(d, k, tracks, productId));
     edited();
   };
 
@@ -234,7 +236,7 @@ export function SellFlowDialog({
       fixRef.current?.focus();
       return;
     }
-    if (!ladder.ok || !draft.kind || !draft.use || !draft.token) return;
+    if (!ladder.ok || !draft.use || !draft.token) return;
     const sellKind = draft.kind;
     const use: EditionUse = draft.use;
     const at = trackStateOf(fresh, productId, sellKind, use);
@@ -258,7 +260,7 @@ export function SellFlowDialog({
         {
           // Nothing is created when the listing can't follow it.
           recheck: () =>
-            mainGateNow(project.id, project.name) ??
+            lockGateNow(project) ??
             (canCreate(readEditions(project.id), productId, sellKind).availableUses.includes(use) ? null : `${USE_WORD[use]} is already created.`),
           commit: (proof) => {
             const track = createTrack({ projectId: project.id, productId, kind: sellKind, use, count: n, now: proof.at });
@@ -299,9 +301,9 @@ export function SellFlowDialog({
     const confirmOwner = askOwner && draft.owner;
     const note = draft.note;
     const result = await request(req, {
-      recheck: () => mainGateNow(project.id, project.name),
+      recheck: () => lockGateNow(project),
       commit: (proof) => {
-        const gate = mainGateNow(project.id, project.name);
+        const gate = lockGateNow(project);
         if (gate) return { ok: false, message: gate };
         if (sellKind === "physical") {
           const s = writeShipPlan(project.id, productId, note, proof.at);
@@ -317,7 +319,7 @@ export function SellFlowDialog({
     setBusy(false);
     if (result.ok) {
       const n = track.supply.total;
-      onDone(`${KIND_LABEL[sellKind]} on sale: ${n} ${n === 1 ? "copy" : "copies"} at ${formatAmount(listing.regular, listing.token)}.`, track);
+      onDone(`On sale: ${n} ${KIND_LABEL[sellKind]} ${n === 1 ? "copy" : "copies"} of ${what} at ${formatAmount(listing.regular, listing.token)}.`, track);
       return;
     }
     const failed = failureCopy(result);
@@ -328,16 +330,6 @@ export function SellFlowDialog({
   const stepProps = { draft, change, problem, prefix };
   let body: React.ReactNode;
   switch (step) {
-    case "what": {
-      const choices: Choice<EditionKind>[] = kindChoicesOf(tracks, productId).map((c) => ({
-        value: c.kind,
-        title: KIND_LABEL[c.kind],
-        lines: c.open ? [KIND_SUB[c.kind]] : [KIND_SUB[c.kind], ALREADY_ON_SALE],
-        disabled: !c.open,
-      }));
-      body = <WhatStep {...stepProps} headingId={headingId} choices={choices} onKind={chooseKind} />;
-      break;
-    }
     case "price": {
       const uses: Choice<EditionUse>[] = editionUsesOf(tracks, productId, kind).map((c) => ({
         value: c.use,
@@ -362,16 +354,20 @@ export function SellFlowDialog({
       body = (
         <ReviewStep
           {...stepProps}
-          rows={reviewSummaryOf({ draft, count, networkLabel: networkLabelOf(chain.network) })}
+          rows={reviewSummaryOf({ draft, what, count, networkLabel: networkLabelOf(chain.network) })}
           checks={readiness.checks}
           fixRef={fixRef}
           onFix={(fix) => {
-            if (fix === "projectNft") onListingFix();
-            else if (fix === "price") {
+            if (fix === "price") {
               const p = stepProblemOf("price", draft, ctx);
               if (p) show(p);
               else go("price");
-            } else if (product) setGenerating(videoTargetOf(project, product));
+              return;
+            }
+            // The whole project: the first product still without a ready video.
+            const missing = scopeReadiness.products.find((p) => p.video.state !== "ready");
+            const target = product ?? view.products.find((p) => p.id === missing?.productId) ?? null;
+            if (target) setGenerating(videoTargetOf(project, target));
           }}
           askOwner={askOwner}
         >
@@ -448,7 +444,8 @@ export function SellFlowDialog({
         covered={busy || generating !== null || discarding || fixOpen}
         size="sm"
         initialFocus={headingRef}
-        title={`Sell copies of ${productName}`}
+        title={`Sell ${KIND_LABEL[kind].replace(" NFT", "").toLowerCase()} copies of ${what}`}
+        description={product ? `Product · ${productName}` : `Whole project · ${project.name}`}
         footer={footer}
       >
         <div inert={busy || undefined} className="flex flex-col gap-8">
@@ -476,7 +473,7 @@ export function SellFlowDialog({
       <GenerateVideoDialog
         open={generating !== null}
         target={generating}
-        back={{ label: "Back to Sell copies", onBack: () => setGenerating(null) }}
+        back={{ label: "Back to selling copies", onBack: () => setGenerating(null) }}
         onClose={() => setGenerating(null)}
       />
       <ConfirmDialog
