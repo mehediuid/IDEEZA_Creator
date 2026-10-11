@@ -4,17 +4,17 @@
 // 138307, 139690…141777; P2-TABS-24…27 as changed in spec §4.9), in two
 // parts since Build and Earn:
 //
-// - `EditionTracks` — the owner's rows of one kind, under that kind's entry
-//   card in Earn › Editions (earn/sell/sell-entry-card.tsx). A track card:
+// - `EditionTracks` — the owner's rows of one kind, under a product row's
+//   Manage disclosure in Earn › Editions (earn/editions.tsx). A track card:
 //   "NFTs sold {s}/{t}" (or "Sold out"), its use pill, "+{n} new" after Add
-//   NFTs until the next sale, and either Add to marketplace or the listed
-//   prices with Edit · Remove listing · Add NFTs. Add to marketplace asks
+//   copies until the next sale, and either Add to marketplace or the listed
+//   prices with Edit · Remove listing · Add copies. Add to marketplace asks
 //   `listGate` (the Main listing live or paused) and then the strict
 //   "edition" readiness of this product only (errata 16) before the listing
 //   dialog opens. While Main is paused or removed, a listed card says it's
-//   hidden on Explore marketplace. Creating a track is the entry card's
-//   guided flow (P1-3); the card also says why when a gate (Draft, Given,
-//   sold in full, an unknown collection) stops it, so the rows are absent
+//   hidden on Explore marketplace. Creating a track is the row's Sell copies
+//   flow (P1-3); the row also says why when a gate (Draft, Given, sold in
+//   full, an unknown collection) stops it, so the rows are absent
 //   then, as the block's gates always replaced its tracks. Every button is
 //   quiet (C16).
 // - `EditionBlock` — the product page's rail block "Marketplace" for anyone
@@ -395,7 +395,7 @@ function TrackCard({
               Remove listing
             </Button>
             <Button id={`${id}-add`} type="button" hierarchy="secondary" size="md" className={TAP} onClick={onAdd}>
-              Add NFTs
+              Add copies
             </Button>
           </div>
         </>

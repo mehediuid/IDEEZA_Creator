@@ -4,8 +4,8 @@
 // checkbox row, the footer, the demo line and the tracks writer — and the
 // "Create editions" wallet request (§3.9; P2-TABS-25). A track is a
 // lazy-minted batch: nothing is minted or charged now, each NFT is minted by
-// its own sale. Since Build and Earn P1-3 a track is created by the Sell the
-// design / Sell the product flow (earn/sell/sell-flow-dialog.tsx), which makes
+// its own sale. Since Build and Earn P1-3 a track is created by the Sell
+// copies flow (earn/sell/sell-flow-dialog.tsx), which makes
 // this request and writes through `writeTracks`, as the Create dialog did.
 
 import * as React from "react";
