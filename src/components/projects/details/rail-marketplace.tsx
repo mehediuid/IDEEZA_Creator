@@ -62,6 +62,7 @@ import type { SlotProps } from "./slots";
 import { NftTypeTabs } from "../editions/edition-summary";
 import { writeTracks } from "../editions/create-dialog";
 import { unlistProjectTracks } from "@/lib/market/editions";
+import { earnHref } from "@/lib/manual/earn-route";
 
 type Dialog = "edit" | "remove" | "bids" | "close" | null;
 
@@ -237,7 +238,7 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
         <>
           <Facts facts={card.facts} />
           <Link
-            href={`/projects/${project.id}?tab=customers`}
+            href={earnHref(project.id, "customers")}
             scroll={false}
             id={MARKETPLACE_FOCUS_ID}
             className={LINK}
@@ -269,7 +270,7 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
           onDone={(m) => {
             // The Main listing is gone: its editions' listings go with it (their NFTs and sales stay).
             const w = editionsListed > 0 ? writeTracks(project.id, (all) => unlistProjectTracks(all, project.id).tracks) : null;
-            done(w && !w.ok ? `${m} ${w.message} Remove the NFT listings on each product's page.` : m, LISTING_TRIGGER_ID);
+            done(w && !w.ok ? `${m} ${w.message} Remove the NFT listings in Earn › Editions.` : m, LISTING_TRIGGER_ID);
           }}
         />
       )}

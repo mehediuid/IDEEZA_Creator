@@ -717,7 +717,7 @@ export function headerText(s: ProjectSummary, ctx: HeaderCtx = {}): HeaderText {
       ? {
           before: s.sold.owner.before,
           label: buyer.label,
-          href: `/projects/${s.id}?tab=customers&sale=${encodeURIComponent(buyer.saleId)}`,
+          href: earnHref(s.id, "customers", { sale: buyer.saleId }),
           after: s.sold.owner.after,
         }
       : null;
