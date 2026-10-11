@@ -5,12 +5,10 @@
 //
 // Pure, relative imports only.
 
-import { estimateGas } from "../brief/gas";
+import { estimateGas } from "../commerce/gas";
 import { NETWORKS, type Intent, type Network } from "../brief/types";
 import type { StoredDraft } from "../brief/project-brief";
-import type { ManualProject } from "../manual/projects";
-import type { MetaPart } from "../manual/project-summary";
-import { formatDate, formatDateTime, formatShortDate } from "../manual/project-summary";
+import { formatDate, formatDateTime, formatShortDate, type ManualProject, type MetaPart } from "../manual/public";
 import type { Sale } from "../market/types";
 import { DEMO_ACCOUNTS } from "./identities";
 import { formatAmount } from "./money";

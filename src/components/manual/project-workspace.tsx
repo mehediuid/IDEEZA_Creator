@@ -5,11 +5,12 @@
 // The editor opens a PRODUCT, not a project (owner decision 7, P2-EDITOR-1):
 // /project/<slug>/products/<productId>/<step>. The URL is the source of
 // truth. The gate, in order:
-//   1. not hydrated (projects, marketplace) → "Loading project…";
+//   1. not hydrated (projects, the guards' records) → "Loading project…";
 //   2. unknown slug → My projects;
 //   3. locked (sold in full, §3.8.5) → "{project} was sold in full"; and,
 //      as delete does, unreadable marketplace records lock it too — they
-//      can't say whether it was sold;
+//      can't say whether it was sold. Both come from the write guards
+//      commerce registers (lib/manual/use-write-guard.tsx);
 //   4. a legacy /project/<slug>/<step> → the product it resumes (P2-EDITOR-2);
 //   5. unknown product → "This product isn't in {project}" — never another
 //      product silently, or the maker would edit the wrong one;
@@ -34,7 +35,6 @@ import dynamic from "next/dynamic";
 import { HelpCircleIcon, LockIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { StateCard, buttonVariants } from "@/components/ideeza";
-import { useProjectEditGate } from "@/components/projects/use-edit-gate";
 import { useCreateHistory } from "@/lib/create/history";
 import { pendingNoticeOf, type SeedEditor } from "@/lib/manual/build-load";
 import { ensureSeeded, readSeed, type EnsureResult, type SeedBuilt } from "@/lib/manual/build-load-io";
@@ -44,7 +44,7 @@ import { earnMintHref } from "@/lib/manual/earn-route";
 import { editorHref, resumeProductOf } from "@/lib/manual/editor-scope";
 import { can } from "@/lib/manual/permissions";
 import type { EditorScope, EditorStep } from "@/lib/manual/p2-types";
-import { useMarket } from "@/lib/market/market-store";
+import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { usePcbActions, usePcbDocScope } from "@/lib/pcb/store";
 import { cn } from "@/lib/utils";
 import { BringInBanner, EditorBannerProvider, focusEditorBanners } from "./bring-in-banner";
@@ -183,18 +183,17 @@ export function ProjectWorkspace({
     selectEditorScope,
     touchOpened,
   } = useManualProjects();
-  const market = useMarket();
   const { hydrated: historyHydrated, builds } = useCreateHistory();
   const pcb = usePcbActions();
   const pcbScope = usePcbDocScope();
   const project = findBySlug(slug);
-  const gate = useProjectEditGate(project?.id ?? null);
+  const gate = useWriteGuard(project?.id ?? null);
 
   const isBrief = step === "brief";
-  const ready = hydrated && market.hydrated;
+  const ready = hydrated && gate.ready;
   // The lock (decision 12): Open in editor is refused, so the route is too.
   // Unreadable market records read as "no sales", so they lock it as well.
-  const marketUnreadable = !isBrief && !!project && market.data.unreadable;
+  const marketUnreadable = !isBrief && !!project && gate.unreadable;
   const locked =
     marketUnreadable ||
     (!isBrief &&

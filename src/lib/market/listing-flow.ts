@@ -7,10 +7,9 @@
 //
 // Pure, relative imports only.
 
-import { estimateGas } from "../brief/gas";
+import { estimateGas } from "../commerce/gas";
 import { NETWORKS, TOKENS_BY_NETWORK, type BriefState, type Network } from "../brief/types";
-import { benefitDurationText } from "../manual/customers";
-import { formatDate, formatDateTime, type MetaPart } from "../manual/project-summary";
+import { benefitDurationText, formatDate, formatDateTime, type MetaPart } from "../manual/public";
 import { shortAddress } from "../wallet/demo-wallet";
 import { buyerLabel } from "../wallet/identities";
 import { formatAmount } from "../wallet/money";

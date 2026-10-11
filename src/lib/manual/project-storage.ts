@@ -38,6 +38,8 @@ export const OPENED_EVERY_MS = 60_000;
  *    (P2-EDITOR-4/C4);
  *  - `ideeza:market:*` — a listed or sold project keeps its market rows;
  *    `MarketProvider` drops what's droppable on the delete event instead;
+ *  - `ideeza:commerce:<id>` — commerce removes it on the delete event
+ *    (lib/commerce/record.ts), since engineering doesn't name commerce's keys;
  *  - IndexedDB (`ideeza-video`, `ideeza-media`) — their own stores listen
  *    for the delete event and clear their own blobs. */
 export function projectStorageKeys(id: string, rowIds: readonly string[]): string[] {
