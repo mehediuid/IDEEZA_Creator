@@ -13,11 +13,12 @@
 // - Preview as buyer (`?view=buyer`) and a contributor preview that may see
 //   the listing read the same facts with no button, the Testnet demo badge,
 //   and a quiet "Open in Explore marketplace" (preview stays read-only, PPL-6).
-// - A project never listed has no block.
-//
-// - Below the Main NFT, the project's listed Physical and Virtual NFTs
-//   (edition-offers.tsx, T27): a tier choice and a quiet Buy now for a demo
-//   buyer, the prices alone in a preview; hidden while Main is paused.
+// - Below the Main NFT, the project's listed Physical and Virtual NFTs, of the
+//   whole project and of each product (edition-offers.tsx, T27): a tier choice
+//   and a quiet Buy now for a demo buyer, the prices alone in a preview. They
+//   don't need the Main NFT (owner, 2026-10-11): with no Main listing the block
+//   holds the copies alone. Only the lock (sold in full) hides them.
+// - A project with neither has no block.
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -172,7 +173,15 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   const listing = view.listing.kind === "none" ? null : view.listing.listing;
   // Called on every render (hooks can't wait on the viewer): the auction card's clock.
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
-  if (viewer.kind === "local-owner" || !listing || !can(viewer, "listing.seePublic", view.canCtx)) return null;
+  if (viewer.kind === "local-owner" || !can(viewer, "listing.seePublic", view.canCtx)) return null;
+  const copies = view.lock === null && view.editions.some((t) => t.listing !== null);
+  if (!listing) {
+    return copies ? (
+      <RailBlock title="Marketplace" meta="Copies" collapsible={false}>
+        <EditionOffers project={project} view={view} viewer={viewer} announce={announce} alone />
+      </RailBlock>
+    ) : null;
+  }
   const live = view.listing.kind === "live";
   const auction = live && listing.type === "auction" ? auctionStateOf(listing, view.bids, clock) : null;
   const meta = live

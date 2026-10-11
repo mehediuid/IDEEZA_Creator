@@ -18,7 +18,7 @@ import { formatAmount } from "../wallet/money";
 import { EARN_SECTION_LABEL, earnHref, earnMintHref, type EarnSection } from "./earn-route";
 import { can, roleOf, type CanContext, type Viewer } from "./permissions";
 import type { ProjectProduct } from "./project-read";
-import { nextAction, type ActionPair, type NextAction, type ProjectSummary } from "./project-summary";
+import { nextAction, type ActionPair, type NextAction, type ProjectStatus, type ProjectSummary } from "./project-summary";
 import type { ManualProject } from "./projects";
 
 // ─────────────────────────── the Earn button (the project page's door) ───────────────────────────
@@ -143,9 +143,9 @@ const STEP_OF: Record<CommercialState, EarnStepId> = {
 export type EarnPathStep = { id: EarnStepId; label: string; title: string; n: number; state: "done" | "current" | "todo" };
 
 /** The steps with the maker's place on them: every step before the current one is done, and once
- *  something is live (listed, paused, given, sold) both are. */
-export function earnPathOf(commercial: CommercialState): EarnPathStep[] {
-  const live = commercial !== "none" && commercial !== "minted";
+ *  something is live (listed, paused, given, sold, or copies on sale) both are. */
+export function earnPathOf(commercial: CommercialState, copiesOnSale = false): EarnPathStep[] {
+  const live = commercial !== "none" && (commercial !== "minted" || copiesOnSale);
   const at = EARN_STEPS.findIndex((s) => s.id === STEP_OF[commercial]);
   return EARN_STEPS.map((s, i) => ({ ...s, n: i + 1, state: live || i < at ? "done" : i === at ? "current" : "todo" }));
 }
@@ -168,7 +168,8 @@ export type EarnNext = {
   action: { label: string; href: string };
 };
 
-export function earnNextOf(projectId: string, commercial: CommercialState): EarnNext {
+/** `copiesOnSale`: a copy listing is live (copies sell without the Main NFT, owner 2026-10-11). */
+export function earnNextOf(projectId: string, commercial: CommercialState, copiesOnSale = false): EarnNext {
   const step = STEP_OF[commercial];
   const sell = earnHref(projectId, "sell");
   const customers = earnHref(projectId, "customers");
@@ -191,13 +192,16 @@ export function earnNextOf(projectId: string, commercial: CommercialState): Earn
         action: { label: "Start mint", href: earnMintHref(projectId) },
       };
     case "minted":
+      if (copiesOnSale) {
+        return live("Your copies are on the marketplace", "Buyers can find them on Explore marketplace. You get paid when one sells.", "Manage in Sell", sell);
+      }
       return {
         step,
         title: "Sell your project",
-        why: "List the whole project, or sell copies of each product.",
+        why: "Sell the whole project as its Main NFT, or Physical and Virtual copies of it or of each product.",
         point: "list",
         verb: "sell",
-        action: { label: "Add to marketplace", href: earnHref(projectId, "sell", { list: "1" }) },
+        action: { label: "Choose what to sell", href: sell },
       };
     case "listed":
       return live("Your project is on the marketplace", "Buyers can find it on Explore marketplace. You get paid when it sells.", "Manage in Sell", sell);
@@ -215,8 +219,9 @@ export function earnNextOf(projectId: string, commercial: CommercialState): Earn
 export type EarnFact = { label: string; value: string };
 
 /**
- * The live card's facts row: the project's price, the copies sold, the customers and what the
- * sales earned so far (each sale's payout, summed per token, as Payouts sums it).
+ * The live card's facts row: the project's price, the copies sold (of the whole project and of
+ * every product), the customers and what the sales earned so far (each sale's payout, summed per
+ * token, as Payouts sums it).
  */
 export function earnLiveFactsOf(i: {
   projectId: string;
@@ -254,7 +259,7 @@ function priceOf(view: ListingView, commercial: CommercialState): string {
   }
 }
 
-// ─────────────────────────── Sell › Your project ───────────────────────────
+// ─────────────────────────── Sell › Whole project ───────────────────────────
 
 /**
  * Sell's "Your project" card's pair: the header's `nextAction`, minus Review
@@ -294,31 +299,63 @@ export function earnPairOf(
   return { first, second, violet: pair.violet };
 }
 
-/** "Your project"'s one sentence: what it is. */
-export const YOUR_PROJECT_LEAD = "Your whole project as one item on the marketplace. Buyers can buy all of it, or the share you choose to sell.";
+export type MainRowState = {
+  /** The state in words. */
+  line: string;
+  /** Live on the marketplace. */
+  live: boolean;
+  /** The row's one button: the mint flow, the listing flow, the listing's controls, greyed, or none. */
+  action: "mint" | "list" | "manage" | "disabled" | "none";
+  label: "Sell" | "Sold" | "Manage";
+};
 
-/** "Your project"'s state in plain words while no listing card says it: a live, paused or sold
- *  Main listing is shown by the listing's own card, and this is null then. */
-export function yourProjectLineOf(commercial: CommercialState, listing: ListingView["kind"]): string | null {
-  if (listing === "live" || listing === "paused" || listing === "sold") return null;
-  switch (commercial) {
+/** The Main NFT row's state and button, first match wins: not minted (Sell is the mint), sold in
+ *  full, given, a live or paused listing (Manage), else "Not selling" with Sell when the maker
+ *  may list (`canList`: the Sell pair's Add to marketplace / List another share). */
+export function mainRowStateOf(f: {
+  status: ProjectStatus;
+  listing: ListingView;
+  locked: boolean;
+  canList: boolean;
+  /** The owner sees the listing's controls. */
+  manage: boolean;
+}): MainRowState {
+  const row = (line: string, action: MainRowState["action"], label: MainRowState["label"] = "Sell", live = false): MainRowState => ({
+    line,
+    live,
+    action,
+    label,
+  });
+  const sellOr = (line: string) => row(line, f.canList ? "list" : "none");
+  if (f.status === "draft") return row("Not minted yet", "mint");
+  if (f.locked) return row("Sold in full · the buyer owns the project", "disabled", "Sold");
+  if (f.status === "given") return row("Given to the community, so it isn't sold.", "disabled");
+  const v = f.listing;
+  switch (v.kind) {
+    case "live": {
+      const l = v.listing;
+      const line =
+        l.type === "auction"
+          ? `Auction · from ${formatAmount(l.minBid ?? "0", l.token)} · ${l.percentSelling}%`
+          : `Listed · ${formatAmount(l.price ?? "0", l.token)} · ${l.percentSelling}%`;
+      return row(line, f.manage ? "manage" : "none", "Manage", true);
+    }
+    case "paused":
+      return row("Paused · buyers can't see or buy it", f.manage ? "manage" : "none", "Manage");
+    case "sold": {
+      const pct = v.sale.item.nft === "main" ? v.sale.item.sharePct : 0;
+      return sellOr(`Sold ${pct}% · ${formatAmount(v.sale.price, v.sale.token)}`);
+    }
+    case "ended":
+      return sellOr("Not selling · the last listing ended");
     case "none":
-      return "Not minted yet.";
-    case "given":
-      return "Minted and given to the community.";
-    case "soldOut":
-      return "Sold in full.";
-    case "soldPartial":
-      return "Part sold. Not on the marketplace now.";
-    default:
-      return listing === "ended" ? "Minted. Not on the marketplace now." : "Minted. Not on the marketplace yet.";
+      return sellOr("Not selling");
   }
 }
 
-// ─────────────────────────── Sell › Copies of each product ───────────────────────────
+// ─────────────────────────── Sell › One product at a time ───────────────────────────
 
-/** One row per current product, plus a dropped one that still has editions — the same set the
- *  Marketplace block's Physical and Virtual summaries read (edition-summary.tsx). */
+/** One row per current product, plus a dropped one that still has editions. */
 export function editionProductsOf(products: readonly ProjectProduct[], editions: readonly EditionTrack[]): ProjectProduct[] {
   return products.filter((p) => p.dropped === null || editions.some((t) => t.productId === p.id));
 }

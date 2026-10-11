@@ -1,6 +1,7 @@
 "use client";
 
-// The three step bodies of the Sell copies flow (Build and Earn P1-3).
+// The two step bodies of the Sell copies flow (Build and Earn P1-3): Copies
+// and price, then Review. The kind is the row's, preset.
 // Presentational: the dialog (sell-flow-dialog.tsx) owns the draft, the
 // problem shown and the wallet requests, and every value and rule comes from
 // sell-flow.ts. Each control's id is `${prefix}-${field}`, so the dialog can
@@ -25,7 +26,7 @@ import {
   type SellField,
   type SellProblem,
 } from "@/lib/market/sell-flow";
-import type { EditionKind, EditionUse } from "@/lib/market/types";
+import type { EditionUse } from "@/lib/market/types";
 import { formatAmount, toMicros } from "@/lib/wallet/money";
 import { cn } from "@/lib/utils";
 import { CheckRow, ERROR, HINT, LABEL, TAP } from "../../editions/create-dialog";
@@ -51,26 +52,21 @@ function decimal(raw: string): string {
 
 export type Choice<V extends string> = { value: V; title: string; lines: string[]; disabled: boolean };
 
-/** Arrows move and pick, a closed option is skipped. `large`: step 1's two options. */
+/** Arrows move and pick, a closed option is skipped. */
 function ChoiceGroup<V extends string>({
   id,
   label,
-  labelledBy,
   choices,
   value,
   onChange,
   error,
-  large = false,
 }: {
   id: string;
-  /** A visible label, or `labelledBy` the step's heading. */
-  label?: string;
-  labelledBy?: string;
+  label: string;
   choices: Choice<V>[];
   value: V | null;
   onChange: (v: V) => void;
   error: string | null;
-  large?: boolean;
 }) {
   const labelId = `${id}-label`;
   const errId = `${id}-err`;
@@ -89,18 +85,16 @@ function ChoiceGroup<V extends string>({
   };
   return (
     <div className="flex flex-col gap-[var(--spacing-3)]">
-      {label && (
-        <span id={labelId} className={LABEL}>
-          {label}
-        </span>
-      )}
+      <span id={labelId} className={LABEL}>
+        {label}
+      </span>
       <div
         id={id}
         role="radiogroup"
-        aria-labelledby={label ? labelId : labelledBy}
+        aria-labelledby={labelId}
         aria-invalid={!!error || undefined}
         aria-describedby={error ? errId : undefined}
-        className={cn("flex flex-col", large ? "gap-4" : "gap-3")}
+        className="flex flex-col gap-3"
       >
         {choices.map((c, i) => {
           const on = c.value === value && !c.disabled;
@@ -128,8 +122,7 @@ function ChoiceGroup<V extends string>({
                 }
               }}
               className={cn(
-                "flex min-h-[var(--touch-min)] rounded-lg border border-solid text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
-                large ? "items-start gap-4 p-8" : "items-center gap-4 px-6 py-3",
+                "flex min-h-[var(--touch-min)] items-center gap-4 rounded-lg border border-solid px-6 py-3 text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
                 c.disabled
                   ? "cursor-not-allowed border-border bg-bg-surface-raised"
                   : on
@@ -137,15 +130,9 @@ function ChoiceGroup<V extends string>({
                     : "border-border bg-bg-surface hover:bg-bg-subtle",
               )}
             >
-              <Radio checked={on} disabled={c.disabled} decorative size="sm" className={large ? "mt-[3px]" : undefined} />
-              <span className={cn("flex min-w-0 flex-1 flex-col", large ? "gap-2" : "gap-1")}>
-                <span
-                  className={cn(
-                    "break-words font-semibold",
-                    large ? "text-md" : "text-sm",
-                    c.disabled ? "text-text-secondary" : "text-text-primary",
-                  )}
-                >
+              <Radio checked={on} disabled={c.disabled} decorative size="sm" />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className={cn("break-words text-sm font-semibold", c.disabled ? "text-text-secondary" : "text-text-primary")}>
                   {c.title}
                 </span>
                 {c.lines.map((line) => (
@@ -167,30 +154,7 @@ function ChoiceGroup<V extends string>({
   );
 }
 
-// ───────────────────────── 1 · What are you selling? ─────────────────────────
-
-export function WhatStep({
-  draft,
-  problem,
-  prefix,
-  headingId,
-  choices,
-  onKind,
-}: Omit<StepProps, "change"> & { headingId: string; choices: Choice<EditionKind>[]; onKind: (kind: EditionKind) => void }) {
-  return (
-    <ChoiceGroup
-      id={`${prefix}-kind`}
-      labelledBy={headingId}
-      choices={choices}
-      value={draft.kind}
-      onChange={onKind}
-      error={errOf(problem, "kind")}
-      large
-    />
-  );
-}
-
-// ───────────────────────── 2 · Copies and price ─────────────────────────
+// ───────────────────────── 1 · Copies and price ─────────────────────────
 
 function NumberField({
   id,
@@ -400,12 +364,11 @@ export function PriceStep({
   );
 }
 
-// ───────────────────────── 3 · Review ─────────────────────────
+// ───────────────────────── 2 · Review ─────────────────────────
 
 const FIX_LABEL: Record<NonNullable<SellCheck["fix"]>, string> = {
-  projectNft: "Go to Your project",
   video: "Generate AI video",
-  price: "Back to step 2",
+  price: "Back to step 1",
 };
 
 function ReadinessRows({
@@ -469,7 +432,6 @@ export function ReviewStep({
 }: StepProps & {
   rows: { label: string; value: string }[];
   checks: SellCheck[];
-  /** "projectNft" closes the flow for Sell's "Your project" card, where the listing starts. */
   onFix: (fix: NonNullable<SellCheck["fix"]>) => void;
   fixRef: React.RefObject<HTMLElement | null>;
   askOwner: boolean;

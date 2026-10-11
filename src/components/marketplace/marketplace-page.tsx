@@ -7,10 +7,12 @@
 // pagination.
 //
 // - Every item is real local data: the listings, sales and bids
-//   (`useMarket`), the projects and their builds for the name, cover and
-//   product count, and the active demo buyer. `marketItemsOf` makes one item
-//   per live listing (an auction ended but not closed included) and one per
-//   sale; paused and removed listings appear in no tab. `filterMarket` counts
+//   (`useMarket`), every project's copy tracks (`useProjectsEditions`), the
+//   projects and their builds for the name, cover and product count, and the
+//   active demo buyer. `marketItemsOf` makes one item per live listing (an
+//   auction ended but not closed included), one per sale, and one per project
+//   selling copies without a live Main card; paused and removed listings
+//   appear in no tab. `filterMarket` counts
 //   the tabs, filters by type, sorts and pages.
 // - Purchased is the active buyer's holdings, one card per project, their
 //   share summed over every purchase (P2-MARKETPLACE-19).
@@ -34,6 +36,7 @@ import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { useCreateHistory } from "@/lib/create/history";
 import { matchProject, projectSummary, type ProjectSummary } from "@/lib/manual/project-summary";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { useProjectsEditions } from "@/lib/market/editions-store";
 import { useMarket } from "@/lib/market/market-store";
 import {
   filterMarket,
@@ -126,11 +129,13 @@ export function MarketplacePage() {
   };
 
   // ── the data ──
-  const ready = hydrated && buildsHydrated && market.hydrated;
+  const allIds = React.useMemo(() => projects.map((p) => p.id), [projects]);
+  const editions = useProjectsEditions(allIds);
+  const ready = hydrated && buildsHydrated && market.hydrated && editions.hydrated;
   const listed = React.useMemo(() => {
-    const ids = new Set(market.data.listings.map((l) => l.projectId));
+    const ids = new Set([...market.data.listings.map((l) => l.projectId), ...editions.record.filter((t) => t.listing).map((t) => t.projectId)]);
     return projects.filter((p) => ids.has(p.id));
-  }, [projects, market.data.listings]);
+  }, [projects, market.data.listings, editions.record]);
   // The grid reads a summary's name, cover, product count and products only — none of which the Brief
   // draft or the clips change — so it is derived without them.
   const summaries = React.useMemo(
@@ -149,10 +154,11 @@ export function MarketplacePage() {
       name: s.name,
       cover: s.cover,
       productCount: s.productCount,
+      locked: s.lock !== null,
     }));
-    const all = marketItemsOf(market.data.listings, like, market.data.sales, market.data.bids, buyer.id, now);
+    const all = marketItemsOf(market.data.listings, like, market.data.sales, market.data.bids, buyer.id, now, editions.record);
     return oneCardPerHolding(all, (id) => holdingOf(id, buyer.id, market.data.sales)?.sharePct ?? 0);
-  }, [summaries, market.data, buyer.id, now]);
+  }, [summaries, market.data, buyer.id, now, editions.record]);
 
   const counts = React.useMemo(() => filterMarket(items, { ...view, q: "", page: 1 }).counts, [items, view]);
   const result = React.useMemo(() => {
@@ -296,7 +302,7 @@ export function MarketplacePage() {
           <>
             <ul role="list" className={GRID}>
               {result.items.map((item) => (
-                <li key={item.sale?.id ?? item.listing.id}>
+                <li key={item.sale?.id ?? item.listing?.id ?? `copies:${item.projectId}`}>
                   <ListingCard
                     item={item}
                     tab={view.tab}

@@ -81,10 +81,16 @@ export type ListingView =
 export type EditionKind = "physical" | "virtual";
 export type EditionUse = "private" | "commercial";
 
+/** A copy track's `productId` (and its sales' `item.productId`) when it sells copies of the whole
+ *  project rather than of one product (owner, 2026-10-11). Product ids are `prd_…` or `p<n>`, so it
+ *  never names a product, and every stored track and sale keeps its shape. */
+export const PROJECT_SCOPE = "project";
+
 /** TABS P2-TABS-24…27. */
 export type EditionTrack = {
   id: string;
   projectId: string;
+  /** The product it sells copies of, or `PROJECT_SCOPE` for the whole project. */
   productId: string;
   kind: EditionKind;
   use: EditionUse;
@@ -107,6 +113,7 @@ export type SaleItem =
   | {
       nft: EditionKind;
       trackId: string;
+      /** `PROJECT_SCOPE` for a copy of the whole project; `productName` is then the project's name. */
       productId: string;
       productName: string;
       use: EditionUse;

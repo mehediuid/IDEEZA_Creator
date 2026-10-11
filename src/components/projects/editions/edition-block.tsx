@@ -4,26 +4,25 @@
 // 138307, 139690…141777; P2-TABS-24…27 as changed in spec §4.9), in two
 // parts since Build and Earn:
 //
-// - `EditionTracks` — the owner's rows of one kind, under a product row's
-//   Manage disclosure in Earn › Sell › Copies of each product
-//   (earn/editions.tsx). A track card, in the maker's words (sell-flow.ts):
-//   "Copies sold {s} of {t}" (or "Sold out"), its use pill ("Personal use",
-//   "Business use"), "Price" and "Price with future updates", "+{n} new"
-//   after Add copies until the next sale, and either Add to marketplace or the listed
-//   prices with Edit · Remove listing · Add copies. Add to marketplace asks
-//   `listGate` (the Main listing live or paused) and then the strict
-//   "edition" readiness of this product only (errata 16) before the listing
-//   dialog opens. While Main is paused or removed, a listed card says it's
-//   hidden on Explore marketplace. Creating a track is the row's Sell copies
-//   flow (P1-3); the row also says why when a gate (Draft, Given, sold in
-//   full, an unknown collection) stops it, so the rows are absent
-//   then, as the block's gates always replaced its tracks. Every button is
-//   quiet (C16).
+// - `EditionTracks` — the owner's tracks of one kind and one scope (the whole
+//   project, or one product), under a Physical or Virtual row's Manage in
+//   Earn › Sell (earn/editions.tsx). A track card, in the maker's words
+//   (sell-flow.ts): "Copies sold {s} of {t}" (or "Sold out"), its use pill
+//   ("Personal use", "Business use"), "Price" and "Price with future
+//   updates", "+{n} new" after Add copies until the next sale, and either Add
+//   to marketplace or the listed prices with Edit · Remove listing · Add
+//   copies. Add to marketplace asks the scope's readiness first: one
+//   product's video ("edition", errata 16), or every product's for the whole
+//   project ("sell"). The Main listing is never asked (owner, 2026-10-11).
+//   Creating a track is the row's Sell flow (P1-3); the row also says why
+//   when a gate (Draft, Given, sold in full, an unknown collection) stops it,
+//   so the cards are absent then. Every button is quiet (C16).
 // - `EditionBlock` — the product page's rail block "Marketplace" for anyone
 //   else (a preview, a demo buyer): the Testnet demo badge, a tablist
 //   "Physical NFT · Virtual NFT", and only the tracks buyers can see,
 //   read-only, with a link to the project on Explore marketplace. Absent
-//   when there are none, and for the owner, who manages editions in Earn.
+//   when there are none, once the project is sold in full, and for the owner,
+//   who manages editions in Earn.
 //
 // Every fact is the page's derivation (`view`); every write is a dialog's,
 // re-read and written once. What changed is said in the page's live region
@@ -43,9 +42,8 @@ import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
 import {
   editionChainOf,
   editionGate,
-  editionsHiddenWith,
   KIND_WORD,
-  listGate,
+  lockedListReason,
   trackCardOf,
   tracksOf,
   unlistTrack,
@@ -59,6 +57,7 @@ import { moveTab } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
 import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
 import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
+import type { ProjectProduct } from "@/lib/manual/project-read";
 import type { ProductSlotProps } from "../product/product-slots";
 import { AddNftsDialog } from "./add-nfts-dialog";
 import { focusSoon } from "../listing/listing-dialog";
@@ -79,6 +78,9 @@ const LINK =
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 type Dialog = { kind: "gate" | "list" | "edit" | "add" | "remove"; track: EditionTrack } | null;
 
+/** Whose copies: one product, or the whole project (`id` = `PROJECT_SCOPE`, `product` null). */
+export type CopyScope = { id: string; name: string; product: ProjectProduct | null };
+
 export function helperLineOf(kind: EditionKind, product: string): string {
   return kind === "physical"
     ? `A licence to build ${product} — buyers get its fabrication files.`
@@ -90,8 +92,8 @@ const firstControlId = (trackId: string) => `edition-${trackId}`;
 export function EditionBlock(props: ProductSlotProps) {
   const { view, product, viewer } = props;
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const hidden = editionsHiddenWith(view.listing, view.lock !== null);
-  // What buyers can see: listed, and not hidden by a paused or removed Main listing.
+  const hidden = view.lock !== null;
+  // What buyers can see: listed, whatever the Main listing's state, until the project is sold in full.
   const publicTracks = React.useMemo(
     () => (hidden ? [] : tracksOf(product.id, view.editions).filter((t) => t.listing !== null)),
     [hidden, product.id, view.editions],
@@ -164,21 +166,22 @@ function ChainFacts({ chain }: { chain: { network: Network; collection: string }
   );
 }
 
-/** The owner's rows of one kind for one product, with their dialogs (Earn › Sell › Copies of each product). */
+/** The owner's tracks of one kind for one scope, with their dialogs (Earn › Sell, a row's Manage). */
 export function EditionTracks({
   kind,
+  scope,
   project,
   view,
-  product,
   viewer,
   announce,
-}: Omit<ProductSlotProps, "version"> & { kind: EditionKind }) {
+}: Omit<ProductSlotProps, "version" | "product"> & { kind: EditionKind; scope: CopyScope }) {
   const brief = useProjectBrief(project.id) ?? null;
   const { jobs, now } = useVideoJobs();
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [note, setNote] = React.useState<string | null>(null);
   const [removeError, setRemoveError] = React.useState<string | null>(null);
-  const name = displayProductName(product.name);
+  const product = scope.product;
+  const name = scope.name;
   const main: Listing | null = view.listing.kind === "none" ? null : view.listing.listing;
   const chain = editionChainOf(view.mint.record, main, view.mint.status === "legacy" && brief ? brief.state : null);
 
@@ -189,7 +192,7 @@ export function EditionTracks({
     projectName: project.name,
   });
   const blocked = gate.kind === "blocked" || !can(viewer, "editions.manage", view.canCtx) || !chain;
-  const listing = listGate(view.listing, project.name);
+  const lockReason = lockedListReason(view.lock !== null, project.name);
 
   const done = (message: string, focusId?: string) => {
     setDialog(null);
@@ -203,18 +206,15 @@ export function EditionTracks({
     setDialog(d);
   };
 
-  // Add to marketplace: the list gate is shown on the card; then this product's video.
-  const startListing = (track: EditionTrack) => {
+  // The scope's readiness: one product's video, or every product's for the whole project.
+  const readiness = () => {
     const facts = readinessFactsOf(project, view, brief, view.videos.record, jobs, now);
-    const readiness = readinessOf({ ...facts, product }, "edition");
-    open({ kind: dialogBlockerOf(readiness) ? "gate" : "list", track });
+    return product ? readinessOf({ ...facts, product }, "edition") : readinessOf(facts, "sell");
   };
-  const ownershipAsked = () => {
-    const facts = readinessFactsOf(project, view, brief, view.videos.record, jobs, now);
-    return readinessOf({ ...facts, product }, "edition").rules.some((r) => r.id === "ownership" && !r.ok);
-  };
+  const startListing = (track: EditionTrack) => open({ kind: dialogBlockerOf(readiness()) ? "gate" : "list", track });
+  const ownershipAsked = () => readiness().rules.some((r) => r.id === "ownership" && !r.ok);
 
-  const ofKind = tracksOf(product.id, view.editions)
+  const ofKind = tracksOf(scope.id, view.editions)
     .filter((t) => t.kind === kind)
     .sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
 
@@ -247,8 +247,8 @@ export function EditionTracks({
                 track={t}
                 view={view}
                 projectName={project.name}
-                listBlocked={listing.kind === "blocked" ? listing.reason : null}
-                hidden={t.listing !== null && editionsHiddenWith(view.listing, view.lock !== null)}
+                listBlocked={lockReason}
+                hidden={t.listing !== null && view.lock !== null}
                 onList={() => startListing(t)}
                 onEdit={() => open({ kind: "edit", track: t })}
                 onRemove={() => open({ kind: "remove", track: t })}
@@ -261,19 +261,18 @@ export function EditionTracks({
 
       {d?.kind === "gate" && (
         <ReadinessDialog
-          purpose="edition"
+          purpose={product ? "edition" : "sell"}
           project={project}
           view={view}
           brief={brief}
-          product={product}
+          product={product ?? undefined}
           onPass={() => setDialog({ kind: "list", track: d.track })}
           onClose={() => setDialog(null)}
         />
       )}
       {d?.kind === "list" && chain && (
         <ListDialog
-          projectId={project.id}
-          projectName={project.name}
+          project={project}
           productName={name}
           track={d.track}
           chain={chain}
@@ -376,11 +375,7 @@ function TrackCard({
   onAdd: () => void;
 }) {
   const id = firstControlId(track.id);
-  const hiddenLine = view.lock
-    ? `Off Explore marketplace: ${projectName} was sold in full.`
-    : view.listing.kind === "paused"
-      ? `Hidden on Explore marketplace while ${projectName}'s listing is paused.`
-      : `Hidden on Explore marketplace until ${projectName} is listed again.`;
+  const hiddenLine = `Off Explore marketplace: ${projectName} was sold in full.`;
   return (
     <section aria-label={trackNameOf(track)} className="flex flex-col gap-5 rounded-lg border border-solid border-border p-6">
       <TrackHead track={track} view={view} plain />

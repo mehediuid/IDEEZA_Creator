@@ -2,16 +2,18 @@
 
 // Earn › Overview, design A (owner, 2026-10-11: "A ta koro" — the setup
 // checklist from the mockups; no "Get paid" step, a sale pays the wallet at once).
-// - Once something is live (listed, paused, given, sold) a "You're selling" card
-//   leads: the state in words, the facts (`earnLiveFactsOf`: price, copies sold,
-//   customers, earned) and where each is managed.
+// - Once something is live (listed, paused, given, sold, or copies on sale
+//   without the Main NFT) a "You're selling" card leads: the state in words, the
+//   facts (`earnLiveFactsOf`: price, copies sold of the whole project and of
+//   each product, customers, earned) and where each is managed.
 // - Then one checklist card, "Get {project} earning": a progress bar ("N of M
 //   done") over two steps, ① Mint your project and ② Put it on sale. A done step
 //   folds to one line; the current one lists its tasks — the ladder's steps for
 //   that commit point, the same ones the project page's Earn button counts — and
 //   only its first missing task opens, with its one-tap fix (StepFix); the
 //   step's own action ends the list and is the page's one violet control, shown
-//   only once nothing above it is missing (never a greyed button). A later
+//   only once nothing above it is missing (never a greyed button); step two's
+//   is "Choose what to sell", the Sell tab. A later
 //   step's tasks show dimmed, so the whole road is visible.
 // - Before the wallet and identity stores hydrate, the tasks wait, so nothing
 //   flashes as missing.
@@ -52,14 +54,15 @@ const TASK_WORD: Partial<Record<LadderStep["id"], string>> = {
 
 const ACTION_LINE: Record<EarnPathStep["id"], string> = {
   mint: "Opens the mint: keep it private, give it away, or sell it.",
-  sell: "Set a price for the whole project, or sell copies of each product.",
+  sell: "Opens Sell: the Main NFT, or Physical and Virtual copies.",
 };
 
 export function EarnOverview({ project, view, brief, announce }: SlotProps) {
   const source = React.useMemo(() => earnSourceOf(project, view, brief), [project, view, brief]);
   const { facts, ready } = useEarnFacts(source);
-  const next = earnNextOf(project.id, source.commercial);
-  const steps = earnPathOf(source.commercial);
+  const copiesOnSale = view.lock === null && view.editions.some((t) => t.listing !== null);
+  const next = earnNextOf(project.id, source.commercial, copiesOnSale);
+  const steps = earnPathOf(source.commercial, copiesOnSale);
   const live =
     next.point === null
       ? earnLiveFactsOf({

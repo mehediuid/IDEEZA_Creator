@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { filterMarket, listingCardText, marketItemsOf, marketQueryString, parseMarketQuery } = await import(
+const { copiesLineOf, copyOfferOf, filterMarket, listingCardText, marketItemsOf, marketQueryString, parseMarketQuery } = await import(
   "../../.tmp-test/lib/market/market-list.js"
 );
 
@@ -37,6 +37,7 @@ function itemFixture(overrides = {}) {
     cover: null,
     productCount: 1,
     listing: listingFixture(),
+    copies: null,
     status: "live",
     sale: null,
     auction: null,
@@ -119,6 +120,61 @@ test("marketItemsOf: paused and removed listings appear in no tab", () => {
   const projects = [{ id: "p1", name: "Car", cover: null, productCount: 1 }];
   const items = marketItemsOf(listings, projects, [], [], null, 0);
   assert.deepEqual(items.map((i) => i.listing.id), ["lst_live"]);
+});
+
+// ───────────────────────── copies sold on their own (owner, 2026-10-11) ─────────────────────────
+
+const TRACK_LISTING = { token: "MATIC", regular: "0.05", extended: "0.08", royaltyPct: 10, listedAt: 2000, updatedAt: 2000 };
+function trackFixture(overrides = {}) {
+  return {
+    id: "ed_1",
+    projectId: "p2",
+    productId: "project",
+    kind: "virtual",
+    use: "private",
+    supply: { total: 30 },
+    createdAt: 1,
+    lazy: true,
+    listing: TRACK_LISTING,
+    demo: true,
+    ...overrides,
+  };
+}
+const PROJECTS = [
+  { id: "p1", name: "Car", cover: null, productCount: 1 },
+  { id: "p2", name: "Lamp", cover: null, productCount: 2 },
+];
+
+test("marketItemsOf: a project with only copy listings is an item — no Main listing needed", () => {
+  const tracks = [trackFixture(), trackFixture({ id: "ed_2", productId: "prd_a", kind: "physical", listing: { ...TRACK_LISTING, regular: "0.4", listedAt: 3000 } })];
+  const items = marketItemsOf([], PROJECTS, [], [], null, 0, tracks);
+  assert.equal(items.length, 1);
+  const [copies] = items;
+  assert.equal(copies.projectId, "p2");
+  assert.equal(copies.listing, null);
+  assert.equal(copies.status, "live");
+  assert.deepEqual(copies.copies, { count: 2, kinds: ["physical", "virtual"], from: { amount: "0.05", token: "MATIC" }, listedAt: 3000 });
+  assert.deepEqual(listingCardText(copies, 0), { price: "From 0.05 MATIC", sub: "Physical and Virtual copies · not the project itself" });
+  // For sale, and a Buy now, not an auction.
+  assert.equal(filterMarket(items, { tab: "forSale", q: "", type: "buyNow", sort: "newest", page: 1 }).items.length, 1);
+  assert.equal(filterMarket(items, { tab: "forSale", q: "", type: "auction", sort: "newest", page: 1 }).items.length, 0);
+});
+
+test("marketItemsOf: a live Main card carries the copies; a sold-out, unlisted or locked project's copies don't count", () => {
+  const listings = [listingFixture({ projectId: "p2" })];
+  const items = marketItemsOf(listings, PROJECTS, [], [], null, 0, [trackFixture()]);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].listing.id, "lst_1");
+  assert.equal(copiesLineOf(items[0]), "Copies from 0.05 MATIC");
+  assert.equal(copyOfferOf([trackFixture({ listing: null })], [], false), null);
+  assert.equal(copyOfferOf([trackFixture({ supply: { total: 1 } })], [{ id: "s", at: 1, item: { nft: "virtual", trackId: "ed_1" } }], false), null);
+  const locked = [{ ...PROJECTS[1], locked: true }];
+  assert.deepEqual(marketItemsOf([], locked, [], [], null, 0, [trackFixture()]), []);
+});
+
+test("marketItemsOf: a paused Main listing hides no copies — the project still shows for them", () => {
+  const items = marketItemsOf([listingFixture({ projectId: "p2", status: "paused" })], PROJECTS, [], [], null, 0, [trackFixture()]);
+  assert.deepEqual(items.map((i) => [i.projectId, i.listing]), [["p2", null]]);
 });
 
 test("parseMarketQuery / marketQueryString: URL codec with defaults left out", () => {

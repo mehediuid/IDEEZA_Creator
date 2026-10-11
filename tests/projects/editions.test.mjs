@@ -8,8 +8,9 @@ const {
   checkCreateTrack,
   checkEditionListing,
   editionGate,
-  editionsHiddenWith,
-  listGate,
+  isProjectScope,
+  liveTracksOf,
+  lockedListReason,
   normalizeEditions,
   soldOf,
   tracksOf,
@@ -50,14 +51,9 @@ test("editionGate: otherwise ok", () => {
   assert.deepEqual(editionGate({ minted: true, intent: "save", projectName: "Car" }), { kind: "ok" });
 });
 
-test("listGate: Main live or paused is ok; otherwise it's blocked with the list-first copy", () => {
-  assert.deepEqual(listGate({ kind: "live" }, "Car"), { kind: "ok" });
-  assert.deepEqual(listGate({ kind: "paused" }, "Car"), { kind: "ok" });
-  const blocked = listGate({ kind: "none" }, "Car");
-  assert.equal(blocked.kind, "blocked");
-  assert.equal(blocked.reason, "List Car on the marketplace first — its NFTs are sold on the project's listing.");
-  assert.equal(listGate({ kind: "sold" }, "Car").kind, "blocked");
-  assert.equal(listGate({ kind: "ended" }, "Car").kind, "blocked");
+test("lockedListReason: copies list without the Main NFT; only the lock (sold in full) refuses", () => {
+  assert.equal(lockedListReason(false, "Car"), null);
+  assert.equal(lockedListReason(true, "Car"), "Car was sold in full, so its copies can't be listed.");
 });
 
 test("canCreate: both uses free on a fresh product; the Create button retires once both exist", () => {
@@ -124,13 +120,31 @@ test("checkEditionListing: the P2-TABS-26 copy table", () => {
   assert.equal(checkEditionListing({ regular: "0.01", extended: "0.02", royaltiesPct: 5, confirmed: true }), null);
 });
 
-test("editionsHiddenWith: pausing or removing Main hides editions; a lapsed auction or a sale doesn't", () => {
-  assert.equal(editionsHiddenWith({ kind: "none" }), true);
-  assert.equal(editionsHiddenWith({ kind: "paused" }), true);
-  assert.equal(editionsHiddenWith({ kind: "ended", why: "removed" }), true);
-  assert.equal(editionsHiddenWith({ kind: "ended", why: "noBids" }), false);
-  assert.equal(editionsHiddenWith({ kind: "live" }), false);
-  assert.equal(editionsHiddenWith({ kind: "sold" }), false);
+test("project-scope tracks: PROJECT_SCOPE as the productId, stored and read like any other track", async () => {
+  const { PROJECT_SCOPE } = await import("../../.tmp-test/lib/market/types.js");
+  assert.equal(PROJECT_SCOPE, "project");
+  const whole = trackFixture({ id: "ed_w", productId: PROJECT_SCOPE, kind: "virtual" });
+  const [read] = normalizeEditions([whole]);
+  assert.equal(read.productId, PROJECT_SCOPE);
+  assert.equal(isProjectScope(read.productId), true);
+  assert.equal(isProjectScope("prd_1"), false);
+  const tracks = [whole, trackFixture()];
+  assert.deepEqual(tracksOf(PROJECT_SCOPE, tracks).map((t) => t.id), ["ed_w"]);
+  assert.deepEqual(tracksOf("prd_1", tracks).map((t) => t.id), ["ed_1"]);
+  // Old stored product tracks keep reading unchanged.
+  assert.equal(normalizeEditions([trackFixture()])[0].productId, "prd_1");
+});
+
+test("liveTracksOf: listed and not sold out, none once locked — whatever the Main listing", () => {
+  const listing = { token: "ETH", regular: "0.01", extended: "0.02", royaltyPct: 5, listedAt: 1, updatedAt: 1 };
+  const tracks = [
+    trackFixture({ id: "a", listing }),
+    trackFixture({ id: "b", listing, supply: { total: 1 } }),
+    trackFixture({ id: "c" }),
+  ];
+  const sold = [{ id: "s", at: 1, item: { nft: "physical", trackId: "b" } }];
+  assert.deepEqual(liveTracksOf(tracks, sold, false).map((t) => t.id), ["a"]);
+  assert.deepEqual(liveTracksOf(tracks, sold, true), []);
 });
 
 test("normalizeEditions: drops malformed rows, keeps well-formed ones", () => {
@@ -219,7 +233,7 @@ test("trackCardOf: sold out at s = t; a sale of another track doesn't count", ()
   assert.equal(nextSerialOf("ed_1", [unitSale("ed_1", 1, 1)]), 2);
 });
 
-test("unlistProjectTracks: removing Main takes every listed track of that project off, supply kept", () => {
+test("unlistProjectTracks: a sale in full takes every listed track of that project off, supply kept", () => {
   const tracks = [
     trackFixture({ listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
     trackFixture({ id: "ed_2", use: "commercial" }),
@@ -261,17 +275,21 @@ test("editionSummaryOf: empty until a track exists; then a row per product and a
   assert.deepEqual(editionSummaryOf(products, tracks, [], "virtual", { listedOnly: false }), []);
 });
 
-test("editionOffersOf: listed tracks only, hidden while Main is paused or removed", () => {
-  const products = [{ id: "prd_1", name: "Controller" }];
+test("editionOffersOf: listed tracks only, the whole project's first, with no Main listing at all", () => {
+  const scopes = [
+    { id: "project", name: "RC car" },
+    { id: "prd_1", name: "Controller" },
+  ];
   const tracks = [
     trackFixture({ id: "ed_c", use: "commercial", listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
     trackFixture({ id: "ed_p", listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
     trackFixture({ id: "ed_v", kind: "virtual" }),
+    trackFixture({ id: "ed_w", productId: "project", kind: "virtual", listing: { ...TERMS, listedAt: 1, updatedAt: 1 } }),
   ];
-  const live = editionOffersOf(products, tracks, { kind: "live" });
-  assert.deepEqual(live[0].tracks.map((t) => t.id), ["ed_p", "ed_c"]);
-  assert.deepEqual(editionOffersOf(products, tracks, { kind: "paused" }), []);
-  assert.deepEqual(editionOffersOf(products, tracks, { kind: "ended", why: "removed" }), []);
+  const offers = editionOffersOf(scopes, tracks);
+  assert.deepEqual(offers.map((g) => [g.productId, g.name]), [["project", "RC car"], ["prd_1", "Controller"]]);
+  assert.deepEqual(offers[0].tracks.map((t) => t.id), ["ed_w"]);
+  assert.deepEqual(offers[1].tracks.map((t) => t.id), ["ed_p", "ed_c"]);
 });
 
 test("editionChainOf: the mint record, else the Main listing, else a v1 draft; null without a collection", () => {
@@ -283,16 +301,13 @@ test("editionChainOf: the mint record, else the Main listing, else a v1 draft; n
   assert.equal(editionChainOf(null, null, null), null);
 });
 
-test("editionsHiddenWith / editionOffersOf: a project sold in full hides every offer (R1-2)", async () => {
-  assert.equal(editionsHiddenWith({ kind: "live" }, true), true);
-  assert.equal(editionsHiddenWith({ kind: "sold" }, true), true);
-  assert.equal(editionsHiddenWith({ kind: "sold" }, false), false);
+test("editionOffersOf: a project sold in full hides every offer (R1-2)", async () => {
   const { createTrack } = await import("../../.tmp-test/lib/market/editions.js");
   const products = [{ id: "prd_a", name: "A" }];
   const listed = { ...createTrack({ projectId: "proj_1", productId: "prd_a", kind: "physical", use: "private", count: 3, now: 1 }) };
   const tracks = listTrack([listed], listed.id, { token: "MATIC", regular: "0.01", extended: "0.02", royaltyPct: 5 }, 2);
-  assert.equal(editionOffersOf(products, tracks, { kind: "sold" }).length, 1);
-  assert.deepEqual(editionOffersOf(products, tracks, { kind: "sold" }, true), []);
+  assert.equal(editionOffersOf(products, tracks).length, 1);
+  assert.deepEqual(editionOffersOf(products, tracks, true), []);
 });
 
 test("listTrack and editTrackListing store prices in their one written form (§3.1)", () => {

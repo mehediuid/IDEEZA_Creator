@@ -26,14 +26,16 @@
 // - A demo buyer is never the maker (C4); the seller's payout wallet is the
 //   mint record's, else Demo account 1 (lib `payoutAddressOf`, one rule for a
 //   purchase and an auction's close).
-// - A Physical or Virtual NFT (T27, P2-TABS-26) is the same request with the
-//   buyer's tier: Regular (this version only) or Extended (every future
-//   version). Its quote is `purchaseQuote(track, "buyNow", tier, network)` on
-//   the project's own chain (errata 9). `recheck` reads the track fresh — still
-//   listed at the same price, not sold out, and not hidden by a paused or
-//   removed Main listing, and the project not sold in full (the lock) — and
-//   `commit` appends one Sale for the next unit. A unit another tab sold in
-//   between is a conflict: buying again gets the next one.
+// - A Physical or Virtual NFT (T27, P2-TABS-26), of one product or of the whole
+//   project, is the same request with the buyer's tier: Regular (this version
+//   only) or Extended (every future version). Its quote is
+//   `purchaseQuote(track, "buyNow", tier, network)` on the project's own chain
+//   (errata 9). `recheck` reads the track fresh — still listed at the same
+//   price, not sold out, and the project not sold in full (the lock); the Main
+//   listing's state is never asked (owner, 2026-10-11) — and `commit` appends
+//   one Sale for the next unit, named by the project when it's a copy of the
+//   whole project. A unit another tab sold in between is a conflict: buying
+//   again gets the next one.
 
 import * as React from "react";
 import { estimateGas } from "@/lib/brief/gas";
@@ -47,14 +49,13 @@ import type { EditionTrack, Listing, MarketData } from "@/lib/market/types";
 import { readEditions } from "@/lib/market/editions-store";
 import {
   editionChainOf,
-  editionsHiddenWith,
+  isProjectScope,
   KIND_WORD,
   nextSerialOf,
   soldOf,
   unlistProjectTracks,
   USE_WORD,
 } from "@/lib/market/editions";
-import { listingViewOf } from "@/lib/market/listing";
 import { projectLockOf } from "@/lib/commerce/edit-gate";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
@@ -228,27 +229,10 @@ export const TIER_LINE: Record<EditionTier, string> = {
 };
 
 /** Why a track can't be bought right now, read from the stores as they are. */
-function trackClosedReason(
-  project: ManualProject,
-  track: EditionTrack,
-  tier: EditionTier,
-  data: MarketData,
-  now: number,
-  price: string,
-): string | null {
+function trackClosedReason(project: ManualProject, track: EditionTrack, tier: EditionTier, data: MarketData, price: string): string | null {
   const cur = readEditions(track.projectId).find((t) => t.id === track.id);
   if (!cur || !cur.listing) return TRACK_GONE;
-  const locked = projectLockOf(project, data.sales) !== null;
-  if (locked) return SOLD_IN_FULL;
-  const main = listingViewOf(track.projectId, {
-    listings: data.listings,
-    sales: data.sales,
-    bids: data.bids,
-    now,
-    current: { name: "", description: "", products: [], cover: null, at: 0 },
-  });
-  if (main.kind === "paused") return PAUSED;
-  if (editionsHiddenWith(main, locked)) return TRACK_GONE;
+  if (projectLockOf(project, data.sales) !== null) return SOLD_IN_FULL;
   if (soldOf(cur.id, data.sales) >= cur.supply.total) return SOLD_OUT;
   const nowPrice = tier === "extended" ? cur.listing.extended : cur.listing.regular;
   if (nowPrice !== price || cur.listing.token !== track.listing?.token) {
@@ -282,7 +266,9 @@ export function useEditionPurchase({
       const name = buyerNameOf(buyerId);
       const buyerAddress = demoAddress(buyerId);
       const sellerAddress = payoutAddressOf(view.mint.record);
-      const productName = displayProductName(view.products.find((p) => p.id === track.productId)?.name ?? "");
+      const whole = isProjectScope(track.productId);
+      // A copy of the whole project is named by the project, on the request and on the Sale.
+      const productName = whole ? project.name : displayProductName(view.products.find((p) => p.id === track.productId)?.name ?? "");
       const what = `${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT`;
       const serialNow = nextSerialOf(track.id, view.sales);
       const doneLine = `${productName} · ${what} (${TIER_WORD[tier]}) was minted to ${name}'s demo wallet.`;
@@ -294,7 +280,7 @@ export function useEditionPurchase({
         network: chain.network,
         title: "Confirm purchase",
         summary: [
-          { label: "Product", value: `${productName} · ${project.name}` },
+          whole ? { label: "Project", value: `${project.name} · a copy, not the project` } : { label: "Product", value: `${productName} · ${project.name}` },
           { label: "NFT", value: `${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]} · #${serialNow} of ${track.supply.total}` },
           { label: "Tier", value: TIER_LINE[tier] },
           { label: "Token", value: "Minted on this sale (lazy mint)" },
@@ -314,10 +300,10 @@ export function useEditionPurchase({
       setBusyId(track.id);
       try {
         const result = await request(req, {
-          recheck: () => trackClosedReason(project, track, tier, readMarketNow(), Date.now(), quote.price),
+          recheck: () => trackClosedReason(project, track, tier, readMarketNow(), quote.price),
           commit: (proof) => {
             const data = readMarketNow();
-            const why = trackClosedReason(project, track, tier, data, proof.at, quote.price);
+            const why = trackClosedReason(project, track, tier, data, quote.price);
             if (why) return { ok: false, conflict: true, message: why };
             const sale = makeSale(
               {

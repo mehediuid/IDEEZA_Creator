@@ -285,3 +285,26 @@ test("purchaseQuote: no \"Total\" line — price and network fee can be differen
   assert.ok(!quote.lines.some((l) => l.startsWith("Total")), quote.lines.join("\n"));
   assert.equal(quote.lines.length, 3);
 });
+
+test("makeSale: a copy of the whole project sells with no Main listing, named by the project; normalizeSales keeps it", async () => {
+  const { PROJECT_SCOPE } = await import("../../.tmp-test/lib/market/types.js");
+  const { normalizeSales, holdingOf } = await import("../../.tmp-test/lib/market/sales.js");
+  const item = { nft: "virtual", trackId: "ed_w", productId: PROJECT_SCOPE, productName: "RC car", use: "private", tier: "regular", serial: 1 };
+  const sale = makeSale(saleInputFixture({ listingId: "ed_w", item, price: "0.05" }), {
+    sales: [],
+    mint: mintViewFixture(),
+    ownership: { creatorPct: 100 },
+    now: 2000,
+  });
+  assert.ok(!("ok" in sale), JSON.stringify(sale));
+  assert.equal(sale.item.productId, PROJECT_SCOPE);
+  assert.equal(sale.item.productName, "RC car");
+  assert.equal(sale.payout, "0.04875");
+  const [read] = normalizeSales([{ ...sale, demo: true }]);
+  assert.deepEqual(read.item, item);
+  // A whole-project copy is a holding of every product's files (R5-20), not a Main share.
+  const held = holdingOf("proj_1", "buyer-mira", [read], { productId: "prd_any" });
+  assert.equal(held.sharePct, 0);
+  assert.deepEqual(held.editions.map((s) => s.id), [read.id]);
+  assert.equal(holdingOf("proj_1", "buyer-mira", [read]), null);
+});
