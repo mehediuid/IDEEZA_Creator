@@ -11,10 +11,9 @@ import * as React from "react";
 import { LockIcon, PrinterIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ConfirmDialog, Select } from "@/components/ideeza";
-import { projectLockOf } from "@/lib/manual/edit-gate";
 import type { ManualProject } from "@/lib/manual/projects";
-import { useMarket } from "@/lib/market/market-store";
 import { formatDate } from "@/lib/manual/project-summary";
+import { useGuards } from "@/lib/manual/use-write-guard";
 import { useBusinessPlan } from "@/lib/manual/business-plan-store";
 import { clearBusinessPlan, regeneratePlanRun, restorePlanVersion, retryPlanSection, useIsPlanLive } from "./plan-runner";
 import { PlanSectionView } from "./plan-section";
@@ -38,10 +37,10 @@ export function BusinessPlanPanel({
 }) {
   const { record: plan } = useBusinessPlan(project.id);
   const live = useIsPlanLive(project.id);
-  // Sold in full, the plan is read-only like the rest of the project. The
-  // lock reads the market's sales; the Earn layout has read that store.
-  const { data: market } = useMarket();
-  const lockReason = projectLockOf(project, market.sales)?.line ?? null;
+  // Sold in full, the plan is read-only like the rest of the project: the
+  // guards' lock, the one every engineering gate asks.
+  const guards = useGuards();
+  const lockReason = (guards.ready ? guards.lockOf(project)?.reason : null) ?? null;
   const locked = lockReason !== null;
   const lockId = React.useId();
 
