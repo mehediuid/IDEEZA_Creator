@@ -206,12 +206,15 @@ export function statusAfterCommit(intent: Intent | null): ProjectStatus {
 
 export const COLLECTION_REASON = "Choose a collection to mint into.";
 export const OWNERSHIP_REASON = "Confirm you are the rightful owner of this idea.";
+/** A Sell lists at once, and listing needs a license (the ladder's L3, Build and Earn P1-4). */
+export const SELL_LICENSE_REASON = "Choose the license buyers get it under.";
 
 /**
  * Why Details can't continue yet — the first thing missing, top-down: the
  * collection, then a Sell's listing terms (`listingProblems`), a Save's
- * ownership confirm, and the gate's own form rules (the ownership confirm, a
- * Give's license). `readiness` is the gate's, or null for an ungated Save.
+ * ownership confirm, the gate's own form rules (the ownership confirm, a
+ * Give's license), then a Sell's license. `readiness` is the gate's, or null
+ * for an ungated Save.
  */
 export function detailsMissing(
   s: MintState,
@@ -227,7 +230,9 @@ export function detailsMissing(
     if (first) return first;
   }
   if (s.intent === "save" && !s.confirmOwnership) return OWNERSHIP_REASON;
-  return f.readiness?.rules.find((r) => !r.ok && r.fixedIn === "form")?.reason ?? null;
+  const rule = f.readiness?.rules.find((r) => !r.ok && r.fixedIn === "form")?.reason;
+  if (rule) return rule;
+  return s.intent === "sell" && !s.license ? SELL_LICENSE_REASON : null;
 }
 
 /**

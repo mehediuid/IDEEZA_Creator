@@ -149,7 +149,9 @@ test("P0: the header's one door to Earn — no pair, no Preview as buyer, and on
   assert.match(header, /earnButtonOf\(\{/);
   assert.match(header, /reviewPending: review !== null/, "Review version keeps the violet while it is pending");
   assert.match(header, /tone=\{earn\.violet \? "primary" : "quiet"\}/);
-  assert.match(header, /stageLineOf\(summary\)/);
+  assert.match(header, /stageLineOf\(view\.engineering, summary\)/, "the stage line reads the engineering axis");
+  assert.match(header, /commercial: earnSource\.commercial,/, "the Earn button reads the commercial axis");
+  assert.match(header, /facts: ladder\.ready \? ladder\.facts : null,/, "and the ladder, once its stores have hydrated");
   assert.match(header, /const engineering = context === "project" && !buyerSide\(viewer\);/);
   assert.match(header, /earnHref\(project\.id, "customers"\)/, "the lock line links to the sale in Earn");
   assert.equal(header.match(/tone="primary"/g)?.length, 1, "Review version is the header's only fixed violet");

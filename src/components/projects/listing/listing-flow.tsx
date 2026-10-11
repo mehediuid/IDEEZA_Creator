@@ -10,7 +10,9 @@
 // away; otherwise T14's ReadinessDialog opens, and its "Continue to
 // listing" replaces it with the form once every video is ready — one
 // floating layer at a time. `?list=1` (My projects' card) does the same
-// once, on arrival, and the address drops `list` (errata 43).
+// once, on arrival, and the address drops `list` (errata 43); nothing opens
+// until the ladder's check has run, so a full page load never flashes the
+// dialog for a frame before its missing steps replace it.
 //
 // When the maker holds no share, the button stays focusable but
 // aria-disabled, with the reason beside it, and opens nothing (COR-67).
@@ -24,7 +26,7 @@ import { Tag01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { LISTING_TRIGGER_ID, MARKETPLACE_FOCUS_ID } from "@/lib/market/listing-flow";
 import { cn } from "@/lib/utils";
-import { LevelCheck, useCommitCheck } from "../earn/ladder/level-check";
+import { LevelCheck, useCommitGate } from "../earn/ladder/level-check";
 import { earnSourceOf } from "../earn/ladder/use-earn-facts";
 import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
 import type { ActionSlotProps } from "../details/slots";
@@ -45,7 +47,7 @@ const QUIET = "border border-solid border-border bg-bg-surface text-text-primary
 export function ListingFlow({ project, view, brief, now, announce, action, violet, className }: ActionSlotProps) {
   const search = useSearchParams();
   const pathname = usePathname();
-  const ladder = useCommitCheck("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
+  const { check: ladder, ready } = useCommitGate("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
   const blocked = action.blocked ?? null;
   const steps = !blocked && !ladder.ok;
   const reasonId = React.useId();
@@ -97,7 +99,7 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
         <LevelCheck check={ladder} what="list" id={stepsId} project={project} brief={brief} announce={announce} className="order-last w-full max-w-[720px] basis-full" />
       )}
 
-      {open === "gate" && !steps && (
+      {open === "gate" && ready && !steps && (
         <ReadinessDialog
           purpose="sell"
           project={project}
@@ -107,7 +109,7 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
           onClose={close}
         />
       )}
-      {open === "form" && !steps && (
+      {open === "form" && ready && !steps && (
         <ListingDialog
           mode="add"
           project={project}

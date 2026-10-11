@@ -1,17 +1,17 @@
 // The project header's own words and rules (spec §5.4) — what `headerText()`
 // in project-summary.ts doesn't print: the inline editors' checks (CNT-2,
 // CNT-5), the pending-version notices (COR-18), and the engineering header's
-// stage line, meta line and Earn button (Build and Earn P0). The chip, status
-// line, meta line and action pair a buyer reads are `headerText()`'s; nothing
-// here repeats them.
+// stage line and meta line (Build and Earn P0). The chip, status line, meta
+// line and action pair a buyer reads are `headerText()`'s; nothing here
+// repeats them. The Earn button reads commerce, so it is earn-view.ts's
+// (`earnButtonOf`).
 //
 // Pure. Value imports are relative, so `node --test` loads the compiled
 // module as it is (harness notes).
 
-import { earnHref } from "./earn-route";
-import type { ProjectLock, Readiness } from "./p2-types";
+import type { EngineeringState } from "./engineering-state";
 import { piecesOf, type Lineage, type PendingBuild } from "./project-read";
-import { countLabel, formatDate, formatDateTime, type MetaPart, type ProjectStatus, type ProjectSummary } from "./project-summary";
+import { countLabel, formatDate, formatDateTime, type MetaPart, type ProjectSummary } from "./project-summary";
 
 /** CNT-5 / COR-93: the store kept the change in memory, but localStorage refused it. */
 export const WRITE_FAILED = "This browser's storage is full — the change wasn't saved.";
@@ -136,21 +136,21 @@ export function pendingNoticesOf(
 
 // ─────────────────────────── the engineering header (Build and Earn P0) ───────────────────────────
 
+const STAGE_WORD: Record<EngineeringState["state"], string> = { building: "Building", empty: "Made by hand", built: "Built" };
+
 /**
  * The stage line, in the status chip's old place: what the project is as engineering, from the
- * summary's own facts. "Built · 3 products · v2".
+ * engineering axis (`engineeringStateOf`, `view.engineering`) and the summary's counts.
+ * "Built · 3 products · v2".
  * - The stage: "Building" while a newer version of a lineage builds or waits to; "Made by hand"
  *   for a project no build stands behind; "Built" otherwise.
  * - The products, counted as the card counts them.
  * - The version: "v{n}" for one lineage ("v1" before a second version), "{k} builds" across
- *   several lineages; none for a project made by hand.
+ *   several lineages (the summary's count); none for a project made by hand.
  */
-export function stageLineOf(s: Pick<ProjectSummary, "source" | "productCount" | "version" | "pendingVersion">): string {
-  const waiting = s.pendingVersion?.status === "running" || s.pendingVersion?.status === "queued";
-  const hand = s.source.kind === "hand";
-  const stage = waiting ? "Building" : hand ? "Made by hand" : "Built";
-  const version = s.version ? (s.version.kind === "single" ? `v${s.version.v}` : `${s.version.k} builds`) : hand ? null : "v1";
-  return [stage, countLabel(s.productCount), ...(version ? [version] : [])].join(" · ");
+export function stageLineOf(e: Pick<EngineeringState, "state" | "version">, s: Pick<ProjectSummary, "productCount" | "version">): string {
+  const version = e.state === "empty" ? null : s.version?.kind === "builds" ? `${s.version.k} builds` : `v${Math.max(1, e.version)}`;
+  return [STAGE_WORD[e.state], countLabel(s.productCount), ...(version ? [version] : [])].join(" · ");
 }
 
 /** The engineering meta line: the stage line already counts the products and names the
@@ -164,63 +164,4 @@ export function engineeringMetaOf(s: Pick<ProjectSummary, "when" | "source">, st
   if (s.source.kind === "build-gone") meta.push({ kind: "text", text: "build not in this browser" });
   if (stage) meta.push({ kind: "text", text: `Stage ${stage.short}` });
   return meta;
-}
-
-export const EARN_LABEL = "Earn from this project";
-
-export type EarnButtonState = "notReady" | "ready" | "active" | "soldInFull";
-
-/** The engineering page's one door to Earn: its label stays, its tone and short fact follow the
- *  project. It always opens the Earn overview. */
-export type EarnButton = {
-  state: EarnButtonState;
-  label: typeof EARN_LABEL;
-  /** The fact said beside the button: "1 of 2 ready", "Listed", "Sold 40%", "Sold in full"; null when ready. */
-  sub: string | null;
-  violet: boolean;
-  href: string;
-};
-
-/**
- * The Earn button's state, first match wins:
- * 1. sold in full (the lock) → quiet, "Sold in full": Earn opens read-only;
- * 2. a live or paused listing, a partial sale, or a project given away → quiet, the live fact:
- *    "Listed", "Listing paused", "Sold 40%", "Given to the community";
- * 3. `readinessOf(…, "sell")` passes → ready, the page's one violet — unless the header's
- *    Review version is pending, which keeps the violet, and Earn is quiet;
- * 4. otherwise not ready → quiet, "{passed} of {total} ready" over the same rules.
- */
-export function earnButtonOf(input: {
-  projectId: string;
-  status: ProjectStatus;
-  lock: ProjectLock | null;
-  soldSharePct: number;
-  /** `view.videos.readiness.sell`. */
-  readiness: Pick<Readiness, "ok" | "rules">;
-  /** The header shows Review version {n}, which is violet. */
-  reviewPending: boolean;
-}): EarnButton {
-  const quiet = (state: EarnButtonState, sub: string | null): EarnButton => ({
-    state,
-    label: EARN_LABEL,
-    sub,
-    violet: false,
-    href: earnHref(input.projectId),
-  });
-  if (input.lock) return quiet("soldInFull", "Sold in full");
-  switch (input.status) {
-    case "listed":
-      return quiet("active", "Listed");
-    case "paused":
-      return quiet("active", "Listing paused");
-    case "sold":
-      return quiet("active", `Sold ${input.soldSharePct}%`);
-    case "given":
-      return quiet("active", "Given to the community");
-    default:
-      break;
-  }
-  if (input.readiness.ok) return { ...quiet("ready", null), violet: !input.reviewPending };
-  const passed = input.readiness.rules.filter((r) => r.ok).length;
-  return quiet("notReady", `${passed} of ${input.readiness.rules.length} ready`);
 }

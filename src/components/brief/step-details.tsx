@@ -5,13 +5,14 @@
 // - Sell IS the marketplace listing form (P2-LISTING-22): the ONE shared
 //   `ListingFields` in its Brief mode — chain, collection, listing type,
 //   minting type, price, % selling, royalties, benefits and the ownership
-//   box — then Share to Innovations.
+//   box — then the license buyers get it under (a listing needs one, the
+//   ladder's L3) and Share to Innovations.
 // - Give: chain, collection, minting type, license, the two confirms.
 // - Keep private: chain and collection — always a free lazy signature (MINT
 //   §5 Q1), so no minting type — and the two confirms.
 // Continue shuts on `detailsMissing`: the form's own reasons and the gate's
-// form rules (the ownership confirm, a Give's license). The videos, the cost
-// and the signature are the review's.
+// form rules (the ownership confirm, a Give's license), and a Sell's license.
+// The videos, the cost and the signature are the review's.
 
 import * as React from "react";
 import { Checkbox, SelectMenu, type SelectOption } from "@/components/ideeza";
@@ -173,6 +174,13 @@ export function StepDetails({
               now={now}
               newBenefitId={() => randomId("ben_")}
               collectionField={collectionField}
+            />
+            <SelectMenu
+              label="License"
+              placeholder="Select a license"
+              value={state.license}
+              onChange={(v) => onChange({ license: v })}
+              options={LICENSE_OPTIONS}
             />
             <Check
               label="Share to Innovations"

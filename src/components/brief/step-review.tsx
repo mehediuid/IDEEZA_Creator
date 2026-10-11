@@ -14,9 +14,11 @@
 //   each sale pays out.
 // - The CTA is `commitCtaLabel`'s ("Sign and list" / "Pay and give" / "Sign
 //   and save"), the page's one violet control. It stays aria-disabled on
-//   `reviewMissing`, with the reason under it, and on the ladder's mint level
-//   (L2, Build and Earn P1-4): the steps this flow doesn't gate itself (the
-//   demo wallet) show above it, each with its fix.
+//   `reviewMissing`, with the reason under it, and on the ladder (Build and
+//   Earn P1-4): Keep private and Give at the mint level (L2; a Give's license
+//   is its gate's form rule), a Sell at the list level (L3), since it lists
+//   as it mints. The steps this flow doesn't gate itself (the demo wallet)
+//   show above it, each with its fix.
 // - A Sell is a sale of a share: its terms carry the fixed testnet note, and
 //   royalties read as a share of resales, if marketplaces honour it.
 
@@ -60,6 +62,8 @@ const VIDEOS_OPTIONAL = "Videos are optional when you keep it private.";
 const VIDEOS_READY = "Every product has its video.";
 /** The flow's own ownership confirm and its readiness gate already ask these. */
 const MINT_HANDLED = ["ownership", "videos"] as const;
+/** A Sell's too, and Details asks its license; the commit is the mint, and every mint pays a wallet. */
+const LIST_HANDLED = ["ownership", "videos", "license", "minted", "payout"] as const;
 
 /** The cost box's listing row: "Listing (Buy now) · 0.05 MATIC". */
 function listingCostRow(input: ListingInput): { label: string; amount: string } | undefined {
@@ -88,7 +92,7 @@ function termsOf(s: MintState, intent: Intent, type: MintType, input: ListingInp
     { label: "Collection", value: s.collection || "Not chosen" },
     { label: "Minting", value: type === "instant" ? "Instant — on chain now" : "Lazy — a free signature" },
   ];
-  if (intent === "give") {
+  if (intent === "give" || intent === "sell") {
     rows.push({ label: "License", value: LICENSES.find((l) => l.value === s.license)?.label ?? "Not chosen" });
   }
   if (intent === "sell") {
@@ -141,11 +145,12 @@ export function StepReview({
   const headingId = React.useId();
   const input = listingInputFromBrief(briefStateOf(state));
   const listingCtx: ListingCtx = { mode: "brief", now, creatorPct };
-  // The mint level reads no commercial fact (minted is L3's), so "none" stands in.
+  // Nothing is minted until this commit, so "none" stands in; a Sell's minted and payout steps are the commit's own.
+  const selling = intent === "sell";
   const ladder = useCommitCheck(
-    "mint",
+    selling ? "list" : "mint",
     { products: gate.readiness.products.map(() => ({ dropped: null })), sell: gate.readiness, commercial: "none", license: state.license },
-    { handled: MINT_HANDLED },
+    { handled: selling ? LIST_HANDLED : MINT_HANDLED },
   );
   const stepsId = React.useId();
   const canGo = !missing && !minting && ladder.ok;
@@ -247,7 +252,7 @@ export function StepReview({
           </section>
         )}
 
-        <LevelCheck check={ladder} what="mint" id={stepsId} project={project} brief={null} />
+        <LevelCheck check={ladder} what={selling ? "mint and list" : "mint"} id={stepsId} project={project} brief={null} />
 
         <div className="flex flex-col gap-[8px]">
           <button

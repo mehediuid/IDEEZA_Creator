@@ -8,15 +8,17 @@
 // 1. the title row: the h1 and its rename pencil, then `headerParts.titleRow`
 //    (the Activity chip and its "?");
 // 2. the stage line in the status chip's old place ("Built · 3 products ·
-//    v2", `stageLineOf`), the Showcase badge, `headerParts.statusRow` and, in a
-//    contributor preview, the role chip (P2-CONTRIB-13);
+//    v2", `stageLineOf` over the engineering axis), the Showcase badge,
+//    `headerParts.statusRow` and, in a contributor preview, the role chip
+//    (P2-CONTRIB-13);
 // 3. the lock line once the project is sold in full, with its link to the
 //    sale in Earn;
 // 4. the meta line: Saved {date} · … · Stage {short} (`engineeringMetaOf`);
 // 5. the description, then `headerParts.afterDescription` (its coachmark);
 // 6. Review version {n} while a draft has a newer version ready, then the one
-//    "Earn from this project" button (`earnButtonOf`) and its short fact; then
-//    one notice per newer build of a chat that isn't saved yet.
+//    "Earn from this project" button (`earnButtonOf`, over the commercial axis
+//    and the gating ladder's next commit point) and its short fact; then one
+//    notice per newer build of a chat that isn't saved yet.
 // The status chip, the status line, the Brief and listing pair and Preview as
 // buyer moved to Earn (/projects/<id>/earn); the page has one violet — Review
 // version while it is pending, else Earn once it is ready.
@@ -49,16 +51,12 @@ import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
 import { LockLine } from "@/components/projects/product/product-states";
 import { roleChipOf } from "@/lib/manual/contributors";
 import { earnHref } from "@/lib/manual/earn-route";
+import { earnButtonOf } from "@/lib/manual/earn-view";
 import { headerText, type MetaPart } from "@/lib/manual/project-summary";
 import { buyerSide } from "@/lib/manual/project-route";
 import { can } from "@/lib/manual/permissions";
-import {
-  earnButtonOf,
-  engineeringMetaOf,
-  pendingNoticesOf,
-  stageLineOf,
-  type PendingNotice,
-} from "@/lib/manual/project-header";
+import { engineeringMetaOf, pendingNoticesOf, stageLineOf, type PendingNotice } from "@/lib/manual/project-header";
+import { earnSourceOf, useEarnFacts } from "../earn/ladder/use-earn-facts";
 import { BUYER_PREVIEW_ENTRY, isPreview, useFocusAfterPreview } from "./buyer-preview";
 import { ProjectDescription } from "./description-editor";
 import type { ProjectSlots, SlotProps } from "./slots";
@@ -102,6 +100,9 @@ export function ProjectHeader({
   const text = headerText(summary, { viewer, stage: view.stage, context });
   const owner = can(viewer, "facts.seeOwnerOnly");
   const engineering = context === "project" && !buyerSide(viewer);
+  // The ladder's facts, the ones Earn's overview and every commit point read.
+  const earnSource = React.useMemo(() => earnSourceOf(project, view, brief), [project, view, brief]);
+  const ladder = useEarnFacts(earnSource);
 
   // What is left of the pair on the engineering page: Review version {n}, the page's violet.
   const review =
@@ -110,10 +111,9 @@ export function ProjectHeader({
     engineering && owner
       ? earnButtonOf({
           projectId: project.id,
-          status: summary.status,
-          lock: summary.lock,
+          commercial: earnSource.commercial,
           soldSharePct: summary.customers.soldSharePct,
-          readiness: view.videos.readiness.sell,
+          facts: ladder.ready ? ladder.facts : null,
           reviewPending: review !== null,
         })
       : null;
@@ -164,7 +164,7 @@ export function ProjectHeader({
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
           {engineering ? (
-            <p className="min-w-0 font-medium text-text-primary">{stageLineOf(summary)}</p>
+            <p className="min-w-0 font-medium text-text-primary">{stageLineOf(view.engineering, summary)}</p>
           ) : (
             <StatusChip status={summary.status} word={text.chip.word} />
           )}

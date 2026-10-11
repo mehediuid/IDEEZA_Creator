@@ -1,22 +1,22 @@
 // Task C2a — the project header's own words: the rename and description
 // checks (CNT-2, CNT-5), the pending-version notices (COR-18, COR-101), and
-// Build and Earn P0's stage line, meta line and Earn button.
+// Build and Earn P0's stage line, meta line and Earn button (the button is
+// earn-view.ts's since it reads the ladder, P1).
 // The Open in editor hint (COR-12) is deleted (P2-BUILDLOAD-14).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as header from "../../.tmp-test/lib/manual/project-header.js";
 import {
   DESCRIPTION_SAVED,
-  EARN_LABEL,
   WRITE_FAILED,
   checkDescription,
   checkProjectName,
-  earnButtonOf,
   engineeringMetaOf,
   pendingNoticesOf,
   renamedMessage,
   stageLineOf,
 } from "../../.tmp-test/lib/manual/project-header.js";
+import { EARN_LABEL, earnButtonOf } from "../../.tmp-test/lib/manual/earn-view.js";
 
 const KINDS = ["3d", "pcb", "code", "wiring", "parts"];
 /** A BuildJob with just what piecesOf() reads: items (primary + companions) and status. */
@@ -147,23 +147,40 @@ test("COR-18: a partial or failed version asks for a retry in its chat; a queued
 
 const BUILD = { kind: "build", builds: 1 };
 
-test("P0 · the stage line: stage · products · version, from the summary's own facts", () => {
-  const s = (over = {}) => ({ source: BUILD, productCount: 3, version: { kind: "single", v: 2 }, pendingVersion: null, ...over });
-  assert.equal(stageLineOf(s()), "Built · 3 products · v2");
+test("P0 · the stage line: stage · products · version, from the engineering axis and the summary's counts", () => {
+  const e = (over = {}) => ({ state: "built", version: 2, ...over });
+  const s = (over = {}) => ({ productCount: 3, version: { kind: "single", v: 2 }, ...over });
+  assert.equal(stageLineOf(e(), s()), "Built · 3 products · v2");
   // One version so far reads v1; several lineages read their build count.
-  assert.equal(stageLineOf(s({ productCount: 1, version: null })), "Built · 1 product · v1");
-  assert.equal(stageLineOf(s({ productCount: 4, version: { kind: "builds", k: 3 } })), "Built · 4 products · 3 builds");
-  // A build that is no longer in this browser is still a build.
-  assert.equal(stageLineOf(s({ source: { kind: "build-gone" }, version: null })), "Built · 3 products · v1");
-  // By hand: no version.
-  assert.equal(stageLineOf(s({ source: { kind: "hand" }, productCount: 1, version: null })), "Made by hand · 1 product");
+  assert.equal(stageLineOf(e({ version: 1 }), s({ productCount: 1, version: null })), "Built · 1 product · v1");
+  assert.equal(stageLineOf(e({ version: 1 }), s({ productCount: 4, version: { kind: "builds", k: 3 } })), "Built · 4 products · 3 builds");
+  // A build that is no longer in this browser is still a build (its refs keep their version).
+  assert.equal(stageLineOf(e({ version: 1 }), s({ version: null })), "Built · 3 products · v1");
+  // By hand (empty): no version.
+  assert.equal(stageLineOf(e({ state: "empty", version: 0 }), s({ productCount: 1, version: null })), "Made by hand · 1 product");
   // A newer version building or waiting to: Building, the saved version still named.
-  for (const status of ["running", "queued"]) {
-    assert.equal(stageLineOf(s({ pendingVersion: { buildId: "b3", n: 3, status } })), "Building · 3 products · v2", status);
-  }
-  // Ready, partial or failed: the saved project is still Built (the notices say the rest).
-  for (const status of ["ready", "partial", "failed"]) {
-    assert.equal(stageLineOf(s({ pendingVersion: { buildId: "b3", n: 3, status } })), "Built · 3 products · v2", status);
+  assert.equal(stageLineOf(e({ state: "building" }), s()), "Building · 3 products · v2");
+});
+
+test("P1 · the stage line from the engineering axis reads as the summary-only one did, on every fixture", async () => {
+  const { ALL: FIXTURES, T, DAY, build, items } = await import("./fixtures/projects.mjs");
+  const { engineeringStateOf } = await import("../../.tmp-test/lib/manual/engineering-state.js");
+  const { countLabel, projectSummary } = await import("../../.tmp-test/lib/manual/project-summary.js");
+  /** stageLineOf as it was before it read the axis (project-header.ts at 9c88009), verbatim. */
+  const oldStageLine = (s) => {
+    const waiting = s.pendingVersion?.status === "running" || s.pendingVersion?.status === "queued";
+    const hand = s.source.kind === "hand";
+    const stage = waiting ? "Building" : hand ? "Made by hand" : "Built";
+    const version = s.version ? (s.version.kind === "single" ? `v${s.version.v}` : `${s.version.k} builds`) : hand ? null : "v1";
+    return [stage, countLabel(s.productCount), ...(version ? [version] : [])].join(" · ");
+  };
+  const four = FIXTURES.find((f) => f.name === "a 4-product build");
+  const next = (status) =>
+    build({ id: `b-drone-${status}`, chatId: "c-drone", title: "Survey Drone", createdAt: T + DAY, status, ...(status === "running" ? { items: items("running") } : null) });
+  const extra = ["running", "queued", "failed"].map((status) => ({ ...four, name: `${four.name} + ${status}`, builds: [...four.builds, next(status)] }));
+  for (const fx of [...FIXTURES, ...extra]) {
+    const summary = projectSummary(fx.project, { builds: fx.builds, brief: fx.draft, videoJobs: [], now: T + 30 * DAY });
+    assert.equal(stageLineOf(engineeringStateOf(fx.project, { builds: fx.builds }), summary), oldStageLine(summary), fx.name);
   }
 });
 
@@ -180,50 +197,75 @@ test("P0 · the engineering meta line drops what the stage line says and the own
   assert.deepEqual(gone.map((m) => (m.kind === "time" ? m.time.text : m.text)), ["Created Sep 26, 2026", "build not in this browser"]);
 });
 
-const rule = (id, ok) => ({ id, ok, fixedIn: "gate", reason: ok ? null : "x" });
-const SELL_READY = { ok: true, rules: [rule("videos", true), rule("ownership", true)] };
-const SELL_HALF = { ok: false, rules: [rule("videos", false), rule("ownership", true)] };
-const SELL_NONE = { ok: false, rules: [rule("videos", false), rule("ownership", false)] };
-const LOCK = { kind: "soldInFull", at: 1, buyers: ["Mira"], line: "Sold in full…" };
+// The ladder's facts (lib/commerce/ladder.ts): the Earn button counts its next commit point's steps.
+const ALL = {
+  built: true, walletConnected: true, ownershipConfirmed: true, videosReady: true,
+  minted: true, licenseSet: true, payoutWalletSet: true, identityVerified: true,
+};
+const DRAFT = { ...ALL, walletConnected: false, ownershipConfirmed: false, videosReady: false, minted: false, licenseSet: false, payoutWalletSet: false, identityVerified: false };
 const earnOf = (over = {}) =>
-  earnButtonOf({ projectId: "proj_car", status: "draft", lock: null, soldSharePct: 0, readiness: SELL_NONE, reviewPending: false, ...over });
+  earnButtonOf({ projectId: "proj_car", commercial: "none", soldSharePct: 0, facts: DRAFT, reviewPending: false, ...over });
 
-test("P0 · the Earn button: not ready counts the sell rules that pass, quiet, and still opens Earn", () => {
+test("P1 · the Earn button: a draft counts the mint level's steps (L2), quiet, and still opens Earn", () => {
   assert.deepEqual(earnOf(), {
     state: "notReady",
     label: EARN_LABEL,
-    sub: "0 of 2 ready",
+    sub: "1 of 4 ready",
     violet: false,
     href: "/projects/proj_car/earn",
   });
   assert.equal(EARN_LABEL, "Earn from this project");
-  assert.equal(earnOf({ readiness: SELL_HALF }).sub, "1 of 2 ready");
-  assert.equal(earnOf({ status: "private", readiness: SELL_HALF }).state, "notReady");
+  assert.equal(earnOf({ facts: { ...DRAFT, walletConnected: true, videosReady: true } }).sub, "3 of 4 ready");
+  // Identity (L4) and the license (L3) aren't the mint's: a draft is ready without them.
+  const mintReady = earnOf({ facts: { ...DRAFT, walletConnected: true, ownershipConfirmed: true, videosReady: true } });
+  assert.deepEqual(pick(mintReady), ["ready", null, true]);
+});
+
+test("P1 · the Earn button: a minted project counts the list level's steps (L3)", () => {
+  const minted = { ...ALL, licenseSet: false, identityVerified: false };
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: minted })), ["notReady", "6 of 7 ready", false]);
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, walletConnected: false } })), ["notReady", "5 of 7 ready", false]);
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, licenseSet: true } })), ["ready", null, true]);
+});
+
+test("P1 · the Earn button's ready is exactly the commit point's check", async () => {
+  const { commitCheck } = await import("../../.tmp-test/lib/commerce/ladder.js");
+  const keys = Object.keys(ALL);
+  for (let mask = 0; mask < 1 << keys.length; mask++) {
+    const facts = Object.fromEntries(keys.map((k, i) => [k, (mask & (1 << i)) !== 0]));
+    for (const [commercial, point] of [["none", "mint"], ["minted", "list"]]) {
+      const b = earnOf({ commercial, facts });
+      assert.equal(b.state === "ready", commitCheck(point, facts).ok, `${commercial} ${mask}`);
+    }
+  }
+});
+
+test("P1 · the Earn button: before the ladder's stores hydrate it says no count", () => {
+  assert.deepEqual(pick(earnOf({ facts: null })), ["notReady", null, false]);
+  assert.deepEqual(pick(earnOf({ commercial: "listed", facts: null })), ["active", "Listed", false]);
 });
 
 test("P0 · the Earn button: ready is the page's one violet — unless Review version holds it", () => {
-  const ready = earnOf({ readiness: SELL_READY });
+  const ready = earnOf({ facts: ALL });
   assert.deepEqual([ready.state, ready.sub, ready.violet], ["ready", null, true]);
-  assert.equal(earnOf({ status: "private", readiness: SELL_READY }).violet, true);
-  const behindReview = earnOf({ readiness: SELL_READY, reviewPending: true });
+  assert.equal(earnOf({ commercial: "minted", facts: ALL }).violet, true);
+  const behindReview = earnOf({ facts: ALL, reviewPending: true });
   assert.deepEqual([behindReview.state, behindReview.violet], ["ready", false]);
 });
 
 test("P0 · the Earn button: an active listing, a partial sale or a gift is quiet with its live fact", () => {
-  for (const readiness of [SELL_READY, SELL_NONE]) {
-    assert.deepEqual(pick(earnOf({ status: "listed", readiness })), ["active", "Listed", false]);
-    assert.deepEqual(pick(earnOf({ status: "paused", readiness })), ["active", "Listing paused", false]);
-    assert.deepEqual(pick(earnOf({ status: "sold", soldSharePct: 40, readiness })), ["active", "Sold 40%", false]);
-    assert.deepEqual(pick(earnOf({ status: "given", readiness })), ["active", "Given to the community", false]);
+  for (const facts of [ALL, DRAFT]) {
+    assert.deepEqual(pick(earnOf({ commercial: "listed", facts })), ["active", "Listed", false]);
+    assert.deepEqual(pick(earnOf({ commercial: "paused", facts })), ["active", "Listing paused", false]);
+    assert.deepEqual(pick(earnOf({ commercial: "soldPartial", soldSharePct: 40, facts })), ["active", "Sold 40%", false]);
+    assert.deepEqual(pick(earnOf({ commercial: "given", facts })), ["active", "Given to the community", false]);
   }
 });
 
-test("P0 · the Earn button: sold in full wins over everything, quiet, and opens Earn read-only", () => {
-  for (const status of ["sold", "listed"]) {
-    const b = earnOf({ status, lock: LOCK, soldSharePct: 100, readiness: SELL_READY });
-    assert.deepEqual(pick(b), ["soldInFull", "Sold in full", false], status);
-    assert.equal(b.href, "/projects/proj_car/earn");
-  }
+test("P0 · the Earn button: sold in full is quiet and opens Earn read-only", () => {
+  const b = earnOf({ commercial: "soldOut", soldSharePct: 100, facts: ALL, reviewPending: false });
+  assert.deepEqual(pick(b), ["soldInFull", "Sold in full", false]);
+  assert.equal(b.href, "/projects/proj_car/earn");
 });
 
 function pick(b) {
