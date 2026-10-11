@@ -52,6 +52,14 @@ const COLUMNS =
 // notFound() could set the 404.
 export function EarnShell({ id, children }: { id: string; children: React.ReactNode }) {
   const segment = useSelectedLayoutSegment();
+  // The mint flow (`earn/mint`, P1-2) is a focused full-page wizard with its own
+  // h1, loading and not-found states, so it takes the page without the Earn
+  // header and sub-navigation; its Back leads to Earn › Project NFT.
+  if (segment === "mint") return <>{children}</>;
+  return <EarnSections id={id} segment={segment}>{children}</EarnSections>;
+}
+
+function EarnSections({ id, segment, children }: { id: string; segment: string | null; children: React.ReactNode }) {
   const section: EarnSection = isEarnSection(segment) ? segment : "overview";
   const data = useProjectPageData(id, "project");
   if (data.state === "loading") return <EarnSkeleton>{children}</EarnSkeleton>;

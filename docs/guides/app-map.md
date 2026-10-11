@@ -24,9 +24,10 @@ profile dropdown, plan badge (Free/Pro).
 - `/parts/[id]` — one part, with its land pattern.
 - `/innovations`, `/innovations/[slug]` — **community feed** (Discover/Following, categories, minted badges).
 - `/(create)/chat/[chatId]`, `/(create)/build/[jobId]` — **AI concept chat → build job**.
-- `/(create)/build/[jobId]/brief` — **the build's Brief**, opened from the review card's **Add Brief** once Save has made the project: the same dashboard shell as the review surface (global sidebar, a "← Back" link to the build's chat over one card, a one-line *Step N of 4* in place of the step rail). A still-building job goes back to its chat (or to `/build/[jobId]` when the chat is gone).
+- `/(create)/build/[jobId]/brief` — the old address of a saved build's Brief: it redirects to its project's mint flow (below). A ready build no project holds goes to `/build/[jobId]?save=1`; a still-building job goes back to its chat (or to `/build/[jobId]` when the chat is gone).
+- `/(create)/projects/[id]/earn/mint` — **the mint flow** (the Brief, Build and Earn P1-2; `earnMintHref`): Choose · Details · Review and sign · Success, opened from Earn › Project NFT and the project's Add / Continue / View brief. A static segment, so it wins over `earn/[section]`. A minted Brief opens read-only on its success step; a project minted from its page says it is already minted.
 
-**Per-project editor** — `/project/[projectSlug]/products/[productId]/[step]` (the editor opens one product; `/project/[projectSlug]/[step]` redirects to the product last opened, and `/project/[projectSlug]/brief` is the project-level Brief); the left rail switches
+**Per-project editor** — `/project/[projectSlug]/products/[productId]/[step]` (the editor opens one product; `/project/[projectSlug]/[step]` redirects to the product last opened, and `/project/[projectSlug]/brief` redirects to the project's mint flow); the left rail switches
 modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · Code · 3D Module · Assembly · Peripheral Wiring · Product Preview · Add Brief**.
 
 **Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); Upgrade to Pro.

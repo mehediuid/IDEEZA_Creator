@@ -1,31 +1,31 @@
 "use client";
 
-// The product page's rail block "Marketplace": this product's Physical NFT and
-// Virtual NFT editions (Figma 41505:137261, 138307, 139690…141777; P2-TABS-24
-// …27 as changed in spec §4.9). It is the one home of every edition control
-// (§2.7); the project page shows a read-only summary (edition-summary.tsx).
+// A product's Physical NFT and Virtual NFT editions (Figma 41505:137261,
+// 138307, 139690…141777; P2-TABS-24…27 as changed in spec §4.9), in two
+// parts since Build and Earn:
 //
-// - The Testnet demo badge, then a tablist "Physical NFT · Virtual NFT"
-//   (neutral selected style, Physical first). Each tab: its helper line, the
-//   project's Collection and Blockchain (the mint record's), then the tracks.
-// - The owner's gates, first match wins, each replacing the tracks with no
-//   disabled buttons: Draft → Given → sold in full (locked) → the tracks.
-// - A track card: "NFTs sold {s}/{t}" (or "Sold out"), its use pill, "+{n}
-//   new" after Add NFTs until the next sale, and either Add to marketplace or
-//   the listed prices with Edit · Remove listing · Add NFTs. Add to
-//   marketplace asks `listGate` (the Main listing live or paused) and then
-//   the strict "edition" readiness of this product only (errata 16) before
-//   the listing dialog opens. While Main is paused or removed, a listed card
-//   says it's hidden on Explore marketplace.
-// - Create {Kind} NFT stays while one of the kind's two uses is uncreated.
-// - Every button is quiet (C16): Open in editor is the page's one violet.
-// - Anyone else (a preview, a demo buyer): only the tracks buyers can see,
-//   read-only, and a link to the project on Explore marketplace; the block
-//   is absent when there are none.
+// - `EditionTracks` — the owner's rows of one kind, under that kind's entry
+//   card in Earn › Editions (earn/sell/sell-entry-card.tsx). A track card:
+//   "NFTs sold {s}/{t}" (or "Sold out"), its use pill, "+{n} new" after Add
+//   NFTs until the next sale, and either Add to marketplace or the listed
+//   prices with Edit · Remove listing · Add NFTs. Add to marketplace asks
+//   `listGate` (the Main listing live or paused) and then the strict
+//   "edition" readiness of this product only (errata 16) before the listing
+//   dialog opens. While Main is paused or removed, a listed card says it's
+//   hidden on Explore marketplace. Creating a track is the entry card's
+//   guided flow (P1-3); the card also says why when a gate (Draft, Given,
+//   sold in full, an unknown collection) stops it, so the rows are absent
+//   then, as the block's gates always replaced its tracks. Every button is
+//   quiet (C16).
+// - `EditionBlock` — the product page's rail block "Marketplace" for anyone
+//   else (a preview, a demo buyer): the Testnet demo badge, a tablist
+//   "Physical NFT · Virtual NFT", and only the tracks buyers can see,
+//   read-only, with a link to the project on Explore marketplace. Absent
+//   when there are none, and for the owner, who manages editions in Earn.
 //
 // Every fact is the page's derivation (`view`); every write is a dialog's,
 // re-read and written once. What changed is said in the page's live region
-// and shown in the block, and focus moves to the card's next control.
+// and shown above the rows, and focus moves to the card's next control.
 
 import * as React from "react";
 import Link from "next/link";
@@ -39,7 +39,6 @@ import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { readinessFactsOf, readinessOf } from "@/lib/manual/readiness";
 import {
-  canCreate,
   editionChainOf,
   editionGate,
   editionsHiddenWith,
@@ -60,7 +59,7 @@ import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
 import type { ProductSlotProps } from "../product/product-slots";
 import { AddNftsDialog } from "./add-nfts-dialog";
 import { focusSoon } from "../listing/listing-dialog";
-import { CreateDialog, TAP, writeTracks } from "./create-dialog";
+import { TAP, writeTracks } from "./create-dialog";
 import { EditDialog } from "./edit-dialog";
 import { ListDialog } from "./list-dialog";
 
@@ -75,8 +74,7 @@ const LINK =
   "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-sm font-semibold text-text-link underline-offset-2 outline-none hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
-type Dialog =
-  { kind: "create"; edition: EditionKind } | { kind: "gate" | "list" | "edit" | "add" | "remove"; track: EditionTrack } | null;
+type Dialog = { kind: "gate" | "list" | "edit" | "add" | "remove"; track: EditionTrack } | null;
 
 export function helperLineOf(kind: EditionKind, product: string): string {
   return kind === "physical"
@@ -89,17 +87,16 @@ const firstControlId = (trackId: string) => `edition-${trackId}`;
 export function EditionBlock(props: ProductSlotProps) {
   const { view, product, viewer } = props;
   const owner = can(viewer, "facts.seeOwnerOnly");
-  const mine = React.useMemo(() => tracksOf(product.id, view.editions), [product.id, view.editions]);
   const hidden = editionsHiddenWith(view.listing, view.lock !== null);
   // What buyers can see: listed, and not hidden by a paused or removed Main listing.
-  const publicTracks = React.useMemo(() => (hidden ? [] : mine.filter((t) => t.listing !== null)), [hidden, mine]);
-
-  if (!owner && publicTracks.length === 0) return null;
-  const listed = mine.filter((t) => t.listing).length;
-  const meta = owner ? (listed ? `${listed} listed` : undefined) : `${publicTracks.length} on sale`;
+  const publicTracks = React.useMemo(
+    () => (hidden ? [] : tracksOf(product.id, view.editions).filter((t) => t.listing !== null)),
+    [hidden, product.id, view.editions],
+  );
+  if (owner || publicTracks.length === 0) return null;
   return (
-    <RailBlock title="Marketplace" meta={meta}>
-      {owner ? <OwnerBody {...props} tracks={mine} /> : <PublicBody {...props} tracks={publicTracks} />}
+    <RailBlock title="Marketplace" meta={`${publicTracks.length} on sale`}>
+      <PublicBody {...props} tracks={publicTracks} />
     </RailBlock>
   );
 }
@@ -164,10 +161,17 @@ function ChainFacts({ chain }: { chain: { network: Network; collection: string }
   );
 }
 
-function OwnerBody({ project, view, product, viewer, announce, tracks }: ProductSlotProps & { tracks: EditionTrack[] }) {
+/** The owner's rows of one kind for one product, with their dialogs (Earn › Editions). */
+export function EditionTracks({
+  kind,
+  project,
+  view,
+  product,
+  viewer,
+  announce,
+}: Omit<ProductSlotProps, "version"> & { kind: EditionKind }) {
   const brief = useProjectBrief(project.id) ?? null;
   const { jobs, now } = useVideoJobs();
-  const [kind, setKind] = React.useState<EditionKind>("physical");
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [note, setNote] = React.useState<string | null>(null);
   const [removeError, setRemoveError] = React.useState<string | null>(null);
@@ -181,15 +185,7 @@ function OwnerBody({ project, view, product, viewer, announce, tracks }: Product
     intent: status === "given" ? "give" : null,
     projectName: project.name,
   });
-  const manage = can(viewer, "editions.manage", view.canCtx);
-  const blocked =
-    gate.kind === "blocked"
-      ? gate.reason
-      : !manage
-        ? `${project.name} was sold in full — its NFTs can't be changed.`
-        : !chain
-          ? "This mint's collection isn't known, so its NFTs can't be created. Check it in the Brief."
-          : null;
+  const blocked = gate.kind === "blocked" || !can(viewer, "editions.manage", view.canCtx) || !chain;
   const listing = listGate(view.listing, project.name);
 
   const done = (message: string, focusId?: string) => {
@@ -215,8 +211,9 @@ function OwnerBody({ project, view, product, viewer, announce, tracks }: Product
     return readinessOf({ ...facts, product }, "edition").rules.some((r) => r.id === "ownership" && !r.ok);
   };
 
-  const ofKind = tracks.filter((t) => t.kind === kind).sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
-  const create = canCreate(tracks, product.id, kind);
+  const ofKind = tracksOf(product.id, view.editions)
+    .filter((t) => t.kind === kind)
+    .sort((a, b) => USES.indexOf(a.use) - USES.indexOf(b.use));
 
   const confirmRemove = (track: EditionTrack) => {
     const w = writeTracks(project.id, (all) => unlistTrack(all, track.id));
@@ -227,73 +224,38 @@ function OwnerBody({ project, view, product, viewer, announce, tracks }: Product
     done(`${USE_WORD[track.use]} ${KIND_WORD[track.kind]} NFT removed from the marketplace.`, `${firstControlId(track.id)}-list`);
   };
 
+  if (blocked || ofKind.length === 0) return null;
   const d = dialog;
   return (
     <>
-      <KindTabs active={kind} onSelect={setKind}>
-        <p className="m-0 text-sm leading-relaxed text-text-secondary">{helperLineOf(kind, name)}</p>
-        {blocked ? (
-          <p className="m-0 text-md leading-relaxed text-text-primary">{blocked}</p>
-        ) : (
-          <>
-            {chain && <ChainFacts chain={chain} />}
-            {note && (
-              <p className="m-0 flex items-start gap-2 text-sm font-medium text-text-success">
-                <span aria-hidden className="mt-[2px] inline-flex">
-                  <Icon icon={CheckmarkCircle02Icon} size={14} />
-                </span>
-                {note}
-              </p>
-            )}
-            {ofKind.length > 0 && (
-              <ul role="list" className="m-0 flex list-none flex-col gap-6 p-0">
-                {ofKind.map((t) => (
-                  <li key={t.id}>
-                    <TrackCard
-                      track={t}
-                      view={view}
-                      projectName={project.name}
-                      listBlocked={listing.kind === "blocked" ? listing.reason : null}
-                      hidden={t.listing !== null && editionsHiddenWith(view.listing, view.lock !== null)}
-                      onList={() => startListing(t)}
-                      onEdit={() => open({ kind: "edit", track: t })}
-                      onRemove={() => open({ kind: "remove", track: t })}
-                      onAdd={() => open({ kind: "add", track: t })}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {create.bothCreated ? (
-              <p className="m-0 text-sm text-text-secondary">Both Private use and Commercial use are created.</p>
-            ) : (
-              <Button
-                type="button"
-                hierarchy="secondary"
-                size="md"
-                className={cn("self-start", TAP)}
-                onClick={() => open({ kind: "create", edition: kind })}
-              >
-                {`Create ${KIND_WORD[kind]} NFT`}
-              </Button>
-            )}
-          </>
+      <div className="flex flex-col gap-6">
+        {note && (
+          <p className="m-0 flex items-start gap-2 text-sm font-medium text-text-success">
+            <span aria-hidden className="mt-[2px] inline-flex">
+              <Icon icon={CheckmarkCircle02Icon} size={14} />
+            </span>
+            {note}
+          </p>
         )}
-      </KindTabs>
+        <ul role="list" aria-label={`${KIND_WORD[kind]} NFTs of ${name}`} className="m-0 flex list-none flex-col gap-6 p-0">
+          {ofKind.map((t) => (
+            <li key={t.id}>
+              <TrackCard
+                track={t}
+                view={view}
+                projectName={project.name}
+                listBlocked={listing.kind === "blocked" ? listing.reason : null}
+                hidden={t.listing !== null && editionsHiddenWith(view.listing, view.lock !== null)}
+                onList={() => startListing(t)}
+                onEdit={() => open({ kind: "edit", track: t })}
+                onRemove={() => open({ kind: "remove", track: t })}
+                onAdd={() => open({ kind: "add", track: t })}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      {d?.kind === "create" && chain && (
-        <CreateDialog
-          projectId={project.id}
-          projectName={project.name}
-          productId={product.id}
-          productName={name}
-          kind={d.edition}
-          chain={chain}
-          tracks={view.editions}
-          onClose={() => setDialog(null)}
-          onDone={(track, message) => done(message, `${firstControlId(track.id)}-list`)}
-        />
-      )}
       {d?.kind === "gate" && (
         <ReadinessDialog
           purpose="edition"

@@ -19,6 +19,6 @@ UI grouped by module; logic and data for the same module live in [src/lib/](../l
 | `newsfeed/` | Innovations feed, cards, controls, minted badge | features/platform-and-projects.md |
 | `pcb/` | The schematic + PCB editor | [pcb/README.md](pcb/README.md) |
 | `code/`, `3d/`, `assembly/`, `wiring/`, `preview/` | The other editor modules (`code/ai-chat.tsx` is the assistant shared with PCB) | [features/editor-modules.md](../../docs/guides/features/editor-modules.md) (Assembly has no entry yet) |
-| `brief/` | Add Brief: `brief-app` sequence, rail, steps 1–4, modals, AR hand-off, the routes' guard (`use-brief-opens`) | features/editor-modules.md › Add Brief |
+| `brief/` | The mint flow (the Brief, in Earn): `mint-page`, `brief-app` (steps + commit), `brief-card`, the Choose · Details · Review · Success steps, the route's guard (`use-brief-opens`), Prompt Help | features/editor-modules.md › The mint flow |
 | `video-jobs/` | Render jobs provider, the browser clip renderer, player, Generate dialog, global render indicator | features/platform-and-projects.md › Video |
 | `manual/`, `product-flow/` | Per-project editor gate (`project-workspace`), step navigation, legacy-route redirect; cross-module flow provider | [app-map.md](../../docs/guides/app-map.md) |
