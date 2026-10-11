@@ -79,7 +79,7 @@ const PILL_TONE: Record<PillTone, string> = {
 };
 
 const LINK =
-  "inline-flex items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
+  "inline-flex items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 /** A card's lead line when it has no control: a focus target, not a Tab stop. */
 const LEAD = "m-0 rounded-sm text-md font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
 
