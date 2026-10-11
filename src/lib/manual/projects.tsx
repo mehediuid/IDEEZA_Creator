@@ -45,6 +45,8 @@ import {
 } from "./contributors";
 import { normalizeLegal } from "./legal";
 import { dispatchProjectDeleted } from "./events";
+import { deleteBlockOfGuards } from "./guards";
+import { readThroughHooks, wroteThroughHooks } from "./record-hooks";
 import { normalizeMintRecord } from "../wallet/mint";
 import type { MintRecord } from "../wallet/types";
 import type {
@@ -1063,7 +1065,8 @@ export function withMint(list: readonly ManualProject[], id: string, record: Min
 /** Another tab's stored projects (§3.4), adopted over this tab's `cur`: `cur`
  *  itself when they're the same, so nothing re-renders, and when the key
  *  can't be read — a corrupt key never wipes this tab's list. A removed key
- *  (`raw` null) reads as no projects. */
+ *  (`raw` null) reads as no projects. Read through the record hooks, like the
+ *  first load. */
 export function projectsFromStorage(cur: ManualProject[], raw: string | null): ManualProject[] {
   let value: unknown = [];
   if (raw !== null) {
@@ -1074,7 +1077,7 @@ export function projectsFromStorage(cur: ManualProject[], raw: string | null): M
     }
     if (!Array.isArray(value)) return cur;
   }
-  const next = normalizeProjects(value);
+  const next = readThroughHooks(normalizeProjects(value));
   return sameJson(cur, next) ? cur : next;
 }
 
@@ -1182,8 +1185,9 @@ type Ctx = {
    *  browser (§5.1.9): sweeps `projectStorageKeys(id, rowIds)`, removes the
    *  network, then dispatches `ideeza:project-deleted` so the market, video
    *  and journey stores purge their own records. Callers check
-   *  deleteBlockOf() first (COR-70). */
-  deleteProject: (id: string) => void;
+   *  deleteBlockOf() first (COR-70); false, and nothing deleted, when a
+   *  delete guard blocks it as it's pressed (Build and Earn P1-1). */
+  deleteProject: (id: string) => boolean;
 };
 
 const ManualProjectsContext = React.createContext<Ctx | null>(null);
@@ -1226,7 +1230,9 @@ export function ManualProjectsProvider({
   React.useEffect(() => {
     const raw = loadRaw(PROJECTS_KEY);
     synced.current = raw;
-    const stored = normalizeProjects(parseList(raw));
+    // Through the record hooks: commerce lays its own copy of its fields over
+    // each record (record-hooks.ts).
+    const stored = readThroughHooks(normalizeProjects(parseList(raw)));
     // Reading localStorage in the state initialiser would render different
     // markup on the server and the client — so the store hydrates here, once,
     // after mount, on purpose.
@@ -1245,12 +1251,17 @@ export function ManualProjectsProvider({
   }, []);
 
   // A write the browser refuses is reported, so the page can say so (COR-93).
+  // One that holds is handed to the record hooks, which keep commerce's copy
+  // in step with it.
   React.useEffect(() => {
     latest.current = projects;
     if (!hydrated || adopted.current === projects) return;
     const json = JSON.stringify(projects);
     const ok = saveRaw(PROJECTS_KEY, json);
-    if (ok) synced.current = json;
+    if (ok) {
+      synced.current = json;
+      wroteThroughHooks(projects);
+    }
     reportWrite(PROJECTS_KEY, ok);
   }, [projects, hydrated]);
   // §3.4: another tab's write reaches this one on `storage`, or on `focus` when
@@ -1503,6 +1514,7 @@ export function ManualProjectsProvider({
     reportWrite(PROJECTS_KEY, ok);
     if (!ok) return false;
     synced.current = json;
+    wroteThroughHooks(next);
     setProjects((arr) => withMint(arr, id, record, now) ?? arr);
     return true;
   }, []);
@@ -1597,9 +1609,12 @@ export function ManualProjectsProvider({
   // the `ideeza:project-deleted` event, on which the market, video and journey
   // stores purge their own records. Builds keep their now-dangling projectId,
   // so History drops the link and the build's review offers Save again (COR-71).
+  // A delete guard has the last word as it's pressed: the dialog checked
+  // already, so a block here means something changed since.
   const deleteProject = React.useCallback(
     (id: string) => {
       const record = recordOf(id);
+      if (deleteBlockOfGuards(record ?? { id, createdAt: 0, contributors: [] }, Date.now())) return false;
       const rowIds = record ? sweepRowIdsOf(record) : ["p1"];
       setProjects((arr) => arr.filter((p) => p.id !== id));
       setActiveProjectId((cur) => (cur === id ? null : cur));
@@ -1608,7 +1623,7 @@ export function ManualProjectsProvider({
       for (const [buildId, held] of builtFrom.current) {
         if (held.id === id) builtFrom.current.delete(buildId);
       }
-      if (typeof window === "undefined") return;
+      if (typeof window === "undefined") return true;
       // The stored active id goes now, not in the save effect after the next
       // render, so nothing reads the deleted project as active meanwhile. (The
       // PCB store follows the editor's scope and keeps its own target key, so
@@ -1621,6 +1636,7 @@ export function ManualProjectsProvider({
       }
       deleteNetwork(id);
       dispatchProjectDeleted(id);
+      return true;
     },
     [recordOf],
   );

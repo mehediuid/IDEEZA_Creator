@@ -152,9 +152,13 @@ test("entryStateOf: the edition gates replace the start, first match wins", () =
   assert.deepEqual(entryStateOf({ ...ENTRY, minted: false, given: true }), {
     kind: "blocked",
     reason: "Mint Car first — its NFTs use the project's collection and blockchain.",
+    link: "mint",
+  });
+  assert.deepEqual(entryStateOf({ ...ENTRY, given: true }), {
+    kind: "blocked",
+    reason: "Car was given to the community, so licences for it aren't sold.",
     link: null,
   });
-  assert.equal(entryStateOf({ ...ENTRY, given: true }).reason, "Car was given to the community, so licences for it aren't sold.");
   assert.equal(entryStateOf({ ...ENTRY, manage: false }).reason, "Car was sold in full — its NFTs can't be changed.");
   assert.equal(
     entryStateOf({ ...ENTRY, chainKnown: false }).reason,

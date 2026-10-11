@@ -95,7 +95,7 @@ export function RelistPanel({
 
   const items = relistChecklist(view.videos.readiness.relist, changed);
   const ready = items.every((i) => i.ok);
-  const ladder = useCommitCheck("list", earnSourceOf(view, brief), { handled: RELIST_HANDLED });
+  const ladder = useCommitCheck("list", earnSourceOf(project, view, brief), { handled: RELIST_HANDLED });
   const stepsId = React.useId();
 
   /** `videosReady`: the checklist's, or the gate dialog's own once it lets the relist through. */

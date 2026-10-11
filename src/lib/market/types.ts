@@ -7,7 +7,7 @@
 // Types and store keys only, with relative imports.
 
 import type { Network, Token } from "../brief/types";
-import type { ProductSource } from "../manual/projects";
+import type { ProductSource, WriteChange } from "../manual/public";
 import type { Amount, Coin, DemoBuyerId, MintType } from "../wallet/types";
 
 export const LISTINGS_KEY = "ideeza:market:listings";
@@ -23,7 +23,8 @@ export type UtilityBenefit = {
   duration: { months: 1 | 3 | 6 | 12 } | { whileHeld: true };
 };
 
-export type ListingChange = "rename" | "description" | "cover" | "addProduct" | "editProduct" | "dropProduct";
+/** The writes a listing pauses for: engineering names them (`WriteChange`, manual/guards.ts). */
+export type ListingChange = WriteChange;
 
 export type ListingMetadata = {
   name: string;

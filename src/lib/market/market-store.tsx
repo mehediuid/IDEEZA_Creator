@@ -22,10 +22,9 @@
 // exported for node:test.
 
 import * as React from "react";
-import { estimateGas } from "../brief/gas";
+import { estimateGas } from "../commerce/gas";
 import { parseStored, readStoredKey, subscribeStores, writeStoredKey } from "../key-store";
-import { onProjectDeleted } from "../manual/events";
-import { useJourneyMediaSweep } from "../manual/journey-store";
+import { onProjectDeleted, useJourneyMediaSweep } from "../manual/public";
 import { availableOf, type BalanceCtx } from "../wallet/balances";
 import { addAmounts, compareAmounts } from "../wallet/money";
 import { settleAuction, type SettleResult } from "./auction";

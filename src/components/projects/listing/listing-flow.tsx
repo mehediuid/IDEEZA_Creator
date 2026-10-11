@@ -45,7 +45,7 @@ const QUIET = "border border-solid border-border bg-bg-surface text-text-primary
 export function ListingFlow({ project, view, brief, now, announce, action, violet, className }: ActionSlotProps) {
   const search = useSearchParams();
   const pathname = usePathname();
-  const ladder = useCommitCheck("list", earnSourceOf(view, brief), { handled: LIST_HANDLED });
+  const ladder = useCommitCheck("list", earnSourceOf(project, view, brief), { handled: LIST_HANDLED });
   const blocked = action.blocked ?? null;
   const steps = !blocked && !ladder.ok;
   const reasonId = React.useId();

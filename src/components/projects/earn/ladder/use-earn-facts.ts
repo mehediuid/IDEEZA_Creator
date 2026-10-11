@@ -1,7 +1,8 @@
 "use client";
 
-// The ladder's facts, live: the page's own derivation (`view`) for products,
-// readiness and the mint; the Brief draft for the license; the demo wallet and
+// The ladder's facts, live: the page's own derivation (`view`) for products
+// and readiness; the commercial axis (`commercialStateOf`, the one the Earn
+// header reads) for the mint; the Brief draft for the license; the demo wallet and
 // the demo identity check from their stores. `ready` is false until both
 // stores have hydrated, so a commit point never flashes a missing step that
 // is really in place.
@@ -9,18 +10,24 @@
 import * as React from "react";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { earnFactsOf, type EarnFacts, type EarnFactsInput } from "@/lib/commerce/ladder";
+import { commercialFactsOf, commercialStateOf } from "@/lib/commerce/state";
 import { useKyc } from "@/lib/commerce/use-commerce";
 import type { ProjectView } from "@/lib/manual/project-read";
+import type { ManualProject } from "@/lib/manual/projects";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
 
 export type EarnFactsSource = Omit<EarnFactsInput, "wallet" | "kyc">;
 
 /** The ladder's input from the project page's SlotProps. */
-export function earnSourceOf(view: Pick<ProjectView, "products" | "videos" | "mint">, brief: StoredDraft | null): EarnFactsSource {
+export function earnSourceOf(
+  project: Pick<ManualProject, "id" | "createdAt" | "contributors" | "mint">,
+  view: Pick<ProjectView, "products" | "videos" | "listing" | "sales">,
+  brief: StoredDraft | null,
+): EarnFactsSource {
   return {
     products: view.products,
     sell: view.videos.readiness.sell,
-    mint: view.mint,
+    commercial: commercialStateOf(commercialFactsOf(project, brief, { listing: view.listing, sales: view.sales })),
     license: brief?.state.license ?? null,
   };
 }

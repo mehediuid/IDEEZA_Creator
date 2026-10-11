@@ -16,8 +16,9 @@
 // booleans, and `earnFactsOf` reads them off structural shapes the project
 // page's derivation already satisfies.
 
-import type { DemoWallet, MintStatus } from "../wallet/types";
+import type { DemoWallet } from "../wallet/types";
 import type { KycRecord } from "./kyc";
+import type { CommercialState } from "./state";
 
 export type EarnLevel = 0 | 1 | 2 | 3 | 4;
 
@@ -228,7 +229,8 @@ export type EarnFactsInput = {
   products: readonly { dropped: unknown }[];
   /** The Sell readiness gate (`view.videos.readiness.sell`): its videos and ownership rules. */
   sell: { rules: readonly { id: string; ok: boolean; reason: string | null }[] };
-  mint: { status: MintStatus; record: { wallet: { address: string } } | null };
+  /** The commercial axis (`commercialStateOf`), the one the Earn header reads: anything but "none" is minted. */
+  commercial: CommercialState;
   /** The license the project is given or sold under, if one is chosen. */
   license: string | null;
   wallet: DemoWallet | undefined;
@@ -237,6 +239,7 @@ export type EarnFactsInput = {
 
 export function earnFactsOf(i: EarnFactsInput): EarnFacts {
   const built = i.products.some((p) => p.dropped === null);
+  const minted = i.commercial !== "none";
   const rule = (id: string) => i.sell.rules.find((r) => r.id === id);
   const videos = rule("videos");
   const videosReady = built && videos?.ok === true;
@@ -248,9 +251,10 @@ export function earnFactsOf(i: EarnFactsInput): EarnFacts {
     walletConnected: !!w && w.identities[`maker-${w.account}`]?.connected === true,
     ownershipConfirmed: rule("ownership")?.ok === true,
     videosReady,
-    minted: i.mint.status !== "notMinted",
+    minted,
     licenseSet: i.license !== null,
-    payoutWalletSet: i.mint.record !== null || i.mint.status === "legacy",
+    // Every mint pays a wallet: its record's, or Demo account 1 by default (`payoutAddressOf`).
+    payoutWalletSet: minted,
     identityVerified: i.kyc?.status === "verified",
     reasons,
   };

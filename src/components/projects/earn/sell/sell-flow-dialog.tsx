@@ -159,7 +159,7 @@ export function SellFlowDialog({
   const [generating, setGenerating] = React.useState<VideoTarget | null>(null);
   const [discarding, setDiscarding] = React.useState(false);
   const [fixOpen, setFixOpen] = React.useState(false);
-  const ladder = useCommitCheck(kind === "physical" ? "editionPhysical" : "editionVirtual", earnSourceOf(view, brief), {
+  const ladder = useCommitCheck(kind === "physical" ? "editionPhysical" : "editionVirtual", earnSourceOf(project, view, brief), {
     handled: LADDER_HANDLED,
   });
   const headingRef = React.useRef<HTMLHeadingElement>(null);

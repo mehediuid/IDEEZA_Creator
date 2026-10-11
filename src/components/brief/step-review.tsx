@@ -141,10 +141,10 @@ export function StepReview({
   const headingId = React.useId();
   const input = listingInputFromBrief(briefStateOf(state));
   const listingCtx: ListingCtx = { mode: "brief", now, creatorPct };
-  // The mint level reads no mint fact (that's L3), so the not-yet-minted status stands in.
+  // The mint level reads no commercial fact (minted is L3's), so "none" stands in.
   const ladder = useCommitCheck(
     "mint",
-    { products: gate.readiness.products.map(() => ({ dropped: null })), sell: gate.readiness, mint: { status: "notMinted", record: null }, license: state.license },
+    { products: gate.readiness.products.map(() => ({ dropped: null })), sell: gate.readiness, commercial: "none", license: state.license },
     { handled: MINT_HANDLED },
   );
   const stepsId = React.useId();

@@ -105,6 +105,52 @@ export const ACTIONS = [
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
+/** Which layer an action belongs to (Build and Earn P1-1): engineering builds the project and
+ *  needs no wallet; commerce sells it — the mint, listings, editions, shares and their people,
+ *  the plan, the rights, buyers' acts and their downloads. */
+export type ActionLayer = "engineering" | "commerce";
+
+export const ACTION_LAYER: Record<Action, ActionLayer> = {
+  "project.rename": "engineering",
+  "project.editDescription": "engineering",
+  "project.delete": "engineering",
+  "project.brief": "commerce",
+  "project.showcase": "engineering",
+  "product.add": "engineering",
+  "product.edit": "engineering",
+  "product.openEditor": "engineering",
+  "network.manage": "engineering",
+  "app.manage": "engineering",
+  "activity.write": "engineering",
+  "video.generate": "engineering",
+  "mint.run": "commerce",
+  "mint.changeWallet": "commerce",
+  "listing.create": "commerce",
+  "listing.manage": "commerce",
+  "listing.seePublic": "commerce",
+  "listing.buy": "commerce",
+  "listing.bid": "commerce",
+  "purchase.seeSummary": "commerce",
+  "creator.support": "commerce",
+  "deliverables.download": "commerce",
+  "facts.seeOwnerOnly": "engineering",
+  "preview.enter": "commerce",
+  "customers.see": "commerce",
+  "people.seeTeam": "engineering",
+  "people.seeRoster": "commerce",
+  "ownership.see": "commerce",
+  "people.invite": "commerce",
+  "people.manage": "commerce",
+  "editions.manage": "commerce",
+  "businessPlan.manage": "commerce",
+  "legal.edit": "commerce",
+  "activity.seeListedMarker": "commerce",
+  "ownership.listShare": "commerce",
+  "project.report": "engineering",
+  "share.newsfeed": "engineering",
+  "premiumParts.manage": "commerce",
+};
+
 /** Nobody has these yet: each needs something that doesn't exist (a share market,
  *  reports, a newsfeed, premium parts), and a `true` would put a control on the page
  *  over invented data (PPL-3). */
@@ -162,8 +208,9 @@ const GRANTS: Record<Role, (action: Action, viewer: Viewer) => boolean> = {
 /**
  * The lock (decision 12, §3.8.5): after a 100 % sale these are refused. View brief,
  * Showcase, Preview and every read stay; delete stays blocked by the "sold" rule.
+ * One set per layer (Build and Earn P1-1); together they are the lock, unchanged.
  */
-const LOCKED: ReadonlySet<Action> = new Set<Action>([
+export const LOCKED_ENGINEERING: ReadonlySet<Action> = new Set<Action>([
   "project.rename",
   "project.editDescription",
   "product.add",
@@ -173,6 +220,8 @@ const LOCKED: ReadonlySet<Action> = new Set<Action>([
   "app.manage",
   "activity.write",
   "video.generate",
+]);
+export const LOCKED_COMMERCE: ReadonlySet<Action> = new Set<Action>([
   "mint.run",
   "mint.changeWallet",
   "listing.create",
@@ -214,7 +263,7 @@ export function can(viewer: Viewer, action: Action, ctx: CanContext = {}): boole
   if (NOT_YET.has(action)) return false;
   const role = roleOf(viewer);
   if (!GRANTS[role](action, viewer)) return false;
-  if (ctx.locked === true && LOCKED.has(action)) return false;
+  if (ctx.locked === true && (LOCKED_ENGINEERING.has(action) || LOCKED_COMMERCE.has(action))) return false;
   const need = NEEDS[action];
   return need ? need(ctx, role) : true;
 }

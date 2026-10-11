@@ -151,7 +151,8 @@ export function editionUsesOf(tracks: EditionTrack[], productId: string, kind: E
 // ───────────────────────── the entry card ─────────────────────────
 
 export type EntryState =
-  | { kind: "blocked"; reason: string; link: "projectNft" | null }
+  /** `link`: where the fix is — Earn's mint flow, or Earn › Project NFT for the Main listing. */
+  | { kind: "blocked"; reason: string; link: "mint" | "projectNft" | null }
   | { kind: "open"; note: string | null }
   | { kind: "full"; line: string };
 
@@ -172,7 +173,7 @@ export function entryStateOf(f: {
   tracks: EditionTrack[];
 }): EntryState {
   const gate = editionGate({ minted: f.minted, intent: f.given ? "give" : null, projectName: f.projectName });
-  if (gate.kind === "blocked") return { kind: "blocked", reason: gate.reason, link: null };
+  if (gate.kind === "blocked") return { kind: "blocked", reason: gate.reason, link: f.minted ? null : "mint" };
   if (!f.manage) return { kind: "blocked", reason: `${f.projectName} was sold in full — its NFTs can't be changed.`, link: null };
   if (!f.chainKnown) {
     return {

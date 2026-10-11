@@ -27,13 +27,13 @@ export function RequestPayout({
   now,
   announce,
 }: {
-  project: Pick<ManualProject, "id">;
-  view: Pick<ProjectView, "products" | "videos" | "mint" | "sales">;
+  project: Pick<ManualProject, "id" | "createdAt" | "contributors" | "mint">;
+  view: Pick<ProjectView, "products" | "videos" | "listing" | "sales">;
   brief: StoredDraft | null;
   now: number;
   announce?: (message: string) => void;
 }) {
-  const source = React.useMemo(() => earnSourceOf(view, brief), [view, brief]);
+  const source = React.useMemo(() => earnSourceOf(project, view, brief), [project, view, brief]);
   const check = useCommitCheck("payout", source);
   const requests = usePayoutRequests();
   const [refused, setRefused] = React.useState(false);

@@ -7,7 +7,7 @@
 
 import type { Amount, Coin, DemoBuyerId, MintView } from "../wallet/types";
 import type { Network, Token } from "../brief/types";
-import { estimateGas } from "../brief/gas";
+import { estimateGas } from "../commerce/gas";
 import { toMicros } from "../wallet/money";
 import { FEE_LABEL, IDEEZA_FEE_BPS, ideezaFeeOf, payoutOf } from "./fee";
 import type { EditionTrack, Listing, Sale, SaleItem, UtilityBenefit } from "./types";

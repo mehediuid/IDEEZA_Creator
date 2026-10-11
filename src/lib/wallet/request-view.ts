@@ -13,9 +13,9 @@
 //
 // Pure, relative imports only (node:test loads the compiled module).
 
-import { estimateGas } from "../brief/gas";
+import { estimateGas } from "../commerce/gas";
 import { NETWORKS, type Network, type Token } from "../brief/types";
-import { formatDateTime } from "../manual/project-summary";
+import { formatDateTime } from "../manual/public";
 import { affordOf, balancesOf, type BalanceCtx } from "./balances";
 import { demoAddress, demoHex, makerId, shortAddress } from "./demo-wallet";
 import { DEMO_ACCOUNTS, buyerLabel } from "./identities";

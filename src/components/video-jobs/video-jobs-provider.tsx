@@ -44,8 +44,7 @@ import {
   type VideoJobStage,
 } from "@/lib/video/jobs";
 import { onProjectDeleted } from "@/lib/manual/events";
-import { projectLockOf } from "@/lib/manual/edit-gate";
-import { readMarketNow } from "@/lib/market/market-store";
+import { lockOf } from "@/lib/manual/guards";
 import { readBriefDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, productsOfProject } from "@/lib/manual/project-read";
@@ -391,10 +390,10 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
           durationMs: clip.durationMs,
           bytes: clip.video.size,
         };
-        // Sold in full (read from the sales as they are now: another tab may
-        // have just sold the rest), the buyer's product keeps the video it was sold with.
+        // Sold in full (the guards read the sales as they are now: another tab
+        // may have just sold the rest), the buyer's product keeps the video it was sold with.
         const owner = projectsRef.current.find((p) => p.id === projectId);
-        const locked = !!owner && projectLockOf(owner, readMarketNow().sales) !== null;
+        const locked = !!owner && lockOf(owner) !== null;
         const wrote = writeProduct(projectId, productId, (v) => {
           if (!v) return null;
           const next = pv.finishTake(v, id, meta, Date.now());

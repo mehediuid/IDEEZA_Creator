@@ -5,7 +5,7 @@
 //
 // Pure, relative imports only, so node:test loads the compiled module.
 
-import type { ProjectLogEntry } from "../manual/project-read";
+import type { ProjectLogEntry } from "../manual/public";
 import type { Sale, SupportRequest } from "./types";
 
 /**

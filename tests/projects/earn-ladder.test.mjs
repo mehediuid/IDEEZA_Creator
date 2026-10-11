@@ -169,7 +169,7 @@ const wallet = (connected, account = 1) => ({
 const input = (o = {}) => ({
   products: [product("a")],
   sell: { rules: [rule("videos", true), rule("ownership", true)] },
-  mint: { status: "lazyMinted", record: { wallet: { address: "0xabc" } } },
+  commercial: "minted",
   license: "mit",
   wallet: wallet(true),
   kyc: { status: "verified", at: 1, demo: true },
@@ -202,13 +202,15 @@ test("earnFactsOf: the wallet is the maker's current account, connected; unread 
   assert.equal(earnFactsOf(input({ wallet: undefined })).walletConnected, false);
 });
 
-test("earnFactsOf: minted is any mint; a legacy mint pays the default wallet, so its payout is set", () => {
-  const none = earnFactsOf(input({ mint: { status: "notMinted", record: null } }));
+test("earnFactsOf: minted is the commercial axis past \"none\"; every mint pays a wallet, so its payout is set", () => {
+  const none = earnFactsOf(input({ commercial: "none" }));
   assert.equal(none.minted, false);
   assert.equal(none.payoutWalletSet, false);
-  const legacy = earnFactsOf(input({ mint: { status: "legacy", record: null } }));
-  assert.equal(legacy.minted, true);
-  assert.equal(legacy.payoutWalletSet, true);
+  for (const state of ["minted", "given", "listed", "paused", "soldPartial", "soldOut"]) {
+    const f = earnFactsOf(input({ commercial: state }));
+    assert.equal(f.minted, true, state);
+    assert.equal(f.payoutWalletSet, true, state);
+  }
 });
 
 test("earnFactsOf: no license, no KYC record", () => {
@@ -258,7 +260,7 @@ const fromGate = (f, extra = {}) =>
   earnFactsOf({
     products: f.products,
     sell: readinessOf(f, "sell"),
-    mint: { status: "lazyMinted", record: { wallet: { address: "0x1" } } },
+    commercial: "minted",
     license: "mit",
     wallet: wallet(true),
     kyc: null,
@@ -286,4 +288,14 @@ test("ladder × Sell gate: a dropped product needs no video (COR-108)", () => {
   const products = [realProduct("p1", "Planter"), realProduct("p2", "Hub", { lastIn: 1, current: 2 })];
   const f = fromGate(gateFacts({ products, videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1") } } }));
   assert.equal(f.videosReady, true);
+});
+
+test("ladder × commercial axis: a mint record or a minted draft reads minted; a plain draft doesn't", async () => {
+  const { commercialFactsOf, commercialStateOf } = await import("../../.tmp-test/lib/commerce/state.js");
+  const p = { id: "p", createdAt: 1, contributors: [] };
+  const stateOf = (proj, draft) => commercialStateOf(commercialFactsOf(proj, draft, {}));
+  const minted = (proj, draft) => earnFactsOf(input({ commercial: stateOf(proj, draft) })).minted;
+  assert.equal(minted({ ...p, mint: { wallet: { account: 1, address: "0x1" } } }, null), true);
+  assert.equal(minted(p, { state: { mintedAt: 5, intent: "give" }, step: "success" }), true);
+  assert.equal(minted(p, { state: { mintedAt: null, intent: "sell" }, step: "form" }), false);
 });
