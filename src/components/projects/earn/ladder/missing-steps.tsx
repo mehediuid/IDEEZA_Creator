@@ -12,6 +12,8 @@
 //   own write.
 // - Choose a license, Verify identity: open their dialogs.
 // Every fix is secondary: the page's one violet control stays its own.
+// Inside a dialog, `onCover` tells it while a fix's own dialog sits on top,
+// so the keyboard belongs to the top one (ModalFrame's `covered`).
 
 import * as React from "react";
 import Link from "next/link";
@@ -35,14 +37,22 @@ type FixContext = {
   brief: StoredDraft | null;
   /** The page's polite live region, for a fix that changes state in place. */
   announce?: (message: string) => void;
+  /** Called with true while a fix's dialog is open, false once it's gone. */
+  onCover?: (covered: boolean) => void;
 };
 
 /** One missing step's fix control. */
-export function StepFix({ step, project, brief, announce, describedBy }: FixContext & { step: LadderStep; describedBy?: string }) {
+export function StepFix({ step, project, brief, announce, onCover, describedBy }: FixContext & { step: LadderStep; describedBy?: string }) {
   const { openManage } = useWalletRequest();
   const { setOwnerConfirmed } = useManualProjects();
   const [dialog, setDialog] = React.useState<"license" | "identity" | null>(null);
   const label = step.fix.label;
+  // Also uncovers when the fixed step's row goes away with its dialog.
+  React.useEffect(() => {
+    if (!dialog || !onCover) return;
+    onCover(true);
+    return () => onCover(false);
+  }, [dialog, onCover]);
 
   switch (step.fix.kind) {
     case "products":
@@ -116,16 +126,17 @@ export function StepFix({ step, project, brief, announce, describedBy }: FixCont
 /**
  * Steps as rows: the glyph and its word (done or not done yet), the step,
  * and, while it's missing, why and its fix. A step without `ok` is missing.
+ * Ruled rows, not a box: they sit inside cards and dialogs (no card in a card).
  */
 export function MissingSteps({ steps, ...ctx }: FixContext & { steps: readonly (LadderStep & { ok?: boolean })[] }) {
   const base = React.useId();
   return (
-    <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-solid border-border p-0">
+    <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border border-y border-solid border-border p-0">
       {steps.map((s) => {
         const reasonId = `${base}-${s.id}`;
         const done = s.ok === true;
         return (
-          <li key={s.id} className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
+          <li key={s.id} className="flex flex-wrap items-center gap-x-6 gap-y-4 py-5">
             <span aria-hidden className={cn("inline-flex shrink-0 self-start pt-px", done ? "text-text-success" : "text-text-tertiary")}>
               <Icon icon={done ? CheckmarkCircle02Icon : CircleIcon} size={20} />
             </span>

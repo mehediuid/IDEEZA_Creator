@@ -20,6 +20,10 @@
 //   and writes once, as the Create and Add to marketplace dialogs do. A
 //   listing that isn't signed after the create leaves the NFTs created and
 //   unlisted; opening the flow again picks up at the listing.
+// - Sign also asks the ladder (Build and Earn P1-4): L3 for a virtual
+//   edition, L4 (the demo identity check) for a physical one. A missing step
+//   shows on the Sign step with its fix and the CTA waits; the video and
+//   ownership stay Readiness's, and the wallet the requests' own connect.
 
 import * as React from "react";
 import { Banner, Button, ConfirmDialog, ModalFrame, Spinner } from "@/components/ideeza";
@@ -74,6 +78,10 @@ import {
   type SignState,
 } from "./sell-steps";
 import { useSellTerms, writeShipPlan } from "./use-sell-terms";
+import { LevelCheck, useCommitCheck } from "../ladder/level-check";
+import { earnSourceOf } from "../ladder/use-earn-facts";
+
+const LADDER_HANDLED = ["videos", "ownership", "wallet"] as const;
 
 const INTRO: Record<SellStep, string> = {
   product: "Each product sells its own NFTs.",
@@ -150,6 +158,10 @@ export function SellFlowDialog({
   const [createdHere, setCreatedHere] = React.useState<string | null>(null);
   const [generating, setGenerating] = React.useState<VideoTarget | null>(null);
   const [discarding, setDiscarding] = React.useState(false);
+  const [fixOpen, setFixOpen] = React.useState(false);
+  const ladder = useCommitCheck(kind === "physical" ? "editionPhysical" : "editionVirtual", earnSourceOf(view, brief), {
+    handled: LADDER_HANDLED,
+  });
   const headingRef = React.useRef<HTMLHeadingElement>(null);
   const fixRef = React.useRef<HTMLElement | null>(null);
   const prefix = React.useId().replace(/:/g, "");
@@ -241,7 +253,7 @@ export function SellFlowDialog({
   };
 
   const sign = async () => {
-    if (busy) return;
+    if (busy || !ladder.ok) return;
     const fresh = readEditions(project.id);
     const p = firstProblemOf(draft, { ...ctx, tracks: fresh }, "readiness");
     if (p) {
@@ -420,10 +432,25 @@ export function SellFlowDialog({
       break;
     }
   }
+  if (step === "sign" && !ladder.ok) {
+    body = (
+      <>
+        {body}
+        <LevelCheck
+          check={ladder}
+          what={`sell ${KIND_WORD[kind]} NFTs`}
+          id={`${prefix}-ladder`}
+          project={project}
+          brief={brief}
+          onCover={setFixOpen}
+        />
+      </>
+    );
+  }
 
   const atSign = step === "sign";
   const cta = atSign ? (plan.length === 2 ? "Sign and list" : "Sign the listing") : "Next";
-  const blocked = step === "readiness" && !readiness.ok;
+  const blocked = (step === "readiness" && !readiness.ok) || (step === "sign" && !ladder.ok);
   const reason = problem?.message ?? null;
 
   const footer = (
@@ -464,7 +491,7 @@ export function SellFlowDialog({
       ) : (
         blocked && (
           <p id={reasonId} className="m-0 max-w-[40ch] text-sm text-text-secondary [@media(min-width:480px)]:text-right">
-            {readiness.blocker}
+            {step === "sign" ? "Finish the steps above to sign." : readiness.blocker}
           </p>
         )
       )}
@@ -476,7 +503,7 @@ export function SellFlowDialog({
       <ModalFrame
         open
         onClose={requestClose}
-        covered={busy || generating !== null || discarding}
+        covered={busy || generating !== null || discarding || fixOpen}
         size="sm"
         initialFocus={headingRef}
         title={FLOW_TITLE[flow]}

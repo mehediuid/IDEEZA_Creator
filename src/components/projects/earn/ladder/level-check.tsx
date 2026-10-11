@@ -32,6 +32,7 @@ export function LevelCheck({
   project,
   brief,
   announce,
+  onCover,
   className,
 }: {
   check: Check;
@@ -42,6 +43,8 @@ export function LevelCheck({
   project: Pick<ManualProject, "id">;
   brief: StoredDraft | null;
   announce?: (message: string) => void;
+  /** Inside a dialog: true while a fix's own dialog is on top of it. */
+  onCover?: (covered: boolean) => void;
   className?: string;
 }) {
   const headingId = React.useId();
@@ -58,7 +61,7 @@ export function LevelCheck({
           {`This needs level ${level.level}, ${level.name}.`}
         </p>
       </div>
-      <MissingSteps steps={check.missing} project={project} brief={brief} announce={announce} />
+      <MissingSteps steps={check.missing} project={project} brief={brief} announce={announce} onCover={onCover} />
     </section>
   );
 }

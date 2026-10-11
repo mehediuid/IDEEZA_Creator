@@ -94,7 +94,7 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
       )}
 
       {steps && (
-        <LevelCheck check={ladder} what="list" id={stepsId} project={project} brief={brief} announce={announce} className="w-full basis-full" />
+        <LevelCheck check={ladder} what="list" id={stepsId} project={project} brief={brief} announce={announce} className="order-last w-full max-w-[720px] basis-full" />
       )}
 
       {open === "gate" && !steps && (
