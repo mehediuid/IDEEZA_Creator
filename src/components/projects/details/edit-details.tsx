@@ -144,7 +144,6 @@ function EditDetailsDialog({
     [project],
   );
   const ai = useDescriptionAiAssist({ products: rows, value: description, onReplace: setDescription, pillClassName: TAP });
-  const savingAiText = React.useRef(false);
   const startedAi = React.useRef(false);
   React.useEffect(() => {
     if (!startAi || startedAi.current) return;
@@ -155,12 +154,13 @@ function EditDetailsDialog({
   const write = useStoreWrite(
     pending !== null && project.name === pending.name && project.description === pending.description,
     () => {
-      if (savingAiText.current) setDescriptionHint(project.id, { dismissedAt: Date.now(), productCount: rows.length });
-      savingAiText.current = false;
       const p = pending;
       if (p) {
         const renamed = p.name !== initial.name.trim();
         const described = p.description !== initial.description.trim();
+        // A description saved here — by Update with AI or by hand — is the maker's overview of the
+        // products the project has now: the coachmark waits for the next product (owner, 2026-10-12).
+        if (described) setDescriptionHint(project.id, { dismissedAt: Date.now(), productCount: rows.length });
         announce(renamed && described ? "Name and description saved" : renamed ? renamedMessage(p.name) : DESCRIPTION_SAVED);
       }
       ai.reset();
@@ -181,15 +181,15 @@ function EditDetailsDialog({
       return;
     }
     if (!nameChanged && !descChanged && !write.failed) {
+      // A run that wrote back the very text already saved still answers the coachmark.
+      if (ai.wrote) setDescriptionHint(project.id, { dismissedAt: Date.now(), productCount: rows.length });
       ai.reset();
       onClose();
       return;
     }
     const next = { name: nameCheck.value, description: descCheck.value };
-    const fromAi = ai.wrote;
     setDenied(null);
     const outcome = gate.guard(change, () => {
-      savingAiText.current = fromAi;
       setPending(next);
       write.start();
       updateProject(project.id, next);

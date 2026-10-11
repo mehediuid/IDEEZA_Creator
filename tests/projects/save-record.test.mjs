@@ -4,7 +4,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { saveRecord } from "../../.tmp-test/lib/manual/projects.js";
-import { buildsOf } from "../../.tmp-test/lib/manual/project-read.js";
+import { buildsOf, productRowsOf } from "../../.tmp-test/lib/manual/project-read.js";
+import { coachmarkDueOf } from "../../.tmp-test/lib/manual/describe.js";
 import { nextVersionOf } from "../../.tmp-test/lib/create/save-footer.js";
 import { T, build, companion, project, row } from "./fixtures/projects.mjs";
 
@@ -53,6 +54,19 @@ describe("saveRecord · new", () => {
     );
     assert.equal(p.productName, "Bench tools");
     assert.deepEqual(p.cover, { buildId: job.id, productId: "light" });
+  });
+
+  it("a description written at save answers the description coachmark until a product is added (owner, 2026-10-12)", () => {
+    const job = bench();
+    const said = saveRecord({ kind: "new", name: "Bench tools", description: "Holds boards, lit.", cover: null }, job, [], [], NOW, IDS).next;
+    assert.deepEqual(said.descriptionHint, { dismissedAt: NOW, productCount: 2 });
+    assert.equal(coachmarkDueOf(productRowsOf(said), said.descriptionHint), false, "not on the page it was just saved to");
+    // A third product joins: the coachmark is due again.
+    const third = { ...said, products: [...said.products, { id: "p3", name: "Stand", description: "Holds the clamp." }] };
+    assert.equal(coachmarkDueOf(productRowsOf(third), third.descriptionHint), true);
+    // No description at save: nothing answers it yet.
+    const blank = saveRecord({ kind: "new", name: "Bench tools", description: "  ", cover: null }, job, [], [], NOW, IDS).next;
+    assert.equal(blank.descriptionHint, undefined);
   });
 
   it("the primary (or no choice) writes no cover key: it is the default already", () => {

@@ -868,7 +868,13 @@ export function saveRecord(
       updatedAt: now,
       flowState: { ...EMPTY_FLOW_STATE },
     };
-    const next = attach(created, job, [], now, { origin: true });
+    const attached = attach(created, job, [], now, { origin: true });
+    // A description written at save — the products' own sentences joined, or Update with AI —
+    // already speaks for every product the project starts with: the description coachmark
+    // waits until a product is added (owner, 2026-10-12; P2-TABS-22).
+    const next: ManualProject = created.description
+      ? { ...attached, descriptionHint: { dismissedAt: now, productCount: Math.max(1, attached.products?.length ?? 0) } }
+      : attached;
     const c = input.cover;
     const cover = c && !(c.buildId === job.id && c.productId === "primary") ? c : null;
     return {
