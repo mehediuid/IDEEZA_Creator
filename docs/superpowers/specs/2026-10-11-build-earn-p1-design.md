@@ -48,7 +48,7 @@ Engineering behaviour must not change. A maker who never opens Earn sees nothing
   Write tests for migrate, rerun, partial data, rollback reads and delete.
 
 ## P1-2: the Brief becomes Earn's mint flow
-- **Route.** The mint wizard moves to `/projects/<id>/earn/sell/mint`, linked from Earn › Project NFT. The old `/project/<slug>/brief` and `/build/<id>/brief` routes redirect there. A Brief that has already minted opens its read-only success step, as today.
+- **Route.** The mint wizard moves to `/projects/<id>/earn/mint` (a static `earn/mint` route, which wins over P0's `earn/[section]`), linked from Earn › Project NFT. The old `/project/<slug>/brief` and `/build/<id>/brief` routes redirect there. A Brief that has already minted opens its read-only success step, as today.
 - **Steps:**
   1. **Choose:** Keep private, Give to the community, or Sell. The intent chooser comes out of the old Step 1.
   2. **Details:** license, plus the ONE shared listing form (`ListingFields`) for Sell, with chain, collection, price, % selling and royalties as today.
