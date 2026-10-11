@@ -13,8 +13,8 @@
 // - Gated: the edition block's gates (Draft, Given, sold in full, an
 //   unknown collection, a dropped product) and then the Main listing
 //   (`listGate`), first match wins. Each replaces the button with the reason
-//   in plain words — no disabled card — and a missing listing links to
-//   Earn › Project NFT.
+//   in plain words — no disabled card. Not minted links to Earn's mint flow,
+//   a missing listing to Earn › Project NFT.
 // - Both uses on sale: it says so; their rows below hold every control.
 // - Physical: the stored "How you'll make and ship it" note, once a listing
 //   has been signed with it.
@@ -28,7 +28,7 @@ import { ArrowRight01Icon, CheckmarkCircle02Icon } from "@hugeicons/core-free-ic
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza";
 import { useProjectBrief } from "@/lib/brief/project-brief";
-import { earnHref } from "@/lib/manual/earn-route";
+import { earnHref, earnMintHref } from "@/lib/manual/earn-route";
 import { can, type Viewer } from "@/lib/manual/permissions";
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
@@ -137,9 +137,9 @@ export function SellEntryCard({
           {blurb}
           {shipNote}
           <p className="m-0 text-sm leading-relaxed text-text-primary">{state.kind === "blocked" ? state.reason : state.line}</p>
-          {state.kind === "blocked" && state.link === "projectNft" && (
-            <Link href={earnHref(project.id, "sell")} className={LINK}>
-              Go to Project NFT
+          {state.kind === "blocked" && state.link && (
+            <Link href={state.link === "mint" ? earnMintHref(project.id) : earnHref(project.id, "sell")} className={LINK}>
+              {state.link === "mint" ? "Go to mint" : "Go to Project NFT"}
               <Icon icon={ArrowRight01Icon} size={14} />
             </Link>
           )}
