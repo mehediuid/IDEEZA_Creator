@@ -10,7 +10,7 @@ profile dropdown, plan badge (Free/Pro).
 
 **Platform routes:**
 - `/` — **Dashboard home**: "What will you build today?" AI prompt (Generate with AI / Build manually) + Browse Project cards.
-- `/projects` — **My projects**: the only project index — tabs **All · Draft · Private · Given · Listed · Sold**, then a **Showcase** membership tab; search, a Source facet (AI build · By hand), sort and pagination (12 per page); cards read the live market data.
+- `/projects` — **My projects**: the only project index — tabs **All · Draft · Minted · Listed · Sold**, a **Showcase only** filter beside Sort, search and pagination (12 per page); each card is one link to its project and reads the live market data. Query: `tab`, `q`, `sort`, `showcase=1`, `page` (old `tab=private|given|showcase` still open).
 - `/projects/[id]` (`?tab=media|network|contributors|customers`, `?view=buyer`, `?view=contributor&as=<id>`, `?list=1`, `?saved=<buildId>`) — **Project page**: header (rename, Activity, Business plan chips, one action pair, Preview as buyer), tabs **Products · Media · Network · Contributors · Customers**, and the rail **Marketplace · Outcome · Details · Legal · Versions · Project log · Manage**.
 - `/projects/[id]/products/[productId]` (`?tab=`, `?v=`) — **Product page**: header with **Open in editor**, tabs **Media · 3D model · PCB · Firmware code · Wiring · Parts · Contributors · Customers**, rail **Marketplace** (Physical/Virtual editions) and **Editor** (Load / Restore version).
 - `/projects/[id]/business-plan` — the project's seven-section **business plan** (owner): read, edit, versions, Regenerate.

@@ -1,5 +1,6 @@
 // B1 — My projects list state (spec §5.2): LST-4, LST-8, LST-9, LST-10, LST-13, LST-14,
-// LST-17, LST-23, LST-26, LST-27, LST-28, LST-31. filterProjects() is the one pass the page runs.
+// LST-23, LST-26, LST-27, LST-28, LST-31, as the owner simplified them on 2026-10-11 (five tabs,
+// Showcase a filter, no Source). filterProjects() is the one pass the page runs.
 // Compiled by tests/projects/tsconfig.json (A1) into .tmp-test, then:
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
 import { test } from "node:test";
@@ -9,9 +10,10 @@ import {
   DEFAULT_LIST_QUERY,
   LIST_TABS,
   SORT_OPTIONS,
-  SOURCE_OPTIONS,
   countLine,
   filterProjects,
+  inShowcase,
+  inTab,
   listQueryString,
   pageItemsFor,
   parseListQuery,
@@ -101,20 +103,29 @@ const ITEMS = [
 const view = (patch) => ({ ...DEFAULT_LIST_QUERY, ...patch });
 const ids = (r) => r.rows.map((row) => row.project.id);
 
-test("LST-4 · the outcome tabs add up to All but for an unreadable mint; Showcase is membership", () => {
+test("LST-4 · the outcome tabs add up to All, an unreadable mint included; Showcase is counted apart", () => {
   const r = filterProjects(ITEMS, DEFAULT_LIST_QUERY);
-  assert.deepEqual(r.counts, { all: 8, draft: 4, private: 1, given: 1, listed: 1, sold: 0, showcase: 2 });
-  assert.equal(r.counts.draft + r.counts.private + r.counts.given + r.counts.listed + r.counts.sold, r.counts.all - 1);
+  assert.deepEqual(r.counts, { all: 8, draft: 4, minted: 3, listed: 1, sold: 0 });
+  assert.equal(r.counts.draft + r.counts.minted + r.counts.listed + r.counts.sold, r.counts.all);
+  assert.equal(r.showcased, 2);
   assert.equal(r.total, 8);
   assert.equal(r.matched, 8);
   assert.equal(r.narrowed, false);
   assert.equal(countLine(r), "8 projects");
 });
 
-test("LST-4 / LST-10 · the tab row: the outcome words, Sold after Listed, then Showcase after the divider (P2-LISTING-18)", () => {
-  assert.deepEqual(LIST_TABS.map((t) => t.id), ["all", "draft", "private", "given", "listed", "sold", "showcase"]);
-  assert.deepEqual(LIST_TABS.map((t) => t.label), ["All", "Draft", "Private", "Given", "Listed", "Sold", "Showcase"]);
-  assert.deepEqual(LIST_TABS.filter((t) => t.divider).map((t) => t.id), ["showcase"]);
+test("LST-4 · the tab row is five: All · Draft · Minted · Listed · Sold, no divider and no Showcase tab (P2-LISTING-18)", () => {
+  assert.deepEqual(LIST_TABS.map((t) => t.id), ["all", "draft", "minted", "listed", "sold"]);
+  assert.deepEqual(LIST_TABS.map((t) => t.label), ["All", "Draft", "Minted", "Listed", "Sold"]);
+  assert.ok(LIST_TABS.every((t) => !("divider" in t)));
+});
+
+test("LST-4 · every status sits in All and in exactly one outcome tab", () => {
+  const home = { draft: "draft", private: "minted", given: "minted", minted: "minted", listed: "listed", paused: "listed", sold: "sold" };
+  for (const [status, tab] of Object.entries(home)) {
+    assert.ok(inTab({ status }, "all"), status);
+    assert.deepEqual(LIST_TABS.filter((t) => t.id !== "all" && inTab({ status }, t.id)).map((t) => t.id), [tab], status);
+  }
 });
 
 test("P2-LISTING-18 / P2-CUSTOMERS-14 · Listed holds live and paused; Sold is its own tab; ?tab=sold survives a reload", () => {
@@ -135,17 +146,35 @@ test("P2-LISTING-18 / P2-CUSTOMERS-14 · Listed holds live and paused; Sold is i
   assert.equal(parseListQuery(new URLSearchParams("tab=paused")).tab, "all", "there is no Paused tab");
 });
 
-test("LST-9 / LST-10 · a tab keeps its own projects; Showcase spans outcomes; an unreadable mint is under All only", () => {
+test("LST-9 · a tab keeps its own projects; Minted holds Private, Given and an unreadable mint", () => {
   assert.deepEqual(ids(filterProjects(ITEMS, view({ tab: "draft", sort: "name" }))), ["b1", "b2", "car", "garden"]);
-  assert.deepEqual(ids(filterProjects(ITEMS, view({ tab: "showcase" }))), ["lamp", "soil"]);
+  assert.deepEqual(ids(filterProjects(ITEMS, view({ tab: "minted", sort: "name" }))), ["kit", "lamp", "vault"]);
   assert.deepEqual(ids(filterProjects(ITEMS, view({ tab: "listed" }))), ["soil"]);
-  for (const tab of ["draft", "private", "given", "listed", "showcase"]) {
+  for (const tab of ["draft", "listed", "sold"]) {
     assert.ok(!ids(filterProjects(ITEMS, view({ tab }))).includes("vault"), tab);
   }
   assert.ok(ids(filterProjects(ITEMS, view({ tab: "all" }))).includes("vault"));
   const draft = filterProjects(ITEMS, view({ tab: "draft" }));
   assert.equal(draft.narrowed, true);
   assert.equal(countLine(draft), "4 of 8 projects");
+});
+
+test("LST-10 · Showcase only is a filter on any tab: it narrows the rows, never the tab counts", () => {
+  const all = filterProjects(ITEMS, view({ showcase: true }));
+  assert.deepEqual(ids(all), ["lamp", "soil"]);
+  assert.equal(all.narrowed, true);
+  assert.equal(countLine(all), "2 of 8 projects");
+  assert.deepEqual(all.counts, filterProjects(ITEMS, DEFAULT_LIST_QUERY).counts);
+  assert.deepEqual(ids(filterProjects(ITEMS, view({ showcase: true, tab: "minted" }))), ["lamp"]);
+  assert.deepEqual(ids(filterProjects(ITEMS, view({ showcase: true, tab: "listed" }))), ["soil"]);
+  const none = filterProjects(ITEMS, view({ showcase: true, tab: "draft" }));
+  assert.deepEqual([none.matched, none.counts.draft, none.showcased], [0, 4, 2], "Draft holds projects, none showcased");
+  assert.deepEqual(ids(filterProjects(ITEMS, view({ showcase: true, q: "probe" }))), ["soil"]);
+  assert.equal(inShowcase({ showcase: null }, false), true);
+  assert.equal(inShowcase({ showcase: null }, true), false);
+  assert.equal(inShowcase({ showcase: { at: T0 } }, true), true);
+  const unshowcased = ITEMS.map((i) => ({ ...i, summary: { ...i.summary, showcase: null } }));
+  assert.equal(filterProjects(unshowcased, view({ showcase: true })).showcased, 0);
 });
 
 test("LST-13 / LST-14 · search reaches every product and names the one that matched", () => {
@@ -186,13 +215,12 @@ test("matchProject · via only when the match lies wholly in a product other tha
   assert.deepEqual(matchProject(car, "", ""), { hit: true });
 });
 
-test("LST-17 · Source: AI build includes a build gone from this browser; By hand is the rest", () => {
-  assert.deepEqual(SOURCE_OPTIONS.map((o) => o.label), ["Any source", "AI build", "By hand"]);
-  assert.deepEqual(ids(filterProjects(ITEMS, view({ source: "build" }))), ["car", "kit", "soil", "vault"]);
-  assert.deepEqual(ids(filterProjects(ITEMS, view({ source: "hand" }))), ["garden", "lamp", "b1", "b2"]);
-  const both = filterProjects(ITEMS, view({ source: "build", tab: "showcase" }));
-  assert.deepEqual(ids(both), ["soil"]);
-  assert.equal(countLine(both), "1 of 8 projects");
+test("LST-17 retired · there is no Source filter: a source= link reads as the default view", () => {
+  for (const source of ["build", "hand", "any"]) {
+    assert.deepEqual(parseListQuery(new URLSearchParams(`source=${source}`)), DEFAULT_LIST_QUERY, source);
+  }
+  assert.ok(!("source" in DEFAULT_LIST_QUERY));
+  assert.equal(listQueryString(parseListQuery(new URLSearchParams("tab=draft&source=hand"))), "?tab=draft");
   const none = filterProjects(ITEMS, view({ tab: "listed", q: "battery" }));
   assert.deepEqual([none.matched, none.page, none.pageCount, none.rows.length], [0, 1, 1, 0]);
 });
@@ -228,20 +256,41 @@ test("LST-27 / LST-31 · twelve a page; a page past the end shows the last one",
 
 test("LST-28 · the URL carries the view, defaults left out, unknown values read as defaults", () => {
   assert.equal(listQueryString(DEFAULT_LIST_QUERY), "");
-  const full = { tab: "draft", q: "remote", sort: "name", source: "hand", page: 2 };
-  assert.equal(listQueryString(full), "?tab=draft&q=remote&sort=name&source=hand&page=2");
+  const full = { tab: "minted", q: "remote", sort: "name", showcase: true, page: 2 };
+  assert.equal(listQueryString(full), "?tab=minted&q=remote&sort=name&showcase=1&page=2");
   assert.deepEqual(parseListQuery(new URLSearchParams(listQueryString(full))), full);
   assert.equal(listQueryString(view({ q: "   " })), "");
   assert.equal(listQueryString(view({ q: "rc car" })), "?q=rc+car");
   assert.equal(parseListQuery(new URLSearchParams("q=rc+car")).q, "rc car");
-  assert.equal(parseListQuery(new URLSearchParams("tab=showcase")).tab, "showcase");
+  assert.equal(listQueryString(view({ showcase: true })), "?showcase=1");
   assert.deepEqual(parseListQuery(new URLSearchParams("")), DEFAULT_LIST_QUERY);
   assert.deepEqual(parseListQuery(new URLSearchParams("tab=completed&sort=views&source=ai&page=abc")), DEFAULT_LIST_QUERY);
+  for (const bad of ["true", "0", "yes", ""]) {
+    assert.equal(parseListQuery(new URLSearchParams(`showcase=${bad}`)).showcase, false, bad);
+  }
   for (const bad of ["0", "-2", "2.5", ""]) {
     assert.equal(parseListQuery(new URLSearchParams(`page=${bad}`)).page, 1, bad);
   }
   assert.equal(searchInUrl("   "), "");
   assert.equal(searchInUrl("remote "), "remote ");
+});
+
+test("LST-28 · a link from before the five tabs still opens: Private and Given under Minted, Showcase as the filter", () => {
+  const read = (qs) => parseListQuery(new URLSearchParams(qs));
+  assert.deepEqual(read("tab=private"), view({ tab: "minted" }));
+  assert.deepEqual(read("tab=given"), view({ tab: "minted" }));
+  assert.deepEqual(read("tab=showcase"), view({ showcase: true }));
+  assert.deepEqual(read("tab=private&showcase=1&q=lamp&page=2"), view({ tab: "minted", showcase: true, q: "lamp", page: 2 }));
+  assert.deepEqual(read("tab=showcase&sort=name&source=hand"), view({ showcase: true, sort: "name" }));
+  // The view they open is written back in the new words.
+  assert.equal(listQueryString(read("tab=private")), "?tab=minted");
+  assert.equal(listQueryString(read("tab=given&sort=oldest")), "?tab=minted&sort=oldest");
+  assert.equal(listQueryString(read("tab=showcase")), "?showcase=1");
+  // An inherited object key is not an old tab.
+  for (const key of ["constructor", "toString", "__proto__"]) assert.deepEqual(read(`tab=${key}`), DEFAULT_LIST_QUERY, key);
+  // …and they hold what they held: the old Private and Given tabs' projects are under Minted.
+  assert.deepEqual(ids(filterProjects(ITEMS, read("tab=private"))).sort(), ["kit", "lamp", "vault"]);
+  assert.deepEqual(ids(filterProjects(ITEMS, read("tab=showcase"))), ["lamp", "soil"]);
 });
 
 test("LST-26 / LST-8 · the count words", () => {

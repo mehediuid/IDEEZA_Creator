@@ -13,8 +13,8 @@ import {
   formatDateTime,
   formatShortDate,
   headerText,
+  hintOf,
   nextAction,
-  productLine,
   projectSummary,
   sourceTag,
 } from "../../.tmp-test/lib/manual/project-summary.js";
@@ -240,10 +240,10 @@ const sum = (p, brief = null, over = {}) =>
 
 const addBrief = (slug) => ({ kind: "add-brief", label: "Add Brief", href: `/project/${slug}/brief` });
 const viewBrief = (slug) => ({ kind: "view-brief", label: "View brief", href: `/project/${slug}/brief` });
-// Phase 2 §3.6.3: no open-editor kind (Open in editor is the product page's, decision 7); the
-// card shows `card`, which is `first` when it is violet and null otherwise (§2.5).
-const violetPair = (first) => ({ first, second: null, violet: true, card: first });
-const quietPair = (first) => ({ first, second: null, violet: false, card: null });
+// Phase 2 §3.6.3: no open-editor kind (Open in editor is the product page's, decision 7). The
+// card shows no button: its hint words the pair (hintOf).
+const violetPair = (first) => ({ first, second: null, violet: true });
+const quietPair = (first) => ({ first, second: null, violet: false });
 const DRAFT_CHIP = (line) => ({ word: "Draft", icon: "circle", badge: null, line });
 
 // ── LST-32 / COR-11: the card and the header derive identical strings ──
@@ -253,8 +253,8 @@ const FIXTURES = [
     p: car4,
     draft: null,
     chip: DRAFT_CHIP("Not briefed yet"),
-    productLine: "4 products · RC Car Controller, Remote Controller +2",
-    card: "AI build · Saved 4:12 PM",
+    hint: "Next: mint",
+    card: "4 products · Saved 4:12 PM",
     header: "4 products · Saved Sep 26, 2026",
     pair: violetPair(addBrief("car")),
     cover: "https://img.test/b_car.png",
@@ -264,8 +264,8 @@ const FIXTURES = [
     p: legacyHand,
     draft: null,
     chip: DRAFT_CHIP("Not briefed yet"),
-    productLine: "1 product · not named yet",
-    card: "By hand · Created Aug 3",
+    hint: "Next: mint",
+    card: "1 product · Created Aug 3",
     header: "1 product · Made by hand · Created Aug 3, 2026",
     pair: violetPair(addBrief("garden-weather-station")),
     cover: null,
@@ -276,14 +276,13 @@ const FIXTURES = [
     draft: soilDraft,
     // A v1 sell never reached a marketplace: it reads Private, and Add to marketplace lists it (P2-LISTING-24).
     chip: { word: "Private", icon: "lock", badge: SHOWCASE_BADGE, line: "Minted Sep 22 · not on the marketplace yet" },
-    productLine: "1 product · Soil Probe",
-    card: "AI build · Saved Sep 20",
+    hint: "Next: sell",
+    card: "1 product · Saved Sep 20",
     header: "1 product · Saved Sep 20, 2026",
     pair: {
       first: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil?list=1" },
       second: viewBrief("plant-soil-monitor"),
       violet: true,
-      card: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil?list=1" },
     },
     cover: "https://img.test/b_soil.png",
   },
@@ -292,8 +291,8 @@ const FIXTURES = [
     p: handJoined,
     draft: null,
     chip: DRAFT_CHIP("Not briefed yet"),
-    productLine: "2 products · Station Hub, Rain Gauge",
-    card: "AI build · Created Aug 3",
+    hint: "Next: mint",
+    card: "2 products · Created Aug 3",
     header: "2 products · Created Aug 3, 2026",
     pair: violetPair(addBrief("weather-station")),
     cover: "https://img.test/b_rain.png",
@@ -303,8 +302,8 @@ const FIXTURES = [
     p: purged,
     draft: null,
     chip: DRAFT_CHIP("Not briefed yet"),
-    productLine: "1 product · Lamp Base",
-    card: "AI build · not in this browser · Saved Dec 5, 2025",
+    hint: "Next: mint",
+    card: "1 product · Saved Dec 5, 2025",
     header: "1 product · Saved Dec 5, 2025 · build not in this browser",
     pair: violetPair(addBrief("desk-lamp")),
     cover: null,
@@ -314,8 +313,8 @@ const FIXTURES = [
     p: rebuilt,
     draft: null,
     chip: DRAFT_CHIP("Version 3 is ready to save"),
-    productLine: "4 products · RC Car Controller, Remote Controller +2",
-    card: "AI build · Saved 4:12 PM · Version 2",
+    hint: "Next: review version 3",
+    card: "4 products · Saved 4:12 PM",
     header: "4 products · Version 2 · Saved Sep 26, 2026",
     pair: violetPair({ kind: "review-version", label: "Review version 3", href: "/build/b_v3" }),
     cover: "https://img.test/b_v2.png",
@@ -326,10 +325,10 @@ const FIXTURES = [
     draft: null,
     raw: "{not json",
     chip: { word: "Minted", icon: "hexagon", badge: SHOWCASE_BADGE, line: "Minted · the brief record isn't in this browser" },
-    productLine: "1 product · Feeder",
-    card: "By hand · Created Aug 3",
+    hint: "Record not in this browser",
+    card: "1 product · Created Aug 3",
     header: "1 product · Made by hand · Created Aug 3, 2026",
-    pair: { first: null, second: null, violet: false, card: null },
+    pair: { first: null, second: null, violet: false },
     cover: null,
   },
 ];
@@ -351,24 +350,21 @@ for (const f of FIXTURES) {
     // What both surfaces print is the same string.
     assert.deepEqual(card.chip, header.chip);
     assert.equal(card.count, header.count);
-    assert.equal(card.version, header.version);
-    if (header.pair.card === null) assert.equal(card.action, null);
-    else {
-      const { ariaLabel, ...cardButton } = card.action;
-      assert.deepEqual(cardButton, header.pair.card);
-      assert.equal(ariaLabel, `${header.pair.card.label} for ${f.p.name}`);
-    }
-    const cardTime = card.meta.find((m) => m.kind === "time").time;
+    // The card's hint reads the header's pair (COR-11): the same summary, one chooser.
+    assert.equal(card.hint, hintOf(pageSide));
     const headerTime = header.meta.find((m) => m.kind === "time").time;
-    assert.equal(cardTime.dateTime, headerTime.dateTime);
-    assert.equal(cardTime.title, headerTime.title);
-    assert.equal(cardTime.text.split(" ")[0], headerTime.text.split(" ")[0]); // "Saved" | "Created"
-    assert.ok(card.productLine.startsWith(`${header.count} · `));
+    assert.equal(card.time.dateTime, headerTime.dateTime);
+    assert.equal(card.time.title, headerTime.title);
+    assert.equal(card.time.text.split(" ")[0], headerTime.text.split(" ")[0]); // "Saved" | "Created"
+    assert.ok(card.line.startsWith(`${header.count} · `));
+    assert.ok(card.line.endsWith(card.time.text));
+    // The source and the version stay on the project page (owner, 2026-10-11).
+    assert.doesNotMatch(card.line, /AI build|By hand|Version|builds|not in this browser/);
 
     // …and it is exactly this.
     assert.deepEqual(header.chip, f.chip);
-    assert.equal(card.productLine, f.productLine);
-    assert.equal(card.metaText, f.card);
+    assert.equal(card.line, f.card);
+    assert.equal(card.hint, f.hint);
     assert.equal(header.metaText, f.header);
     assert.deepEqual(header.pair, f.pair);
     assert.equal(pageSide.cover, f.cover);
@@ -434,7 +430,7 @@ test("§4.1 row 6 · Private, and its showcased form; showcasing never changes t
   assert.equal(s.mintedAt, MINTED);
   // Phase 2 §2.2: a Private project's violet step is Add to marketplace, with View brief beside it.
   const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_lamp?list=1" };
-  assert.deepEqual(s.next, { first: add, second: viewBrief("night-light"), violet: true, card: add });
+  assert.deepEqual(s.next, { first: add, second: viewBrief("night-light"), violet: true });
 
   const shown = sum({ ...minted, showcasedAt: NOW }, d);
   assert.deepEqual(shown.showcase, { at: NOW });
@@ -471,7 +467,7 @@ test("§4.1 row 9 · Minted, the brief record unreadable (LST-9) → no pair (Ph
   assert.equal(s.statusLine, "Minted · the brief record isn't in this browser");
   assert.equal(s.mintedAt, null);
   assert.deepEqual(s.showcase, { at: MINTED });
-  assert.deepEqual(s.next, { first: null, second: null, violet: false, card: null });
+  assert.deepEqual(s.next, { first: null, second: null, violet: false });
 });
 
 // ── Modifiers and the rules around them ──
@@ -522,18 +518,16 @@ test("Products, not builds; a dropped product stays (LST-37, COR-42, COR-108)", 
   );
   assert.deepEqual(s.version, { kind: "single", v: 2 });
   assert.deepEqual(s.when, { label: "Saved", at: TODAY_412 });
-  assert.equal(productLine({ products: [{ id: "p1", name: "  ", description: "" }] }), "1 product · not named yet");
-  assert.equal(
-    productLine({ products: [{ id: "a", name: "A", description: "" }, { id: "b", name: "B", description: "" }] }),
-    "2 products · A, B",
-  );
+  // The card counts products; the names are the project page's (owner, 2026-10-11).
+  assert.equal(cardText(s, NOW).line, "4 products · Saved 4:12 PM");
 });
 
 test("Several lineages read as builds (LST-42)", () => {
   const other = build("b_other", "chat_other", SEP20, [], { title: "Extra", projectId: "proj_car" });
   const s = sum(car4, null, { builds: [...BUILDS, other] });
   assert.deepEqual(s.version, { kind: "builds", k: 2 });
-  assert.equal(cardText(s, NOW).version, "2 builds");
+  assert.equal(headerText(s).version, "2 builds");
+  assert.equal(cardText(s, NOW).line, "4 products · Saved 4:12 PM", "the card leaves the build count to the page");
   assert.equal(headerText(s).metaText, "4 products · 2 builds · Saved Sep 26, 2026");
 });
 
@@ -544,7 +538,7 @@ test("The source tag (LST-38, COR-55)", () => {
   assert.deepEqual(sum(car4).source, { kind: "build", builds: 1 });
   assert.deepEqual(sum(purged).source, { kind: "build-gone" });
   assert.deepEqual(sum(legacyHand).source, { kind: "hand" });
-  assert.equal(cardText(sum(purged), NOW).sourceTip, BUILD_GONE_TIP);
+  assert.equal(cardText(sum(purged), NOW).line, "1 product · Saved Dec 5, 2025", "the card leaves the source to the rail");
 });
 
 test("The one date formatter (LST-41, COM-7)", () => {

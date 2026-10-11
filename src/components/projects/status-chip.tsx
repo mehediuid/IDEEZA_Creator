@@ -1,10 +1,11 @@
 "use client";
 
-// The two badges that ride on the My projects card (B2) and the project
-// details header alike (B2 amendment: this file is shared so C2 doesn't
-// build them again). §4's icon table: Draft ○ circle · Private lock · Given
-// hand-heart · Listed tag · Paused pause · Sold badge-check · Minted hexagon ·
-// Showcase eye (Phase 2 spec §3.2).
+// The status chip, shared by the My projects card (B2) and the project details
+// header (B2 amendment: this file is shared so C2 doesn't build it again), and
+// the header's Showcase badge; on a card, Showcase is the eye inside the chip.
+// §4's icon table: Draft ○ circle · Private lock · Given hand-heart · Listed
+// tag · Paused pause · Sold badge-check · Minted hexagon · Showcase eye (Phase
+// 2 spec §3.2).
 
 import * as React from "react";
 import {
@@ -36,10 +37,11 @@ export const ICONS: Record<IconName, IconValue> = {
 };
 
 /** LST-35: word + icon, sentence case; Draft neutral, every minted word
- *  success tone; the same word as the details chip — both callers pass
- *  `summary.status` / `summary.statusWord`, straight from `STATUS_WORD`
- *  (project-summary.ts), so they can't drift. Never violet. */
-export function StatusChip({ status, word }: { status: ProjectStatus; word: string }) {
+ *  success tone; the same word as the details chip — both callers pass the
+ *  word straight from `STATUS_WORD` (project-summary.ts), so they can't drift.
+ *  Never violet. `showcased` adds the card's eye (LST-65): it sits above the
+ *  card's stretched link so its title shows on hover. */
+export function StatusChip({ status, word, showcased = false }: { status: ProjectStatus; word: string; showcased?: boolean }) {
   const neutral = status === "draft";
   return (
     <Badge
@@ -48,6 +50,16 @@ export function StatusChip({ status, word }: { status: ProjectStatus; word: stri
       className="h-[22px] items-center gap-[4px] px-[8px] py-0 text-sm font-semibold leading-none"
     >
       {word}
+      {showcased && (
+        <span
+          role="img"
+          aria-label={SHOWCASE_BADGE.ariaLabel}
+          title={SHOWCASE_BADGE.ariaLabel}
+          className="pointer-events-auto relative z-[1] ml-[2px] inline-flex size-[12px] items-center justify-center"
+        >
+          <Icon icon={ICONS[SHOWCASE_BADGE.icon]} size={12} />
+        </span>
+      )}
     </Badge>
   );
 }

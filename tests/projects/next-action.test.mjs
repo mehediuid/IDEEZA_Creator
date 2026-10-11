@@ -1,5 +1,6 @@
 // T10 — nextAction() v2 (Phase 2 spec §2.2's table, §3.6.3): every row of the
-// action pair, the card's one button, and the kinds that no longer exist.
+// action pair, the card's hint that words it (owner, 2026-10-11: the card has
+// no button), and the kinds that no longer exist.
 // Compiled by tests/projects/tsconfig.json:
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
 import { test } from "node:test";
@@ -9,6 +10,7 @@ import {
   NO_SHARE_TO_SELL,
   briefOpensFor,
   cardText,
+  hintOf,
   nextAction,
   projectSummary,
 } from "../../.tmp-test/lib/manual/project-summary.js";
@@ -49,18 +51,19 @@ const sale = (over = {}) => ({
 });
 const market = (o = {}) => ({ ...EMPTY_MARKET, ...o });
 const SELL = draft({ intent: "sell", mintedAt: MINTED, network: "mumbai" });
-const pairOf = (p, brief, m = EMPTY_MARKET, extra = {}) =>
-  projectSummary(p, { builds: [], brief, videoJobs: [], now: NOW, market: m, ...extra }).next;
+const summaryOf = (p, brief, m = EMPTY_MARKET, extra = {}) =>
+  projectSummary(p, { builds: [], brief, videoJobs: [], now: NOW, market: m, ...extra });
+const pairOf = (p, brief, m = EMPTY_MARKET, extra = {}) => summaryOf(p, brief, m, extra).next;
 
 const BRIEF = "/project/car/brief";
 const LIST = "/projects/proj_car?list=1";
 const viewBrief = { kind: "view-brief", label: "View brief", href: BRIEF };
 const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: LIST };
-const violet = (first, second = null) => ({ first, second, violet: true, card: first });
-const quiet = (first, second = null) => ({ first, second, violet: false, card: null });
+const violet = (first, second = null) => ({ first, second, violet: true });
+const quiet = (first, second = null) => ({ first, second, violet: false });
 const NEVER = new Set(["open-editor", "relist", "view-listing"]);
 
-/** §2.2, row by row. Each row: the facts, the pair, and the card's button. */
+/** §2.2, row by row. Each row: the facts and the pair. */
 const build = (id, chatId, createdAt, over = {}) => ({
   id, chatId, conceptImageUrl: "", conceptPrompt: "", title: "RC Car", summary: "", parts: [], conceptNumber: "1",
   status: "running", estimateMin: 1, creditsCharged: true, creditsRefunded: false,
@@ -140,8 +143,7 @@ const ROWS = [
 for (const row of ROWS) {
   test(`§2.2 · ${row.name}`, () => {
     assert.deepEqual(row.pair, row.want);
-    // `card` is `first` when violet, else null (§3.6.3) — a card never shows "View …".
-    assert.deepEqual(row.pair.card, row.pair.violet ? row.pair.first : null);
+    assert.ok(!("card" in row.pair), "the card shows no button, so the pair carries none for it");
     for (const a of [row.pair.first, row.pair.second]) if (a) assert.ok(!NEVER.has(a.kind), a.kind);
   });
 }
@@ -157,11 +159,48 @@ test("§3.6.3 · the kinds open-editor, relist and view-listing never appear, in
   );
 });
 
-test("§2.5 · the card's button is the pair's violet step, with its accessible name; no button otherwise", () => {
-  const s = projectSummary(project({ mint: lazy }), { builds: [], brief: SELL, videoJobs: [], now: NOW });
-  assert.deepEqual(cardText(s, NOW).action, { ...add, ariaLabel: "Add to marketplace for Car" });
-  const listed = projectSummary(project({ mint: lazy }), { builds: [], brief: SELL, videoJobs: [], now: NOW, market: market({ listings: [listing()] }) });
-  assert.equal(cardText(listed, NOW).action, null);
+/** The card's hint, state by state: the next step when there is one, else the outcome. */
+const HINTS = [
+  ["Draft, a newer version ready", projectSummary(built, { builds: BUILDS, brief: null, videoJobs: [], now: NOW }), "Next: review version 2"],
+  ["Draft, Brief started", summaryOf(project({ status: "draft" }), draft({ intent: "sell" }, "preview")), "Next: mint"],
+  ["Draft, no Brief", summaryOf(project({ status: "draft" }), null), "Next: mint"],
+  ["Draft, a newer version still building", projectSummary(built, { builds: [BUILDS[0], { ...BUILDS[1], items: BUILDS[1].items.map((i) => ({ ...i, status: "running", progress: 50 })) }], brief: null, videoJobs: [], now: NOW }), "Next: mint"],
+  ["Private, never listed", summaryOf(project({ mint: lazy }), SELL), "Next: sell"],
+  ["Private, the listing removed", summaryOf(project({ mint: lazy }), SELL, market({ listings: [listing({ status: "removed", endedAt: NOW })] })), "Next: sell"],
+  ["Private, the maker holds 0 %", summaryOf(project({ mint: lazy, contributors: [coOwnerAll] }), SELL), "Minted privately"],
+  ["Given", summaryOf(project(), draft({ intent: "give", mintedAt: MINTED, license: "mit" })), "Given to the community"],
+  ["Listed · Buy now", summaryOf(project({ mint: lazy }), SELL, market({ listings: [listing()] })), "On the marketplace"],
+  ["Listed · auction running", summaryOf(project({ mint: lazy }), SELL, market({ listings: [listing({ type: "auction", endsAt: NOW + 5 * 60 * MIN })] })), "On the marketplace"],
+  ["Paused", summaryOf(project({ mint: lazy }), SELL, market({ listings: [paused] })), "Listing paused"],
+  ["Sold, the maker still holds a share", summaryOf(project({ mint: lazy }), SELL, market({ listings: [listing()], sales: [sale()] })), "Next: sell another share"],
+  [
+    "Sold in full",
+    summaryOf(project({ mint: lazy }), SELL, market({ listings: [listing({ percentSelling: 100 })], sales: [sale({ item: { nft: "main", sharePct: 100 } })] })),
+    "Sold out",
+  ],
+  ["Minted, record unreadable", summaryOf(project(), null), "Record not in this browser"],
+];
+
+for (const [name, s, want] of HINTS) {
+  test(`card hint · ${name} → "${want}"`, () => {
+    assert.equal(hintOf(s), want);
+    assert.equal(cardText(s, NOW).hint, want);
+    assert.doesNotMatch(want, /\bview\b|\bbrief\b/i, "the hint never offers View brief, nor speaks of the Brief");
+  });
+}
+
+test("card hint · every status is reached, and Showcase never changes it (§3.8)", () => {
+  assert.deepEqual(
+    [...new Set(HINTS.map(([, s]) => s.status))].sort(),
+    ["draft", "given", "listed", "minted", "paused", "private", "sold"],
+  );
+  const shown = summaryOf(project({ mint: lazy, showcasedAt: NOW }), SELL);
+  assert.ok(shown.showcase);
+  assert.equal(hintOf(shown), "Next: sell");
+  // The hint reads the pair: a step the project page doesn't offer is never named.
+  const blocked = summaryOf(project({ mint: lazy, contributors: [coOwnerAll] }), SELL);
+  assert.equal(blocked.next.first.blocked, NO_SHARE_TO_SELL);
+  assert.equal(hintOf(blocked), "Minted privately");
 });
 
 test("§3.6.3 · the facts are optional: a v1 caller gets the maker holding everything, nothing locked", () => {

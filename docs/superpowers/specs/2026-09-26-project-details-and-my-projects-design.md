@@ -1396,16 +1396,16 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 | LST-1 | **Header.** h1 "My projects"; an intro of at most 62ch: *"Every project you've saved — from an AI build or started by hand. They're stored in this browser."*; `document.title` "My projects · IDEEZA". |
 | LST-2 | **"New project"** (owner decision O11) — a secondary button, right-aligned in the header, that links to Home (`/`), where creation lives. No creation flow runs on this page. |
 | LST-3 | **Gutters and width.** 16 px below a 640 px viewport, 32 px from 640; content capped at 1280 px and centred; nothing scrolls sideways at 400 px. |
-| LST-4 | **The tab set** (amended, §7; owner decisions O5, O6): exactly **All · Draft · Private · Given · Listed · Showcase**, one selected, each with a live count. Draft · Private · Given · Listed are the outcome tabs: every project is in exactly one, so their counts add up to All — except LST-9. **Showcase** is a membership tab, last, after a hairline divider: its projects are also counted in their outcome tab, and its count is outside that sum. |
+| LST-4 | **The tab set** (amended 2026-10-11, owner: My projects simplified): exactly **All · Draft · Minted · Listed · Sold**, one selected, each with a live count. Minted holds Private, Given and an unreadable mint (LST-9); Listed holds live and paused listings. Every project is in All and in exactly one outcome tab, so their counts add up to All. Showcase is not a tab: it is the **Showcase only** filter (LST-10). A saved `tab=private` or `tab=given` opens Minted; `tab=showcase` opens All with the filter on. |
 | LST-6 | **Removed tabs.** Completed and Utility NFT are removed (they held the same set). All is the landing tab. "Utility NFT" is kept free for real benefit NFTs (LATER). |
 | LST-7 | **Counts** read "—" until the projects and every brief draft have been read; they are read again on window focus and on `storage` events, so a mint in another tab moves the card. |
 | LST-8 | **Tab semantics.** A real ARIA tablist: one Tab stop, ← → Home End, `aria-controls` on one tabpanel, accessible names that carry the count ("Draft, 9 projects"). Changing tab resets the page to 1 and keeps the search and facets. |
 | LST-9 | **Brief record missing.** `status: "completed"` with a missing or corrupt draft shows the chip **Minted**, under All only among the outcome tabs — never under a guessed one. When showcased it is also under Showcase, which reads the project record, not the draft. |
-| LST-10 | **The Showcase tab** (amended, owner decision O5): the projects whose `showcasedAt` is a time (COR-105), on any outcome, labelled **Showcase** — the badge's word. It reads the project record, never the brief draft, and its order and search follow the rest of the list. A project leaves it the moment the maker stops showcasing. |
+| LST-10 | **The Showcase only filter** (amended 2026-10-11, owner: My projects simplified): a toggle button beside Sort, `aria-pressed`, in the URL as `showcase=1`. On, it keeps the projects whose `showcasedAt` is a time (COR-105), on any tab; it narrows the rows, not the tab counts. It reads the project record, never the brief draft. Finding nothing: "Nothing showcased yet", or "Nothing showcased in {Tab}" when another tab holds one. |
 | LST-13 | **What search matches:** the project name, every product name (`products[].name`, falling back to `productName`), the description and every product description. Case- and accent-insensitive, trimmed; with several words all must match. "remote" finds Car's Remote Controller. |
 | LST-14 | **Which product matched.** When the only match is in a product other than the first, the product line reads "… · matches Remote Controller". |
 | LST-15 | **Search controls.** Enabled on every tab. Placeholder *"Search projects and products"*; a clear (×) control; "/" focuses search unless focus is in another field (⌘K stays with the command palette); Esc clears it while focused. |
-| LST-17 | **Source filter**, in the Figma's "Status" slot: **Any source · AI build · By hand**. "AI build" = a saved build points at the project, or `project.buildId` is set (also when that build is gone). |
+| LST-17 | **Source filter** — removed (amended 2026-10-11, owner: My projects simplified). A `source=` link is ignored. The source stays on the project page (COR-55). |
 | LST-18 | **Facets combine** with AND, each an independent single-select that resets with "Any …". A facet not on "Any …" shows as a removable chip on the row under the toolbar; **Clear filters** resets every facet and leaves the search. One control per facet, in the toolbar. |
 | LST-23 | **Sort:** **Recently updated** (default; `updatedAt`, newest first) · **Newest to oldest** (`createdAt`) · **Oldest to newest** (`createdAt`) · **Name A–Z**; ties by name, then id. |
 | LST-26 | **Count line**, left on the row under the toolbar: "38 projects", or "4 of 38 projects" when a tab, search or facet narrows the view; on every tab; announced in a polite live region after each change. |
@@ -1413,39 +1413,39 @@ export function attach(p: ManualProject, job: BuildJob, lineage: BuildJob[], now
 | LST-28 | **View state in the URL** (`ListQuery`, §5.1.3), written with `replace`, defaults left out; Back from a project returns the same view at the same scroll position. |
 | LST-31 | **After a delete** (amended: NOW, because delete ships NOW): the project leaves the list and the counts at once; a page left empty shows the previous page. |
 | LST-33 | **Cover**, 16:10: `coverOf()`, else a neutral placeholder tile. No carousel dots. A failed image shows the caption *"Image didn't load"* on the placeholder. `loading="lazy" decoding="async"`. |
-| LST-35 | **Status chip**, top-right over the cover (beside the title on row cards): word + icon from §4 (Draft · Private · Given · Listed · Minted), sentence case, 12 px semibold; Draft neutral, the minted words success; the same word as the details chip; never violet. |
-| LST-65 | **(new) The Showcase badge** on the card, when `summary.showcase` is set: the eye icon and "Showcase", info tone, 12 px semibold, to the left of the status chip over the cover (beside the chip on row cards, wrapping under the title when narrow); the same badge as the details header (COR-9); never violet; not a control. Its accessible name is "Showcased". |
+| LST-35 | **Status chip**, top-right over the cover (beside the title on row cards): word + icon from §4 (Draft · Private · Given · Listed · Paused · Sold · Minted), sentence case, 12 px semibold; Draft neutral, the minted words success; the same word as the details chip; never violet. The card's only badge (LST-65). |
+| LST-65 | **Showcase on the card** (amended 2026-10-11, owner: My projects simplified): no second badge. A showcased project's chip carries a small eye icon, `aria-label` and title "Showcased". The details header keeps its Showcase badge (COR-9). |
 | LST-36 | **Title:** the project name as an h3, 16 px, up to 2 lines, the full name as a tooltip; the card's link to `/projects/<id>`, stretched over the cover and title. The small "Details" pill is removed. |
-| LST-37 | **Product line:** "4 products · RC Car Controller, Remote Controller +2"; "1 product" in the singular; an unnamed product reads "not named yet", never "Untitled product". The count comes from the shared selector: products, not builds. |
-| LST-38 | **Source tag** in the meta row: **"AI build"**, **"By hand"** or **"AI build · not in this browser"**, the last with the tooltip *"The build this project came from isn't stored in this browser any more. Its products are still listed."* The same words as the details Source row. |
+| LST-37 | **The card's one line** (amended 2026-10-11, owner: My projects simplified): "{N} products · Saved {when}" ("1 product" in the singular; "Created" for a hand-made project, LST-41). The count comes from the shared selector: products, not builds. Product names stay on the project page. |
+| LST-38 | **Source tag** — removed from the card (amended 2026-10-11, owner: My projects simplified); the details Source row keeps the words (COR-55). |
 | LST-39 | **Status line**, under the product line, up to 2 lines, from §4.1. |
-| LST-40 | **Next-action button:** one full-width secondary button with a boundary of at least 3:1, showing `next.first` (Review version {n} · Continue Brief · Add Brief · Open in editor), `aria-label` "{label} for {project}", "Opening…" while it navigates, a second press blocked. Never "Resume —", never "Next:", never a step bar. |
+| LST-40 | **No button** (amended 2026-10-11, owner: My projects simplified): the whole card is one link to `/projects/<id>` (the title link stretched over it), with a visible focus ring and hover feedback. At its foot, bottom-aligned so a row's lines up, a plain hint with a small → icon (`hintOf`): Next: review version {n} · Next: mint · Next: sell · Minted privately · Given to the community · On the marketplace · Listing paused · Next: sell another share · Sold out · Record not in this browser. |
 | LST-41 | **Date** (amended): the meta-line fact — "Saved {when}" for a built project, "Created {when}" for a hand-made one — where {when} is the time today, "Mon D" this year and "Mon D, YYYY" earlier; a `<time dateTime>` with the full date in `title`; the details page's formatter in its short form. |
-| LST-42 | **Version** (amended: NOW) in the meta row: "Version {v}" when one lineage has more than one version, "{k} builds" with several lineages; absent otherwise. |
+| LST-42 | **Version** — removed from the card (amended 2026-10-11, owner: My projects simplified); the details meta line keeps it (COR-10). |
 | LST-43 | **New version waiting** (amended: NOW): when a newer build of the project's chat is ready and unsaved, the status line reads "Version {n} is ready to save" and the button **Review version {n}** opens that build. Never on a minted project. |
 | LST-49 | **No ⋮ on cards.** Its three items have homes on the details page: Edit → inline rename and description; Delete → Manage; Add New Product → the "Add a product" tile (NEXT). |
 | LST-51 | **Loading:** six skeleton cards in the grid shape (cover block, two bars, a status-line bar, a button block); the tab row, search, dropdowns and count row render normally with counts "—"; no stat placeholders; a static shimmer under reduced motion. |
-| LST-52 | **No projects at all:** `StateCard` "No projects yet" with today's body — *"A project starts on Home. Describe an idea and Generate with AI, then press Save Project on the finished build — or pick Build manually to start from an empty board. Either way it lands here."* — and **Go to Home**, the page's one violet button; tabs and toolbar hidden. |
+| LST-52 | **No projects at all** (amended 2026-10-11, owner: My projects simplified): `StateCard` "No projects yet", body *"Describe an idea on Home and save the build. It shows up here."*, and **Go to Home**, the page's one violet button; tabs and toolbar hidden. |
 | LST-53 | **Empty tab** — teaching copy, no button, tabs still visible (table below). |
-| LST-54 | **No match:** *"No matches for "{q}""*, body *"Nothing in {tab} has that in a project or product name or description."*, **Clear search**, and **Search all projects** when a tab or facet also narrows the view. |
+| LST-54 | **No match:** *"No matches for "{q}""*, body *"Nothing in {tab} has that in a project or product name or description."* ("(Showcase only)" after the tab when the filter is on), **Clear search**, and **Search all projects** when a tab or the Showcase filter also narrows the view. |
 | LST-56 | **Grid columns** by a container query on the content box: 1 below 560 px, 2 from 560, 3 from 900; a card is never narrower than 260 px. |
-| LST-57 | **Row cards** below a 560 px content box: a 96 × 60 cover, the chip beside the title, the lines stacked, a full-width button; tabs wrap; search takes a row; Source and Sort share one. |
+| LST-57 | **Row cards** below a 560 px content box: a 96 × 60 cover, the chip beside the title, the line, the hint under it; tabs wrap; search takes a row; Showcase only and Sort share one (amended 2026-10-11, owner: My projects simplified). |
 | LST-58 | **Tokens and atoms only:** `SearchInput`, `SelectMenu`, `Button`, `ButtonGroup`, `StateCard`, `Badge` (extended with the status tones); `bg-bg-brand`, never `bg-violet-*`; meta ≥ 12 px, lines 14 px, titles 16 px. |
 | LST-59 | **Focus and targets:** rings offset 2 px in the surface colour on filled controls; tabs, card buttons and pagination 36 px; touch rows ≥ 44 px. |
 | LST-60 | **Heading outline:** h1 "My projects"; a visually hidden h2 "{Tab} projects", which is the results heading and the focus target; card titles h3. |
 
-**Empty-tab copy (LST-53)**
+**Empty-tab copy (LST-53)** (amended 2026-10-11, owner: My projects simplified: one short sentence, no Brief jargon)
 
 | Tab | Title | Body |
 |---|---|---|
-| Draft | No drafts | "Every project here has been minted. A build you save starts as a draft." |
-| Private | Nothing saved as private yet | "In a project's brief, choose Save as Private and mint. Only you can see it." |
-| Given | Nothing given to the community yet | "In a project's brief, choose Give to Community and mint." |
-| Listed | Nothing listed yet | "In a project's brief, choose Sell Your Idea and mint. It goes on sale when the marketplace opens." |
-| Showcase | Nothing showcased yet | "Showcase a minted project from its page, or when its brief finishes. Nothing is posted until Innovations opens." |
+| Draft | Nothing in progress | "A build you save starts here." |
+| Minted | Nothing minted yet | "Open a draft and mint it." |
+| Listed | Nothing on the marketplace | "Open a minted project and sell it." |
+| Sold | Nothing sold yet | — |
+| Showcase only (filter) | Nothing showcased yet | — |
 
-**Keyboard order:** New project → the tablist (one stop) → search → Source →
-Sort → per card, the title link then the button → pagination.
+**Keyboard order:** New project → the tablist (one stop) → search → Showcase
+only → Sort → per card, its one link → pagination.
 
 ### 5.3 The project page: shell and states
 
