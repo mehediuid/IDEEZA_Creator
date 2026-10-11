@@ -2,9 +2,10 @@
 
 // ProjectPage is /projects/[id] (spec §5.3; Phase 2 §2.2, §3.10; Build and
 // Earn P0). For the owner it is the engineering page: the header with its
-// stage line and the one "Earn from this project" button, the tabs Products ·
-// Media · Network · Team, and the rail Details · Versions · Showcase · Log ·
-// Manage. Everything that makes money lives in Earn (/projects/<id>/earn).
+// stage line, the one "Earn from this project" button and the ⋯ menu (Edit
+// name and description, Share to Innovations, Activity, Delete project), the
+// tabs Products · Media · Network · Team, and the rail About · Versions ·
+// Recent. Everything that makes money lives in Earn (/projects/<id>/earn).
 // The buyer's side (`buyerSide`: Preview as buyer) still reads the page as
 // before — the Marketplace and Legal blocks, the Utility pill — because the
 // public listing pages are not changed in P0, and Explore marketplace's
@@ -31,7 +32,6 @@ import { buyerSide, parseProjectTab } from "@/lib/manual/project-route";
 import { useJourney } from "@/lib/manual/journey-store";
 import { productsTabView } from "@/lib/manual/products-tab-view";
 import { BuyerPreviewBanner, isBuyerPreview, previewQuery } from "./buyer-preview";
-import { ProjectActivityChip } from "./activity-chip";
 import { ContributorPreviewBanner } from "./contributor-preview-banner";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
@@ -41,8 +41,6 @@ import { ProductsTab } from "./products-tab";
 import { RailDetails } from "./rail-details";
 import { RailLegal } from "./rail-legal";
 import { RailLog } from "./rail-log";
-import { RailManage } from "./rail-manage";
-import { RailShowcase } from "./rail-showcase";
 import { RailVersions } from "./rail-versions";
 import { ProjectShell } from "./shell";
 import { SavedBanner } from "./saved-banner";
@@ -113,11 +111,6 @@ function PreviewBannerSlot({ viewer }: SlotProps) {
   return isBuyerPreview(viewer) ? <BuyerPreviewBanner /> : null;
 }
 
-// T20's wiring: the Activity chip (P2-TABS-5), in the title row.
-function ActivitySlot(props: SlotProps) {
-  return <ProjectActivityChip {...props} />;
-}
-
 // T17's wiring (P2-CONTRIB-12): the contributor-preview banner is its own
 // entry in `banners`, after the buyer-preview banner.
 function ContributorPreviewBannerSlot({ viewer }: SlotProps) {
@@ -148,11 +141,6 @@ function UtilityPillSlot(props: SlotProps) {
   return buyerSide(props.viewer) ? <UtilityPill {...props} /> : null;
 }
 
-// P0's Showcase block, lifted out of the Outcome block (rail-showcase.tsx).
-function ShowcaseSlot(props: SlotProps) {
-  return <RailShowcase {...props} />;
-}
-
 // ─────────────────────────── the page's composition ───────────────────────────
 
 /** Exported for its `banners`, which the product page shows too, so a preview reads the same
@@ -165,9 +153,6 @@ export const SLOTS: ProjectSlots = {
   notice: SavedBanner,
   header: HeaderSlot,
   headerParts: {
-    titleRow: [
-      ActivitySlot,
-    ],
     statusRow: [
       UtilityPillSlot,
     ],
@@ -186,9 +171,7 @@ export const SLOTS: ProjectSlots = {
     details: DetailsSlot,
     legal: LegalSlot,
     versions: RailVersions,
-    showcase: ShowcaseSlot,
     log: RailLog,
-    manage: RailManage,
   },
 };
 

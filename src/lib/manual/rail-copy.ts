@@ -166,7 +166,7 @@ export type OutcomeSummary = Pick<ProjectSummary, "status" | "showcase"> & Parti
 /** The Outcome block, in words (§4.1's Outcome column; P2-MINT-10, P2-LISTING-23, P2-VIDEO-15).
  *  `showcaseGate` is `view.videos.readiness.showcase`: without it the Showcase row reads v1's notes. */
 export function outcomeView(c: ProjectCommerce, s: OutcomeSummary, showcaseGate?: Readiness): OutcomeView {
-  const meta = [STATUS_WORD[s.status], ...(s.showcase ? ["Showcased"] : [])].join(" · ");
+  const meta = [STATUS_WORD[s.status], ...(s.showcase ? ["Shared"] : [])].join(" · ");
   const demo = c.record !== null;
   const undecided = (subline: string): OutcomeView => ({ subline, clipLine: null, minted: null, mint: c.mint, demo, meta });
   const showcase = showcaseRow(

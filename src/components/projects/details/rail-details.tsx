@@ -1,6 +1,6 @@
 "use client";
 
-// The rail's Details block (COR-55): where the project came from, the day it
+// The rail's About block (COR-55; "Details" until 2026-10-11): where the project came from, the day it
 // was made when that isn't the meta line's date, and where it is kept. The
 // build's chat isn't here: each lineage's chat heads its group in the
 // Versions block (owner decision O9), so the chat has one home on the page.
@@ -31,9 +31,11 @@ export function RailDetails({
     when: summary.when,
     createdAt: project.createdAt,
     ownerFacts: can(viewer, "facts.seeOwnerOnly"),
-  });
+    // "By hand" is already the header's meta line ("Made by hand · …"): said once (owner, 2026-10-11).
+  }).filter((r) => !(r.key === "source" && summary.source.kind === "hand"));
+  if (rows.length === 0) return null;
   return (
-    <RailBlock title="Details">
+    <RailBlock title="About">
       <RailFacts>
         {rows.map((r) => (
           <RailFact key={r.key} label={r.label}>

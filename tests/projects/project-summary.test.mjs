@@ -478,7 +478,7 @@ test("Showcase is never on a Draft, and only a time counts (COR-105)", () => {
   const never = { ...listedShowcased };
   delete never.showcasedAt;
   assert.equal(sum(never, soilDraft).showcase, null);
-  assert.deepEqual(SHOWCASE_BADGE, { word: "Showcase", icon: "eye", ariaLabel: "Showcased" });
+  assert.deepEqual(SHOWCASE_BADGE, { word: "Shared", icon: "eye", ariaLabel: "Shared to Innovations" });
 });
 
 test("The preview clip no longer modifies the line (P2-VIDEO-15: video status lives in Media and the cards)", () => {

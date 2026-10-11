@@ -96,6 +96,8 @@ export type WriteGuardHandle = {
   guard: (change: WriteChange, run: (undo: Undo) => void) => GuardOutcome;
   /** The confirming guard's dialog, wired. Render it once beside the control. */
   dialog: React.ReactNode;
+  /** The confirming guard's dialog is open: a dialog under it hands it the keyboard. */
+  confirming: boolean;
   ready: boolean;
   unreadable: boolean;
 };
@@ -194,6 +196,7 @@ export function useWriteGuard(projectId: string | null | undefined): WriteGuardH
     reasonOf,
     guard,
     dialog,
+    confirming: pending !== null,
     ready: snap !== SERVER_GUARDS,
     unreadable: snap !== SERVER_GUARDS && guardsUnreadable(),
   };

@@ -1,15 +1,14 @@
 "use client";
 
-// The Activity chip (P2-TABS-5), on both the project page and the product
-// page — a quiet pill with a count badge and "›" that opens the Activity
-// History drawer (activity/drawer.tsx), plus a separate "?" that explains
-// what Activity is. It replaces v1's "Activity ┆NEXT┆" slot.
+// The Activity chip (P2-TABS-5), on the product page — a quiet pill with a
+// count badge and "›" that opens the Activity History drawer
+// (activity/drawer.tsx), plus a separate "?" that explains what Activity is.
+// It replaces v1's "Activity ┆NEXT┆" slot. The project page's Activity is its
+// ⋯ menu's (project-menu.tsx, owner 2026-10-11).
 //
-// `ProjectActivityChip` and `ProductActivityChip` are the two slot-shaped
-// components the merge points mount: the first matches `SlotProps`
-// (project-page.tsx's `headerParts.titleRow`), the second `ProductSlotProps`
-// (product-slots.tsx's). Both read the same journey (T11's `useJourney`) and
-// own the drawer's open state — the chip is a self-contained widget, not
+// `ProductActivityChip` is the slot-shaped component product-slots.tsx mounts
+// (`ProductSlotProps`). It reads the journey (T11's `useJourney`) and owns
+// the drawer's open state — the chip is a self-contained widget, not
 // something the page has to wire state for. Writing asks
 // `can(viewer, "activity.write", view.canCtx)`: the lock (decision 12) is the
 // page's one derivation's, never re-derived here.
@@ -26,9 +25,7 @@ import type { ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 import { ActivityDrawer } from "./activity/drawer";
 import type { ProductSlotProps } from "../product/product-slots";
-import type { SlotProps } from "./slots";
 
-const PROJECT_TOOLTIP = "Check and add the current phase and status of this project.";
 const PRODUCT_TOOLTIP = "Check and add the current phase and status of this product.";
 
 // ─────────────────────────── "?" — opens on hover, focus and tap ───────────────────────────
@@ -162,23 +159,6 @@ function ActivityChipWidget({
         now={now}
       />
     </div>
-  );
-}
-
-// ─────────────────────────── project-page slot ───────────────────────────
-
-export function ProjectActivityChip({ project, view, viewer, announce, now }: SlotProps) {
-  const products = React.useMemo(() => view.products.map((p) => ({ id: p.id, name: p.name })), [view.products]);
-  return (
-    <ActivityChipWidget
-      project={project}
-      products={products}
-      viewer={viewer}
-      canCtx={view.canCtx}
-      announce={announce}
-      tooltip={PROJECT_TOOLTIP}
-      now={now}
-    />
   );
 }
 

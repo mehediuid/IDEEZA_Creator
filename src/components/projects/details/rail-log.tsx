@@ -31,7 +31,7 @@ export function RailLog({ view, viewer }: SlotProps) {
   );
   if (lines.length === 0) return null;
   return (
-    <RailBlock title="Project log">
+    <RailBlock title="Recent">
       <LogList lines={lines} />
     </RailBlock>
   );

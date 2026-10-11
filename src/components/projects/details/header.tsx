@@ -1,40 +1,36 @@
 "use client";
 
 // ProjectHeader — the top of /projects/[id] (spec §5.4; Phase 2 §2.2; Build
-// and Earn P0). It has two readings.
+// and Earn P0; owner, 2026-10-11). It has two readings.
 //
-// The engineering header — the owner and a contributor preview — in reading
-// order, at every width:
-// 1. the title row: the h1 and its rename pencil, then `headerParts.titleRow`
-//    (the Activity chip and its "?");
-// 2. the stage line in the status chip's old place ("Built · 3 products ·
-//    v2", `stageLineOf` over the engineering axis), the Showcase badge,
-//    `headerParts.statusRow` and, in a contributor preview, the role chip
-//    (P2-CONTRIB-13);
-// 3. the lock line once the project is sold in full, with its link to the
-//    sale in Earn;
-// 4. the meta line: Saved {date} · … · Stage {short} (`engineeringMetaOf`);
-// 5. the description, then `headerParts.afterDescription` (its coachmark);
-// 6. Review version {n} while a draft has a newer version ready, then the one
-//    "Earn from this project" button (`earnButtonOf`, over the commercial axis
-//    and the gating ladder's next commit point) and its short fact; then one
-//    notice per newer build of a chat that isn't saved yet.
-// The status chip, the status line, the Brief and listing pair and Preview as
-// buyer moved to Earn (/projects/<id>/earn); the page has one violet — Review
-// version while it is pending, else Earn once it is ready.
+// The engineering header — the owner and a contributor preview. Two columns
+// from a 720 px header, stacked below it:
+// - left: the h1 with the "Shared" chip while the project is on Innovations
+//   (and, in a contributor preview, the role chip, P2-CONTRIB-13); one meta
+//   line — the stage line, then Saved {date} · … (`stageLineOf`,
+//   `engineeringMetaOf`); the lock line once the project is sold in full; the
+//   description (or "Add a description"), then `headerParts.afterDescription`
+//   (its coachmark);
+// - right: Review version {n} while a draft has a newer version ready, the
+//   one "Earn from this project" button (`earnButtonOf`) and the ⋯ menu
+//   (project-menu.tsx: Edit name and description, Share to Innovations,
+//   Activity, Delete project…), with Earn's short fact under them.
+// Then one notice per newer build of a chat that isn't saved yet. The page has
+// one violet — Review version while it is pending, else Earn once it is ready.
+// No pencil by the h1, no "Edit description" line, no Activity chip: each
+// lives in the ⋯ menu, once.
 //
 // The buyer's side (`buyerSide`: Preview as buyer, and Explore marketplace's
-// "market" context) reads the header as before: the status chip, the
-// Showcase badge, `headerParts.statusRow` (the Utility NFT pill), the status
-// line, the meta line ([Created by you · Owned by X] · … · Stage {short} — on
-// Explore marketplace "Created by you · Listed {date}"), the description. It
-// offers no control: `can()` refuses a visitor and a buyer every one (PPL-6).
+// "market" context) reads the header as before: the status chip, the Shared
+// badge, `headerParts.statusRow` (the Utility NFT pill), the status line, the
+// meta line ([Created by you · Owned by X] · … · Stage {short} — on Explore
+// marketplace "Created by you · Listed {date}"), the description. It offers
+// no control: `can()` refuses a visitor and a buyer every one (PPL-6).
 //
 // Every string here is `headerText()`'s (project-summary.ts) or
 // project-header.ts's. Every `can()` passes `view.canCtx`, so the 100 % lock
-// refuses rename and description here as everywhere (§3.8.5). There is no ⋮
-// and no Share (COR-14, P2-TABS-30), and no Open in editor: it lives on the
-// product page (P2-EDITOR-12).
+// refuses editing here as everywhere (§3.8.5). There is no Open in editor: it
+// lives on the product page (P2-EDITOR-12).
 //
 // The h1's arrival focus (COR-7) and the page's one polite live region
 // (COR-101) are the shell's (usePageArrival, shell.tsx): `titleRef` and
@@ -59,6 +55,8 @@ import { engineeringMetaOf, pendingNoticesOf, stageLineOf, type PendingNotice } 
 import { earnSourceOf, useEarnFacts } from "../earn/ladder/use-earn-facts";
 import { BUYER_PREVIEW_ENTRY, isPreview, useFocusAfterPreview } from "./buyer-preview";
 import { ProjectDescription } from "./description-editor";
+import { useEditDetails } from "./edit-details";
+import { ProjectMenu } from "./project-menu";
 import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
 
@@ -66,8 +64,10 @@ import { ProjectTitle } from "./title-editor";
  *  hands focus to it when it is on the page, else to the h1. */
 export const PREVIEW_TRIGGER_ID = "preview-as-buyer-trigger";
 
-/** Full width and 44 px at phone width (COR-11, PPL-4); their own width from a 520 px header. */
-const HEADER_BUTTON = "h-[44px] w-full justify-center [@container(min-width:520px)]:w-auto";
+/** Sharing the row with ⋯ and 44 px tall at phone width (COR-11, PPL-4); their own width from a
+ *  480 px header, 40 px tall once the actions sit beside the title (720 px). */
+const HEADER_BUTTON =
+  "h-[44px] min-w-0 flex-1 justify-center [@container(min-width:480px)]:flex-none [@container(min-width:720px)]:h-[40px]";
 
 const INLINE_LINK =
   "rounded-sm font-medium text-text-link underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
@@ -94,6 +94,7 @@ export function ProjectHeader({
   // Which control is taking the maker off the page. Never cleared: the navigation unmounts it.
   const [leaving, setLeaving] = React.useState<string | null>(null);
   const earnFactId = React.useId();
+  const menuRef = React.useRef<HTMLButtonElement>(null);
 
   const slotProps: SlotProps = { project, view, viewer, brief, now, announce };
   const { summary, canCtx } = view;
@@ -145,118 +146,121 @@ export function ProjectHeader({
     else if (text.ownedBy?.created) lead.push(text.ownedBy.created);
     if (text.ownedBy) lead.push(`Owned by ${text.ownedBy.ownedBy}`);
   }
-  const meta: MetaPart[] = engineering ? engineeringMetaOf(summary, view.stage) : text.meta;
+  const meta: MetaPart[] = engineering
+    ? [{ kind: "text", text: stageLineOf(view.engineering, summary) }, ...engineeringMetaOf(summary, view.stage)]
+    : text.meta;
+  // One editor for the name and the description, opened from ⋯, "Add a description" and the coachmark.
+  const canEdit = can(viewer, "project.rename", canCtx) || can(viewer, "project.editDescription", canCtx);
+  const fallbackFocus = React.useCallback(() => menuRef.current ?? titleRef.current, [titleRef]);
+  const edit = useEditDetails({ project, canEdit: engineering && owner && canEdit, announce, fallbackFocus });
+  const menu = engineering && owner;
 
   return (
     <header className="flex flex-col gap-8 [container-type:inline-size]">
-      <div className="flex flex-col gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
-          <div className="min-w-0 max-w-full">
-            <ProjectTitle
-              project={project}
-              canRename={can(viewer, "project.rename", canCtx)}
-              announce={announce}
-              titleRef={titleRef}
-            />
+      <div className="flex flex-col gap-6 [@container(min-width:720px)]:flex-row [@container(min-width:720px)]:items-start [@container(min-width:720px)]:justify-between [@container(min-width:720px)]:gap-10">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="min-w-0 max-w-full">
+              <ProjectTitle project={project} titleRef={titleRef} />
+            </div>
+            {engineering && text.chip.badge && <ShowcaseChip />}
+            {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
+            {role && (
+              <Badge tone="neutral" icon={<Icon icon={UserIcon} size={12} />}>
+                {role}
+              </Badge>
+            )}
           </div>
-          {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
-        </div>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
-          {engineering ? (
-            <p className="min-w-0 font-medium text-text-primary">{stageLineOf(view.engineering, summary)}</p>
-          ) : (
-            <StatusChip status={summary.status} word={text.chip.word} />
-          )}
-          {text.chip.badge && <ShowcaseChip />}
-          {parts?.statusRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
-          {role && (
-            <Badge tone="neutral" icon={<Icon icon={UserIcon} size={12} />}>
-              {role}
-            </Badge>
-          )}
-        </div>
-
-        {showLine && <p className="min-w-0 text-md text-text-secondary">{text.chip.line}</p>}
-        {text.lockLine && (
-          <LockLine line={text.lockLine}>
-            {" "}
-            <Link href={earnHref(project.id, "customers")} className={INLINE_LINK}>
-              See the sale
-            </Link>
-          </LockLine>
-        )}
-
-        <p className="text-sm text-text-secondary">
-          {[
-            ...lead,
-            ...meta.map((m, i) =>
-              m.kind === "time" ? (
-                <time key={`t${i}`} dateTime={m.time.dateTime} title={m.time.title}>
-                  {m.time.text}
-                </time>
-              ) : (
-                m.text
-              ),
-            ),
-          ].map((part, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && " · "}
-              {part}
-            </React.Fragment>
-          ))}
-        </p>
-
-        <ProjectDescription
-          project={project}
-          canEdit={can(viewer, "project.editDescription", canCtx)}
-          announce={announce}
-        />
-        {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
-      </div>
-
-      {(review || earn) && (
-        <div
-          data-header-actions
-          className="flex max-w-full flex-col gap-4 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:flex-wrap [@container(min-width:520px)]:items-center"
-        >
-          {review && (
-            <LeaveButton
-              tone="primary"
-              busy={leaving === "review"}
-              blocked={leaving !== null}
-              onClick={() => leave("review", review.href)}
-              icon={ArrowRight02Icon}
-              className={HEADER_BUTTON}
-            >
-              {review.label}
-            </LeaveButton>
-          )}
-          {earn && (
-            <div
-              data-earn-state={earn.state}
-              className="flex flex-col gap-2 [@container(min-width:520px)]:flex-row [@container(min-width:520px)]:items-center [@container(min-width:520px)]:gap-4"
-            >
-              <LeaveButton
-                tone={earn.violet ? "primary" : "quiet"}
-                busy={leaving === "earn"}
-                blocked={leaving !== null}
-                onClick={() => leave("earn", earn.href)}
-                icon={Coins01Icon}
-                className={HEADER_BUTTON}
-                aria-describedby={earn.sub ? earnFactId : undefined}
-              >
-                {earn.label}
-              </LeaveButton>
-              {earn.sub && (
-                <span id={earnFactId} className="text-sm text-text-secondary">
-                  {earn.sub}
-                </span>
-              )}
+          {!engineering && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-md text-text-secondary">
+              <StatusChip status={summary.status} word={text.chip.word} />
+              {text.chip.badge && <ShowcaseChip />}
+              {parts?.statusRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             </div>
           )}
+
+          {showLine && <p className="min-w-0 text-md text-text-secondary">{text.chip.line}</p>}
+
+          <p className="text-sm text-text-secondary">
+            {[
+              ...lead,
+              ...meta.map((m, i) =>
+                m.kind === "time" ? (
+                  <time key={`t${i}`} dateTime={m.time.dateTime} title={m.time.title}>
+                    {m.time.text}
+                  </time>
+                ) : (
+                  m.text
+                ),
+              ),
+            ].map((part, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && " · "}
+                {part}
+              </React.Fragment>
+            ))}
+          </p>
+
+          {text.lockLine && (
+            <LockLine line={text.lockLine}>
+              {" "}
+              <Link href={earnHref(project.id, "customers")} className={INLINE_LINK}>
+                See the sale
+              </Link>
+            </LockLine>
+          )}
+
+          <ProjectDescription
+            project={project}
+            onAdd={menu && can(viewer, "project.editDescription", canCtx) ? () => edit.open() : undefined}
+          />
+          {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
         </div>
-      )}
+
+        {(review || earn || menu) && (
+          <div
+            data-header-actions
+            className="flex shrink-0 flex-col gap-2 [@container(min-width:480px)]:flex-row [@container(min-width:480px)]:items-center [@container(min-width:480px)]:gap-4 [@container(min-width:720px)]:flex-col [@container(min-width:720px)]:items-end [@container(min-width:720px)]:gap-2"
+          >
+            <div data-earn-state={earn?.state} className="flex items-center gap-3">
+              {review && (
+                <LeaveButton
+                  tone="primary"
+                  busy={leaving === "review"}
+                  blocked={leaving !== null}
+                  onClick={() => leave("review", review.href)}
+                  icon={ArrowRight02Icon}
+                  className={HEADER_BUTTON}
+                >
+                  {review.label}
+                </LeaveButton>
+              )}
+              {earn && (
+                <LeaveButton
+                  tone={earn.violet ? "primary" : "quiet"}
+                  busy={leaving === "earn"}
+                  blocked={leaving !== null}
+                  onClick={() => leave("earn", earn.href)}
+                  icon={Coins01Icon}
+                  className={HEADER_BUTTON}
+                  aria-describedby={earn.sub ? earnFactId : undefined}
+                >
+                  {earn.label}
+                </LeaveButton>
+              )}
+              {menu && (
+                <ProjectMenu {...slotProps} canEdit={canEdit} onEdit={() => edit.open()} triggerRef={menuRef} />
+              )}
+            </div>
+            {earn?.sub && (
+              <span id={earnFactId} className="text-sm text-text-secondary">
+                {earn.sub}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {notices.length > 0 && (
         <div className="flex flex-col gap-4">
@@ -271,6 +275,7 @@ export function ProjectHeader({
           ))}
         </div>
       )}
+      {edit.dialog}
     </header>
   );
 }

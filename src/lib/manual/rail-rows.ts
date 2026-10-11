@@ -21,8 +21,8 @@ export const NOT_READ = "—";
 /** The Versions block shows this many versions, then "Show all ({n})" (§5.1.10). */
 export const VERSIONS_SHOWN = 5;
 
-/** The Project log shows this many entries, then "Show all ({n})" (COR-52). */
-export const LOG_SHOWN = 6;
+/** The rail's Recent block (the project log) shows this many entries, then "Show all ({n})" (COR-52; owner, 2026-10-11: a short rail). */
+export const LOG_SHOWN = 3;
 
 /** A date in the one formatter, "Sep 26, 2026 · 9:09 PM", inside `<time>` (COR-52, COR-107). */
 function when(at: number): MetaPart {
@@ -158,7 +158,7 @@ export function logLinesOf(entries: ProjectLogEntry[], opts: LogLineOptions = {}
       case "created":
         return line("", "Created by hand");
       case "showcased":
-        return line("", "Showcased");
+        return line("", "Shared to Innovations");
       case "minted":
         return line("", `Minted · ${STATUS_WORD[LEGACY_MINTED_AS[e.intent]]}${net(e.network)}`);
       case "lazyMinted": {

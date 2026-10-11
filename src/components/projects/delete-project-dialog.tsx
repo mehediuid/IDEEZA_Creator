@@ -1,17 +1,11 @@
 "use client";
 
-// Delete project — the Manage block's one control and the one dialog behind
-// it (COR-67…71, owner answer 6; Phase 2 §3.8.4).
-//
-// - The control is owner-only (`can(viewer, "project.delete")`) and absent in
-//   Preview as buyer. `deleteBlockOf(view.deleteFacts)` (§3.8.4) names the
-//   first rule that applies — unreadable market records, a sale, a live
-//   auction, a live or paused listing, or a co-owner's share — and while it
-//   does, the control stays where it is, aria-disabled and in the tab order,
-//   with the reason and detail beside it, named by aria-describedby; pressing
-//   it opens nothing. The otherOwners case also carries a quiet "Open
-//   Contributors" link to the roster (P2-CONTRIB-14) — Earn › Splits since
-//   Build and Earn P0, where a co-owner's share is changed.
+// Delete project — the dialog behind the project's ⋯ › Delete project…
+// (COR-67…71, owner answer 6; Phase 2 §3.8.4). The menu item is owner-only
+// (`can(viewer, "project.delete")`) and, while `deleteBlockOf(view.deleteFacts)`
+// names a rule (unreadable market records, a sale, a live auction, a live or
+// paused listing, or a co-owner's share), aria-disabled with the reason under
+// it (project-menu.tsx).
 // - The dialog lists what goes and what stays (deletePlanOf) and asks for the
 //   typed project name only when editor work, a mint record or a network would
 //   be lost. The editor work is every swept row's (`editorWorkOfProject`),
@@ -26,8 +20,6 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Delete02Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { Banner, ConfirmDialog, TextInput } from "@/components/ideeza";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { useCreateHistory } from "@/lib/create/history";
@@ -36,78 +28,14 @@ import { readMarketNow } from "@/lib/market/market-store";
 import { deletePlanOf, matchesTypedName } from "@/lib/manual/delete-plan";
 import { editorWorkOfProject } from "@/lib/manual/editor-work";
 import { readJourney } from "@/lib/manual/journey-store";
-import { can, deleteBlockOf, type DeleteBlock, type Viewer } from "@/lib/manual/permissions";
+import { deleteBlockOf, type DeleteBlock } from "@/lib/manual/permissions";
 import { deleteFactsOf, type ProjectView } from "@/lib/manual/project-read";
-import { earnHref } from "@/lib/manual/earn-route";
 import { projectSummary } from "@/lib/manual/project-summary";
 import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { readNetwork } from "@/lib/network/store";
-import { cn } from "@/lib/utils";
 import { setProjectNotice } from "./project-notice";
 
-export type DeleteProjectControlProps = {
-  project: ManualProject;
-  viewer: Viewer;
-  /** The page's one derivation — §3.8.4's facts (`view.deleteFacts`) and every other fact the
-   *  dialog reads (mint, summary). */
-  view: ProjectView;
-  /** The project's brief draft as the page read it. */
-  draft: StoredDraft | null;
-};
-
-export function DeleteProjectControl({ project, viewer, view, draft }: DeleteProjectControlProps) {
-  const router = useRouter();
-  const [open, setOpen] = React.useState(false);
-  const reasonId = React.useId();
-  if (!can(viewer, "project.delete")) return null;
-  // §3.8.4: the first rule that applies, from the page's one derivation — no
-  // second reading of the market or the roster here.
-  const block = deleteBlockOf(view.deleteFacts);
-  const unavailable = block !== null;
-  const openContributors = () => router.push(earnHref(project.id, "splits"));
-  return (
-    <div className="flex flex-col items-start gap-[8px]">
-      <button
-        type="button"
-        onClick={() => {
-          if (!unavailable) setOpen(true);
-        }}
-        aria-disabled={unavailable || undefined}
-        aria-describedby={block ? reasonId : undefined}
-        aria-haspopup="dialog"
-        className={cn(
-          "inline-flex min-h-[40px] items-center gap-[8px] rounded-lg border border-solid border-border bg-bg-surface px-[14px] text-sm font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
-          unavailable
-            ? "cursor-not-allowed text-text-disabled"
-            : "text-text-error hover:border-border-error hover:bg-bg-error-subtle",
-        )}
-      >
-        <Icon icon={Delete02Icon} size={16} />
-        Delete project…
-      </button>
-      {block && (
-        <div id={reasonId} className="max-w-[40ch] text-sm leading-relaxed">
-          <p className="font-medium text-text-primary">{block.reason}</p>
-          <p className="text-text-secondary">{block.detail}</p>
-          {block.link && (
-            <button
-              type="button"
-              onClick={openContributors}
-              className="mt-1 rounded-sm text-text-primary underline decoration-border-strong underline-offset-2 outline-none transition-colors duration-normal ease-decelerate hover:decoration-current focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
-            >
-              {block.link.label}
-            </button>
-          )}
-        </div>
-      )}
-      {open && (
-        <DeleteProjectDialog project={project} view={view} draft={draft} onClose={() => setOpen(false)} />
-      )}
-    </div>
-  );
-}
-
-type DeleteProjectDialogProps = {
+export type DeleteProjectDialogProps = {
   project: ManualProject;
   view: ProjectView;
   draft: StoredDraft | null;
@@ -144,7 +72,7 @@ function deleteBlockNow(project: ManualProject, view: ProjectView, draft: Stored
   return null;
 }
 
-function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDialogProps) {
+export function DeleteProjectDialog({ project, view, draft, onClose }: DeleteProjectDialogProps) {
   const router = useRouter();
   const { deleteProject } = useManualProjects();
   const { chats } = useCreateHistory();

@@ -41,7 +41,8 @@ test("SLOTS takes `banners` (not the v1 `banner`), one key per line (§3.10)", (
   const slots = slotsOf(read(DETAILS + "project-page.tsx"));
   assert.match(slots, /\n  banners: \[\n/);
   assert.doesNotMatch(slots, /\n  banner:/);
-  assert.match(slots, /\n  headerParts: \{\n    titleRow: \[\n/);
+  assert.match(slots, /\n  headerParts: \{\n    statusRow: \[\n/);
+  assert.doesNotMatch(slots, /titleRow|ActivitySlot/, "Activity is the ⋯ menu's (owner, 2026-10-11)");
 });
 
 test("isBuyerPreview( survives only to choose the buyer-preview banner (§3.8.1)", () => {
@@ -124,18 +125,18 @@ test("P0: the product page is engineering for the owner — no Customers panel, 
   assert.match(page, /\{lockLine && <LockLine line=\{lockLine\} \/>\}/);
 });
 
-test("P0: SLOTS is the engineering page — Team, the Showcase block, and the commerce blocks only on the buyer's side", () => {
+test("P0: SLOTS is the engineering page — Team, and the commerce blocks only on the buyer's side; Share and Delete are the ⋯ menu's", () => {
   const src = read(DETAILS + "project-page.tsx");
   const slots = slotsOf(src);
-  for (const key of ["team: TeamSlot", "showcase: ShowcaseSlot", "marketplace: MarketplaceSlot", "legal: LegalSlot", "UtilityPillSlot"]) {
+  for (const key of ["team: TeamSlot", "marketplace: MarketplaceSlot", "legal: LegalSlot", "UtilityPillSlot"]) {
     assert.ok(slots.includes(key), key);
   }
-  assert.doesNotMatch(slots, /\b(outcome|customers|contributors|actions)\s*:/);
+  assert.doesNotMatch(slots, /\b(outcome|customers|contributors|actions|showcase|manage)\s*:/);
   assert.doesNotMatch(slots, /BusinessPlanChip|ListingFlow|UtilityPill,/);
   for (const slot of ["MarketplaceSlot", "LegalSlot", "UtilityPillSlot"]) {
     assert.match(src, new RegExp(`function ${slot}\\(props: SlotProps\\) \\{\\s*return buyerSide\\(props\\.viewer\\) \\?`), slot);
   }
-  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "details", "legal", "versions", "showcase", "log", "manage"\]/);
+  assert.match(read(DETAILS + "slots.ts"), /RAIL_ORDER = \["marketplace", "details", "legal", "versions", "log"\]/);
   // Explore marketplace keeps reading the same slots (P2-MARKETPLACE-8).
   const market = read("components/marketplace/market-slots.tsx");
   for (const key of ["team: SLOTS.tabs.team", "details: SLOTS.rail.details", "legal: SLOTS.rail.legal", "marketplace: BuyerRail"]) {
@@ -180,11 +181,17 @@ test("the Add a product tile is the owner's first tile, a link to /?addTo= behin
   assert.match(read(DETAILS + "project-page.tsx"), /canAddProduct=\{can\(viewer, "product\.add", view\.canCtx\)\}/);
 });
 
-test("no ⋮ menu and no Premium Parts tab on either page (P2-TABS-30)", () => {
+test("no Premium Parts tab on either page (P2-TABS-30); the project's one ⋯ menu is the header's (owner, 2026-10-11)", () => {
   for (const path of [DETAILS + "header.tsx", DETAILS + "shell.tsx", PRODUCT + "product-page.tsx", PRODUCT + "product-tabs.tsx"]) {
     const src = read(path);
     assert.doesNotMatch(src, /⋮|MoreVertical|"More"|"Options"|Premium Parts/, path);
   }
+  const menu = read(DETAILS + "project-menu.tsx");
+  assert.match(menu, /aria-label="Project actions"\s+aria-haspopup="menu"/);
+  for (const item of ["Edit name and description", "Share to Innovations", "Stop sharing", "Activity", "Delete project…"]) {
+    assert.ok(menu.includes(`"${item}"`), item);
+  }
+  assert.match(read(DETAILS + "header.tsx"), /<ProjectMenu \{\.\.\.slotProps\}/);
 });
 
 test("the Contributors, Team and Media phone targets are 44 px at phone width and on a coarse pointer (pd2 final re-verify)", () => {
@@ -195,7 +202,7 @@ test("the Contributors, Team and Media phone targets are 44 px at phone width an
   assert.match(contrib, /const CARD_ACTION = "min-h-\[var\(--touch-min\)\] min-w-\[var\(--touch-min\)\]/, "a card row action is 44 px both ways (Edit)");
   assert.match(contrib, /\[@media\(pointer:coarse\)\]:min-w-\[var\(--touch-min\)\]/, "and a table row action on a coarse pointer");
   assert.match(read(DETAILS + "media-tab.tsx"), /max-md:size-\[var\(--touch-min\)\] \[@media\(pointer:coarse\)\]:size-\[var\(--touch-min\)\]/, "Use as cover");
-  assert.match(read("components/projects/delete-project-dialog.tsx"), new RegExp(`\\{block\\.link && \\([\\s\\S]{0,120}onClick=\\{openContributors\\}[\\s\\S]{0,400}${PHONE.source}`), "the blocked Delete's Open Contributors");
+  assert.match(read(DETAILS + "project-menu.tsx"), /"flex min-h-\[44px\] w-full items-start/, "every ⋯ menu item, Delete project… among them, is 44 px tall");
   const team = read(DETAILS + "team-tab.tsx");
   assert.match(team, new RegExp(`const PHONE_TAP = "${PHONE.source}"`), "the Team tab's phone rule");
   assert.match(team, /PHONE_TAP,\s*\)\}\s*>\s*Open Splits/, "the empty state's Open Splits carries it");

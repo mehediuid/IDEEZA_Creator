@@ -72,7 +72,7 @@ test("logLinesOf: created, minted and showcased only, each over its date (COR-52
     { kind: "created", at: SEP20_1005 },
   ]);
   assert.deepEqual(lines, [
-    { key: `showcased:${SEP26_1000}`, title: "Showcased", note: null, when: [time(SEP26_1000, "Sep 26, 2026 · 10:00 AM")] },
+    { key: `showcased:${SEP26_1000}`, title: "Shared to Innovations", note: null, when: [time(SEP26_1000, "Sep 26, 2026 · 10:00 AM")] },
     {
       key: `minted:${SEP22_2109}`,
       // A v1 Sell never reached a marketplace: it reads Private, as the chip does (P2-LISTING-24),
@@ -107,7 +107,7 @@ test("logLinesOf: network: false leaves the chain out of a mint (PPL-7, Preview 
   );
   assert.equal(minted.title, "Minted · Private");
   assert.equal(minted.note, null);
-  assert.equal(showcased.title, "Showcased");
+  assert.equal(showcased.title, "Shared to Innovations");
   // The default is the owner's line, chain included.
   assert.equal(logLinesOf([{ kind: "minted", at: 2, intent: "sell", network: "baseSepolia" }])[0].title, "Minted · Private · Base Sepolia (Testnet)");
 });
@@ -301,7 +301,7 @@ test("versionGroupsOf: a build that needs a retry says so; empty lineages are sk
 
 test("firstVersions: five versions per project across lineages, then Show all (§5.1.10)", () => {
   assert.equal(VERSIONS_SHOWN, 5);
-  assert.equal(LOG_SHOWN, 6);
+  assert.equal(LOG_SHOWN, 3);
   const run = (chatId, n) =>
     Array.from({ length: n }, (_, i) => ({
       ...v1, chatId, lineage: chatId, version: n - i, current: i === 0, buildId: `${chatId}_${n - i}`, diff: null,

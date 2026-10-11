@@ -1,4 +1,4 @@
-// C7b — the rail's Outcome, Showcase and Details blocks keep their one-home rules (COM-3, COM-12, COM-18,
+// C7b — the rail's Outcome and About blocks, and the ⋯ menu's Share to Innovations, keep their one-home rules (COM-3, COM-12, COM-18,
 // COM-55, PPL-1, PPL-7, COR-54, COR-55, COR-56). The words they render are pinned by
 // rail-copy.test.mjs; these read the component sources, so they need no compile step.
 import { test } from "node:test";
@@ -16,25 +16,24 @@ test("the Outcome block still has no door to Innovations or the Brief, and no li
   assert.doesNotMatch(src, /ShowcaseFact|setShowcase|ReadinessDialog/, "Showcase is the rail's own block now");
 });
 
-test("the Showcase block's only link is P2-VIDEO-15's one-missing-product line, and it has no door to Innovations (P0)", () => {
-  const src = read("rail-showcase.tsx");
-  const hrefs = src.match(/href=/g) ?? [];
-  assert.equal(hrefs.length, 1, "the Showcase note's product-page link is the block's only href");
-  assert.match(src, /href=\{link\.href\}/);
-  assert.doesNotMatch(src, /\/innovations/);
-  assert.doesNotMatch(src, /shareToNewsfeed/);
+test("Share to Innovations lives in the ⋯ menu only — no rail block, no link of its own (owner, 2026-10-11)", () => {
+  assert.throws(() => read("rail-showcase.tsx"), /ENOENT/, "the rail's Showcase block is gone");
+  const menu = read("project-menu.tsx");
+  assert.doesNotMatch(menu, /href=/, "the menu's items act; none is a link");
+  assert.doesNotMatch(menu, /shareToNewsfeed/);
 });
 
-test("Showcase and the owner-only facts ask the one permission source (PPL-1, COM-55, PPL-7)", () => {
+test("Sharing and the owner-only facts ask the one permission source (PPL-1, COM-55, PPL-7)", () => {
   assert.match(read("rail-outcome.tsx"), /can\(viewer, "facts\.seeOwnerOnly"\)/);
-  const showcase = read("rail-showcase.tsx");
-  assert.match(showcase, /can\(viewer, "facts\.seeOwnerOnly"\)/);
-  assert.match(showcase, /can\(viewer, "project\.showcase", view\.canCtx\)/);
-  // P2-VIDEO-15: "Stop showcasing" is never gated; "Showcase project" flips at once only once
-  // `readinessOf` passes, so the single v1 toggle is now these two explicit calls.
-  assert.match(showcase, /setShowcase\(projectId, true\)/);
-  assert.match(showcase, /setShowcase\(projectId, false\)/);
-  assert.match(showcase, /<ReadinessDialog/);
+  const menu = read("project-menu.tsx");
+  assert.match(menu, /can\(viewer, "project\.showcase", view\.canCtx\)/);
+  assert.match(menu, /can\(viewer, "project\.delete"\)/);
+  assert.match(read("header.tsx"), /const menu = engineering && owner;/, "the ⋯ menu is the owner's, never a preview's");
+  // P2-VIDEO-15: "Stop sharing" is never gated; "Share to Innovations" flips at once only once
+  // `readinessOf` passes, else it opens the ReadinessDialog.
+  assert.match(menu, /setShowcase\(project\.id, true\)/);
+  assert.match(menu, /setShowcase\(project\.id, false\)/);
+  assert.match(menu, /<ReadinessDialog/);
   assert.match(read("rail-details.tsx"), /can\(viewer, "facts\.seeOwnerOnly"\)/);
 });
 
@@ -48,8 +47,8 @@ test("Details carries no chat link — Built in lives in the Versions block (COR
 });
 
 test("the blocks frame themselves in the shared RailBlock, whose probe matches RAIL_MIN (COR-54, COR-56)", () => {
-  assert.match(read("rail-showcase.tsx"), /<RailBlock title="Showcase"/);
-  assert.match(read("rail-details.tsx"), /<RailBlock/);
+  assert.match(read("rail-details.tsx"), /<RailBlock title="About"/);
+  assert.match(read("rail-log.tsx"), /<RailBlock title="Recent"/);
   const frame = read("rail-block.tsx");
   assert.match(frame, /export const RAIL_MIN = 1024;/);
   // The block's probe and RailStackScope's (an Earn card's facts) both carry RAIL_MIN − 1.

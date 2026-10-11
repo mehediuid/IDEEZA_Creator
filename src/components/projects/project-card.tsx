@@ -227,7 +227,7 @@ export function NoShowcaseState({ tabLabel }: { tabLabel: string | null }) {
     <StateCard
       tone="empty"
       icon={<Icon icon={ICONS.eye} size={32} />}
-      title={tabLabel ? `Nothing showcased in ${tabLabel}` : "Nothing showcased yet"}
+      title={tabLabel ? `Nothing shared in ${tabLabel}` : "Nothing shared to Innovations yet"}
       className="mx-auto mt-[24px]"
     />
   );

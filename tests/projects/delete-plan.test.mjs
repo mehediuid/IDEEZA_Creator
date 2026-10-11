@@ -118,7 +118,7 @@ test("a mint record asks for the typed name and says nothing on a chain changes"
   const kept = deletePlanOf(input({ status: "private", draft: minted("save"), showcased: true }));
   assert.deepEqual(kept.goes.slice(1), [
     `The brief — kept private, minted ${on}`,
-    "Showcase — it leaves your Showcase tab",
+    "Its place on Innovations — it stops showing there",
   ]);
   assert.equal(kept.typed, true);
 

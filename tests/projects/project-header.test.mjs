@@ -210,12 +210,12 @@ test("P1 · the Earn button: a draft counts the mint level's steps (L2), quiet, 
   assert.deepEqual(earnOf(), {
     state: "notReady",
     label: EARN_LABEL,
-    sub: "1 of 4 ready",
+    sub: "1 of 4 ready to sell",
     violet: false,
     href: "/projects/proj_car/earn",
   });
   assert.equal(EARN_LABEL, "Earn from this project");
-  assert.equal(earnOf({ facts: { ...DRAFT, walletConnected: true, videosReady: true } }).sub, "3 of 4 ready");
+  assert.equal(earnOf({ facts: { ...DRAFT, walletConnected: true, videosReady: true } }).sub, "3 of 4 ready to sell");
   // Identity (L4) and the license (L3) aren't the mint's: a draft is ready without them.
   const mintReady = earnOf({ facts: { ...DRAFT, walletConnected: true, ownershipConfirmed: true, videosReady: true } });
   assert.deepEqual(pick(mintReady), ["ready", null, true]);
@@ -223,8 +223,8 @@ test("P1 · the Earn button: a draft counts the mint level's steps (L2), quiet, 
 
 test("P1 · the Earn button: a minted project counts the list level's steps (L3)", () => {
   const minted = { ...ALL, licenseSet: false, identityVerified: false };
-  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: minted })), ["notReady", "6 of 7 ready", false]);
-  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, walletConnected: false } })), ["notReady", "5 of 7 ready", false]);
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: minted })), ["notReady", "6 of 7 ready to sell", false]);
+  assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, walletConnected: false } })), ["notReady", "5 of 7 ready to sell", false]);
   assert.deepEqual(pick(earnOf({ commercial: "minted", facts: { ...minted, licenseSet: true } })), ["ready", null, true]);
 });
 

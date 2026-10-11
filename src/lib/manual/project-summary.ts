@@ -77,7 +77,7 @@ export type ShowcaseBadge = { word: string; icon: IconName; ariaLabel: string };
 /** The Showcase badge: its own word and icon, info tone, beside the header's chip
  *  (LST-65, COR-9); a My projects card shows the eye alone, inside its chip. It is not a
  *  control; its accessible name is "Showcased". */
-export const SHOWCASE_BADGE: ShowcaseBadge = { word: "Showcase", icon: "eye", ariaLabel: "Showcased" };
+export const SHOWCASE_BADGE: ShowcaseBadge = { word: "Shared", icon: "eye", ariaLabel: "Shared to Innovations" };
 
 /** No marketplace record at all — what a caller that hasn't read the market store passes. */
 export const EMPTY_MARKET: MarketData = { listings: [], sales: [], bids: [], support: [], unreadable: false };

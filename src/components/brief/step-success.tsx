@@ -38,7 +38,7 @@ import { can } from "@/lib/manual/permissions";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects } from "@/lib/manual/projects";
-import { SUCCESS_SHOWCASE, showcaseAnnouncement } from "@/lib/manual/showcase-copy";
+import { SUCCESS_SHOWCASE, shareAnnouncement } from "@/lib/manual/showcase-copy";
 import { listingViewOf } from "@/lib/market/listing";
 import { termsLineOf } from "@/lib/market/listing-flow";
 import { useMarket } from "@/lib/market/market-store";
@@ -290,7 +290,7 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
   const flip = (next: boolean) => {
     focusNext.current = next ? "undo" : "show";
     setShowcase(project.id, next);
-    setSaid(showcaseAnnouncement(next, project.name));
+    setSaid(shareAnnouncement(next, project.name));
   };
 
   return (

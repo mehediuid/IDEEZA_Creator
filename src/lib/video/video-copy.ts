@@ -35,7 +35,7 @@ export const HIGH_LOCKED_NOTE = "720p comes with the Builder plan, which isn't o
 export const PROMPT_PLACEHOLDER = "Describe the shot — the product, the setting, how the camera moves";
 export const RENDER_KEEPS_RUNNING = "You can close this — the render keeps running, and its progress shows in the corner.";
 export const NO_VIDEO_PRODUCT =
-  "No video yet — every product needs one before the project can be showcased, sold or given.";
+  "No video yet — every product needs one before the project can be shared, sold or given.";
 export const LINE_MAX = 60;
 
 export function resolutionOf(q: VideoQuality): string {
@@ -126,9 +126,9 @@ export function readinessCopy(purpose: ReadinessPurpose, productName = "This pro
   switch (purpose) {
     case "showcase":
       return {
-        title: "Showcase project",
-        info: "To showcase this project, every product needs an AI video.",
-        cta: "Showcase project",
+        title: "Share to Innovations",
+        info: "To share this project to Innovations, every product needs an AI video.",
+        cta: "Share to Innovations",
       };
     case "sell":
       return {

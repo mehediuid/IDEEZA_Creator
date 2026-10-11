@@ -78,9 +78,9 @@ test("lines: meta, take label, stage line, title", () => {
 
 test("readinessCopy: P2-VIDEO-14's table with relist and edition", () => {
   assert.deepEqual(copy.readinessCopy("showcase"), {
-    title: "Showcase project",
-    info: "To showcase this project, every product needs an AI video.",
-    cta: "Showcase project",
+    title: "Share to Innovations",
+    info: "To share this project to Innovations, every product needs an AI video.",
+    cta: "Share to Innovations",
   });
   assert.equal(copy.readinessCopy("sell").cta, "Continue to listing");
   assert.equal(copy.readinessCopy("sell").title, "Add to marketplace");

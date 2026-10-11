@@ -390,7 +390,7 @@ export function MyProjects() {
                 )}
               >
                 <Icon icon={EyeIcon} size={16} />
-                Showcase only
+                Shared only
               </button>
               <SelectMenu
                 ariaLabel="Sort"
@@ -433,7 +433,7 @@ export function MyProjects() {
                 // goes to the search box rather than falling to the body.
                 <NoMatchState
                   query={view.q}
-                  scopeLabel={view.showcase ? `${tabLabel} (Showcase only)` : tabLabel}
+                  scopeLabel={view.showcase ? `${tabLabel} (Shared only)` : tabLabel}
                   onClearSearch={() => {
                     setText("");
                     write({ ...view, q: "", page: 1 });

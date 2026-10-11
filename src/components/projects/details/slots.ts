@@ -44,10 +44,11 @@ export type PanelSlot = React.ComponentType<SlotProps>;
 
 /** The rail's blocks, in order (COR-54; Phase 2 spec §2.2, §3.10). The v1
  *  `editor` block moves to the product page (decision 7). Build and Earn P0:
- *  the owner's rail is Details · Versions · Showcase · Log · Manage — Outcome
- *  moved to Earn, and Marketplace and Legal stay only for the buyer's side
- *  (`buyerSide`), which reads Marketplace · Details · Legal · Log. */
-export const RAIL_ORDER = ["marketplace", "details", "legal", "versions", "showcase", "log", "manage"] as const;
+ *  Outcome moved to Earn, and Marketplace and Legal stay only for the buyer's
+ *  side (`buyerSide`), which reads Marketplace · About · Legal · Recent. The
+ *  owner's rail is About · Versions · Recent (owner, 2026-10-11): Share to
+ *  Innovations and Delete project live in the header's ⋯ menu. */
+export const RAIL_ORDER = ["marketplace", "details", "legal", "versions", "log"] as const;
 export type RailBlockId = (typeof RAIL_ORDER)[number];
 
 /** The listing start's props — "Add to marketplace" / "List another share"

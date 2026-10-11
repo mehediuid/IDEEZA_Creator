@@ -87,7 +87,7 @@ export function earnButtonOf(input: {
   const steps = commitStepsOf(input.commercial === "none" ? "mint" : "list", input.facts);
   const done = steps.filter((s) => s.ok).length;
   if (done === steps.length) return { ...quiet("ready", null), violet: !input.reviewPending };
-  return quiet("notReady", `${done} of ${steps.length} ready`);
+  return quiet("notReady", `${done} of ${steps.length} ready to sell`);
 }
 
 // ─────────────────────────── the area ───────────────────────────
