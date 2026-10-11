@@ -238,8 +238,9 @@ const BUILDS = [bCar, bSoil, bRain, bV1, bV2, bV3];
 const sum = (p, brief = null, over = {}) =>
   projectSummary(p, { builds: BUILDS, brief, videoJobs: [], now: NOW, ...over });
 
-const addBrief = (slug) => ({ kind: "add-brief", label: "Add Brief", href: `/project/${slug}/brief` });
-const viewBrief = (slug) => ({ kind: "view-brief", label: "View brief", href: `/project/${slug}/brief` });
+// The Brief is Earn's mint flow (Build and Earn P1-2): every Brief action opens /projects/<id>/earn/mint.
+const addBrief = (id) => ({ kind: "add-brief", label: "Add Brief", href: `/projects/${id}/earn/mint` });
+const viewBrief = (id) => ({ kind: "view-brief", label: "View brief", href: `/projects/${id}/earn/mint` });
 // Phase 2 §3.6.3: no open-editor kind (Open in editor is the product page's, decision 7). The
 // card shows no button: its hint words the pair (hintOf).
 const violetPair = (first) => ({ first, second: null, violet: true });
@@ -256,7 +257,7 @@ const FIXTURES = [
     hint: "Next: mint",
     card: "4 products · Saved 4:12 PM",
     header: "4 products · Saved Sep 26, 2026",
-    pair: violetPair(addBrief("car")),
+    pair: violetPair(addBrief("proj_car")),
     cover: "https://img.test/b_car.png",
   },
   {
@@ -267,7 +268,7 @@ const FIXTURES = [
     hint: "Next: mint",
     card: "1 product · Created Aug 3",
     header: "1 product · Made by hand · Created Aug 3, 2026",
-    pair: violetPair(addBrief("garden-weather-station")),
+    pair: violetPair(addBrief("proj_hand")),
     cover: null,
   },
   {
@@ -281,7 +282,7 @@ const FIXTURES = [
     header: "1 product · Saved Sep 20, 2026",
     pair: {
       first: { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_soil?list=1" },
-      second: viewBrief("plant-soil-monitor"),
+      second: viewBrief("proj_soil"),
       violet: true,
     },
     cover: "https://img.test/b_soil.png",
@@ -294,7 +295,7 @@ const FIXTURES = [
     hint: "Next: mint",
     card: "2 products · Created Aug 3",
     header: "2 products · Created Aug 3, 2026",
-    pair: violetPair(addBrief("weather-station")),
+    pair: violetPair(addBrief("proj_ws")),
     cover: "https://img.test/b_rain.png",
   },
   {
@@ -305,7 +306,7 @@ const FIXTURES = [
     hint: "Next: mint",
     card: "1 product · Saved Dec 5, 2025",
     header: "1 product · Saved Dec 5, 2025 · build not in this browser",
-    pair: violetPair(addBrief("desk-lamp")),
+    pair: violetPair(addBrief("proj_gone")),
     cover: null,
   },
   {
@@ -392,7 +393,7 @@ test("§4.1 row 2 · Draft, Brief in progress → ★ Continue Brief", () => {
   const s = sum(car4, draft({ intent: "sell" }, "preview"));
   assert.equal(s.statusWord, "Draft");
   assert.equal(s.statusLine, "Brief in progress · to sell · Preview step");
-  assert.deepEqual(s.next, violetPair({ kind: "continue-brief", label: "Continue Brief", href: "/project/car/brief" }));
+  assert.deepEqual(s.next, violetPair({ kind: "continue-brief", label: "Continue Brief", href: "/projects/proj_car/earn/mint" }));
   assert.equal(sum(car4, draft({ intent: "give" }, "idea")).statusLine, "Brief in progress · to give · Idea step");
   // The step is left out at the form step.
   assert.equal(sum(car4, draft({ intent: "save" }, "form")).statusLine, "Brief in progress · to keep");
@@ -416,7 +417,7 @@ test("§4.1 row 4 · Draft from a build, not briefed → ★ Add Brief (also whe
 test("§4.1 row 5 · Draft by hand, not briefed → ★ Add Brief (Phase 2 §2.2: a build or by hand)", () => {
   const s = sum(legacyHand);
   assert.equal(s.statusLine, "Not briefed yet");
-  assert.deepEqual(s.next, violetPair(addBrief("garden-weather-station")));
+  assert.deepEqual(s.next, violetPair(addBrief("proj_hand")));
 });
 
 test("§4.1 row 6 · Private, and its showcased form; showcasing never changes the pair", () => {
@@ -430,7 +431,7 @@ test("§4.1 row 6 · Private, and its showcased form; showcasing never changes t
   assert.equal(s.mintedAt, MINTED);
   // Phase 2 §2.2: a Private project's violet step is Add to marketplace, with View brief beside it.
   const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: "/projects/proj_lamp?list=1" };
-  assert.deepEqual(s.next, { first: add, second: viewBrief("night-light"), violet: true });
+  assert.deepEqual(s.next, { first: add, second: viewBrief("proj_lamp"), violet: true });
 
   const shown = sum({ ...minted, showcasedAt: NOW }, d);
   assert.deepEqual(shown.showcase, { at: NOW });
@@ -444,7 +445,7 @@ test("§4.1 row 7 · Given, under its licence", () => {
   assert.equal(s.statusWord, "Given");
   assert.equal(STATUS_ICON[s.status], "hand-heart");
   assert.equal(s.statusLine, "Minted Sep 22 · given to the community under MIT License");
-  assert.deepEqual(s.next, quietPair(viewBrief("night-light")));
+  assert.deepEqual(s.next, quietPair(viewBrief("proj_lamp")));
 });
 
 test("§4.1 row 8 · a v1 sell with no listing reads Private, never Listed; the record's status is never read alone (LST-5, P2-LISTING-24)", () => {

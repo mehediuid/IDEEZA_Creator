@@ -49,7 +49,7 @@ ideeza-creator-panel/
    │  │   ├─ chat/[chatId]/           concept chat
    │  │   └─ build/[jobId]/           AI build job (status → outputs)
    │  ├─ project/[projectSlug]/products/[productId]/[step]/   the product-scoped editor (PCB/Code/3D/…)
-   │  ├─ project/[projectSlug]/[step]/   legacy editor address (redirects to the resumed product) + the Brief
+   │  ├─ project/[projectSlug]/[step]/   legacy editor address (redirects to the resumed product; brief → the mint flow)
    │  └─ pcb/ code/ 3d/ preview/ wiring/ brief/   legacy flat routes (each redirects to
    │                                       /project/<slug>/<step>) + pcb-editor.css
    │
@@ -86,10 +86,10 @@ ideeza-creator-panel/
    │  ├─ manual/             project-workspace (the editor gate: product scope, seed, banners) + step navigation
    │  ├─ product-flow/       cross-module step/flow provider
    │  ├─ video-jobs/         render jobs provider, browser clip renderer, player, Generate dialog, indicator
-   │  ├─ brief/              Add Brief: brief-app (the intent-aware sequence) + brief-rail,
-   │  │                      step-1-idea · step-2-video (preview) · step-3-mint (the form) ·
-   │  │                      step-4-success, review-modal (the headline's video),
-   │  │                      prompt-help-modal, ar-record-panel
+   │  ├─ brief/              the mint flow (the Brief, in Earn): mint-page (the route's states),
+   │  │                      brief-app (the steps + the commit), brief-card (frame, step line),
+   │  │                      step-choose · step-details · step-review · step-success,
+   │  │                      use-brief-opens, prompt-help-modal (the Generate form's)
    │  ├─ pcb/                ★ PCB module (schematic + PCB editor) — see below
    │  ├─ code/               Code module: Monaco dev-editor + Blockly + AI chat
    │  ├─ 3d/                 3D module: model-viewer, AI generate, sketch, three canvas
@@ -126,11 +126,11 @@ ideeza-creator-panel/
    │  │                      menu copy and part/radio/MCU tables, edit helpers and
    │  │                      what-it-does/pairing facts (types, units, batteries,
    │  │                      bodies, derive, hints, catalog, edits, facts, format).
-   │  ├─ brief/              types.ts (BriefState + `stepsFor` / STEP_ORDER — the sequence
-   │  │                      the wizard and the rail both read — + the stored-draft
-   │  │                      migration), project-brief.ts (the Brief read + the Outcome
-   │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (Step
-   │  │                      4's pure copy), gas.ts, wallet.ts, video-prompt.ts, qr.ts
+   │  ├─ brief/              types.ts (the stored BriefState + its migration, the stored step),
+   │  │                      mint-flow.ts (the mint flow's state, steps, draft read/write and
+   │  │                      gates), project-brief.ts (the Brief read + the Outcome
+   │  │                      card's derivation — see docs/guides/features/platform-and-projects.md), success-copy.ts (the
+   │  │                      success step's pure copy), gas.ts, wallet.ts, video-prompt.ts
    │  ├─ voice/              use-voice-input.ts (one dictation hook + its error copy, every box)
    │  ├─ dashboard/          refine.ts (prompt enhance)
    │  ├─ manual/             projects.tsx (manual project store), project-read.ts

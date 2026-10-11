@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { ProjectWorkspace } from "@/components/manual/project-workspace";
 import type { ManualFlowState } from "@/lib/manual/projects";
 
-// /project/<slug>/<step>. The Brief lives here: it is the project's. Every
-// editor step here is a legacy address (P2-EDITOR-2): ProjectWorkspace, given
-// no product, replaces it with /project/<slug>/products/<productId>/<step>
-// for the product the project resumes.
+// /project/<slug>/<step>. `brief` redirects to the project's mint flow in
+// Earn (Build and Earn P1-2). Every editor step here is a legacy address
+// (P2-EDITOR-2): ProjectWorkspace, given no product, replaces it with
+// /project/<slug>/products/<productId>/<step> for the product the project
+// resumes.
 //
 // URL segment → flow step. Inlined here (rather than imported from the client
 // store module) so this server component stays out of the client bundle graph.
