@@ -14,7 +14,11 @@
 //   each sale pays out.
 // - The CTA is `commitCtaLabel`'s ("Sign and list" / "Pay and give" / "Sign
 //   and save"), the page's one violet control. It stays aria-disabled on
-//   `reviewMissing`, with the reason under it.
+//   `reviewMissing`, with the reason under it, and on the ladder's mint level
+//   (L2, Build and Earn P1-4): the steps this flow doesn't gate itself (the
+//   demo wallet) show above it, each with its fix.
+// - A Sell is a sale of a share: its terms carry the fixed testnet note, and
+//   royalties read as a share of resales, if marketplaces honour it.
 
 import * as React from "react";
 import Link from "next/link";
@@ -34,6 +38,8 @@ import { formatAmount, toMicros } from "@/lib/wallet/money";
 import type { MintType } from "@/lib/wallet/types";
 import { readyCountLine, statusCopy } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
+import { LevelCheck, useCommitCheck } from "@/components/projects/earn/ladder/level-check";
 import type { BriefGate } from "./brief-app";
 import { BriefCard, Spinner, TAP, primaryCta } from "./brief-card";
 
@@ -52,6 +58,8 @@ const SHARED_AS: Record<Intent, string> = {
 export const MAKE_VIDEOS = "Make videos in Media";
 const VIDEOS_OPTIONAL = "Videos are optional when you keep it private.";
 const VIDEOS_READY = "Every product has its video.";
+/** The flow's own ownership confirm and its readiness gate already ask these. */
+const MINT_HANDLED = ["ownership", "videos"] as const;
 
 /** The cost box's listing row: "Listing (Buy now) · 0.05 MATIC". */
 function listingCostRow(input: ListingInput): { label: string; amount: string } | undefined {
@@ -87,7 +95,7 @@ function termsOf(s: MintState, intent: Intent, type: MintType, input: ListingInp
     const cost = listingCostRow(input);
     rows.push({ label: input.type === "auction" ? "Auction" : "Buy now", value: cost?.amount ?? "No price yet" });
     if (input.percentSelling !== null) rows.push({ label: "Selling", value: `${input.percentSelling}% of the project` });
-    if (input.royalties.trim()) rows.push({ label: "Royalties", value: `${input.royalties.trim()}%` });
+    if (input.royalties.trim()) rows.push({ label: "Royalties", value: royaltyText(input.royalties.trim()) });
   }
   return rows;
 }
@@ -133,7 +141,14 @@ export function StepReview({
   const headingId = React.useId();
   const input = listingInputFromBrief(briefStateOf(state));
   const listingCtx: ListingCtx = { mode: "brief", now, creatorPct };
-  const canGo = !missing && !minting;
+  // The mint level reads no commercial fact (minted is L3's), so "none" stands in.
+  const ladder = useCommitCheck(
+    "mint",
+    { products: gate.readiness.products.map(() => ({ dropped: null })), sell: gate.readiness, commercial: "none", license: state.license },
+    { handled: MINT_HANDLED },
+  );
+  const stepsId = React.useId();
+  const canGo = !missing && !minting && ladder.ok;
   const cta = commitCtaLabel(intent, type, { last: true, fromPreview: false, innovations: state.shareToNewsfeed });
   const { readiness, gated } = gate;
   const counts = readiness.counts;
@@ -169,6 +184,7 @@ export function StepReview({
               </div>
             ))}
           </dl>
+          {intent === "sell" && <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-text-secondary">{SHARE_SALE_NOTE}</p>}
         </section>
 
         <section aria-labelledby={headingId} className="flex flex-col gap-[10px]">
@@ -231,6 +247,8 @@ export function StepReview({
           </section>
         )}
 
+        <LevelCheck check={ladder} what="mint" id={stepsId} project={project} brief={null} />
+
         <div className="flex flex-col gap-[8px]">
           <button
             type="button"
@@ -238,7 +256,7 @@ export function StepReview({
               if (canGo) onSign();
             }}
             aria-disabled={!canGo || undefined}
-            aria-describedby={missing ? reasonId : undefined}
+            aria-describedby={[missing && reasonId, !ladder.ok && stepsId].filter(Boolean).join(" ") || undefined}
             aria-busy={minting || undefined}
             className={primaryCta(canGo)}
           >

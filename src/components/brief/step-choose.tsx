@@ -40,7 +40,7 @@ const INTENTS: { id: Intent; label: string; sub: string; requirement: string; ic
     id: "sell",
     label: "Sell",
     sub: "Mint it and list it on Explore marketplace.",
-    requirement: "Wallet + identity check",
+    requirement: "Wallet needed · no KYC",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />

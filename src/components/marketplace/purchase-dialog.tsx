@@ -37,6 +37,7 @@
 
 import * as React from "react";
 import { estimateGas } from "@/lib/brief/gas";
+import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { ProjectView } from "@/lib/manual/project-read";
 import type { ManualProject } from "@/lib/manual/projects";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
@@ -127,6 +128,7 @@ export function usePurchase({
         lazy ? "was minted to" : "moved to"
       } ${name}'s demo wallet.`;
 
+      const fee = quote.lines.find((l) => l.startsWith("Includes"));
       const req: WalletRequest = {
         kind: "transaction",
         purpose: "purchase",
@@ -141,7 +143,7 @@ export function usePurchase({
           },
           { label: "Paying from", value: `${name}'s demo wallet · ${shortAddress(buyerAddress)}` },
         ],
-        note: quote.lines.find((l) => l.startsWith("Includes")) ?? "",
+        note: fee ? `${fee}. ${SHARE_SALE_NOTE}` : SHARE_SALE_NOTE,
         doneLine,
         charge: {
           network: listing.network,

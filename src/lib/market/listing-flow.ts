@@ -9,6 +9,7 @@
 
 import { estimateGas } from "../commerce/gas";
 import { NETWORKS, TOKENS_BY_NETWORK, type BriefState, type Network } from "../brief/types";
+import { royaltyText } from "../commerce/share-copy";
 import { benefitDurationText, formatDate, formatDateTime, type MetaPart } from "../manual/public";
 import { shortAddress } from "../wallet/demo-wallet";
 import { buyerLabel } from "../wallet/identities";
@@ -197,7 +198,7 @@ export function editRequestOf(l: Listing, projectName: string, next: Terms & { r
     { label: "Project", value: projectName },
     { label: "Price", value: was === now ? now : `${was} → ${now}` },
     { label: "Selling percentage", value: `${next.percentSelling ?? l.percentSelling}% of the project` },
-    { label: "Royalties", value: `${Number(next.royalties) || 0}% on resales` },
+    { label: "Royalties", value: royaltyText(Number(next.royalties) || 0) },
   ];
   if (next.benefits.length) summary.push({ label: "Holder benefits", value: next.benefits.map((b) => b.name.trim()).join(", ") });
   const base = { purpose: "editListing" as const, identity: "maker" as const, network: l.network, summary, doneLine: "Listing updated." };
@@ -336,7 +337,7 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
       const since = fact("On the marketplace", text("since "), time(formatDateTime(l.listedAt), l.listedAt));
       const common = [
         fact("Selling percentage", text(`${l.percentSelling}%`)),
-        fact("Royalties", text(`${l.royaltiesPct}% on resales`)),
+        fact("Royalties", text(royaltyText(l.royaltiesPct))),
         fact("Minting", text(mintingLineOf(l))),
       ];
       if (l.type === "buyNow") {
@@ -400,7 +401,7 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
           fact("IDEEZA fee", text(`${feePercentText(s.fees.ideezaBps)} · ${formatAmount(s.fees.ideeza, s.token)}`)),
           fact("You received", text(formatAmount(s.payout, s.token))),
           fact("Selling percentage", text(`${share}% of the project`)),
-          fact("Royalties", text(`${s.royaltiesPct}% on resales`)),
+          fact("Royalties", text(royaltyText(s.royaltiesPct))),
           fact("Transfer date", time(formatDate(s.at), s.at)),
         ],
       };

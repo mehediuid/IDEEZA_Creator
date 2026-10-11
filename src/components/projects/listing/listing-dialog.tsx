@@ -144,7 +144,7 @@ export function sellRecheckOf(
   const maker = makerShareNow(p, ctx.market);
   if (ctx.percentSelling <= maker) return null;
   return maker > 0
-    ? `You hold ${maker}% of this project now, less than the ${ctx.percentSelling}% this listing sells. Close this and lower Percent Selling.`
+    ? `You hold ${maker}% of this project now, less than the ${ctx.percentSelling}% this listing sells. Close this and lower the selling percentage.`
     : "You no longer hold any share of this project to sell.";
 }
 

@@ -14,6 +14,7 @@
 
 import * as React from "react";
 import { estimateGas } from "@/lib/brief/gas";
+import { SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import type { ManualProject } from "@/lib/manual/projects";
 import { auctionStateOf, makeBid } from "@/lib/market/auction";
 import { readMarketNow, useMarket } from "@/lib/market/market-store";
@@ -66,7 +67,7 @@ export function usePlaceBid({
           { label: "Bid", value: `${bid} on ${project.name} · ${listing.percentSelling}% of the project` },
           { label: "Bidding as", value: buyerLabel(buyerId) },
         ],
-        note: `No network fee to bid. If you win, ${formatAmount(String(gas.fee), gas.native)} is added when the creator closes the auction. Held in your demo wallet until you're outbid or the auction ends · free after this bid: ${formatAmount(after, listing.token)}.`,
+        note: `No network fee to bid. If you win, ${formatAmount(String(gas.fee), gas.native)} is added when the creator closes the auction. Held in your demo wallet until you're outbid or the auction ends · free after this bid: ${formatAmount(after, listing.token)}. ${SHARE_SALE_NOTE}`,
         doneLine,
       };
 

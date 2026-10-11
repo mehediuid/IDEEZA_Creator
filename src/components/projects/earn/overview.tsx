@@ -1,11 +1,12 @@
 "use client";
 
 // Earn › Overview: "Ready to earn", then one card per way to earn.
-// - The checklist is `readyRowsOf` (earn-view.ts): the Sell gate's rules
-//   from the page's own `view.videos.readiness` (the rows the project page's
-//   Earn button counts), then Minted. Each row says
-//   its state with a glyph and a word for assistive tech, never colour alone,
-//   and a row that isn't done says why in the rule's own words.
+// - "Ready to earn" is the gating ladder (Build and Earn P1-4,
+//   ladder/ladder-track.tsx): the five levels, then the next level's steps,
+//   each missing one with its one-tap fix. Its rows are the ladder's facts,
+//   the same ones every commit point checks, so this checklist and a blocked
+//   commit always agree. Each row says its state with a glyph and a word for
+//   assistive tech, never colour alone.
 // - The cards are links to their sections, each with its gate badge: Wallet
 //   where the demo wallet signs (listing, minting, editions), No wallet
 //   where none is needed.
@@ -14,53 +15,23 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight01Icon, CheckmarkCircle02Icon, CircleIcon, Wallet01Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza";
 import { earnHref } from "@/lib/manual/earn-route";
-import { EARN_OPTIONS, GATE_TEXT, readyRowsOf, type EarnGate } from "@/lib/manual/earn-view";
+import { EARN_OPTIONS, GATE_TEXT, type EarnGate } from "@/lib/manual/earn-view";
 import type { SlotProps } from "../details/slots";
+import { LadderTrack } from "./ladder/ladder-track";
 
 const CARD =
   "group flex h-full min-h-[var(--touch-min)] flex-col gap-3 rounded-2xl border border-solid border-border bg-bg-surface p-8 outline-none transition-colors duration-normal ease-out hover:border-border-strong hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
 
-export function EarnOverview({ project, view }: SlotProps) {
-  const rows = readyRowsOf(view.videos.readiness);
-  const ready = rows.every((r) => r.ok);
-  const readyId = React.useId();
+export function EarnOverview({ project, view, brief, now, announce }: SlotProps) {
   const waysId = React.useId();
 
   return (
     <div className="flex max-w-[720px] flex-col gap-16">
-      <section
-        aria-labelledby={readyId}
-        className="flex flex-col gap-8 rounded-2xl border border-solid border-border bg-bg-surface p-8 [@container(min-width:640px)]:p-10"
-      >
-        <div className="flex flex-col gap-2">
-          <h2 id={readyId} className="m-0 text-lg font-bold text-text-primary">
-            Ready to earn
-          </h2>
-          <p className="m-0 max-w-[62ch] text-md leading-relaxed text-text-secondary">
-            {ready ? "Everything a listing needs is in place." : "What a listing still needs."}
-          </p>
-        </div>
-        <ul className="m-0 flex list-none flex-col gap-6 p-0">
-          {rows.map((r) => (
-            <li key={r.id} className="flex items-start gap-4">
-              <span aria-hidden className={r.ok ? "inline-flex pt-px text-text-success" : "inline-flex pt-px text-text-tertiary"}>
-                <Icon icon={r.ok ? CheckmarkCircle02Icon : CircleIcon} size={20} />
-              </span>
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="text-md font-semibold text-text-primary">
-                  {r.label}
-                  <span className="sr-only">{r.ok ? ", done" : ", not done yet"}</span>
-                </span>
-                {r.reason && <span className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">{r.reason}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <LadderTrack project={project} view={view} brief={brief} now={now} announce={announce} />
 
       <section aria-labelledby={waysId} className="flex flex-col gap-8">
         <h2 id={waysId} className="m-0 text-lg font-bold text-text-primary">

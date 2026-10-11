@@ -208,7 +208,7 @@ export function walletFactOf(
   const identity = `maker-${account.index}` as const;
   const state = w.identities[identity];
   if (!state?.connected) {
-    return { heading, line: `No wallet connected — you'll connect the demo wallet when you ${verb}.`, tone: "info" };
+    return { heading, line: `No wallet connected — connect the demo wallet before you ${verb}.`, tone: "info" };
   }
   if (state.network !== ctx.network) {
     return {

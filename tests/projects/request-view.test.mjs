@@ -229,7 +229,7 @@ test("walletFactLineOf: balance on a connected instant mint, and the can't-affor
   assert.equal(rv.walletFactLineOf(on, { type: "lazy", network: "baseSepolia" }, m).line, "Demo account 1 · 0x955d…ed95");
   assert.equal(
     rv.walletFactLineOf(defaultWallet(), { type: "instant", network: "baseSepolia" }, m).line,
-    "No wallet connected — you'll connect the demo wallet when you pay.",
+    "No wallet connected — connect the demo wallet before you pay.",
   );
   const poor = spend(on, "maker-1", [{ coin: "IDZ", amount: "38" }]);
   const warn = rv.walletFactLineOf(poor, { type: "instant", network: "baseSepolia" }, m);
