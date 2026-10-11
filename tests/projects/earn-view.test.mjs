@@ -116,13 +116,13 @@ test("the header's one status pill says the commercial state in a maker's words"
 
 // ─────────────────────────── the Overview ───────────────────────────
 
-test("the path is Mint → Sell → Get paid, every step before the maker's place done", () => {
-  assert.deepEqual(EARN_STEPS.map((s) => s.label), ["Mint", "Sell", "Get paid"]);
+test("the steps are Mint → Sell; minted is at Sell, and anything live has both done", () => {
+  assert.deepEqual(EARN_STEPS.map((s) => s.label), ["Mint", "Sell"]);
   const states = (c) => earnPathOf(c).map((s) => s.state);
-  assert.deepEqual(states("none"), ["current", "todo", "todo"]);
-  for (const c of ["minted", "listed", "paused", "given"]) assert.deepEqual(states(c), ["done", "current", "todo"], c);
-  for (const c of ["soldPartial", "soldOut"]) assert.deepEqual(states(c), ["done", "done", "current"], c);
-  assert.deepEqual(earnPathOf("none").map((s) => s.n), [1, 2, 3]);
+  assert.deepEqual(states("none"), ["current", "todo"]);
+  assert.deepEqual(states("minted"), ["done", "current"]);
+  for (const c of ["listed", "paused", "given", "soldPartial", "soldOut"]) assert.deepEqual(states(c), ["done", "done"], c);
+  assert.deepEqual(earnPathOf("none").map((s) => s.n), [1, 2]);
 });
 
 test("the Overview's card: mint, then sell, each with its why; later states say where they're managed", () => {
@@ -146,7 +146,8 @@ test("the Overview's card: mint, then sell, each with its why; later states say 
     const n = earnNextOf("proj_car", state);
     assert.equal(n.point, null, state);
     assert.equal(n.verb, null, state);
-    assert.equal(n.step, earnPathOf(state).find((s) => s.state === "current").id, `${state}: the card is the path's current step`);
+    assert.equal(n.step, "sell", state);
+    assert.ok(earnPathOf(state).every((s) => s.state === "done"), `${state}: live, so both steps are done`);
     assert.match(n.action.href, /^\/projects\/proj_car\/earn\/(sell|money#customers)$/, state);
     assert.match(n.title, /^[A-Z][^—]*$/, n.title);
     assert.match(n.why, /^[A-Z][^—]*\.$/, n.why);

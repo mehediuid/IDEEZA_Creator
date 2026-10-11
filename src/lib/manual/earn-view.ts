@@ -122,12 +122,12 @@ export function earnStatusOf(commercial: CommercialState): { word: string; tone:
 
 // ─────────────────────────── the Overview ───────────────────────────
 
-/** The Overview's path, in order: ① Mint → ② Sell → ③ Get paid. */
-export type EarnStepId = "mint" | "sell" | "paid";
-export const EARN_STEPS: readonly { id: EarnStepId; label: string }[] = [
-  { id: "mint", label: "Mint" },
-  { id: "sell", label: "Sell" },
-  { id: "paid", label: "Get paid" },
+/** The Overview's two steps, in order: ① Mint → ② Sell (owner, 2026-10-11: no "Get paid" step —
+ *  a sale pays the maker's wallet at once, minus the fee). */
+export type EarnStepId = "mint" | "sell";
+export const EARN_STEPS: readonly { id: EarnStepId; label: string; title: string }[] = [
+  { id: "mint", label: "Mint", title: "Mint your project" },
+  { id: "sell", label: "Sell", title: "Put it on sale" },
 ];
 
 const STEP_OF: Record<CommercialState, EarnStepId> = {
@@ -136,16 +136,18 @@ const STEP_OF: Record<CommercialState, EarnStepId> = {
   listed: "sell",
   paused: "sell",
   given: "sell",
-  soldPartial: "paid",
-  soldOut: "paid",
+  soldPartial: "sell",
+  soldOut: "sell",
 };
 
-export type EarnPathStep = { id: EarnStepId; label: string; n: number; state: "done" | "current" | "todo" };
+export type EarnPathStep = { id: EarnStepId; label: string; title: string; n: number; state: "done" | "current" | "todo" };
 
-/** The path with the maker's place on it: every step before the current one is done. */
+/** The steps with the maker's place on them: every step before the current one is done, and once
+ *  something is live (listed, paused, given, sold) both are. */
 export function earnPathOf(commercial: CommercialState): EarnPathStep[] {
+  const live = commercial !== "none" && commercial !== "minted";
   const at = EARN_STEPS.findIndex((s) => s.id === STEP_OF[commercial]);
-  return EARN_STEPS.map((s, i) => ({ ...s, n: i + 1, state: i < at ? "done" : i === at ? "current" : "todo" }));
+  return EARN_STEPS.map((s, i) => ({ ...s, n: i + 1, state: live || i < at ? "done" : i === at ? "current" : "todo" }));
 }
 
 /**
