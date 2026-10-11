@@ -37,3 +37,9 @@ export function earnHref(projectId: string, section: EarnSection = "overview", q
   const qs = query && Object.keys(query).length ? `?${new URLSearchParams(query).toString()}` : "";
   return base + qs;
 }
+
+/** `/projects/<id>/earn/mint` — the mint flow (the Brief, Build and Earn P1-2), opened from
+ *  Earn › Project NFT. A static segment, so it wins over `earn/[section]`. */
+export function earnMintHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/earn/mint`;
+}

@@ -1,6 +1,7 @@
 "use client";
 
-// Step 4 — Mint Success.
+// Success — the mint flow's last step (Build and Earn P1-2), as the Brief's
+// Step 4 was.
 //
 // Reached once the commit's wallet request confirmed and its writes landed.
 // A Sell is listed on Explore marketplace (P2-LISTING-22), and a Sell or a
@@ -16,7 +17,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { EyeIcon, PlayIcon } from "@hugeicons/core-free-icons";
-import { type BriefState, type Intent } from "./brief-app";
 import { Icon } from "@/components/dashboard/icon";
 import { ProgressBar, TestnetDemoBadge } from "@/components/ideeza";
 import { dialogBlockerOf, ReadinessDialog } from "@/components/projects/details/readiness-dialog";
@@ -32,6 +32,8 @@ import {
   pendingSubline,
   showcaseGateLine,
 } from "@/lib/brief/success-copy";
+import type { MintState } from "@/lib/brief/mint-flow";
+import type { Intent } from "@/lib/brief/types";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectProduct } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
@@ -44,6 +46,7 @@ import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
+import { TAP } from "./brief-card";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   sell: "Listed on the marketplace",
@@ -53,14 +56,14 @@ const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
 
 const NO_METADATA: ListingMetadata = { name: "", description: "", products: [], cover: null, at: 0 };
 
-export function Step4Success({
+export function StepSuccess({
   state,
   onBrowse,
   projectName,
   projectId,
   products,
 }: {
-  state: BriefState;
+  state: Pick<MintState, "intent">;
   onBrowse: (href: string) => void;
   projectName: string;
   /** The project this brief minted — what Showcase flags (COM-56). */
@@ -145,7 +148,7 @@ export function Step4Success({
           {onMarket && (
             <Link
               href={`/marketplace/${projectId}`}
-              className="mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+              className={`mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
             >
               {VIEW_ON_MARKETPLACE}
             </Link>
@@ -199,7 +202,7 @@ export function Step4Success({
         <div className="flex items-center justify-center">
           <Link
             href="/"
-            className="rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+            className={`inline-flex items-center rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
           >
             Back to home
           </Link>

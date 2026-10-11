@@ -55,7 +55,7 @@ const summaryOf = (p, brief, m = EMPTY_MARKET, extra = {}) =>
   projectSummary(p, { builds: [], brief, videoJobs: [], now: NOW, market: m, ...extra });
 const pairOf = (p, brief, m = EMPTY_MARKET, extra = {}) => summaryOf(p, brief, m, extra).next;
 
-const BRIEF = "/project/car/brief";
+const BRIEF = "/projects/proj_car/earn/mint"; // the mint flow (Build and Earn P1-2)
 const LIST = "/projects/proj_car/earn/sell?list=1"; // listFlowHref: Earn › Project NFT (Build and Earn P0)
 const viewBrief = { kind: "view-brief", label: "View brief", href: BRIEF };
 const add = { kind: "add-to-marketplace", label: "Add to marketplace", href: LIST };
