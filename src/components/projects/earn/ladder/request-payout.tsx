@@ -27,7 +27,7 @@ export function RequestPayout({
   now,
   announce,
 }: {
-  project: Pick<ManualProject, "id" | "slug">;
+  project: Pick<ManualProject, "id">;
   view: Pick<ProjectView, "products" | "videos" | "mint" | "sales">;
   brief: StoredDraft | null;
   now: number;

@@ -14,6 +14,9 @@
 //
 // When the maker holds no share, the button stays focusable but
 // aria-disabled, with the reason beside it, and opens nothing (COR-67).
+// Below the ladder's L3 (Build and Earn P1-4) it does the same, with the
+// missing steps and their fixes under it; videos and ownership stay the
+// gate's and the form's own.
 
 import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -21,11 +24,15 @@ import { Tag01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { LISTING_TRIGGER_ID, MARKETPLACE_FOCUS_ID } from "@/lib/market/listing-flow";
 import { cn } from "@/lib/utils";
+import { LevelCheck, useCommitCheck } from "../earn/ladder/level-check";
+import { earnSourceOf } from "../earn/ladder/use-earn-facts";
 import { dialogBlockerOf, ReadinessDialog } from "../details/readiness-dialog";
 import type { ActionSlotProps } from "../details/slots";
 import { focusSoon, ListingDialog } from "./listing-dialog";
 
 type Open = "gate" | "form" | null;
+
+const LIST_HANDLED = ["videos", "ownership"] as const;
 
 const BASE =
   "inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg px-8 text-md font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none";
@@ -38,8 +45,11 @@ const QUIET = "border border-solid border-border bg-bg-surface text-text-primary
 export function ListingFlow({ project, view, brief, now, announce, action, violet, className }: ActionSlotProps) {
   const search = useSearchParams();
   const pathname = usePathname();
+  const ladder = useCommitCheck("list", earnSourceOf(view, brief), { handled: LIST_HANDLED });
   const blocked = action.blocked ?? null;
+  const steps = !blocked && !ladder.ok;
   const reasonId = React.useId();
+  const stepsId = React.useId();
 
   const firstStep = React.useCallback(
     (): Open => (dialogBlockerOf(view.videos.readiness.sell) ? "gate" : "form"),
@@ -67,12 +77,12 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
       <button
         id={LISTING_TRIGGER_ID}
         type="button"
-        aria-disabled={blocked ? true : undefined}
-        aria-describedby={blocked ? reasonId : undefined}
+        aria-disabled={blocked || steps ? true : undefined}
+        aria-describedby={blocked ? reasonId : steps ? stepsId : undefined}
         onClick={() => {
-          if (!blocked) setOpen(firstStep());
+          if (!blocked && !steps) setOpen(firstStep());
         }}
-        className={cn(BASE, violet && !blocked ? PRIMARY : QUIET, blocked && "cursor-not-allowed opacity-60", className)}
+        className={cn(BASE, violet && !blocked && !steps ? PRIMARY : QUIET, (blocked || steps) && "cursor-not-allowed opacity-60", className)}
       >
         <Icon icon={Tag01Icon} size={18} />
         {action.label}
@@ -83,7 +93,11 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
         </p>
       )}
 
-      {open === "gate" && (
+      {steps && (
+        <LevelCheck check={ladder} what="list" id={stepsId} project={project} brief={brief} announce={announce} className="w-full basis-full" />
+      )}
+
+      {open === "gate" && !steps && (
         <ReadinessDialog
           purpose="sell"
           project={project}
@@ -93,7 +107,7 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
           onClose={close}
         />
       )}
-      {open === "form" && (
+      {open === "form" && !steps && (
         <ListingDialog
           mode="add"
           project={project}

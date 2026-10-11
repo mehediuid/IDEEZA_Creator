@@ -4,8 +4,9 @@
 // One row component for the Earn overview's track and every commit point, so
 // a step reads and fixes the same wherever it's asked:
 // - Open products, Make videos in Media, Go to mint, Set payout wallet: links
-//   to the one place that step is done (the payout wallet lives in the
-//   Outcome block of Earn › Project NFT).
+//   to the one place that step is done. Minting starts from Earn › Project
+//   NFT (the Brief entry, the mint flow's home), and the payout wallet lives
+//   in its Outcome block.
 // - Connect wallet: opens the Demo wallet dialog.
 // - Confirm ownership: writes `ownerConfirmedAt` at once, the readiness gate's
 //   own write.
@@ -14,14 +15,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CircleIcon } from "@hugeicons/core-free-icons";
+import { CheckmarkCircle02Icon, CircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, buttonVariants } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import type { LadderStep } from "@/lib/commerce/ladder";
 import { earnHref } from "@/lib/manual/earn-route";
-import { stepHref, useManualProjects, type ManualProject } from "@/lib/manual/projects";
+import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 import { LicenseDialog } from "./license-dialog";
 import { VerifyIdentityDialog } from "./verify-identity-dialog";
@@ -30,7 +31,7 @@ const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var
 const FIX = cn(buttonVariants({ hierarchy: "secondary", size: "md" }), "shrink-0 whitespace-nowrap max-sm:w-full", TAP);
 
 type FixContext = {
-  project: Pick<ManualProject, "id" | "slug">;
+  project: Pick<ManualProject, "id">;
   brief: StoredDraft | null;
   /** The page's polite live region, for a fix that changes state in place. */
   announce?: (message: string) => void;
@@ -57,11 +58,6 @@ export function StepFix({ step, project, brief, announce, describedBy }: FixCont
         </Link>
       );
     case "mint":
-      return (
-        <Link href={stepHref(project.slug, "brief")} className={FIX} aria-describedby={describedBy}>
-          {label}
-        </Link>
-      );
     case "payout":
       return (
         <Link href={earnHref(project.id, "sell")} className={FIX} aria-describedby={describedBy}>
@@ -117,28 +113,34 @@ export function StepFix({ step, project, brief, announce, describedBy }: FixCont
   }
 }
 
-/** The missing steps as rows: an open circle, the step, why, and its fix. */
-export function MissingSteps({ steps, ...ctx }: FixContext & { steps: readonly LadderStep[] }) {
+/**
+ * Steps as rows: the glyph and its word (done or not done yet), the step,
+ * and, while it's missing, why and its fix. A step without `ok` is missing.
+ */
+export function MissingSteps({ steps, ...ctx }: FixContext & { steps: readonly (LadderStep & { ok?: boolean })[] }) {
   const base = React.useId();
   return (
     <ul role="list" className="m-0 flex list-none flex-col divide-y divide-border rounded-lg border border-solid border-border p-0">
       {steps.map((s) => {
         const reasonId = `${base}-${s.id}`;
+        const done = s.ok === true;
         return (
           <li key={s.id} className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
-            <span aria-hidden className="inline-flex shrink-0 self-start pt-px text-text-tertiary">
-              <Icon icon={CircleIcon} size={20} />
+            <span aria-hidden className={cn("inline-flex shrink-0 self-start pt-px", done ? "text-text-success" : "text-text-tertiary")}>
+              <Icon icon={done ? CheckmarkCircle02Icon : CircleIcon} size={20} />
             </span>
             <span className="flex min-w-0 flex-1 basis-[200px] flex-col gap-1">
               <span className="text-md font-semibold text-text-primary">
                 {s.label}
-                <span className="sr-only">, not done yet</span>
+                <span className="sr-only">{done ? ", done" : ", not done yet"}</span>
               </span>
-              <span id={reasonId} className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
-                {s.reason}
-              </span>
+              {!done && (
+                <span id={reasonId} className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
+                  {s.reason}
+                </span>
+              )}
             </span>
-            <StepFix step={s} describedBy={reasonId} {...ctx} />
+            {!done && <StepFix step={s} describedBy={reasonId} {...ctx} />}
           </li>
         );
       })}

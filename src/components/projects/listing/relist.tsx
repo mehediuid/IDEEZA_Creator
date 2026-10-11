@@ -18,6 +18,9 @@
 //   items above to relist."), and pressing it — or "Generate videos" — opens
 //   T14's ReadinessDialog for the relist, whose own "Relist" goes on once the
 //   videos are ready.
+// - Below the ladder's L3 (Build and Earn P1-4), Relist is aria-disabled and
+//   the missing steps sit under it with their fixes; the videos stay this
+//   checklist's own.
 // - Below a 1024 px page (`actionsFirst`, C21) the Relist row leads — its hint
 //   and error with it — then the card's lines (`facts`), then the checklist,
 //   so Relist is above a phone's fold.
@@ -37,10 +40,13 @@ import { readMarketNow, useMarket } from "@/lib/market/market-store";
 import type { Listing } from "@/lib/market/types";
 import { cn } from "@/lib/utils";
 import { ReadinessDialog } from "../details/readiness-dialog";
+import { LevelCheck, useCommitCheck } from "../earn/ladder/level-check";
+import { earnSourceOf } from "../earn/ladder/use-earn-facts";
 import { makerShareNow, refusedCopy, sellRecheckOf } from "./listing-dialog";
 
 const FINISH_FIRST = "Finish the items above to relist.";
 const FINISH_BELOW = "Finish the items below to relist.";
+const RELIST_HANDLED = ["videos"] as const;
 
 export function RelistPanel({
   project,
@@ -89,10 +95,12 @@ export function RelistPanel({
 
   const items = relistChecklist(view.videos.readiness.relist, changed);
   const ready = items.every((i) => i.ok);
+  const ladder = useCommitCheck("list", earnSourceOf(view, brief), { handled: RELIST_HANDLED });
+  const stepsId = React.useId();
 
   /** `videosReady`: the checklist's, or the gate dialog's own once it lets the relist through. */
   const relist = async (videosReady: boolean) => {
-    if (busy) return;
+    if (busy || !ladder.ok) return;
     setError(null);
     setBusy(true);
     const result = await request(relistRequestOf(listing, project.name, changed), {
@@ -181,11 +189,11 @@ export function RelistPanel({
       <div className="flex flex-wrap gap-4">
         <button
           type="button"
-          aria-disabled={!ready || undefined}
-          aria-describedby={!ready ? hintId : undefined}
+          aria-disabled={!ready || !ladder.ok || undefined}
+          aria-describedby={[!ready && hintId, !ladder.ok && stepsId].filter(Boolean).join(" ") || undefined}
           aria-busy={busy || undefined}
-          onClick={() => (ready ? void relist(true) : setGate(true))}
-          className={cn(buttonClass, primaryClass, !ready && "cursor-not-allowed opacity-60")}
+          onClick={() => (!ladder.ok ? undefined : ready ? void relist(true) : setGate(true))}
+          className={cn(buttonClass, primaryClass, (!ready || !ladder.ok) && "cursor-not-allowed opacity-60")}
         >
           {busy ? "Relisting…" : "Relist"}
         </button>
@@ -196,6 +204,7 @@ export function RelistPanel({
           {actionsFirst ? FINISH_BELOW : FINISH_FIRST}
         </p>
       )}
+      <LevelCheck check={ladder} what="relist" id={stepsId} project={project} brief={brief} />
     </>
   );
 

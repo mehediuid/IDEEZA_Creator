@@ -1,11 +1,14 @@
 "use client";
 
-// Earn › Overview's ladder track (Build and Earn P1-4): the five levels from
-// Engineering to Physical editions & payouts, how far this project has come,
-// and what the next level still needs, each missing step with its fix.
+// Earn › Overview's "Ready to earn" (Build and Earn P1-4): the gating
+// ladder's five levels, from Engineering to Physical editions & payouts, how
+// far this project has come, and the next level's steps, done or not, each
+// missing one with its fix. It is the overview's one checklist: every row is
+// a ladder step read from `earnFactsOf`, the same facts every commit point
+// checks, so the overview and a blocked commit can't disagree.
 // - Each level says its state in words as well as a glyph (Reached, Next,
-//   Locked), never colour alone. Reached levels take the success colour, as
-//   the overview's checklist does; nothing here is violet.
+//   Locked), never colour alone. Reached levels and done steps take the
+//   success colour; nothing here is violet.
 // - Wide (640 px and up, the section's own width): five columns, each topped
 //   with a bar. Narrow: one row per level, so 400 px never scrolls sideways.
 // - The demo identity check lives here once verified: the date, and Reset.
@@ -17,7 +20,7 @@ import { CheckmarkCircle02Icon, CircleIcon, LockIcon, UserCheck01Icon } from "@h
 import { Icon } from "@/components/dashboard/icon";
 import { Button } from "@/components/ideeza";
 import type { StoredDraft } from "@/lib/brief/project-brief";
-import { EARN_LEVELS, earnLevelOf, type EarnLevel } from "@/lib/commerce/ladder";
+import { EARN_LEVELS, earnLevelOf, levelStepsOf, type EarnLevel } from "@/lib/commerce/ladder";
 import { resetKycDemo, useKyc } from "@/lib/commerce/use-commerce";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { formatShortDate } from "@/lib/manual/project-summary";
@@ -39,7 +42,7 @@ export function LadderTrack({
   now,
   announce,
 }: {
-  project: Pick<ManualProject, "id" | "slug">;
+  project: Pick<ManualProject, "id">;
   view: Pick<ProjectView, "products" | "videos" | "mint">;
   brief: StoredDraft | null;
   now: number;
@@ -50,7 +53,8 @@ export function LadderTrack({
   const { level, next } = earnLevelOf(facts);
   const kyc = useKyc();
   const headingId = React.useId();
-  const nextId = React.useId();
+  const nextSteps = next ? levelStepsOf(next.level, facts) : [];
+  const doneCount = nextSteps.filter((s) => s.ok).length;
 
   const stateOf = (l: EarnLevel): LevelState => {
     if (l === 0) return "reached";
@@ -62,11 +66,11 @@ export function LadderTrack({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-8 rounded-2xl border border-solid border-border bg-bg-surface p-8 [container-type:inline-size]"
+      className="flex flex-col gap-8 rounded-2xl border border-solid border-border bg-bg-surface p-8 [container-type:inline-size] [@container(min-width:640px)]:p-10"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <h2 id={headingId} className="m-0 text-lg font-bold text-text-primary">
-          Earning level
+          Ready to earn
         </h2>
         {ready && (
           <span className="text-sm font-medium text-text-secondary">
@@ -117,12 +121,12 @@ export function LadderTrack({
       {ready && next && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <h3 id={nextId} className="m-0 text-md font-semibold text-text-primary">
-              {`Next: ${EARN_LEVELS[next.level].name}`}
+            <h3 className="m-0 text-md font-semibold text-text-primary">
+              {`Next: ${EARN_LEVELS[next.level].name} · ${doneCount} of ${nextSteps.length} done`}
             </h3>
             <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-text-secondary">{EARN_LEVELS[next.level].opens}</p>
           </div>
-          <MissingSteps steps={next.missing} project={project} brief={brief} announce={announce} />
+          <MissingSteps steps={nextSteps} project={project} brief={brief} announce={announce} />
         </div>
       )}
 

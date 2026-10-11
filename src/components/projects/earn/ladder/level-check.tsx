@@ -14,6 +14,7 @@ import * as React from "react";
 import type { StoredDraft } from "@/lib/brief/project-brief";
 import { commitCheck, EARN_LEVELS, type CommitPoint, type LadderStepId, type LevelCheck as Check } from "@/lib/commerce/ladder";
 import type { ManualProject } from "@/lib/manual/projects";
+import { cn } from "@/lib/utils";
 import { MissingSteps } from "./missing-steps";
 import { useEarnFacts, type EarnFactsSource } from "./use-earn-facts";
 
@@ -31,22 +32,24 @@ export function LevelCheck({
   project,
   brief,
   announce,
+  className,
 }: {
   check: Check;
   /** The commit, as a verb phrase: "list this project", "mint". */
   what: string;
   /** The notice's id, for the commit control's aria-describedby. */
   id?: string;
-  project: Pick<ManualProject, "id" | "slug">;
+  project: Pick<ManualProject, "id">;
   brief: StoredDraft | null;
   announce?: (message: string) => void;
+  className?: string;
 }) {
   const headingId = React.useId();
   if (check.ok) return null;
   const level = EARN_LEVELS[check.level];
   const n = check.missing.length;
   return (
-    <section id={id} aria-labelledby={headingId} className="flex flex-col gap-4">
+    <section id={id} aria-labelledby={headingId} className={cn("flex flex-col gap-4", className)}>
       <div className="flex flex-col gap-1">
         <h3 id={headingId} className="m-0 text-md font-semibold text-text-primary">
           {n === 1 ? `One step before you ${what}` : `${n} steps before you ${what}`}

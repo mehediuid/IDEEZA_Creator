@@ -1,7 +1,8 @@
 // The Earn area's pure facts (docs/superpowers/specs/2026-10-11-build-earn-p0-design.md,
-// "Earn area"): who may open it, its document title, the Overview's "Ready to
-// earn" rows and option cards with their gate badges, the Project NFT
-// section's action pair, and which products the Editions section lists.
+// "Earn area"): who may open it, its document title, the Overview's option
+// cards with their gate badges, the Project NFT section's action pair, and
+// which products the Editions section lists. The Overview's "Ready to earn"
+// is the gating ladder's (lib/commerce/ladder.ts, Build and Earn P1-4).
 // Every fact is read off the page's one derivation (`projectView`, COR-74);
 // nothing here derives project state of its own.
 //
@@ -10,7 +11,6 @@
 import type { StoredDraft } from "../brief/project-brief";
 import type { EditionTrack } from "../market/types";
 import { EARN_SECTION_LABEL, type EarnSection } from "./earn-route";
-import type { Readiness, ReadinessRuleId } from "./p2-types";
 import { can, roleOf, type CanContext, type Viewer } from "./permissions";
 import type { ProjectProduct } from "./project-read";
 import { nextAction, type ActionPair, type NextAction, type ProjectSummary } from "./project-summary";
@@ -28,29 +28,6 @@ export function earnDocTitle(section: EarnSection, projectName: string): string 
 }
 
 // ─────────────────────────── the Overview ───────────────────────────
-
-export type ReadyRow = { id: ReadinessRuleId; label: string; ok: boolean; reason: string | null };
-
-const READY_LABEL: Partial<Record<ReadinessRuleId, string>> = {
-  minted: "Minted",
-  videos: "Product videos",
-  ownership: "Ownership",
-};
-
-/**
- * "Ready to earn": the Sell gate's rules in their table order (videos,
- * ownership) — the ones the project page's Earn button counts as "N of M
- * ready" (`earnButtonOf`), so its count is these first rows — then Minted.
- * Sell doesn't ask Minted itself, so that row is the Showcase gate's own
- * rule: the same `status !== "draft"` test, with its reason.
- */
-export function readyRowsOf(readiness: { sell: Readiness; showcase: Readiness }): ReadyRow[] {
-  const minted = readiness.showcase.rules.find((r) => r.id === "minted");
-  return [...readiness.sell.rules, ...(minted ? [minted] : [])].flatMap((r) => {
-    const label = READY_LABEL[r.id];
-    return label ? [{ id: r.id, label, ok: r.ok, reason: r.reason }] : [];
-  });
-}
 
 /** A section's gate badge: listing, minting and editions sign with the demo wallet; the rest need none. No KYC in P0. */
 export type EarnGate = "wallet" | "none";

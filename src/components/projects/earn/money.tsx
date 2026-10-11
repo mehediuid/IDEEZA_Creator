@@ -7,8 +7,10 @@
 //   dialog, removal, and Preview as a contributor, which opens the project
 //   page as that contributor (the Earn area is the owner's alone). The row's
 //   "See contributors" link stays behind: the roster is right under it.
-// - Customers: the Customers panel, project scope; it reads `?sale=` once on
-//   arrival and opens that sale, so the deep links keep working.
+// - Customers: once the project has a sale, Payouts and its "Request payout
+//   (demo)" (Build and Earn P1-4, gated at the ladder's L4), then the
+//   Customers panel, project scope; it reads `?sale=` once on arrival and
+//   opens that sale, so the deep links keep working.
 // - Rights: the Legal information block (patent, copyright, trademark, its
 //   inline edit) and, for a project given under a license, the license line.
 // Every write asks `can(viewer, …, view.canCtx)` inside the moved component,
@@ -23,6 +25,7 @@ import { ContributorsTab } from "../details/contributors-tab";
 import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
 import { legalRows, RailLegal } from "../details/rail-legal";
 import type { SlotProps } from "../details/slots";
+import { RequestPayout } from "./ladder/request-payout";
 import { EARN_SURFACE } from "./surface";
 
 export function EarnSplits(props: SlotProps) {
@@ -45,9 +48,9 @@ export function EarnSplits(props: SlotProps) {
   );
 }
 
-export function EarnCustomers({ project, view, viewer, now, announce }: SlotProps) {
+export function EarnCustomers({ project, view, viewer, brief, now, announce }: SlotProps) {
   if (!can(viewer, "customers.see")) return null;
-  return (
+  const panel = (
     <CustomersPanel
       customers={view.customers}
       scope={{ kind: "project" }}
@@ -58,6 +61,13 @@ export function EarnCustomers({ project, view, viewer, now, announce }: SlotProp
       now={now}
       announce={announce}
     />
+  );
+  if (view.sales.length === 0) return panel;
+  return (
+    <div className="flex flex-col gap-12">
+      <RequestPayout project={project} view={view} brief={brief} now={now} announce={announce} />
+      {panel}
+    </div>
   );
 }
 

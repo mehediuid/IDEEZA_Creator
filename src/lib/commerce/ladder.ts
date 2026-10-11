@@ -173,6 +173,22 @@ export function earnLevelOf(f: EarnFacts): { level: EarnLevel; next: LadderNext 
   return { level, next: { level: target, missing: missingUpTo(target, f, target) } };
 }
 
+/**
+ * One level's own steps with their state, for showing the level whole: a step
+ * whose prerequisite is missing waits (payout, until minted), as in `next`.
+ */
+export function levelStepsOf(level: EarnLevel, f: EarnFacts): (LadderStep & { ok: boolean })[] {
+  const own = LADDER_STEPS.filter((s) => s.level === level);
+  const missing = new Set(own.filter((s) => !stepOk(s, f)).map((s) => s.id));
+  return own
+    .filter((s) => !(s.requires && missing.has(s.requires)))
+    .map((s) => {
+      const ok = stepOk(s, f);
+      const reason = ok ? undefined : f.reasons?.[s.id];
+      return { ...s, ...(reason ? { reason } : null), ok };
+    });
+}
+
 export type LevelCheck = { ok: true } | { ok: false; level: EarnLevel; current: EarnLevel; missing: LadderStep[] };
 
 /** Whether the facts reach `level`; when not, every missing step up to it. */

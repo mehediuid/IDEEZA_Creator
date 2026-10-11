@@ -216,3 +216,74 @@ test("earnFactsOf: no license, no KYC record", () => {
   assert.equal(f.licenseSet, false);
   assert.equal(f.identityVerified, false);
 });
+
+// ─────────────────────────── levelStepsOf ───────────────────────────
+
+test("levelStepsOf: a level's own steps with their state, done ones included", async () => {
+  const { levelStepsOf } = await import("../../.tmp-test/lib/commerce/ladder.js");
+  const rows = levelStepsOf(2, facts({ walletConnected: false, reasons: { videos: "x" } }));
+  assert.deepEqual(rows.map((r) => [r.id, r.ok]), [["wallet", false], ["ownership", true], ["videos", true]]);
+  assert.equal(rows[2].reason, "Every product needs a finished AI video.", "a done step keeps its default words");
+});
+
+test("levelStepsOf: payout waits for the mint, as `next` does", async () => {
+  const { levelStepsOf } = await import("../../.tmp-test/lib/commerce/ladder.js");
+  assert.deepEqual(levelStepsOf(3, facts({ minted: false, payoutWalletSet: false })).map((r) => r.id), ["minted", "license"]);
+  assert.deepEqual(levelStepsOf(3, facts()).map((r) => r.id), ["minted", "license", "payout"]);
+  assert.deepEqual(levelStepsOf(0, facts()), []);
+});
+
+// ─────────── one source: the ladder reads the Sell gate the readiness module computes ───────────
+// (Earn › Overview's "Ready to earn" is the ladder; these were the P0 checklist's cases.)
+
+const { readinessOf } = await import("../../.tmp-test/lib/manual/readiness.js");
+const NOW = 1_000_000;
+const CLIP = { mime: "video/webm", width: 640, height: 360, durationMs: 10_000, bytes: 1 };
+const realProduct = (id, name, dropped = null) => ({ id, name, description: "", built: null, state: "hand", version: null, dropped });
+const readyVideo = (id) => ({
+  takes: [{ id, productId: "x", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: NOW - 10_000, readyAt: NOW - 5_000, clip: CLIP }],
+  inUseId: id,
+});
+const gateFacts = (o = {}) => ({
+  products: [realProduct("p1", "Planter"), realProduct("p2", "Hub")],
+  videos: { version: 1, projectId: "p", products: {} },
+  jobs: [],
+  now: NOW,
+  status: "private",
+  ownershipConfirmed: true,
+  license: null,
+  ...o,
+});
+const fromGate = (f, extra = {}) =>
+  earnFactsOf({
+    products: f.products,
+    sell: readinessOf(f, "sell"),
+    mint: { status: "lazyMinted", record: { wallet: { address: "0x1" } } },
+    license: "mit",
+    wallet: wallet(true),
+    kyc: null,
+    ...extra,
+  });
+
+test("ladder × Sell gate: two products without videos and no ownership fail both, with the gate's own video count", () => {
+  const f = fromGate(gateFacts({ ownershipConfirmed: false }));
+  assert.equal(f.videosReady, false);
+  assert.equal(f.ownershipConfirmed, false);
+  const r = earnLevelOf(f);
+  assert.equal(r.level, 1);
+  assert.deepEqual(ids(r.next.missing), ["ownership", "videos"]);
+  assert.equal(r.next.missing.find((s) => s.id === "videos").reason, "2 products still need an AI video.");
+});
+
+test("ladder × Sell gate: every video ready and ownership confirmed passes L2", () => {
+  const f = fromGate(gateFacts({ videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1"), p2: readyVideo("t2") } } }));
+  assert.equal(f.videosReady, true);
+  assert.equal(f.ownershipConfirmed, true);
+  assert.equal(earnLevelOf(f).level, 3);
+});
+
+test("ladder × Sell gate: a dropped product needs no video (COR-108)", () => {
+  const products = [realProduct("p1", "Planter"), realProduct("p2", "Hub", { lastIn: 1, current: 2 })];
+  const f = fromGate(gateFacts({ products, videos: { version: 1, projectId: "p", products: { p1: readyVideo("t1") } } }));
+  assert.equal(f.videosReady, true);
+});

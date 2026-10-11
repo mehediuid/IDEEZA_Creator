@@ -1,6 +1,5 @@
 // The Earn area's pure facts (docs/superpowers/specs/2026-10-11-build-earn-p0-design.md,
-// "Earn area"): the owner-only gate, the document title, the Overview's "Ready to earn" rows
-// and gate badges, the Project NFT section's pair and the Editions section's products.
+// "Earn area"): the owner-only gate, the document title, the Overview's gate badges, the Project NFT section's pair and the Editions section's products.
 // Compiled by tests/projects/tsconfig.json:
 //   rm -rf .tmp-test && npx tsc -p tests/projects/tsconfig.json && node --test "tests/projects/*.test.mjs"
 import { test } from "node:test";
@@ -12,10 +11,8 @@ import {
   earnDocTitle,
   earnPairOf,
   editionProductsOf,
-  readyRowsOf,
 } from "../../.tmp-test/lib/manual/earn-view.js";
 import { EARN_GROUPS, EARN_SECTIONS, earnHref } from "../../.tmp-test/lib/manual/earn-route.js";
-import { readinessOf } from "../../.tmp-test/lib/manual/readiness.js";
 import { EMPTY_MARKET, NO_SHARE_TO_SELL, projectSummary } from "../../.tmp-test/lib/manual/project-summary.js";
 import { normalizeBrief, normalizeStep } from "../../.tmp-test/lib/brief/types.js";
 import { demoAddress } from "../../.tmp-test/lib/wallet/demo-wallet.js";
@@ -56,54 +53,6 @@ test("the Earn links the area reads: ?list=1 on Project NFT and a sale on Custom
   assert.equal(earnHref("proj_car", "sell", { list: "1" }), "/projects/proj_car/earn/sell?list=1");
   assert.equal(earnHref("proj_car", "customers", { sale: "sale_a" }), "/projects/proj_car/earn/customers?sale=sale_a");
   assert.equal(earnHref("proj_car"), "/projects/proj_car/earn");
-});
-
-// ─────────────────────────── "Ready to earn" ───────────────────────────
-
-const product = (id, name, dropped = null) => ({ id, name, description: "", built: null, state: "hand", version: null, dropped });
-const CLIP = { mime: "video/webm", width: 640, height: 360, durationMs: 10_000, bytes: 1 };
-const readyVideo = (id) => ({
-  takes: [{ id, productId: "x", n: 1, prompt: "", lines: ["", "", ""], quality: "low", source: null, createdAt: NOW - 10_000, readyAt: NOW - 5_000, clip: CLIP }],
-  inUseId: id,
-});
-const facts = (o = {}) => ({
-  products: [product("p1", "Planter"), product("p2", "Hub")],
-  videos: { products: {} },
-  jobs: [],
-  now: NOW,
-  status: "private",
-  ownershipConfirmed: true,
-  license: null,
-  ...o,
-});
-const readinessFor = (f) => ({ sell: readinessOf(f, "sell"), showcase: readinessOf(f, "showcase") });
-
-test("the rows are the Sell gate's videos and ownership, in that order, then Minted", () => {
-  const f = facts();
-  const rows = readyRowsOf(readinessFor(f));
-  assert.deepEqual(rows.map((r) => r.id), ["videos", "ownership", "minted"]);
-  assert.deepEqual(rows.map((r) => r.label), ["Product videos", "Ownership", "Minted"]);
-  // The Earn button's "N of M ready" counts the Sell rules, so they are the first M rows.
-  const sell = readinessOf(f, "sell").rules;
-  assert.deepEqual(rows.slice(0, sell.length).map((r) => [r.id, r.ok]), sell.map((r) => [r.id, r.ok]));
-});
-
-test("a draft with two products missing videos and no ownership confirmed fails every row, with each rule's reason", () => {
-  const rows = readyRowsOf(readinessFor(facts({ status: "draft", ownershipConfirmed: false })));
-  assert.deepEqual(rows.map((r) => r.ok), [false, false, false]);
-  assert.equal(rows[0].reason, "2 products still need an AI video.");
-  assert.equal(rows[1].reason, "Confirm you are the rightful owner of this idea.");
-  assert.match(rows[2].reason, /^Mint it first/);
-});
-
-test("a minted project with every video ready and ownership confirmed passes every row, with no reasons", () => {
-  const rows = readyRowsOf(readinessFor(facts({ videos: { products: { p1: readyVideo("t1"), p2: readyVideo("t2") } } })));
-  assert.deepEqual(rows.map((r) => [r.ok, r.reason]), [[true, null], [true, null], [true, null]]);
-});
-
-test("a dropped product needs no video (COR-108), as the Sell gate says", () => {
-  const rows = readyRowsOf(readinessFor(facts({ products: [product("p1", "Planter"), product("p2", "Hub", { lastIn: 1, current: 2 })], videos: { products: { p1: readyVideo("t1") } } })));
-  assert.equal(rows.find((r) => r.id === "videos").ok, true);
 });
 
 // ─────────────────────────── the option cards ───────────────────────────
@@ -211,6 +160,8 @@ test("a preview gets no pair at all (PPL-6)", () => {
 });
 
 // ─────────────────────────── Editions ───────────────────────────
+
+const product = (id, name, dropped = null) => ({ id, name, description: "", built: null, state: "hand", version: null, dropped });
 
 test("Editions lists every current product, and a dropped one only while it has editions", () => {
   const dropped = { lastIn: 1, current: 2 };
