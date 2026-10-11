@@ -1,7 +1,8 @@
 "use client";
 
-// The Contributors tab (P2-CONTRIB-1, -2, -3, -7, -8, -13): the roster, its
-// empty state, removal, and the buyer preview's team credit. The add/edit
+// The contributors roster (P2-CONTRIB-1, -2, -3, -7, -8, -13), Earn › Money ›
+// Splits' body under that section's own h2: the roster, its empty state (one
+// line and Add contributor), removal, and the buyer preview's team credit. The add/edit
 // dialog is `contributor-dialog.tsx`; the preview banner is
 // `contributor-preview-banner.tsx`.
 //
@@ -17,9 +18,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { PlusSignIcon, UserGroupIcon, UserIcon } from "@hugeicons/core-free-icons";
+import { PlusSignIcon, UserIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner, Button, ConfirmDialog, SearchInput, StateCard, TestnetDemoBadge } from "@/components/ideeza";
+import { Banner, Button, ConfirmDialog, SearchInput, TestnetDemoBadge } from "@/components/ideeza";
 import { isPreview } from "@/lib/manual/buyer-preview";
 import {
   CONTRIBUTORS_MAX,
@@ -78,7 +79,7 @@ export function ContributorsTab({
   announce,
   previewHref,
 }: SlotProps & {
-  /** Where a row's "Preview" opens the contributor's view: Earn › Splits passes the
+  /** Where a row's "Preview" opens the contributor's view: Earn › Money › Splits passes the
    *  project page's address, since the Earn area itself is the owner's alone. Without
    *  it the preview opens on this page, as `?view=contributor&as=<id>`. */
   previewHref?: (contributorId: string) => string;
@@ -173,28 +174,23 @@ export function ContributorsTab({
 
   return (
     <div className="flex flex-col gap-8">
-      <h2 className="text-lg font-bold text-text-primary">Contributors</h2>
-
       {contributors.length === 0 ? (
-        <StateCard
-          tone="empty"
-          icon={<Icon icon={UserGroupIcon} size={32} />}
-          title="Just you so far"
-          body="Add the people on this project — as viewers, editors, or co-owners with a share of its ownership."
-          action={
-            canInvite ? (
-              <Button
-                ref={emptyAddRef}
-                hierarchy="secondary"
-                className={PHONE_TAP}
-                iconLeading={<Icon icon={PlusSignIcon} size={16} />}
-                onClick={() => setDialog({ mode: "add" })}
-              >
-                Add contributor
-              </Button>
-            ) : undefined
-          }
-        />
+        <div className="flex flex-col items-start gap-4">
+          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+            No contributors yet.
+          </p>
+          {canInvite && (
+            <Button
+              ref={emptyAddRef}
+              hierarchy="secondary"
+              className={PHONE_TAP}
+              iconLeading={<Icon icon={PlusSignIcon} size={16} />}
+              onClick={() => setDialog({ mode: "add" })}
+            >
+              Add contributor
+            </Button>
+          )}
+        </div>
       ) : (
         <>
           {canInvite && (

@@ -162,7 +162,7 @@ test("Delete is blocked while Listed, with the reason and the way out (COR-70, P
   assert.deepEqual(deleteBlockOf({ ...FREE, listed: true }), {
     id: "listed", // A4b's DeleteBlock carries its rule id
     reason: "A listed project can't be deleted.",
-    detail: "Remove the listing first — it's in Earn › Project NFT.",
+    detail: "Remove the listing first — it's in Earn › Sell.",
   });
   assert.equal(deleteBlockOf(FREE), null);
 });

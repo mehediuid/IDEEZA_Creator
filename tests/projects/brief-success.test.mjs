@@ -122,7 +122,7 @@ test("the old Brief addresses redirect to the mint flow; it opens per useBriefOp
   const page = read("mint-page.tsx");
   assert.match(page, /useBriefOpens\(project\)/);
   assert.match(page, /<ProjectNotFound id=\{id\} \/>/);
-  assert.match(page, /earnHref\(project\.id, "sell"\)/, "minted without a Brief: the way out is Earn › Project NFT");
+  assert.match(page, /earnHref\(project\.id, "sell"\)/, "minted without a Brief: the way out is Earn › Sell");
 
   const build = readSrc("app/(create)/build/[jobId]/brief/page.tsx");
   assert.doesNotMatch(build, /BriefApp/);
@@ -135,7 +135,7 @@ test("the old Brief addresses redirect to the mint flow; it opens per useBriefOp
   assert.doesNotMatch(workspace, /BriefApp|useBriefOpens/);
   assert.match(workspace, /if \(ready && projectId && isBrief\) router\.replace\(earnMintHref\(projectId\)\);/);
 
-  // Back from Choose is Earn › Project NFT.
+  // Back from Choose is Earn › Sell.
   assert.match(read("brief-app.tsx"), /const leave = \(\) => router\.push\(earnHref\(projectId, "sell"\)\);/);
 });
 

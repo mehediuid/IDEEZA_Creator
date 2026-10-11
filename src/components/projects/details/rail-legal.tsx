@@ -29,12 +29,11 @@ import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
 import { LinkConfirmDialog } from "./link-confirm";
 import { RailBlock, RailFact, RailFacts, useRailStacked } from "./rail-block";
-import { RAIL_LINK, SHOW_ALL } from "./rail-versions";
+import { RAIL_LINK } from "./rail-versions";
 import { useStoreWrite } from "./use-store-write";
 import type { SlotProps } from "./slots";
 
 const FOOTNOTE = "As stated by you — not verified.";
-const EMPTY_OWNER_HINT = "Add the patent, copyright or trademark details buyers should know.";
 const SAVED_MESSAGE = "Legal details saved";
 
 export type LegalRow =
@@ -75,7 +74,8 @@ export function RailLegal({ project, view, viewer, announce }: SlotProps) {
   );
 }
 
-function LegalBody({
+/** The block's body, also Earn › Money › Rights' (under a RailStackScope there). */
+export function LegalBody({
   project,
   editable,
   rows,
@@ -109,9 +109,7 @@ function LegalBody({
         />
       ) : (
         <>
-          {rows.length === 0 ? (
-            <p className="text-md leading-md text-text-secondary">{EMPTY_OWNER_HINT}</p>
-          ) : (
+          {rows.length > 0 && (
             <>
               <RailFacts>
                 {rows.map((row) => (
@@ -123,16 +121,20 @@ function LegalBody({
               <p className="text-sm leading-sm text-text-tertiary">{FOOTNOTE}</p>
             </>
           )}
+          {/* Only the owner edits, and the owner reads these in Earn › Money › Rights, whose
+              lead line says what they are: an empty one is that line and this one action. */}
           {editable && (
-            <button
+            <Button
               ref={triggerRef}
               type="button"
+              hierarchy="secondary"
+              size="md"
+              iconLeading={rows.length === 0 ? <Icon icon={Add01Icon} size={16} /> : undefined}
               onClick={() => setEditing(true)}
-              className={cn(SHOW_ALL, stacked && "min-h-[var(--touch-min)]")}
+              className={cn("self-start", stacked && "min-h-[var(--touch-min)]", "[@media(pointer:coarse)]:min-h-[var(--touch-min)]")}
             >
-              {rows.length === 0 && <Icon icon={Add01Icon} size={16} />}
               {rows.length === 0 ? "Add legal details" : "Edit legal details"}
-            </button>
+            </Button>
           )}
         </>
       )}

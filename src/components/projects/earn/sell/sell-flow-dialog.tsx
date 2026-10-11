@@ -11,7 +11,7 @@
 //   everything typed. Closing with anything entered asks first.
 // - Review lists the summary, then the edition rules unchanged
 //   (`sellChecksOf`): the project's Main listing live or paused (`listGate`,
-//   with a link to Earn › Project NFT), this product's AI video (the "edition"
+//   with a link to Earn › Sell), this product's AI video (the "edition"
 //   readiness, fixed here with the Generate dialog on top), ownership, and for
 //   a built product the make-and-ship note and its promises (fixed back on
 //   step 2). It also asks the ladder (Build and Earn P1-4): L3 for design
@@ -32,7 +32,6 @@ import { GenerateVideoDialog, videoTargetOf, type VideoTarget } from "@/componen
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { useProjectBrief } from "@/lib/brief/project-brief";
-import { earnHref } from "@/lib/manual/earn-route";
 import type { ProjectView } from "@/lib/manual/project-read";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
@@ -96,6 +95,7 @@ export function SellFlowDialog({
   productId,
   onClose,
   onDone,
+  onListingFix,
 }: {
   project: ManualProject;
   /** The page's one derivation: the Main listing, the mint, the products. */
@@ -105,6 +105,8 @@ export function SellFlowDialog({
   onClose: () => void;
   /** After the listing is signed: the sentence the page says, and the listed track. */
   onDone: (message: string, track: EditionTrack) => void;
+  /** "Go to Your project" on Review: the Main listing isn't live, and it starts on the same tab. */
+  onListingFix: () => void;
 }) {
   const { request } = useWalletRequest();
   const { projects, setOwnerConfirmed } = useManualProjects();
@@ -362,10 +364,10 @@ export function SellFlowDialog({
           {...stepProps}
           rows={reviewSummaryOf({ draft, count, networkLabel: networkLabelOf(chain.network) })}
           checks={readiness.checks}
-          projectNftHref={earnHref(project.id, "sell")}
           fixRef={fixRef}
           onFix={(fix) => {
-            if (fix === "price") {
+            if (fix === "projectNft") onListingFix();
+            else if (fix === "price") {
               const p = stepProblemOf("price", draft, ctx);
               if (p) show(p);
               else go("price");

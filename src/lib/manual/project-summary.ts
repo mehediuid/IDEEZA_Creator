@@ -176,7 +176,7 @@ function pairOf(first: NextAction | null, second: NextAction | null, violet: boo
   return { first, second, violet };
 }
 
-/** The listing flow's entry (§3.6.3), in Earn › Project NFT since Build and Earn P0: that
+/** The listing flow's entry (§3.6.3), in Earn › Sell since Build and Earn P0: that
  *  section renders the flow and reads `?list=1` once on arrival. */
 export function listFlowHref(projectId: string): string {
   return earnHref(projectId, "sell", { list: "1" });

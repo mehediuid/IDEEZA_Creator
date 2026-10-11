@@ -74,7 +74,7 @@ export function BusinessPlanPanel({
       <div>
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <h2 ref={titleRef} tabIndex={-1} className="m-0 text-2xl font-semibold text-text-primary outline-none">
+            <h2 ref={titleRef} tabIndex={-1} className="m-0 text-xl font-bold leading-xl text-text-primary outline-none">
               Business plan
             </h2>
             <p className="mt-2 text-sm text-text-secondary">

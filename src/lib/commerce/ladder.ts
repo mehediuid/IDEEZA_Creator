@@ -68,7 +68,7 @@ export type LevelInfo = {
 export const EARN_LEVELS: readonly LevelInfo[] = [
   { level: 0, name: "Engineering", opens: "Build, version and showcase your project.", gate: "Always open" },
   { level: 1, name: "Drafts", opens: "Write the business plan and set the splits.", gate: "No wallet" },
-  { level: 2, name: "Mint", opens: "Mint the Project NFT.", gate: "Wallet" },
+  { level: 2, name: "Mint", opens: "Mint your project.", gate: "Wallet" },
   { level: 3, name: "Sell & editions", opens: "List the project and sell virtual editions.", gate: "Wallet" },
   { level: 4, name: "Physical editions & payouts", opens: "Sell physical editions and request payouts.", gate: "Identity" },
 ];
@@ -106,7 +106,7 @@ export const LADDER_STEPS: readonly LadderStep[] = [
     id: "minted",
     level: 3,
     label: "Minted",
-    reason: "Mint the Project NFT first. It keeps your name on it before anyone sees it.",
+    reason: "Mint your project first. It keeps your name on it before anyone sees it.",
     fix: { kind: "mint", label: "Go to mint" },
   },
   {

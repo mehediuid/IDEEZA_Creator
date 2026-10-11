@@ -40,7 +40,7 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
           tone="empty"
           icon={<Icon icon={UserGroupIcon} size={32} />}
           title="Just you so far"
-          body="People you add to this project show here with their role. You add them, and any share of ownership, in Earn › Splits."
+          body="People you add to this project show here with their role. You add them, and any share of ownership, in Earn › Money › Splits."
           action={
             manages ? (
               <Link

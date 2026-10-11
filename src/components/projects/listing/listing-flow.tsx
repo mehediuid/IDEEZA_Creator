@@ -16,9 +16,10 @@
 //
 // When the maker holds no share, the button stays focusable but
 // aria-disabled, with the reason beside it, and opens nothing (COR-67).
-// Below the ladder's L3 (Build and Earn P1-4) it does the same, with the
-// missing steps and their fixes under it; videos and ownership stay the
-// gate's and the form's own.
+// Below the ladder's L3 (Build and Earn P1-4) the button is left out and
+// "Before you can list" stands in its place, the missing steps with their
+// fixes (owner, 2026-10-11: never a greyed step button); videos and
+// ownership stay the gate's and the form's own.
 
 import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -51,7 +52,6 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
   const blocked = action.blocked ?? null;
   const steps = !blocked && !ladder.ok;
   const reasonId = React.useId();
-  const stepsId = React.useId();
 
   const firstStep = React.useCallback(
     (): Open => (dialogBlockerOf(view.videos.readiness.sell) ? "gate" : "form"),
@@ -76,19 +76,21 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
 
   return (
     <>
-      <button
-        id={LISTING_TRIGGER_ID}
-        type="button"
-        aria-disabled={blocked || steps ? true : undefined}
-        aria-describedby={blocked ? reasonId : steps ? stepsId : undefined}
-        onClick={() => {
-          if (!blocked && !steps) setOpen(firstStep());
-        }}
-        className={cn(BASE, violet && !blocked && !steps ? PRIMARY : QUIET, (blocked || steps) && "cursor-not-allowed opacity-60", className)}
-      >
-        <Icon icon={Tag01Icon} size={18} />
-        {action.label}
-      </button>
+      {!steps && (
+        <button
+          id={LISTING_TRIGGER_ID}
+          type="button"
+          aria-disabled={blocked ? true : undefined}
+          aria-describedby={blocked ? reasonId : undefined}
+          onClick={() => {
+            if (!blocked) setOpen(firstStep());
+          }}
+          className={cn(BASE, violet && !blocked ? PRIMARY : QUIET, blocked && "cursor-not-allowed opacity-60", className)}
+        >
+          <Icon icon={Tag01Icon} size={18} />
+          {action.label}
+        </button>
+      )}
       {blocked && (
         <p id={reasonId} className="text-sm text-text-secondary">
           {blocked}
@@ -96,7 +98,7 @@ export function ListingFlow({ project, view, brief, now, announce, action, viole
       )}
 
       {steps && (
-        <LevelCheck check={ladder} what="list" id={stepsId} project={project} brief={brief} announce={announce} className="order-last w-full max-w-[720px] basis-full" />
+        <LevelCheck check={ladder} what="list" project={project} brief={brief} announce={announce} className="w-full" />
       )}
 
       {open === "gate" && ready && !steps && (

@@ -1,33 +1,28 @@
 "use client";
 
-// The rail's Marketplace block, the owner's side (Phase 2 spec §2.2, §2.7;
-// P2-LISTING-1, -2 and -8…16 as changed in §4.5). It is the one home of the
-// listing's state and of every operation on a listing that exists: Edit ·
-// Remove · View on marketplace, Bidding History · Close auction, Relist.
-// Starting a listing is the header's (ListingFlow); the `none` card says so.
+// The project's listing, the owner's side (Phase 2 spec §2.2, §2.7;
+// P2-LISTING-1, -2 and -8…16 as changed in §4.5): the body of Earn › Sell's
+// "Your project" card while a Main listing is live, paused or sold
+// (earn/sell.tsx). It is the one home of the listing's state and of every
+// operation on a listing that exists: Edit · Remove · View on marketplace,
+// Bidding History · Close auction, Relist. Starting a listing is the card's
+// ListingFlow.
 //
-// First in the rail, and below a 1024 px page container between the header
-// and the tab strip (C21), always open there: it can hold the page's one
-// violet (Close auction once an auction has ended, Relist while paused).
-// There an auction's and a paused listing's action row comes first in the
-// card, right under its state line and before its facts, so that violet is
-// above a phone's fold; it is the DOM order, so Tab follows what is seen.
-// Absent for a Draft, Given, and a mint whose record can't be read.
+// It can hold the page's one violet (Close auction once an auction has ended,
+// Relist while paused). Once stacked (below a 1024 px page container) an
+// auction's and a paused listing's action row comes first, right under its
+// state line and before its facts, so that violet is above a phone's fold;
+// it is the DOM order, so Tab follows what is seen.
 //
 // Every fact is `marketplaceCardOf(view.listing)`, from the page's one
 // derivation (COR-74); every write is the listing dialogs' own. What changed
 // is said in the page's one polite live region (COR-101), and focus moves to
-// what's next: this block's first control after a write, the header's
-// "Add to marketplace" after Remove. Every card carries MARKETPLACE_FOCUS_ID
-// on that first control — on its lead line when it has none (Ended, None) —
-// so a write that changes the card (Close auction → Sold or Ended) still
-// lands the keyboard in the block.
-//
-// T27: the block's tabs are "Main NFT · Physical NFT · Virtual NFT" (Main
-// first and selected); Physical and Virtual are read-only summaries
-// (editions/edition-summary.tsx, P2-TABS-28). Removing the Main listing also
-// takes its Physical and Virtual NFT listings off the marketplace, and the
-// confirm says so (spec C23).
+// what's next: this body's first control after a write, the card's "Add to
+// marketplace" after Remove. Every card carries MARKETPLACE_FOCUS_ID on that
+// first control — on its lead line when it has none (Ended, None) — so a
+// write that changes the card (Close auction → Sold or Ended) still lands the
+// keyboard here. Removing the Main listing also takes its copies' listings
+// off the marketplace, and the confirm says so (spec C23).
 
 import * as React from "react";
 import Link from "next/link";
@@ -57,17 +52,13 @@ import { CloseAuctionDialog } from "../listing/close-auction-dialog";
 import { focusSoon, ListingDialog } from "../listing/listing-dialog";
 import { RelistPanel } from "../listing/relist";
 import { RemoveListingDialog } from "../listing/remove-listing-dialog";
-import { RailBlock, RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
+import { RailFact, RailFacts, RailValue, useRailStacked } from "./rail-block";
 import type { SlotProps } from "./slots";
-import { NftTypeTabs } from "../editions/edition-summary";
 import { writeTracks } from "../editions/create-dialog";
 import { unlistProjectTracks } from "@/lib/market/editions";
 import { earnHref } from "@/lib/manual/earn-route";
 
 type Dialog = "edit" | "remove" | "bids" | "close" | null;
-
-/** The statuses whose Marketplace block the owner sees (P2-LISTING-1 C). */
-const WITH_BLOCK = new Set(["private", "listed", "paused", "sold"]);
 
 const PRIMARY =
   "bg-bg-brand text-text-on-brand hover:bg-bg-brand-hover focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface";
@@ -84,17 +75,8 @@ const LINK =
 /** A card's lead line when it has no control: a focus target, not a Tab stop. */
 const LEAD = "m-0 rounded-sm text-md font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus";
 
-export function RailMarketplace(props: SlotProps) {
-  const { viewer, view } = props;
-  if (!can(viewer, "facts.seeOwnerOnly") || !WITH_BLOCK.has(view.summary.status)) return null;
-  return (
-    <RailBlock title="Marketplace" collapsible={false}>
-      <NftTypeTabs projectId={props.project.id} view={view} main={<MarketplaceBody {...props} />} />
-    </RailBlock>
-  );
-}
-
-function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotProps) {
+/** The Main listing's card and its operations; the caller shows it only to the owner. */
+export function ListingBody({ project, view, viewer, brief, now, announce }: SlotProps) {
   const stacked = useRailStacked();
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const card = marketplaceCardOf(view.listing, { bids: view.bids, now });
@@ -270,7 +252,7 @@ function MarketplaceBody({ project, view, viewer, brief, now, announce }: SlotPr
           onDone={(m) => {
             // The Main listing is gone: its editions' listings go with it (their NFTs and sales stay).
             const w = editionsListed > 0 ? writeTracks(project.id, (all) => unlistProjectTracks(all, project.id).tracks) : null;
-            done(w && !w.ok ? `${m} ${w.message} Remove the NFT listings in Earn › Editions.` : m, LISTING_TRIGGER_ID);
+            done(w && !w.ok ? `${m} ${w.message} Remove the copies' listings in Earn › Sell.` : m, LISTING_TRIGGER_ID);
           }}
         />
       )}
@@ -301,11 +283,11 @@ function pausedFacts(card: Extract<MarketplaceCard, { kind: "paused" }>) {
   );
 }
 
-/** The Remove confirm names the edition listings that go with the Main one (TABS T3). */
+/** The Remove confirm names the copies' listings that go with the Main one (TABS T3). */
 function editionsRemovedLine(n: number): string {
   return n === 1
-    ? "Its Physical or Virtual NFT listing comes off the marketplace too. Its NFTs and sales are kept."
-    : `Its ${n} Physical and Virtual NFT listings come off the marketplace too. Their NFTs and sales are kept.`;
+    ? "The listing of its copies comes off the marketplace too. Copies already sold are kept."
+    : `The ${n} listings of its copies come off the marketplace too. Copies already sold are kept.`;
 }
 
 const STATE_ICON: Partial<Record<MarketplaceCard["kind"], IconValue>> = {

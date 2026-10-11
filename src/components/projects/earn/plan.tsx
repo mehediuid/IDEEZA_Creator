@@ -14,23 +14,22 @@
 // - Ready: the plan.
 // Writing a plan asks `can(viewer, "businessPlan.manage", view.canCtx)`,
 // which a project sold in full refuses: a plan that exists stays readable,
-// and there is nothing to start.
+// and there is nothing to start. Its heading, cards and rhythm are the other
+// tabs' (surface.tsx); with no plan it is one line and one action.
 
 import * as React from "react";
-import { Note01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
-import { Button, ProgressBar, StateCard } from "@/components/ideeza";
+import { Button, ProgressBar } from "@/components/ideeza";
 import { planChipState, PLAN_SECTIONS } from "@/lib/manual/business-plan";
 import { useBusinessPlan } from "@/lib/manual/business-plan-store";
 import { can } from "@/lib/manual/permissions";
 import type { ManualProject } from "@/lib/manual/projects";
+import { cn } from "@/lib/utils";
 import { GenerateBusinessPlanDialog, WritingBusinessPlanDialog } from "../business-plan/plan-dialogs";
 import { BusinessPlanPanel } from "../business-plan/plan-page";
 import { resumePlanRun, startPlanRun, stopPlanRun, useIsPlanLive } from "../business-plan/plan-runner";
 import type { SlotProps } from "../details/slots";
+import { EARN_CARD, EARN_STACK, EarnBlock, TAP } from "./surface";
 
-/** 44 px on a phone or a touch screen, as the plan's own controls. */
-const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const TOTAL = PLAN_SECTIONS.length;
 
 /** The Generate dialog's prefill (P2-TABS-14): the project description, then its product names. */
@@ -51,29 +50,26 @@ export function EarnPlan({ project, view, viewer, announce }: SlotProps) {
   const emptyRef = React.useRef<HTMLDivElement | null>(null);
 
   const empty = (
-    <div ref={emptyRef} tabIndex={-1} className="flex justify-center rounded-2xl outline-none">
-      <StateCard
-        tone="empty"
-        icon={<Icon icon={Note01Icon} size={32} />}
-        title="No business plan yet"
-        body={
+    <div ref={emptyRef} tabIndex={-1} className="rounded-2xl outline-none">
+      <EarnBlock
+        title="Business plan"
+        lead={
           writes
-            ? "Describe the product, and AI writes a seven-section plan you can edit and print."
+            ? "No plan yet. Describe the product, and AI writes a seven-section plan you can edit and print."
             : `There's no business plan for ${project.name}.`
         }
-        action={
-          writes ? (
-            <Button type="button" hierarchy="primary" size="lg" className={TAP} onClick={() => setGenerateOpen(true)}>
-              Generate business plan
-            </Button>
-          ) : undefined
-        }
-      />
+      >
+        {writes && (
+          <Button type="button" hierarchy="primary" size="lg" className={cn("self-start max-sm:w-full", TAP)} onClick={() => setGenerateOpen(true)}>
+            Generate business plan
+          </Button>
+        )}
+      </EarnBlock>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className={EARN_STACK}>
       {writes && state === "writing" && plan?.run && (
         <RunRow
           text={`Writing business plan · ${plan.run.next} of ${TOTAL}`}
@@ -140,7 +136,7 @@ export function EarnPlan({ project, view, viewer, announce }: SlotProps) {
 /** A run's state over the plan: what is happening, how far it has got, and what can be done about it. */
 function RunRow({ text, progress, actions }: { text: string; progress?: number; actions: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-solid border-border bg-bg-surface p-8 print:hidden [@container(min-width:640px)]:flex-row [@container(min-width:640px)]:items-center [@container(min-width:640px)]:justify-between">
+    <div className={cn(EARN_CARD, "gap-4 print:hidden [@container(min-width:640px)]:flex-row [@container(min-width:640px)]:items-center [@container(min-width:640px)]:justify-between")}>
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <p className="m-0 text-md font-semibold text-text-primary">{text}</p>
         {progress !== undefined && <ProgressBar value={progress} label={text} className="max-w-[360px]" />}

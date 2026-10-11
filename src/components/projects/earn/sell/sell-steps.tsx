@@ -11,7 +11,6 @@
 // outlined in the text colour: the dialog's one violet control is its CTA.
 
 import * as React from "react";
-import Link from "next/link";
 import { ArrowDown01Icon, CheckmarkCircle02Icon, CircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, Radio, SelectMenu, Textarea, TextInput, type SelectOption } from "@/components/ideeza";
@@ -404,20 +403,18 @@ export function PriceStep({
 // ───────────────────────── 3 · Review ─────────────────────────
 
 const FIX_LABEL: Record<NonNullable<SellCheck["fix"]>, string> = {
-  projectNft: "Go to Project NFT",
+  projectNft: "Go to Your project",
   video: "Generate AI video",
   price: "Back to step 2",
 };
 
 function ReadinessRows({
   checks,
-  projectNftHref,
   onFix,
   fixRef,
 }: {
   checks: SellCheck[];
-  projectNftHref: string;
-  onFix: (fix: "video" | "price") => void;
+  onFix: (fix: NonNullable<SellCheck["fix"]>) => void;
   /** The first fix's control, where a press on the blocked CTA sends focus. */
   fixRef: React.RefObject<HTMLElement | null>;
 }) {
@@ -426,6 +423,7 @@ function ReadinessRows({
     <ul aria-label="Before you sell" className="m-0 flex list-none flex-col gap-6 p-0">
       {checks.map((c, i) => {
         const ref = i === firstFixAt ? fixRef : undefined;
+        const fix = c.ok ? null : c.fix;
         return (
           <li key={c.id} className="flex items-start gap-4">
             <span aria-hidden className={cn("inline-flex pt-px", c.ok ? "text-text-success" : "text-text-tertiary")}>
@@ -437,28 +435,16 @@ function ReadinessRows({
                 <span className="sr-only">{c.ok ? ", ready" : ", not ready yet"}</span>
               </span>
               {c.detail && <span className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">{c.detail}</span>}
-              {!c.ok && c.fix === "projectNft" && (
-                <Link
-                  ref={ref as React.RefObject<HTMLAnchorElement> | undefined}
-                  href={projectNftHref}
-                  className={cn(
-                    "mt-2 inline-flex min-h-[32px] items-center self-start rounded-lg border border-solid border-border bg-bg-surface px-6 text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus",
-                    TAP,
-                  )}
-                >
-                  {FIX_LABEL.projectNft}
-                </Link>
-              )}
-              {!c.ok && (c.fix === "video" || c.fix === "price") && (
+              {fix && (
                 <Button
                   ref={ref as React.RefObject<HTMLButtonElement> | undefined}
                   type="button"
                   hierarchy="secondary"
                   size="md"
                   className={cn("mt-2 self-start", TAP)}
-                  onClick={() => onFix(c.fix as "video" | "price")}
+                  onClick={() => onFix(fix)}
                 >
-                  {FIX_LABEL[c.fix]}
+                  {FIX_LABEL[fix]}
                 </Button>
               )}
             </span>
@@ -476,7 +462,6 @@ export function ReviewStep({
   prefix,
   rows,
   checks,
-  projectNftHref,
   onFix,
   fixRef,
   askOwner,
@@ -484,8 +469,8 @@ export function ReviewStep({
 }: StepProps & {
   rows: { label: string; value: string }[];
   checks: SellCheck[];
-  projectNftHref: string;
-  onFix: (fix: "video" | "price") => void;
+  /** "projectNft" closes the flow for Sell's "Your project" card, where the listing starts. */
+  onFix: (fix: NonNullable<SellCheck["fix"]>) => void;
   fixRef: React.RefObject<HTMLElement | null>;
   askOwner: boolean;
   /** The ladder's level check, while a step is missing. */
@@ -507,7 +492,7 @@ export function ReviewStep({
           </div>
         ))}
       </dl>
-      <ReadinessRows checks={checks} projectNftHref={projectNftHref} onFix={onFix} fixRef={fixRef} />
+      <ReadinessRows checks={checks} onFix={onFix} fixRef={fixRef} />
       {children}
       <div className="flex flex-col gap-3">
         {askOwner && (

@@ -2,8 +2,10 @@
 
 // A commit point's ladder check, inline (Build and Earn P1-4). The call site
 // asks `useCommitCheck(point, source)`; while it isn't met, the commit control
-// reads aria-disabled and points at this notice (`describedBy`), which lists
-// each missing step with its one-tap fix. Engineering never renders it.
+// reads aria-disabled and points at this notice (`describedBy`), or is left
+// out (Earn's Overview and "Your project"), and the notice, "Before you can
+// {what}", lists each missing step with its one-tap fix. Engineering never
+// renders it.
 //
 // The one shared helper every commit point uses: mint (L2), list (L3),
 // virtual editions (L3), physical editions and Request payout (L4). A step
@@ -12,9 +14,10 @@
 
 import * as React from "react";
 import type { StoredDraft } from "@/lib/brief/project-brief";
-import { commitCheck, EARN_LEVELS, type CommitPoint, type LadderStepId, type LevelCheck as Check } from "@/lib/commerce/ladder";
+import { commitCheck, type CommitPoint, type LadderStepId, type LevelCheck as Check } from "@/lib/commerce/ladder";
 import type { ManualProject } from "@/lib/manual/projects";
 import { cn } from "@/lib/utils";
+import { EARN_H3 } from "../surface";
 import { MissingSteps } from "./missing-steps";
 import { useEarnFacts, type EarnFactsSource } from "./use-earn-facts";
 
@@ -49,7 +52,7 @@ export function LevelCheck({
   className,
 }: {
   check: Check;
-  /** The commit, as a verb phrase: "list this project", "mint". */
+  /** The commit, as a verb phrase finishing "Before you can …": "list", "mint". */
   what: string;
   /** The notice's id, for the commit control's aria-describedby. */
   id?: string;
@@ -62,18 +65,11 @@ export function LevelCheck({
 }) {
   const headingId = React.useId();
   if (check.ok) return null;
-  const level = EARN_LEVELS[check.level];
-  const n = check.missing.length;
   return (
     <section id={id} aria-labelledby={headingId} className={cn("flex flex-col gap-4", className)}>
-      <div className="flex flex-col gap-1">
-        <h3 id={headingId} className="m-0 text-md font-semibold text-text-primary">
-          {n === 1 ? `One step before you ${what}` : `${n} steps before you ${what}`}
-        </h3>
-        <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-text-secondary">
-          {`This needs level ${level.level}, ${level.name}.`}
-        </p>
-      </div>
+      <h3 id={headingId} className={EARN_H3}>
+        {`Before you can ${what}`}
+      </h3>
       <MissingSteps steps={check.missing} project={project} brief={brief} announce={announce} onCover={onCover} />
     </section>
   );

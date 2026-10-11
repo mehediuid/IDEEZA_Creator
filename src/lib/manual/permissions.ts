@@ -21,10 +21,9 @@ import type { ContributorRole, DeleteFacts, OtherOwner } from "./p2-types";
 import { formatDate, type ProjectStatus } from "./project-summary";
 import { EARN_SECTION_LABEL } from "./earn-route";
 
-/** Where the delete block's market fixes live since Build and Earn P0: the listing and the
- *  auction in Earn › Project NFT, the edition listings in Earn › Editions. */
+/** Where the delete block's market fixes live: the listing, the auction and the copies'
+ *  listings are all in Earn › Sell. */
 const EARN_SELL = `Earn › ${EARN_SECTION_LABEL.sell}`;
-const EARN_EDITIONS = `Earn › ${EARN_SECTION_LABEL.editions}`;
 
 // ─────────────────────────── who is looking (§3.8.1) ───────────────────────────
 
@@ -282,7 +281,7 @@ export type DeleteBlock = {
   reason: string;
   /** The way out. */
   detail: string;
-  /** otherOwners only: the quiet link under the detail, to the roster — Earn › Splits since
+  /** otherOwners only: the quiet link under the detail, to the roster — Earn › Money › Splits since
    *  Build and Earn P0 (`tab` names the roster's old home; the dialog links to Splits). */
   link?: { label: "Open Contributors"; tab: "contributors" };
 };
@@ -360,7 +359,7 @@ const DELETE_RULES: readonly DeleteRule[] = [
       reason: "A listed project can't be deleted.",
       detail: f.listed
         ? `Remove the listing first — it's in ${EARN_SELL}.`
-        : `Take its NFTs off the marketplace first — Remove listing is in ${EARN_EDITIONS}.`,
+        : `Take its NFTs off the marketplace first — Remove listing is in ${EARN_SELL}.`,
     }),
   },
   {

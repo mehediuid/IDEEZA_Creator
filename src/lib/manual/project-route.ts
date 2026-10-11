@@ -45,7 +45,7 @@ export function buyerSide(viewer: Viewer): boolean {
 }
 
 /** The addresses on `/projects/<id>` that moved to Earn (P0): `?list=1` opens the listing flow
- *  in Earn › Project NFT, and `?tab=customers` is Earn › Customers, a `sale=` deep link kept.
+ *  in Earn › Sell, and `?tab=customers` is Earn › Money › Customers, a `sale=` deep link kept.
  *  Null when the address stays on the page. Takes the route's `searchParams` as Next hands them. */
 export function projectRedirectOf(
   projectId: string,

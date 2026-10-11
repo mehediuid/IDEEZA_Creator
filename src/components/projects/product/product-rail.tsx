@@ -4,7 +4,7 @@
 // order:
 // 1. Marketplace: Physical NFT · Virtual NFT editions — PRODUCT_SLOTS.rail
 //    (T27), the buyer's side only since Build and Earn P0 (the owner's
-//    controls are Earn › Editions): it shows only listed tracks, else it is
+//    controls are Earn › Sell): it shows only listed tracks, else it is
 //    absent.
 // 2. Editor: six rows into this product's editor, and the seed caption
 //    (P2-EDITOR-11). Absent in every preview and on a locked project.

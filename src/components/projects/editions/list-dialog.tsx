@@ -33,6 +33,7 @@ import {
   type TrackTerms,
 } from "@/lib/market/editions";
 import { FEE_LABEL, payoutOf } from "@/lib/market/fee";
+import { EXTENDED_BELOW, PRICE_LABEL } from "@/lib/market/sell-flow";
 import { listingViewOf } from "@/lib/market/listing";
 import { readMarketNow } from "@/lib/market/market-store";
 import type { EditionTrack, Listing } from "@/lib/market/types";
@@ -101,7 +102,7 @@ export function termsProblem(
             : message.startsWith("Royalties")
               ? "royalties"
               : "confirm";
-    return { field, message };
+    return { field, message: field === "extended" && message === "Extended can't cost less than Regular." ? EXTENDED_BELOW : message };
   }
   if (opts.askOwner && !opts.owner) return { field: "owner", message: OWNER_REASON };
   return null;
@@ -121,10 +122,10 @@ export function EachSale({ input }: { input: TermsInput }) {
   const token = input.token;
   const rows: string[] = [`${FEE_LABEL} · taken from the price of each sale`];
   if (token && positive(input.regular) && places(input.regular) <= 6) {
-    rows.push(`You receive ${formatAmount(payoutOf(input.regular.trim()), token)} per NFT (Regular)`);
+    rows.push(`You receive ${formatAmount(payoutOf(input.regular.trim()), token)} per copy`);
   }
   if (token && positive(input.extended) && places(input.extended) <= 6) {
-    rows.push(`You receive ${formatAmount(payoutOf(input.extended.trim()), token)} per NFT (Extended)`);
+    rows.push(`You receive ${formatAmount(payoutOf(input.extended.trim()), token)} per copy with future updates`);
   }
   return (
     <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
@@ -217,7 +218,7 @@ export function EditionTermsFields({
       <div className="grid grid-cols-1 gap-8 [@media(min-width:480px)]:grid-cols-2 [@media(min-width:480px)]:gap-6">
         <PriceField
           id={`${idPrefix}-regular`}
-          label="Regular price"
+          label={PRICE_LABEL.regular}
           help={TIER_HELP.regular}
           value={value.regular}
           onChange={(regular) => onChange({ regular })}
@@ -225,7 +226,7 @@ export function EditionTermsFields({
         />
         <PriceField
           id={`${idPrefix}-extended`}
-          label="Extended price"
+          label={PRICE_LABEL.extended}
           help={TIER_HELP.extended}
           value={value.extended}
           onChange={(extended) => onChange({ extended })}
@@ -284,8 +285,8 @@ export function listRequestOf(f: {
     summary: [
       { label: "Product", value: `${f.productName} · ${f.projectName}` },
       { label: "NFT", value: `${KIND_WORD[track.kind]} NFT · ${USE_WORD[track.use]} · ${track.supply.total} NFTs` },
-      { label: "Regular price", value: formatAmount(terms.regular, terms.token) },
-      { label: "Extended price", value: formatAmount(terms.extended, terms.token) },
+      { label: PRICE_LABEL.regular, value: formatAmount(terms.regular, terms.token) },
+      { label: PRICE_LABEL.extended, value: formatAmount(terms.extended, terms.token) },
       { label: "Royalties", value: `${terms.royaltyPct}% on resales` },
       { label: "Collection", value: f.collection },
       { label: "Network", value: networkLabelOf(f.network) },

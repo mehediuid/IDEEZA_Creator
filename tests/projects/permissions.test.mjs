@@ -273,7 +273,7 @@ test("rule 2 · auction: its reason, and the end date in the detail", () => {
   assert.deepEqual(deleteBlockOf({ ...FREE, auction: { endsAt: ENDS } }), {
     id: "auction",
     reason: "A project in an auction can't be deleted.",
-    detail: `Close the auction after it ends on ${formatDate(ENDS)}, in Earn › Project NFT.`,
+    detail: `Close the auction after it ends on ${formatDate(ENDS)}, in Earn › Sell.`,
   });
   assert.equal(formatDate(ENDS), "Oct 3, 2026");
 });
@@ -282,7 +282,7 @@ test("rule 3 · listed: its reason and the way out (P2-LISTING-19)", () => {
   assert.deepEqual(deleteBlockOf({ ...FREE, listed: true }), {
     id: "listed",
     reason: "A listed project can't be deleted.",
-    detail: "Remove the listing first — it's in Earn › Project NFT.",
+    detail: "Remove the listing first — it's in Earn › Sell.",
   });
 });
 
@@ -375,6 +375,6 @@ test("rule 2 · an auction that has ended asks to be closed, not waited for (R2 
   assert.deepEqual(deleteBlockOf({ ...FREE, auction: { endsAt: ENDS, ended: true } }), {
     id: "auction",
     reason: "A project in an auction can't be deleted.",
-    detail: `The auction ended on ${formatDate(ENDS)} — close it in Earn › Project NFT first.`,
+    detail: `The auction ended on ${formatDate(ENDS)} — close it in Earn › Sell first.`,
   });
 });

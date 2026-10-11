@@ -65,16 +65,16 @@ test("the buyer's side is Preview as buyer and a demo buyer; the owner and a con
 });
 
 test("the addresses that moved to Earn redirect there; everything else stays on the page (P0)", () => {
-  // ?list=1 → Earn › Project NFT, which opens the listing flow once.
+  // ?list=1 → Earn › Sell, which opens the listing flow once.
   assert.equal(projectRedirectOf("proj_car", { list: "1" }), "/projects/proj_car/earn/sell?list=1");
   assert.equal(projectRedirectOf("proj_car", { list: "1", tab: "media" }), "/projects/proj_car/earn/sell?list=1");
-  // ?tab=customers → Earn › Customers, keeping a sale= deep link and nothing else.
-  assert.equal(projectRedirectOf("proj_car", { tab: "customers" }), "/projects/proj_car/earn/customers");
+  // ?tab=customers → Earn › Money › Customers, keeping a sale= deep link and nothing else.
+  assert.equal(projectRedirectOf("proj_car", { tab: "customers" }), "/projects/proj_car/earn/money#customers");
   assert.equal(
     projectRedirectOf("proj_car", { tab: "customers", sale: "sale_a", view: "buyer" }),
-    "/projects/proj_car/earn/customers?sale=sale_a",
+    "/projects/proj_car/earn/money?sale=sale_a#customers",
   );
-  assert.equal(projectRedirectOf("proj_car", { tab: ["customers", "media"], sale: ["sale_b"] }), "/projects/proj_car/earn/customers?sale=sale_b");
+  assert.equal(projectRedirectOf("proj_car", { tab: ["customers", "media"], sale: ["sale_b"] }), "/projects/proj_car/earn/money?sale=sale_b#customers");
   // An id is encoded once, by the Earn route contract.
   assert.equal(projectRedirectOf("a b", { list: "1" }), "/projects/a%20b/earn/sell?list=1");
   // Not moved: Team (and its old name), the previews, a saved build, list values other than "1".

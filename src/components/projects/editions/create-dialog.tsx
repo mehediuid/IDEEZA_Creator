@@ -25,7 +25,7 @@ export const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min
 export const LABEL = "w-fit text-md text-[color:var(--color-input-label)]";
 export const HINT = "text-sm text-[color:var(--color-input-helper)]";
 export const ERROR = "text-sm text-[color:var(--color-input-error-text)]";
-export const EDITION_DEMO_LINE = "Testnet demo — nothing is minted or listed on a real blockchain.";
+export const EDITION_DEMO_LINE = "Nothing is minted or listed on a real blockchain.";
 
 const UNREADABLE = "This browser's NFT records couldn't be read, so nothing was changed.";
 const CHANGED = "These NFTs changed in another tab — close this and look again.";
@@ -51,7 +51,7 @@ export function failureCopy(result: RequestResult): string | null {
   return result.message || STORAGE_FULL;
 }
 
-/** "Testnet demo — nothing is minted or listed on a real blockchain." with its pill. */
+/** The Testnet demo pill, then "Nothing is minted or listed on a real blockchain." */
 export function DemoLine() {
   return (
     <p className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">

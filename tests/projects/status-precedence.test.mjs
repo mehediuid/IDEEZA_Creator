@@ -245,7 +245,7 @@ test("headerText · the sold buyer-link part (§3.2): the owner's link to the Cu
   assert.deepEqual(headerText(s).soldBuyerLink, {
     before: "Sold 10% to ",
     label: "Mira (demo buyer)",
-    href: "/projects/proj_car/earn/customers?sale=sale_a",
+    href: "/projects/proj_car/earn/money?sale=sale_a#customers",
     after: " · Sep 28, 2026",
   });
   const link = headerText(s).soldBuyerLink;
@@ -413,7 +413,7 @@ test("deleteFactsOf: a listed edition track blocks delete as listed, even with M
   assert.deepEqual(deleteBlockOf(facts), {
     id: "listed",
     reason: "A listed project can't be deleted.",
-    detail: "Take its NFTs off the marketplace first — Remove listing is in Earn › Editions.",
+    detail: "Take its NFTs off the marketplace first — Remove listing is in Earn › Sell.",
   });
   assert.equal(deleteBlockOf(view(p, SELL, market({ listings: [removed] }), { editions: [track(null)] }).deleteFacts), null);
 });

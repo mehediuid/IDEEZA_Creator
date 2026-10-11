@@ -367,7 +367,7 @@ export function BriefApp({ projectId }: { projectId: string }) {
     if (target) setStep(target);
   };
 
-  // Back from Choose is where the flow is opened from: Earn › Project NFT.
+  // Back from Choose is where the flow is opened from: Earn › Sell.
   const leave = () => router.push(earnHref(projectId, "sell"));
 
   if (!project) return null;
