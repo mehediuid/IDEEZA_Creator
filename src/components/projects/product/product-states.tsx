@@ -81,7 +81,7 @@ export function ProductMissing({ projectName, href }: { projectName: string; hre
   );
 }
 
-const UNBUILT: Record<Exclude<ProjectProduct["state"], "built">, string> = {
+export const UNBUILT: Record<Exclude<ProjectProduct["state"], "built">, string> = {
   "build-gone": "Its build isn't in this browser any more.",
   unmatched: "Its build can't be matched to this name.",
   hand: "Made by hand — its work is in the editor.",

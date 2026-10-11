@@ -5,8 +5,8 @@
 // concept images in v1's tile grid. It is PRODUCT_SLOTS.panels.media.
 //
 // Video, for the owner (can(viewer, "video.generate")):
-// - none: a dashed 16:9 box, "No video yet — every product needs one…",
-//   with Generate AI video;
+// - none: one compact dashed row, "No video yet" and why, with Generate AI
+//   video;
 // - rendering, ready, failed: the player (or P2-VIDEO-4's panel in its box),
 //   Regenerate beside the heading, and the Takes list — play any ready take
 //   in the player, make it the one in use, or delete one that isn't;
@@ -30,7 +30,10 @@ import { etaLabel, progressOf } from "@/lib/video/jobs";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
-import { FAILURE_COPY, NO_VIDEO_PRODUCT, takeLabel } from "@/lib/video/video-copy";
+import { FAILURE_COPY, takeLabel } from "@/lib/video/video-copy";
+
+/** Under "No video yet": why it matters, in one line. */
+const NO_VIDEO_LINE = "Every product needs one before you can share or sell the project.";
 import { cn } from "@/lib/utils";
 import { MediaLightbox, MediaTileCard, type MediaTile } from "../details/media-tab";
 import type { ProductSlotProps } from "./product-slots";
@@ -39,7 +42,7 @@ const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var
 
 export function ProductMediaPanel(props: ProductSlotProps) {
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-12 [container-type:inline-size]">
       <ProductVideoSection {...props} />
       <ProductImages {...props} />
     </div>
@@ -136,8 +139,12 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
       </div>
 
       {status.state === "none" ? (
-        <div className="flex aspect-video w-full flex-col items-center justify-center gap-6 rounded-xl border border-dashed border-border bg-bg-surface px-8 text-center">
-          <p className="max-w-[52ch] text-sm text-text-secondary">{NO_VIDEO_PRODUCT}</p>
+        // One compact row, not an empty 16:9 box (owner, 2026-10-11).
+        <div className="flex flex-col gap-4 rounded-xl border border-dashed border-border bg-bg-surface px-8 py-6 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:items-center [@container(min-width:560px)]:justify-between [@container(min-width:560px)]:gap-8">
+          <p className="flex max-w-[52ch] flex-col gap-1 text-sm text-text-secondary">
+            <span className="text-md font-semibold text-text-primary">No video yet</span>
+            {NO_VIDEO_LINE}
+          </p>
           <Button
             type="button"
             hierarchy="secondary"
@@ -153,14 +160,8 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
         </div>
       ) : (
         <>
-          <VideoPlayer
-            take={playing}
-            productName={name}
-            projectId={project.id}
-            owner
-            status={status}
-            onGenerate={() => openGenerate(playing ?? latest)}
-          />
+          {/* No Generate again inside the player: Regenerate above is the one way to a new take. */}
+          <VideoPlayer take={playing} productName={name} projectId={project.id} owner status={status} />
           {madeFrom !== null && <p className="text-sm text-text-secondary">Made from version {madeFrom}</p>}
 
           <div className="flex flex-col gap-4">
@@ -358,8 +359,9 @@ function ProductImages(props: ProductSlotProps) {
         Images
       </h2>
       {tiles.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border bg-bg-surface px-8 py-10 text-center text-sm text-text-secondary">
-          {"No images yet — this product's concept images from AI builds appear here."}
+        <p className="flex flex-col gap-1 rounded-xl border border-dashed border-border bg-bg-surface px-8 py-6 text-sm text-text-secondary">
+          <span className="text-md font-semibold text-text-primary">No images yet</span>
+          {"Concept images from its AI builds show here."}
         </p>
       ) : (
         <ul role="list" className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-6">

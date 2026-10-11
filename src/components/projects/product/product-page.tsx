@@ -3,13 +3,16 @@
 // ProductPage — /projects/[id]/products/[productId] (spec §3.4, §5.7; Phase 2
 // §2.3, P2-EDITOR-9, 16…19, P2-TABS-2, 3). One product of one project, at one
 // saved version, in the project page's frame (`ProjectFrame`):
-// - main: the breadcrumb; the header — the h1 and `headerParts.titleRow` (the
-//   Activity chip), the Build check, the version select, ★ Open in editor (the
-//   page's one violet, C16), the lock line, the version notice or the source
-//   line; the identity row; then the tab strip and its panel (product-tabs.tsx);
+// - main: the breadcrumb; the header (owner, 2026-10-11: made like the project
+//   page's) — the concept image as a thumbnail from a 480 px header, the h1,
+//   the version select and one meta line ("AI build · {date} · All 5 pieces
+//   ready", or the unbuilt line), the frozen description; beside them ★ Open
+//   in editor (the page's one violet, C16) and the ⋯ menu (product-menu.tsx:
+//   Rename product, Activity, Open chat); then the lock line and the version
+//   notice; then the tab strip and its panel (product-tabs.tsx);
 // - the rail: the Marketplace block (T27, the buyer's side only since Build
-//   and Earn P0), then the Editor block (product-rail.tsx), right of the tabs
-//   from a 1024 px page container.
+//   and Earn P0), Specs and Build check (product-facts.tsx), then the Editor
+//   block (product-rail.tsx), right of the tabs from a 1024 px page container.
 //
 // Every read is `useProjectPageData`'s — the project page's own derivation —
 // so the two pages can't disagree (COR-74), and every `can()` passes
@@ -29,7 +32,6 @@
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CpuIcon } from "@hugeicons/core-free-icons";
-import { ConfidenceBadge, ConfidenceIssuesPanel } from "@/components/create/confidence-badge";
 import { LeaveButton } from "@/components/create/leave-button";
 import { partChangesOf, partChangesText } from "@/lib/create/build-artifacts";
 import { confidenceFor } from "@/lib/create/confidence";
@@ -51,10 +53,11 @@ import { NotOnMarketplace } from "@/components/marketplace/market-project-page";
 import { SLOTS as PROJECT_SLOTS } from "../details/project-page";
 import { useProjectPageData, type ProjectPageContext } from "../details/use-project-page-data";
 import { DeliverablesAccess } from "./product-deliverables";
-import { ProductIdentity } from "./product-identity";
+import { ClampedText, ConceptImage } from "./product-identity";
+import { ProductMenu } from "./product-menu";
 import { ProductRail } from "./product-rail";
-import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
-import { LockLine, ProductLoading, ProductMissing, UnbuiltNote } from "./product-states";
+import type { ProductSlotProps } from "./product-slots";
+import { LockLine, ProductLoading, ProductMissing, UNBUILT } from "./product-states";
 import { ProductTabs } from "./product-tabs";
 import { VersionNoticeBlock, VersionSelect } from "./product-version";
 import { When } from "./when";
@@ -125,9 +128,6 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
     () => (job && bp ? (confidenceFor(job, productsOf(job)).byProduct.find((c) => c.productId === bp.id) ?? null) : null),
     [job, bp],
   );
-  const issuesKey = `${version?.build.buildId ?? ""}:${bp?.id ?? ""}`;
-  const [issues, setIssues] = React.useState({ key: "", open: false });
-  const issuesOpen = issues.key === issuesKey && issues.open;
 
   // What the maker changed on the spec sheet before the build (owner only).
   // The description beside it is the concept's, frozen before any edit (H-7).
@@ -181,7 +181,18 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   // open the editor — every preview, and a project sold in full.
   const editor = can(viewer, "product.openEditor", view.canCtx) ? openInEditorOf(project, product.id) : null;
   const lockLine = ownerFacts ? (view.lock?.line ?? null) : null;
-  const TitleParts = PRODUCT_SLOTS.headerParts?.titleRow ?? [];
+  // The chat this version was built in, while this browser has it: the build is changed there.
+  const chat = ownerFacts && job ? (chats.find((c) => c.id === job.chatId) ?? null) : null;
+  const image = bp?.conceptImageUrl || null;
+  const meta: React.ReactNode =
+    job && pieces ? (
+      <>
+        AI build · <When at={job.endedAt ?? job.createdAt} /> ·{" "}
+        {pieces.ready === pieces.total ? `All ${pieces.total} pieces ready` : `${pieces.ready} of ${pieces.total} pieces ready`}
+      </>
+    ) : product.state !== "built" ? (
+      UNBUILT[product.state]
+    ) : null;
 
   return (
     <>
@@ -201,86 +212,66 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
         main={
           <div className="flex flex-col gap-10">
             <header className="flex flex-col gap-6 [container-type:inline-size]">
-              <div className="flex flex-wrap items-center justify-between gap-x-10 gap-y-4">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
-                  <h1
-                    ref={titleRef}
-                    tabIndex={-1}
-                    className="min-w-0 break-words text-3xl font-bold tracking-tight text-text-primary outline-none"
-                  >
-                    {name}
-                  </h1>
-                  {TitleParts.map((Part, i) => (
-                    <Part key={i} {...slot} />
-                  ))}
-                </div>
-                {confidence && (
-                  <div className="flex flex-wrap items-center gap-4">
-                    <span className="text-sm text-text-secondary">Build check</span>
-                    <ConfidenceBadge
-                      confidence={confidence}
-                      open={issuesOpen}
-                      onOpenChange={(open) => setIssues({ key: issuesKey, open })}
+              <div className="flex flex-col gap-6 [@container(min-width:720px)]:flex-row [@container(min-width:720px)]:items-start [@container(min-width:720px)]:justify-between [@container(min-width:720px)]:gap-10">
+                <div className="flex min-w-0 flex-1 items-start gap-6">
+                  {image && (
+                    <ConceptImage
+                      key={image}
+                      src={image}
+                      alt={`${name} concept image, v${version?.shown ?? home}`}
+                      className="hidden size-[88px] shrink-0 [@container(min-width:480px)]:block"
                     />
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <h1
+                      ref={titleRef}
+                      tabIndex={-1}
+                      className="min-w-0 break-words text-3xl font-bold leading-3xl tracking-tight text-text-primary outline-none"
+                    >
+                      {name}
+                    </h1>
+                    {(meta || (ownerFacts && version && version.options.length > 1)) && (
+                      <div className="flex flex-col gap-3 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:flex-wrap [@container(min-width:560px)]:items-center [@container(min-width:560px)]:gap-x-6">
+                        {ownerFacts && version && version.options.length > 1 && (
+                          <VersionSelect view={version} onPick={(n) => router.push(hrefFor(n), { scroll: false })} />
+                        )}
+                        {meta && <p className="text-sm text-text-secondary">{meta}</p>}
+                      </div>
+                    )}
+                    {description && <ClampedText text={description} />}
+                  </div>
+                </div>
+
+                {(editor || ownerFacts) && (
+                  <div data-header-actions className="flex shrink-0 items-center gap-3">
+                    {editor && (
+                      <LeaveButton
+                        tone="primary"
+                        busy={leaving}
+                        blocked={leaving}
+                        onClick={() => {
+                          setLeaving(true);
+                          selectEditorScope(project.id, product.id);
+                          router.push(editor.href);
+                        }}
+                        icon={CpuIcon}
+                        className="h-[44px] min-w-0 flex-1 justify-center [@container(min-width:480px)]:flex-none [@container(min-width:720px)]:h-[40px]"
+                      >
+                        {editor.label}
+                      </LeaveButton>
+                    )}
+                    {ownerFacts && !market && (
+                      <ProductMenu slot={slot} chat={chat ? { title: chat.title.trim() || "Untitled chat", href: `/chat/${chat.id}` } : null} />
+                    )}
                   </div>
                 )}
               </div>
-              {/* The disclosure's text — what Draft means and the credit note —
-                  gets the header's full width, not the badge's corner (L1). */}
-              {issuesOpen && confidence?.tier === "draft" && <ConfidenceIssuesPanel confidence={confidence} />}
-
-              {version && (
-                <div className="flex flex-col gap-4 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:flex-wrap [@container(min-width:560px)]:items-center">
-                  {ownerFacts && version.options.length > 1 && (
-                    <VersionSelect view={version} onPick={(n) => router.push(hrefFor(n), { scroll: false })} />
-                  )}
-                  {job && pieces && (
-                    <p className="text-sm text-text-secondary">
-                      Built <When at={job.endedAt ?? job.createdAt} /> · Concept {job.conceptNumber} ·{" "}
-                      {pieces.ready} of {pieces.total} pieces ready
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {editor && (
-                <div>
-                  <LeaveButton
-                    tone="primary"
-                    busy={leaving}
-                    blocked={leaving}
-                    onClick={() => {
-                      setLeaving(true);
-                      // The editor opens this product; choosing it first skips "Opening product…".
-                      selectEditorScope(project.id, product.id);
-                      router.push(editor.href);
-                    }}
-                    icon={CpuIcon}
-                    className="h-[44px] w-full justify-center [@container(min-width:520px)]:w-auto"
-                  >
-                    {editor.label}
-                  </LeaveButton>
-                </div>
-              )}
               {lockLine && <LockLine line={lockLine} />}
               {/* Version history is the owner's: a buyer sees the version on offer, nothing about the others. */}
               {ownerFacts && version?.notice && (
                 <VersionNoticeBlock notice={version.notice} name={name} home={home} hrefFor={hrefFor} />
               )}
-              <UnbuiltNote state={product.state} />
             </header>
-
-            {job && bp ? (
-              <ProductIdentity
-                product={bp}
-                name={name}
-                description={description}
-                version={version?.shown ?? home}
-                partChanges={partChanges}
-              />
-            ) : description ? (
-              <p className="max-w-[68ch] text-md leading-relaxed text-text-primary">{description}</p>
-            ) : null}
 
             <DeliverablesAccess.Provider
               value={can(viewer, "deliverables.download", canCtxOf(view, viewer, { productId: product.id }))}
@@ -297,7 +288,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
             </DeliverablesAccess.Provider>
           </div>
         }
-        rail={<ProductRail slot={slot} />}
+        rail={<ProductRail slot={slot} built={bp} confidence={confidence} partChanges={partChanges} />}
       />
       <LiveRegion text={live} />
     </>

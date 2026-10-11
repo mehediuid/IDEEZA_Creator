@@ -2,13 +2,15 @@
 
 // The product page's one tab strip and its tabpanel (P2-EDITOR-16…18 as
 // changed; P2-TABS-2 as changed; spec §2.3, C2; Build and Earn P0):
-//   Media · 3D model · PCB · Firmware code · Wiring · Parts[ ┆ Contributors]
-// - Media is first and the default, and is never written to `?tab=`; an
-//   unknown or absent `?tab=` reads as Media; the v1 links (`?tab=pcb`) still
-//   work. Changes `replace` the URL (COR-32).
+//   3D model · PCB · Firmware code · Wiring · Parts · Media[ ┆ Contributors]
+// - Owner, 2026-10-11: the build's pieces lead and Media follows them; a
+//   buyer's side opens on Media first. The first tab is the default and is
+//   never written to `?tab=`; an unknown or absent `?tab=` reads as the first;
+//   the v1 links (`?tab=pcb`, `?tab=media`) still work. Changes `replace` the
+//   URL (COR-32).
 // - A piece the build never made has no tab (H-5); a hand-made, build-gone
-//   or unmatched product has Media only. The firmware source waits for
-//   `deliverables.download` (O12).
+//   or unmatched product has Media only — and then no tab strip at all, just
+//   the panel. The firmware source waits for `deliverables.download` (O12).
 // - P0: the owner's page is engineering only. Customers moved to Earn ›
 //   Customers, and the team is the project's Team tab, so Contributors — a
 //   team credit with ≥ 1 contributor — is the buyer's side only (`buyerSide`:
@@ -78,6 +80,7 @@ export function ProductTabs({
       buyerSide(viewer) &&
       (can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && contributors > 0)),
     customers: false,
+    mediaFirst: buyerSide(viewer),
   });
   // The pick shows at once; the URL follows it by replace.
   const [picked, setPicked] = React.useState<ProductTabId | null>(null);
@@ -86,7 +89,7 @@ export function ProductTabs({
   const select = (id: ProductTabId) => {
     if (id === active) return;
     setPicked(id);
-    onTab(id === "media" ? null : id);
+    onTab(id === tabs[0] ? null : id);
   };
 
   const def = (id: ProductTabId): TabDef<ProductTabId> => ({ id, label: PRODUCT_TAB_LABEL[id] });
@@ -94,6 +97,19 @@ export function ProductTabs({
 
   const piece = PIECE[active];
   const Panel = active === "media" ? panels.media : active === "contributors" ? panels.contributors : undefined;
+
+  // One tab is no choice: its panel stands alone, without a strip.
+  if (tabs.length === 1) {
+    return (
+      <div>
+        {piece && job && bp ? (
+          <ProductPiecePanel key={`${job.id}:${bp.id}:${piece}`} job={job} product={bp} kind={piece} chatHref={chatHref} />
+        ) : Panel ? (
+          <Panel {...slot} />
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -208,27 +208,28 @@ const PIECE_TABS: ReadonlyArray<{ kind: BuildItemKind; tab: ProductTabId }> = [
 export function productTabsOf(
   product: ProjectProduct,
   items: BuildItem[] | null,
-  gates: { firmware: boolean; contributors: boolean; customers: boolean },
+  gates: { firmware: boolean; contributors: boolean; customers: boolean; mediaFirst?: boolean },
 ): ProductTabId[] {
-  const tabs: ProductTabId[] = ["media"];
-
+  const pieces: ProductTabId[] = [];
   if (product.state === "built" && items) {
     for (const { kind, tab } of PIECE_TABS) {
       if (tab === "code" && !gates.firmware) continue;
       const item = items.find((i) => i.kind === kind);
-      if (item && item.status !== "skipped") tabs.push(tab);
+      if (item && item.status !== "skipped") pieces.push(tab);
     }
   }
-
+  // The owner's page is engineering: the build's pieces lead and Media follows them (owner,
+  // 2026-10-11). A buyer's side opens on the video (`mediaFirst`).
+  const tabs: ProductTabId[] = gates.mediaFirst ? ["media", ...pieces] : [...pieces, "media"];
   if (gates.contributors) tabs.push("contributors");
   if (gates.customers) tabs.push("customers");
   return tabs;
 }
 
-/** The tab `?tab=` asks for, when the strip actually has it; Media otherwise
- *  — an unknown or absent `?tab=` always reads as Media (P2-EDITOR-16). */
+/** The tab `?tab=` asks for, when the strip actually has it; the strip's first tab otherwise —
+ *  an unknown or absent `?tab=` reads as the first (P2-EDITOR-16). */
 export function pickProductTab(tabs: readonly ProductTabId[], asked: string | null): ProductTabId {
-  return tabs.includes(asked as ProductTabId) ? (asked as ProductTabId) : "media";
+  return tabs.includes(asked as ProductTabId) ? (asked as ProductTabId) : (tabs[0] ?? "media");
 }
 
 // ───────────────────────────── URL ─────────────────────────────

@@ -112,7 +112,8 @@ test("the product strip reads PRODUCT_SLOTS for its people tab and Media, with t
   assert.match(tabs, /panels\.contributors !== undefined &&\s*buyerSide\(viewer\) &&/, "Contributors is the buyer's side only (P0)");
   assert.match(tabs, /customers: false,/, "Customers moved to Earn (P0)");
   assert.match(tabs, /label="Product sections"/);
-  assert.match(tabs, /onTab\(id === "media" \? null : id\)/, "Media is never written to ?tab=");
+  assert.match(tabs, /onTab\(id === tabs\[0\] \? null : id\)/, "the first tab is never written to ?tab=");
+  assert.match(tabs, /mediaFirst: buyerSide\(viewer\),/, "a buyer's side opens on Media; the owner's on the pieces");
 });
 
 test("P0: the product page is engineering for the owner — no Customers panel, and Editions only on the buyer's side", () => {
@@ -121,7 +122,8 @@ test("P0: the product page is engineering for the owner — no Customers panel, 
   assert.match(slots, /return buyerSide\(props\.viewer\) \? <EditionBlock \{\.\.\.props\} \/> : null;/);
   const page = read(PRODUCT + "product-page.tsx");
   assert.match(page, /<VersionSelect/);
-  assert.match(page, /<ConfidenceBadge/);
+  assert.match(page, /<ProductRail slot=\{slot\} built=\{bp\} confidence=\{confidence\} partChanges=\{partChanges\} \/>/, "Specs and Build check are the rail's");
+  assert.match(page, /<ProductMenu slot=\{slot\}/, "the owner's ⋯ menu");
   assert.match(page, /\{lockLine && <LockLine line=\{lockLine\} \/>\}/);
 });
 

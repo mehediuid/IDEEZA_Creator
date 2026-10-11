@@ -20,12 +20,13 @@ const buildGone = { id: "prd_a", name: "Car", description: "", built: null, stat
 
 const ALL_GATES = { firmware: true, contributors: true, customers: true };
 
-test("a built product for the owner gives the 8 tabs in spec §2.3's order, Media first", () => {
+test("a built product for the owner leads with its pieces, Media after them (owner, 2026-10-11)", () => {
   const items = ORDER.map((k) => item(k, "ready"));
   const tabs = productTabsOf(built(), items, ALL_GATES);
-  assert.deepEqual(tabs, ["media", "3d", "pcb", "code", "wiring", "parts", "contributors", "customers"]);
-  assert.deepEqual(tabs, PRODUCT_TABS.slice());
-  assert.equal(tabs[0], "media");
+  assert.deepEqual(tabs, ["3d", "pcb", "code", "wiring", "parts", "media", "contributors", "customers"]);
+  assert.equal(pickProductTab(tabs, null), "3d", "the first piece is the default");
+  // A buyer's side opens on the video: spec §2.3's order.
+  assert.deepEqual(productTabsOf(built(), items, { ...ALL_GATES, mediaFirst: true }), PRODUCT_TABS.slice());
 });
 
 test("a hand-made product gives [media, contributors, customers] — no piece tabs, no build data needed", () => {
@@ -40,7 +41,7 @@ test("a build-gone or unmatched product gets no piece tabs either", () => {
 test("the buyer preview has no code and no customers", () => {
   const items = ORDER.map((k) => item(k, "ready"));
   const gates = { firmware: false, contributors: true, customers: false };
-  assert.deepEqual(productTabsOf(built(), items, gates), ["media", "3d", "pcb", "wiring", "parts", "contributors"]);
+  assert.deepEqual(productTabsOf(built(), items, { ...gates, mediaFirst: true }), ["media", "3d", "pcb", "wiring", "parts", "contributors"]);
 });
 
 test("a dropped row (state stays built) keeps its piece tabs", () => {
@@ -51,14 +52,14 @@ test("a dropped row (state stays built) keeps its piece tabs", () => {
 
 test("a piece this build never made (skipped) has no tab — H-5", () => {
   const items = [item("3d", "ready"), item("pcb", "skipped"), item("code", "ready"), item("wiring", "ready"), item("parts", "ready")];
-  assert.deepEqual(productTabsOf(built(), items, ALL_GATES), ["media", "3d", "code", "wiring", "parts", "contributors", "customers"]);
+  assert.deepEqual(productTabsOf(built(), items, ALL_GATES), ["3d", "code", "wiring", "parts", "media", "contributors", "customers"]);
 });
 
 test("neither Contributors nor Customers show without their own gate", () => {
   assert.deepEqual(productTabsOf(hand, null, { firmware: true, contributors: false, customers: false }), ["media"]);
 });
 
-test("pickProductTab: an unknown or absent ?tab= reads as Media", () => {
+test("pickProductTab: an unknown or absent ?tab= reads as the strip's first tab", () => {
   assert.equal(pickProductTab(PRODUCT_TABS, "bogus"), "media");
   assert.equal(pickProductTab(PRODUCT_TABS, null), "media");
 });

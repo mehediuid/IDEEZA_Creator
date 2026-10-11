@@ -15,7 +15,8 @@
 // This file is a merge point. Each task adds only its import, one adapter
 // named `<Area>Slot` directly above PRODUCT_SLOTS, and its key(s), and never
 // reorders or edits another entry:
-// - W1: T14 panels.media · T17 panels.contributors · T20 headerParts.titleRow;
+// - W1: T14 panels.media · T17 panels.contributors (T20's Activity chip is the
+//   header's ⋯ menu since 2026-10-11, product-menu.tsx);
 // - W3: T27 rail.marketplace.
 
 import type * as React from "react";
@@ -24,7 +25,6 @@ import type { ProductVersionView } from "@/lib/manual/product-page";
 import type { ProjectProduct, ProjectView } from "@/lib/manual/project-read";
 import { buyerSide } from "@/lib/manual/project-route";
 import type { ManualProject } from "@/lib/manual/projects";
-import { ProductActivityChip } from "../details/activity-chip";
 import { ProductContributorsPanel } from "./product-contributors";
 import { ProductMediaPanel } from "./product-media";
 import { EditionBlock } from "../editions/edition-block";
@@ -48,13 +48,7 @@ export type ProductSlotProps = {
 export type ProductSlots = {
   panels: Partial<Record<"media" | "contributors", React.ComponentType<ProductSlotProps>>>;
   rail: Partial<Record<"marketplace", React.ComponentType<ProductSlotProps>>>;
-  headerParts?: { titleRow?: React.ComponentType<ProductSlotProps>[] };
 };
-
-// T20's wiring: the Activity chip (P2-TABS-5), scoped to this product.
-function ActivitySlot(props: ProductSlotProps) {
-  return <ProductActivityChip {...props} />;
-}
 
 // T17's wiring (P2-CONTRIB-15, P2-TABS-4): the product page's read-only
 // contributors credit.
@@ -75,8 +69,5 @@ export const PRODUCT_SLOTS: ProductSlots = {
   },
   rail: {
     marketplace: EditionsSlot,
-  },
-  headerParts: {
-    titleRow: [ActivitySlot],
   },
 };
