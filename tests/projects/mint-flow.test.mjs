@@ -315,3 +315,19 @@ test("earnMintHref: the static mint route under Earn", () => {
   assert.equal(earnMintHref("a b"), "/projects/a%20b/earn/mint");
   assert.ok(earnMintHref("proj_a").startsWith(earnHref("proj_a")));
 });
+
+test("Publish (owner, 2026-10-12): a Draft keeps it private, gives or sells; a Private one gives or sells; the choice rides the link", async () => {
+  const { publishOptionsOf, publishHrefOf, publishIntentOf } = await import("../../.tmp-test/lib/manual/earn-route.js");
+  assert.deepEqual(publishOptionsOf("draft", false), ["save", "give", "sell"]);
+  assert.deepEqual(publishOptionsOf("private", true), ["give", "sell"]);
+  assert.deepEqual(publishOptionsOf("private", false), ["sell"], "a mint from the page can't be carried on by the flow");
+  for (const out of ["given", "listed", "paused", "sold", "minted"]) assert.equal(publishOptionsOf(out, true), null, out);
+  assert.equal(publishHrefOf("p1", "draft", "sell"), "/projects/p1/earn/mint?intent=sell");
+  assert.equal(publishHrefOf("p1", "draft", "save"), "/projects/p1/earn/mint?intent=save");
+  assert.equal(publishHrefOf("p1", "private", "give"), "/projects/p1/earn/mint?intent=give");
+  assert.equal(publishHrefOf("p1", "private", "sell"), "/projects/p1/earn/sell?list=1");
+  assert.equal(earnMintHref("p1"), "/projects/p1/earn/mint");
+  assert.equal(publishIntentOf("give"), "give");
+  assert.equal(publishIntentOf("bogus"), null);
+  assert.equal(publishIntentOf(null), null);
+});

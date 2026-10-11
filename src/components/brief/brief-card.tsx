@@ -42,16 +42,18 @@ export function BriefCard({ onBack, children }: { onBack?: () => void; children:
   );
 }
 
-/** "Step 2 of 4 · Choose · Details · Review and sign · Done" — read-only; Back on the card walks back. */
-export function MintStepLine({ current }: { current: MintStepId }) {
-  const here = MINT_STEPS.indexOf(current);
+/** "Step 2 of 4 · Choose · Details · Review and sign · Done" — read-only; Back on the card walks back.
+ *  `skipChoose`: the choice came with the link, so the line starts at Details (3 steps). */
+export function MintStepLine({ current, skipChoose = false }: { current: MintStepId; skipChoose?: boolean }) {
+  const steps = skipChoose ? MINT_STEPS.filter((s) => s !== "choose") : MINT_STEPS;
+  const here = steps.indexOf(current);
   return (
     <nav aria-label="Mint steps" className="w-full max-w-[600px]">
       <ol className="m-0 flex list-none flex-wrap items-center gap-x-[8px] gap-y-[4px] p-0 text-sm">
         <li className="text-text-tertiary">
-          Step {here + 1} of {MINT_STEPS.length}
+          Step {here + 1} of {steps.length}
         </li>
-        {MINT_STEPS.map((id, i) => (
+        {steps.map((id, i) => (
           <li
             key={id}
             aria-current={i === here ? "step" : undefined}

@@ -151,7 +151,8 @@ test("P0: the header's one door to Earn — no pair, no Preview as buyer, and on
   assert.doesNotMatch(header, /Preview as buyer"|>\s*Preview as buyer|ListingFlow|actions\?\.\[/);
   assert.match(header, /earnButtonOf\(\{/);
   assert.match(header, /reviewPending: review !== null/, "Review version keeps the violet while it is pending");
-  assert.match(header, /tone=\{earn\.violet \? "primary" : "quiet"\}/);
+  assert.match(header, /tone=\{earn\.violet && !publishOptions \? "primary" : "quiet"\}/, "Publish takes the violet while it shows");
+  assert.match(header, /tone=\{review \? "quiet" : "primary"\}/, "and gives it to Review version while that is pending");
   assert.match(header, /stageLineOf\(view\.engineering, summary\)/, "the stage line reads the engineering axis");
   assert.match(header, /commercial: earnSource\.commercial,/, "the Earn button reads the commercial axis");
   assert.match(header, /facts: ladder\.ready \? ladder\.facts : null,/, "and the ladder, once its stores have hydrated");

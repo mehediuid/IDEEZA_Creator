@@ -135,7 +135,7 @@ test("the Overview's card: mint, then sell, each with its why; later states say 
     why: "Minting creates a record that you own this design. It's free here and signed in the demo wallet.",
     point: "mint",
     verb: "mint",
-    action: { label: "Start mint", href: "/projects/proj_car/earn/mint" },
+    action: { label: "Start mint", href: "/projects/proj_car/earn/mint?intent=save" },
   });
   assert.deepEqual(earnNextOf("proj_car", "minted"), {
     step: "sell",

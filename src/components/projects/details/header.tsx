@@ -39,14 +39,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight02Icon, BubbleChatIcon, Coins01Icon, UserIcon } from "@hugeicons/core-free-icons";
+import { ArrowRight02Icon, BubbleChatIcon, Coins01Icon, Rocket01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
 import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
 import { LockLine } from "@/components/projects/product/product-states";
 import { roleChipOf } from "@/lib/manual/contributors";
-import { earnHref } from "@/lib/manual/earn-route";
+import { earnHref, publishOptionsOf } from "@/lib/manual/earn-route";
 import { earnButtonOf } from "@/lib/manual/earn-view";
 import { headerText, type MetaPart } from "@/lib/manual/project-summary";
 import { buyerSide } from "@/lib/manual/project-route";
@@ -57,6 +57,7 @@ import { BUYER_PREVIEW_ENTRY, isPreview, useFocusAfterPreview } from "./buyer-pr
 import { ProjectDescription } from "./description-editor";
 import { useEditDetails } from "./edit-details";
 import { ProjectMenu } from "./project-menu";
+import { PublishDialog } from "./publish-dialog";
 import type { ProjectSlots, SlotProps } from "./slots";
 import { ProjectTitle } from "./title-editor";
 
@@ -154,6 +155,16 @@ export function ProjectHeader({
   const fallbackFocus = React.useCallback(() => menuRef.current ?? titleRef.current, [titleRef]);
   const edit = useEditDetails({ project, canEdit: engineering && owner && canEdit, announce, fallbackFocus });
   const menu = engineering && owner;
+  // Publish (owner, 2026-10-12): how a Draft or a Private project goes out, chosen here once.
+  const publishOptions = menu && view.lock === null ? publishOptionsOf(summary.status, brief?.state.mintedAt != null) : null;
+  const [publishing, setPublishing] = React.useState(false);
+  const publishLine = !publishOptions
+    ? null
+    : publishOptions.length === 3
+      ? "Keep it private, give it away, or sell it."
+      : publishOptions.includes("give")
+        ? "Give it away or sell it."
+        : "List it on Explore marketplace.";
 
   return (
     <header className="flex flex-col gap-8 [container-type:inline-size]">
@@ -163,6 +174,7 @@ export function ProjectHeader({
             <div className="min-w-0 max-w-full">
               <ProjectTitle project={project} titleRef={titleRef} />
             </div>
+            {engineering && owner && <StatusChip status={summary.status} word={text.chip.word} />}
             {engineering && text.chip.badge && <ShowcaseChip />}
             {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             {role && (
@@ -236,15 +248,28 @@ export function ProjectHeader({
                   {review.label}
                 </LeaveButton>
               )}
+              {publishOptions && (
+                <LeaveButton
+                  tone={review ? "quiet" : "primary"}
+                  busy={false}
+                  blocked={leaving !== null}
+                  onClick={() => setPublishing(true)}
+                  icon={Rocket01Icon}
+                  className={HEADER_BUTTON}
+                  aria-describedby={publishLine ? earnFactId : undefined}
+                >
+                  Publish
+                </LeaveButton>
+              )}
               {earn && (
                 <LeaveButton
-                  tone={earn.violet ? "primary" : "quiet"}
+                  tone={earn.violet && !publishOptions ? "primary" : "quiet"}
                   busy={leaving === "earn"}
                   blocked={leaving !== null}
                   onClick={() => leave("earn", earn.href)}
                   icon={Coins01Icon}
                   className={HEADER_BUTTON}
-                  aria-describedby={earn.sub ? earnFactId : undefined}
+                  aria-describedby={earn.sub && !publishOptions ? earnFactId : undefined}
                 >
                   {earn.label}
                 </LeaveButton>
@@ -253,9 +278,9 @@ export function ProjectHeader({
                 <ProjectMenu {...slotProps} canEdit={canEdit} onEdit={() => edit.open()} triggerRef={menuRef} />
               )}
             </div>
-            {earn?.sub && (
+            {(publishLine ?? earn?.sub) && (
               <span id={earnFactId} className="text-sm text-text-secondary">
-                {earn.sub}
+                {publishLine ?? earn?.sub}
               </span>
             )}
           </div>
@@ -276,6 +301,15 @@ export function ProjectHeader({
         </div>
       )}
       {edit.dialog}
+      {publishing && publishOptions && (
+        <PublishDialog
+          projectId={project.id}
+          projectName={project.name}
+          status={summary.status}
+          options={publishOptions}
+          onClose={() => setPublishing(false)}
+        />
+      )}
     </header>
   );
 }

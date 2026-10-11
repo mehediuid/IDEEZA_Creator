@@ -23,7 +23,7 @@ import type { ManualProject } from "./projects";
 
 // ─────────────────────────── the Earn button (the project page's door) ───────────────────────────
 
-export const EARN_LABEL = "Earn from this project";
+export const EARN_LABEL = "Earn";
 
 export type EarnButtonState = "notReady" | "ready" | "active" | "soldInFull";
 
@@ -66,7 +66,8 @@ export function earnButtonOf(input: {
     label: EARN_LABEL,
     sub,
     violet: false,
-    href: earnHref(input.projectId),
+    // Earn opens on Sell (owner, 2026-10-12: "Earn → straight to Sell").
+    href: earnHref(input.projectId, "sell"),
   });
   switch (input.commercial) {
     case "soldOut":
@@ -189,7 +190,7 @@ export function earnNextOf(projectId: string, commercial: CommercialState, copie
         why: "Minting creates a record that you own this design. It's free here and signed in the demo wallet.",
         point: "mint",
         verb: "mint",
-        action: { label: "Start mint", href: earnMintHref(projectId) },
+        action: { label: "Start mint", href: earnMintHref(projectId, "save") },
       };
     case "minted":
       if (copiesOnSale) {

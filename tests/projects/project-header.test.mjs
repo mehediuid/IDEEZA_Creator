@@ -208,7 +208,7 @@ const earnOf = (over = {}) =>
 
 test("P1 · the Earn button: a built draft is ready to mint — no wallet, ownership or videos first (owner, 2026-10-12)", () => {
   assert.deepEqual(pick(earnOf()), ["ready", null, true]);
-  assert.equal(EARN_LABEL, "Earn from this project");
+  assert.equal(EARN_LABEL, "Earn");
   // Nothing built yet: the one step the mint needs.
   assert.deepEqual(pick(earnOf({ facts: { ...DRAFT, built: false } })), ["notReady", "0 of 1 ready to sell", false]);
 });
@@ -258,7 +258,7 @@ test("P0 · the Earn button: an active listing, a partial sale or a gift is quie
 test("P0 · the Earn button: sold in full is quiet and opens Earn read-only", () => {
   const b = earnOf({ commercial: "soldOut", soldSharePct: 100, facts: ALL, reviewPending: false });
   assert.deepEqual(pick(b), ["soldInFull", "Sold in full", false]);
-  assert.equal(b.href, "/projects/proj_car/earn");
+  assert.equal(b.href, "/projects/proj_car/earn/sell", "Earn opens on Sell (owner, 2026-10-12)");
 });
 
 function pick(b) {

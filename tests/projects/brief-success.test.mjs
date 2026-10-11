@@ -206,7 +206,7 @@ test("a Sell commit writes the MintRecord, then the listing, then the draft's mi
     "setMint(cur.id, record)",
     "writeListings(listings)",
     "bumpMinted(network, collection)",
-    "writeDraft(scope, { ...s, mintedAt: at }",
+    "writeDraft(scope, { ...s, mintedAt: carryOn ? (s.mintedAt ?? at) : at }",
     'markStepCompleted(cur.id, "brief")',
     'setStatus(cur.id, "completed")',
   ];
@@ -231,7 +231,8 @@ test("a Sell commit writes the MintRecord, then the listing, then the draft's mi
 test("the mint showcases at the mint time itself: one moment for mintedAt and showcasedAt (COR-105)", () => {
   const app = read("brief-app.tsx");
   const writes = slice(app, "const writeAll = (at: number", "let result: RequestResult | null = null;");
-  assert.match(writes, /mintedAt: at\b/);
+  // A fresh mint stamps the proof's time; a minted project carried on keeps its first one.
+  assert.match(writes, /mintedAt: carryOn \? \(s\.mintedAt \?\? at\) : at\b/);
   // Shared at the mint once every video is ready (a private mint never waits for them; owner, 2026-10-12).
   assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) setShowcase\(cur\.id, true, at\);/);
   assert.doesNotMatch(writes, /Date\.now\(\)/, "the writes take the proof's time, never a second clock read");

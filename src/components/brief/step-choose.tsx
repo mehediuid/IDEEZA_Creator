@@ -10,7 +10,8 @@ import Link from "next/link";
 import type { Intent } from "@/lib/brief/types";
 import { BriefCard, TAP, primaryCta } from "./brief-card";
 
-const INTENTS: { id: Intent; label: string; sub: string; requirement: string; icon: React.ReactNode }[] = [
+/** The three ways out, shared with the project page's Publish (publish-dialog.tsx). */
+export const INTENTS: { id: Intent; label: string; sub: string; requirement: string; icon: React.ReactNode }[] = [
   {
     id: "save",
     label: "Keep private",

@@ -213,7 +213,8 @@ export function CopyRow({ kind, scope, ...props }: SlotProps & { kind: EditionKi
     ) : state.kind === "sell" ? (
       <RowButton id={buttonId} label="Sell" onClick={() => sell(null)} />
     ) : state.link === "mint" ? (
-      <RowLink href={earnMintHref(project.id)} label="Sell" />
+      // Copies need the project minted: the plain, private mint, straight to its details.
+      <RowLink href={earnMintHref(project.id, "save")} label="Sell" />
     ) : (
       <RowButton id={buttonId} label="Sell" disabled describedBy={stateId} />
     );

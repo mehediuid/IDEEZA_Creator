@@ -71,8 +71,33 @@ export function earnSectionRedirectOf(
   return earnHref(projectId, part, part === "customers" && sale ? { sale } : undefined);
 }
 
-/** `/projects/<id>/earn/mint` — the mint flow (the Brief, Build and Earn P1-2), opened from
- *  Earn › Sell. A static segment, so it wins over `earn/[section]`. */
-export function earnMintHref(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}/earn/mint`;
+/** How a project goes out — the mint flow's Choose, made before the flow opens. */
+export type PublishIntent = "save" | "give" | "sell";
+
+/** `/projects/<id>/earn/mint` — the mint flow (the Brief, Build and Earn P1-2). A static
+ *  segment, so it wins over `earn/[section]`. With `intent` (owner, 2026-10-12: Publish, Sell,
+ *  Start mint) the flow opens on Details with that choice made, never asking it again. */
+export function earnMintHref(projectId: string, intent?: PublishIntent): string {
+  return `/projects/${encodeURIComponent(projectId)}/earn/mint${intent ? `?intent=${intent}` : ""}`;
+}
+
+/** The intent a mint link carries, when it is one. */
+export function publishIntentOf(raw: string | null): PublishIntent | null {
+  return raw === "save" || raw === "give" || raw === "sell" ? raw : null;
+}
+
+/** What Publish offers a project in `status` (owner, 2026-10-12); null when it is out already:
+ *  a Draft keeps it private, gives it or sells it; a Private one gives it (only when its mint came
+ *  through the flow, which can carry it on) or sells it. */
+export function publishOptionsOf(status: string, mintedInFlow: boolean): PublishIntent[] | null {
+  if (status === "draft") return ["save", "give", "sell"];
+  if (status === "private") return mintedInFlow ? ["give", "sell"] : ["sell"];
+  return null;
+}
+
+/** Where a Publish pick goes: the mint flow on Details, or — a Private project's Sell — Earn ›
+ *  Sell's listing flow, the way a minted project is listed. */
+export function publishHrefOf(projectId: string, status: string, intent: PublishIntent): string {
+  if (status === "private" && intent === "sell") return earnHref(projectId, "sell", { list: "1" });
+  return earnMintHref(projectId, intent);
 }

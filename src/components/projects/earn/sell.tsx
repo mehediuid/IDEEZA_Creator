@@ -127,7 +127,7 @@ function MainRow(props: SlotProps) {
 
   const action =
     state.action === "mint" ? (
-      <RowLink href={earnMintHref(project.id)} label="Sell" />
+      <RowLink href={earnMintHref(project.id, "sell")} label="Sell" />
     ) : state.action === "manage" ? (
       <RowButton id="sell-main" label="Manage" expanded={open} controls={panelId} onClick={() => setOpen((o) => !o)} />
     ) : state.action === "list" && listing ? (

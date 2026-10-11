@@ -18,7 +18,7 @@
 // Sell — the listing, then the draft's `mintedAt` and the v1 writes.
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { refusedCopy } from "@/components/projects/listing/listing-dialog";
 import { Banner } from "@/components/ideeza";
 import { useMinuteClock } from "@/components/projects/details/use-project-page-data";
@@ -48,7 +48,7 @@ import {
 } from "@/lib/brief/mint-flow";
 import { briefDraftKey } from "@/lib/brief/types";
 import { useCreateHistory } from "@/lib/create/history";
-import { earnHref } from "@/lib/manual/earn-route";
+import { earnHref, publishIntentOf } from "@/lib/manual/earn-route";
 import { ownershipOf } from "@/lib/manual/ownership";
 import type { Readiness } from "@/lib/manual/p2-types";
 import { buildsOf, listingMetadataOf, productRowsOf, productsOfProject, type ProjectProduct } from "@/lib/manual/project-read";
@@ -138,8 +138,22 @@ export function BriefApp({ projectId }: { projectId: string }) {
   // once, on mount: the page keys the flow by project and renders it only in
   // the browser, so the state in hand always belongs to this project.
   const [initial] = React.useState(() => readMintDraft(readRaw(draftKey(projectId))));
-  const [state, setState] = React.useState<MintState>(() => ({ ...(initial?.state ?? DEFAULT_MINT_STATE), projectId }));
-  const [step, setStep] = React.useState<MintStepId>(initial?.step ?? "choose");
+  // Publish, Sell and Start mint carry the choice (`?intent=`, owner 2026-10-12): the flow opens
+  // on Details with it made and never asks it again. A minted Brief opens on Details only to go
+  // out further (a private project given away); its own intent again is its read-only Done.
+  const search = useSearchParams();
+  const [asked] = React.useState(() => {
+    const intent = publishIntentOf(search.get("intent"));
+    if (!intent) return null;
+    if (initial?.step === "success" && (intent === initial.state.intent || intent === "save")) return null;
+    return intent;
+  });
+  const [state, setState] = React.useState<MintState>(() => ({
+    ...(initial?.state ?? DEFAULT_MINT_STATE),
+    ...(asked ? { intent: asked } : null),
+    projectId,
+  }));
+  const [step, setStep] = React.useState<MintStepId>(() => (asked ? "details" : (initial?.step ?? "choose")));
   // The commit's wallet request is open. The ref stops a second press inside
   // the same tick; the flag is what the CTA and Back read.
   const mintingRef = React.useRef(false);
@@ -155,10 +169,13 @@ export function BriefApp({ projectId }: { projectId: string }) {
     } catch {}
   }, []);
 
-  // Saved as you go — and never after the project is gone.
+  // Saved as you go — and never after the project is gone. A minted project carried on (a Private
+  // one given away) keeps its stored draft until the commit: its intent there is what it *is*
+  // (the commercial axis reads it), so Details must not make it "given" before the signature.
+  const carryOn = asked !== null && initial?.step === "success";
   React.useEffect(() => {
-    if (scope) writeDraft(scope, state, step);
-  }, [state, step, scope]);
+    if (scope && !(carryOn && step !== "success")) writeDraft(scope, state, step);
+  }, [state, step, scope, carryOn]);
 
   const patch = (next: Partial<MintState>) => setState((s) => ({ ...s, ...next }));
 
@@ -300,7 +317,8 @@ export function BriefApp({ projectId }: { projectId: string }) {
         if (newMint) bumpMinted(network, collection);
         // 3. The draft's mintedAt — one moment, which a showcase it starts shares (COR-105) —
         //    then the v1 writes.
-        setDraftNotSaved(!writeDraft(scope, { ...s, mintedAt: at }, "success"));
+        // A project carried on keeps the moment it was first minted.
+        setDraftNotSaved(!writeDraft(scope, { ...s, mintedAt: carryOn ? (s.mintedAt ?? at) : at }, "success"));
         markStepCompleted(cur.id, "brief");
         setStatus(cur.id, "completed");
         if (typeof cur.ownerConfirmedAt !== "number") setOwnerConfirmed(cur.id, at);
@@ -371,6 +389,12 @@ export function BriefApp({ projectId }: { projectId: string }) {
   };
 
   const goBack = () => {
+    // Details is the first step when the choice came with the link: Back goes where it came from.
+    if (asked && step === "details") {
+      if (window.history.length > 1) router.back();
+      else router.push(`/projects/${encodeURIComponent(projectId)}`);
+      return;
+    }
     const target = mintStepBefore(step);
     if (target) setStep(target);
   };
@@ -396,7 +420,7 @@ export function BriefApp({ projectId }: { projectId: string }) {
       // Tighter at phone width, where 32 px a side was a fifth of the screen.
       className="flex min-h-full flex-col items-center gap-6 px-[16px] pb-[48px] pt-[24px] md:px-[32px] md:pb-[64px] md:pt-[40px]"
     >
-      {step !== "success" && <MintStepLine current={step} />}
+      {step !== "success" && <MintStepLine current={step} skipChoose={asked !== null} />}
       {draftNotSaved && step === "success" ? (
         <Banner tone="attention" className="w-full max-w-[600px]">
           {DRAFT_NOT_SAVED}

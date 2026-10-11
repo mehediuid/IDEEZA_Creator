@@ -120,7 +120,7 @@ export function ProjectMenu({
                   label: "Share to Innovations",
                   sub: shareCopy ? "Show it on the Innovations page" : "Mint it first · Go to mint",
                   icon: News01Icon,
-                  run: shareCopy ? share : () => router.push(earnMintHref(project.id)),
+                  run: shareCopy ? share : () => router.push(earnMintHref(project.id, "save")),
                 },
           ]
         : []),
