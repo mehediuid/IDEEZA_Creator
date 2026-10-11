@@ -68,9 +68,9 @@ test("statusCopy: P2-VIDEO-4's table", () => {
 });
 
 test("lines: meta, take label, stage line, title", () => {
-  assert.equal(copy.clipMetaLine(take(), "29 Sep 2026"), "10-second silent clip · 360p · Take 2 · Made 29 Sep 2026");
+  assert.equal(copy.clipMetaLine(take(), "29 Sep 2026"), "10-second silent clip · 480p · Take 2 · Made 29 Sep 2026");
   assert.equal(copy.clipMetaLine(take({ quality: "high" }), "x"), "10-second silent clip · 720p · Take 2 · Made x");
-  assert.equal(copy.takeLabel(take(), "29 Sep 2026"), "Take 2 · 360p · 29 Sep 2026");
+  assert.equal(copy.takeLabel(take(), "29 Sep 2026"), "Take 2 · 480p · 29 Sep 2026");
   assert.equal(copy.stageLine(2, "queued"), "Take 2 · Stage 1 of 5 · Queued");
   assert.equal(copy.stageLine(2, "encoding"), "Take 2 · Stage 5 of 5 · Encoding & finalising");
   assert.equal(copy.renderTitle("Rider", "Car"), "Rider · Car");

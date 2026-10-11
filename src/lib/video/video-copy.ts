@@ -29,6 +29,11 @@ export function honestyLine(productName: string): string {
 }
 
 export const SILENT_NOTE = "The video is silent.";
+
+/** Under the storyboard (owner, 2026-10-12): what the browser can make of it today. */
+export function storyboardHonesty(productName: string): string {
+  return `This preview is made in your browser from ${productName}'s image, with each scene's speech shown on screen. The AI video and audio models aren't connected yet — your prompts and this storyboard are kept with the video for them.`;
+}
 export const CANNOT_PLAY_COPY = "This browser can't play this video file.";
 export const PROMPT_BLOCKER = "Write what the video should show.";
 export const HIGH_LOCKED_NOTE = "720p comes with the Builder plan, which isn't on sale yet.";

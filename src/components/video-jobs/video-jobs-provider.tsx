@@ -56,6 +56,7 @@ import { ClipStoreError, deleteClips, deleteProjectClips, putClip, verifyClips }
 import * as pv from "@/lib/video/product-video";
 import { readProjectVideos, writeProjectVideos } from "@/lib/video/store";
 import type { OnScreenLines, ProductVideo, ProjectVideos, VideoFailureKind, VideoQuality } from "@/lib/video/types";
+import type { Storyboard } from "@/lib/video/storyboard";
 import { renderTitle } from "@/lib/video/video-copy";
 
 export {
@@ -83,6 +84,11 @@ export type ProductVideoSpec = {
   source: ProductSource | null;
   /** The `/api/concept/image/<id>` reference, never a copy. */
   imageUrl: string | null;
+  /** Kept with the take for the model (owner, 2026-10-12): the sound asked for, what was left
+   *  to AI, and the reviewed storyboard. */
+  audioPrompt?: string;
+  auto?: { video: boolean; audio: boolean };
+  storyboard?: Storyboard;
 };
 
 export type StartResult = { ok: true; takeId: string; n: number } | { ok: false };
@@ -473,7 +479,16 @@ export function VideoJobsProvider({ children }: { children: React.ReactNode }) {
     const wrote = writeProduct(spec.projectId, spec.productId, (v) => {
       const res = pv.startTake(
         v,
-        { productId: spec.productId, prompt: spec.prompt, lines: spec.lines, quality: spec.quality, source: spec.source },
+        {
+          productId: spec.productId,
+          prompt: spec.prompt,
+          lines: spec.lines,
+          quality: spec.quality,
+          source: spec.source,
+          audioPrompt: spec.audioPrompt,
+          auto: spec.auto,
+          storyboard: spec.storyboard,
+        },
         t,
         id,
       );
