@@ -19,6 +19,12 @@ import type { AuctionPhase, ListingView } from "../market/types";
 import type { DemoBuyerId, MintStatus } from "../wallet/types";
 import type { ContributorRole, DeleteFacts, OtherOwner } from "./p2-types";
 import { formatDate, type ProjectStatus } from "./project-summary";
+import { EARN_SECTION_LABEL } from "./earn-route";
+
+/** Where the delete block's market fixes live since Build and Earn P0: the listing and the
+ *  auction in Earn › Project NFT, the edition listings in Earn › Editions. */
+const EARN_SELL = `Earn › ${EARN_SECTION_LABEL.sell}`;
+const EARN_EDITIONS = `Earn › ${EARN_SECTION_LABEL.editions}`;
 
 // ─────────────────────────── who is looking (§3.8.1) ───────────────────────────
 
@@ -227,7 +233,8 @@ export type DeleteBlock = {
   reason: string;
   /** The way out. */
   detail: string;
-  /** otherOwners only: the quiet link under the detail, which selects the Contributors tab. */
+  /** otherOwners only: the quiet link under the detail, to the roster — Earn › Splits since
+   *  Build and Earn P0 (`tab` names the roster's old home; the dialog links to Splits). */
   link?: { label: "Open Contributors"; tab: "contributors" };
 };
 
@@ -293,8 +300,8 @@ const DELETE_RULES: readonly DeleteRule[] = [
     block: (f) => ({
       reason: "A project in an auction can't be deleted.",
       detail: f.auction!.ended
-        ? `The auction ended on ${formatDate(f.auction!.endsAt)} — close it in the Marketplace block first.`
-        : `Close the auction after it ends on ${formatDate(f.auction!.endsAt)}, in the Marketplace block.`,
+        ? `The auction ended on ${formatDate(f.auction!.endsAt)} — close it in ${EARN_SELL} first.`
+        : `Close the auction after it ends on ${formatDate(f.auction!.endsAt)}, in ${EARN_SELL}.`,
     }),
   },
   {
@@ -303,8 +310,8 @@ const DELETE_RULES: readonly DeleteRule[] = [
     block: (f) => ({
       reason: "A listed project can't be deleted.",
       detail: f.listed
-        ? "Remove the listing first — it's in the Marketplace block."
-        : "Take its NFTs off the marketplace first — Remove listing is on each product's page.",
+        ? `Remove the listing first — it's in ${EARN_SELL}.`
+        : `Take its NFTs off the marketplace first — Remove listing is in ${EARN_EDITIONS}.`,
     }),
   },
   {

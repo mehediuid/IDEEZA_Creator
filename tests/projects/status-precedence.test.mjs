@@ -413,7 +413,7 @@ test("deleteFactsOf: a listed edition track blocks delete as listed, even with M
   assert.deepEqual(deleteBlockOf(facts), {
     id: "listed",
     reason: "A listed project can't be deleted.",
-    detail: "Take its NFTs off the marketplace first — Remove listing is on each product's page.",
+    detail: "Take its NFTs off the marketplace first — Remove listing is in Earn › Editions.",
   });
   assert.equal(deleteBlockOf(view(p, SELL, market({ listings: [removed] }), { editions: [track(null)] }).deleteFacts), null);
 });

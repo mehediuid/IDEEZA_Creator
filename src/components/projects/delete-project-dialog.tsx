@@ -10,7 +10,8 @@
 //   does, the control stays where it is, aria-disabled and in the tab order,
 //   with the reason and detail beside it, named by aria-describedby; pressing
 //   it opens nothing. The otherOwners case also carries a quiet "Open
-//   Contributors" link that selects the Contributors tab (P2-CONTRIB-14).
+//   Contributors" link to the roster (P2-CONTRIB-14) — Earn › Splits since
+//   Build and Earn P0, where a co-owner's share is changed.
 // - The dialog lists what goes and what stays (deletePlanOf) and asks for the
 //   typed project name only when editor work, a mint record or a network would
 //   be lost. The editor work is every swept row's (`editorWorkOfProject`),
@@ -24,7 +25,7 @@
 //   renders "We couldn't find this project" on the way out.
 
 import * as React from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, ConfirmDialog, TextInput } from "@/components/ideeza";
@@ -37,7 +38,7 @@ import { editorWorkOfProject } from "@/lib/manual/editor-work";
 import { readJourney } from "@/lib/manual/journey-store";
 import { can, deleteBlockOf, type DeleteBlock, type Viewer } from "@/lib/manual/permissions";
 import { deleteFactsOf, type ProjectView } from "@/lib/manual/project-read";
-import { withTab } from "@/lib/manual/project-route";
+import { earnHref } from "@/lib/manual/earn-route";
 import { projectSummary } from "@/lib/manual/project-summary";
 import { normalizeProjects, PROJECTS_KEY, useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { readNetwork } from "@/lib/network/store";
@@ -55,8 +56,7 @@ export type DeleteProjectControlProps = {
 };
 
 export function DeleteProjectControl({ project, viewer, view, draft }: DeleteProjectControlProps) {
-  const pathname = usePathname();
-  const search = useSearchParams();
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const reasonId = React.useId();
   if (!can(viewer, "project.delete")) return null;
@@ -64,10 +64,7 @@ export function DeleteProjectControl({ project, viewer, view, draft }: DeletePro
   // second reading of the market or the roster here.
   const block = deleteBlockOf(view.deleteFacts);
   const unavailable = block !== null;
-  const openContributors = () => {
-    const qs = withTab(search.toString(), block!.link!.tab);
-    window.history.pushState(null, "", qs ? `${pathname}?${qs}` : pathname);
-  };
+  const openContributors = () => router.push(earnHref(project.id, "splits"));
   return (
     <div className="flex flex-col items-start gap-[8px]">
       <button

@@ -35,6 +35,7 @@ import { ownedBySegment, ownershipOf } from "./ownership";
 import { lockOf } from "./edit-gate";
 import { can, type Viewer } from "./permissions";
 import type { OwnershipSplit, ProjectLock } from "./p2-types";
+import { earnHref } from "./earn-route";
 
 // ─────────────────────────── the status ───────────────────────────
 
@@ -169,11 +170,10 @@ function pairOf(first: NextAction | null, second: NextAction | null, violet: boo
   return { first, second, violet };
 }
 
-/** The listing flow's entry (§3.6.3). On the project page the header renders
- *  `slots.actions["add-to-marketplace"]` in the button's place and opens the flow there; a
- *  link here opens it too, the page reading `?list=1` once on arrival. */
+/** The listing flow's entry (§3.6.3), in Earn › Project NFT since Build and Earn P0: that
+ *  section renders the flow and reads `?list=1` once on arrival. */
 export function listFlowHref(projectId: string): string {
-  return `/projects/${projectId}?list=1`;
+  return earnHref(projectId, "sell", { list: "1" });
 }
 
 /**
