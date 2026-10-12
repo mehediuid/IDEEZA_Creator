@@ -22,7 +22,6 @@ import { addCollection, readCollections, type WalletCollection } from "@/lib/bri
 import { briefStateOf, type MintState } from "@/lib/brief/mint-flow";
 import { LICENSES, NETWORKS, TOKENS_BY_NETWORK, type Intent, type License, type Network } from "@/lib/brief/types";
 import { listingInputFromBrief, listingProblems, type ListingCtx, type ListingInput } from "@/lib/market/listing-form";
-import { STAGES, type StageId } from "@/lib/manual/journey";
 import { randomId } from "@/lib/market/sales";
 import type { MintStatus } from "@/lib/wallet/types";
 import { BriefCard, FIELD_BASE, TAP, primaryCta } from "./brief-card";
@@ -42,7 +41,6 @@ const SUB_BY_INTENT: Record<Intent, string> = {
 };
 
 const MAX_STORY = 500;
-const STAGE_OPTIONS: SelectOption<StageId>[] = STAGES.map((s) => ({ value: s.id, label: s.label, info: s.help }));
 /** The collection row that creates one instead of choosing one. */
 const NEW_COLLECTION = "__new__";
 /** The chain picker's placeholder — one string, all three forms. */
@@ -328,14 +326,6 @@ function StoryPanel({
           {state.story.length}/{MAX_STORY}
         </span>
       </div>
-      {/* The post's status: where the project is now, one of Activity's stages (owner, 2026-10-12). */}
-      <SelectMenu
-        label="Project status"
-        placeholder="Where is the project now?"
-        value={(state.shareStage || null) as StageId | null}
-        onChange={(v) => onChange({ shareStage: v })}
-        options={STAGE_OPTIONS}
-      />
       {note ? <div className="text-sm leading-relaxed text-text-secondary">{note}</div> : null}
     </div>
   );

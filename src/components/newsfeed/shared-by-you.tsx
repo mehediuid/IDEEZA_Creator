@@ -16,7 +16,6 @@ import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, coverOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
-import { stageWordOf } from "@/lib/manual/share-post";
 
 export function SharedByYou() {
   const { projects, hydrated } = useManualProjects();
@@ -35,7 +34,7 @@ export function SharedByYou() {
           at: p.showcasedAt as number,
           cover: coverOf(p, buildsOf(p, builds)),
           story: p.post?.story.trim() ?? "",
-          status: stageWordOf(p.post?.stage ?? null),
+          status: null as string | null,
         })),
     [projects, builds],
   );
