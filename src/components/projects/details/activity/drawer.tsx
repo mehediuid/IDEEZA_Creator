@@ -44,6 +44,8 @@ export type ActivityDrawerProps = {
   targetName: string;
   /** The default Planning's date — the project's createdAt, or when the product joined; absent for an NFT. */
   defaultAt?: number;
+  /** "add" opens straight into the Add form (the card's + Add activity); the list otherwise. */
+  startWith?: "list" | "add";
   products: { id: string; name: string }[];
   /** `can(viewer, "activity.write", { locked })` — owner only, and absent
    *  while the project is locked (decision 12). */
@@ -117,6 +119,7 @@ export function ActivityDrawer({
   target,
   targetName,
   defaultAt,
+  startWith = "list",
   products,
   canWrite,
   isPreview,
@@ -138,7 +141,7 @@ export function ActivityDrawer({
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setView({ kind: "list" });
+      setView(startWith === "add" && canWrite ? { kind: "form", mode: "add", entry: null } : { kind: "list" });
       setOverlay(null);
     }
   }

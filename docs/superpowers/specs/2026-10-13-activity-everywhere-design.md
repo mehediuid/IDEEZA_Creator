@@ -203,6 +203,10 @@ The share dialog (`projects/share-dialog.tsx`) and the Brief's details step (`br
 
 The owner found Activity hidden in the ⋯ menus and couldn't find the NFTs' activity in Earn › Sell. Both entry points moved to one **Activity card**: the rail's lead block on the owner's project page (above the tabs on a phone) and the first block of a product page's rail. It has a row per target, with its current activity, and each row opens that target's drawer. §6.1's ⋯ items and Earn › Sell lines are removed.
 
+A second review the same day said that mixing the project's and its products' activity in one card confuses, and that the NFTs still couldn't be found. The final layout has two blocks at the top of the rail, each the page's own:
+- **Activity:** this page's journey only. It reads as a buyer reads it, with + Add activity and Edit history.
+- **NFT activity:** a tab per NFT the page sells. The project page has Main, Physical and Virtual (the whole project's copies); a product page has Physical and Virtual (its own). A tab is always shown; before its NFT exists it says so and links to Earn › Sell.
+
 ## 7. Viewer surfaces (buyer, owner preview, Innovations)
 
 ### 7.1 The "Now" block (one shared component)
