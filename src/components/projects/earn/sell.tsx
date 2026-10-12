@@ -38,6 +38,7 @@ import { MintDetails } from "../details/rail-outcome";
 import type { SlotProps } from "../details/slots";
 import { useCommitGate } from "./ladder/level-check";
 import { earnSourceOf } from "./ladder/use-earn-facts";
+import { ActivityLine } from "./activity-line";
 import { COPY_KINDS, CopyRow, EarnProducts, KindDot, RowButton, RowLink, SellRow, StateLines, WHOLE_PROJECT } from "./editions";
 import { EARN_LINK, EARN_STACK, EarnBlock, TAP } from "./surface";
 
@@ -139,6 +140,7 @@ function MainRow(props: SlotProps) {
 
   return (
     <SellRow kind="main" label="Main NFT" stateId={stateId} state={<StateLines lines={[state.line]} live={state.live} />} action={action}>
+      {view.summary.status !== "draft" && view.mint.status !== "notMinted" && <ActivityLine {...props} target={{ kind: "main" }} />}
       {steps && listing && <ListingFlow {...props} action={listing} violet={false} className="" />}
       {state.action === "manage" && open && (
         <div id={panelId}>
