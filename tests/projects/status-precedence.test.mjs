@@ -219,13 +219,13 @@ test("headerText · ownedBy (P2-CONTRIB-10): owner, buyer preview and the holder
   assert.equal(headerText(sum(project({ contributors: [{ ...ana, share: 30 }] }), SAVE)).ownedBy, null);
 });
 
-test("headerText · stage (P2-TABS-10) ends the meta line", () => {
+test("headerText · the current activity ends the meta line", () => {
   const s = sum(project(), SAVE);
-  const h = headerText(s, { stage: { short: "Prototype" } });
-  assert.equal(h.stage, "Stage Prototype");
-  assert.equal(h.meta.at(-1).text, "Stage Prototype");
-  assert.ok(h.metaText.endsWith("· Stage Prototype"));
-  assert.equal(headerText(s).stage, null);
+  const h = headerText(s, { now: { label: "Prototype" } });
+  assert.equal(h.now, "Now: Prototype");
+  assert.equal(h.meta.at(-1).text, "Now: Prototype");
+  assert.ok(h.metaText.endsWith("· Now: Prototype"));
+  assert.equal(headerText(s).now, null);
 });
 
 test("headerText · lockLine (§3.8.5) for the owner of a project sold in full", () => {

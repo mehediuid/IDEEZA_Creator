@@ -1,20 +1,46 @@
-// JOURNEY — journey.ts (P2-TABS-5…12, Phase 2 spec §3.5.9).
+// JOURNEY — journey.ts (spec 2026-10-13-activity-everywhere §1–§5).
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  STAGES,
-  activitiesFor,
+  CATALOGUES,
+  LEGACY_TYPES,
+  PROOF_MISSING,
+  WHOLE_PROJECT_SCOPE,
+  activitiesOf,
+  catalogueOf,
   checkActivity,
-  currentStage,
+  currentOf,
+  historyOf,
+  labelOf,
   normalizeJourney,
+  shortOf,
   snapshotPrices,
+  targetKey,
+  targetNameOf,
+  typeDefOf,
 } from "../../.tmp-test/lib/manual/journey.js";
+import { PROJECT_SCOPE } from "../../.tmp-test/lib/market/types.js";
 
 const T = Date.UTC(2026, 8, 22, 9, 0);
 const DAY = 86_400_000;
+const PROJECT = { kind: "project" };
+const FILE = { id: "m1", name: "photo.png", mime: "image/png", kind: "image", size: 100, blobKey: "b1" };
 
-const activity = (over = {}) => ({
+const v2 = (over = {}) => ({
+  v: 2,
+  id: "act_1",
+  projectId: "p1",
+  target: PROJECT,
+  type: "testing",
+  description: "Bench-tested.",
+  urls: [],
+  media: [FILE],
+  createdAt: T,
+  updatedAt: T,
+  ...over,
+});
+const v1 = (over = {}) => ({
   v: 1,
   id: "act_1",
   projectId: "p1",
@@ -27,200 +53,177 @@ const activity = (over = {}) => ({
   ...over,
 });
 
-describe("STAGES", () => {
-  it("has 11 stages plus Others, each with a short label", () => {
-    assert.equal(STAGES.length, 12);
-    assert.ok(STAGES.every((s) => s.short && s.label && s.help));
-    assert.equal(STAGES.find((s) => s.id === "others").short, "Other");
+describe("targets", () => {
+  it("the whole-project scope literal is lib/market's PROJECT_SCOPE", () => {
+    assert.equal(WHOLE_PROJECT_SCOPE, PROJECT_SCOPE);
+  });
+  it("targetKey names each target once", () => {
+    assert.equal(targetKey(PROJECT), "project");
+    assert.equal(targetKey({ kind: "product", productId: "prd_1" }), "product:prd_1");
+    assert.equal(targetKey({ kind: "main" }), "main");
+    assert.equal(targetKey({ kind: "physical", scope: "project" }), "physical:project");
+    assert.equal(targetKey({ kind: "virtual", scope: "prd_1" }), "virtual:prd_1");
+  });
+  it("targetNameOf says whose journey it is", () => {
+    const names = { project: "Smart Lamp", productName: (id) => (id === "prd_1" ? "VoxLamp" : "?") };
+    assert.equal(targetNameOf(PROJECT, names), "Smart Lamp");
+    assert.equal(targetNameOf({ kind: "product", productId: "prd_1" }, names), "VoxLamp");
+    assert.equal(targetNameOf({ kind: "main" }, names), "Main NFT");
+    assert.equal(targetNameOf({ kind: "physical", scope: "prd_1" }, names), "VoxLamp · Physical NFT");
+    assert.equal(targetNameOf({ kind: "virtual", scope: "project" }, names), "Whole project · Virtual NFT");
   });
 });
 
-// ─────────────────────────── normalizeJourney ───────────────────────────
+describe("catalogues", () => {
+  it("each list is the spec's, in order, ending with Others", () => {
+    assert.deepEqual(CATALOGUES.project.map((d) => d.id), [
+      "planning", "design", "prototype", "testing", "certification", "ready-for-manufacture",
+      "pilot-run", "manufacturing", "launched", "improvement", "others",
+    ]);
+    assert.deepEqual(CATALOGUES.main.map((d) => d.id), ["ip", "partnership", "sales-report", "milestone", "roadmap", "others"]);
+    assert.deepEqual(CATALOGUES.physical.map((d) => d.id), [
+      "making", "quality-check", "shipped", "delivered", "delay-notice", "fix-notice", "others",
+    ]);
+    assert.deepEqual(CATALOGUES.virtual.map((d) => d.id), [
+      "files-released", "update-released", "bug-fix", "guide-added", "licence-change", "others",
+    ]);
+    for (const list of Object.values(CATALOGUES)) assert.ok(list.every((d) => d.label && d.short && d.help));
+  });
+  it("a product reads the project's list; NFTs read their own", () => {
+    assert.equal(catalogueOf({ kind: "product", productId: "x" }), CATALOGUES.project);
+    assert.equal(typeDefOf({ kind: "physical", scope: "project" }, "shipped").label, "Shipped");
+    assert.equal(typeDefOf({ kind: "physical", scope: "project" }, "testing"), null);
+  });
+  it("every v1 stage maps to a project type", () => {
+    for (const [from, to] of LEGACY_TYPES) assert.ok(typeDefOf(PROJECT, to), `${from} → ${to}`);
+    assert.equal(LEGACY_TYPES.get("concept-definition"), "planning");
+    assert.equal(LEGACY_TYPES.get("mass-production"), "manufacturing");
+    assert.equal(LEGACY_TYPES.get("toString"), undefined);
+  });
+});
 
 describe("normalizeJourney", () => {
-  it("drops a malformed entry and keeps the rest", () => {
-    const raw = {
+  it("reads a v1 entry as v2: the target from productId, the type through LEGACY_TYPES", () => {
+    const j = normalizeJourney({
       v: 1,
-      activities: [
-        activity({ id: "act_ok" }),
-        { id: "act_bad" }, // missing everything else
-        activity({ id: "act_bad_type", type: "not-a-stage" }),
-        null,
-        "nope",
-      ],
-    };
-    const j = normalizeJourney(raw);
+      activities: [v1({ id: "a" }), v1({ id: "b", productId: "prd_1", type: "manufacturing-preparation" })],
+    });
     assert.deepEqual(
-      j.activities.map((a) => a.id),
-      ["act_ok"],
+      j.activities.map((a) => [a.v, a.id, targetKey(a.target), a.type, "productId" in a]),
+      [
+        [2, "a", "project", "planning", false],
+        [2, "b", "product:prd_1", "ready-for-manufacture", false],
+      ],
     );
   });
-
-  it("a wholly unreadable record reads as an empty journey", () => {
-    assert.deepEqual(normalizeJourney(null), { v: 1, activities: [] });
-    assert.deepEqual(normalizeJourney("garbage"), { v: 1, activities: [] });
-    assert.deepEqual(normalizeJourney({ activities: "nope" }), { v: 1, activities: [] });
-  });
-
-  it("keeps optional fields — productId, customName, media, pricing", () => {
-    const raw = {
+  it("keeps a v2 entry of every target kind", () => {
+    const j = normalizeJourney({
       v: 1,
       activities: [
-        activity({
-          id: "act_full",
-          productId: "prd_1",
-          type: "others",
-          customName: "Trade show",
-          media: [{ id: "m1", name: "photo.png", mime: "image/png", kind: "image", size: 100, blobKey: "b1" }],
-          pricing: { at: T, token: "MATIC", main: "0.05", editions: [] },
-        }),
+        v2({ id: "p" }),
+        v2({ id: "m", target: { kind: "main" }, type: "ip" }),
+        v2({ id: "ph", target: { kind: "physical", scope: "prd_1" }, type: "shipped" }),
+        v2({ id: "vi", target: { kind: "virtual", scope: "project" }, type: "bug-fix" }),
       ],
-    };
-    const j = normalizeJourney(raw);
-    assert.equal(j.activities.length, 1);
-    assert.equal(j.activities[0].productId, "prd_1");
+    });
+    assert.deepEqual(j.activities.map((a) => a.id), ["p", "m", "ph", "vi"]);
+  });
+  it("drops what isn't an entry: a bad target, a type its target doesn't offer, an unknown v1 stage", () => {
+    const j = normalizeJourney({
+      v: 1,
+      activities: [
+        v2({ id: "ok" }),
+        v2({ id: "bad_target", target: { kind: "physical" } }),
+        v2({ id: "wrong_list", target: { kind: "main" }, type: "testing" }),
+        v1({ id: "bad_stage", type: "not-a-stage" }),
+        { id: "bare" },
+        null,
+      ],
+    });
+    assert.deepEqual(j.activities.map((a) => a.id), ["ok"]);
+  });
+  it("keeps customName, media and pricing, and reads garbage as empty", () => {
+    const j = normalizeJourney({
+      v: 1,
+      activities: [v2({ type: "others", customName: "Trade show", pricing: { at: T, token: "MATIC", main: "0.05", editions: [] } })],
+    });
     assert.equal(j.activities[0].customName, "Trade show");
     assert.equal(j.activities[0].media.length, 1);
     assert.equal(j.activities[0].pricing.main, "0.05");
-  });
-
-  it("drops a malformed media entry but keeps the activity", () => {
-    const raw = {
-      v: 1,
-      activities: [activity({ media: [{ id: "m1" }, { id: "m2", name: "x", mime: "image/png", kind: "image", size: 1, blobKey: "b" }] })],
-    };
-    const j = normalizeJourney(raw);
-    assert.equal(j.activities[0].media.length, 1);
-    assert.equal(j.activities[0].media[0].id, "m2");
+    assert.deepEqual(normalizeJourney(null), { v: 1, activities: [] });
+    assert.deepEqual(normalizeJourney({ activities: "nope" }), { v: 1, activities: [] });
   });
 });
-
-// ─────────────────────────── checkActivity (P2-TABS-7) ───────────────────────────
 
 describe("checkActivity", () => {
-  const emptyInput = { type: "", customName: "", description: "", urls: [], attachments: 0 };
-
-  it("requires a type", () => {
-    const errors = checkActivity(emptyInput, 1);
-    assert.ok(errors.type);
-    assert.equal(errors.ok, false);
+  const ok = { type: "testing", customName: "", description: "d", urls: [], attachments: 1 };
+  it("needs a type and a description", () => {
+    assert.equal(checkActivity({ ...ok, type: "" }).type, "Choose an activity type.");
+    assert.equal(checkActivity({ ...ok, description: " " }).description, "Describe this activity.");
   });
-
-  it("Others past 40 characters: 'Maximum 40 characters allowed', live", () => {
-    const errors = checkActivity({ ...emptyInput, type: "others", customName: "x".repeat(41), description: "d", attachments: 1 }, 1);
-    assert.equal(errors.customName, "Maximum 40 characters allowed");
+  it("needs at least one file: a link alone is not proof", () => {
+    const e = checkActivity({ ...ok, attachments: 0, urls: ["https://x.io"] });
+    assert.equal(e.attachments, PROOF_MISSING);
+    assert.equal(PROOF_MISSING, "Add at least one photo, video, PDF or document.");
+    assert.equal(e.ok, false);
   });
-
-  it("Others within 40 characters: no error", () => {
-    const errors = checkActivity({ ...emptyInput, type: "others", customName: "Trade show", description: "d", attachments: 1 }, 1);
-    assert.equal(errors.customName, null);
-  });
-
-  it("description past 400 characters: 'Maximum 400 characters allowed'", () => {
-    const errors = checkActivity({ ...emptyInput, type: "concept-definition", description: "d".repeat(401), attachments: 1 }, 1);
-    assert.equal(errors.description, "Maximum 400 characters allowed");
-  });
-
-  it("a non-https URL: the exact ACT-58 copy, and the text is implicitly kept (the caller owns the field)", () => {
-    const errors = checkActivity({ ...emptyInput, type: "concept-definition", description: "d", urls: ["http://x.io"], attachments: 0 }, 1);
-    assert.equal(errors.urls[0], "Please enter a valid URL starting with https://");
-  });
-
-  it("an https URL passes", () => {
-    const errors = checkActivity({ ...emptyInput, type: "concept-definition", description: "d", urls: ["https://x.io"], attachments: 0 }, 1);
-    assert.equal(errors.urls[0], null);
-  });
-
-  it("nothing attached: 'Add at least one file or link.'", () => {
-    const errors = checkActivity({ ...emptyInput, type: "concept-definition", description: "d" }, 1);
-    assert.equal(errors.attachments, "Add at least one file or link.");
-    assert.equal(errors.ok, false);
-  });
-
-  it("a URL alone satisfies the attachment requirement", () => {
-    const errors = checkActivity({ ...emptyInput, type: "concept-definition", description: "d", urls: ["https://x.io"] }, 1);
-    assert.equal(errors.attachments, null);
-  });
-
-  it("a fully valid input is ok", () => {
-    const errors = checkActivity(
-      { type: "prototype-development", customName: "", description: "Built the first prototype.", urls: [], attachments: 2 },
-      3,
-    );
-    assert.equal(errors.ok, true);
+  it("keeps the length and https rules", () => {
+    assert.equal(checkActivity({ ...ok, type: "others", customName: "x".repeat(41) }).customName, "Maximum 40 characters allowed");
+    assert.equal(checkActivity({ ...ok, type: "others", customName: "" }).customName, "Name this activity.");
+    assert.equal(checkActivity({ ...ok, description: "d".repeat(401) }).description, "Maximum 400 characters allowed");
+    assert.equal(checkActivity({ ...ok, urls: ["http://x.io"] }).urls[0], "Please enter a valid URL starting with https://");
+    assert.equal(checkActivity({ ...ok, urls: ["https://x.io"] }).ok, true);
   });
 });
 
-// ─────────────────────────── activitiesFor / currentStage (P2-TABS-5, 10) ───────────────────────────
-
-describe("activitiesFor", () => {
+describe("history and current", () => {
   const j = {
     v: 1,
     activities: [
-      activity({ id: "a1", createdAt: T }),
-      activity({ id: "a2", createdAt: T + DAY, productId: "prd_a" }),
-      activity({ id: "a3", createdAt: T + 2 * DAY, productId: "prd_b" }),
+      v2({ id: "p1", createdAt: T + DAY }),
+      v2({ id: "p2", createdAt: T + 3 * DAY, type: "others", customName: "Trade show" }),
+      v2({ id: "x1", createdAt: T + 2 * DAY, target: { kind: "product", productId: "prd_1" }, type: "prototype" }),
+      v2({ id: "s1", createdAt: T + 2 * DAY, target: { kind: "physical", scope: "prd_1" }, type: "shipped" }),
+      v2({ id: "s0", createdAt: T + 2 * DAY, target: { kind: "physical", scope: "prd_1" }, type: "making" }),
     ],
   };
-
-  it("the project page (no productId) sees every entry, newest first", () => {
-    assert.deepEqual(
-      activitiesFor(j, {}).map((a) => a.id),
-      ["a3", "a2", "a1"],
-    );
+  it("activitiesOf matches the target exactly, newest first, equal times by id descending", () => {
+    assert.deepEqual(activitiesOf(j, PROJECT).map((a) => a.id), ["p2", "p1"]);
+    assert.deepEqual(activitiesOf(j, { kind: "product", productId: "prd_1" }).map((a) => a.id), ["x1"]);
+    assert.deepEqual(activitiesOf(j, { kind: "physical", scope: "prd_1" }).map((a) => a.id), ["s1", "s0"]);
+    assert.deepEqual(activitiesOf(j, { kind: "main" }), []);
   });
-
-  it("a product page sees its own tagged entries, plus every untagged one", () => {
-    assert.deepEqual(
-      activitiesFor(j, { productId: "prd_a" }).map((a) => a.id),
-      ["a2", "a1"],
-    );
+  it("a project or product history ends with its default Planning; an NFT has none", () => {
+    const h = historyOf(j, "p1", PROJECT, T);
+    assert.deepEqual(h.map((e) => e.id), ["p2", "p1", "default:project"]);
+    const d = h.at(-1);
+    assert.deepEqual([d.type, d.isDefault, d.createdAt, d.description, d.media.length], ["planning", true, T, "Project created.", 0]);
+    const product = historyOf({ v: 1, activities: [] }, "p1", { kind: "product", productId: "prd_9" }, T + DAY);
+    assert.deepEqual(product.map((e) => [e.id, e.description]), [["default:product:prd_9", "Product added."]]);
+    assert.deepEqual(historyOf(j, "p1", { kind: "main" }, T), []);
   });
-});
-
-describe("currentStage", () => {
-  it("the newest non-Others stage of the whole journey", () => {
-    const list = [
-      activity({ id: "a1", type: "concept-definition", createdAt: T }),
-      activity({ id: "a2", type: "prototype-development", createdAt: T + DAY }),
-      activity({ id: "a3", type: "others", createdAt: T + 2 * DAY }),
-    ];
-    assert.equal(currentStage(list).short, "Prototype");
+  it("current is the newest entry, Others included; null for an NFT with nothing", () => {
+    const now = currentOf(j, "p1", PROJECT, T);
+    assert.equal(now.id, "p2");
+    assert.equal(labelOf(now), "Trade show");
+    assert.equal(currentOf({ v: 1, activities: [] }, "p1", PROJECT, T).isDefault, true);
+    assert.equal(currentOf(j, "p1", { kind: "main" }), null);
   });
-
-  it("per product: only entries tagged to that product count, untagged ones don't", () => {
-    const list = [
-      activity({ id: "a1", type: "testing-refinement", productId: "prd_a", createdAt: T + DAY }),
-      activity({ id: "a2", type: "mass-production", createdAt: T }), // untagged — doesn't count for prd_b
-    ];
-    assert.equal(currentStage(list, "prd_a").short, "Testing");
-    assert.equal(currentStage(list, "prd_b"), null);
-  });
-
-  it("is null with nothing but Others, or nothing at all", () => {
-    assert.equal(currentStage([]), null);
-    assert.equal(currentStage([activity({ type: "others" })]), null);
+  it("labelOf and shortOf read the target's catalogue, Others by its own name", () => {
+    assert.equal(labelOf({ target: PROJECT, type: "ready-for-manufacture" }), "Ready for manufacture");
+    assert.equal(shortOf({ target: PROJECT, type: "ready-for-manufacture" }), "Mfg ready");
+    assert.equal(labelOf({ target: { kind: "virtual", scope: "project" }, type: "licence-change" }), "Licence change");
+    assert.equal(shortOf({ target: PROJECT, type: "others", customName: "  " }), "Other");
   });
 });
-
-// ─────────────────────────── snapshotPrices (P2-TABS-11) ───────────────────────────
 
 describe("snapshotPrices", () => {
-  it("is undefined when nothing is live", () => {
+  it("is undefined when nothing is live, and snapshots Main and live editions otherwise", () => {
     assert.equal(snapshotPrices({ editions: [] }), undefined);
-  });
-
-  it("snapshots the Main listing's price and token, at the fact's own time", () => {
-    const snap = snapshotPrices({ main: { token: "ETH", price: "0.05", at: T }, editions: [] });
-    assert.deepEqual(snap, { at: T, token: "ETH", main: "0.05", editions: [] });
-  });
-
-  it("carries live edition prices alongside Main", () => {
     const snap = snapshotPrices({
       main: { token: "MATIC", price: "0.05", at: T },
       editions: [{ productId: "prd_1", kind: "physical", use: "private", regular: "0.01", extended: "0.02" }],
     });
-    assert.equal(snap.editions.length, 1);
-    assert.equal(snap.editions[0].regular, "0.01");
+    assert.deepEqual([snap.at, snap.main, snap.editions.length], [T, "0.05", 1]);
   });
 });

@@ -1,111 +1,136 @@
-// JOURNEY — the Activity History (P2-TABS-5…12), consolidated spec §3.5.9,
-// area file tabs.md §B. Pure: types, the 11 stages plus Others, the form's
-// checks, the read helpers and the price snapshot. Storage and IndexedDB are
-// journey-store.ts's (T11).
+// JOURNEY — a project's Activity: the proof-backed journey of the project, each
+// product, and its Main, Physical and Virtual NFTs (spec
+// docs/superpowers/specs/2026-10-13-activity-everywhere-design.md; v1 was
+// P2-TABS-5…12). Pure: the targets, each target's catalogue, the stored record
+// and its v1 read, the form's check, the default Planning, the read helpers and
+// the price snapshot. Storage and IndexedDB are journey-store.ts's.
 //
 // Value imports are relative, so `node --test` loads the compiled module.
 
 import type { EditionKind, EditionUse } from "../market/types";
 import type { Token } from "../brief/types";
 
-// ─────────────────────────── stages ───────────────────────────
+// ─────────────────────────── targets (spec §1) ───────────────────────────
 
-export type StageId =
-  | "concept-definition"
-  | "requirement-gathering"
-  | "preliminary-architecture"
-  | "digital-design"
-  | "integration-review"
-  | "prototype-development"
-  | "testing-refinement"
-  | "manufacturing-preparation"
-  | "pilot-production-run"
-  | "mass-production"
-  | "product-launch-feedback"
-  | "others";
+/** The whole project's copies — lib/market's `PROJECT_SCOPE`, written as a literal so lib/manual
+ *  gains no market value import (journey.test.mjs pins the two equal). */
+export const WHOLE_PROJECT_SCOPE = "project";
 
-export type StageDef = { id: StageId; label: string; short: string; help: string };
+/** Whose activity an entry is. Personal and Business use share one Physical / Virtual target. */
+export type ActivityTarget =
+  | { kind: "project" }
+  | { kind: "product"; productId: string }
+  | { kind: "main" }
+  | { kind: "physical" | "virtual"; scope: string };
 
-/** The 11 stages plus Others, in Figma order (ACT-48). Short labels are P2-TABS-10's draft. */
-export const STAGES: readonly StageDef[] = [
-  {
-    id: "concept-definition",
-    label: "Concept Definition",
-    short: "Concept",
-    help: "The idea is written down: what it is, who it's for, why it's worth building.",
-  },
-  {
-    id: "requirement-gathering",
-    label: "Requirement Gathering",
-    short: "Requirements",
-    help: "What the product must do is listed out, before any design starts.",
-  },
-  {
-    id: "preliminary-architecture",
-    label: "Preliminary Architecture",
-    short: "Architecture",
-    help: "The rough shape of the system — its parts and how they connect.",
-  },
-  {
-    id: "digital-design",
-    label: "Digital Design",
-    short: "Design",
-    help: "The board, enclosure and firmware are drawn up in detail.",
-  },
-  {
-    id: "integration-review",
-    label: "Integration Review",
-    short: "Integration",
-    help: "The parts are checked together, before anything is built.",
-  },
-  {
-    id: "prototype-development",
-    label: "Prototype Development",
-    short: "Prototype",
-    help: "A working, one-off build, made to prove the design.",
-  },
-  {
-    id: "testing-refinement",
-    label: "Testing & Refinement",
-    short: "Testing",
-    help: "The prototype is tried, and the design is fixed where it falls short.",
-  },
-  {
-    id: "manufacturing-preparation",
-    label: "Manufacturing Preparation",
-    short: "Mfg prep",
-    help: "Getting ready to make more than one: files, sourcing, tooling.",
-  },
-  {
-    id: "pilot-production-run",
-    label: "Pilot Production Run",
-    short: "Pilot run",
-    help: "A small batch, made the way every later one will be.",
-  },
-  {
-    id: "mass-production",
-    label: "Mass Production",
-    short: "Production",
-    help: "The product is made at volume.",
-  },
-  {
-    id: "product-launch-feedback",
-    label: "Product Launch & Feedback",
-    short: "Launch",
-    help: "It's out. What happens next is what buyers say about it.",
-  },
-  {
-    id: "others",
-    label: "Others",
-    short: "Other",
-    help: "Something that doesn't fit the stages above.",
-  },
-];
+/** One string per target: "project", "product:prd_1", "main", "physical:project", "virtual:prd_1". */
+export function targetKey(t: ActivityTarget): string {
+  switch (t.kind) {
+    case "project":
+    case "main":
+      return t.kind;
+    case "product":
+      return `product:${t.productId}`;
+    default:
+      return `${t.kind}:${t.scope}`;
+  }
+}
 
-const STAGE_IDS: ReadonlySet<StageId> = new Set(STAGES.map((s) => s.id));
-const STAGE_BY_ID = new Map(STAGES.map((s) => [s.id, s]));
+/** Whose journey a drawer or an announcement names: "Smart Lamp", "VoxLamp", "Main NFT",
+ *  "VoxLamp · Physical NFT", "Whole project · Virtual NFT". */
+export function targetNameOf(t: ActivityTarget, names: { project: string; productName: (id: string) => string }): string {
+  switch (t.kind) {
+    case "project":
+      return names.project;
+    case "product":
+      return names.productName(t.productId);
+    case "main":
+      return "Main NFT";
+    default: {
+      const scope = t.scope === WHOLE_PROJECT_SCOPE ? "Whole project" : names.productName(t.scope);
+      return `${scope} · ${t.kind === "physical" ? "Physical NFT" : "Virtual NFT"}`;
+    }
+  }
+}
 
-// ─────────────────────────── the record ───────────────────────────
+// ─────────────────────────── catalogues (spec §2) ───────────────────────────
+
+export type TypeDef = { id: string; label: string; short: string; help: string };
+
+const OTHERS: TypeDef = { id: "others", label: "Others", short: "Other", help: "Something that doesn't fit the types above." };
+
+/** Each target kind's types, in order; Others ends every list. A product reads the project's. */
+export const CATALOGUES: Readonly<Record<"project" | "main" | "physical" | "virtual", readonly TypeDef[]>> = {
+  project: [
+    { id: "planning", label: "Planning", short: "Planning", help: "What it is, who it's for, and what it must do." },
+    { id: "design", label: "Design", short: "Design", help: "The board, the case and the firmware are drawn up." },
+    { id: "prototype", label: "Prototype", short: "Prototype", help: "A first working unit is built." },
+    { id: "testing", label: "Testing", short: "Testing", help: "It's been tried out, and problems were found and fixed." },
+    { id: "certification", label: "Certification", short: "Certified", help: "Safety and radio approvals, such as CE, FCC or RoHS." },
+    {
+      id: "ready-for-manufacture",
+      label: "Ready for manufacture",
+      short: "Mfg ready",
+      help: "Files are final; parts and a factory are lined up.",
+    },
+    { id: "pilot-run", label: "Pilot run", short: "Pilot run", help: "A small first batch, made the way every later one will be." },
+    { id: "manufacturing", label: "Manufacturing", short: "Manufacturing", help: "It's being made at volume." },
+    { id: "launched", label: "Launched", short: "Launched", help: "It's on sale and reaching buyers." },
+    { id: "improvement", label: "Improvement", short: "Improved", help: "A new version or a fix after launch." },
+    OTHERS,
+  ],
+  main: [
+    { id: "ip", label: "IP / Patent", short: "IP", help: "A patent, trademark or design right was filed or granted." },
+    { id: "partnership", label: "Partnership", short: "Partnership", help: "A deal with a factory, distributor or partner." },
+    { id: "sales-report", label: "Sales report", short: "Sales", help: "What sold and what it earned." },
+    { id: "milestone", label: "Milestone", short: "Milestone", help: "An award, press, or a goal reached." },
+    { id: "roadmap", label: "Roadmap", short: "Roadmap", help: "What's coming next." },
+    OTHERS,
+  ],
+  physical: [
+    { id: "making", label: "Making", short: "Making", help: "Units for this batch are being made." },
+    { id: "quality-check", label: "Quality check", short: "QC", help: "Units were tested before packing." },
+    { id: "shipped", label: "Shipped", short: "Shipped", help: "Units were handed to the courier." },
+    { id: "delivered", label: "Delivered", short: "Delivered", help: "Buyers have their units." },
+    { id: "delay-notice", label: "Delay notice", short: "Delayed", help: "Something is late, and here's the new date." },
+    { id: "fix-notice", label: "Fix notice", short: "Fix", help: "A problem was found in shipped units, and here's the fix." },
+    OTHERS,
+  ],
+  virtual: [
+    { id: "files-released", label: "Files released", short: "Released", help: "The first version of the files is out." },
+    { id: "update-released", label: "Update released", short: "Updated", help: "A new version, and what changed." },
+    { id: "bug-fix", label: "Bug fix", short: "Fix", help: "A problem in the files was fixed." },
+    { id: "guide-added", label: "Guide added", short: "Guide", help: "A build guide, video or document was added." },
+    { id: "licence-change", label: "Licence change", short: "Licence", help: "What buyers may do with the files changed." },
+    OTHERS,
+  ],
+};
+
+export function catalogueOf(t: ActivityTarget): readonly TypeDef[] {
+  return CATALOGUES[t.kind === "product" ? "project" : t.kind];
+}
+
+export function typeDefOf(t: ActivityTarget, typeId: string): TypeDef | null {
+  return catalogueOf(t).find((d) => d.id === typeId) ?? null;
+}
+
+/** v1's stages (Figma's 11 plus Others) → today's project types (spec §2.5). */
+export const LEGACY_TYPES: ReadonlyMap<string, string> = new Map([
+  ["concept-definition", "planning"],
+  ["requirement-gathering", "planning"],
+  ["preliminary-architecture", "design"],
+  ["digital-design", "design"],
+  ["integration-review", "design"],
+  ["prototype-development", "prototype"],
+  ["testing-refinement", "testing"],
+  ["manufacturing-preparation", "ready-for-manufacture"],
+  ["pilot-production-run", "pilot-run"],
+  ["mass-production", "manufacturing"],
+  ["product-launch-feedback", "launched"],
+  ["others", "others"],
+]);
+
+// ─────────────────────────── the record (spec §3) ───────────────────────────
 
 export type MediaRef = {
   id: string;
@@ -128,12 +153,13 @@ export type PriceSnapshot = {
 };
 
 export type Activity = {
-  v: 1;
+  v: 2;
   id: string;
   projectId: string;
-  /** absent = "Whole project" */
-  productId?: string;
-  type: StageId;
+  target: ActivityTarget;
+  /** An id from the target's catalogue. */
+  type: string;
+  /** Others only. */
   customName?: string;
   description: string;
   urls: string[];
@@ -142,6 +168,9 @@ export type Activity = {
   createdAt: number;
   updatedAt: number;
 };
+
+/** A history row: a stored entry, or the synthesized default Planning (spec §4). */
+export type JourneyEntry = Activity & { isDefault?: true };
 
 export type ProjectJourney = { v: 1; activities: Activity[] };
 export const JOURNEY_KEY = (id: string) => `ideeza:project:journey:${id}`;
@@ -202,34 +231,56 @@ function normalizePriceSnapshot(raw: unknown): PriceSnapshot | undefined {
   return out;
 }
 
+function normalizeTarget(raw: unknown): ActivityTarget | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  switch (r.kind) {
+    case "project":
+      return { kind: "project" };
+    case "main":
+      return { kind: "main" };
+    case "product": {
+      const productId = str(r.productId);
+      return productId ? { kind: "product", productId } : null;
+    }
+    case "physical":
+    case "virtual": {
+      const scope = str(r.scope);
+      return scope ? { kind: r.kind, scope } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** A v2 entry as stored, or a v1 entry read as v2: no `target` means v1, whose `productId` names
+ *  the product (absent = the project) and whose stage maps through LEGACY_TYPES. A type its
+ *  target's catalogue doesn't offer drops the entry. */
 function normalizeActivity(raw: unknown): Activity | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const id = str(r.id);
   const projectId = str(r.projectId);
-  const type = r.type;
+  const rawType = str(r.type);
   const description = str(r.description);
   const createdAt = num(r.createdAt);
   const updatedAt = num(r.updatedAt);
-  if (!id || !projectId || typeof type !== "string" || !STAGE_IDS.has(type as StageId)) return null;
-  if (description === null || createdAt === null || updatedAt === null) return null;
+  if (!id || !projectId || !rawType || description === null || createdAt === null || updatedAt === null) return null;
+  const v1 = r.target === undefined;
+  const legacyProduct = str(r.productId);
+  const target: ActivityTarget | null = v1
+    ? legacyProduct
+      ? { kind: "product", productId: legacyProduct }
+      : { kind: "project" }
+    : normalizeTarget(r.target);
+  if (!target) return null;
+  const type = v1 ? (LEGACY_TYPES.get(rawType) ?? null) : rawType;
+  if (!type || !typeDefOf(target, type)) return null;
   const urls = Array.isArray(r.urls) ? r.urls.filter((u): u is string => typeof u === "string") : [];
   const media = Array.isArray(r.media)
     ? (r.media as unknown[]).map(normalizeMedia).filter((m): m is MediaRef => m !== null)
     : [];
-  const out: Activity = {
-    v: 1,
-    id,
-    projectId,
-    type: type as StageId,
-    description,
-    urls,
-    media,
-    createdAt,
-    updatedAt,
-  };
-  const productId = str(r.productId);
-  if (productId) out.productId = productId;
+  const out: Activity = { v: 2, id, projectId, target, type, description, urls, media, createdAt, updatedAt };
   const customName = str(r.customName);
   if (customName) out.customName = customName;
   const pricing = normalizePriceSnapshot(r.pricing);
@@ -247,14 +298,14 @@ export function normalizeJourney(raw: unknown): ProjectJourney {
   return { v: 1, activities };
 }
 
-// ─────────────────────────── the form's check (P2-TABS-7) ───────────────────────────
+// ─────────────────────────── the form's check (spec §5) ───────────────────────────
 
 export type ActivityInput = {
-  type: StageId | "";
+  type: string;
   customName: string;
   description: string;
   urls: string[];
-  /** The count of attached files — real uploads, never a fake percentage (ACT-62). */
+  /** Files attached and saved or saving — real uploads, never a fake percentage (ACT-62). */
   attachments: number;
 };
 
@@ -271,15 +322,14 @@ export type ActivityErrors = {
 const CUSTOM_NAME_MAX = 40;
 const DESCRIPTION_MAX = 400;
 const HTTPS_ERROR = "Please enter a valid URL starting with https://";
+/** Proof is a file (owner, 2026-10-13): a link alone never saves. */
+export const PROOF_MISSING = "Add at least one photo, video, PDF or document.";
 
 function isHttpsUrl(u: string): boolean {
   return /^https:\/\//i.test(u.trim());
 }
 
-/** The exact copy of P2-TABS-7 (carried from ACT-43…63). `products` is the project's product
- *  count — a UI concern (whether to show the Product select); it never changes what's valid. */
-export function checkActivity(input: ActivityInput, products: number): ActivityErrors {
-  void products;
+export function checkActivity(input: ActivityInput): ActivityErrors {
   const type = input.type ? null : "Choose an activity type.";
 
   let customName: string | null = null;
@@ -294,33 +344,69 @@ export function checkActivity(input: ActivityInput, products: number): ActivityE
     descLen === 0 ? "Describe this activity." : descLen > DESCRIPTION_MAX ? "Maximum 400 characters allowed" : null;
 
   const urls = input.urls.map((u) => (isHttpsUrl(u) ? null : HTTPS_ERROR));
-
-  const attachments = input.urls.length === 0 && input.attachments === 0 ? "Add at least one file or link." : null;
+  const attachments = input.attachments === 0 ? PROOF_MISSING : null;
 
   const ok = type === null && customName === null && description === null && urls.every((e) => e === null) && attachments === null;
-
   return { type, customName, description, urls, attachments, ok };
 }
 
-// ─────────────────────────── reads (P2-TABS-5, 9, 10) ───────────────────────────
+// ─────────────────────────── reads (spec §4, §5) ───────────────────────────
 
-/** The journey's entries for a scope, newest first. On the project page (`productId`
- *  undefined) that's every entry; on a product page it's this product's, plus every
- *  untagged "Whole project" entry (P2-TABS-5). */
-export function activitiesFor(j: ProjectJourney, scope: { productId?: string }): Activity[] {
-  const list =
-    scope.productId === undefined
-      ? j.activities
-      : j.activities.filter((a) => a.productId === undefined || a.productId === scope.productId);
-  return [...list].sort((a, b) => b.createdAt - a.createdAt);
+/** A target's stored entries, newest first; equal times by id, descending, so the order is stable. */
+export function activitiesOf(j: ProjectJourney, target: ActivityTarget): Activity[] {
+  const key = targetKey(target);
+  return j.activities
+    .filter((a) => targetKey(a.target) === key)
+    .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 }
 
-/** The newest non-Others stage — of the whole list, or (with `productId`) of only the
- *  entries tagged to that product (untagged ones don't count here, unlike `activitiesFor`). */
-export function currentStage(list: readonly Activity[], productId?: string): StageDef | null {
-  const scoped = productId === undefined ? list : list.filter((a) => a.productId === productId);
-  const newest = [...scoped].filter((a) => a.type !== "others").sort((a, b) => b.createdAt - a.createdAt)[0];
-  return newest ? (STAGE_BY_ID.get(newest.type) ?? null) : null;
+/** The Planning every project and product starts at: synthesized, never stored, never edited. */
+export function defaultPlanningOf(projectId: string, target: ActivityTarget, at: number): JourneyEntry {
+  return {
+    v: 2,
+    id: `default:${targetKey(target)}`,
+    projectId,
+    target,
+    type: "planning",
+    description: target.kind === "project" ? "Project created." : "Product added.",
+    urls: [],
+    media: [],
+    createdAt: at,
+    updatedAt: at,
+    isDefault: true,
+  };
+}
+
+/** A target's whole history, newest first: its stored entries, then — for the project or a product,
+ *  given `defaultAt` (the project's createdAt, or when the product joined) — its default Planning,
+ *  always last. An NFT has no default. */
+export function historyOf(j: ProjectJourney, projectId: string, target: ActivityTarget, defaultAt?: number): JourneyEntry[] {
+  const list: JourneyEntry[] = activitiesOf(j, target);
+  if ((target.kind === "project" || target.kind === "product") && defaultAt !== undefined) {
+    list.push(defaultPlanningOf(projectId, target, defaultAt));
+  }
+  return list;
+}
+
+/** The target's current activity: its newest entry, the default included; null for an NFT with none. */
+export function currentOf(j: ProjectJourney, projectId: string, target: ActivityTarget, defaultAt?: number): JourneyEntry | null {
+  return historyOf(j, projectId, target, defaultAt)[0] ?? null;
+}
+
+type Named = Pick<Activity, "target" | "type" | "customName">;
+
+export function labelOf(e: Named): string {
+  if (e.type === "others") return e.customName?.trim() || OTHERS.label;
+  return typeDefOf(e.target, e.type)?.label ?? "Activity";
+}
+
+export function shortOf(e: Named): string {
+  if (e.type === "others") return e.customName?.trim() || OTHERS.short;
+  return typeDefOf(e.target, e.type)?.short ?? "Activity";
+}
+
+export function helpOf(e: Named): string {
+  return typeDefOf(e.target, e.type)?.help ?? "";
 }
 
 // ─────────────────────────── the price snapshot (P2-TABS-11) ───────────────────────────

@@ -186,10 +186,10 @@ test("P1 · the stage line from the engineering axis reads as the summary-only o
 
 test("P0 · the engineering meta line drops what the stage line says and the ownership lead", () => {
   const at = new Date(2026, 8, 26, 16, 12).getTime();
-  const meta = engineeringMetaOf({ when: { label: "Saved", at }, source: BUILD }, { short: "Prototype" });
+  const meta = engineeringMetaOf({ when: { label: "Saved", at }, source: BUILD }, { label: "Prototype" });
   assert.deepEqual(
     meta.map((m) => (m.kind === "time" ? m.time.text : m.text)),
-    ["Saved Sep 26, 2026", "Stage Prototype"],
+    ["Saved Sep 26, 2026", "Now: Prototype"],
   );
   assert.equal(meta[0].time.dateTime, new Date(at).toISOString());
   assert.equal(meta[0].time.title, "Sep 26, 2026 · 4:12 PM");

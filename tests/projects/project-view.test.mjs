@@ -80,7 +80,10 @@ describe("projectView (COR-74)", () => {
       assert.equal(view.customers.saleCount, 0);
       assert.equal(view.videos.record, null);
       assert.deepEqual(Object.keys(view.videos.readiness), ["showcase", "sell", "give", "relist", "edition", "videos"]);
-      assert.deepEqual([view.stage, view.activityCount, view.lock, view.marketUnreadable], [null, 0, null, false]);
+      assert.deepEqual(
+        [view.current.type, view.current.isDefault, view.current.createdAt, view.lock, view.marketUnreadable],
+        ["planning", true, fx.project.createdAt, null, false],
+      );
       assert.deepEqual(view.deleteFacts, {
         marketUnreadable: false,
         sold: { sharePct: 0, editions: 0, buyers: 0 },
