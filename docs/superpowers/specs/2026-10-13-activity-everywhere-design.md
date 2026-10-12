@@ -207,6 +207,13 @@ A second review the same day said that mixing the project's and its products' ac
 - **Activity:** this page's journey only. It reads as a buyer reads it, with + Add activity and Edit history.
 - **NFT activity:** a tab per NFT the page sells. The project page has Main, Physical and Virtual (the whole project's copies); a product page has Physical and Virtual (its own). A tab is always shown; before its NFT exists it says so and links to Earn › Sell.
 
+**Final layout, after the UX study (owner decisions, 2026-10-13):** https://claude.ai/artifact/SwMDKAjNaGyP7q42qHEuEt
+- The name stays Activity.
+- The engineering pages show only their own Activity, plus an owner link to Earn › Sell.
+- NFT activity sits on each NFT row in Earn › Sell (D2).
+- The sale lock still stops all writes.
+- Buyer blocks get headings, Now/Latest with an age, and an empty note.
+
 ## 7. Viewer surfaces (buyer, owner preview, Innovations)
 
 ### 7.1 The "Now" block (one shared component)

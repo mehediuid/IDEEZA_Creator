@@ -393,6 +393,19 @@ export function currentOf(j: ProjectJourney, projectId: string, target: Activity
   return historyOf(j, projectId, target, defaultAt)[0] ?? null;
 }
 
+const DAY_MS = 86_400_000;
+
+/** How old an entry is, in words a buyer reads at a glance: "today", "yesterday", "5 days ago",
+ *  "3 weeks ago", "2 months ago". A clock behind the entry reads "today", never negative. */
+export function ageOf(at: number, now: number): string {
+  const days = Math.floor(Math.max(0, now - at) / DAY_MS);
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+  return `${Math.floor(days / 30)} months ago`;
+}
+
 type Named = Pick<Activity, "target" | "type" | "customName">;
 
 export function labelOf(e: Named): string {

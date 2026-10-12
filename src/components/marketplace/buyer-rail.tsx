@@ -195,7 +195,15 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
 
   return (
     <RailBlock title="Marketplace" meta={meta} collapsible={false}>
-      <ActivityNow compact projectId={project.id} target={{ kind: "main" }} className="mb-6" />
+      <ActivityNow
+        compact
+        projectId={project.id}
+        target={{ kind: "main" }}
+        heading="Main NFT activity"
+        mode="latest"
+        emptyNote={`No activity yet · listed ${formatDate(listing.listedAt)}`}
+        className="mb-6"
+      />
       {viewer.kind === "demo-buyer" ? (
         <BuyerBody
           project={project}

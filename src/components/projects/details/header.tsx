@@ -229,7 +229,9 @@ export function ProjectHeader({
             project={project}
             onAdd={menu && can(viewer, "project.editDescription", canCtx) ? () => edit.open() : undefined}
           />
-          {!engineering && <ActivityNow projectId={project.id} target={{ kind: "project" }} defaultAt={project.createdAt} />}
+          {!engineering && (
+            <ActivityNow projectId={project.id} target={{ kind: "project" }} defaultAt={project.createdAt} heading="Project activity" />
+          )}
           {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
         </div>
 

@@ -246,6 +246,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                         projectId={project.id}
                         target={{ kind: "product", productId: product.id }}
                         defaultAt={productAddedAt(project, view.refs, product)}
+                        heading={`${name} activity`}
                       />
                     )}
                   </div>

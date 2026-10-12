@@ -227,3 +227,17 @@ describe("snapshotPrices", () => {
     assert.deepEqual([snap.at, snap.main, snap.editions.length], [T, "0.05", 1]);
   });
 });
+
+describe("ageOf (how old an entry is, in words)", async () => {
+  const { ageOf } = await import("../../.tmp-test/lib/manual/journey.js");
+  it("reads today, yesterday, days, weeks and months", () => {
+    assert.equal(ageOf(T, T + 3 * 3600_000), "today");
+    assert.equal(ageOf(T, T + DAY), "yesterday");
+    assert.equal(ageOf(T, T + 2 * DAY), "2 days ago");
+    assert.equal(ageOf(T, T + 13 * DAY), "13 days ago");
+    assert.equal(ageOf(T, T + 14 * DAY), "2 weeks ago");
+    assert.equal(ageOf(T, T + 59 * DAY), "8 weeks ago");
+    assert.equal(ageOf(T, T + 60 * DAY), "2 months ago");
+    assert.equal(ageOf(T, T - DAY), "today", "a clock behind the entry never reads negative");
+  });
+});

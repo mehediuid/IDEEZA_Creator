@@ -32,8 +32,7 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { TIER_WORD, useEditionPurchase, type EditionTier } from "./purchase-dialog";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
-import { activitiesOf } from "@/lib/manual/journey";
-import { useJourney } from "@/lib/manual/journey-store";
+import { formatDate } from "@/lib/manual/project-summary";
 
 const TIERS: EditionTier[] = ["regular", "extended"];
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -52,7 +51,6 @@ export function EditionOffers({
   /** No Main NFT card above it: no rule between them. */
   alone?: boolean;
 }) {
-  const { record: journey } = useJourney(project.id);
   const scopes = React.useMemo(
     () => [{ id: PROJECT_SCOPE, name: project.name }, ...view.products.map((p) => ({ id: p.id, name: displayProductName(p.name) }))],
     [project.name, view.products],
@@ -92,11 +90,21 @@ export function EditionOffers({
               // Personal and Business share the target. `g.productId` is PROJECT_SCOPE or a product id.
               const target = { kind: t.kind, scope: g.productId } as const;
               const first = i === 0 || g.tracks[i - 1].kind !== t.kind;
+              const kind = t.kind === "physical" ? "Physical" : "Virtual";
+              const of = isProjectScope(g.productId) ? "the whole project" : g.name;
+              const listedAt = Math.min(...g.tracks.filter((x) => x.kind === t.kind).map((x) => x.listing?.listedAt ?? Infinity));
               return (
                 <React.Fragment key={t.id}>
-                  {first && activitiesOf(journey, target).length > 0 && (
+                  {first && (
                     <li>
-                      <ActivityNow compact projectId={project.id} target={target} />
+                      <ActivityNow
+                        compact
+                        projectId={project.id}
+                        target={target}
+                        heading={`${kind} copies of ${of} · Activity`}
+                        mode="latest"
+                        emptyNote={Number.isFinite(listedAt) ? `No activity yet · listed ${formatDate(listedAt)}` : "No activity yet"}
+                      />
                     </li>
                   )}
                   <li>

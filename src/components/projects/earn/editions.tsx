@@ -43,6 +43,7 @@ import { focusSoon } from "../listing/listing-dialog";
 import { RailStackScope } from "../details/rail-block";
 import type { SlotProps } from "../details/slots";
 import { SellFlowDialog } from "./sell/sell-flow-dialog";
+import { NftActivityLine } from "./nft-activity";
 import { EARN_H3, EARN_LEAD, EarnBlock, TAP } from "./surface";
 
 /** Physical before Virtual, as the mockup lists them. */
@@ -227,6 +228,9 @@ export function CopyRow({ kind, scope, ...props }: SlotProps & { kind: EditionKi
       state={state.kind === "manage" ? <StateLines lines={state.lines} live /> : <StateLines lines={[state.line]} />}
       action={action}
     >
+      {view.editions.some((t) => t.productId === scope.id && t.kind === kind) && (
+        <NftActivityLine {...props} target={{ kind, scope: scope.id }} />
+      )}
       {note && <DoneNote note={note} />}
       {state.kind === "manage" && open && (
         <div id={panelId} className="flex flex-col gap-6">

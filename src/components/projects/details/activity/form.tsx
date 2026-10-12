@@ -204,6 +204,14 @@ export function ActivityForm({
   const showAttachError = touched ? errors.attachments : null;
 
   const typeOptions = catalogueOf(target).map((d) => ({ value: d.id, label: d.label, info: d.help }));
+  // What counts as proof where it isn't obvious (UX study 2026-10-13): bad news shouldn't wait for a
+  // photo, and a Virtual update must never leak the files buyers paid for.
+  const proofHint =
+    type === "delay-notice" || type === "fix-notice"
+      ? "A screenshot of your supplier's email or a written notice works as proof."
+      : target.kind === "virtual"
+        ? "Don't attach the paid files: buyers get those with their copy. A changelog or a screenshot works."
+        : null;
 
   // After a refused save, the keyboard goes to the first field at fault (spec §6.2).
   function focusFirstInvalid() {
@@ -390,6 +398,7 @@ export function ActivityForm({
         rejectedCount={rejectedCount}
         onDismissRejected={() => setRejectedCount(0)}
         error={showAttachError}
+        hint={proofHint}
         dropRef={dropRef}
       />
 
@@ -483,6 +492,7 @@ function MediaSection({
   rejectedCount,
   onDismissRejected,
   error,
+  hint,
   dropRef,
 }: {
   files: AttachedFile[];
@@ -495,18 +505,26 @@ function MediaSection({
   onDismissRejected: () => void;
   /** PROOF_MISSING once a save was tried with no file; null otherwise. */
   error: string | null;
+  /** What counts as proof for this type, under the label; null for the default. */
+  hint: string | null;
   dropRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const errorId = React.useId();
+  const hintId = React.useId();
   return (
     <div className="flex flex-col gap-3">
       <span className="text-md text-input-label">
         Attach Media <span aria-hidden className="text-text-error">*</span>
         <span className="sr-only">(required)</span>
       </span>
+      {hint && (
+        <p id={hintId} className="m-0 text-sm text-text-secondary">
+          {hint}
+        </p>
+      )}
       <div
         ref={dropRef}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={[hint ? hintId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined}
         role="button"
         tabIndex={0}
         onClick={() => fileInputRef.current?.click()}
