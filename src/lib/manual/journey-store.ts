@@ -1,5 +1,5 @@
-// A project's journey (the Activity history), live — Phase 2 spec §3.4,
-// §3.6.2, P2-TABS-9, C24.
+// A project's journey — every target's Activity (the project, its products,
+// its NFTs), live — Phase 2 spec §3.4, §3.6.2, P2-TABS-9, C24.
 // - The text is localStorage `ideeza:project:journey:<projectId>`,
 //   normalized on every read. The delete sweep removes it with the project.
 // - The files are IndexedDB `ideeza-media` / `files`, one record per blob,
