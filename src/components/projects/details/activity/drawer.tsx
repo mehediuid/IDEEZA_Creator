@@ -11,6 +11,8 @@
 // build the price snapshot's facts (P2-TABS-11) at save time only.
 
 import * as React from "react";
+import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { Button, ConfirmDialog, Drawer } from "@/components/ideeza";
 import {
   STAGES,
@@ -173,13 +175,19 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
     if (result.ok) announce(`${stageTitleOf(entry)} deleted from your product journey.`);
   };
 
-  const subtitle = isPreview
-    ? undefined
-    : scope
-      ? `${scope.productName}'s journey and the whole project's, newest first.`
-      : canWrite
-        ? "Your product journey, newest first. Use ⋮ to edit a stage."
-        : "Your product journey, newest first.";
+  // The ⋮ hint only once there is an entry to edit, drawn as that button's
+  // own icon: the "⋮" character fell back to a colon in the UI font.
+  const subtitle = isPreview ? undefined : scope ? (
+    `${scope.productName}'s journey and the whole project's, newest first.`
+  ) : canWrite && entries.length > 0 ? (
+    <>
+      Your product journey, newest first. Use{" "}
+      <Icon icon={MoreVerticalIcon} size={14} className="inline-block align-[-2px]" />
+      <span className="sr-only">the actions button</span> to edit a stage.
+    </>
+  ) : (
+    "Your product journey, newest first."
+  );
 
   const title =
     view.kind === "list" ? "Activity History" : view.mode === "add" ? "Add New Activity" : "Edit Activity";

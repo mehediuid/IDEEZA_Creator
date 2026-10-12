@@ -43,14 +43,14 @@ import {
 import { useCredits } from "@/lib/create/credits";
 import type { SaveMode } from "@/lib/manual/save-step";
 import {
-  activityOf,
+  buildLogOf,
   announcementFor,
   nextStep,
   productNameOf,
   projectState,
   railRows,
   stageOf,
-  type ActivityEntry,
+  type BuildLogEntry,
   type JumpTarget,
   type NextStep,
   type ProjectState,
@@ -82,8 +82,8 @@ export type RailModel = {
   build: { status: BuildStatus; percent: number } | null;
   /** Offered by the classifier and never drawn — named here, added there. */
   suggested: string[];
-  activity: ActivityEntry[];
-  /** The turns drawing right now, whose activity entries carry the clock. */
+  buildLog: BuildLogEntry[];
+  /** The turns drawing right now, whose build-log entries carry the clock. */
   drawing: Set<string>;
   /** What the announcer compares between renders. */
   snapshot: RailSnapshot;
@@ -108,9 +108,9 @@ export function useRailModel(
     () => railRows(state, labels, build),
     [state, labels, build],
   );
-  const activity = React.useMemo(
+  const buildLog = React.useMemo(
     () =>
-      activityOf(
+      buildLogOf(
         chat,
         labels,
         (t) => productNameOf(state.setup, t),
@@ -164,7 +164,7 @@ export function useRailModel(
         ? { status: buildStatus, percent: Math.round(rollupBuild(build).progress) }
         : null,
     suggested: state.available.map((c) => c.name),
-    activity,
+    buildLog,
     drawing,
     snapshot,
     state,
@@ -218,8 +218,8 @@ export function ProjectRail({
       {model.rows.length > 0 && model.suggested.length > 0 && (
         <SuggestedLine names={model.suggested} onJump={onJump} />
       )}
-      <Activity
-        entries={model.activity}
+      <BuildLog
+        entries={model.buildLog}
         drawing={model.drawing}
         // Before the question is answered there is nothing else to show, so
         // the history is the body rather than a line to open.
@@ -785,14 +785,14 @@ function SuggestedLine({
   );
 }
 
-// ─────────────────────────────── activity ────────────────────────────────
+// ─────────────────────────────── build log ───────────────────────────────
 
-function Activity({
+function BuildLog({
   entries,
   drawing,
   folded,
 }: {
-  entries: ActivityEntry[];
+  entries: BuildLogEntry[];
   drawing: Set<string>;
   /** Behind a disclosure, once there are products to show above it. */
   folded: boolean;
@@ -803,11 +803,11 @@ function Activity({
 
   if (!folded) {
     return (
-      <section aria-labelledby="rail-activity-title" className="px-[18px] py-[18px]">
-        <h3 id="rail-activity-title" className="sr-only">
-          Activity
+      <section aria-labelledby="rail-build-log-title" className="px-[18px] py-[18px]">
+        <h3 id="rail-build-log-title" className="sr-only">
+          Build log
         </h3>
-        <ActivityList entries={entries} drawing={drawing} now={now} />
+        <BuildLogList entries={entries} drawing={drawing} now={now} />
       </section>
     );
   }
@@ -819,7 +819,7 @@ function Activity({
         <button
           type="button"
           aria-expanded={open}
-          aria-controls="rail-activity"
+          aria-controls="rail-build-log"
           onClick={() => setOpen((v) => !v)}
           className="relative -ml-[8px] inline-flex h-[32px] scroll-mt-[120px] items-center gap-[6px] rounded-lg px-[8px] text-sm font-semibold text-text-secondary outline-none transition-colors duration-normal ease-decelerate motion-reduce:transition-none after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-[''] hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
         >
@@ -832,10 +832,10 @@ function Activity({
           >
             <Icon icon={ArrowDown01Icon} size={14} />
           </span>
-          {/* One flex item, so the gap doesn't split it; heard as "Activity
-              8 entries", not "Activity middle dot 8". */}
+          {/* One flex item, so the gap doesn't split it; heard as "Build log
+              8 entries", not "Build log middle dot 8". */}
           <span>
-            Activity <span aria-hidden>·</span> {entries.length}
+            Build log <span aria-hidden>·</span> {entries.length}
             <span className="sr-only"> entries</span>
           </span>
         </button>
@@ -848,7 +848,7 @@ function Activity({
         </p>
       )}
       <div
-        id="rail-activity"
+        id="rail-build-log"
         hidden={!open}
         // `hidden` alone loses to a display utility, so the class follows
         // the same state.
@@ -857,25 +857,25 @@ function Activity({
           open ? "block" : "hidden",
         ].join(" ")}
       >
-        <ActivityList entries={entries} drawing={drawing} now={now} />
+        <BuildLogList entries={entries} drawing={drawing} now={now} />
       </div>
     </section>
   );
 }
 
 /** The newest entry as one phrase: "Spare Battery Pack · Concept 5 drawn". */
-function summaryOf(e: ActivityEntry): string {
+function summaryOf(e: BuildLogEntry): string {
   if (e.tone === "plain") return `${e.title}: ${e.detail ?? ""}`;
   if (!e.detail) return e.title;
   return `${e.title} ${e.detail.charAt(0).toLowerCase()}${e.detail.slice(1)}`;
 }
 
-function ActivityList({
+function BuildLogList({
   entries,
   drawing,
   now,
 }: {
-  entries: ActivityEntry[];
+  entries: BuildLogEntry[];
   drawing: Set<string>;
   now: number;
 }) {
@@ -928,7 +928,7 @@ function ActivityList({
   );
 }
 
-function EntryGlyph({ tone }: { tone: ActivityEntry["tone"] }) {
+function EntryGlyph({ tone }: { tone: BuildLogEntry["tone"] }) {
   if (tone === "waiting") {
     // Not started yet: a still dot, never a spinner that doesn't spin.
     return (
