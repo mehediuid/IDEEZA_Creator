@@ -61,6 +61,8 @@ import { LockLine, ProductLoading, ProductMissing, UNBUILT } from "./product-sta
 import { ProductTabs } from "./product-tabs";
 import { VersionNoticeBlock, VersionSelect } from "./product-version";
 import { When } from "./when";
+import { ActivityNow } from "../details/activity/now-block";
+import { productAddedAt } from "@/lib/manual/journey-dates";
 
 /** A product no build stands behind has no version: an empty view keeps ProductSlotProps total
  *  (no options, no build, `productId` null — the same shape as a version whose build is gone). */
@@ -239,6 +241,13 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                       </div>
                     )}
                     {description && <ClampedText text={description} />}
+                    {!ownerFacts && (
+                      <ActivityNow
+                        projectId={project.id}
+                        target={{ kind: "product", productId: product.id }}
+                        defaultAt={productAddedAt(project, view.refs, product)}
+                      />
+                    )}
                   </div>
                 </div>
 

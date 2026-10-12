@@ -49,6 +49,7 @@ import type { SlotProps } from "@/components/projects/details/slots";
 import { cn } from "@/lib/utils";
 import { BidCard, useAfterDialogClose, useAuctionClock } from "./bid-card";
 import { EditionOffers } from "./edition-offers";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { buyerNameOf, usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
 
@@ -194,6 +195,7 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
 
   return (
     <RailBlock title="Marketplace" meta={meta} collapsible={false}>
+      <ActivityNow compact projectId={project.id} target={{ kind: "main" }} className="mb-6" />
       {viewer.kind === "demo-buyer" ? (
         <BuyerBody
           project={project}

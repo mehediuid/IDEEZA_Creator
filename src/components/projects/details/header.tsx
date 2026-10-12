@@ -51,6 +51,7 @@ import { earnButtonOf } from "@/lib/manual/earn-view";
 import { headerText, type MetaPart } from "@/lib/manual/project-summary";
 import { buyerSide } from "@/lib/manual/project-route";
 import { labelOf } from "@/lib/manual/journey";
+import { ActivityNow } from "./activity/now-block";
 import { can } from "@/lib/manual/permissions";
 import { engineeringMetaOf, pendingNoticesOf, stageLineOf, type PendingNotice } from "@/lib/manual/project-header";
 import { earnSourceOf, useEarnFacts } from "../earn/ladder/use-earn-facts";
@@ -228,6 +229,7 @@ export function ProjectHeader({
             project={project}
             onAdd={menu && can(viewer, "project.editDescription", canCtx) ? () => edit.open() : undefined}
           />
+          {!engineering && <ActivityNow projectId={project.id} target={{ kind: "project" }} defaultAt={project.createdAt} />}
           {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
         </div>
 

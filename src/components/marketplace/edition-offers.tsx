@@ -31,6 +31,9 @@ import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { TIER_WORD, useEditionPurchase, type EditionTier } from "./purchase-dialog";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { activitiesOf } from "@/lib/manual/journey";
+import { useJourney } from "@/lib/manual/journey-store";
 
 const TIERS: EditionTier[] = ["regular", "extended"];
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -49,6 +52,7 @@ export function EditionOffers({
   /** No Main NFT card above it: no rule between them. */
   alone?: boolean;
 }) {
+  const { record: journey } = useJourney(project.id);
   const scopes = React.useMemo(
     () => [{ id: PROJECT_SCOPE, name: project.name }, ...view.products.map((p) => ({ id: p.id, name: displayProductName(p.name) }))],
     [project.name, view.products],
@@ -83,33 +87,46 @@ export function EditionOffers({
             <h4 className="m-0 text-md font-semibold text-text-primary">{g.name}</h4>
           )}
           <ul role="list" className="m-0 flex list-none flex-col gap-4 p-0">
-            {g.tracks.map((t) => (
-              <li key={t.id}>
-                {buyerId ? (
-                  <BuyableOffer
-                    project={project}
-                    view={view}
-                    viewer={viewer}
-                    buyerId={buyerId}
-                    track={t as Listed}
-                    announce={announce}
-                  />
-                ) : (
-                  <OfferFrame track={t as Listed} view={view}>
-                    <RailFacts>
-                      <RailFact label="Price">
-                        <span className="tabular-nums">{formatAmount(t.listing!.regular, t.listing!.token)}</span>
-                      </RailFact>
-                      {t.listing!.extended !== t.listing!.regular && (
-                        <RailFact label="With future updates">
-                          <span className="tabular-nums">{formatAmount(t.listing!.extended, t.listing!.token)}</span>
-                        </RailFact>
-                      )}
-                    </RailFacts>
-                  </OfferFrame>
-                )}
-              </li>
-            ))}
+            {g.tracks.map((t, i) => {
+              // One activity block per (scope, kind), above that kind's first card (spec §7.2):
+              // Personal and Business share the target. `g.productId` is PROJECT_SCOPE or a product id.
+              const target = { kind: t.kind, scope: g.productId } as const;
+              const first = i === 0 || g.tracks[i - 1].kind !== t.kind;
+              return (
+                <React.Fragment key={t.id}>
+                  {first && activitiesOf(journey, target).length > 0 && (
+                    <li>
+                      <ActivityNow compact projectId={project.id} target={target} />
+                    </li>
+                  )}
+                  <li>
+                    {buyerId ? (
+                      <BuyableOffer
+                        project={project}
+                        view={view}
+                        viewer={viewer}
+                        buyerId={buyerId}
+                        track={t as Listed}
+                        announce={announce}
+                      />
+                    ) : (
+                      <OfferFrame track={t as Listed} view={view}>
+                        <RailFacts>
+                          <RailFact label="Price">
+                            <span className="tabular-nums">{formatAmount(t.listing!.regular, t.listing!.token)}</span>
+                          </RailFact>
+                          {t.listing!.extended !== t.listing!.regular && (
+                            <RailFact label="With future updates">
+                              <span className="tabular-nums">{formatAmount(t.listing!.extended, t.listing!.token)}</span>
+                            </RailFact>
+                          )}
+                        </RailFacts>
+                      </OfferFrame>
+                    )}
+                  </li>
+                </React.Fragment>
+              );
+            })}
           </ul>
         </div>
       ))}
