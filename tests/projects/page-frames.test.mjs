@@ -42,7 +42,7 @@ test("SLOTS takes `banners` (not the v1 `banner`), one key per line (§3.10)", (
   assert.match(slots, /\n  banners: \[\n/);
   assert.doesNotMatch(slots, /\n  banner:/);
   assert.match(slots, /\n  headerParts: \{\n    statusRow: \[\n/);
-  assert.doesNotMatch(slots, /titleRow|ActivitySlot/, "Activity is the ⋯ menu's (owner, 2026-10-11)");
+  assert.doesNotMatch(slots, /titleRow|ActivitySlot/, "Activity is the rail's lead card, not a header part (owner, 2026-10-13)");
 });
 
 test("isBuyerPreview( survives only to choose the buyer-preview banner (§3.8.1)", () => {
@@ -191,9 +191,12 @@ test("no Premium Parts tab on either page (P2-TABS-30); the project's one ⋯ me
   }
   const menu = read(DETAILS + "project-menu.tsx");
   assert.match(menu, /aria-label="Project actions"\s+aria-haspopup="menu"/);
-  for (const item of ["Edit name and description", "Share to Innovations", "Stop sharing", "Activity", "Delete project…"]) {
+  for (const item of ["Edit name and description", "Share to Innovations", "Stop sharing", "Delete project…"]) {
     assert.ok(menu.includes(`"${item}"`), item);
   }
+  // Activity left the ⋯ for its own card at the top of the rail (owner, 2026-10-13).
+  assert.doesNotMatch(menu, /label: "Activity"/);
+  assert.match(read(DETAILS + "project-page.tsx"), /<ActivityCard \{\.\.\.props\} \/>/);
   assert.match(read(DETAILS + "header.tsx"), /<ProjectMenu \{\.\.\.slotProps\}/);
 });
 

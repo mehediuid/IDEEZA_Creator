@@ -199,6 +199,10 @@ The share dialog (`projects/share-dialog.tsx`) and the Brief's details step (`br
 - `sharePostBlocker` asks only for the story.
 - A stored `post.stage` is still parsed, and ignored.
 
+## 6.5 Change after review (owner, 2026-10-13)
+
+The owner found Activity hidden in the ⋯ menus and couldn't find the NFTs' activity in Earn › Sell. Both entry points moved to one **Activity card**: the rail's lead block on the owner's project page (above the tabs on a phone) and the first block of a product page's rail. It has a row per target, with its current activity, and each row opens that target's drawer. §6.1's ⋯ items and Earn › Sell lines are removed.
+
 ## 7. Viewer surfaces (buyer, owner preview, Innovations)
 
 ### 7.1 The "Now" block (one shared component)

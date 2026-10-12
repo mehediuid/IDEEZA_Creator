@@ -33,6 +33,7 @@ import { useJourney } from "@/lib/manual/journey-store";
 import { productsTabView } from "@/lib/manual/products-tab-view";
 import { BuyerPreviewBanner, isBuyerPreview, previewQuery } from "./buyer-preview";
 import { ContributorPreviewBanner } from "./contributor-preview-banner";
+import { ActivityCard } from "./activity/activity-card";
 import { ProjectHeader } from "./header";
 import { MediaTab } from "./media-tab";
 import { NetworkTab } from "./network-tab";
@@ -127,8 +128,14 @@ function TeamSlot(props: SlotProps) {
 // buyer rail — facts and "Open in Explore marketplace", never a Buy or Bid
 // button (T23: P2-MARKETPLACE-10, P2-LISTING-21). The owner's card and its
 // listing operations (rail-marketplace.tsx's ListingBody) live in Earn › Sell (P0).
+// The rail's lead block: the buyer's Marketplace; on the owner's side, the Activity card
+// (owner, 2026-10-13: Activity out of the ⋯, where it can be seen, the NFTs' with it).
 function MarketplaceSlot(props: SlotProps) {
-  return buyerSide(props.viewer) ? <BuyerRail {...props} /> : null;
+  return buyerSide(props.viewer) ? <BuyerRail {...props} /> : <OwnerActivitySlot {...props} />;
+}
+
+function OwnerActivitySlot(props: SlotProps) {
+  return can(props.viewer, "facts.seeOwnerOnly") ? <ActivityCard {...props} /> : null;
 }
 
 // The Legal block, the buyer's side only: the owner edits it in Earn › Rights (P0).

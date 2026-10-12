@@ -7,21 +7,15 @@
 //   editor's name field makes, through the same write guard ("editProduct":
 //   a live Buy-now listing asks to pause first; an auction or the lock
 //   refuses, said under the field);
-// - Activity — this product's phase-and-status notes (P2-TABS-5), with the
-//   count;
 // - Open chat “…” — the chat this version was built in, while it is in this
 //   browser: the build is changed there.
 // The menu button is the project menu's (WAI-ARIA APG keys, Escape back to ⋯).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Activity01Icon, BubbleChatIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, IconButton, ModalFrame, TextInput } from "@/components/ideeza";
-import { currentOf, labelOf, type ActivityTarget } from "@/lib/manual/journey";
-import { productAddedAt } from "@/lib/manual/journey-dates";
-import { useJourney } from "@/lib/manual/journey-store";
-import { isPreview } from "@/lib/manual/buyer-preview";
 import { can } from "@/lib/manual/permissions";
 import { WRITE_FAILED } from "@/lib/manual/project-header";
 import { productRowsOf } from "@/lib/manual/project-read";
@@ -29,7 +23,6 @@ import { displayProductName } from "@/lib/manual/products-tab-view";
 import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { cn } from "@/lib/utils";
-import { ActivityDrawer } from "../details/activity/drawer";
 import { useStoreWrite } from "../details/use-store-write";
 import type { ProductSlotProps } from "./product-slots";
 
@@ -46,31 +39,19 @@ export function ProductMenu({
   /** The chat this version was built in, while this browser has it. */
   chat: { title: string; href: string } | null;
 }) {
-  const { project, view, product, viewer, now, announce } = slot;
+  const { view, viewer } = slot;
   const router = useRouter();
-  const { record } = useJourney(project.id);
   const [open, setOpen] = React.useState(false);
-  const [layer, setLayer] = React.useState<"rename" | "activity" | null>(null);
+  const [layer, setLayer] = React.useState<"rename" | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const menuId = React.useId();
 
-  const products = React.useMemo(() => view.products.map((p) => ({ id: p.id, name: p.name })), [view.products]);
-  const target = React.useMemo<ActivityTarget>(() => ({ kind: "product", productId: product.id }), [product.id]);
-  const addedAt = productAddedAt(project, view.refs, product);
-  const current = currentOf(record, project.id, target, addedAt);
   const canRename = can(viewer, "product.openEditor", view.canCtx);
 
   const items: Item[] = [
     ...(canRename ? [{ id: "rename", label: "Rename product", icon: PencilEdit01Icon, run: () => setLayer("rename") }] : []),
-    {
-      id: "activity",
-      label: "Activity",
-      sub: current ? `Now: ${labelOf(current)}` : "Notes on its phase and status",
-      icon: Activity01Icon,
-      run: () => setLayer("activity"),
-    },
     ...(chat
       ? [{ id: "chat", label: `Open chat “${chat.title}”`, sub: "Where it was built — change it there", icon: BubbleChatIcon, run: () => router.push(chat.href) }]
       : []),
@@ -165,22 +146,6 @@ export function ProductMenu({
         </div>
       )}
 
-      <ActivityDrawer
-        open={layer === "activity"}
-        onClose={() => {
-          setLayer(null);
-          backToTrigger();
-        }}
-        projectId={project.id}
-        target={target}
-        targetName={displayProductName(product.name)}
-        defaultAt={addedAt}
-        products={products}
-        canWrite={can(viewer, "activity.write", view.canCtx)}
-        isPreview={isPreview(viewer)}
-        announce={announce}
-        now={now}
-      />
       {layer === "rename" && (
         <RenameDialog
           slot={slot}
