@@ -18,7 +18,8 @@ import { useRouter } from "next/navigation";
 import { Activity01Icon, BubbleChatIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, IconButton, ModalFrame, TextInput } from "@/components/ideeza";
-import { activitiesFor } from "@/lib/manual/journey";
+import { currentOf, labelOf, type ActivityTarget } from "@/lib/manual/journey";
+import { productAddedAt } from "@/lib/manual/journey-dates";
 import { useJourney } from "@/lib/manual/journey-store";
 import { isPreview } from "@/lib/manual/buyer-preview";
 import { can } from "@/lib/manual/permissions";
@@ -56,7 +57,9 @@ export function ProductMenu({
   const menuId = React.useId();
 
   const products = React.useMemo(() => view.products.map((p) => ({ id: p.id, name: p.name })), [view.products]);
-  const count = activitiesFor(record, { productId: product.id }).length;
+  const target = React.useMemo<ActivityTarget>(() => ({ kind: "product", productId: product.id }), [product.id]);
+  const addedAt = productAddedAt(project, view.refs, product);
+  const current = currentOf(record, project.id, target, addedAt);
   const canRename = can(viewer, "product.openEditor", view.canCtx);
 
   const items: Item[] = [
@@ -64,7 +67,7 @@ export function ProductMenu({
     {
       id: "activity",
       label: "Activity",
-      sub: count === 0 ? "Notes on its phase and status" : `${count} ${count === 1 ? "note" : "notes"}`,
+      sub: current ? `Now: ${labelOf(current)}` : "Notes on its phase and status",
       icon: Activity01Icon,
       run: () => setLayer("activity"),
     },
@@ -169,7 +172,9 @@ export function ProductMenu({
           backToTrigger();
         }}
         projectId={project.id}
-        scope={{ productId: product.id, productName: product.name }}
+        target={target}
+        targetName={displayProductName(product.name)}
+        defaultAt={addedAt}
         products={products}
         canWrite={can(viewer, "activity.write", view.canCtx)}
         isPreview={isPreview(viewer)}

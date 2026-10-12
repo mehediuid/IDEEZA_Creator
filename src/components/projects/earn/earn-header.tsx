@@ -28,6 +28,7 @@ import { earnStatusOf } from "@/lib/manual/earn-view";
 import { can, hasAudience } from "@/lib/manual/permissions";
 import { headerText } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
+import { labelOf } from "@/lib/manual/journey";
 import type { SlotProps } from "../details/slots";
 import { TAP } from "./surface";
 
@@ -42,7 +43,7 @@ export function EarnHeader({
   titleRef,
 }: SlotProps & { commercial: CommercialState; titleRef: React.RefObject<HTMLHeadingElement | null> }) {
   const { summary } = view;
-  const text = headerText(summary, { viewer, stage: view.stage });
+  const text = headerText(summary, { viewer, now: { label: labelOf(view.current) } });
   const status = earnStatusOf(commercial);
   const preview = commercial !== "none" && can(viewer, "preview.enter") && hasAudience(summary.status, summary.showcase);
 

@@ -33,7 +33,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { IconButton } from "@/components/ideeza";
 import { DeleteProjectDialog } from "@/components/projects/delete-project-dialog";
-import { activitiesFor } from "@/lib/manual/journey";
+import { currentOf, labelOf, type ActivityTarget } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { isPreview } from "@/lib/manual/buyer-preview";
 import { earnMintHref } from "@/lib/manual/earn-route";
@@ -57,6 +57,9 @@ type Item = {
   unavailable?: string;
   run?: () => void;
 };
+
+/** The project's own journey (spec §6.1). */
+const PROJECT_TARGET: ActivityTarget = { kind: "project" };
 
 export function ProjectMenu({
   project,
@@ -83,7 +86,7 @@ export function ProjectMenu({
   const menuId = React.useId();
 
   const products = React.useMemo(() => view.products.map((p) => ({ id: p.id, name: p.name })), [view.products]);
-  const activityCount = activitiesFor(record, {}).length;
+  const current = currentOf(record, project.id, PROJECT_TARGET, project.createdAt);
 
   // Sharing: what Showcase was. Null on a Draft (the Brief's minted rule decides first).
   const readiness = view.videos.readiness.showcase;
@@ -123,7 +126,7 @@ export function ProjectMenu({
       {
         id: "activity",
         label: "Activity",
-        sub: activityCount === 0 ? "Notes on its phase and status" : `${activityCount} ${activityCount === 1 ? "note" : "notes"}`,
+        sub: current ? `Now: ${labelOf(current)}` : "Notes on its phase and status",
         icon: Activity01Icon,
         run: () => setLayer("activity"),
       },
@@ -242,6 +245,9 @@ export function ProjectMenu({
           });
         }}
         projectId={project.id}
+        target={PROJECT_TARGET}
+        targetName={project.name.trim() || "Untitled project"}
+        defaultAt={project.createdAt}
         products={products}
         canWrite={can(viewer, "activity.write", view.canCtx)}
         isPreview={isPreview(viewer)}

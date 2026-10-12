@@ -4,7 +4,7 @@
 // (the project page's ⋯ › Share to Innovations; `showcasedAt` on the
 // project). The feed below is a sample dataset with no write path, so a
 // shared project shows here, at the top of Innovations, newest first: a
-// cover, the name with the post's status, its story, its product count and
+// cover, the name with the project's current activity, its story, its product count and
 // when it was shared, linking to its project page. Nothing renders until the
 // stores are read, or when nothing is shared.
 
@@ -15,6 +15,8 @@ import { Icon } from "@/components/dashboard/icon";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, coverOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
+import { currentOf, labelOf } from "@/lib/manual/journey";
+import { readJourney } from "@/lib/manual/journey-store";
 import { useManualProjects } from "@/lib/manual/projects";
 
 export function SharedByYou() {
@@ -34,7 +36,9 @@ export function SharedByYou() {
           at: p.showcasedAt as number,
           cover: coverOf(p, buildsOf(p, builds)),
           story: p.post?.story.trim() ?? "",
-          status: null as string | null,
+          status: labelOf(
+            currentOf(readJourney(p.id), p.id, { kind: "project" }, p.createdAt) ?? { target: { kind: "project" }, type: "planning" },
+          ),
         })),
     [projects, builds],
   );

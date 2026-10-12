@@ -1,7 +1,7 @@
 "use client";
 
 // One Activity History entry (P2-TABS-6…8, -11): its title row with the
-// stage's own "?", the date and product-tag line, the 4-line description,
+// stage's own "?", the date line, the 4-line description,
 // its 60×60 media tiles and link cards, its price-snapshot pills, and the
 // owner-only "⋮ Actions for {stage}" menu (Edit / Delete). The lightbox
 // (CNT-18's pattern, generalised to video) lives here too, since only an
@@ -25,7 +25,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/dashboard/icon";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { Badge, TestnetDemoBadge, Tooltip } from "@/components/ideeza";
-import { STAGES, type Activity, type MediaRef } from "@/lib/manual/journey";
+import { helpOf, labelOf, type JourneyEntry, type MediaRef } from "@/lib/manual/journey";
 import { getMediaFile } from "@/lib/manual/journey-store";
 import { formatDate } from "@/lib/manual/project-summary";
 import { compareAmounts, formatAmount } from "@/lib/wallet/money";
@@ -44,12 +44,6 @@ const USE_LABEL: Record<"private" | "commercial", string> = {
   private: "Private use",
   commercial: "Commercial use",
 };
-
-function stageMetaOf(activity: Activity) {
-  const meta = STAGES.find((s) => s.id === activity.type) ?? null;
-  const title = activity.type === "others" ? activity.customName?.trim() || "Others" : (meta?.label ?? "Activity");
-  return { title, help: meta?.help ?? "" };
-}
 
 async function downloadMedia(m: MediaRef): Promise<void> {
   const blob = await getMediaFile(m.blobKey);
@@ -200,7 +194,7 @@ function EntryMenu({
 
 // ─────────────────────────── media tile (60×60) ───────────────────────────
 
-function MediaTile({ media, onView }: { media: MediaRef; onView: () => void }) {
+export function MediaTile({ media, onView }: { media: MediaRef; onView: () => void }) {
   const [url, setUrl] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (media.kind !== "image") return;
@@ -311,7 +305,7 @@ function EditionPopover({
   );
 }
 
-function PricePills({ activity, products }: { activity: Activity; products: readonly { id: string; name: string }[] }) {
+function PricePills({ activity, products }: { activity: JourneyEntry; products: readonly { id: string; name: string }[] }) {
   const pricing = activity.pricing;
   if (!pricing) return null;
   const physical = pricing.editions.filter((e) => e.kind === "physical");
@@ -329,86 +323,31 @@ function PricePills({ activity, products }: { activity: Activity; products: read
 
 // ─────────────────────────── the entry card ───────────────────────────
 
-export type ProductTag = { text: string; href?: string };
-
-export function productTagOf(
-  activity: Activity,
-  scope: { productId: string } | undefined,
-  products: readonly { id: string; name: string }[],
-): ProductTag | null {
-  if (!scope) {
-    if (!activity.productId) return null;
-    const p = products.find((x) => x.id === activity.productId);
-    return p ? { text: p.name, href: `/projects/${activity.projectId}/products/${p.id}` } : { text: "A removed product" };
-  }
-  if (activity.productId) return null;
-  return { text: "Whole project" };
-}
-
-export function ActivityEntry({
-  activity,
-  scope,
-  products,
-  canWrite,
-  onEdit,
-  onDeleteRequest,
+/** An entry's proof: its media tiles, then a card per link (opened through the confirm dialog). */
+export function EntryProof({
+  entry,
   onOpenMedia,
   onOpenLink,
 }: {
-  activity: Activity;
-  scope?: { productId: string };
-  products: readonly { id: string; name: string }[];
-  canWrite: boolean;
-  onEdit: () => void;
-  onDeleteRequest: () => void;
+  entry: JourneyEntry;
   onOpenMedia: (media: MediaRef[], index: number) => void;
   onOpenLink: (url: string) => void;
 }) {
-  const { title, help } = stageMetaOf(activity);
-  const tag = productTagOf(activity, scope, products);
-  const viewable = activity.media.filter((m) => m.kind === "image" || m.kind === "video");
-
+  const viewable = entry.media.filter((m) => m.kind === "image" || m.kind === "video");
   return (
-    <li className="border-b border-solid border-border py-6 first:pt-0 last:border-b-0">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <h3 className="truncate text-md font-semibold text-text-primary">{title}</h3>
-          {help && <InfoBubble label={`What is ${title}?`} text={help} />}
-        </div>
-        {canWrite && <EntryMenu activityId={activity.id} stage={title} onEdit={onEdit} onDelete={onDeleteRequest} />}
-      </div>
-
-      <p className="mt-1 text-sm text-text-tertiary">
-        {formatDate(activity.createdAt)}
-        {tag && (
-          <>
-            {" · "}
-            {tag.href ? (
-              <a href={tag.href} className="underline underline-offset-2 hover:text-text-secondary">
-                {tag.text}
-              </a>
-            ) : (
-              tag.text
-            )}
-          </>
-        )}
-      </p>
-
-      {activity.description && <p className="mt-3 line-clamp-4 text-sm text-text-secondary">{activity.description}</p>}
-
-      {activity.media.length > 0 && (
+    <>
+      {entry.media.length > 0 && (
         <ul role="list" className="mt-4 flex flex-wrap gap-2">
-          {activity.media.map((m) => (
+          {entry.media.map((m) => (
             <li key={m.id}>
               <MediaTile media={m} onView={() => onOpenMedia(viewable, viewable.indexOf(m))} />
             </li>
           ))}
         </ul>
       )}
-
-      {activity.urls.length > 0 && (
+      {entry.urls.length > 0 && (
         <ul role="list" className="mt-3 flex flex-col gap-2">
-          {activity.urls.map((u, i) => (
+          {entry.urls.map((u, i) => (
             <li key={i}>
               <button
                 type="button"
@@ -423,7 +362,43 @@ export function ActivityEntry({
           ))}
         </ul>
       )}
+    </>
+  );
+}
 
+export function ActivityEntry({
+  activity,
+  products,
+  canWrite,
+  onEdit,
+  onDeleteRequest,
+  onOpenMedia,
+  onOpenLink,
+}: {
+  activity: JourneyEntry;
+  products: readonly { id: string; name: string }[];
+  /** False for the default Planning: it has no ⋮. */
+  canWrite: boolean;
+  onEdit: () => void;
+  onDeleteRequest: () => void;
+  onOpenMedia: (media: MediaRef[], index: number) => void;
+  onOpenLink: (url: string) => void;
+}) {
+  const title = labelOf(activity);
+  const help = helpOf(activity);
+
+  return (
+    <li className="border-b border-solid border-border py-6 first:pt-0 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h3 className="truncate text-md font-semibold text-text-primary">{title}</h3>
+          {help && <InfoBubble label={`What is ${title}?`} text={help} />}
+        </div>
+        {canWrite && <EntryMenu activityId={activity.id} stage={title} onEdit={onEdit} onDelete={onDeleteRequest} />}
+      </div>
+      <p className="mt-1 text-sm text-text-tertiary">{formatDate(activity.createdAt)}</p>
+      {activity.description && <p className="mt-3 line-clamp-4 text-sm text-text-secondary">{activity.description}</p>}
+      <EntryProof entry={activity} onOpenMedia={onOpenMedia} onOpenLink={onOpenLink} />
       <PricePills activity={activity} products={products} />
     </li>
   );

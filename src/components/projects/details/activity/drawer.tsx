@@ -15,9 +15,11 @@ import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, ConfirmDialog, Drawer } from "@/components/ideeza";
 import {
-  STAGES,
-  activitiesFor,
+  historyOf,
+  labelOf,
   type Activity,
+  type ActivityTarget,
+  type JourneyEntry,
   type LiveListingFacts,
   type MediaRef,
 } from "@/lib/manual/journey";
@@ -36,9 +38,12 @@ export type ActivityDrawerProps = {
   open: boolean;
   onClose: () => void;
   projectId: string;
-  /** Present on the product page: the subtitle, the tag line and the form's
-   *  default Product all read it. */
-  scope?: { productId: string; productName: string };
+  /** Whose journey this is (spec §6.1): the project, a product, Main, or one Physical / Virtual scope. */
+  target: ActivityTarget;
+  /** `targetNameOf(target, …)`: the subtitle and the announcements name it. */
+  targetName: string;
+  /** The default Planning's date — the project's createdAt, or when the product joined; absent for an NFT. */
+  defaultAt?: number;
   products: { id: string; name: string }[];
   /** `can(viewer, "activity.write", { locked })` — owner only, and absent
    *  while the project is locked (decision 12). */
@@ -53,10 +58,10 @@ export type ActivityDrawerProps = {
   now: number;
 };
 
-type ViewState = { kind: "list" } | { kind: "form"; mode: "add" | "edit"; entry: Activity | null };
+type ViewState = { kind: "list" } | { kind: "form"; mode: "add" | "edit"; entry: JourneyEntry | null };
 type Overlay =
   | { kind: "lightbox"; media: MediaRef[]; index: number }
-  | { kind: "delete"; entry: Activity }
+  | { kind: "delete"; entry: JourneyEntry }
   | { kind: "link"; url: string };
 
 const FORM_ID = "activity-form";
@@ -105,7 +110,19 @@ function useLiveListingFacts(
   }, [projectId, products, data.listings, data.sales, data.bids, editions.record, now]);
 }
 
-export function ActivityDrawer({ open, onClose, projectId, scope, products, canWrite, isPreview, announce, now }: ActivityDrawerProps) {
+export function ActivityDrawer({
+  open,
+  onClose,
+  projectId,
+  target,
+  targetName,
+  defaultAt,
+  products,
+  canWrite,
+  isPreview,
+  announce,
+  now,
+}: ActivityDrawerProps) {
   const { record, write } = useJourney(projectId);
   const listingFacts = useLiveListingFacts(projectId, products, now);
 
@@ -126,7 +143,8 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
     }
   }
 
-  const entries = activitiesFor(record, { productId: scope?.productId });
+  const entries = historyOf(record, projectId, target, defaultAt);
+  const stored = entries.filter((e) => !e.isDefault).length;
 
   // The control that was pressed leaves with the view it was in (Add goes
   // with the list, Update with the form), so focus is placed on the next
@@ -150,7 +168,7 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
     return () => cancelAnimationFrame(raf);
   }, [view, overlay]);
 
-  const openForm = (mode: "add" | "edit", entry: Activity | null) => {
+  const openForm = (mode: "add" | "edit", entry: JourneyEntry | null) => {
     focusAfter.current = "form";
     setView({ kind: "form", mode, entry });
   };
@@ -164,29 +182,27 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
 
   const handleSaved = (mode: "add" | "edit", stageLabel: string) => {
     toList();
-    announce(`${stageLabel} ${mode === "add" ? "added to" : "updated in"} your product journey.`);
+    announce(`${stageLabel} ${mode === "add" ? "added to" : "updated in"} ${targetName}'s journey.`);
   };
 
-  const handleDelete = async (entry: Activity) => {
+  const handleDelete = async (entry: JourneyEntry) => {
     const result = await removeActivity(projectId, entry.id);
     // Its ⋮ is gone with it.
     if (result.ok) focusAfter.current = "add";
     setOverlay(null);
-    if (result.ok) announce(`${stageTitleOf(entry)} deleted from your product journey.`);
+    if (result.ok) announce(`${labelOf(entry)} deleted from ${targetName}'s journey.`);
   };
 
   // The ⋮ hint only once there is an entry to edit, drawn as that button's
   // own icon: the "⋮" character fell back to a colon in the UI font.
-  const subtitle = isPreview ? undefined : scope ? (
-    `${scope.productName}'s journey and the whole project's, newest first.`
-  ) : canWrite && entries.length > 0 ? (
+  const subtitle = isPreview ? undefined : canWrite && stored > 0 ? (
     <>
-      Your product journey, newest first. Use{" "}
+      {targetName} · newest first. Use{" "}
       <Icon icon={MoreVerticalIcon} size={14} className="inline-block align-[-2px]" />
       <span className="sr-only">the actions button</span> to edit a stage.
     </>
   ) : (
-    "Your product journey, newest first."
+    `${targetName} · newest first.`
   );
 
   const title =
@@ -224,7 +240,6 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
         {view.kind === "list" ? (
           <ActivityTimeline
             entries={entries}
-            scope={scope}
             products={products}
             canWrite={canWrite}
             isPreview={isPreview}
@@ -239,8 +254,7 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
               mode={view.mode}
               entry={view.entry}
               projectId={projectId}
-              products={products}
-              defaultProductId={scope?.productId}
+              target={target}
               listingFacts={listingFacts}
               onSubmit={view.mode === "add" ? addActivity : updateActivity}
               onSaved={(stageLabel) => handleSaved(view.mode, stageLabel)}
@@ -263,7 +277,7 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
       {overlay?.kind === "delete" && (
         <ConfirmDialog
           open
-          title={`Delete "${stageTitleOf(overlay.entry)}" (${formatDate(overlay.entry.createdAt)})?`}
+          title={`Delete "${labelOf(overlay.entry)}" (${formatDate(overlay.entry.createdAt)})?`}
           confirmLabel="Delete activity"
           tone="danger"
           onConfirm={() => void handleDelete(overlay.entry)}
@@ -276,9 +290,4 @@ export function ActivityDrawer({ open, onClose, projectId, scope, products, canW
       {overlay?.kind === "link" && <LinkConfirmDialog url={overlay.url} onClose={() => setOverlay(null)} />}
     </>
   );
-}
-
-function stageTitleOf(entry: Activity): string {
-  if (entry.type === "others") return entry.customName?.trim() || "Others";
-  return STAGES.find((s) => s.id === entry.type)?.label ?? "Activity";
 }

@@ -69,14 +69,14 @@ function HeaderSlot(props: HeaderSlotProps) {
 
 // C3's wiring. Every card links to its product page with the preview carried
 // (COR-37); the video line and the stage pill come from `productsTabView`
-// over the page's own derivation (P2-VIDEO-12, P2-TABS-10).
+// over the page's own derivation (P2-VIDEO-12; the pill is the product's current activity).
 function ProductsSlot({ project, view, viewer, now }: SlotProps) {
   const { chats } = useCreateHistory();
   const { record: journey } = useJourney(project.id);
   const owner = can(viewer, "facts.seeOwnerOnly");
   const cards = React.useMemo(
-    () => productsTabView(view, { owner, activities: journey.activities }),
-    [view, owner, journey.activities],
+    () => productsTabView(view, { owner, journey, project }),
+    [view, owner, journey, project],
   );
   const query = previewQuery(viewer);
   return (
