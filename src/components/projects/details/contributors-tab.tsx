@@ -144,7 +144,7 @@ export function ContributorsTab({
     if (!contributors.length) return null;
     return (
       <div className="flex flex-col gap-6">
-        <h2 className="text-lg font-bold text-text-primary">Contributors</h2>
+        <h2 className="text-xl font-bold text-text-primary">Contributors</h2>
         <ul className="flex flex-col gap-4">
           {teamOf(contributors).map((t) => (
             <li key={t.id} className="flex items-center gap-3">

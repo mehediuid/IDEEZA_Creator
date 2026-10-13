@@ -112,7 +112,7 @@ export function CustomersPanel({
     <div className={cn("flex flex-col", embedded ? "gap-8" : "gap-16")}>
       {!embedded && (
         <div className="flex flex-wrap items-center gap-8">
-          <h2 className="text-lg font-bold text-text-primary">Customers</h2>
+          <h2 className="text-xl font-bold text-text-primary">Customers</h2>
           <TestnetDemoBadge />
         </div>
       )}

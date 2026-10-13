@@ -78,7 +78,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
   if (!hydrated || !jobsHydrated) {
     return (
       <section aria-labelledby={headingId} aria-busy="true" className="flex flex-col gap-6">
-        <h2 id={headingId} className="text-lg font-bold text-text-primary">
+        <h2 id={headingId} className="text-xl font-bold text-text-primary">
           Video
         </h2>
         <div className="aspect-video w-full rounded-xl bg-bg-subtle motion-safe:animate-pulse" />
@@ -91,7 +91,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
     if (!inUse) return null;
     return (
       <section aria-labelledby={headingId} className="flex flex-col gap-6">
-        <h2 id={headingId} className="text-lg font-bold text-text-primary">
+        <h2 id={headingId} className="text-xl font-bold text-text-primary">
           Video
         </h2>
         <VideoPlayer take={inUse} productName={name} projectId={project.id} />
@@ -119,7 +119,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
   return (
     <section ref={sectionRef} tabIndex={-1} aria-labelledby={headingId} className="flex flex-col gap-6 outline-none">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <h2 id={headingId} className="text-lg font-bold text-text-primary">
+        <h2 id={headingId} className="text-xl font-bold text-text-primary">
           Video
         </h2>
         {status.state !== "none" && (
@@ -355,7 +355,7 @@ function ProductImages(props: ProductSlotProps) {
   };
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-6">
-      <h2 id={headingId} className="text-lg font-bold text-text-primary">
+      <h2 id={headingId} className="text-xl font-bold text-text-primary">
         Images
       </h2>
       {tiles.length === 0 ? (

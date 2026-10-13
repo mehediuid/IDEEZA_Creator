@@ -275,6 +275,31 @@
 }
 
 /* ============================================================
+ * Reading scale — the creator pages (My projects, a project and its products,
+ * Earn, Explore marketplace). People read these pages, so the three small
+ * steps go up one: 2xs 11, xs 12, sm 13 — normal text stops being 12 px. The
+ * dense tools (PCB, code, 3D, wiring, network map, the AI chat canvas) keep
+ * the root scale above. md and up are unchanged at every width.
+ *
+ * The scope is a `display: contents` wrapper each of those routes puts round
+ * its page (`<ReadingScale>`, components/projects/reading-scale.tsx). Dialogs, drawers and menus portal to <body>, outside it,
+ * so while such a page is on screen every top-level layer that does not hold
+ * the page (the portals, the toast layers) takes the same scale — a dialog
+ * reads like the page that opened it. The sidebar sits beside the wrapper in
+ * the shell, so it keeps one size on every page.
+ * ============================================================ */
+[data-type-scale="reading"],
+body:has([data-type-scale="reading"]) > :not(:has([data-type-scale="reading"])) {
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --line-height-2xs: 16px;
+  --line-height-xs: 18px;
+  --line-height-sm: 20px;
+}
+
+
+/* ============================================================
  * Light theme (default) — semantic & component tokens
  * ============================================================ */
 :root,

@@ -40,7 +40,7 @@ export function ProductContributorsPanel({ project, view, viewer }: ProductSlotP
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-bold text-text-primary">Contributors</h2>
+      <h2 className="text-xl font-bold text-text-primary">Contributors</h2>
 
       {canSeeRoster ? (
         <ul className="flex flex-col gap-4">

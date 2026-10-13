@@ -172,7 +172,7 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
 
   return (
     <section aria-labelledby="media-heading" className="mt-16">
-      <h2 id="media-heading" className="text-lg font-bold text-text-primary">
+      <h2 id="media-heading" className="text-xl font-bold text-text-primary">
         Media
       </h2>
 

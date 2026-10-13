@@ -51,7 +51,7 @@ function NetworkReadOnly({ project, refs }: { project: ManualProject; refs: Buil
 
   return (
     <>
-      <h2 id="network-heading" className="text-lg font-bold text-text-primary">
+      <h2 id="network-heading" className="text-xl font-bold text-text-primary">
         Network
       </h2>
       {network ? (

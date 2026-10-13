@@ -35,7 +35,7 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
     if (!can(viewer, "people.seeRoster")) return null;
     return (
       <div className="flex flex-col gap-8">
-        <h2 className="text-lg font-bold text-text-primary">Team</h2>
+        <h2 className="text-xl font-bold text-text-primary">Team</h2>
         <StateCard
           tone="empty"
           icon={<Icon icon={UserGroupIcon} size={32} />}
@@ -62,7 +62,7 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-bold text-text-primary">Team</h2>
+      <h2 className="text-xl font-bold text-text-primary">Team</h2>
       <ul className="flex flex-col gap-4">
         {team.map((t) => (
           <li key={t.id} className="flex items-center gap-3">

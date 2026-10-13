@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import * as React from "react";
 import { connection } from "next/server";
 import { EarnShell } from "@/components/projects/earn/earn-shell";
+import { ReadingScale } from "@/components/projects/reading-scale";
 
 // Before the store is read the page can't know the project's name; the client
 // sets "{section} · Earn · {project} · IDEEZA" once it does.
@@ -23,5 +24,9 @@ export default async function EarnLayout({
 }) {
   await connection();
   const { id } = await params;
-  return <EarnShell id={id}>{children}</EarnShell>;
+  return (
+    <ReadingScale>
+      <EarnShell id={id}>{children}</EarnShell>
+    </ReadingScale>
+  );
 }

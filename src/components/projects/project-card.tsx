@@ -76,7 +76,7 @@ export function ProjectCard({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-[4px] text-text-tertiary">
               <Icon icon={hasCover ? ImageNotFound01Icon : CpuIcon} size={18} strokeWidth={1.4} />
               {hasCover && (
-                <span className="px-[6px] text-center text-[10px] leading-tight">Image didn&apos;t load</span>
+                <span className="px-[6px] text-center text-xs leading-tight">Image didn&apos;t load</span>
               )}
             </div>
           )}

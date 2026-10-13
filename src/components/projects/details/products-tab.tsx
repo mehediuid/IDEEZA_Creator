@@ -127,7 +127,7 @@ export function ProductsTab({
   return (
     <div className="[container-type:inline-size]">
       <div className="mb-8 flex flex-col gap-2">
-        <h2 className="text-lg font-bold text-text-primary">Products</h2>
+        <h2 className="text-xl font-bold text-text-primary">Products</h2>
         {/* A `<p>` here would be invalid HTML: ConfidenceBadge's open panel
             (ConfidenceIssuesPanel) renders block content — div/section/ul —
             and a <p> can't contain block children (breaks hydration). */}

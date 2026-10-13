@@ -6,6 +6,7 @@
 import * as React from "react";
 import type { Metadata } from "next";
 import { MyProjects } from "@/components/projects/my-projects";
+import { ReadingScale } from "@/components/projects/reading-scale";
 
 export const metadata: Metadata = {
   title: "My projects · IDEEZA",
@@ -13,10 +14,12 @@ export const metadata: Metadata = {
 
 export default function ProjectsPage() {
   return (
-    <React.Suspense
-      fallback={<div className="mx-auto w-full max-w-[1280px] px-[16px] py-[28px] min-[640px]:px-[32px]" />}
-    >
-      <MyProjects />
-    </React.Suspense>
+    <ReadingScale>
+      <React.Suspense
+        fallback={<div className="mx-auto w-full max-w-[1280px] px-[16px] py-[28px] min-[640px]:px-[32px]" />}
+      >
+        <MyProjects />
+      </React.Suspense>
+    </ReadingScale>
   );
 }
