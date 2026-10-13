@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { CreatorRow } from "@/components/newsfeed/creator-row";
 
 export const metadata: Metadata = {
   title: "IDEEZA — Project",
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 // description, tags, comments, follow + showcase/sell actions — is a separate
 // build; the newsfeed links here so cards never dead-end. The ?focus=comments
 // query (from a card's Comment action) is where comments will deep-link.
+// Under the title, a sample post's creator and Message (creator-row.tsx).
 export default async function ProjectDetailPage({
   params,
 }: {
@@ -53,6 +55,7 @@ export default async function ProjectDetailPage({
       <h1 className="mt-[24px] text-xl font-bold capitalize tracking-tight text-text-primary">
         {project ? project.title : title}
       </h1>
+      {project && <CreatorRow creator={project.creator} slug={project.slug} />}
       <p className="mt-[8px] max-w-[560px] text-sm text-text-secondary">
         The full project view — visuals, description, tags, comments, follow,
         and showcase/sell actions — is coming next. This page exists so feed

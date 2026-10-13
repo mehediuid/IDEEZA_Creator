@@ -9,6 +9,9 @@
 // (labels hidden, tooltips + aria-labels keep every item reachable) and
 // expands it back. The choice persists in localStorage.
 //
+// Messages carries the unread badge (Messages spec §6; D7: only here, never
+// the bell): a count pill beside the label, a dot on the collapsed rail.
+//
 // Sizing note: the project's Tailwind preset overrides `spacing` with
 // the IDEEZA DS spacing tokens (so `h-5` resolves to 10px, not 20px).
 // Component dimensions therefore use explicit arbitrary px values.
@@ -52,11 +55,16 @@ import { Icon, type IconValue } from "./icon";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { WalletMenuEntry } from "@/components/wallet/wallet-menu-entry";
+import { useStoredActingAs } from "@/lib/messages/identity";
+import { MESSAGES_HREF } from "@/lib/messages/links";
+import { countsFor } from "@/lib/messages/rules";
+import { useMessages } from "@/lib/messages/store";
+import { useMessagePeople } from "@/lib/messages/use-people";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
-// than linking to a 404.
-type NavItem = { label: string; href: string | null; icon: IconValue };
+// than linking to a 404. `unread` is the Messages badge, set where NAV is drawn.
+type NavItem = { label: string; href: string | null; icon: IconValue; unread?: number };
 
 const NAV: NavItem[] = [
   { label: "Home", href: "/", icon: Home01Icon },
@@ -65,7 +73,7 @@ const NAV: NavItem[] = [
   { label: "Parts & agile module", href: "/parts", icon: CpuIcon },
   { label: "Explore marketplace", href: "/marketplace", icon: ShoppingBag01Icon },
   { label: "Innovations", href: "/innovations", icon: News01Icon },
-  { label: "Messages", href: null, icon: Mail01Icon },
+  { label: "Messages", href: MESSAGES_HREF, icon: Mail01Icon },
   { label: "Blog", href: null, icon: BookOpen01Icon },
 ];
 
@@ -83,6 +91,15 @@ function useAttentionElsewhere(): BuildAttention[] {
   }, [attentionBuilds, pathname]);
 }
 
+/** Unread Inbox conversations of the tab's acting person; 0 until both stores are read. */
+function useMessagesUnread(): number {
+  const { data, hydrated } = useMessages();
+  const people = useMessagePeople();
+  const asId = useStoredActingAs();
+  if (!hydrated || !people.hydrated) return 0;
+  return countsFor(data, asId, people.teamIdsOf).unread;
+}
+
 const USER = {
   name: "You",
   initials: "Y",
@@ -97,6 +114,7 @@ function useSidebarCollapsed(): [boolean, () => void] {
 
   React.useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of localStorage after mount (see above)
       if (window.localStorage.getItem(COLLAPSED_KEY) === "1") setCollapsed(true);
     } catch {}
   }, []);
@@ -179,6 +197,7 @@ function SidebarBody({
   /** Present in the drawer: the brand row closes it instead of collapsing. */
   onClose?: () => void;
 }) {
+  const unread = useMessagesUnread();
   return (
     <>
       <Brand collapsed={collapsed} onToggle={onToggle} onClose={onClose} />
@@ -198,7 +217,11 @@ function SidebarBody({
       >
         <ul role="list" className="flex flex-col gap-[2px]">
           {NAV.map((item) => (
-            <NavRow key={item.label} item={item} collapsed={collapsed} />
+            <NavRow
+              key={item.label}
+              item={item.href === MESSAGES_HREF ? { ...item, unread } : item}
+              collapsed={collapsed}
+            />
           ))}
         </ul>
       </nav>
@@ -443,13 +466,15 @@ function NavRow({
   const attentionLabel = showAttention
     ? `, ${attentionBuilds.length} build${attentionBuilds.length === 1 ? "" : "s"} need${attentionBuilds.length === 1 ? "s" : ""} attention`
     : "";
-  const fullLabel = `${item.label}${attentionLabel}`;
+  const unread = item.unread ?? 0;
+  const unreadLabel = unread > 0 ? `, ${unread} unread` : "";
+  const fullLabel = `${item.label}${attentionLabel}${unreadLabel}`;
   return (
     <li>
       <Link
         href={href}
         aria-current={isActive ? "page" : undefined}
-        aria-label={collapsed ? fullLabel : showAttention ? fullLabel : undefined}
+        aria-label={collapsed || showAttention || unread > 0 ? fullLabel : undefined}
         title={collapsed ? item.label : undefined}
         className={[
           "relative flex h-[32px] items-center rounded-md text-md text-text-primary outline-none transition-colors duration-fast",
@@ -473,6 +498,20 @@ function NavRow({
             ].join(" ")}
           />
         )}
+        {unread > 0 &&
+          (collapsed ? (
+            <span
+              aria-hidden
+              className="absolute right-[14px] top-[4px] inline-flex h-[8px] w-[8px] rounded-full bg-bg-brand"
+            />
+          ) : (
+            <span
+              aria-hidden
+              className="inline-flex h-[20px] min-w-[20px] shrink-0 items-center justify-center rounded-full bg-bg-brand px-[6px] text-md font-semibold leading-md tabular-nums text-text-on-brand"
+            >
+              {unread > 99 ? "99+" : unread}
+            </span>
+          ))}
       </Link>
     </li>
   );
