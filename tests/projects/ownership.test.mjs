@@ -94,7 +94,7 @@ test("ownershipOf: a 100% sale leaves the maker at 0%, and the buyer is the majo
   const s = ownershipOf({ createdAt: CREATED, contributors: [], sales, listedPercent: 0 });
   assert.equal(s.maker, 0);
   assert.equal(s.majority.holder.kind, "buyer");
-  assert.equal(s.majority.holder.name, "Mira (demo buyer)");
+  assert.equal(s.majority.holder.name, "Mira (demo creator)");
 });
 
 test("ownershipOf: over-allocation (a hand-edited record) clamps the maker to 0 and flags it", () => {
@@ -192,7 +192,7 @@ test("ownedBySegment: a majority buyer holding reads their buyer label", () => {
   const s = ownershipOf({ createdAt: CREATED, contributors: [], sales, listedPercent: 0 });
   assert.deepEqual(ownedBySegment(s, { kind: "local-owner" }), {
     created: "Created by you",
-    ownedBy: "Mira (demo buyer)",
+    ownedBy: "Mira (demo creator)",
     linked: true,
   });
 });
@@ -225,7 +225,7 @@ test("majority is summed per holder: two 30 % buys make Mira the majority (R2-6)
   assert.equal(s.majority.holder.buyerId, "buyer-mira");
   assert.equal(s.majority.percent, 60);
   assert.equal(s.majority.since, 1);
-  assert.deepEqual(ownedBySegment(s, { kind: "owner-preview" }), { created: null, ownedBy: "Mira (demo buyer)", linked: false });
+  assert.deepEqual(ownedBySegment(s, { kind: "owner-preview" }), { created: null, ownedBy: "Mira (demo creator)", linked: false });
   // The holdings themselves stay one row per sale.
   assert.equal(s.holdings.length, 4);
 });

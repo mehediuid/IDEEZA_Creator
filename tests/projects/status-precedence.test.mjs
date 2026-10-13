@@ -172,9 +172,9 @@ test("statusLineOf · Paused names the Marketplace block", () => {
 
 test("statusLineOf · Sold: one sale, 100 %, several, and a visitor's line", () => {
   const p = project({ mint: lazy });
-  assert.equal(sum(p, SELL, market({ listings: [listing()], sales: [sale()] })).statusLine, "Sold 10% to Mira (demo buyer) · Sep 28, 2026");
+  assert.equal(sum(p, SELL, market({ listings: [listing()], sales: [sale()] })).statusLine, "Sold 10% to Mira (demo creator) · Sep 28, 2026");
   const all = sale({ item: { nft: "main", sharePct: 100 } });
-  assert.equal(sum(p, SELL, market({ listings: [listing({ percentSelling: 100 })], sales: [all] })).statusLine, "Sold to Mira (demo buyer) · Sep 28, 2026");
+  assert.equal(sum(p, SELL, market({ listings: [listing({ percentSelling: 100 })], sales: [all] })).statusLine, "Sold to Mira (demo creator) · Sep 28, 2026");
   const three = [
     sale(),
     sale({ id: "sale_b", listingId: "lst_b", at: SOLD - 60 * MIN, buyerId: "buyer-leo" }),
@@ -234,7 +234,7 @@ test("headerText · lockLine (§3.8.5) for the owner of a project sold in full",
   assert.ok(s.lock);
   assert.equal(
     headerText(s).lockLine,
-    "Sold in full to Mira (demo buyer) on Sep 28, 2026 — it's theirs now, so this project is read-only.",
+    "Sold in full to Mira (demo creator) on Sep 28, 2026 — it's theirs now, so this project is read-only.",
   );
   assert.equal(headerText(s, { viewer: { kind: "owner-preview" } }).lockLine, null);
   assert.equal(headerText(sum(project(), SAVE)).lockLine, null);
@@ -244,7 +244,7 @@ test("headerText · the sold buyer-link part (§3.2): the owner's link to the Cu
   const s = sum(project({ mint: lazy }), SELL, market({ listings: [listing()], sales: [sale()] }));
   assert.deepEqual(headerText(s).soldBuyerLink, {
     before: "Sold 10% to ",
-    label: "Mira (demo buyer)",
+    label: "Mira (demo creator)",
     href: "/projects/proj_car/earn/money?sale=sale_a#customers",
     after: " · Sep 28, 2026",
   });

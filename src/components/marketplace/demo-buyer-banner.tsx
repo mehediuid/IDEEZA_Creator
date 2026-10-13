@@ -19,7 +19,7 @@ import type { DemoBuyerId } from "@/lib/wallet/types";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: SelectOption<DemoBuyerId>[] = DEMO_BUYERS.map((b) => ({ value: b.id, label: `${b.name} · demo buyer` }));
+const OPTIONS: SelectOption<DemoBuyerId>[] = DEMO_BUYERS.map((b) => ({ value: b.id, label: `${b.name} · demo creator` }));
 
 export function DemoBuyerBanner({ className }: { className?: string }) {
   const { buyer, setActiveBuyer } = useActiveBuyer();
@@ -35,12 +35,12 @@ export function DemoBuyerBanner({ className }: { className?: string }) {
           value={buyer.id}
           onChange={setActiveBuyer}
           options={OPTIONS}
-          placeholder="Choose a demo buyer"
+          placeholder="Choose a demo creator"
           className="w-[184px] max-md:[&>button]:min-h-[44px] [@media(pointer:coarse)]:[&>button]:min-h-[44px]"
         />
       }
     >
-      Every listing here is yours, so a demo buyer does the buying — test tokens in a test wallet. Nothing is sent to a
+      Every listing here is yours, so a demo creator does the buying — test tokens in a test wallet. Nothing is sent to a
       blockchain.
     </Banner>
   );

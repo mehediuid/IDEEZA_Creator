@@ -15,7 +15,7 @@ import { formatDate, formatDateTime, type ProjectStatus } from "./project-summar
 import type { ManualProject } from "./projects";
 import { earnHref } from "./earn-route";
 
-// The buyer's label ("Mira (demo buyer)") is the wallet identities' own
+// The buyer's label ("Mira (demo creator)") is the wallet identities' own
 // (spec §3.5.3); re-exported so ownership.ts and the panels keep one import.
 export { buyerLabel };
 

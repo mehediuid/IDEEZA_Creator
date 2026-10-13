@@ -150,7 +150,7 @@ test("customerRowText: the buyer label, and a 'You' distinction never applies (b
   const c = customersOf(PROJECT, ALL);
   const row = c.rows.find((r) => r.saleId === "sale_a");
   const text = customerRowText(row, { projectName: "Car", now: S1.at });
-  assert.equal(text.buyer, "Mira (demo buyer)");
+  assert.equal(text.buyer, "Mira (demo creator)");
 });
 
 test("customerRowText: the product name comes off the sale's snapshot (#7)", () => {
@@ -271,26 +271,26 @@ test("pageOfSale: 1-based page, unknown id gives page 1", () => {
 const dateOf = (at) => new Date(at).toISOString().slice(0, 10);
 
 test("soldLineOf: one partial sale — percent and buyer, owner audience", () => {
-  const c = { mainSale: { at: 1, buyer: "Mira (demo buyer)", saleId: "sale_a", item: { nft: "main", sharePct: 10 } }, mainSaleCount: 1, soldSharePct: 10 };
+  const c = { mainSale: { at: 1, buyer: "Mira (demo creator)", saleId: "sale_a", item: { nft: "main", sharePct: 10 } }, mainSaleCount: 1, soldSharePct: 10 };
   const line = soldLineOf(c, "owner", dateOf);
-  assert.deepEqual(line, { before: "Sold 10% to ", buyer: { label: "Mira (demo buyer)", saleId: "sale_a" }, after: ` · ${dateOf(1)}` });
-  assert.equal(joinSoldLine(line), `Sold 10% to Mira (demo buyer) · ${dateOf(1)}`);
+  assert.deepEqual(line, { before: "Sold 10% to ", buyer: { label: "Mira (demo creator)", saleId: "sale_a" }, after: ` · ${dateOf(1)}` });
+  assert.equal(joinSoldLine(line), `Sold 10% to Mira (demo creator) · ${dateOf(1)}`);
 });
 
 test("soldLineOf: a 100% sale drops the percent", () => {
-  const c = { mainSale: { at: 1, buyer: "Mira (demo buyer)", saleId: "sale_a", item: { nft: "main", sharePct: 100 } }, mainSaleCount: 1, soldSharePct: 100 };
+  const c = { mainSale: { at: 1, buyer: "Mira (demo creator)", saleId: "sale_a", item: { nft: "main", sharePct: 100 } }, mainSaleCount: 1, soldSharePct: 100 };
   const line = soldLineOf(c, "owner", dateOf);
   assert.equal(line.before, "Sold to ");
 });
 
 test("soldLineOf: several sales roll up to a total and a count, with no buyer link", () => {
-  const c = { mainSale: { at: 2, buyer: "Leo (demo buyer)", saleId: "sale_z", item: { nft: "main", sharePct: 20 } }, mainSaleCount: 3, soldSharePct: 30 };
+  const c = { mainSale: { at: 2, buyer: "Leo (demo creator)", saleId: "sale_z", item: { nft: "main", sharePct: 20 } }, mainSaleCount: 3, soldSharePct: 30 };
   const line = soldLineOf(c, "owner", dateOf);
   assert.deepEqual(line, { before: "Sold 30% in 3 sales", buyer: null, after: ` · last ${dateOf(2)}` });
 });
 
 test("soldLineOf: a visitor never learns who or how much", () => {
-  const c = { mainSale: { at: 1, buyer: "Mira (demo buyer)", saleId: "sale_a", item: { nft: "main", sharePct: 10 } }, mainSaleCount: 1, soldSharePct: 10 };
+  const c = { mainSale: { at: 1, buyer: "Mira (demo creator)", saleId: "sale_a", item: { nft: "main", sharePct: 10 } }, mainSaleCount: 1, soldSharePct: 10 };
   const line = soldLineOf(c, "visitor", dateOf);
   assert.deepEqual(line, { before: "Sold", buyer: null, after: ` · ${dateOf(1)}` });
 });

@@ -6,7 +6,7 @@
 //
 // - `manage`, from the account menu: the one home for every identity's
 //   connection. The maker's connect / disconnect, account and network, the
-//   balance and recent activity, then "Demo buyers (for Explore
+//   balance and recent activity, then "Demo creators (for Explore
 //   marketplace)" with a Connect / Disconnect per buyer. No page carries
 //   these controls; pages show a fact line.
 // - `request`, from `useWalletRequest().request()`: MINT-3's phases, driven
@@ -487,7 +487,7 @@ function ManageDialog({ wallet, market, write, onClose }: WalletDialogProps) {
         {wallet && (
           <section aria-labelledby={buyersLabelId} className="flex flex-col gap-[8px] border-t border-solid border-border pt-[16px]">
             <h3 id={buyersLabelId} className="text-sm font-semibold text-text-primary">
-              Demo buyers (for Explore marketplace)
+              Demo creators (for Explore marketplace)
             </h3>
             <ul className="flex flex-col gap-[6px]">
               {DEMO_BUYERS.map((b) => {

@@ -372,7 +372,7 @@ export function soldPartsOf(
  * | given | "{mint} · given to the community[ under {licence}]" |
  * | listed | "Listed Sep 28, 2026 · Buy now · 0.05 MATIC" · "Auction · top bid 0.04 MATIC · 2h 14m left" · … |
  * | paused | "Paused Sep 28, 2026 · relist it from the Marketplace block" |
- * | sold | "Sold 10% to Mira (demo buyer) · Sep 28, 2026" · "Sold to …" · "Sold 30% in 3 sales · last Sep 28"; a visitor: "Sold · Sep 28, 2026" |
+ * | sold | "Sold 10% to Mira (demo creator) · Sep 28, 2026" · "Sold to …" · "Sold 30% in 3 sales · last Sep 28"; a visitor: "Sold · Sep 28, 2026" |
  * | minted | v1: "Minted · the brief record isn't in this browser" |
  */
 export function statusLineOf(status: ProjectStatus, f: StatusLineFacts): string {

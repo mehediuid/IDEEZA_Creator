@@ -304,7 +304,7 @@ test("marketplaceCardOf paused: what changed, and the kept terms (P2-LISTING-14)
 test("marketplaceCardOf sold: buyer, price, the fee, the payout, share and transfer date (P2-LISTING-16 C)", () => {
   const card = flow.marketplaceCardOf(view(listing(), { sales: [sale()] }), { bids: [], now: NOW });
   assert.equal(card.kind, "sold");
-  assert.equal(factOf(card, "Buyer"), "Mira (demo buyer) · 0x68f4…c94e");
+  assert.equal(factOf(card, "Buyer"), "Mira (demo creator) · 0x68f4…c94e");
   assert.equal(factOf(card, "Price"), "0.05 MATIC · Buy now");
   assert.equal(factOf(card, "IDEEZA fee"), "2.5% · 0.00125 MATIC");
   assert.equal(factOf(card, "You received"), "0.04875 MATIC");
@@ -324,7 +324,7 @@ test("bidRowsOf: highest first, bidders as demo buyers, the time in two halves (
   ];
   const rows = flow.bidRowsOf(auction(), bids);
   assert.deepEqual(rows.map((r) => r.bid), ["0.04 MATIC", "0.03 MATIC", "0.02 MATIC"]);
-  assert.equal(rows[0].bidder, "Sam (demo buyer)");
+  assert.equal(rows[0].bidder, "Sam (demo creator)");
   assert.equal(rows[0].date, "Sep 28, 2026");
   assert.equal(`${rows[0].date} · ${rows[0].clock}`, rows[0].time);
   assert.equal(flow.biddingHistoryLabel(3), "Bidding History (3)");
@@ -335,16 +335,16 @@ test("closeCopyOf: the winner, a skipped higher bid, and no payable bid (P2-LIST
   const bids = [bid("bid_1", "0.03", "buyer-leo", NOW - 2 * MIN), bid("bid_2", "0.05", "buyer-sam", NOW - MIN)];
   const l = auction();
   const won = flow.closeCopyOf({ kind: "sale", bid: bids[1] }, l, bids);
-  assert.equal(won.body, "Sam (demo buyer) wins with 0.05 MATIC. The sale is recorded and they appear in Customers.");
+  assert.equal(won.body, "Sam (demo creator) wins with 0.05 MATIC. The sale is recorded and they appear in Customers.");
   assert.equal(won.skipped, null);
   assert.equal(won.confirm, "Close and sell");
   const skipped = flow.closeCopyOf({ kind: "sale", bid: bids[0] }, l, bids);
-  assert.match(skipped.skipped, /^A higher bid is skipped: Sam \(demo buyer\), 0\.05 MATIC/);
+  assert.match(skipped.skipped, /^A higher bid is skipped: Sam \(demo creator\), 0\.05 MATIC/);
   const none = flow.closeCopyOf({ kind: "noBids" }, l, []);
   assert.equal(none.body, "No one bid. The auction ends and the project comes off the marketplace.");
   assert.equal(none.confirm, "Close auction");
   assert.match(flow.closeCopyOf({ kind: "noBids" }, l, bids).body, /^No bid can be paid/);
-  assert.equal(flow.closedAnnouncement({ kind: "sale", bid: bids[1] }, l), "Auction closed · sold to Sam (demo buyer) for 0.05 MATIC");
+  assert.equal(flow.closedAnnouncement({ kind: "sale", bid: bids[1] }, l), "Auction closed · sold to Sam (demo creator) for 0.05 MATIC");
   assert.equal(flow.closedAnnouncement({ kind: "noBids" }, l), "Auction closed with no bids");
 });
 

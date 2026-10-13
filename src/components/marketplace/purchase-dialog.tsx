@@ -74,7 +74,7 @@ const UNREADABLE = "This browser's marketplace records couldn't be read, so the 
 const SOLD_IN_FULL = "This project was just sold in full, so its NFTs are off the marketplace.";
 
 export function buyerNameOf(id: DemoBuyerId): string {
-  return DEMO_BUYERS.find((b) => b.id === id)?.name ?? "Demo buyer";
+  return DEMO_BUYERS.find((b) => b.id === id)?.name ?? "Demo creator";
 }
 
 /** The listing as the market holds it now, or why it can't be bought. `auction` asks for a running auction. */

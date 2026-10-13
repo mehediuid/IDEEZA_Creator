@@ -229,7 +229,7 @@ export type ListingCardText = { price: string; sub: string };
 
 function buyerName(id: DemoBuyerId): string {
   const names: Record<DemoBuyerId, string> = { "buyer-mira": "Mira", "buyer-leo": "Leo", "buyer-sam": "Sam" };
-  return `${names[id]} (demo buyer)`;
+  return `${names[id]} (demo creator)`;
 }
 
 /** The card's price block (P2-MARKETPLACE-6), which depends on the tab and

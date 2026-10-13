@@ -27,11 +27,11 @@ export const DEMO_BUYERS: readonly DemoBuyer[] = [
   { id: "buyer-sam", name: "Sam", initials: "S" },
 ];
 
-/** `"Mira (demo buyer)"` — a buyer's name wherever it stands for a real identity, so it never
+/** `"Mira (demo creator)"` — a buyer's name wherever it stands for a real identity, so it never
  *  reads as one (CUSTOMERS, the request dialog, the roster). */
 export function buyerLabel(id: DemoBuyerId): string {
   const buyer = DEMO_BUYERS.find((b) => b.id === id);
-  return `${buyer ? buyer.name : "Demo buyer"} (demo buyer)`;
+  return `${buyer ? buyer.name : "Demo creator"} (demo creator)`;
 }
 
 /** The active buyer for a raw, possibly-stale or invalid stored id. Unknown → Mira. */

@@ -220,7 +220,7 @@ test("rosterOf: the owner's rows — maker first, contributors oldest first, the
   assert.equal(rows[1].role, "Co-owner");
   assert.equal(rows[1].share.text, "30%");
   assert.equal(rows[2].kind, "buyer");
-  assert.equal(rows[2].name, "Mira (demo buyer)");
+  assert.equal(rows[2].name, "Mira (demo creator)");
   assert.equal(rows[2].role, "Shareholder");
   assert.equal(rows[2].share.text, "10%");
   assert.equal(rows[2].sub, "From a sale");

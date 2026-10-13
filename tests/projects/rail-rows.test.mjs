@@ -192,10 +192,10 @@ test("logLinesOf · sales, support, editions and the business plan (P2-MARKETPLA
   ];
   const products = [{ id: "prd_a", name: "Remote" }];
   assert.deepEqual(logLinesOf(entries, { products }).map((l) => [l.title, l.note]), [
-    ["Support request from Mira (demo buyer)", "Where's the BOM?"],
-    ["Sold a Physical NFT of Remote to Sam (demo buyer)", "0.01 MATIC · Private use"],
-    ["Sold to Leo (demo buyer)", "0.05 MATIC · token #1042"],
-    ["Sold 10% to Mira (demo buyer)", "0.05 MATIC · token #1042 minted on this sale"],
+    ["Support request from Mira (demo creator)", "Where's the BOM?"],
+    ["Sold a Physical NFT of Remote to Sam (demo creator)", "0.01 MATIC · Private use"],
+    ["Sold to Leo (demo creator)", "0.05 MATIC · token #1042"],
+    ["Sold 10% to Mira (demo creator)", "0.05 MATIC · token #1042 minted on this sale"],
     ["Private use Physical NFT listed", "Remote"],
     ["1 Commercial use Virtual NFT created", "Remote"],
     ["Business plan written", null],

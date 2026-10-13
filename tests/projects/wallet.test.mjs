@@ -104,7 +104,7 @@ test("activeBuyerOf: an unknown or missing id defaults to Mira", () => {
 });
 
 test("buyerLabel names a buyer without ever reading as a real identity", () => {
-  assert.equal(buyerLabel("buyer-mira"), "Mira (demo buyer)");
+  assert.equal(buyerLabel("buyer-mira"), "Mira (demo creator)");
   assert.equal(DEMO_BUYERS.map((b) => b.id).join(","), "buyer-mira,buyer-leo,buyer-sam");
 });
 
