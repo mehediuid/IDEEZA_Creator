@@ -98,11 +98,11 @@ export function EditionOffers({
                   {first && (
                     <li>
                       <ActivityNow
-                        compact
+                        variant="line"
                         projectId={project.id}
                         target={target}
+                        label={`${kind} copies`}
                         heading={`${kind} copies of ${of} · Activity`}
-                        mode="latest"
                         emptyNote={Number.isFinite(listedAt) ? `No activity yet · listed ${formatDate(listedAt)}` : "No activity yet"}
                       />
                     </li>

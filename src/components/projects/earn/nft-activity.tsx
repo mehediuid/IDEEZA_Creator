@@ -1,25 +1,28 @@
 "use client";
 
 // Earn › Sell's NFT activity (owner, 2026-10-13; D2 of the UX study
-// https://claude.ai/artifact/SwMDKAjNaGyP7q42qHEuEt). Under an NFT row that
-// exists — the Main NFT once minted, a Physical / Virtual scope once it has
-// copies — one line: its latest activity and how old it is, + Add, and
-// History (n), each opening that NFT's own Activity History. This is the one
-// place an owner adds NFT activity: it sits where the NFT is sold, so updates
-// get written. It wraps on a phone so the row stays readable.
+// https://claude.ai/artifact/SwMDKAjNaGyP7q42qHEuEt; visual pass: one line, no
+// box). Inside an NFT row that exists — the Main NFT once minted, a Physical /
+// Virtual scope once it has copies: "Activity [+] Milestone · today · 1 ›".
+// The + beside the label adds; the latest entry opens its history. This is the
+// one place an owner adds NFT activity: it sits where the NFT is sold, so
+// updates get written.
 
 import * as React from "react";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import { Badge } from "@/components/ideeza";
 import { isPreview } from "@/lib/manual/buyer-preview";
 import { activitiesOf, ageOf, labelOf, targetNameOf, type ActivityTarget } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
+import { formatDateTime } from "@/lib/manual/project-summary";
 import { ActivityDrawer } from "../details/activity/drawer";
 import type { SlotProps } from "../details/slots";
 
-const LINK =
-  "inline-flex min-h-[32px] items-center rounded-sm text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
+const ADD =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-solid border-border-strong text-text-primary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]";
 
 export function NftActivityLine({
   project,
@@ -46,29 +49,30 @@ export function NftActivityLine({
   });
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-solid border-border px-4 py-3 text-sm">
-      <span className="font-semibold text-text-primary">Activity</span>
-      {latest ? (
-        <span className="flex flex-wrap items-center gap-2 text-text-secondary">
-          <span>Latest</span>
-          <Badge tone="brand-outline">{labelOf(latest)}</Badge>
-          <span>{ageOf(latest.createdAt, now)}</span>
-        </span>
-      ) : (
-        <span className="text-text-secondary">None yet. Buyers see what you add here.</span>
+    <div className="flex min-h-[36px] min-w-0 items-center gap-2 text-sm">
+      <span className="shrink-0 text-text-secondary">Activity</span>
+      {canWrite && (
+        <button ref={addRef} type="button" onClick={() => setDrawer("add")} aria-label={`Add activity for ${name}`} className={ADD}>
+          <Icon icon={PlusSignIcon} size={14} />
+        </button>
       )}
-      <span className="ml-auto flex items-center gap-4">
-        {canWrite && (
-          <button ref={addRef} type="button" onClick={() => setDrawer("add")} aria-label={`Add activity for ${name}`} className={LINK}>
-            + Add
-          </button>
-        )}
-        {stored.length > 0 && (
-          <button ref={historyRef} type="button" onClick={() => setDrawer("list")} aria-label={`History (${stored.length}): ${name}`} className={LINK}>
-            History ({stored.length})
-          </button>
-        )}
-      </span>
+      {latest ? (
+        <button
+          ref={historyRef}
+          type="button"
+          onClick={() => setDrawer("list")}
+          aria-label={`${name} activity: ${labelOf(latest)}, ${ageOf(latest.createdAt, now)}. History, ${stored.length}`}
+          className="flex min-h-[32px] min-w-0 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
+        >
+          <Badge tone="brand-outline">{labelOf(latest)}</Badge>
+          <span className="min-w-0 truncate text-text-tertiary" title={formatDateTime(latest.createdAt)}>
+            {ageOf(latest.createdAt, now)}
+          </span>
+          <span className="shrink-0 font-medium text-text-brand">· {stored.length} ›</span>
+        </button>
+      ) : (
+        <span className="min-w-0 truncate text-text-tertiary">None yet</span>
+      )}
       <ActivityDrawer
         open={drawer !== null}
         startWith={drawer ?? "list"}

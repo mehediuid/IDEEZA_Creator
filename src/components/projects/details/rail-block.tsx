@@ -66,10 +66,13 @@ export function RailBlock({
   title,
   meta,
   collapsible = true,
+  action,
   children,
 }: {
   /** The block's h2: "Outcome", "Details", … */
   title: string;
+  /** One control beside the heading (the Activity block's + Add); first in the panel when folded. */
+  action?: React.ReactNode;
   /** Said after the title on the stacked toggle — the block's state in a few words. */
   meta?: string;
   /** False keeps the block open once stacked, under a plain h2: Manage, whose
@@ -117,12 +120,20 @@ export function RailBlock({
             </span>
           </button>
         </h2>
+      ) : action ? (
+        <div className="flex items-center justify-between gap-4">
+          <h2 id={headingId} className="m-0 text-lg font-bold text-text-primary">
+            {title}
+          </h2>
+          {action}
+        </div>
       ) : (
         <h2 id={headingId} className="m-0 text-lg font-bold text-text-primary">
           {title}
         </h2>
       )}
       <div id={panelId} className={cn("flex flex-col gap-6", folds && !open && "hidden")}>
+        {folds && action}
         <StackedContext.Provider value={stacked}>{children}</StackedContext.Provider>
       </div>
     </section>

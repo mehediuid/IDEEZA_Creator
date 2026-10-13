@@ -194,7 +194,7 @@ function EntryMenu({
 
 // ─────────────────────────── media tile (60×60) ───────────────────────────
 
-export function MediaTile({ media, onView }: { media: MediaRef; onView: () => void }) {
+export function MediaTile({ media, onView, small = false }: { media: MediaRef; onView: () => void; small?: boolean }) {
   const [url, setUrl] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (media.kind !== "image") return;
@@ -220,13 +220,16 @@ export function MediaTile({ media, onView }: { media: MediaRef; onView: () => vo
       onClick={() => (downloadable ? void downloadMedia(media) : onView())}
       aria-label={label}
       title={media.name}
-      className="relative flex size-[60px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-solid border-border bg-bg-surface-raised outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-solid border-border bg-bg-surface-raised outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus",
+        small ? "size-9 max-md:size-11" : "size-[60px]",
+      )}
     >
       {media.kind === "image" && url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
       ) : (
-        <Icon icon={KIND_ICON[media.kind]} size={20} className="text-text-tertiary" />
+        <Icon icon={KIND_ICON[media.kind]} size={small ? 16 : 20} className="text-text-tertiary" />
       )}
     </button>
   );
@@ -328,8 +331,11 @@ export function EntryProof({
   entry,
   onOpenMedia,
   onOpenLink,
+  compact = false,
 }: {
   entry: JourneyEntry;
+  /** Small tiles in one row and slim link rows: the compact Activity views (owner, 2026-10-13). */
+  compact?: boolean;
   onOpenMedia: (media: MediaRef[], index: number) => void;
   onOpenLink: (url: string) => void;
 }) {
@@ -337,22 +343,27 @@ export function EntryProof({
   return (
     <>
       {entry.media.length > 0 && (
-        <ul role="list" className="mt-4 flex flex-wrap gap-2">
+        <ul role="list" className={cn("flex flex-wrap gap-2", compact ? "mt-2" : "mt-4")}>
           {entry.media.map((m) => (
             <li key={m.id}>
-              <MediaTile media={m} onView={() => onOpenMedia(viewable, viewable.indexOf(m))} />
+              <MediaTile small={compact} media={m} onView={() => onOpenMedia(viewable, viewable.indexOf(m))} />
             </li>
           ))}
         </ul>
       )}
       {entry.urls.length > 0 && (
-        <ul role="list" className="mt-3 flex flex-col gap-2">
+        <ul role="list" className={cn("flex flex-col", compact ? "mt-2 gap-1" : "mt-3 gap-2")}>
           {entry.urls.map((u, i) => (
             <li key={i}>
               <button
                 type="button"
                 onClick={() => onOpenLink(u)}
-                className="flex w-full items-center gap-2 rounded-lg border border-solid border-border px-4 py-3 text-left text-sm text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+                className={cn(
+                  "flex w-full items-center gap-2 text-left text-sm text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",
+                  compact
+                    ? "min-h-[32px] rounded-md max-md:min-h-[var(--touch-min)]"
+                    : "rounded-lg border border-solid border-border px-4 py-3 hover:border-border-strong",
+                )}
               >
                 <Icon icon={Link01Icon} size={16} className="shrink-0 text-text-tertiary" />
                 <span className="min-w-0 flex-1 truncate">{u}</span>
