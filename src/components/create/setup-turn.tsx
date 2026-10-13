@@ -37,8 +37,9 @@ export type SetupProject = {
   detail?: string;
   /** The project this chat was started for — its page's "Add a product"
    *  (`/?addTo=`, P2-TABS-29). The question opens on it: the chooser holds
-   *  it and the companions start unticked, because a single product is what
-   *  can join a project (a system is always one new project, §4.4.8). */
+   *  it, and whatever is built goes into it, one product or several (owner,
+   *  2026-10-13: a product added from a project never lands in a new one).
+   *  The companions still start unticked — the page asked for one product. */
   preselect?: boolean;
 };
 
@@ -166,9 +167,10 @@ export function SetupTurn({
     );
   }
 
-  const ready = multi
-    ? projectName.trim().length > 0
-    : projectId !== "" || projectName.trim().length > 0;
+  // Several products without a project to add to name one new project (§4.4.8); otherwise the
+  // question is which project — the one this chat was started from, unless the maker picks another.
+  const choosing = !multi || addTo !== null;
+  const ready = choosing ? projectId !== "" || projectName.trim().length > 0 : projectName.trim().length > 0;
 
   return (
     <Card>
@@ -184,18 +186,18 @@ export function SetupTurn({
       )}
       <Question
         chip="Project"
-        ask={multi ? "What should the project be called?" : "Which project is this for?"}
+        ask={choosing ? (multi ? "Which project are these for?" : "Which project is this for?") : "What should the project be called?"}
         note={
           multi
             ? addTo
-              ? `${extra.length + 1} products belong together, so they go in one new project, not ${addTo.name}. Untick the others to add this one to ${addTo.name}.`
+              ? `You're adding ${extra.length + 1} products to ${addTo.name}. You can pick another project, or start a new one.`
               : `${extra.length + 1} products belong together, so they go in one new project.`
             : addTo
               ? `You're adding a product to ${addTo.name}. You can pick another project, or start a new one.`
               : "A single product can join a project you already have, or start a new one."
         }
       >
-        {multi ? (
+        {!choosing ? (
           <NameField
             label="Project name"
             value={projectName}
@@ -229,7 +231,7 @@ export function SetupTurn({
                 {
                   value: NEW_PROJECT,
                   label: "+ Start a new project",
-                  sub: "This product becomes its first.",
+                  sub: multi ? "These products become its first." : "This product becomes its first.",
                 },
                 // Two projects can share a name, so each row says what it
                 // holds and when it last changed — four "Drone" rows with
@@ -257,10 +259,10 @@ export function SetupTurn({
         note={`${extra.length + 1} concept${extra.length ? "s" : ""} · ${extra.length + 1} credit${extra.length ? "s" : ""}`}
         label="Start drawing"
         ready={ready}
-        reason={multi ? "Name the project first" : "Pick a project first"}
+        reason={choosing ? "Pick a project first" : "Name the project first"}
         onGo={() =>
           onAnswer({
-            projectId: multi ? "" : projectId,
+            projectId: choosing ? projectId : "",
             projectName: projectName.trim(),
             picked: extra.map((c) => c.id),
           })

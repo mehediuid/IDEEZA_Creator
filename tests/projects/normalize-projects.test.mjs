@@ -338,7 +338,13 @@ const MINT = {
 };
 const ANA = { id: "ctb_ana00001", name: "Ana Silva", role: "coOwner", share: 30, addedAt: T };
 const LEE = { id: "ctb_lee00001", name: "Lee Park", role: "viewer", share: 0, addedAt: T, updatedAt: T + 1 };
-const LEGAL = { patent: "US 1,234,567", copyright: { text: "© 2026 Ada", url: "https://ada.test" }, updatedAt: T };
+const LEGAL = {
+  rights: [
+    { id: "patent", kind: "patent", text: "US 1,234,567" },
+    { id: "copyright", kind: "copyright", text: "© 2026 Ada", url: "https://ada.test" },
+  ],
+  updatedAt: T,
+};
 
 test("a project holding every Phase 2 field, all valid, comes back as the same object", () => {
   const p = legacy({

@@ -41,7 +41,13 @@ const mint = (over = {}) => ({
   v: 1, demo: true, type: "lazy", network: "mumbai", collection: "Cars", tokenId: 1,
   wallet: { account: 1, address: "0xmaker" }, at: NOW - 3600_000, ...over,
 });
-const legal = { patent: "US 1234", copyright: { text: "© 2026 Maker" }, updatedAt: NOW - 1000 };
+const legal = {
+  rights: [
+    { id: "patent", kind: "patent", text: "US 1234" },
+    { id: "copyright", kind: "copyright", text: "© 2026 Maker" },
+  ],
+  updatedAt: NOW - 1000,
+};
 const ana = { id: "ctb_ana00001", name: "Ana Silva", role: "coOwner", share: 30, addedAt: NOW - 5000 };
 const leo = { id: "ctb_leo00001", name: "Leo Park", role: "editor", share: 0, addedAt: NOW - 4000 };
 const project = (id, over = {}) => ({

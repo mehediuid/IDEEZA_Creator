@@ -569,7 +569,9 @@ function ReviewPanel({
                 className="inline-flex h-[40px] shrink-0 items-center gap-4 whitespace-nowrap rounded-lg bg-bg-brand px-8 text-md font-semibold text-text-on-brand outline-none ring-offset-bg-surface transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus"
               >
                 <Icon icon={FloppyDiskIcon} size={18} />
-                Save Project
+                {/* Says where it goes: a build joining a project (its "Add a product") reads as that,
+                    so nobody fears a second project (owner, 2026-10-13). */}
+                {saveInfo?.mode.kind === "join" ? "Add to project" : "Save Project"}
               </button>
             )}
           </footer>

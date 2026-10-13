@@ -11,6 +11,7 @@ import {
   footerLineOf,
   holderOf,
   mintNoticeOf,
+  namesOf,
   saveBlockOf,
   saveDefaultsOf,
   saveModeOf,
@@ -94,7 +95,7 @@ describe("saveModeOf", () => {
     assert.deepEqual(mode, { kind: "join", project: target });
   });
 
-  it("a multi-product build never joins, even with a projectChoiceId (a system is one new project)", () => {
+  it("a multi-product build joins the project the setup question chose — a project's Add a product never makes a new one (owner, 2026-10-13)", () => {
     const target = project({ id: "p-garden", name: "Garden", createdAt: T });
     const job = build({
       id: "b1",
@@ -105,7 +106,22 @@ describe("saveModeOf", () => {
       createdAt: T,
     });
     const mode = saveModeOf(job, [job], [target], [job], []);
+    assert.equal(mode.kind, "join");
+    assert.equal(mode.project.id, "p-garden");
+  });
+
+  it("a multi-product build with no project chosen is one new project, and can't switch to join (§4.4.8)", () => {
+    const other = project({ id: "p-garden", name: "Garden", createdAt: T });
+    const job = build({
+      id: "b1",
+      chatId: "c1",
+      title: "Sprinkler",
+      companions: [companion({ id: "comp-a", name: "Timer" })],
+      createdAt: T,
+    });
+    const mode = saveModeOf(job, [job], [other], [job], []);
     assert.equal(mode.kind, "new");
+    assert.equal(mode.canJoin, false);
   });
 
   it("version: a rebuild of a chat already saved joins as the next version", () => {
@@ -281,6 +297,18 @@ describe("versionChangesOf", () => {
 });
 
 // ─────────────────────────── copy helpers ───────────────────────────
+
+describe("namesOf (the products a join adds, named)", () => {
+  it("one, two, three", () => {
+    assert.equal(namesOf(["Hub"]), "Hub");
+    assert.equal(namesOf(["Hub", "Valve"]), "Hub and Valve");
+    assert.equal(namesOf(["Hub", "Valve", " Sensor "]), "Hub, Valve and Sensor");
+    assert.equal(namesOf(["", "Valve"]), "Valve");
+  });
+  it("several products joining a minted project read in the plural", () => {
+    assert.equal(mintNoticeOf("listed", "Garden", "products"), "Garden is already minted. These products won't be part of that mint.");
+  });
+});
 
 describe("mintNoticeOf", () => {
   it("is null for a Draft target, and the neutral line otherwise", () => {

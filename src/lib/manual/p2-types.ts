@@ -99,10 +99,21 @@ export type DeleteFacts = {
   otherOwners: OtherOwner[];
 };
 
+export type LegalRightKind = "patent" | "copyright" | "trademark";
+
+/** One right as the maker states it (legal.ts): a patent number, a copyright notice or a
+ *  trademark, an optional https link and, for a trademark, an optional attorney. */
+export type LegalRight = {
+  id: string;
+  kind: LegalRightKind;
+  text: string;
+  url?: string;
+  attorney?: string;
+};
+
+/** The project's rights, as many as the maker has (owner, 2026-10-13), oldest first. */
 export type ProjectLegal = {
-  patent?: string;
-  copyright?: { text: string; url?: string };
-  trademark?: { mark?: string; attorney?: string; url?: string };
+  rights: LegalRight[];
   updatedAt: number;
 };
 
