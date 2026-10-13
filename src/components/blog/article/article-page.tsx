@@ -12,6 +12,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useArticleActions } from "@/components/blog/article-actions";
 import { ChangeCoverDialog } from "@/components/blog/send/change-cover-dialog";
+import { useTabTitle } from "@/components/blog/use-tab-title";
 import { markSeen } from "@/lib/blog/article";
 import { metaDiffers, readerVersion } from "@/lib/blog/article-view";
 import { sameDoc } from "@/lib/blog/doc";
@@ -33,9 +34,7 @@ export function useCanonicalPath(path: string | null) {
 
 /** Names the browser tab after the article. */
 export function useDocumentTitle(title: string | null) {
-  React.useEffect(() => {
-    if (title) document.title = `${title} · Blog · IDEEZA`;
-  }, [title]);
+  useTabTitle(title ? `${title} · Blog · IDEEZA` : null);
 }
 
 /** An article that was on screen and then went (deleted here, the page about to leave, or

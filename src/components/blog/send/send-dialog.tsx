@@ -183,7 +183,7 @@ export function SendDialog({
             type="button"
             hierarchy="ghost"
             size="md"
-            className="self-start"
+            className="self-start max-md:min-h-[var(--touch-min)]"
             aria-expanded={more}
             iconTrailing={<Icon icon={more ? ArrowUp01Icon : ArrowDown01Icon} size={16} />}
             onClick={() => setMore((m) => !m)}

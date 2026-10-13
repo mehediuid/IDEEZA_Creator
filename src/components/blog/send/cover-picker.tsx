@@ -142,6 +142,7 @@ export function CoverPicker({
             hierarchy="secondary"
             size="md"
             aria-label="Zoom out"
+            className="max-md:!size-[var(--touch-min)]"
             icon={<Icon icon={Remove01Icon} size={18} />}
             disabled={value.zoom <= ZOOM_MIN}
             onClick={() => onChange(zoomCover(value, value.zoom - ZOOM_STEP))}
@@ -160,11 +161,12 @@ export function CoverPicker({
             hierarchy="secondary"
             size="md"
             aria-label="Zoom in"
+            className="max-md:!size-[var(--touch-min)]"
             icon={<Icon icon={Add01Icon} size={18} />}
             disabled={value.zoom >= ZOOM_MAX}
             onClick={() => onChange(zoomCover(value, value.zoom + ZOOM_STEP))}
           />
-          <Button type="button" hierarchy="ghost" size="md" onClick={() => onChange(centerCover(value))}>
+          <Button type="button" hierarchy="ghost" size="md" className="max-md:min-h-[var(--touch-min)]" onClick={() => onChange(centerCover(value))}>
             Center image
           </Button>
         </div>
@@ -204,7 +206,7 @@ export function CoverPicker({
             })}
           </div>
         )}
-        <Button type="button" hierarchy="secondary" size="md" loading={busy} iconLeading={<Icon icon={Upload04Icon} size={16} />} onClick={() => fileRef.current?.click()}>
+        <Button type="button" hierarchy="secondary" size="md" className="max-md:min-h-[var(--touch-min)]" loading={busy} iconLeading={<Icon icon={Upload04Icon} size={16} />} onClick={() => fileRef.current?.click()}>
           Upload image
         </Button>
         <input
@@ -231,6 +233,8 @@ export function CoverPicker({
           <span className="text-md font-medium leading-md text-text-primary">Cover description</span>
           <TextInput
             id={`${idPrefix}-cover-alt`}
+            size="lg"
+            containerClassName="max-md:!h-[var(--touch-min)]"
             value={value.alt}
             maxLength={300}
             placeholder="e.g. The finished lamp board on a desk"

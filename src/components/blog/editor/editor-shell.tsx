@@ -18,6 +18,7 @@
 // for the Send dialog) with the saved article and body.
 
 import * as React from "react";
+import { useTabTitle } from "@/components/blog/use-tab-title";
 import dynamic from "next/dynamic";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
@@ -377,18 +378,7 @@ function Workspace({
 
   const savedName = article?.draft.title.trim();
   const tabTitle = savedName ? `Edit “${savedName}” · Blog · IDEEZA` : `${isNew ? "New article" : "Edit article"} · Blog · IDEEZA`;
-  React.useEffect(() => {
-    const apply = () => {
-      if (document.title !== tabTitle) document.title = tabTitle;
-    };
-    apply();
-    // Next writes the route's metadata <title> after the page's effects on a hard load
-    // (the usePageArrival note): apply again whenever <head> changes.
-    const watch = new MutationObserver(apply);
-    watch.observe(document.head, { childList: true, subtree: true, characterData: true });
-    // No restore on the way out: it ran after the next page had named its tab and undid it.
-    return () => watch.disconnect();
-  }, [tabTitle]);
+  useTabTitle(tabTitle);
 
   // ── the What to change panel has been read ──
 

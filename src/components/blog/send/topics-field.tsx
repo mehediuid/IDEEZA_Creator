@@ -43,8 +43,15 @@ export function TopicsField({ id, value, onChange }: { id: string; value: string
         Topics <span className="font-regular text-text-secondary">(up to {TOPICS_MAX})</span>
       </label>
       <div
+        // A tap anywhere in the field (between chips too) types into it.
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            document.getElementById(id)?.focus();
+          }
+        }}
         className={cn(
-          "flex min-h-[40px] flex-wrap items-center gap-3 rounded-xl border border-solid border-border-strong bg-bg-surface px-6 py-3",
+          "flex min-h-[40px] cursor-text flex-wrap items-center gap-3 rounded-xl border border-solid border-border-strong bg-bg-surface px-6 py-3 max-md:min-h-[var(--touch-min)]",
           "focus-within:ring-2 focus-within:ring-border-focus",
         )}
       >
@@ -75,7 +82,7 @@ export function TopicsField({ id, value, onChange }: { id: string; value: string
             }
           }}
           onBlur={() => add(text)}
-          className="min-w-[120px] flex-1 border-0 bg-transparent p-0 text-md leading-md text-text-primary outline-none placeholder:text-text-tertiary"
+          className="min-h-[24px] min-w-[120px] flex-1 self-stretch border-0 bg-transparent p-0 text-md leading-md text-text-primary outline-none placeholder:text-text-tertiary"
         />
         <datalist id={`${id}-list`}>
           {TOPIC_SUGGESTIONS.filter((s) => !value.includes(s)).map((s) => (

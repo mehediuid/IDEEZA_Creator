@@ -25,6 +25,7 @@ import { Pagination } from "@/components/projects/pagination";
 import { useNow } from "@/components/innovations/comments/comment-dom";
 import { useArticleActions } from "@/components/blog/article-actions";
 import { ChangeCoverDialog } from "@/components/blog/send/change-cover-dialog";
+import { useTabTitle } from "@/components/blog/use-tab-title";
 import { findArticle } from "@/lib/blog/article";
 import { blogQueryHref, countLine, filterArticles, pageOf, parseBlogQuery, tabCounts, type BlogQuery } from "@/lib/blog/list";
 import { newArticleHref } from "@/lib/blog/slug";
@@ -53,9 +54,7 @@ export function BlogList() {
   const [coverFor, setCoverFor] = React.useState<string | null>(null);
   // Coming back from the editor or an article keeps the layout's metadata, so Next leaves the
   // tab named after the last article: name it again.
-  React.useEffect(() => {
-    document.title = "Blog · IDEEZA";
-  }, []);
+  useTabTitle("Blog · IDEEZA");
   const actions = useArticleActions({ onChangeCover: (a) => setCoverFor(a.id) });
 
   // ── the view ──
