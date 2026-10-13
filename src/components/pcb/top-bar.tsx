@@ -26,6 +26,7 @@ import { ThreeMenu } from "@/components/3d/three-menu";
 import { WiringMenu } from "@/components/wiring/wiring-menu";
 import { ProfileDropdown } from "@/components/app-chrome/profile-dropdown";
 import { useManualProjects } from "@/lib/manual/projects";
+import { useMe } from "@/lib/people/profile-store";
 import { IdeezaLogo } from "@/components/brand/ideeza-logo";
 import { ProductNameField } from "@/components/manual/product-name-field";
 import { ProductSwitcher } from "@/components/manual/product-switcher";
@@ -81,6 +82,7 @@ function pickMenu(step: FlowStep | null): React.ReactNode | null {
 const MODULE_ROW_H: Partial<Record<FlowStep, number>> = { pcb: 46, three: 38, code: 36 };
 
 export function TopBar() {
+  const me = useMe();
   const pathname = usePathname();
   const currentStep = stepFromPath(pathname);
   const onFlowPage = currentStep !== null;
@@ -243,15 +245,15 @@ export function TopBar() {
           <ProfileDropdown
             trigger={
               <div className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", padding: "3px 6px 3px 3px" }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#b06be0,#7c2db9)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-on-brand)", fontSize: "var(--font-size-sm)", fontWeight: 700, flex: "0 0 auto" }}>NR</div>
-                <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)", color: "var(--color-text-primary)" }}>Nick Rough</span>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#b06be0,#7c2db9)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-on-brand)", fontSize: "var(--font-size-sm)", fontWeight: 700, flex: "0 0 auto", whiteSpace: "nowrap" }}>{me.initials}</div>
+                <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)", color: "var(--color-text-primary)" }}>{me.name}</span>
               </div>
             }
           />
         ) : (
           <div className="ix-pill" style={{ display: "flex", alignItems: "center", gap: "var(--spacing-4)", cursor: "pointer", padding: "3px 6px 3px 3px" }}>
-            <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#b06be0,#7c2db9)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-on-brand)", fontSize: "var(--font-size-sm)", fontWeight: 700, flex: "0 0 auto" }}>NR</div>
-            <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)", color: "var(--color-text-primary)" }}>Nick Rough</span>
+            <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#b06be0,#7c2db9)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-on-brand)", fontSize: "var(--font-size-sm)", fontWeight: 700, flex: "0 0 auto", whiteSpace: "nowrap" }}>{me.initials}</div>
+            <span style={{ fontWeight: 600, fontSize: "var(--font-size-md)", color: "var(--color-text-primary)" }}>{me.name}</span>
           </div>
         )}
 

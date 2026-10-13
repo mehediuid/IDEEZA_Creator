@@ -35,8 +35,9 @@ import { useMyPhoto } from "@/lib/people/photo-store";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { tiesOf } from "@/lib/people/ties";
 import { EditProfileDialog } from "./edit-profile-dialog";
+import { FollowingDialog, useFollowing } from "./following-dialog";
 import { MadeSection } from "./made-section";
-import { OwnerLine } from "./owner-line";
+import { OWNER_LINE_LINK, OwnerLine } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
 import { ProfileHeader } from "./profile-header";
 
@@ -148,7 +149,9 @@ function OwnProfile({
   const journeys = useJourneysRaw(ids);
   const now = useMinuteClock();
   const [editing, setEditing] = React.useState(false);
+  const [followingOpen, setFollowingOpen] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const following = useFollowing();
   const editButton = React.useRef<HTMLButtonElement>(null);
 
   const ready = projectsReady && buildsReady && marketReady && editions.hydrated && journeys !== null && now > 0;
@@ -225,7 +228,17 @@ function OwnProfile({
             </Button>
           }
         />
-        <OwnerLine shown={counts.shown} hidden={counts.hidden} />
+        <OwnerLine
+          shown={counts.shown}
+          hidden={counts.hidden}
+          extra={
+            following.hydrated && (
+              <button type="button" onClick={() => setFollowingOpen(true)} className={OWNER_LINE_LINK}>
+                {`You follow ${following.people.length}`}
+              </button>
+            )
+          }
+        />
         <MadeSection items={made} now={now} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
       </div>
       <div role="group" aria-label="Profile actions" className={PHONE_BAR}>
@@ -233,6 +246,7 @@ function OwnProfile({
           Edit profile
         </Button>
       </div>
+      {followingOpen && <FollowingDialog onClose={() => setFollowingOpen(false)} />}
       {editing && (
         <EditProfileDialog
           initial={{ name: fields.name, latinName: fields.latinName, headline: fields.headline }}

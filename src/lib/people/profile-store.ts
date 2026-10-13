@@ -7,6 +7,7 @@
 import * as React from "react";
 import { parseStored, readStoredKey, storedUnreadable, useStoredKey, writeStoredKey, type WriteResult } from "../key-store";
 import { PROFILE_KEY, normalizeProfile, pinToggled, type ProfileFields } from "./fields";
+import { displayNameOf, initialsOf } from "./ids";
 
 const isProfileShape = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -37,4 +38,13 @@ export function useMyProfile(): {
     return { ok: saveProfile({ pins: next.pins }).ok, refused: false };
   }, []);
   return { hydrated, fields, save: saveProfile, togglePin };
+}
+
+/** You as others see you: your name ("You" until you give one) and your initials. */
+export function useMe(): { name: string; initials: string } {
+  const { fields } = useMyProfile();
+  return React.useMemo(() => {
+    const name = displayNameOf(fields.name);
+    return { name, initials: initialsOf(name, fields.latinName || null) };
+  }, [fields.name, fields.latinName]);
 }
