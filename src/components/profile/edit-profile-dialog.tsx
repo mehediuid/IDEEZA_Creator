@@ -1,9 +1,9 @@
 "use client";
 
 // Edit profile (spec 2026-10-14-creator-profile-design.md): the one home of
-// your profile's own words — photo, name in any script, the name in English
-// letters, a one-line headline, and (Portfolio, 2026-10-14) About, where you
-// are, two links and what you are open to. "Suggest from my work" (owner
+// your profile's own words — cover (owner, 2026-10-14), photo, name in any
+// script, the name in English letters, a one-line headline, and (Portfolio,
+// 2026-10-14) About, where you are, two links and what you are open to. "Suggest from my work" (owner
 // decision D7) drafts the headline from your shared projects only; the draft
 // sits under the field, labelled, until you press Use this, and nothing is
 // saved before Save profile. Cancel with changes asks "Discard changes?".
@@ -16,7 +16,7 @@ import { RadioRow } from "@/components/messages/choice";
 import { cn } from "@/lib/utils";
 import { BIO_MAX, HEADLINE_MAX, LINKS_MAX, LOCATION_MAX, NAME_MAX, OPEN_TO_WORDS, linkOf, type OpenTo } from "@/lib/people/fields";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
-import { deletePhoto, putPhoto, resizePhoto } from "@/lib/people/photo-store";
+import { deleteCover, deletePhoto, putCover, putPhoto, resizeCover, resizePhoto } from "@/lib/people/photo-store";
 import { saveProfile } from "@/lib/people/profile-store";
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -48,12 +48,18 @@ type Suggest = { kind: "idle" } | { kind: "running" } | { kind: "draft"; text: s
 export function EditProfileDialog({
   initial,
   photoUrl,
+  coverUrl,
+  fallbackCover,
   shared,
   onClose,
   onSaved,
 }: {
   initial: { name: string; latinName: string; headline: string; bio: string; location: string; links: readonly string[]; openTo: OpenTo };
   photoUrl: string | null;
+  /** The cover you uploaded; null when you haven't. */
+  coverUrl: string | null;
+  /** What the page shows without one: your featured project's picture. */
+  fallbackCover: string | null;
   /** Your shared projects' public words, what the suggestion may read. */
   shared: readonly { title: string; story: string }[];
   onClose: () => void;
@@ -69,9 +75,11 @@ export function EditProfileDialog({
   const linksId = React.useId();
   const openToId = React.useId();
   const photoHelpId = React.useId();
+  const coverHelpId = React.useId();
   const nameRef = React.useRef<HTMLInputElement>(null);
   const keepRef = React.useRef<HTMLButtonElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const coverFileRef = React.useRef<HTMLInputElement>(null);
 
   const [name, setName] = React.useState(initial.name);
   const [latinName, setLatinName] = React.useState(initial.latinName);
@@ -84,6 +92,8 @@ export function EditProfileDialog({
   const linkRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const [photo, setPhoto] = React.useState<Photo>({ kind: "keep" });
   const [photoError, setPhotoError] = React.useState<string | null>(null);
+  const [cover, setCover] = React.useState<Photo>({ kind: "keep" });
+  const [coverError, setCoverError] = React.useState<string | null>(null);
   const [suggest, setSuggest] = React.useState<Suggest>({ kind: "idle" });
   const [saving, setSaving] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
@@ -94,6 +104,9 @@ export function EditProfileDialog({
   React.useEffect(() => () => {
     if (photo.kind === "new") URL.revokeObjectURL(photo.url);
   }, [photo]);
+  React.useEffect(() => () => {
+    if (cover.kind === "new") URL.revokeObjectURL(cover.url);
+  }, [cover]);
 
   const dirty =
     name.trim() !== initial.name.trim() ||
@@ -103,11 +116,28 @@ export function EditProfileDialog({
     location.trim() !== initial.location.trim() ||
     links.map((l) => l.trim()).join("\n") !== Array.from({ length: LINKS_MAX }, (_, i) => initial.links[i] ?? "").join("\n") ||
     openTo !== initial.openTo ||
-    photo.kind !== "keep";
+    photo.kind !== "keep" ||
+    cover.kind !== "keep";
 
   const linkBad = (raw: string) => raw.trim() !== "" && linkOf(raw) === null;
 
   const shownPhoto = photo.kind === "new" ? photo.url : photo.kind === "remove" ? null : photoUrl;
+  const ownCover = cover.kind === "new" ? cover.url : cover.kind === "remove" ? null : coverUrl;
+  const shownCover = ownCover ?? fallbackCover;
+
+  const pickCover = async (file: File | undefined) => {
+    if (!file) return;
+    setCoverError(null);
+    const blob = await resizeCover(file);
+    if (!blob) {
+      setCoverError("Choose a JPG or PNG image under 10 MB.");
+      return;
+    }
+    setCover((prev) => {
+      if (prev.kind === "new") URL.revokeObjectURL(prev.url);
+      return { kind: "new", blob, url: URL.createObjectURL(blob) };
+    });
+  };
 
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return;
@@ -180,6 +210,8 @@ export function EditProfileDialog({
     let photoOk = true;
     if (wrote.ok && photo.kind === "new") photoOk = (await putPhoto(photo.blob)).ok;
     if (wrote.ok && photo.kind === "remove") photoOk = (await deletePhoto()).ok;
+    if (wrote.ok && photoOk && cover.kind === "new") photoOk = (await putCover(cover.blob)).ok;
+    if (wrote.ok && photoOk && cover.kind === "remove") photoOk = (await deleteCover()).ok;
     setSaving(false);
     if (!wrote.ok || !photoOk) {
       setFailed(true);
@@ -246,45 +278,97 @@ export function EditProfileDialog({
       }
     >
       <form id={formId} onSubmit={save} noValidate className="flex flex-col gap-8 pt-4">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Avatar size="lg" initials={initialsOf(displayNameOf(name), latinName || null)} src={shownPhoto ?? undefined} />
-          <div className="flex min-w-0 flex-col gap-2">
-            <div className="flex flex-wrap gap-3">
-              <Button type="button" hierarchy="secondary" size="md" onClick={() => fileRef.current?.click()} aria-describedby={photoHelpId} className={TAP}>
-                Upload photo
-              </Button>
-              <Button
-                type="button"
-                hierarchy="ghost"
-                size="md"
-                disabled={!shownPhoto}
-                onClick={() => {
-                  setPhotoError(null);
-                  setPhoto((prev) => {
-                    if (prev.kind === "new") URL.revokeObjectURL(prev.url);
-                    return photoUrl ? { kind: "remove" } : { kind: "keep" };
-                  });
-                }}
-                className={TAP}
-              >
-                Remove
-              </Button>
-            </div>
-            <p id={photoHelpId} aria-live="polite" className={photoError ? "text-md text-text-error" : QUIET}>
-              {photoError ?? "JPG or PNG. Resized on your device before it is saved."}
-            </p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden
-              onChange={(e) => {
-                void pickPhoto(e.target.files?.[0]);
-                e.target.value = "";
+        <div className="flex flex-col gap-3">
+          <span className={LABEL}>Cover</span>
+          <div className="relative h-[96px] overflow-hidden rounded-xl bg-bg-brand-subtle">
+            {shownCover && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={shownCover} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            )}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" hierarchy="secondary" size="md" onClick={() => coverFileRef.current?.click()} aria-describedby={coverHelpId} className={TAP}>
+              {ownCover ? "Change cover" : "Upload cover"}
+            </Button>
+            <Button
+              type="button"
+              hierarchy="ghost"
+              size="md"
+              disabled={!ownCover}
+              onClick={() => {
+                setCoverError(null);
+                setCover((prev) => {
+                  if (prev.kind === "new") URL.revokeObjectURL(prev.url);
+                  return coverUrl ? { kind: "remove" } : { kind: "keep" };
+                });
               }}
-            />
+              className={TAP}
+            >
+              Remove
+            </Button>
+          </div>
+          <p id={coverHelpId} aria-live="polite" className={coverError ? "text-md text-text-error" : QUIET}>
+            {coverError ??
+              (!ownCover && fallbackCover
+                ? "Showing your featured project's picture until you add one."
+                : "A wide picture works best, at least 1200 px across.")}
+          </p>
+          <input
+            ref={coverFileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(e) => {
+              void pickCover(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <span className={LABEL}>Photo</span>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Avatar size="lg" initials={initialsOf(displayNameOf(name), latinName || null)} src={shownPhoto ?? undefined} />
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" hierarchy="secondary" size="md" onClick={() => fileRef.current?.click()} aria-describedby={photoHelpId} className={TAP}>
+                  Upload photo
+                </Button>
+                <Button
+                  type="button"
+                  hierarchy="ghost"
+                  size="md"
+                  disabled={!shownPhoto}
+                  onClick={() => {
+                    setPhotoError(null);
+                    setPhoto((prev) => {
+                      if (prev.kind === "new") URL.revokeObjectURL(prev.url);
+                      return photoUrl ? { kind: "remove" } : { kind: "keep" };
+                    });
+                  }}
+                  className={TAP}
+                >
+                  Remove
+                </Button>
+              </div>
+              <p id={photoHelpId} aria-live="polite" className={photoError ? "text-md text-text-error" : QUIET}>
+                {photoError ?? "JPG or PNG. Resized on your device before it is saved."}
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                onChange={(e) => {
+                  void pickPhoto(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </div>
           </div>
         </div>
 

@@ -2,7 +2,8 @@
 
 // /creators/[handle] — a creator's profile, the Portfolio layout (owner picked
 // direction A, 2026-10-14; spec 2026-10-14-creator-profile-design.md). One
-// page for every viewer: an identity column (who, where, since when, what they
+// page for every viewer: a cover across the top (yours, else the featured
+// project's picture), then an identity column (who, where, since when, what they
 // are open to, four counts, About, the parts they build with, what they work
 // on, links) beside their work, under two tabs: Projects (a featured project
 // and the rest) and Activity. Your own adds Edit profile, a prompt where a
@@ -12,7 +13,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { UserIcon } from "@hugeicons/core-free-icons";
+import { ImageAdd01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, Skeleton, StateCard } from "@/components/ideeza";
 import { PAGE_CONTAINER, PAGE_CONTENT } from "@/components/projects/details/frame";
@@ -38,14 +39,14 @@ import { OPEN_TO_WORDS, type ProfileFields } from "@/lib/people/fields";
 import { ME, directory, personByHandle, type Person } from "@/lib/people/ids";
 import { listingFactsOf } from "@/lib/people/listing-facts";
 import { madeOfMine, madeOfSample, ownerCounts, type MadeItem, type MineInput } from "@/lib/people/made";
-import { useMyPhoto } from "@/lib/people/photo-store";
-import { activityOf, builtWithOf, inProduction, localTimeOf, worksOnOf, type ActivityItem } from "@/lib/people/portfolio";
+import { useMyCover, useMyPhoto } from "@/lib/people/photo-store";
+import { activityOf, builtWithOf, featuredOf, inProduction, localTimeOf, worksOnOf, type ActivityItem } from "@/lib/people/portfolio";
 import { useMyProfile } from "@/lib/people/profile-store";
 import { SAMPLE_PROFILES } from "@/lib/people/sample-profiles";
 import { tiesOf } from "@/lib/people/ties";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { FollowingDialog, useFollowing } from "./following-dialog";
-import { ChipRow, IdentityHead, LinkList, OpenToLine, SideSection, StatList } from "./identity";
+import { ChipRow, CoverBand, IdentityHead, LinkList, OpenToLine, SideSection, StatList } from "./identity";
 import { OWNER_LINE_LINK, OwnerLine } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
 import { WorkTabs } from "./work";
@@ -90,9 +91,10 @@ export function ProfileSkeleton() {
         <span className="sr-only" role="status">
           Loading the profile
         </span>
+        <Skeleton shape="block" className="h-[140px] w-full rounded-2xl [@container(min-width:640px)_and_(max-width:999.98px)]:h-[200px] [@container(min-width:1000px)]:h-[240px]" />
         <div className={GRID}>
           <div className={ID_TOP}>
-            <Skeleton shape="block" className="size-[64px] rounded-full" />
+            <Skeleton shape="block" className="-mt-[48px] size-[64px] rounded-full ring-4 ring-bg-page" />
             <div className="flex flex-col gap-[10px]">
               <Skeleton shape="text" size="lg" className="w-[220px] max-w-full" />
               <Skeleton shape="text" size="md" className="w-[280px] max-w-full" />
@@ -198,11 +200,14 @@ function OwnProfile({
   person,
   fields,
   photoUrl,
+  coverUrl,
   togglePin,
 }: {
   person: Person;
   fields: ProfileFields;
   photoUrl: string | null;
+  /** The cover you uploaded; null when you haven't. */
+  coverUrl: string | null;
   togglePin: (projectId: string, valid?: readonly string[]) => { ok: boolean; refused: boolean };
 }) {
   const { hydrated: projectsReady, projects } = useManualProjects();
@@ -297,6 +302,8 @@ function OwnProfile({
     setNotice(r.refused ? "Up to 3 projects can be pinned. Unpin one first." : r.ok ? null : "Couldn't save. This browser's storage is full or blocked.");
   };
 
+  const fallbackCover = featuredOf(made)?.featured.cover ?? null;
+
   const prompt = (words: string) => (
     <button type="button" onClick={openEdit} className={PROMPT}>
       {words}
@@ -306,6 +313,21 @@ function OwnProfile({
   return (
     <div className={PAGE_CONTAINER}>
       <div className={CONTENT}>
+        <CoverBand
+          src={coverUrl ?? fallbackCover}
+          action={
+            <Button
+              type="button"
+              hierarchy="secondary"
+              size="md"
+              onClick={openEdit}
+              iconLeading={<Icon icon={ImageAdd01Icon} size={16} />}
+              className="max-md:min-h-[var(--touch-min)]"
+            >
+              {coverUrl ? "Change cover" : "Add cover"}
+            </Button>
+          }
+        />
         <div className={GRID}>
           <div className={ID_TOP}>
             <IdentityHead
@@ -373,6 +395,8 @@ function OwnProfile({
             openTo: fields.openTo,
           }}
           photoUrl={photoUrl}
+          coverUrl={coverUrl}
+          fallbackCover={fallbackCover}
           shared={shared}
           onClose={closeEdit}
           onSaved={closeEdit}
@@ -480,6 +504,7 @@ function OtherProfile({ person }: { person: Person }) {
           </Banner>
         )}
         {notice?.kind === "error" && <Banner tone="error">{notice.text}</Banner>}
+        <CoverBand src={featuredOf(made)?.featured.cover ?? null} />
         <div className={GRID}>
           <div className={ID_TOP}>
             <IdentityHead
@@ -553,10 +578,11 @@ function OtherProfile({ person }: { person: Person }) {
 export function ProfilePage({ handle }: { handle: string }) {
   const { hydrated, fields, togglePin } = useMyProfile();
   const photo = useMyPhoto();
+  const cover = useMyCover();
   const dir = React.useMemo(() => directory({ name: fields.name, latinName: fields.latinName }), [fields.name, fields.latinName]);
-  if (!hydrated || !photo.hydrated) return <ProfileSkeleton />;
+  if (!hydrated || !photo.hydrated || !cover.hydrated) return <ProfileSkeleton />;
   const person = personByHandle(dir, decodeURIComponent(handle));
   if (!person) return <NotHere />;
-  if (person.kind === "me") return <OwnProfile person={person} fields={fields} photoUrl={photo.url} togglePin={togglePin} />;
+  if (person.kind === "me") return <OwnProfile person={person} fields={fields} photoUrl={photo.url} coverUrl={cover.url} togglePin={togglePin} />;
   return <OtherProfile person={person} />;
 }

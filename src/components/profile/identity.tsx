@@ -1,7 +1,8 @@
 "use client";
 
-// A profile's identity column (owner picked the Portfolio direction,
-// 2026-10-14): who the creator is, at a glance. The head (photo, name,
+// A profile's cover and identity column (owner picked the Portfolio
+// direction, then asked for a cover, 2026-10-14): who the creator is, at a
+// glance. The cover runs across the page; the photo sits over its lower edge. The head (photo, name,
 // headline, where and since when, and on someone else's profile how you are
 // connected), the actions, what they are open to, four counts read from their
 // shared work, and About. The second half (Built with, Works on, Links) sits
@@ -20,6 +21,20 @@ function monthYearLong(at: number): string {
 }
 
 const META = "flex items-start gap-[8px] text-md leading-md text-text-secondary";
+
+/** The band across the top: the creator's cover, else their featured project's picture, else a
+ *  quiet brand tint, so it is never an empty frame. `action` (your own profile) sits on it. */
+export function CoverBand({ src, action }: { src: string | null; action?: React.ReactNode }) {
+  return (
+    <div className="relative h-[140px] overflow-hidden rounded-2xl bg-bg-brand-subtle [@container(min-width:640px)_and_(max-width:999.98px)]:h-[200px] [@container(min-width:1000px)]:h-[240px]">
+      {src && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      )}
+      {action && <div className="absolute bottom-[12px] right-[12px]">{action}</div>}
+    </div>
+  );
+}
 
 export function IdentityHead({
   titleRef,
@@ -53,8 +68,16 @@ export function IdentityHead({
 }) {
   return (
     <div className="flex flex-col gap-[16px]">
+      {/* The photo rises over the cover's lower edge, ringed in the page colour; at phone width ⋯
+          sits beside it, just under the cover. */}
       <div className="flex items-start gap-[16px]">
-        <Avatar size="xl" initials={avatar.initials} color={avatar.color ?? undefined} src={avatar.src ?? undefined} className="shrink-0" />
+        <Avatar
+          size="xl"
+          initials={avatar.initials}
+          color={avatar.color ?? undefined}
+          src={avatar.src ?? undefined}
+          className="-mt-[48px] shrink-0 ring-4 ring-bg-page"
+        />
         {phoneMenu && <div className="ml-auto md:hidden">{phoneMenu}</div>}
       </div>
       <div className="flex flex-col gap-[4px]">
