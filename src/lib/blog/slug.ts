@@ -28,4 +28,5 @@ export function findBySlug(data: BlogData, slug: string): BlogArticle | null {
 export const blogHref = () => "/blog";
 export const newArticleHref = () => "/blog/new";
 export const articleHref = (slug: string) => `/blog/${slug}`;
-export const editHref = (slug: string, preview = false) => `/blog/${slug}/edit${preview ? "?view=preview" : ""}`;
+export const editHref = (slug: string) => `/blog/${slug}/edit`;
+export const previewHref = (slug: string) => `/blog/${slug}/preview`;

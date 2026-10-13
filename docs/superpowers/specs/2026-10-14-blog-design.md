@@ -25,7 +25,7 @@ Blog sits in the share layer, next to Innovations (sidebar: … Innovations · *
 - `/blog` — your articles. URL state `?tab=&q=&page=`.
 - `/blog/new` — an empty editor; the draft is created on the first real keystroke, then `router.replace` to its edit URL.
 - `/blog/[slug]` — the article page (status card + the article as readers see it).
-- `/blog/[slug]/edit` — the editor; `?view=preview` shows the reader view with a Preview bar.
+- `/blog/[slug]/edit` — the editor. `/blog/[slug]/preview` — the draft in the reader view under a Preview bar (Back to editing).
 - slug = `slugify(title) || "untitled"` + `-` + the id's last 8 chars; resolved **by the id tail**, then replaced with the canonical slug.
 
 ## Statuses (derived, never stored) — `lib/blog/status.ts`
