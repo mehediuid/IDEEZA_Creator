@@ -20,7 +20,7 @@ export const PROSE = [
   "[&_pre]:overflow-x-auto [&_pre]:!whitespace-pre [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-solid [&_pre]:border-border [&_pre]:bg-bg-subtle [&_pre]:p-8",
   "[&_pre]:font-mono [&_pre]:text-md [&_pre]:leading-md",
   "[&_:not(pre)>code]:rounded-sm [&_:not(pre)>code]:bg-bg-subtle [&_:not(pre)>code]:px-2 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-md",
-  "[&_a]:text-text-brand [&_a]:underline [&_a]:underline-offset-2",
+  "[&_a]:text-text-link [&_a]:underline [&_a]:underline-offset-2",
   "[&>*+hr]:mt-12 [&>hr+*]:mt-12 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-solid [&_hr]:border-border",
   "[&_hr.ProseMirror-selectednode]:border-border-focus",
   "[&>*+.blog-block]:mt-12 [&>.blog-block+*]:mt-12",
