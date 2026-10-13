@@ -6,16 +6,22 @@
 //
 // Types and constants only, with relative imports.
 
+import type { PlanTier } from "../create/plans";
 import type { ProductSource } from "../manual/projects";
 import type { VideoJobStage } from "./jobs";
 import type { Storyboard } from "./storyboard";
 
 export const VIDEO_QUALITY = {
-  low: { label: "Low", resolution: "480p", width: 854, height: 480, seconds: 10, tag: "Free", available: true },
-  high: { label: "High", resolution: "720p", width: 1280, height: 720, seconds: 10, tag: "Upgrade", available: false },
+  low: { label: "Low", resolution: "480p", width: 854, height: 480, seconds: 10, tag: "Free" },
+  high: { label: "High", resolution: "720p", width: 1280, height: 720, seconds: 10, tag: "Upgrade" },
 } as const;
 /** The same values as the Brief's `Quality`. */
 export type VideoQuality = keyof typeof VIDEO_QUALITY;
+
+/** 720p comes with the Disruptor plan (Plan & pricing's comparison); 480p with every plan. */
+export function qualityOpen(q: VideoQuality, tier: PlanTier): boolean {
+  return q === "low" || tier === "disruptor";
+}
 /** At most 60 characters each. */
 export type OnScreenLines = [string, string, string];
 export type VideoFailureKind = "unsupported" | "storage" | "encode" | "interrupted" | "cancelled" | "lost";

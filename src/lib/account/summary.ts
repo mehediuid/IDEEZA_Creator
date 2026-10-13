@@ -2,7 +2,8 @@
 // ledger (lib/create/credits.tsx) — never stored beside it.
 //
 // Balance: `total` is every credit the account was given (the starting seed,
-// each purchase with its bonus, and the free top-ups of earlier builds),
+// each purchase with its bonus, the plan's monthly credits, and the free
+// top-ups of earlier builds),
 // `remaining` is what is left of it. A refund only gives a charge back, so it
 // is in `remaining` but not in `total`; an expiry takes from `remaining`.
 //
@@ -22,7 +23,7 @@ export function creditTotals(ledger: LedgerLine[]): CreditTotals {
   let remaining = 0;
   for (const e of ledger) {
     remaining += e.delta;
-    if (e.reason === "seed" || e.reason === "topup" || e.reason === "purchase") total += e.delta;
+    if (e.reason === "seed" || e.reason === "topup" || e.reason === "purchase" || e.reason === "grant") total += e.delta;
   }
   return { total, remaining: Math.max(0, remaining) };
 }

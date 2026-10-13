@@ -5,8 +5,8 @@ Moved verbatim from `CLAUDE.md` §3 on 2026-09-29. Keep it current: [AGENTS.md �
 **Global shell** (`components/app-chrome`, `components/dashboard/sidebar`):
 left sidebar nav — **Home · History · My projects · Parts & agile module ·
 Explore marketplace · Innovations · Messages · Blog**; top bar — Search + **⌘K
-command palette**, Upgrade to Pro, Tutorial / Tour guide / Help / Report,
-profile dropdown, plan badge (Free/Pro).
+command palette**, Tutorial / Tour guide / Help / Report, the sidebar's
+**Upgrade to Builder / Disruptor** card, the profile popover (name, plan).
 
 **Platform routes:**
 - `/` — **Dashboard home**: "What will you build today?" AI prompt (Generate with AI / Build manually) + Browse Project cards.
@@ -20,7 +20,7 @@ profile dropdown, plan badge (Free/Pro).
 - `/marketplace/[id]`, `/marketplace/[id]/products/[productId]` — the buyer view of a listed project and its products: buyer rail, purchase, bids, holder features. A paused listing reads "off the marketplace for now" to anyone who holds none of it.
 - `/messages`, `/messages/[conversationId]`, `/messages/new` (`?to=&project=&about=listing|purchase:<saleId>|team`, `?to=feed:<id>&post=<slug>`, `?team=<projectId>`; any of them `?as=<person>`) — **Messages**: the conversation list (Inbox · Requests) and one conversation, two panes from 1024 px; `new` finds the conversation an entry point names or drafts it. Demo identities in this browser; see [features/messages.md](features/messages.md).
 - `/history` — **History**: Model Generations · Project/Product Generations.
-- `/settings/plan` — **Plan & pricing**: Credits (buy packs or a custom amount, the balance and its credit history) · Billing history (`?tab=billing`).
+- `/settings/plan` — **Plan & pricing**: Plans (the default: Free · Tinkerer · Builder · Disruptor, monthly or annual, upgrade / switch / cancel) · Credits (`?tab=credits`: buy packs or a custom amount, the balance and its credit history) · Billing history (`?tab=billing`: plan and credit payments).
 - `/parts` — **Parts & Agile Module**: the catalogue, captured Agile Modules, and the packages you have authored.
 - `/parts/new` — **New Package flow**: Package → Symbol → Footprint → 3D Place → Finalize (full-viewport).
 - `/parts/[id]` — one part, with its land pattern.
@@ -33,6 +33,6 @@ profile dropdown, plan badge (Free/Pro).
 **Per-project editor** — `/project/[projectSlug]/products/[productId]/[step]` (the editor opens one product; `/project/[projectSlug]/[step]` redirects to the product last opened, and `/project/[projectSlug]/brief` redirects to the project's mint flow); the left rail switches
 modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · Code · 3D Module · Assembly · Peripheral Wiring · Product Preview · Add Brief**.
 
-**Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); Upgrade to Pro.
+**Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); plans and AI credits paid from the same wallet (Settings › Plan & pricing).
 
 **API:** `/api/business-plan/section` writes one business-plan section (keyless text model; 503 on failure, never filler).

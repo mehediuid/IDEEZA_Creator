@@ -28,7 +28,6 @@ import { Badge, Banner, Button, ModalFrame, Radio, TestnetDemoBadge } from "@/co
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import {
   CREDIT_PACKS,
-  IDZ_PER_USD,
   VALIDITY_MONTHS,
   addMonths,
   coinAmount,
@@ -41,7 +40,9 @@ import {
 } from "@/lib/create/credit-pricing";
 import { BUILD_COST, CONCEPT_COST, buildCost, useCredits } from "@/lib/create/credits";
 import { productsOf, useCreateHistory } from "@/lib/create/history";
+import { useCreditDiscount } from "@/lib/create/plan";
 import { cn } from "@/lib/utils";
+import { PAY_CARD, PAY_CARD_OFF, PAY_CARD_ON, PaymentPicker, type PayCoin } from "./payment-picker";
 
 /** What is being bought: a pack, or a custom number of credits. */
 export type CreditPick = { kind: "pack"; id: PackId } | { kind: "custom"; credits: number };
@@ -60,10 +61,6 @@ type Ctx = {
 };
 
 const BuyContext = React.createContext<Ctx | null>(null);
-
-/** Nobody has a paid plan while plans aren't on sale, so no credit discount
- *  applies yet; the prices below take one the day a plan does. */
-export const CURRENT_DISCOUNT = 0;
 
 export function BuyCreditsProvider({ children }: { children: React.ReactNode }) {
   const [args, setArgs] = React.useState<OpenArgs | null>(null);
@@ -102,7 +99,7 @@ export function BuyCreditsButton({
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 /** What a pick buys and costs. */
-export function orderOf(pick: CreditPick, discount = CURRENT_DISCOUNT) {
+export function orderOf(pick: CreditPick, discount: number) {
   if (pick.kind === "pack") {
     const pack = CREDIT_PACKS.find((p) => p.id === pick.id) as CreditPack;
     return { name: `${pack.name} pack`, pack: pack.name, base: pack.base, bonus: pack.bonus, price: packPrice(pack, discount) };
@@ -120,21 +117,17 @@ function newOrderId(): string {
 }
 
 type Step = "choose" | "pay" | "done" | "failed";
-type Coin = "USDT" | "IDZ";
-
-const CARD =
-  "flex min-h-[var(--touch-min)] items-center gap-[12px] rounded-lg border border-solid px-[14px] py-[12px] text-left outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus";
-const CARD_ON = "border-border-brand bg-bg-brand-subtle";
-const CARD_OFF = "border-border bg-bg-surface hover:bg-bg-subtle";
 
 function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose: () => void }) {
   const { hydrated, balance, purchase } = useCredits();
   const { attentionBuilds } = useCreateHistory();
   const { request } = useWalletRequest();
+  // Builder and Disruptor take a share off every credit (the plan's discount).
+  const discount = useCreditDiscount();
   const short = need !== undefined && hydrated ? Math.max(0, need - balance) : 0;
   const [step, setStep] = React.useState<Step>(picked ? "pay" : "choose");
   const [pick, setPick] = React.useState<CreditPick>(() => picked ?? { kind: "pack", id: packCovering(short).id });
-  const [coin, setCoin] = React.useState<Coin>("IDZ");
+  const [coin, setCoin] = React.useState<PayCoin>("IDZ");
   const [paying, setPaying] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
   const [failure, setFailure] = React.useState<string | null>(null);
@@ -143,10 +136,10 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
   const firstRef = React.useRef<HTMLButtonElement | null>(null);
   const doneRef = React.useRef<HTMLButtonElement>(null);
   const packRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
-  const coinRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
-  const ids = { packs: React.useId(), method: React.useId(), coin: React.useId() };
+  const coinRef = React.useRef<HTMLButtonElement | null>(null);
+  const packsId = React.useId();
 
-  const order = orderOf(pick);
+  const order = orderOf(pick, discount);
   const amount = coinAmount(order.price.final, coin);
   // The day the dialog opened: what "these credits last until" counts from.
   const [openedAt] = React.useState(() => Date.now());
@@ -159,8 +152,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
   // The step's first control takes the focus the last step's button had.
   React.useEffect(() => {
     if (step === "done" || step === "failed") doneRef.current?.focus();
-    else if (step === "pay") coinRefs.current[coin === "USDT" ? 0 : 1]?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- on a step change only, not a coin change
+    else if (step === "pay") coinRef.current?.focus();
   }, [step]);
 
   const pay = async () => {
@@ -228,12 +220,6 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
     setPick({ kind: "pack", id: CREDIT_PACKS[next].id });
     packRefs.current[next]?.focus();
   };
-  const moveCoin = (from: number, dir: 1 | -1) => {
-    const coins: Coin[] = ["USDT", "IDZ"];
-    const next = (from + dir + 2) % 2;
-    setCoin(coins[next]);
-    coinRefs.current[next]?.focus();
-  };
 
   const title =
     step === "done" ? "Payment successful" : step === "failed" ? "Payment failed" : step === "pay" ? "Pay for credits" : "Buy credits";
@@ -295,7 +281,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
           : undefined
       }
       size="sm"
-      initialFocus={firstRef}
+      initialFocus={picked ? coinRef : firstRef}
       footer={footer}
     >
       {step === "done" && done && (
@@ -331,13 +317,13 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
                 : `You have ${plural(balance, "credit")}.`}
           </p>
           <div className="flex flex-col gap-[8px]">
-            <span id={ids.packs} className="text-md font-semibold leading-md text-text-primary">
+            <span id={packsId} className="text-md font-semibold leading-md text-text-primary">
               Choose a pack
             </span>
-            <div role="radiogroup" aria-labelledby={ids.packs} className="flex flex-col gap-[8px]">
+            <div role="radiogroup" aria-labelledby={packsId} className="flex flex-col gap-[8px]">
               {CREDIT_PACKS.map((p, i) => {
                 const on = pick.kind === "pack" && pick.id === p.id;
-                const price = packPrice(p, CURRENT_DISCOUNT);
+                const price = packPrice(p, discount);
                 return (
                   <button
                     key={p.id}
@@ -359,7 +345,7 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
                         movePack(i, -1);
                       }
                     }}
-                    className={cn(CARD, on ? CARD_ON : CARD_OFF)}
+                    className={cn(PAY_CARD, on ? PAY_CARD_ON : PAY_CARD_OFF)}
                   >
                     <Radio checked={on} decorative size="sm" />
                     <span className="flex min-w-0 flex-1 flex-col gap-[2px]">
@@ -401,78 +387,13 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
             </div>
           </dl>
 
-          <div className="flex flex-col gap-[8px]">
-            <span id={ids.method} className="text-md font-semibold leading-md text-text-primary">
-              Pay with
-            </span>
-            <div role="radiogroup" aria-labelledby={ids.method} className="grid grid-cols-3 gap-[8px] max-md:grid-cols-1">
-              {(["Card", "PayPal"] as const).map((m) => (
-                <span
-                  key={m}
-                  role="radio"
-                  aria-checked={false}
-                  aria-disabled
-                  title={`${m} isn't available yet`}
-                  className={cn(CARD, "cursor-not-allowed flex-col items-start gap-[2px] border-border bg-bg-surface")}
-                >
-                  <span className="text-md font-semibold leading-md text-text-disabled">{m}</span>
-                  <span className="text-sm leading-sm text-text-tertiary">Not available yet</span>
-                </span>
-              ))}
-              <span role="radio" aria-checked className={cn(CARD, CARD_ON, "flex-col items-start gap-[2px]")}>
-                <span className="text-md font-semibold leading-md text-text-primary">Crypto</span>
-                <span className="text-sm leading-sm text-text-secondary">Demo wallet</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-[8px]">
-            <span id={ids.coin} className="text-md font-semibold leading-md text-text-primary">
-              Token
-            </span>
-            <div role="radiogroup" aria-labelledby={ids.coin} className="grid grid-cols-2 gap-[8px]">
-              {(["USDT", "IDZ"] as const).map((c, i) => {
-                const on = coin === c;
-                return (
-                  <button
-                    key={c}
-                    ref={(el) => {
-                      coinRefs.current[i] = el;
-                      if (on && picked) firstRef.current = el;
-                    }}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    tabIndex={on ? 0 : -1}
-                    onClick={() => setCoin(c)}
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                        e.preventDefault();
-                        moveCoin(i, 1);
-                      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                        e.preventDefault();
-                        moveCoin(i, -1);
-                      }
-                    }}
-                    className={cn(CARD, on ? CARD_ON : CARD_OFF, "justify-between")}
-                  >
-                    <span className="text-md font-semibold leading-md text-text-primary">{c}</span>
-                    <span className="text-md leading-md tabular-nums text-text-secondary">
-                      {coinAmount(order.price.final, c)} {c}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {coin === "IDZ" && (
-              <p className="text-sm leading-sm text-text-tertiary">Demo rate: 1 IDZ = {usd(1 / IDZ_PER_USD)}</p>
-            )}
-          </div>
-
-          <p className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px] text-sm leading-sm text-text-secondary">
-            <TestnetDemoBadge />
-            Paid from your demo wallet on testnet. No real money moves. These credits last until {expires}.
-          </p>
+          <PaymentPicker
+            amountUsd={order.price.final}
+            coin={coin}
+            onCoin={setCoin}
+            coinRef={coinRef}
+            footnote={`These credits last until ${expires}.`}
+          />
           {note && (
             <p role="status" className="text-md leading-md text-text-secondary">
               {note}

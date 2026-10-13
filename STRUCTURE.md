@@ -56,7 +56,8 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
-   │  ├─ credits/            buy-credits (the one Buy credits dialog), credits-panel, plan-pricing-page
+   │  ├─ credits/            buy-credits (the one Buy credits dialog), credits-panel, plans-panel,
+   │  │                      payment-picker (Card · PayPal · Crypto), plan-pricing-page
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
@@ -123,7 +124,8 @@ ideeza-creator-panel/
    │  │                      AI-answer validation), geometry, products, store,
    │  │                      from-concept (the concept network as the saved Network)
    │  ├─ create/             history.tsx (chats + build jobs), credits.tsx, credit-pricing.ts, credit-lots.ts
-   │  │                      (credits ledger), concept.ts (concept/parts model),
+   │  │                      (credits ledger), plans.ts + plan.tsx (the account's plan:
+   │  │                      subscription, renewals, monthly credit grants), concept.ts (concept/parts model),
    │  │                      build-artifacts.ts (per-artifact build output),
    │  │                      plan.tsx (build-plan data)
    │  ├─ three/              providers.ts (image→3D), assembly.ts (the build as

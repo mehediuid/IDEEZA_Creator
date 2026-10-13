@@ -88,7 +88,9 @@ export type RequestPurpose =
   | "createEditions"
   | "listEdition"
   /** AI credits paid from the demo wallet (Buy credits). */
-  | "buyCredits";
+  | "buyCredits"
+  /** A plan paid from the demo wallet (Plan & pricing). */
+  | "subscribe";
 
 export type WalletRequest = {
   kind: "signature" | "transaction";

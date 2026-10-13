@@ -25,7 +25,6 @@ import {
   Cancel01Icon,
   Compass01Icon,
   CpuIcon,
-  CrownIcon,
   FlashIcon,
   Folder01Icon,
   HistoryIcon,
@@ -43,6 +42,9 @@ import {
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import { useCreateHistory, type BuildAttention } from "@/lib/create/history";
+import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { useCreatePlan } from "@/lib/create/plan";
+import { planOf } from "@/lib/create/plans";
 import { Icon, type IconValue } from "./icon";
 import {
   ACCOUNT,
@@ -515,50 +517,52 @@ function NavRow({
 function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
   return (
     <div className="border-t border-border p-[12px]">
-      <UpgradeButton collapsed={collapsed} />
+      <UpgradeButton collapsed={collapsed} onLeave={onLeave} />
       <SupportBlock collapsed={collapsed} />
       <ProfileRow collapsed={collapsed} onLeave={onLeave} />
     </div>
   );
 }
 
-// There is no paid plan to move to yet, so this is not a button that does
-// nothing: it names the plan and says it is not on sale, the convention every
-// other not-yet control here follows.
-function UpgradeButton({ collapsed }: { collapsed: boolean }) {
-  const why = "The Builder plan isn't on sale yet";
+// The way up from your plan (Creator Panel V3.0's "Upgrade to Builder · Unlock
+// more features"): a link to the plans, naming the next plan worth it — Builder
+// from Free or Tinkerer, Disruptor from Builder. Gone on the top plan.
+function UpgradeButton({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
+  const { hydrated, sub } = useCreatePlan();
+  if (!hydrated || sub.tier === "disruptor") return null;
+  const next = planOf(sub.tier === "builder" ? "disruptor" : "builder");
+  const label = `Upgrade to ${next.name}`;
   if (collapsed) {
     return (
-      <span
-        role="img"
-        aria-label={why}
-        title={why}
-        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-subtle text-text-tertiary"
+      <Link
+        href={PLAN_PRICING_HREF}
+        aria-label={label}
+        title={label}
+        className="mb-[12px] flex h-[40px] w-full items-center justify-center rounded-lg bg-bg-brand-subtle text-text-brand outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        <Icon icon={CrownIcon} />
-      </span>
+        <Icon icon={FlashIcon} />
+      </Link>
     );
   }
   return (
-    <div
-      aria-label={why}
-      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-subtle px-[12px] py-[12px]"
+    <Link
+      href={PLAN_PRICING_HREF}
+      onClick={onLeave}
+      className="mb-[16px] flex w-full items-center gap-[12px] rounded-lg bg-bg-brand-subtle px-[12px] py-[12px] outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
     >
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-md font-semibold text-text-secondary">
-          Builder plan
-        </span>
-        <span className="block truncate text-xs font-regular text-text-tertiary">
-          Not on sale yet — you are on Free
+        <span className="block truncate text-md font-semibold leading-md text-text-brand">{label}</span>
+        <span className="block truncate text-sm font-regular leading-sm text-text-secondary">
+          {next.credits.toLocaleString("en-US")} AI credits a month, and more
         </span>
       </span>
       <span
         aria-hidden
-        className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-lg bg-bg-surface text-text-tertiary"
+        className="inline-flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full bg-bg-surface text-text-brand"
       >
         <Icon icon={FlashIcon} />
       </span>
-    </div>
+    </Link>
   );
 }
 

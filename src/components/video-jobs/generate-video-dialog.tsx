@@ -54,6 +54,7 @@ import {
 } from "@/lib/video/storyboard";
 import {
   VIDEO_QUALITY,
+  qualityOpen,
   type OnScreenLines,
   type ProductVideo,
   type VideoQuality,
@@ -69,6 +70,9 @@ import {
   stageLine,
 } from "@/lib/video/video-copy";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { useCreatePlan } from "@/lib/create/plan";
 import { ArRecordPanel } from "./ar-record-panel";
 import { useVideoJobs } from "./video-jobs-provider";
 import { VideoPlayer } from "./video-player";
@@ -505,7 +509,8 @@ function SceneField({
 function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: VideoQuality) => void }) {
   const noteId = React.useId();
   const refs = React.useRef<Record<string, HTMLDivElement | null>>({});
-  const enabled = QUALITIES.filter((q) => VIDEO_QUALITY[q].available);
+  const { sub } = useCreatePlan();
+  const enabled = QUALITIES.filter((q) => qualityOpen(q, sub.tier));
   const move = (dir: 1 | -1) => {
     const at = enabled.indexOf(value);
     const next = enabled[(at + dir + enabled.length) % enabled.length];
@@ -521,7 +526,7 @@ function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: 
         {QUALITIES.map((q) => {
           const tier = VIDEO_QUALITY[q];
           const checked = value === q;
-          const locked = !tier.available;
+          const locked = !qualityOpen(q, sub.tier);
           return (
             <div
               key={q}
@@ -581,9 +586,14 @@ function QualityField({ value, onChange }: { value: VideoQuality; onChange: (q: 
           );
         })}
       </div>
-      <p id={noteId} className="text-sm text-text-secondary">
-        {HIGH_LOCKED_NOTE}
-      </p>
+      {!qualityOpen("high", sub.tier) && (
+        <p id={noteId} className="text-sm text-text-secondary">
+          {HIGH_LOCKED_NOTE}{" "}
+          <Link href={PLAN_PRICING_HREF} className="font-semibold text-text-link hover:text-text-link-hover">
+            See plans
+          </Link>
+        </p>
+      )}
     </div>
   );
 }
@@ -625,6 +635,8 @@ function GenerateVideoDialogOpen({
 }: GenerateVideoDialogProps & { target: VideoTarget }) {
   const { record, hydrated } = useProjectVideos(target.projectId);
   const { jobs, now, startProductVideo, cancelRender, setBrowserNotify, acknowledge } = useVideoJobs();
+  const { sub: planSub } = useCreatePlan();
+  const planTier = planSub.tier;
   const video = record?.products[target.productId];
 
   // A render already running for this product: straight to its view.
@@ -765,7 +777,7 @@ function GenerateVideoDialogOpen({
       productName: target.productName,
       prompt: value.autoVideo ? "" : value.prompt.trim(),
       lines: linesOfStoryboard(storyboard, value.lines),
-      quality: VIDEO_QUALITY[value.quality].available ? value.quality : "low",
+      quality: qualityOpen(value.quality, planTier) ? value.quality : "low",
       source: target.source,
       imageUrl: target.imageUrl,
       audioPrompt: value.autoAudio ? "" : value.audioPrompt.trim(),

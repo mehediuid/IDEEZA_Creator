@@ -6,7 +6,7 @@ import { GlobalRenderIndicator } from "@/components/video-jobs/global-render-ind
 import { ProductFlowProvider } from "@/components/product-flow/product-flow-provider";
 import { PcbProvider } from "@/lib/pcb/store";
 import { CreateHistoryProvider } from "@/lib/create/history";
-import { CreatePlanProvider } from "@/lib/create/plan";
+import { CreatePlanProvider, PlanCredits } from "@/lib/create/plan";
 import { CreditsProvider } from "@/lib/create/credits";
 import { ManualProjectsProvider } from "@/lib/manual/projects";
 import { MarketProvider } from "@/lib/market/market-store";
@@ -131,6 +131,8 @@ export default function RootLayout({
                               worker lives here rather than on the build
                               page. Renders nothing. */}
                           <BuildSimulator />
+                          {/* The plan's credits for each monthly period. */}
+                          <PlanCredits />
                           <GlobalRenderIndicator />
                           <PlanRunner />
                         </CreateHistoryProvider>

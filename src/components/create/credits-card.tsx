@@ -12,7 +12,7 @@ import {
   useCredits,
 } from "@/lib/create/credits";
 import Link from "next/link";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useCreateHistory } from "@/lib/create/history";
 
 export function CreditsCard() {
@@ -64,7 +64,7 @@ export function CreditsCard() {
       {/* Right: where more credits come from */}
       <div className="flex shrink-0 flex-col items-end gap-[6px]">
         <Link
-          href={PLAN_PRICING_HREF}
+          href={CREDITS_HREF}
           className="inline-flex h-[40px] items-center gap-[8px] rounded-lg border border-border-strong bg-bg-surface px-[16px] text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           Buy credits

@@ -22,7 +22,7 @@ test("the three packs, as the design prices them", () => {
 
 test("plan discounts follow the comparison table, and prices are computed from them", () => {
   assert.equal(P.discountFor("free", "monthly"), 0);
-  assert.equal(P.discountFor("explorer", "yearly"), 0);
+  assert.equal(P.discountFor("tinkerer", "yearly"), 0);
   assert.equal(P.discountFor("builder", "monthly"), 0.15);
   assert.equal(P.discountFor("builder", "yearly"), 0.25);
   assert.equal(P.discountFor("disruptor", "monthly"), 0.25);
@@ -127,5 +127,5 @@ test("an old free top-up line expires 12 months after it came in", () => {
 });
 
 test("a ledger line with a reason this code doesn't know still reads", () => {
-  assert.equal(C.describeEntry({ id: "x", delta: 30, reason: "grant", ts: 0 }), "+30 Credits");
+  assert.equal(C.describeEntry({ id: "x", delta: 30, reason: "gift", ts: 0 }), "+30 Credits");
 });

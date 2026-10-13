@@ -34,7 +34,7 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, type BannerTone } from "@/components/ideeza";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { buildCost } from "@/lib/create/credits";
 import { BuyCreditsButton } from "@/components/credits/buy-credits";
 import {
@@ -154,7 +154,7 @@ export function stateRowFor(
       meta: "Waiting for credits",
       actions: "cancelQueued",
       footer: "Your place in the queue is kept — nothing else is needed from you.",
-      footerLink: { label: "Buy credits →", href: PLAN_PRICING_HREF, buyFor: cost },
+      footerLink: { label: "Buy credits →", href: CREDITS_HREF, buyFor: cost },
     };
   }
 

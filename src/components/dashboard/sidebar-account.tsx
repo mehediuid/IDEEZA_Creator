@@ -36,7 +36,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import Link from "next/link";
-import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
+import { CREDITS_HREF } from "@/lib/create/credit-pricing";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
@@ -51,8 +51,8 @@ export const ACCOUNT = { name: "You", initials: "Y" };
 
 /** The plan line under the name: "Free plan". */
 export function usePlanLabel(): string {
-  const { state } = useCreatePlan();
-  return `${state.plan} plan`;
+  const { plan } = useCreatePlan();
+  return `${plan.name} plan`;
 }
 
 // ────────────────────────────────── placement ───────────────────────────
@@ -483,7 +483,7 @@ function BalanceCard({
             plan. As the design's profile dropdown, it goes to the Credits
             page (Settings › Plan & pricing). */}
         <Link
-          href={PLAN_PRICING_HREF}
+          href={CREDITS_HREF}
           data-nav-item
           onClick={onLeave}
           className={cn(

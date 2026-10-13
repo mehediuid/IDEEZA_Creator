@@ -34,7 +34,6 @@ import { blocksBuild, deriveSpec, effectiveParts, partsForBuild } from "@/lib/sp
 import { rebaseEdits } from "@/lib/spec/edits";
 import { cardFacts, specLine } from "@/lib/spec/format";
 import { asConceptSummary, cleanEdits } from "@/lib/spec/hints";
-import { useCreatePlan } from "@/lib/create/plan";
 import { CONCEPT_COST, useCredits } from "@/lib/create/credits";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useGuards } from "@/lib/manual/use-write-guard";
@@ -327,7 +326,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
     setNetworkEdit,
     setNetworkAdded,
   } = useCreateHistory();
-  const { incrementPrompt } = useCreatePlan();
   // Every concept render costs credits — the first draft, a refine and a
   // regenerate alike. `canAfford` gates the three controls that start one;
   // the charge itself happens in `runGeneration`, the single funnel all
@@ -679,11 +677,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         parentImageUrl?: string;
       },
     ) => {
-      // Every generation kick — first run, refine, or regenerate —
-      // counts against the user's daily prompt quota. The plan store
-      // silently no-ops past the cap; surfacing a friendly cap UI is
-      // out of scope here (the QuotaCard makes the limit visible).
-      incrementPrompt();
       try {
         // Charged before the request, keyed by the turn the render will
         // land in, so a retry of a different turn is its own charge. The
@@ -730,7 +723,6 @@ export function ConceptChat({ chatId }: { chatId: string }) {
       }
     },
     [
-      incrementPrompt,
       charge,
       refund,
       setTurnJob,

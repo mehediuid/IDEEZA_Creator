@@ -1,139 +1,138 @@
 "use client";
 
-// CreatePlanProvider — the user's current generation plan (placeholder
-// for now) + daily prompt usage with a midnight reset. Powers the
-// QuotaCard at the top of /history and is incremented each time the
-// concept chat runs a generation.
+// CreatePlanProvider — the account's plan: its subscription (lib/create/
+// plans.ts), persisted to localStorage, carried past each period's end on load
+// and once a minute (a renewal, or a scheduled switch or cancel starting).
 //
-// Today this lives entirely client-side (localStorage), so the value
-// is the user's own usage record. When real auth lands, swap to a
-// server-fed snapshot — the consumer hook stays the same.
+// It replaced the daily prompt quota ("5 prompts a day", Free/Plus/Pro): that
+// meter never stopped a generation, and credits are the one meter now.
+//
+// <PlanCredits /> sits inside the credits provider and writes each monthly
+// period's plan credits into the ledger, once per period (`grantDue`).
 
 import * as React from "react";
+import { discountFor, type BillingCycle } from "./credit-pricing";
+import { useCredits } from "./credits";
+import {
+  advance,
+  cancelPlan,
+  freeSubscription,
+  grantDue,
+  keepPlan,
+  planOf,
+  scheduleSwitch,
+  startPlan,
+  type Plan,
+  type PlanTier,
+  type Subscription,
+} from "./plans";
 
-export type PlanTier = "Free" | "Plus" | "Pro";
+const STORAGE_KEY = "ideeza:account:plan";
+/** The retired daily-quota record, cleared on load. */
+const LEGACY_KEY = "ideeza:create:plan";
 
-export type CreatePlanState = {
-  plan: PlanTier;
-  dailyLimit: number;
-  promptsUsedToday: number;
-  nextResetAt: number; // ms-since-epoch (next local midnight)
-};
-
-const STORAGE_KEY = "ideeza:create:plan";
-
-const DEFAULT_STATE: CreatePlanState = {
-  plan: "Free",
-  dailyLimit: 5,
-  promptsUsedToday: 0,
-  nextResetAt: 0,
-};
-
-function nextMidnight(now: Date = new Date()): number {
-  const next = new Date(now);
-  next.setHours(24, 0, 0, 0);
-  return next.getTime();
-}
-
-function loadStored(): CreatePlanState {
-  if (typeof window === "undefined") return DEFAULT_STATE;
+function loadStored(now: number): Subscription {
   try {
+    window.localStorage.removeItem(LEGACY_KEY);
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_STATE, nextResetAt: nextMidnight() };
-    const parsed = JSON.parse(raw) as Partial<CreatePlanState>;
-    return {
-      plan: (parsed.plan as PlanTier) ?? DEFAULT_STATE.plan,
-      dailyLimit: parsed.dailyLimit ?? DEFAULT_STATE.dailyLimit,
-      promptsUsedToday: parsed.promptsUsedToday ?? 0,
-      nextResetAt: parsed.nextResetAt ?? nextMidnight(),
-    };
-  } catch {
-    return { ...DEFAULT_STATE, nextResetAt: nextMidnight() };
-  }
+    if (raw) {
+      const parsed = JSON.parse(raw) as Subscription;
+      if (parsed && typeof parsed.tier === "string" && Array.isArray(parsed.orders)) return parsed;
+    }
+  } catch {}
+  return freeSubscription(now);
 }
 
 type Ctx = {
   hydrated: boolean;
-  state: CreatePlanState;
-  // Returns true when the increment was accepted, false when the user
-  // is already at their daily cap (callers can decide what to do).
-  incrementPrompt: () => boolean;
+  sub: Subscription;
+  plan: Plan;
+  /** A paid start: the plan begins now (an upgrade). */
+  start: (tier: PlanTier, cycle: BillingCycle, pay: { orderId: string; amount: number; paidWith: string }) => void;
+  /** A smaller plan or the monthly cycle, from the period's end. */
+  schedule: (tier: PlanTier, cycle: BillingCycle) => void;
+  cancel: () => void;
+  keep: () => void;
 };
 
 const CreatePlanContext = React.createContext<Ctx | null>(null);
 
-export function CreatePlanProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [state, setState] = React.useState<CreatePlanState>(DEFAULT_STATE);
+export function CreatePlanProvider({ children }: { children: React.ReactNode }) {
+  const [sub, setSub] = React.useState<Subscription>(() => freeSubscription(0, "sub_ssr"));
   const [hydrated, setHydrated] = React.useState(false);
 
-  // Hydrate once. If the stored reset timestamp has passed (e.g. the
-  // user came back the next day), reset counters before exposing state.
   React.useEffect(() => {
-    const stored = loadStored();
-    if (stored.nextResetAt <= Date.now()) {
-      stored.promptsUsedToday = 0;
-      stored.nextResetAt = nextMidnight();
-    }
-    setState(stored);
+    const now = Date.now();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of localStorage after mount
+    setSub(advance(loadStored(now), now));
     setHydrated(true);
   }, []);
 
-  // Persist on change post-hydration.
   React.useEffect(() => {
     if (!hydrated) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sub));
     } catch {}
-  }, [state, hydrated]);
+  }, [sub, hydrated]);
 
-  // Auto-roll the counters at midnight. We poll every 30s rather than
-  // scheduling a timeout — keeps the logic correct after suspend/wake.
+  // A period that ends while the page is open.
   React.useEffect(() => {
     if (!hydrated) return;
-    const tick = () => {
-      setState((prev) => {
-        if (Date.now() < prev.nextResetAt) return prev;
-        return {
-          ...prev,
-          promptsUsedToday: 0,
-          nextResetAt: nextMidnight(),
-        };
-      });
-    };
-    const id = window.setInterval(tick, 30_000);
-    tick();
+    const id = window.setInterval(() => setSub((s) => advance(s, Date.now())), 60_000);
     return () => window.clearInterval(id);
   }, [hydrated]);
 
-  const incrementPrompt = React.useCallback(() => {
-    let accepted = false;
-    setState((prev) => {
-      if (prev.promptsUsedToday >= prev.dailyLimit) return prev;
-      accepted = true;
-      return {
-        ...prev,
-        promptsUsedToday: prev.promptsUsedToday + 1,
-      };
-    });
-    return accepted;
-  }, []);
-
-  const value: Ctx = { hydrated, state, incrementPrompt };
-  return (
-    <CreatePlanContext.Provider value={value}>
-      {children}
-    </CreatePlanContext.Provider>
+  const start = React.useCallback<Ctx["start"]>(
+    (tier, cycle, pay) =>
+      setSub((s) => {
+        const now = Date.now();
+        return startPlan(advance(s, now), tier, cycle, now, pay);
+      }),
+    [],
   );
+  const schedule = React.useCallback<Ctx["schedule"]>((tier, cycle) => setSub((s) => scheduleSwitch(s, tier, cycle)), []);
+  const cancel = React.useCallback(() => setSub((s) => cancelPlan(s)), []);
+  const keep = React.useCallback(() => setSub((s) => keepPlan(s)), []);
+
+  const value = React.useMemo<Ctx>(
+    () => ({ hydrated, sub, plan: planOf(sub.tier), start, schedule, cancel, keep }),
+    [hydrated, sub, start, schedule, cancel, keep],
+  );
+  return <CreatePlanContext.Provider value={value}>{children}</CreatePlanContext.Provider>;
 }
 
 export function useCreatePlan(): Ctx {
   const ctx = React.useContext(CreatePlanContext);
-  if (!ctx) {
-    throw new Error("useCreatePlan must be used inside <CreatePlanProvider>");
-  }
+  if (!ctx) throw new Error("useCreatePlan must be used inside <CreatePlanProvider>");
   return ctx;
+}
+
+/** The share the current plan takes off credits (0 on Free and Tinkerer). */
+export function useCreditDiscount(): number {
+  const { sub } = useCreatePlan();
+  return discountFor(sub.tier, sub.cycle);
+}
+
+/** Writes the plan's credits for the current monthly period, once. Renders nothing. */
+export function PlanCredits() {
+  const { hydrated: planReady, sub } = useCreatePlan();
+  const { hydrated: creditsReady, ledger, grant } = useCredits();
+  const granted = React.useMemo(
+    () => new Set(ledger.filter((e) => e.reason === "grant" && e.orderId).map((e) => e.orderId as string)),
+    [ledger],
+  );
+  const [tick, setTick] = React.useState(0);
+
+  React.useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  React.useEffect(() => {
+    if (!planReady || !creditsReady) return;
+    const due = grantDue(sub, granted, Date.now());
+    if (due) grant(due);
+  }, [planReady, creditsReady, sub, granted, grant, tick]);
+
+  return null;
 }

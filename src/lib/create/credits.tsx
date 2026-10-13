@@ -74,8 +74,9 @@ export type CreditEntry = {
   id: string;
   delta: number;
   /** `topup`: the free demo top-ups of earlier builds, kept readable.
-   *  `purchase`: credits bought. `expiry`: a lot ran out of time. */
-  reason: ChargeReason | "seed" | "refund" | "topup" | "purchase" | "expiry";
+   *  `purchase`: credits bought. `grant`: the plan's monthly credits.
+   *  `expiry`: a lot ran out of time. */
+  reason: ChargeReason | "seed" | "refund" | "topup" | "purchase" | "grant" | "expiry";
   /** What was charged: a build id, or a concept turn id. The field keeps
    *  its name because ledgers are already stored under it. */
   buildId?: string;
@@ -258,6 +259,24 @@ export function purchaseState(state: CreditsState, order: CreditOrder): CreditsS
   });
 }
 
+// A plan's credits for one monthly period, expiring when the period ends.
+// Idempotent per grant id (lib/create/plans.ts `grantDue`).
+export function grantState(
+  state: CreditsState,
+  grant: { orderId: string; credits: number; plan: string; ts: number; expiresAt: number },
+): CreditsState {
+  if (grant.credits <= 0 || state.ledger.some((e) => e.orderId === grant.orderId)) return state;
+  return applyEntry(state, {
+    id: makeId(),
+    delta: grant.credits,
+    reason: "grant",
+    orderId: grant.orderId,
+    ts: grant.ts,
+    expiresAt: grant.expiresAt,
+    pack: grant.plan,
+  });
+}
+
 // The lots past their expiry at `now` lose what they had left: one `expiry`
 // line each, so the balance and the ledger stay one story.
 export function expireState(state: CreditsState, now: number): CreditsState {
@@ -282,6 +301,8 @@ export function describeEntry(entry: CreditEntry, subject?: string): string {
       return `${sign}${amount} Top up`;
     case "purchase":
       return `${sign}${amount} ${entry.pack ? `${entry.pack} pack` : "Credits bought"}`;
+    case "grant":
+      return `${sign}${amount} ${entry.pack ?? "Plan"} plan credits`;
     case "expiry":
       return `${sign}${amount} Expired`;
     case "build":
@@ -308,6 +329,8 @@ type Ctx = {
   refund: (buildId: string) => boolean;
   /** Adds a paid order's credits once per `orderId`; false when it already did. */
   purchase: (order: CreditOrder) => boolean;
+  /** Adds a plan's monthly credits once per grant id. */
+  grant: (g: Parameters<typeof grantState>[1]) => boolean;
 };
 
 const CreditsContext = React.createContext<Ctx | null>(null);
@@ -319,14 +342,22 @@ export function CreditsProvider({
 }) {
   const [state, setState] = React.useState<CreditsState>(DEFAULT_STATE);
   const [hydrated, setHydrated] = React.useState(false);
+  // The latest state, for writes decided at event time. Every write sets it
+  // before its setState — there is no effect copying `state` into it, since
+  // that ran after children's effects and put back a stale state over a
+  // write a child had just made.
   const stateRef = React.useRef(state);
-  React.useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
 
-  // Hydrate once, letting any lot past its date expire first.
+  // Hydrate once, letting any lot past its date expire first. The ref is set
+  // here, not left to the effect that follows `state`: children's effects run
+  // before this provider's, so the first write after hydration (PlanCredits'
+  // monthly grant) read the empty pre-hydration ref and replaced the whole
+  // ledger with its one line.
   React.useEffect(() => {
-    setState(expireState(loadStored(), Date.now()));
+    const loaded = expireState(loadStored(), Date.now());
+    stateRef.current = loaded;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of localStorage after mount
+    setState(loaded);
     setHydrated(true);
   }, []);
 
@@ -411,6 +442,14 @@ export function CreditsProvider({
     return true;
   }, []);
 
+  const grant = React.useCallback((g: Parameters<typeof grantState>[1]) => {
+    const next = grantState(stateRef.current, g);
+    if (next === stateRef.current) return false;
+    stateRef.current = next;
+    setState(next);
+    return true;
+  }, []);
+
   const value: Ctx = {
     hydrated,
     balance: state.balance,
@@ -419,6 +458,7 @@ export function CreditsProvider({
     charge,
     refund,
     purchase,
+    grant,
   };
 
   return (

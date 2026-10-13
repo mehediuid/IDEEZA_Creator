@@ -12,12 +12,14 @@
 // Every Buy opens the one Buy credits dialog on its Pay step.
 
 import * as React from "react";
-import { Badge, Banner, Button, ModalFrame, NumberInput } from "@/components/ideeza";
+import Link from "next/link";
+import { Badge, Banner, Button, ModalFrame, NumberInput, buttonVariants } from "@/components/ideeza";
 import {
   CREDIT_PACKS,
   CUSTOM_MIN,
   CUSTOM_RATE,
   MAX_DISCOUNT,
+  PLAN_PRICING_HREF,
   betterDeal,
   customAmountError,
   customPrice,
@@ -29,7 +31,9 @@ import {
 import { lotsOf } from "@/lib/create/credit-lots";
 import { useCredits, type CreditEntry } from "@/lib/create/credits";
 import { cn } from "@/lib/utils";
-import { CURRENT_DISCOUNT, useBuyCredits } from "./buy-credits";
+import { useCreditDiscount } from "@/lib/create/plan";
+import { planOf } from "@/lib/create/plans";
+import { useBuyCredits } from "./buy-credits";
 
 const pct = (d: number) => `${Math.round(d * 100)}%`;
 const date = (ts: number) => new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -39,7 +43,7 @@ export function CreditsPanel() {
   const { open } = useBuyCredits();
   const [history, setHistory] = React.useState(false);
   const [compare, setCompare] = React.useState(false);
-  const discount = CURRENT_DISCOUNT;
+  const discount = useCreditDiscount();
 
   return (
     <div className="flex flex-col gap-[24px]">
@@ -205,7 +209,9 @@ function CustomAmount({ discount }: { discount: number }) {
         </div>
         <div className="flex flex-col gap-[2px]">
           <span className="text-2xl font-semibold leading-2xl tabular-nums text-text-primary">{usd(price.final)}</span>
-          <span className="text-sm leading-sm text-text-secondary">{usd(CUSTOM_RATE)} per credit</span>
+          <span className="text-sm leading-sm text-text-secondary">
+            {usd(CUSTOM_RATE)} per credit{discount > 0 && ` · ${pct(discount)} off`}
+          </span>
         </div>
         <Button
           hierarchy="secondary"
@@ -280,8 +286,6 @@ function CreditHistoryDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-const PLAN_NAME = { free: "Free", explorer: "Explorer", builder: "Builder", disruptor: "Disruptor" } as const;
-
 function DiscountsDialog({ onClose }: { onClose: () => void }) {
   const pro = CREDIT_PACKS.find((p) => p.id === "pro")!;
   return (
@@ -310,7 +314,7 @@ function DiscountsDialog({ onClose }: { onClose: () => void }) {
                 return (
                   <tr key={`${r.tier}-${r.cycle}`} className="border-t border-solid border-border">
                     <th scope="row" className="px-[14px] py-[10px] font-medium text-text-primary">
-                      {PLAN_NAME[r.tier]} ({r.cycle})
+                      {planOf(r.tier).name} ({r.cycle})
                     </th>
                     <td className="px-[14px] py-[10px] tabular-nums text-text-secondary">{pct(r.discount)}</td>
                     <td className="px-[14px] py-[10px] tabular-nums text-text-primary">{usd(price.final)}</td>
@@ -321,9 +325,14 @@ function DiscountsDialog({ onClose }: { onClose: () => void }) {
             </tbody>
           </table>
         </div>
-        <p className="text-sm leading-sm text-text-secondary">
-          The Free plan has no credit discount. Plans aren&apos;t on sale yet, so every price here is the full price for now.
-        </p>
+        <p className="text-sm leading-sm text-text-secondary">Free and Tinkerer have no credit discount.</p>
+        <Link
+          href={PLAN_PRICING_HREF}
+          onClick={onClose}
+          className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "self-start")}
+        >
+          See plans
+        </Link>
       </div>
     </ModalFrame>
   );

@@ -1,7 +1,8 @@
 // What AI credits cost — User Panel V2, "AI Credit Purchase" (Figma
 // 41549:170243). Three packs, a custom amount at a flat rate, and a discount
 // on both for paid plans by billing cycle ("Compare Credit Discounts by
-// Plan"). Bought credits last 12 months from the purchase.
+// Plan"; the design's "Explorer" row is the Tinkerer plan). Bought credits
+// last 12 months from the purchase.
 //
 // The design's paid-plan screen shows rounded prices ($3 / $6 / $12 under
 // "35% OFF"); the discount table is the source of truth, so prices are
@@ -12,8 +13,9 @@
 //
 // Pure, no imports.
 
-/** Settings › Plan & pricing, the credits' own page (Credits tab first). */
+/** Settings › Plan & pricing: its Plans tab, and its Credits tab. */
 export const PLAN_PRICING_HREF = "/settings/plan";
+export const CREDITS_HREF = "/settings/plan?tab=credits";
 
 export type PackId = "starter" | "pro" | "power";
 
@@ -44,13 +46,13 @@ export const VALIDITY_MONTHS = 12;
 /** The demo rate for paying in IDZ: IDZ per US dollar. */
 export const IDZ_PER_USD = 1;
 
-export type PlanTierKey = "free" | "explorer" | "builder" | "disruptor";
+export type PlanTierKey = "free" | "tinkerer" | "builder" | "disruptor";
 export type BillingCycle = "monthly" | "yearly";
 
 /** The credit discount a plan gives, by cycle (the design's table). */
 const DISCOUNT: Record<PlanTierKey, Record<BillingCycle, number>> = {
   free: { monthly: 0, yearly: 0 },
-  explorer: { monthly: 0, yearly: 0 },
+  tinkerer: { monthly: 0, yearly: 0 },
   builder: { monthly: 0.15, yearly: 0.25 },
   disruptor: { monthly: 0.25, yearly: 0.35 },
 };
