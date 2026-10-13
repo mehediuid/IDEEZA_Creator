@@ -4,10 +4,10 @@
 // direction A, 2026-10-14; spec 2026-10-14-creator-profile-design.md). One
 // page for every viewer: an identity column (who, where, since when, what they
 // are open to, four counts, About, the parts they build with, what they work
-// on, links) beside their work (a featured project, the rest, and recent
-// Activity). Your own adds Edit profile, a prompt where a field is empty, and
-// one owner-only line. Every count and chip is read from work already public;
-// nothing is typed in for you or guessed. A skeleton holds the place until the
+// on, links) beside their work, under two tabs: Projects (a featured project
+// and the rest) and Activity. Your own adds Edit profile, a prompt where a
+// field is empty, and one owner-only line. Every count and chip is read from
+// work already public; nothing is typed in for you or guessed. A skeleton holds the place until the
 // stores are read, so Follow never flashes on your own page.
 
 import * as React from "react";
@@ -48,7 +48,7 @@ import { FollowingDialog, useFollowing } from "./following-dialog";
 import { ChipRow, IdentityHead, LinkList, OpenToLine, SideSection, StatList } from "./identity";
 import { OWNER_LINE_LINK, OwnerLine } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
-import { ActivitySection, WorkSections } from "./work";
+import { WorkTabs } from "./work";
 
 const CONTENT = cn(PAGE_CONTENT, "flex max-w-[1200px] flex-col gap-8 max-md:pb-[104px]");
 
@@ -343,8 +343,7 @@ function OwnProfile({
                 )
               }
             />
-            <WorkSections items={made} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
-            <ActivitySection items={portfolio.activity} />
+            <WorkTabs items={made} activity={portfolio.activity} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
           </div>
           <div className={ID_MORE}>
             <MoreAbout
@@ -521,13 +520,13 @@ function OtherProfile({ person }: { person: Person }) {
             )}
           </div>
           <div className={WORK}>
-            <WorkSections
+            <WorkTabs
               items={made}
+              activity={portfolio.activity}
               own={false}
               ownerName={person.name}
               appreciationsOf={(m) => portfolio.appreciations.get(m.key) ?? null}
             />
-            <ActivitySection items={portfolio.activity} />
           </div>
           <div className={ID_MORE}>
             <MoreAbout
