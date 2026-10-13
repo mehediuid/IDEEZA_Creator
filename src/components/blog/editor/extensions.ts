@@ -5,17 +5,19 @@
 //   mailto only, never opened on click, autolinked as you type.
 // - A quote holds paragraphs, and a list item a paragraph and nested lists —
 //   BlogDoc's own rules — so these two are our nodes, not StarterKit's.
-// - Image is ours (a stored file, its description, caption, decoration flag).
-// - Image rows, video and project cards come in a later phase; an article that
-//   already has one keeps it as a quiet block rather than losing it.
+// - Image is ours (a stored file, its description, caption, decoration flag);
+//   so are image rows (2–3 images side by side, stacking on phones), video (a
+//   stored file and a caption) and the IDEEZA project card.
 
 import { Extension, Node, mergeAttributes, wrappingInputRule, type AnyExtension, type Editor } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
-import type { ResolvedPos } from "@tiptap/pm/model";
+import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
+import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
 import { allowedLinkUri, MAX_LIST_DEPTH } from "./editor-logic";
 import { ImageView } from "./image-view";
+import { ProjectCardView, VideoView } from "./media-views";
 
 const QuoteNode = Node.create({
   name: "blockquote",
@@ -110,15 +112,45 @@ export const ImageNode = Node.create({
   },
 });
 
-const KEPT = "blog-block rounded-xl border border-solid border-border-subtle bg-bg-subtle px-8 py-6 text-md leading-md text-text-secondary";
+/** A row left with one picture (the other deleted — ProseMirror fills the gap with an empty
+ *  image to keep the row valid) becomes that picture again, as the stored body would make it
+ *  on the next read. */
+const unwrapLonelyRows = new Plugin({
+  key: new PluginKey("blogLonelyRows"),
+  appendTransaction: (trs, _old, state) => {
+    if (!trs.some((t) => t.docChanged)) return null;
+    let tr: Transaction | null = null;
+    state.doc.descendants((node, pos) => {
+      if (node.type.name !== "imageRow") return true;
+      const real: ProseMirrorNode[] = [];
+      node.forEach((child) => {
+        if (child.attrs.fileKey || child.attrs.uploadId) real.push(child);
+      });
+      if (real.length < 2) {
+        tr = tr ?? state.tr;
+        const at = tr.mapping.map(pos);
+        tr.replaceWith(at, at + node.nodeSize, real);
+      }
+      return false;
+    });
+    return tr;
+  },
+});
 
 const ImageRowNode = Node.create({
   name: "imageRow",
   group: "block",
   content: "image{2,3}",
   isolating: true,
+  addProseMirrorPlugins() {
+    return [unwrapLonelyRows];
+  },
   parseHTML: () => [{ tag: "div[data-image-row]" }],
-  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes({ "data-image-row": "", class: "blog-block grid grid-cols-2 gap-6" }, HTMLAttributes), 0],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "div",
+    mergeAttributes({ "data-image-row": "", class: `blog-block grid gap-6 max-md:grid-cols-1 ${node.childCount === 3 ? "grid-cols-3" : "grid-cols-2"}` }, HTMLAttributes),
+    0,
+  ],
 });
 
 const VideoNode = Node.create({
@@ -130,7 +162,10 @@ const VideoNode = Node.create({
     return { fileKey: dataAttr("file-key", text, ""), caption: dataAttr("caption", text, "") };
   },
   parseHTML: () => [{ tag: "div[data-blog-video]" }],
-  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes({ "data-blog-video": "", class: KEPT }, HTMLAttributes), "Video"],
+  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes({ "data-blog-video": "" }, HTMLAttributes)],
+  addNodeView() {
+    return ReactNodeViewRenderer(VideoView, { className: BLOCK });
+  },
 });
 
 const ProjectCardNode = Node.create({
@@ -142,7 +177,10 @@ const ProjectCardNode = Node.create({
     return { projectId: dataAttr("project-id", text, "") };
   },
   parseHTML: () => [{ tag: "div[data-project-card]" }],
-  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes({ "data-project-card": "", class: KEPT }, HTMLAttributes), "IDEEZA project"],
+  renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes({ "data-project-card": "" }, HTMLAttributes)],
+  addNodeView() {
+    return ReactNodeViewRenderer(ProjectCardView, { className: BLOCK });
+  },
 });
 
 /** What the editor asks of the page around it, read at the moment a key is pressed. */

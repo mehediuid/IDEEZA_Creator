@@ -1,7 +1,7 @@
 "use client";
 
-// Adding a block (spec § Screens 2): Heading, Subheading, Image, Bulleted list,
-// Numbered list, Code, Quote, Divider. On a mouse it is the "+" beside an empty
+// Adding a block (spec § Screens 2): Heading, Subheading, Image, Images side by
+// side, Video, Bulleted list, Numbered list, Code, Quote, Divider, IDEEZA project. On a mouse it is the "+" beside an empty
 // line (the DS Menu: ↑ ↓, Enter, Escape) and the same list on "/"; on a phone it
 // is the format bar's labelled "Add", opening the list as a bottom sheet — a
 // floating "+" fights the phone's own selection handles there.
@@ -10,14 +10,17 @@ import * as React from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Add01Icon,
+  CpuIcon,
   Heading02Icon,
   Heading03Icon,
   Image01Icon,
+  LayoutTwoColumnIcon,
   LeftToRightListBulletIcon,
   LeftToRightListNumberIcon,
   MinusSignIcon,
   QuoteDownIcon,
   SourceCodeIcon,
+  Video01Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { IconButton, Menu, ModalFrame, type MenuItem } from "@/components/ideeza";
@@ -29,6 +32,9 @@ const ICONS: Record<BlockId, IconValue> = {
   heading: Heading02Icon,
   subheading: Heading03Icon,
   image: Image01Icon,
+  row: LayoutTwoColumnIcon,
+  video: Video01Icon,
+  project: CpuIcon,
   bullet: LeftToRightListBulletIcon,
   ordered: LeftToRightListNumberIcon,
   code: SourceCodeIcon,
@@ -36,11 +42,16 @@ const ICONS: Record<BlockId, IconValue> = {
   divider: MinusSignIcon,
 };
 
-/** Turns the empty line into the block (an image asks for its file first). */
-export function runBlock(editor: Editor, id: BlockId, pickImage: () => void): void {
-  if (id === "image") {
+/** The blocks that ask for something first: files from the device, or one of your projects. */
+export type BlockPick = "image" | "row" | "video" | "project";
+const PICKS: readonly BlockId[] = ["image", "row", "video", "project"];
+export const asksFirst = (id: BlockId): id is BlockPick => PICKS.includes(id);
+
+/** Turns the empty line into the block (images, video and a project ask first). */
+export function runBlock(editor: Editor, id: BlockId, pick: (what: BlockPick) => void): void {
+  if (asksFirst(id)) {
     editor.commands.focus();
-    pickImage();
+    pick(id);
     return;
   }
   const c = editor.chain().focus();

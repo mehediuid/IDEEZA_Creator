@@ -15,10 +15,12 @@ import { Selection } from "@tiptap/pm/state";
 import { usePostToast } from "@/components/innovations/toast";
 import { normalizeDoc } from "@/lib/blog/doc";
 import { deleteBlogFiles } from "@/lib/blog/files";
-import { storeImage, type StoredImage } from "@/lib/blog/image";
-import { IMAGE_TYPES } from "@/lib/blog/media";
+import { storeImage, storeVideo, type StoredImage } from "@/lib/blog/image";
+import { IMAGE_TYPES, VIDEO_TYPES } from "@/lib/blog/media";
 import type { BlogDoc } from "@/lib/blog/types";
-import { BlockInserter, BlockSheet, runBlock } from "./block-menu";
+import { asksFirst, BlockInserter, BlockSheet, runBlock, type BlockPick } from "./block-menu";
+import { ProjectPicker } from "./project-picker";
+import { rowPick } from "./editor-logic";
 import { editableDoc, pastedHeadings, pastedImageCount, pastedImagesNote, type BlockId } from "./editor-logic";
 import { blogExtensions, keyBus } from "./extensions";
 import { FormatBubble } from "./format-bubble";
@@ -79,6 +81,20 @@ function placeFile(editor: Editor, uploadId: string, file: StoredImage): boolean
 }
 
 /** Where dropped files go: in place of an empty line, else after the block under the pointer. */
+/** Puts a new block where the writer is without replacing anything: an empty line becomes
+ *  the block; a selected picture, a row or text keeps its place and the block goes after it. */
+function insertBlock(editor: Editor, content: Parameters<Editor["commands"]["insertContent"]>[0]): void {
+  const { selection } = editor.state;
+  const $from = selection.$from;
+  const onEmptyLine = selection.empty && $from.depth === 1 && $from.parent.isTextblock && $from.parent.content.size === 0;
+  if (onEmptyLine) {
+    editor.chain().focus().insertContent(content).run();
+    return;
+  }
+  const at = $from.depth === 0 ? selection.to : $from.after(1);
+  editor.chain().focus().insertContentAt(at, content).run();
+}
+
 function dropPos(editor: Editor, pos: number): number {
   const $p = editor.state.doc.resolve(pos);
   if ($p.depth === 0) return pos;
@@ -105,6 +121,9 @@ export default function BodyEditor(props: BodyEditorProps) {
   const [linkOpen, setLinkOpen] = React.useState(false);
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  const rowRef = React.useRef<HTMLInputElement>(null);
+  const videoRef = React.useRef<HTMLInputElement>(null);
+  const [projectOpen, setProjectOpen] = React.useState(false);
   const openMenu = React.useRef<(() => void) | null>(null);
   const editorRef = React.useRef<Editor | null>(null);
   const [keys] = React.useState(keyBus);
@@ -139,13 +158,51 @@ export default function BodyEditor(props: BodyEditorProps) {
         return next;
       });
       const nodes = items.map((i) => ({ type: "image", attrs: { uploadId: i.uploadId } }));
-      const c = ed.chain().focus();
-      (typeof at === "number" ? c.insertContentAt(dropPos(ed, at), nodes) : c.insertContent(nodes)).run();
+      if (typeof at === "number") ed.chain().focus().insertContentAt(dropPos(ed, at), nodes).run();
+      else insertBlock(ed, nodes);
       if (!articleId) return;
       for (const i of items) await upload(i.uploadId, i.file, articleId);
     },
     [upload],
   );
+
+  /** Images side by side: 2 or 3 placeholders in one row, each filled as its file is stored. */
+  const insertRow = React.useCallback(
+    async (picked: File[]) => {
+      const ed = editorRef.current;
+      if (!ed || ed.isDestroyed) return;
+      const { take, message } = rowPick(picked.length);
+      if (message) toastRef.current(message);
+      if (!take) return;
+      const files = picked.slice(0, take);
+      const articleId = latest.current.ensureArticle();
+      const items = files.map((file) => ({ file, uploadId: crypto.randomUUID() }));
+      setUploads((u) => {
+        const next = { ...u };
+        for (const i of items) next[i.uploadId] = { name: i.file.name, error: articleId ? null : storageFull(i.file.name) };
+        return next;
+      });
+      insertBlock(ed, { type: "imageRow", content: items.map((i) => ({ type: "image", attrs: { uploadId: i.uploadId } })) });
+      if (!articleId) return;
+      for (const i of items) await upload(i.uploadId, i.file, articleId);
+    },
+    [upload],
+  );
+
+  /** A video goes in once its file is stored; until then the toast says it is on its way. */
+  const insertVideo = React.useCallback(async (file: File | undefined) => {
+    const ed = editorRef.current;
+    if (!file || !ed || ed.isDestroyed) return;
+    const articleId = latest.current.ensureArticle();
+    if (!articleId) return toastRef.current(storageFull(file.name));
+    toastRef.current(`Adding ${file.name}…`);
+    const res = await storeVideo(file, articleId);
+    if (!res.ok) return toastRef.current(res.error);
+    const now = editorRef.current;
+    if (!now || now.isDestroyed) return;
+    insertBlock(now, { type: "video", attrs: { fileKey: res.value.fileKey, caption: "" } });
+    toastRef.current(`${file.name} added.`);
+  }, []);
 
   const uploadsApi = React.useMemo<UploadsApi>(
     () => ({
@@ -267,9 +324,14 @@ export default function BodyEditor(props: BodyEditorProps) {
     }
   }, [editor, props.describedBy]);
 
-  const pickImage = () => fileRef.current?.click();
+  const pick = (what: BlockPick) => {
+    if (what === "image") fileRef.current?.click();
+    else if (what === "row") rowRef.current?.click();
+    else if (what === "video") videoRef.current?.click();
+    else setProjectOpen(true);
+  };
   const onBlock = (id: BlockId) => {
-    if (editor) runBlock(editor, id, pickImage);
+    if (editor) runBlock(editor, id, pick);
   };
 
   return (
@@ -298,12 +360,53 @@ export default function BodyEditor(props: BodyEditorProps) {
                 window.requestAnimationFrame(() => editor.commands.focus());
               }}
               onBlock={(id) => {
-                if (id === "image") pickImage();
+                // A file picker must open inside the tap itself, or the phone refuses it.
+                if (asksFirst(id)) pick(id);
                 setSheetOpen(false);
-                if (id !== "image") window.requestAnimationFrame(() => runBlock(editor, id, pickImage));
+                if (!asksFirst(id)) window.requestAnimationFrame(() => runBlock(editor, id, pick));
               }}
             />
           </>
+        )}
+        <input
+          ref={rowRef}
+          type="file"
+          accept={IMAGE_TYPES.join(",")}
+          multiple
+          tabIndex={-1}
+          aria-hidden
+          className="sr-only"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            void insertRow(files);
+          }}
+        />
+        <input
+          ref={videoRef}
+          type="file"
+          accept={VIDEO_TYPES.join(",")}
+          tabIndex={-1}
+          aria-hidden
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            void insertVideo(file);
+          }}
+        />
+        {editor && (
+          <ProjectPicker
+            open={projectOpen}
+            onClose={() => {
+              setProjectOpen(false);
+              window.requestAnimationFrame(() => editor.commands.focus());
+            }}
+            onPick={(projectId) => {
+              setProjectOpen(false);
+              insertBlock(editor, { type: "projectCard", attrs: { projectId } });
+            }}
+          />
         )}
         <input
           ref={fileRef}

@@ -20,6 +20,7 @@ import {
   fixLines,
   internalTarget,
   BLOCKS,
+  rowPick,
   FAILED_LINE,
   OFFLINE_LINE,
   LINK_REFUSED,
@@ -152,9 +153,16 @@ test("the leave guard holds back in-app pages only", () => {
   assert.equal(internalTarget("https://example.com/", here), null);
 });
 
-test("the + list has the eight blocks of this phase, in order", () => {
+test("the + list has the eleven blocks, in the mockup's order", () => {
   assert.deepEqual(
     BLOCKS.map((b) => b.label),
-    ["Heading", "Subheading", "Image", "Bulleted list", "Numbered list", "Code", "Quote", "Divider"],
+    ["Heading", "Subheading", "Image", "Images side by side", "Video", "Bulleted list", "Numbered list", "Code", "Quote", "Divider", "IDEEZA project"],
   );
+});
+
+test("images side by side take 2 or 3, and say so otherwise", () => {
+  assert.deepEqual(rowPick(1), { take: 0, message: "Pick 2 or 3 images to show side by side." });
+  assert.deepEqual(rowPick(2), { take: 2, message: null });
+  assert.deepEqual(rowPick(3), { take: 3, message: null });
+  assert.deepEqual(rowPick(5), { take: 3, message: "Only the first 3 images are used side by side." });
 });

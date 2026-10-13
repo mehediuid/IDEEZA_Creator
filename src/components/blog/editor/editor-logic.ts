@@ -172,16 +172,26 @@ export function internalTarget(href: string, here: string): string | null {
   return `${to.pathname}${to.search}${to.hash}`;
 }
 
-export type BlockId = "heading" | "subheading" | "image" | "bullet" | "ordered" | "code" | "quote" | "divider";
+export type BlockId = "heading" | "subheading" | "image" | "row" | "video" | "bullet" | "ordered" | "code" | "quote" | "divider" | "project";
 
-/** The "+" list, in the mockup's order. Image rows, video and the project card come later. */
+/** The "+" list, in the mockup's order. */
 export const BLOCKS: readonly { id: BlockId; label: string; hint?: string }[] = [
   { id: "heading", label: "Heading", hint: "Starts a section. Shows in “On this page”." },
   { id: "subheading", label: "Subheading" },
   { id: "image", label: "Image", hint: "Asks for a short description." },
+  { id: "row", label: "Images side by side", hint: "2 or 3. They stack on phones." },
+  { id: "video", label: "Video", hint: "MP4 or WebM, up to 50 MB." },
   { id: "bullet", label: "Bulleted list" },
   { id: "ordered", label: "Numbered list" },
   { id: "code", label: "Code" },
   { id: "quote", label: "Quote" },
   { id: "divider", label: "Divider" },
+  { id: "project", label: "IDEEZA project", hint: "A card that links to one of your projects." },
 ];
+
+/** Images side by side take 2 or 3: how many of the picked files to use, and what to say. */
+export function rowPick(picked: number): { take: number; message: string | null } {
+  if (picked < 2) return { take: 0, message: "Pick 2 or 3 images to show side by side." };
+  if (picked > 3) return { take: 3, message: "Only the first 3 images are used side by side." };
+  return { take: picked, message: null };
+}
