@@ -11,6 +11,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useArticleActions } from "@/components/blog/article-actions";
+import { ChangeCoverDialog } from "@/components/blog/send/change-cover-dialog";
 import { markSeen } from "@/lib/blog/article";
 import { metaDiffers, readerVersion } from "@/lib/blog/article-view";
 import { sameDoc } from "@/lib/blog/doc";
@@ -77,7 +78,8 @@ export function ArticlePage({ slug }: { slug: string }) {
   const [shownId, setShownId] = React.useState<string | null>(null);
   if (article && shownId !== article.id) setShownId(article.id);
 
-  const actions = useArticleActions({ onDeleted: () => router.replace(blogHref()) });
+  const [coverFor, setCoverFor] = React.useState<BlogArticle | null>(null);
+  const actions = useArticleActions({ onDeleted: () => router.replace(blogHref()), onChangeCover: setCoverFor });
 
   React.useEffect(() => {
     settleDueReviews();
@@ -95,6 +97,7 @@ export function ArticlePage({ slug }: { slug: string }) {
     <>
       {!hydrated ? <ArticleSkeleton /> : article ? <ArticleView article={article} actions={actions} /> : shownId ? <Gone /> : <ArticleMissing />}
       {actions.dialogs}
+      <ChangeCoverDialog article={coverFor && article?.id === coverFor.id ? article : null} onClose={() => setCoverFor(null)} />
     </>
   );
 }

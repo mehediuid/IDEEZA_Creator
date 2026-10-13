@@ -29,7 +29,7 @@ export function BlogImage({
       <span
         role={missing ? "img" : undefined}
         aria-label={missing ? "This image is no longer in this browser" : undefined}
-        className={cn("flex items-center justify-center bg-bg-subtle text-icon-secondary", className)}
+        className={cn("flex items-center justify-center bg-bg-subtle text-[color:var(--color-icon-secondary)]", className)}
       >
         {missing && <Icon icon={Image01Icon} size={20} />}
       </span>
@@ -52,7 +52,7 @@ export function CoverImage({ cover, className, decorative = false }: { cover: Bl
           style={{ objectPosition: `${cover.x}% ${cover.y}%`, transform: `scale(${cover.zoom})`, transformOrigin: `${cover.x}% ${cover.y}%` }}
         />
       ) : (
-        <span aria-hidden className="absolute inset-0 flex items-center justify-center text-icon-secondary">
+        <span aria-hidden className="absolute inset-0 flex items-center justify-center text-[color:var(--color-icon-secondary)]">
           <Icon icon={Image01Icon} size={20} />
         </span>
       )}
