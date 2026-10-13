@@ -142,12 +142,12 @@ export function RelistPanel({
 
   const checklist = (
     <section aria-labelledby={headId} className="flex flex-col gap-3">
-      <h3 id={headId} className="m-0 text-sm font-semibold text-text-primary">
+      <h3 id={headId} className="m-0 text-md font-semibold text-text-primary">
         To relist:
       </h3>
       <ul role="list" className="m-0 flex flex-col gap-3 p-0">
         {items.map((item) => (
-          <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 text-sm">
+          <li key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-2 text-md">
             {item.id === "metadata" ? (
               <span aria-hidden className="w-[16px] shrink-0 text-center text-text-tertiary">
                 •
@@ -172,7 +172,7 @@ export function RelistPanel({
               <button
                 type="button"
                 onClick={() => setGate(true)}
-                className="rounded-sm text-sm font-semibold text-text-link underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
+                className="rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
               >
                 Generate videos
               </button>
@@ -200,7 +200,7 @@ export function RelistPanel({
         {children}
       </div>
       {!ready && (
-        <p id={hintId} className="m-0 text-sm text-text-secondary">
+        <p id={hintId} className="m-0 text-md text-text-secondary">
           {actionsFirst ? FINISH_BELOW : FINISH_FIRST}
         </p>
       )}
@@ -230,7 +230,7 @@ export function RelistPanel({
           view={view}
           brief={brief}
           extra={
-            <p className="m-0 text-sm text-text-secondary">
+            <p className="m-0 text-md text-text-secondary">
               <span className="font-semibold text-text-primary">NFT metadata</span>
               {changed.length ? ` · updates now: ${changed.join(", ")}` : " · updated when you relist"}
             </p>

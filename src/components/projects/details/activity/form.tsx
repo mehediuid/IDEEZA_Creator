@@ -16,14 +16,16 @@ import { Cancel01Icon, CloudUploadIcon, Doc01Icon, Image01Icon, Pdf01Icon, Video
 import { Icon } from "@/components/dashboard/icon";
 import { Button, SelectMenu, TextInput, Textarea } from "@/components/ideeza";
 import {
-  STAGES,
+  catalogueOf,
   checkActivity,
+  labelOf,
   snapshotPrices,
   type Activity,
   type ActivityInput,
+  type ActivityTarget,
+  type JourneyEntry,
   type LiveListingFacts,
   type MediaRef,
-  type StageId,
 } from "@/lib/manual/journey";
 import { deleteMediaFiles, getMediaFile, putMediaFile } from "@/lib/manual/journey-store";
 import { randomId } from "@/lib/market/sales";
@@ -90,11 +92,10 @@ function blobKeysOf(media: readonly MediaRef[]): string[] {
 
 export type ActivityFormProps = {
   mode: "add" | "edit";
-  entry: Activity | null;
+  entry: JourneyEntry | null;
   projectId: string;
-  products: { id: string; name: string }[];
-  /** The product page's own product, defaulted on Add (P2-TABS-7). */
-  defaultProductId?: string;
+  /** Whose entry this is: the type list is its catalogue (spec §6.2). */
+  target: ActivityTarget;
   /** LISTING's Main listing and this area's edition listings, live — read
    *  once at save time (P2-TABS-11); an edit never re-snapshots (ACT-98). */
   listingFacts: LiveListingFacts;
@@ -113,19 +114,17 @@ export function ActivityForm({
   mode,
   entry,
   projectId,
-  products,
-  defaultProductId,
+  target,
   listingFacts,
   onSubmit,
   onSaved,
   formId,
   onBusyChange,
 }: ActivityFormProps) {
-  const [type, setType] = React.useState<StageId | "">(entry?.type ?? "");
+  const [type, setType] = React.useState<string>(entry?.type ?? "");
   const [customName, setCustomName] = React.useState(entry?.customName ?? "");
   const [description, setDescription] = React.useState(entry?.description ?? "");
   const [urls, setUrls] = React.useState<string[]>(entry?.urls && entry.urls.length ? entry.urls : []);
-  const [productId, setProductId] = React.useState<string>(entry ? (entry.productId ?? "") : (defaultProductId ?? ""));
   const [files, setFiles] = React.useState<AttachedFile[]>(() =>
     (entry?.media ?? []).map((m) => ({
       id: m.id,
@@ -145,6 +144,9 @@ export function ActivityForm({
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const formRef = React.useRef<HTMLFormElement>(null);
+  const typeWrapRef = React.useRef<HTMLDivElement>(null);
+  const dropRef = React.useRef<HTMLDivElement>(null);
 
   // Cleanup bookkeeping: a file this session wrote to IndexedDB is dropped if
   // the form never reaches a successful save (Cancel, Esc, the drawer's ×,
@@ -184,13 +186,12 @@ export function ActivityForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const typeMeta = STAGES.find((s) => s.id === type) ?? null;
   const isOthers = type === "others";
 
   const nonBlankUrls = React.useMemo(() => urls.map((u) => u.trim()).filter(Boolean), [urls]);
   const attachmentsCount = files.filter((f) => f.status !== "error").length;
   const input: ActivityInput = { type, customName, description, urls: nonBlankUrls, attachments: attachmentsCount };
-  const errors = checkActivity(input, products.length);
+  const errors = checkActivity(input);
 
   const nameLen = Array.from(customName.trim()).length;
   const descLen = Array.from(description.trim()).length;
@@ -202,8 +203,34 @@ export function ActivityForm({
   const showDescError = descLen > DESCRIPTION_MAX ? errors.description : touched ? errors.description : null;
   const showAttachError = touched ? errors.attachments : null;
 
-  const stageOptions = STAGES.map((s) => ({ value: s.id, label: s.label, info: s.help }));
-  const productOptions = [{ value: "", label: "Whole project" }, ...products.map((p) => ({ value: p.id, label: p.name }))];
+  const typeOptions = catalogueOf(target).map((d) => ({ value: d.id, label: d.label, info: d.help }));
+  // What counts as proof where it isn't obvious (UX study 2026-10-13): bad news shouldn't wait for a
+  // photo, and a Virtual update must never leak the files buyers paid for.
+  const proofHint =
+    type === "delay-notice" || type === "fix-notice"
+      ? "A screenshot of your supplier's email or a written notice works as proof."
+      : target.kind === "virtual"
+        ? "Don't attach the paid files: buyers get those with their copy. A changelog or a screenshot works."
+        : null;
+
+  // After a refused save, the keyboard goes to the first field at fault (spec §6.2).
+  function focusFirstInvalid() {
+    requestAnimationFrame(() => {
+      const form = formRef.current;
+      const el: HTMLElement | null | undefined = errors.type
+        ? typeWrapRef.current?.querySelector<HTMLElement>("button")
+        : errors.customName
+          ? form?.querySelector<HTMLElement>("#activity-name")
+          : errors.description
+            ? form?.querySelector<HTMLElement>("#activity-description")
+            : errors.urls.some(Boolean)
+              ? form?.querySelector<HTMLElement>('input[aria-invalid="true"]')
+              : errors.attachments
+                ? dropRef.current
+                : null;
+      el?.focus();
+    });
+  }
 
   function handleFiles(list: FileList | null) {
     if (!list || !list.length) return;
@@ -248,7 +275,11 @@ export function ActivityForm({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setTouched(true);
-    if (!errors.ok || filesBusy || saving) return;
+    if (filesBusy || saving) return;
+    if (!errors.ok) {
+      focusFirstInvalid();
+      return;
+    }
 
     setSaving(true);
     setSaveError(null);
@@ -260,11 +291,11 @@ export function ActivityForm({
     const pricing = mode === "add" ? snapshotPrices(listingFacts) : entry?.pricing;
 
     const activity: Activity = {
-      v: 1,
+      v: 2,
       id: entry?.id ?? randomId("act_"),
       projectId,
-      ...(productId ? { productId } : {}),
-      type: type as StageId,
+      target,
+      type,
       ...(isOthers && customName.trim() ? { customName: customName.trim() } : {}),
       description: description.trim(),
       urls: nonBlankUrls,
@@ -288,24 +319,24 @@ export function ActivityForm({
     }
     submittedRef.current = true;
     setSaving(false);
-    const label = isOthers ? customName.trim() || "Activity" : (typeMeta?.label ?? "Activity");
+    const label = labelOf({ target, type, customName });
     onSaved(label);
   }
 
   return (
-    <form id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
-      <p className="text-sm text-text-secondary">
+    <form ref={formRef} id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
+      <p className="text-md text-text-secondary">
         {mode === "add"
-          ? "Show this stage with photos, videos, files or links — buyers see them in your product journey."
-          : "Changes update this stage in your product journey."}
+          ? "Add at least one photo, video, PDF or document as proof — buyers see it in the journey."
+          : "Changes update this entry in the journey. It keeps at least one file."}
       </p>
 
-      <div className="flex flex-col gap-2">
-        <SelectMenu<StageId>
+      <div ref={typeWrapRef} className="flex flex-col gap-2">
+        <SelectMenu<string>
           label="Activity Type"
           value={type || null}
-          options={stageOptions}
-          placeholder="Choose a stage"
+          options={typeOptions}
+          placeholder="Choose a type"
           onChange={(v) => setType(v)}
           error={showTypeError ? errors.type ?? undefined : undefined}
         />
@@ -324,7 +355,7 @@ export function ActivityForm({
             maxLength={200}
             placeholder="Name this stage"
           />
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-md">
             <span className={cn(showNameError ? "text-text-error" : "text-text-tertiary")}>
               {showNameError ?? ""}
             </span>
@@ -347,23 +378,13 @@ export function ActivityForm({
           rows={4}
           placeholder="What happened at this stage?"
         />
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-md">
           <span className={cn(showDescError ? "text-text-error" : "text-text-tertiary")}>{showDescError ?? ""}</span>
           <span className="tabular-nums text-text-tertiary">
             {descLen}/{DESCRIPTION_MAX}
           </span>
         </div>
       </div>
-
-      {products.length >= 2 && (
-        <SelectMenu
-          label="Product"
-          value={productId}
-          options={productOptions}
-          placeholder="Whole project"
-          onChange={setProductId}
-        />
-      )}
 
       <UrlsSection urls={urls} onChange={setUrls} />
 
@@ -376,15 +397,13 @@ export function ActivityForm({
         onRemove={removeFile}
         rejectedCount={rejectedCount}
         onDismissRejected={() => setRejectedCount(0)}
+        error={showAttachError}
+        hint={proofHint}
+        dropRef={dropRef}
       />
 
-      {showAttachError && (
-        <p role="alert" className="text-sm text-text-error">
-          {showAttachError}
-        </p>
-      )}
       {saveError && (
-        <p role="alert" className="text-sm text-text-error">
+        <p role="alert" className="text-md text-text-error">
           {saveError}
         </p>
       )}
@@ -441,20 +460,26 @@ function UrlsSection({ urls, onChange }: { urls: string[]; onChange: (next: stri
                 type="button"
                 onClick={() => onChange(urls.filter((_, j) => j !== i))}
                 aria-label={`Remove link ${i + 1}`}
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+                className="inline-flex size-[36px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
               >
                 <Icon icon={Cancel01Icon} size={16} />
               </button>
             </div>
             {shown && (
-              <p role="alert" className="text-sm text-text-error">
+              <p role="alert" className="text-md text-text-error">
                 Please enter a valid URL starting with https://
               </p>
             )}
           </div>
         );
       })}
-      <Button type="button" hierarchy="secondary" size="sm" className="self-start" onClick={() => onChange([...urls, ""])}>
+      <Button
+        type="button"
+        hierarchy="secondary"
+        size="md"
+        className="self-start text-[length:var(--font-size-md)] max-md:min-h-[var(--touch-min)]"
+        onClick={() => onChange([...urls, ""])}
+      >
         + Add URL
       </Button>
     </div>
@@ -472,6 +497,9 @@ function MediaSection({
   onRemove,
   rejectedCount,
   onDismissRejected,
+  error,
+  hint,
+  dropRef,
 }: {
   files: AttachedFile[];
   dragOver: boolean;
@@ -481,11 +509,28 @@ function MediaSection({
   onRemove: (id: string) => void;
   rejectedCount: number;
   onDismissRejected: () => void;
+  /** PROOF_MISSING once a save was tried with no file; null otherwise. */
+  error: string | null;
+  /** What counts as proof for this type, under the label; null for the default. */
+  hint: string | null;
+  dropRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const errorId = React.useId();
+  const hintId = React.useId();
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-md text-input-label">Attach Media</span>
+      <span className="text-md text-input-label">
+        Attach Media <span aria-hidden className="text-text-error">*</span>
+        <span className="sr-only">(required)</span>
+      </span>
+      {hint && (
+        <p id={hintId} className="m-0 text-md text-text-secondary">
+          {hint}
+        </p>
+      )}
       <div
+        ref={dropRef}
+        aria-describedby={[hint ? hintId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined}
         role="button"
         tabIndex={0}
         onClick={() => fileInputRef.current?.click()}
@@ -511,9 +556,14 @@ function MediaSection({
         )}
       >
         <Icon icon={CloudUploadIcon} size={22} className="text-text-tertiary" />
-        <p className="text-sm font-medium text-text-primary">Click or drag a file to upload</p>
-        <p className="text-xs text-text-tertiary">PNG, JPG, PDF, DOC, GIF, Video or DOCX</p>
+        <p className="text-md font-medium text-text-primary">Click or drag a file to upload</p>
+        <p className="text-md text-text-tertiary">PNG, JPG, PDF, DOC, GIF, Video or DOCX</p>
       </div>
+      {error && (
+        <p id={errorId} role="alert" className="text-md text-text-error">
+          {error}
+        </p>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -526,7 +576,7 @@ function MediaSection({
         }}
       />
       {rejectedCount > 0 && (
-        <p role="alert" className="text-sm text-text-error">
+        <p role="alert" className="text-md text-text-error">
           {rejectedCount === 1 ? "One file wasn't a supported type." : `${rejectedCount} files weren't a supported type.`}{" "}
           <button type="button" onClick={onDismissRejected} className="underline underline-offset-2">
             Dismiss
@@ -542,15 +592,15 @@ function MediaSection({
             >
               {f.kind === "image" && f.previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={f.previewUrl} alt="" className="size-10 shrink-0 rounded object-cover" />
+                <img src={f.previewUrl} alt="" className="size-[40px] shrink-0 rounded object-cover" />
               ) : (
-                <span className="flex size-10 shrink-0 items-center justify-center rounded bg-bg-subtle text-text-tertiary">
+                <span className="flex size-[40px] shrink-0 items-center justify-center rounded bg-bg-subtle text-text-tertiary">
                   <Icon icon={KIND_ICON[f.kind]} size={18} />
                 </span>
               )}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-text-primary">{f.name}</span>
-                <span className="block text-xs text-text-tertiary">
+                <span className="block truncate text-md text-text-primary">{f.name}</span>
+                <span className="block text-md text-text-tertiary">
                   {formatSize(f.size)}
                   {f.status === "saving" && " · Saving…"}
                   {f.status === "error" && " · Couldn't save this file"}
@@ -560,7 +610,7 @@ function MediaSection({
                 type="button"
                 onClick={() => onRemove(f.id)}
                 aria-label={`Remove ${f.name}`}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+                className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
               >
                 <Icon icon={Cancel01Icon} size={14} />
               </button>

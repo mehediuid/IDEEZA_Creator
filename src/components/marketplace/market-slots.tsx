@@ -34,8 +34,8 @@ function MarketProductsSlot({ project, view, now }: SlotProps) {
   const { chats } = useCreateHistory();
   const { record: journey } = useJourney(project.id);
   const cards = React.useMemo(
-    () => productsTabView(view, { owner: false, activities: journey.activities }),
-    [view, journey.activities],
+    () => productsTabView(view, { owner: false, journey, project }),
+    [view, journey, project],
   );
   return (
     <ProductsTab

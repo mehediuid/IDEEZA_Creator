@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { RailBlock, RailFact, RailFacts } from "../details/rail-block";
 
 const TOGGLE =
-  "min-h-[24px] self-start rounded-sm text-sm font-semibold text-text-primary underline decoration-border-strong underline-offset-4 outline-none transition-colors duration-normal ease-decelerate hover:decoration-current focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+  "min-h-[24px] self-start rounded-sm text-md font-semibold text-text-primary underline decoration-border-strong underline-offset-4 outline-none transition-colors duration-normal ease-decelerate hover:decoration-current focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 export function ProductSpecsBlock({ product, partChanges }: { product: BuildProduct; partChanges: string | null }) {
   const facts = productFacts(specOfSource(product), product.parts);
@@ -39,7 +39,7 @@ export function ProductSpecsBlock({ product, partChanges }: { product: BuildProd
         </RailFacts>
       )}
       {!bookedSpec(product) && facts.length > 0 && <p className="text-sm text-text-secondary">Worked out from the parts.</p>}
-      {partChanges && <p className="text-sm leading-relaxed text-text-secondary">Built with your part changes: {partChanges}</p>}
+      {partChanges && <p className="text-md leading-relaxed text-text-secondary">Built with your part changes: {partChanges}</p>}
     </RailBlock>
   );
 }

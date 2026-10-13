@@ -100,7 +100,7 @@ export function SupportDialog({
           creator reads it in the project&apos;s log in this browser.
         </p>
         <div className="flex flex-col gap-3">
-          <label htmlFor={fieldId} className="text-sm font-medium text-text-primary">
+          <label htmlFor={fieldId} className="text-md font-medium text-text-primary">
             Message
           </label>
           <Textarea

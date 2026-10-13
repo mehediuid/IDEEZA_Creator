@@ -99,7 +99,7 @@ function Pill({ lines, owner }: { lines: string[]; owner: boolean }) {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => (open ? close(false) : setOpen(true))}
-        className="inline-flex min-h-[24px] items-center gap-2 rounded-full border border-solid border-border bg-bg-surface px-4 text-xs font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
+        className="inline-flex min-h-[24px] items-center gap-2 rounded-full border border-solid border-border bg-bg-surface px-4 text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
       >
         Utility NFT
         <span
@@ -134,15 +134,15 @@ function Pill({ lines, owner }: { lines: string[]; owner: boolean }) {
             <h2 id={titleId} className="m-0 text-md font-bold text-text-primary">
               Holder benefits
             </h2>
-            <p className="m-0 text-sm text-text-secondary">{copy.lead}</p>
+            <p className="m-0 text-md text-text-secondary">{copy.lead}</p>
             <ul role="list" className="m-0 flex flex-col gap-2 p-0">
               {lines.map((line, i) => (
-                <li key={i} className="text-sm font-medium text-text-primary">
+                <li key={i} className="text-md font-medium text-text-primary">
                   {line}
                 </li>
               ))}
             </ul>
-            <p className="m-0 text-xs leading-relaxed text-text-tertiary">{copy.note}</p>
+            <p className="m-0 text-sm leading-relaxed text-text-tertiary">{copy.note}</p>
           </div>,
           document.body,
         )}

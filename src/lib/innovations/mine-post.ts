@@ -91,7 +91,9 @@ export function minePostOf(project: ManualProject, view: ProjectView, network: s
 
   const mint = view.mint;
   const minted = mint.status !== "notMinted";
-  const stage = project.post?.stage ?? (view.stage && view.stage.id !== "others" ? view.stage.id : null);
+  // The post's status is the project's current Activity, never a second one to keep in step
+  // (owner, 2026-10-13); Others has no place on the stage line, so it shows none.
+  const stage = view.current.type !== "others" ? view.current.type : null;
   return {
     id: postIdOfProject(project.id),
     slug: mineSlugOf(project),

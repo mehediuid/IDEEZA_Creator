@@ -214,7 +214,7 @@ export function ReadinessDialog({
                 if (!owned) setOwnerConfirmed(project.id, Date.now());
               }}
               className={cn(
-                "flex min-h-[32px] items-center gap-[10px] self-start rounded-md px-[4px] text-left text-sm font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus aria-disabled:cursor-default",
+                "flex min-h-[32px] items-center gap-[10px] self-start rounded-md px-[4px] text-left text-md font-medium text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus aria-disabled:cursor-default",
                 TAP,
               )}
             >
@@ -256,13 +256,13 @@ function ReadinessRow({
     <li className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
       <RowThumb row={row} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-sm font-semibold text-text-primary">{name}</span>
-        <span className="flex items-center gap-2 text-sm text-text-secondary">
+        <span className="truncate text-md font-semibold text-text-primary">{name}</span>
+        <span className="flex items-center gap-2 text-md text-text-secondary">
           <StatusGlyph icon={copy.icon} tone={copy.tone} size={14} />
           <span>{copy.text}</span>
         </span>
         {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video`} className="mt-1 max-w-[240px]" />}
-        {copy.sub && <span className="text-xs text-text-tertiary">{copy.sub}</span>}
+        {copy.sub && <span className="text-sm text-text-tertiary">{copy.sub}</span>}
       </div>
       {action && (
         <Button

@@ -142,10 +142,10 @@ export function PlanVersionsMenu({
                   <li key={v.n} className="rounded-lg px-3 py-3 hover:bg-bg-subtle">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-text-primary">
+                        <p className="text-md font-semibold text-text-primary">
                           Version {v.n} · {formatDate(v.createdAt)}
                         </p>
-                        <p className="mt-1 truncate text-xs italic text-text-tertiary" title={v.prompt}>
+                        <p className="mt-1 truncate text-sm italic text-text-tertiary" title={v.prompt}>
                           &ldquo;{v.prompt}&rdquo;
                         </p>
                       </div>
@@ -172,11 +172,11 @@ export function PlanVersionsMenu({
               })}
             </ul>
             {restoreBlocked && plan.versions.length > 1 && (
-              <p id={blockedId} className="mt-3 px-3 text-xs text-text-secondary">
+              <p id={blockedId} className="mt-3 px-3 text-md text-text-secondary">
                 {restoreBlocked}
               </p>
             )}
-            <p className="mt-3 border-t border-solid border-border-subtle pt-3 text-xs text-text-tertiary">
+            <p className="mt-3 border-t border-solid border-border-subtle pt-3 text-sm text-text-tertiary">
               {plan.versions.length} of {MAX_VERSIONS} versions kept — the oldest is removed when a 6th is made.
             </p>
           </div>,

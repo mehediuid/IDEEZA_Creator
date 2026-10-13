@@ -23,7 +23,6 @@ import {
 import type { Readiness, ReadinessPurpose } from "../manual/p2-types";
 import type { ProjectStatus } from "../manual/project-summary";
 import { listingInputFromBrief, listingProblems } from "../market/listing-form";
-import type { StageId } from "../manual/journey";
 import { sharePostBlocker } from "../manual/share-post";
 
 // ── The state ────────────────────────────────────────────────────────────────
@@ -235,9 +234,9 @@ export function detailsMissing(
     if (first) return first;
   }
   if (s.intent === "save" && !s.confirmOwnership) return OWNERSHIP_REASON;
-  // Shared to Innovations: the post needs its story and status (owner, 2026-10-12).
+  // Shared to Innovations: the post needs its story (owner, 2026-10-12); its status is the project's activity.
   if (s.shareToNewsfeed) {
-    const post = sharePostBlocker({ story: s.story, stage: s.shareStage ? (s.shareStage as StageId) : null });
+    const post = sharePostBlocker({ story: s.story });
     if (post) return post;
   }
   const rule = f.readiness?.rules.find((r) => !r.ok && r.fixedIn === "form")?.reason;

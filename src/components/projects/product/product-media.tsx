@@ -78,7 +78,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
   if (!hydrated || !jobsHydrated) {
     return (
       <section aria-labelledby={headingId} aria-busy="true" className="flex flex-col gap-6">
-        <h2 id={headingId} className="text-lg font-bold text-text-primary">
+        <h2 id={headingId} className="text-2xl font-semibold leading-2xl text-text-primary">
           Video
         </h2>
         <div className="aspect-video w-full rounded-xl bg-bg-subtle motion-safe:animate-pulse" />
@@ -91,7 +91,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
     if (!inUse) return null;
     return (
       <section aria-labelledby={headingId} className="flex flex-col gap-6">
-        <h2 id={headingId} className="text-lg font-bold text-text-primary">
+        <h2 id={headingId} className="text-2xl font-semibold leading-2xl text-text-primary">
           Video
         </h2>
         <VideoPlayer take={inUse} productName={name} projectId={project.id} />
@@ -119,7 +119,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
   return (
     <section ref={sectionRef} tabIndex={-1} aria-labelledby={headingId} className="flex flex-col gap-6 outline-none">
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <h2 id={headingId} className="text-lg font-bold text-text-primary">
+        <h2 id={headingId} className="text-2xl font-semibold leading-2xl text-text-primary">
           Video
         </h2>
         {status.state !== "none" && (
@@ -141,7 +141,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
       {status.state === "none" ? (
         // One compact row, not an empty 16:9 box (owner, 2026-10-11).
         <div className="flex flex-col gap-4 rounded-xl border border-dashed border-border bg-bg-surface px-8 py-6 [@container(min-width:560px)]:flex-row [@container(min-width:560px)]:items-center [@container(min-width:560px)]:justify-between [@container(min-width:560px)]:gap-8">
-          <p className="flex max-w-[52ch] flex-col gap-1 text-sm text-text-secondary">
+          <p className="flex max-w-[52ch] flex-col gap-1 text-md text-text-secondary">
             <span className="text-md font-semibold text-text-primary">No video yet</span>
             {NO_VIDEO_LINE}
           </p>
@@ -190,7 +190,7 @@ export function ProductVideoSection({ project, view, product, version, viewer, a
               ))}
             </ul>
             {error && (
-              <p role="alert" className="text-sm text-text-error">
+              <p role="alert" className="text-md text-text-error">
                 {error}
               </p>
             )}
@@ -256,12 +256,12 @@ function TakeRow({
       : progress
         ? `Take ${take.n} · rendering ${Math.round(progress.total)} % · ${etaLabel(progress.etaSec)} left`
         : `Take ${take.n} · ${FAILURE_COPY.interrupted}`;
-    return <li className="px-6 py-5 text-sm text-text-secondary">{line}</li>;
+    return <li className="px-6 py-5 text-md text-text-secondary">{line}</li>;
   }
   return (
     <li className="flex flex-wrap items-center gap-x-6 gap-y-4 px-6 py-5">
       <TakePoster take={take} playing={playing} onPlay={onPlay} />
-      <span className="min-w-0 flex-1 text-sm text-text-primary">{takeLabel(take, formatDate(take.readyAt!))}</span>
+      <span className="min-w-0 flex-1 text-md text-text-primary">{takeLabel(take, formatDate(take.readyAt!))}</span>
       {inUse ? (
         <Badge tone="success" icon={<Icon icon={Tick02Icon} size={12} strokeWidth={2.5} />}>
           In use
@@ -355,11 +355,11 @@ function ProductImages(props: ProductSlotProps) {
   };
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-6">
-      <h2 id={headingId} className="text-lg font-bold text-text-primary">
+      <h2 id={headingId} className="text-2xl font-semibold leading-2xl text-text-primary">
         Images
       </h2>
       {tiles.length === 0 ? (
-        <p className="flex flex-col gap-1 rounded-xl border border-dashed border-border bg-bg-surface px-8 py-6 text-sm text-text-secondary">
+        <p className="flex flex-col gap-1 rounded-xl border border-dashed border-border bg-bg-surface px-8 py-6 text-md text-text-secondary">
           <span className="text-md font-semibold text-text-primary">No images yet</span>
           {"Concept images from its AI builds show here."}
         </p>

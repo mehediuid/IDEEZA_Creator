@@ -93,7 +93,7 @@ export function PublishDialog({
             </Button>
           </div>
           {!pick && (
-            <p id={reasonId} className={cn("text-sm", tried ? "text-text-error" : "text-text-secondary")}>
+            <p id={reasonId} className={cn("text-md", tried ? "text-text-error" : "text-text-secondary")}>
               Pick how it goes out.
             </p>
           )}
@@ -141,10 +141,10 @@ export function PublishDialog({
                 {it.icon}
               </span>
               <span className="text-md font-semibold text-text-primary">{it.label}</span>
-              <span className="text-sm leading-relaxed text-text-secondary">
+              <span className="text-md leading-relaxed text-text-secondary">
                 {(status === "private" && SUB_PRIVATE[it.id as PublishIntent]) || it.sub}
               </span>
-              <span className="rounded-md bg-bg-subtle px-[8px] py-[2px] text-xs font-semibold text-text-secondary">{it.requirement}</span>
+              <span className="rounded-md bg-bg-subtle px-[8px] py-[2px] text-sm font-semibold text-text-secondary">{it.requirement}</span>
             </button>
           );
         })}

@@ -22,7 +22,7 @@ export const EARN_STACK = "flex flex-col gap-16";
 export const EARN_CARD =
   "flex min-w-0 flex-col gap-8 rounded-2xl border border-solid border-border bg-bg-surface p-8 [@container(min-width:640px)]:p-12";
 
-export const EARN_H2 = "m-0 text-xl font-bold leading-xl text-text-primary";
+export const EARN_H2 = "m-0 text-2xl font-semibold leading-2xl text-text-primary";
 export const EARN_H3 = "m-0 text-lg font-semibold leading-lg text-text-primary";
 /** A section's one-line explanation, and a compact empty state's line. */
 export const EARN_LEAD = "m-0 max-w-[62ch] text-md leading-md text-text-secondary";

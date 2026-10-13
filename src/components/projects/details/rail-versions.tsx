@@ -35,7 +35,7 @@ export const RAIL_LINK =
 
 /** "Show all ({n})" under a capped list — quiet, in place, no inner scroller. */
 export const SHOW_ALL =
-  "-mx-3 inline-flex min-h-16 items-center self-start rounded-md px-3 text-sm font-semibold leading-sm text-text-secondary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+  "-mx-3 inline-flex min-h-16 items-center self-start rounded-md px-3 text-md font-semibold leading-md text-text-secondary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 export function RailVersions({ project, view, viewer }: SlotProps) {
   const groups = React.useMemo(
@@ -66,7 +66,7 @@ function VersionList({ groups, total }: { groups: VersionGroup[]; total: number 
       <div className="flex flex-col gap-10">
         {shown.map((g, gi) => (
           <div key={g.key} className="flex flex-col gap-6">
-            <h3 className="text-sm font-medium leading-sm text-text-secondary">
+            <h3 className="text-md font-medium leading-md text-text-secondary">
               {g.chatHref ? (
                 <NextLink href={g.chatHref} className={cn(RAIL_LINK, "inline-flex items-center", stacked && "min-h-[var(--touch-min)]")}>
                   {g.heading}

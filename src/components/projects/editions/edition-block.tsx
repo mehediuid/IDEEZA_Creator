@@ -69,11 +69,11 @@ const KINDS: EditionKind[] = ["physical", "virtual"];
 const USES: EditionUse[] = ["private", "commercial"];
 
 const TAB =
-  "inline-flex h-[32px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-6 text-sm font-semibold outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:h-[var(--touch-min)] max-md:h-[var(--touch-min)]";
+  "inline-flex h-[32px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-6 text-md font-semibold outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus [@media(pointer:coarse)]:h-[var(--touch-min)] max-md:h-[var(--touch-min)]";
 const TAB_ON = "border-text-primary bg-bg-subtle text-text-primary";
 const TAB_OFF = "border-transparent text-text-secondary hover:bg-bg-subtle hover:text-text-primary";
 const LINK =
-  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-sm font-semibold text-text-link underline-offset-2 outline-none hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-semibold text-text-link underline-offset-2 outline-none hover:text-text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 type Listed = EditionTrack & { listing: NonNullable<EditionTrack["listing"]> };
 type Dialog = { kind: "gate" | "list" | "edit" | "add" | "remove"; track: EditionTrack } | null;
@@ -233,7 +233,7 @@ export function EditionTracks({
     <>
       <div className="flex flex-col gap-6">
         {note && (
-          <p className="m-0 flex items-start gap-2 text-sm font-medium text-text-success">
+          <p className="m-0 flex items-start gap-2 text-md font-medium text-text-success">
             <span aria-hidden className="mt-[2px] inline-flex">
               <Icon icon={CheckmarkCircle02Icon} size={14} />
             </span>
@@ -382,7 +382,7 @@ function TrackCard({
       {track.listing ? (
         <>
           <Prices listing={track.listing} plain />
-          {hidden && <p className="m-0 text-sm text-text-secondary">{hiddenLine}</p>}
+          {hidden && <p className="m-0 text-md text-text-secondary">{hiddenLine}</p>}
           <div className="flex flex-wrap gap-4">
             <Button id={`${id}-edit`} type="button" hierarchy="secondary" size="md" className={TAP} onClick={onEdit}>
               Edit
@@ -396,7 +396,7 @@ function TrackCard({
           </div>
         </>
       ) : listBlocked ? (
-        <p className="m-0 text-sm leading-relaxed text-text-secondary">{listBlocked}</p>
+        <p className="m-0 text-md leading-relaxed text-text-secondary">{listBlocked}</p>
       ) : (
         <Button
           id={`${id}-list`}
@@ -424,7 +424,7 @@ function PublicBody({ project, view, product, viewer, tracks }: ProductSlotProps
   return (
     <>
       <KindTabs active={kind} onSelect={setKind}>
-        <p className="m-0 text-sm leading-relaxed text-text-secondary">{helperLineOf(kind, name)}</p>
+        <p className="m-0 text-md leading-relaxed text-text-secondary">{helperLineOf(kind, name)}</p>
         {chain && <ChainFacts chain={chain} />}
         {ofKind.length ? (
           <ul role="list" className="m-0 flex list-none flex-col gap-6 p-0">
@@ -441,7 +441,7 @@ function PublicBody({ project, view, product, viewer, tracks }: ProductSlotProps
             ))}
           </ul>
         ) : (
-          <p className="m-0 text-sm text-text-secondary">{`No ${KIND_WORD[kind]} NFTs of ${name} are on sale.`}</p>
+          <p className="m-0 text-md text-text-secondary">{`No ${KIND_WORD[kind]} NFTs of ${name} are on sale.`}</p>
         )}
       </KindTabs>
       <Link href={`/marketplace/${project.id}`} className={LINK}>

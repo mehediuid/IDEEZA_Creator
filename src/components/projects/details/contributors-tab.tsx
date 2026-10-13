@@ -144,7 +144,7 @@ export function ContributorsTab({
     if (!contributors.length) return null;
     return (
       <div className="flex flex-col gap-6">
-        <h2 className="text-lg font-bold text-text-primary">Contributors</h2>
+        <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Contributors</h2>
         <ul className="flex flex-col gap-4">
           {teamOf(contributors).map((t) => (
             <li key={t.id} className="flex items-center gap-3">
@@ -195,7 +195,7 @@ export function ContributorsTab({
         <>
           {canInvite && (
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <p className="max-w-[52ch] text-sm text-text-secondary">
+              <p className="max-w-[52ch] text-md text-text-secondary">
                 Kept in this browser. Adding someone doesn&apos;t invite or notify them.
               </p>
               <div className="flex flex-col items-end gap-2">
@@ -291,7 +291,7 @@ function Avatar({ name, kind = "contributor" }: { name: string; kind?: "maker" |
   return (
     <span
       aria-hidden
-      className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-xs font-semibold text-text-secondary"
+      className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-full bg-bg-subtle text-sm font-semibold text-text-secondary"
     >
       {kind === "maker" ? <Icon icon={UserIcon} size={16} /> : initialsOf(name)}
     </span>
@@ -349,7 +349,7 @@ function RowActions({
           ref={(el) => editRefs.set(variant, id, el)}
           aria-label={`Edit ${row.name}`}
           onClick={() => onEdit(row)}
-          className={cn(cls, "inline-flex items-center text-sm font-semibold text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus")}
+          className={cn(cls, "inline-flex items-center text-md font-semibold text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus")}
         >
           Edit
         </button>
@@ -359,7 +359,7 @@ function RowActions({
           type="button"
           aria-label={`Remove ${row.name}`}
           onClick={() => onRemove(row)}
-          className={cn(cls, "inline-flex items-center text-sm font-semibold text-text-error outline-none hover:brightness-90 focus-visible:ring-2 focus-visible:ring-border-focus")}
+          className={cn(cls, "inline-flex items-center text-md font-semibold text-text-error outline-none hover:brightness-90 focus-visible:ring-2 focus-visible:ring-border-focus")}
         >
           Remove
         </button>
@@ -370,7 +370,7 @@ function RowActions({
           ref={(el) => previewRefs.set(variant, id, el)}
           aria-label={`Preview as ${row.name}`}
           onClick={() => onPreview(row)}
-          className={cn(cls, "inline-flex items-center text-sm font-semibold text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus")}
+          className={cn(cls, "inline-flex items-center text-md font-semibold text-text-secondary outline-none hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus")}
         >
           Preview
         </button>
@@ -428,7 +428,7 @@ function RosterTable({
           <tbody>
             {noMatch !== null && (
               <tr>
-                <td colSpan={showActions ? 5 : 4} className="px-4 py-6 text-sm text-text-secondary">
+                <td colSpan={showActions ? 5 : 4} className="px-4 py-6 text-md text-text-secondary">
                   {`No one matches "${noMatch}".`}
                 </td>
               </tr>
@@ -469,12 +469,12 @@ function RosterTable({
       {/* Under 560 px: one stacked card per person, same fields and order. */}
       <ul className="hidden flex-col gap-4 [@container(max-width:559px)]:flex">
         {noMatch !== null && (
-          <li className="text-sm text-text-secondary">{`No one matches "${noMatch}".`}</li>
+          <li className="text-md text-text-secondary">{`No one matches "${noMatch}".`}</li>
         )}
         {rows.map((row) => (
           <li key={row.key} className="flex flex-col gap-3 rounded-lg border border-solid border-border p-4">
             <PersonCell row={row} />
-            <div className="flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+            <div className="flex flex-wrap items-center gap-2 text-md text-text-secondary">
               <span>{row.role}</span>
               <span aria-hidden>·</span>
               <ShareCell row={row} />

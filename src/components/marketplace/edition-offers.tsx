@@ -31,6 +31,8 @@ import { formatAmount } from "@/lib/wallet/money";
 import type { DemoBuyerId } from "@/lib/wallet/types";
 import { cn } from "@/lib/utils";
 import { TIER_WORD, useEditionPurchase, type EditionTier } from "./purchase-dialog";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { formatDate } from "@/lib/manual/project-summary";
 
 const TIERS: EditionTier[] = ["regular", "extended"];
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -83,33 +85,56 @@ export function EditionOffers({
             <h4 className="m-0 text-md font-semibold text-text-primary">{g.name}</h4>
           )}
           <ul role="list" className="m-0 flex list-none flex-col gap-4 p-0">
-            {g.tracks.map((t) => (
-              <li key={t.id}>
-                {buyerId ? (
-                  <BuyableOffer
-                    project={project}
-                    view={view}
-                    viewer={viewer}
-                    buyerId={buyerId}
-                    track={t as Listed}
-                    announce={announce}
-                  />
-                ) : (
-                  <OfferFrame track={t as Listed} view={view}>
-                    <RailFacts>
-                      <RailFact label="Price">
-                        <span className="tabular-nums">{formatAmount(t.listing!.regular, t.listing!.token)}</span>
-                      </RailFact>
-                      {t.listing!.extended !== t.listing!.regular && (
-                        <RailFact label="With future updates">
-                          <span className="tabular-nums">{formatAmount(t.listing!.extended, t.listing!.token)}</span>
-                        </RailFact>
-                      )}
-                    </RailFacts>
-                  </OfferFrame>
-                )}
-              </li>
-            ))}
+            {g.tracks.map((t, i) => {
+              // One activity block per (scope, kind), above that kind's first card (spec §7.2):
+              // Personal and Business share the target. `g.productId` is PROJECT_SCOPE or a product id.
+              const target = { kind: t.kind, scope: g.productId } as const;
+              const first = i === 0 || g.tracks[i - 1].kind !== t.kind;
+              const kind = t.kind === "physical" ? "Physical" : "Virtual";
+              const of = isProjectScope(g.productId) ? "the whole project" : g.name;
+              const listedAt = Math.min(...g.tracks.filter((x) => x.kind === t.kind).map((x) => x.listing?.listedAt ?? Infinity));
+              return (
+                <React.Fragment key={t.id}>
+                  {first && (
+                    <li>
+                      <ActivityNow
+                        variant="line"
+                        projectId={project.id}
+                        target={target}
+                        label={`${kind} copies`}
+                        heading={`${kind} copies of ${of} · Activity`}
+                        emptyNote={Number.isFinite(listedAt) ? `No activity yet · listed ${formatDate(listedAt)}` : "No activity yet"}
+                      />
+                    </li>
+                  )}
+                  <li>
+                    {buyerId ? (
+                      <BuyableOffer
+                        project={project}
+                        view={view}
+                        viewer={viewer}
+                        buyerId={buyerId}
+                        track={t as Listed}
+                        announce={announce}
+                      />
+                    ) : (
+                      <OfferFrame track={t as Listed} view={view}>
+                        <RailFacts>
+                          <RailFact label="Price">
+                            <span className="tabular-nums">{formatAmount(t.listing!.regular, t.listing!.token)}</span>
+                          </RailFact>
+                          {t.listing!.extended !== t.listing!.regular && (
+                            <RailFact label="With future updates">
+                              <span className="tabular-nums">{formatAmount(t.listing!.extended, t.listing!.token)}</span>
+                            </RailFact>
+                          )}
+                        </RailFacts>
+                      </OfferFrame>
+                    )}
+                  </li>
+                </React.Fragment>
+              );
+            })}
           </ul>
         </div>
       ))}
@@ -169,7 +194,7 @@ function BuyableOffer({
   return (
     <OfferFrame track={track} view={view}>
       {oneTier ? (
-        <p className="m-0 text-sm leading-relaxed text-text-secondary">Includes every future version of this design.</p>
+        <p className="m-0 text-md leading-relaxed text-text-secondary">Includes every future version of this design.</p>
       ) : (
       <div className="flex flex-col gap-2">
         <span id={labelId} className="text-sm font-medium text-text-secondary">
@@ -205,12 +230,12 @@ function BuyableOffer({
                 <Radio checked={on} decorative size="sm" className="mt-[2px]" />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="flex flex-wrap items-baseline justify-between gap-x-4">
-                    <span className="text-sm font-semibold text-text-primary">{TIER_WORD[t]}</span>
-                    <span className="text-sm font-semibold tabular-nums text-text-primary">
+                    <span className="text-md font-semibold text-text-primary">{TIER_WORD[t]}</span>
+                    <span className="text-md font-semibold tabular-nums text-text-primary">
                       {formatAmount(price, track.listing.token)}
                     </span>
                   </span>
-                  <span className="text-xs leading-relaxed text-text-secondary">{TIER_HELP[t]}</span>
+                  <span className="text-md leading-relaxed text-text-secondary">{TIER_HELP[t]}</span>
                 </span>
               </button>
             );
@@ -237,7 +262,7 @@ function BuyableOffer({
           {`Buy now · ${formatAmount(tier === "regular" ? track.listing.regular : track.listing.extended, track.listing.token)}`}
         </Button>
       ) : card.soldOut ? (
-        <p className="m-0 text-sm text-text-secondary">All {card.total} are sold.</p>
+        <p className="m-0 text-md text-text-secondary">All {card.total} are sold.</p>
       ) : null}
     </OfferFrame>
   );

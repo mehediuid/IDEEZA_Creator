@@ -155,13 +155,13 @@ export function stageLineOf(e: Pick<EngineeringState, "state" | "version">, s: P
 
 /** The engineering meta line: the stage line already counts the products and names the
  *  version, so this keeps the rest of COR-10's line — "Saved Sep 26, 2026[ · build not in this
- *  browser][ · Stage Prototype]". No ownership lead: who holds what is Earn › Splits. */
-export function engineeringMetaOf(s: Pick<ProjectSummary, "when" | "source">, stage: { short: string } | null): MetaPart[] {
+ *  browser][ · Now: Prototype]". No ownership lead: who holds what is Earn › Splits. */
+export function engineeringMetaOf(s: Pick<ProjectSummary, "when" | "source">, now: { label: string } | null): MetaPart[] {
   const at = s.when.at;
   const meta: MetaPart[] = [
     { kind: "time", time: { text: `${s.when.label} ${formatDate(at)}`, dateTime: new Date(at).toISOString(), title: formatDateTime(at) } },
   ];
   if (s.source.kind === "build-gone") meta.push({ kind: "text", text: "build not in this browser" });
-  if (stage) meta.push({ kind: "text", text: `Stage ${stage.short}` });
+  if (now) meta.push({ kind: "text", text: `Now: ${now.label}` });
   return meta;
 }

@@ -167,7 +167,7 @@ export function StepReview({
       <div className="flex flex-col gap-[20px]">
         <div>
           <h1 className="m-0 text-2xl font-bold tracking-tight text-text-primary">Review and sign</h1>
-          <p className="mt-[6px] max-w-[62ch] text-sm text-text-secondary">{SUB_BY_INTENT[intent]}</p>
+          <p className="mt-[6px] max-w-[62ch] text-md text-text-secondary">{SUB_BY_INTENT[intent]}</p>
         </div>
 
         <section aria-label="What is minted" className="flex flex-col gap-[14px]">
@@ -175,7 +175,7 @@ export function StepReview({
             <Thumb src={imageUrl ?? null} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-lg font-bold text-text-primary">{project.name}</div>
-              <p className="m-0 mt-[2px] line-clamp-3 max-w-[62ch] text-sm leading-relaxed text-text-secondary">
+              <p className="m-0 mt-[2px] line-clamp-3 max-w-[62ch] text-md leading-relaxed text-text-secondary">
                 {project.description.trim() || "No description yet."}
               </p>
               <div className="mt-[4px] text-sm text-text-tertiary">{project.detail}</div>
@@ -185,11 +185,11 @@ export function StepReview({
             {termsOf(state, intent, type, input).map((r) => (
               <div key={r.label} className="flex flex-wrap items-baseline justify-between gap-x-[16px] gap-y-[2px] py-[8px]">
                 <dt className="text-sm text-text-secondary">{r.label}</dt>
-                <dd className="m-0 min-w-0 text-right text-sm font-medium tabular-nums text-text-primary">{r.value}</dd>
+                <dd className="m-0 min-w-0 text-right text-md font-medium tabular-nums text-text-primary">{r.value}</dd>
               </div>
             ))}
           </dl>
-          {intent === "sell" && <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-text-secondary">{SHARE_SALE_NOTE}</p>}
+          {intent === "sell" && <p className="m-0 max-w-[62ch] text-md leading-relaxed text-text-secondary">{SHARE_SALE_NOTE}</p>}
         </section>
 
         <section aria-labelledby={headingId} className="flex flex-col gap-[10px]">
@@ -206,7 +206,7 @@ export function StepReview({
               ))}
             </ul>
           ) : null}
-          <p className="m-0 text-sm text-text-secondary">{videosLine}</p>
+          <p className="m-0 text-md text-text-secondary">{videosLine}</p>
           {counts.missing > 0 ? (
             // The videos open over the review: the maker never leaves the mint (owner, 2026-10-12).
             <MakeVideosButton projectId={project.id} label={MAKE_VIDEOS} className={cn(TAP, "self-start")} />
@@ -227,11 +227,11 @@ export function StepReview({
         {intent === "sell" && (
           <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-2xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+              <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
               <TestnetDemoBadge />
             </div>
             {eachSaleRows(input, listingCtx).map((r, i) => (
-              <p key={i} className="m-0 text-sm text-text-secondary">
+              <p key={i} className="m-0 text-md text-text-secondary">
                 {r.label ? (
                   <>
                     <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
@@ -271,7 +271,7 @@ export function StepReview({
             )}
           </button>
           {missing ? (
-            <p id={reasonId} className="m-0 text-center text-sm leading-relaxed text-text-secondary">
+            <p id={reasonId} className="m-0 text-center text-md leading-relaxed text-text-secondary">
               {missing}
               {detailsMissing === missing ? (
                 <>
@@ -279,7 +279,7 @@ export function StepReview({
                   <button
                     type="button"
                     onClick={onBack}
-                    className={`inline-flex items-center border-0 bg-transparent p-0 text-sm font-semibold text-text-primary underline underline-offset-2 ${TAP}`}
+                    className={`inline-flex items-center border-0 bg-transparent p-0 text-md font-semibold text-text-primary underline underline-offset-2 ${TAP}`}
                   >
                     Change the details
                   </button>
@@ -288,7 +288,7 @@ export function StepReview({
             </p>
           ) : null}
           {mintError && !minting ? (
-            <p role="status" className="m-0 text-center text-sm leading-relaxed text-text-primary">
+            <p role="status" className="m-0 text-center text-md leading-relaxed text-text-primary">
               {mintError}
             </p>
           ) : null}

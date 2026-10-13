@@ -236,7 +236,7 @@ test("the mint showcases at the mint time itself: one moment for mintedAt and sh
   // A fresh mint stamps the proof's time; a minted project carried on keeps its first one.
   assert.match(writes, /mintedAt: carryOn \? \(s\.mintedAt \?\? at\) : at\b/);
   // Shared at the mint once every video is ready (a private mint never waits for them; owner, 2026-10-12).
-  assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) \{\s*setShowcase\(cur\.id, true, at, \{ story: s\.story\.trim\(\), stage:/);
+  assert.match(writes, /if \(s\.shareToNewsfeed && shareReady && cur\.showcasedAt == null\) \{\s*setShowcase\(cur\.id, true, at, \{ story: s\.story\.trim\(\) \}\);/);
   assert.doesNotMatch(writes, /Date\.now\(\)/, "the writes take the proof's time, never a second clock read");
   assert.match(app, /commit: \(proof\) => writeAll\(proof\.at, proof\)/);
   // The store writes the time it is handed; a press with none is stamped now.

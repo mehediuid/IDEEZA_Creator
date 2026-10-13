@@ -11,8 +11,8 @@
 //   sharing first runs the
 //   videos-and-ownership gate (P2-VIDEO-15), opening the ReadinessDialog when
 //   something is missing. Once shared it opens the post, where Edit post and
-//   Stop sharing live (plan D8, 2026-10-13);
-// - Activity — the phase-and-status notes drawer (P2-TABS-5), with its count;
+//   Stop sharing live (plan D8, 2026-10-13). Activity is not here: it is the
+//   card at the top of the rail;
 // - Delete project… — set apart at the end, in the error colour. While a rule
 //   blocks it (§3.8.4: a sale, an auction, a listing, a co-owner) it stays in
 //   the menu, aria-disabled, with the reason under it.
@@ -25,7 +25,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity01Icon,
   Delete02Icon,
   MoreHorizontalIcon,
   News01Icon,
@@ -34,9 +33,6 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { IconButton } from "@/components/ideeza";
 import { DeleteProjectDialog } from "@/components/projects/delete-project-dialog";
-import { activitiesFor } from "@/lib/manual/journey";
-import { useJourney } from "@/lib/manual/journey-store";
-import { isPreview } from "@/lib/manual/buyer-preview";
 import { earnMintHref } from "@/lib/manual/earn-route";
 import { can, deleteBlockOf } from "@/lib/manual/permissions";
 import { formatDate } from "@/lib/manual/project-summary";
@@ -45,7 +41,6 @@ import { outcomeView } from "@/lib/manual/rail-copy";
 import { shareAnnouncement } from "@/lib/manual/showcase-copy";
 import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { cn } from "@/lib/utils";
-import { ActivityDrawer } from "./activity/drawer";
 import { ShareDialog } from "../share-dialog";
 import type { SlotProps } from "./slots";
 
@@ -65,7 +60,6 @@ export function ProjectMenu({
   view,
   viewer,
   brief,
-  now,
   announce,
   canEdit,
   onEdit,
@@ -77,15 +71,11 @@ export function ProjectMenu({
 }) {
   const router = useRouter();
   const { setShowcase } = useManualProjects();
-  const { record } = useJourney(project.id);
   const [open, setOpen] = React.useState(false);
-  const [layer, setLayer] = React.useState<"activity" | "share" | "delete" | null>(null);
+  const [layer, setLayer] = React.useState<"share" | "delete" | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const menuId = React.useId();
-
-  const products = React.useMemo(() => view.products.map((p) => ({ id: p.id, name: p.name })), [view.products]);
-  const activityCount = activitiesFor(record, {}).length;
 
   // Sharing: what Showcase was. Null on a Draft (the Brief's minted rule decides first).
   const readiness = view.videos.readiness.showcase;
@@ -122,13 +112,6 @@ export function ProjectMenu({
                 },
           ]
         : []),
-      {
-        id: "activity",
-        label: "Activity",
-        sub: activityCount === 0 ? "Notes on its phase and status" : `${activityCount} ${activityCount === 1 ? "note" : "notes"}`,
-        icon: Activity01Icon,
-        run: () => setLayer("activity"),
-      },
     ],
     can(viewer, "project.delete")
       ? [
@@ -234,22 +217,6 @@ export function ProjectMenu({
         </div>
       )}
 
-      <ActivityDrawer
-        open={layer === "activity"}
-        onClose={() => {
-          setLayer(null);
-          requestAnimationFrame(() => {
-            const at = document.activeElement;
-            if (!at || at === document.body) triggerRef.current?.focus();
-          });
-        }}
-        projectId={project.id}
-        products={products}
-        canWrite={can(viewer, "activity.write", view.canCtx)}
-        isPreview={isPreview(viewer)}
-        announce={announce}
-        now={now}
-      />
       {layer === "share" && (
         <ShareDialog
           project={project}

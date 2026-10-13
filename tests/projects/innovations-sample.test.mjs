@@ -8,7 +8,7 @@ const { SAMPLE_POSTS, samplePostBySlug, samplePostOf, sampleCommentsOf } = await
   "../../.tmp-test/lib/innovations/sample-posts.js"
 );
 const { PROJECTS, CATEGORIES } = await import("../../.tmp-test/lib/feed.js");
-const { STAGES } = await import("../../.tmp-test/lib/manual/journey.js");
+const { CATALOGUES, LEGACY_TYPES } = await import("../../.tmp-test/lib/manual/journey.js");
 const { SAMPLE_PEOPLE_IDS, personOf } = await import("../../.tmp-test/lib/innovations/people.js");
 const { postIdOfSample } = await import("../../.tmp-test/lib/innovations/slug.js");
 const { ME_ID } = await import("../../.tmp-test/lib/innovations/types.js");
@@ -17,7 +17,8 @@ const { MAX_DEPTH, depthOf } = await import("../../.tmp-test/lib/innovations/com
 const NOW = Date.UTC(2026, 9, 13, 12, 0);
 const MIN = 60_000;
 const PIECE_ORDER = ["3d", "pcb", "code", "wiring", "parts"];
-const REAL_STAGES = STAGES.map((s) => s.id).filter((id) => id !== "others");
+// A post's status is a project Activity type (owner, 2026-10-13), Planning to Improvement.
+const REAL_STAGES = CATALOGUES.project.map((s) => s.id).filter((id) => id !== "others");
 const sentences = (s) => s.split(/(?<=[.!?])\s+/).filter(Boolean).length;
 
 test("every feed project has a sample post, in feed order, with the feed's fields", () => {
@@ -81,10 +82,11 @@ test("every post's copy, stage, licence and listing follow the rules", () => {
   const minted = SAMPLE_POSTS.filter((p) => p.minted);
   const listed = minted.filter((p) => p.listing);
   assert.ok(listed.length >= minted.length / 3 && listed.length <= (minted.length * 2) / 3, `${listed.length} of ${minted.length} listed`);
-  // Spread over the real stages, mostly Prototype Development … Pilot Production Run.
+  // Spread over the stages, mostly Prototype … Pilot run. The samples were written against v1's
+  // eleven stages and read through LEGACY_TYPES, so they cover every type v1 had.
   const stages = new Set(SAMPLE_POSTS.map((p) => p.stage));
-  assert.equal(stages.size, REAL_STAGES.length);
-  const middle = REAL_STAGES.slice(REAL_STAGES.indexOf("prototype-development"), REAL_STAGES.indexOf("pilot-production-run") + 1);
+  assert.equal(stages.size, new Set([...LEGACY_TYPES.values()].filter((id) => id !== "others")).size);
+  const middle = REAL_STAGES.slice(REAL_STAGES.indexOf("prototype"), REAL_STAGES.indexOf("pilot-run") + 1);
   assert.ok(SAMPLE_POSTS.filter((p) => middle.includes(p.stage)).length > SAMPLE_POSTS.length / 2);
 });
 
@@ -162,7 +164,7 @@ test("smart-plant-watering-hub matches the approved mockup", () => {
     post.description,
     "A Wi-Fi watering hub for up to four pots. Each capacitive probe reports soil moisture over a low-power mesh, and the hub opens a pump channel when a pot drops below its threshold, then logs every watering. It runs from a 5 V USB-C supply, with an optional 18650 cell in each probe. Set thresholds and see the history on the hub's OLED or in the small dashboard it serves on your network.",
   );
-  assert.equal(post.stage, "testing-refinement");
+  assert.equal(post.stage, "testing");
   assert.equal(post.network, "Mesh · 1 hub, 4 probes");
   assert.equal(post.license, "Commercial use");
   assert.equal(post.chain, "Polygon");

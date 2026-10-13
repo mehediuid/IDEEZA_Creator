@@ -936,13 +936,13 @@ export function nextStep(args: {
   return null;
 }
 
-// ─────────────────────────── activityOf ───────────────────────────
+// ─────────────────────────── buildLogOf ───────────────────────────
 
-export type ActivityTone = "plain" | "done" | "working" | "waiting" | "error" | "neutral";
+export type BuildLogTone = "plain" | "done" | "working" | "waiting" | "error" | "neutral";
 
-export type ActivityEntry = {
+export type BuildLogEntry = {
   id: string;
-  tone: ActivityTone;
+  tone: BuildLogTone;
   title: string;
   detail?: string;
   ts: number;
@@ -954,15 +954,15 @@ export type ActivityEntry = {
  *  something that no longer matters (diagnosis item 2). `names` is the
  *  host's own `productNameOf` bound to its `setup`, so this module never
  *  has to special-case which turn's product needs which fallback. */
-export function activityOf(
+export function buildLogOf(
   chat: ChatSession,
   labels: Map<string, string>,
   names: (t: AssistantTurn) => string | undefined,
   job?: BuildJob | null,
   projectName?: string,
-): ActivityEntry[] {
+): BuildLogEntry[] {
   const turns = chat.turns;
-  const entries: ActivityEntry[] = [];
+  const entries: BuildLogEntry[] = [];
 
   for (let i = 0; i < turns.length; i++) {
     const t = turns[i];

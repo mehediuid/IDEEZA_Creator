@@ -166,7 +166,7 @@ export type ManualProject = {
   legal?: ProjectLegal;
   /** The description coachmark, dismissed (P2-TABS-22). */
   descriptionHint?: DescriptionHint;
-  /** The Innovations post a share carries: the maker's story and the project's status (owner, 2026-10-12). */
+  /** The Innovations post a share carries: the maker's story (owner, 2026-10-12); its status is the project's current activity. */
   post?: SharePost;
 };
 

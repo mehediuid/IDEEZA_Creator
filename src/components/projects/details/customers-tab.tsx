@@ -112,7 +112,7 @@ export function CustomersPanel({
     <div className={cn("flex flex-col", embedded ? "gap-8" : "gap-16")}>
       {!embedded && (
         <div className="flex flex-wrap items-center gap-8">
-          <h2 className="text-lg font-bold text-text-primary">Customers</h2>
+          <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Customers</h2>
           <TestnetDemoBadge />
         </div>
       )}
@@ -224,7 +224,7 @@ function EmptyState({
         copy.link ? (
           <a
             href={copy.link.href}
-            className="min-h-[24px] rounded-sm text-sm font-semibold text-text-link outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+            className="min-h-[24px] rounded-sm text-md font-semibold text-text-link outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             {copy.link.label}
           </a>
@@ -308,14 +308,14 @@ function DisclosureBody({
           aria-hidden={!open}
           className={cn("flex flex-col gap-8 py-8", !open && "pointer-events-none")}
         >
-          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-16 gap-y-6 text-sm">
+          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-16 gap-y-6 items-baseline text-sm">
             {text.detail.map((d, i) => (
               <React.Fragment key={`${d.term}-${i}`}>
                 <dt className="font-medium text-text-secondary">{d.term}</dt>
-                <dd className="m-0 min-w-0 break-words text-text-primary">
+                <dd className="m-0 min-w-0 break-words text-md text-text-primary">
                   {d.term === "Wallet" ? (
                     <span className="inline-flex flex-wrap items-center gap-4">
-                      <span className="break-all font-mono text-sm">{d.value}</span>
+                      <span className="break-all font-mono text-md">{d.value}</span>
                       <IconButton
                         type="button"
                         size="sm"
@@ -458,9 +458,9 @@ function ListRow({
           <span className="min-w-0 truncate font-semibold text-text-primary">{text.buyer}</span>
           <Chevron open={open} />
         </button>
-        <span className="shrink-0 text-right text-sm font-semibold text-text-primary">{text.price}</span>
+        <span className="shrink-0 text-right text-md font-semibold text-text-primary">{text.price}</span>
       </div>
-      <p className="mt-4 truncate text-sm text-text-secondary">{itemLine}</p>
+      <p className="mt-4 truncate text-md text-text-secondary">{itemLine}</p>
       <p className="mt-2 flex items-center gap-4 text-sm text-text-tertiary">
         <When at={row.at} /> <span aria-hidden>·</span> {text.benefits ?? <NoneCell />}
       </p>

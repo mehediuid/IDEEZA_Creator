@@ -11,7 +11,7 @@ import { saveDraftLicense } from "@/lib/commerce/license";
 import { cn } from "@/lib/utils";
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-const ERROR = "text-sm text-[color:var(--color-input-error-text)]";
+const ERROR = "text-md text-[color:var(--color-input-error-text)]";
 
 const LICENSE_OPTIONS: SelectOption<License>[] = LICENSES.map((l) => ({ value: l.value, label: l.label, info: l.info }));
 

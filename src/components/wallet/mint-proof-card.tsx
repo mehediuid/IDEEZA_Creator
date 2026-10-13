@@ -60,14 +60,14 @@ export function MintProofCard({
         </h3>
         <TestnetDemoBadge />
       </div>
-      <dl className="flex flex-col gap-[10px] text-sm">
+      <dl className="flex flex-col gap-[10px] text-md">
         {rows.map((r) => (
           <div key={r.key} className="flex flex-col gap-[2px]">
-            <dt className="text-xs font-medium text-text-tertiary">{r.label}</dt>
+            <dt className="text-sm font-medium text-text-tertiary">{r.label}</dt>
             <dd className="font-medium text-text-primary tabular-nums">
               <Parts parts={r.value} />
             </dd>
-            {r.note && <dd className="text-xs leading-relaxed text-text-secondary">{r.note}</dd>}
+            {r.note && <dd className="text-md leading-relaxed text-text-secondary">{r.note}</dd>}
           </div>
         ))}
       </dl>

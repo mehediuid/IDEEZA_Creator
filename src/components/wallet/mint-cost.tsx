@@ -53,14 +53,14 @@ export function MintCostRows({
   return (
     <div className={cn("flex flex-col gap-[8px] rounded-lg bg-bg-surface-raised p-[16px]", className)}>
       <div className="flex items-center justify-between gap-[8px]">
-        <span className="text-2xs font-bold uppercase tracking-caps text-text-tertiary">Cost</span>
+        <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Cost</span>
         <TestnetDemoBadge />
       </div>
       {rows.map((r, i) => {
         if (!r.label && r.note) {
           const note = intent === "give" && type === "lazy" ? GIVE_LAZY_NOTE : r.note;
           return (
-            <p key={`note-${i}`} className="text-xs leading-relaxed text-text-tertiary">
+            <p key={`note-${i}`} className="text-md leading-relaxed text-text-tertiary">
               {note}
             </p>
           );
@@ -73,7 +73,7 @@ export function MintCostRows({
             <div
               className={cn(
                 "flex flex-wrap justify-between gap-x-[12px]",
-                r.bold ? "text-md font-bold text-text-primary" : "text-sm font-medium text-text-secondary",
+                r.bold ? "text-md font-bold text-text-primary" : "text-md font-medium text-text-secondary",
               )}
             >
               <span>{r.label}</span>
@@ -85,7 +85,7 @@ export function MintCostRows({
           </React.Fragment>
         );
       })}
-      {type === "instant" && <p className="text-xs leading-relaxed text-text-tertiary">{ESTIMATE_NOTE}</p>}
+      {type === "instant" && <p className="text-sm leading-relaxed text-text-tertiary">{ESTIMATE_NOTE}</p>}
     </div>
   );
 }
@@ -138,11 +138,11 @@ export function WalletFactLine({
         // Not read yet: a reserved line, never a flash of "No wallet connected" (P2-MINT-1).
         <span aria-hidden className="block h-[20px] w-3/4 rounded-md bg-bg-subtle" />
       ) : (
-        <p className={cn("text-sm leading-relaxed", warning ? "font-medium text-text-primary" : "text-text-secondary")}>
+        <p className={cn("text-md leading-relaxed", warning ? "font-medium text-text-primary" : "text-text-secondary")}>
           {fact.line}
         </p>
       )}
-      <p className="text-sm leading-relaxed text-text-secondary">{COPY_NOTE}</p>
+      <p className="text-md leading-relaxed text-text-secondary">{COPY_NOTE}</p>
     </div>
   );
 }

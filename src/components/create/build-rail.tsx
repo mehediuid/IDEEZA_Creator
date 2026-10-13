@@ -133,7 +133,7 @@ export function PipelineRow({ item }: { item: BuildItem }) {
     >
       {tone === "waiting" ? (
         // Not started yet: a still dot, never a spinner that doesn't spin —
-        // the rail's Activity draws waiting the same way.
+        // the rail's build log draws waiting the same way.
         <span
           aria-hidden
           className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center"

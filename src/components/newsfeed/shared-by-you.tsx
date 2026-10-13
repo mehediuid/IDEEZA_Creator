@@ -4,10 +4,10 @@
 // (the project page's ⋯ › Share to Innovations; `showcasedAt` on the
 // project). The feed below is a sample dataset with no write path, so a
 // shared project shows here, at the top of Innovations, newest first: a
-// cover, the name with the post's status, its story, its product count and
-// when it was shared, linking to its post — what visitors see, with the
-// maker's own controls on top (plan D8). Nothing renders until the stores are
-// read, or when nothing is shared.
+// cover, the name with the project's current activity (its status, here and
+// on the post), its story, its product count and when it was shared, linking
+// to its post — what visitors see, with the maker's own controls on top (plan
+// D8). Nothing renders until the stores are read, or when nothing is shared.
 
 import * as React from "react";
 import Link from "next/link";
@@ -17,8 +17,9 @@ import { useCreateHistory } from "@/lib/create/history";
 import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { buildsOf, coverOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
+import { currentOf, labelOf } from "@/lib/manual/journey";
+import { readJourney } from "@/lib/manual/journey-store";
 import { useManualProjects } from "@/lib/manual/projects";
-import { stageWordOf } from "@/lib/manual/share-post";
 
 export function SharedByYou() {
   const { projects, hydrated } = useManualProjects();
@@ -38,7 +39,9 @@ export function SharedByYou() {
           at: p.showcasedAt as number,
           cover: coverOf(p, buildsOf(p, builds)),
           story: p.post?.story.trim() ?? "",
-          status: stageWordOf(p.post?.stage ?? null),
+          status: labelOf(
+            currentOf(readJourney(p.id), p.id, { kind: "project" }, p.createdAt) ?? { target: { kind: "project" }, type: "planning" },
+          ),
         })),
     [projects, builds],
   );

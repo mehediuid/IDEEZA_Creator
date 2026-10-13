@@ -38,6 +38,7 @@ import { MintDetails } from "../details/rail-outcome";
 import type { SlotProps } from "../details/slots";
 import { useCommitGate } from "./ladder/level-check";
 import { earnSourceOf } from "./ladder/use-earn-facts";
+import { NftActivityLine } from "./nft-activity";
 import { COPY_KINDS, CopyRow, EarnProducts, KindDot, RowButton, RowLink, SellRow, StateLines, WHOLE_PROJECT } from "./editions";
 import { EARN_LINK, EARN_STACK, EarnBlock, TAP } from "./surface";
 
@@ -63,7 +64,7 @@ function SellRules() {
               <KindDot kind={r.id} />
               {r.title}
             </span>
-            <span className="text-sm leading-sm text-text-secondary">{r.line}</span>
+            <span className="text-md leading-md text-text-secondary">{r.line}</span>
             <span className="mt-1 text-sm font-semibold leading-sm text-text-tertiary">{r.where}</span>
           </li>
         ))}
@@ -85,12 +86,12 @@ function WholeProject(props: SlotProps) {
           <CopyRow key={kind} {...props} kind={kind} scope={WHOLE_PROJECT} />
         ))}
       </div>
-      <p className="m-0 rounded-xl bg-bg-subtle px-6 py-5 text-sm leading-sm text-text-secondary">
+      <p className="m-0 rounded-xl bg-bg-subtle px-6 py-5 text-md leading-md text-text-secondary">
         <strong className="font-semibold text-text-primary">{MAIN_SALE_NOTE}</strong> {MAIN_SALE_DETAIL}
       </p>
       <MintDetails summary={view.summary} commerce={view.commerce} viewer={viewer} view={view} announce={announce}>
         {summaryOf && (
-          <Link href={summaryOf.href} className={cn(EARN_LINK, "text-sm")}>
+          <Link href={summaryOf.href} className={EARN_LINK}>
             Open the mint summary
             <Icon icon={ArrowRight01Icon} size={14} />
           </Link>
@@ -139,6 +140,7 @@ function MainRow(props: SlotProps) {
 
   return (
     <SellRow kind="main" label="Main NFT" stateId={stateId} state={<StateLines lines={[state.line]} live={state.live} />} action={action}>
+      {view.summary.status !== "draft" && view.mint.status !== "notMinted" && <NftActivityLine {...props} target={{ kind: "main" }} />}
       {steps && listing && <ListingFlow {...props} action={listing} violet={false} className="" />}
       {state.action === "manage" && open && (
         <div id={panelId}>

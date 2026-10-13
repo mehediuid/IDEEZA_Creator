@@ -67,14 +67,14 @@ function EditPauseDialogOpen({ onCancel, onConfirm, error }: EditPauseDialogProp
             </Button>
           </div>
           {!ticked && (
-            <p id={hintId} className="text-sm text-text-secondary">
+            <p id={hintId} className="text-md text-text-secondary">
               Tick the box to continue.
             </p>
           )}
         </div>
       }
     >
-      <div className="flex flex-col gap-[12px] text-sm leading-relaxed text-text-secondary">
+      <div className="flex flex-col gap-[12px] text-md leading-relaxed text-text-secondary">
         <p>
           Buyers see this project as it was listed. Changing it takes the listing off the marketplace until you
           relist it.

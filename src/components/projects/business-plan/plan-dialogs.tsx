@@ -66,7 +66,7 @@ export function GenerateBusinessPlanDialog({
       }
     >
       <div className="flex flex-col gap-3">
-        <label htmlFor="business-plan-prompt" className="text-sm font-semibold text-text-primary">
+        <label htmlFor="business-plan-prompt" className="text-md font-semibold text-text-primary">
           Describe your product
         </label>
         <Textarea
@@ -79,12 +79,12 @@ export function GenerateBusinessPlanDialog({
         <p id="business-plan-prompt-help" className="text-sm text-text-secondary">
           What does it do, who is it for, and what makes it different from what already exists?
         </p>
-        <div className="flex items-center justify-between text-xs text-text-tertiary">
+        <div className="flex items-center justify-between text-sm text-text-tertiary">
           <span id="business-plan-prompt-caption">At least 50 characters — the more detail, the better the plan.</span>
           <span id="business-plan-prompt-count">{trimmed.length} / {MAX}</span>
         </div>
         {tooShort && (
-          <p role="status" className="text-xs text-text-error">
+          <p role="status" className="text-sm text-text-error">
             {remaining} more characters needed
           </p>
         )}
@@ -126,7 +126,7 @@ export function WritingBusinessPlanDialog({ open, onClose, projectId, plan }: { 
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-sm font-semibold text-text-primary">
+        <p className="text-md font-semibold text-text-primary">
           {current.state === "failed" ? `Couldn't write ${current.title}` : `Writing ${current.title} — ${run.next} of ${total}`}
         </p>
         <ProgressBar value={pct} label={`${run.next} of ${total} sections`} />
@@ -138,7 +138,7 @@ export function WritingBusinessPlanDialog({ open, onClose, projectId, plan }: { 
             </Button>
           )
         ) : (
-          <p className="text-sm text-text-secondary">About 2–5 minutes. You can close this — writing carries on while IDEEZA is open.</p>
+          <p className="text-md text-text-secondary">About 2–5 minutes. You can close this — writing carries on while IDEEZA is open.</p>
         )}
       </div>
     </ModalFrame>

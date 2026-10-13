@@ -11,7 +11,6 @@
 // Relative imports only (node:test loads the compiled module).
 
 import { CATEGORIES, PROJECTS, type Project, type ProjectCategory } from "../feed";
-import type { StageId } from "../manual/journey";
 import type { PostComment } from "./comments";
 import { personOf } from "./people";
 import { postIdOfSample } from "./slug";
@@ -52,7 +51,8 @@ type CommentSeed = {
 };
 
 type PostSeed = {
-  stage: StageId;
+  /** A project Activity type (journey.ts CATALOGUES.project) — what the maker is doing now. */
+  stage: string;
   story: string;
   description: string;
   network?: string;
@@ -78,7 +78,7 @@ const physical = (sold: number, of: number) => `Physical copy · ${sold} of ${of
 
 const SEEDS: Record<string, PostSeed> = {
   "hexapod-walking-robot": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "I wanted a walking robot my kids could drive around the living room without it tipping over on the rug. Six legs with three servos each turned out to be the easiest way to stay stable. The gait code is short enough to change in an evening, so you can teach it new walks or slow it down for thick carpet. Print the legs in PETG, the hips take the most load.",
     description:
@@ -171,7 +171,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "soil-moisture-mesh-network": {
-    stage: "pilot-production-run",
+    stage: "pilot-run",
     story:
       "Our community garden has 30 beds and nobody knew which ones were drying out. I built cheap soil nodes that report over Thread to one gateway in the shed, and the readings show up on a page anyone in the garden can open. We made 25 nodes in a weekend with a hot plate and a stencil. If you run a shared garden, the gateway page works without any cloud account.",
     description:
@@ -253,7 +253,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "e-ink-smartwatch": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "Every smartwatch I owned needed charging every night, so I made one that does not. The e-ink screen only draws power when the minute changes, and mine lasts about three weeks. It shows the time, steps, the next calendar event and phone notifications. The case is printed, so you can resize it for your wrist or write your own watch face in a few lines of code.",
     description:
@@ -329,7 +329,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "65w-gan-charger-board": {
-    stage: "manufacturing-preparation",
+    stage: "ready-for-manufacture",
     story:
       "I travel with a laptop, a phone and a camera, and I wanted one small charger for all three. GaN transistors let the board switch fast enough to shrink the transformer, so it fits in a box the size of a deck of cards. It passed my own load tests at 65 W for four hours. If you build one, treat the mains side with respect and test it behind an isolation transformer first.",
     description:
@@ -396,7 +396,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "pocket-synth-sequencer": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "I wanted something to make beats on the train without opening a laptop. This fits in a jacket pocket, has 16 step keys and a small speaker, and runs on two AAA cells. The synth engine is open, so you can add your own waveforms or change the scale. I mostly use it to sketch ideas and finish them later at home through the line out.",
     description:
@@ -445,7 +445,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "line-following-micro-rover": {
-    stage: "product-launch-feedback",
+    stage: "launched",
     story:
       "I teach a robotics club and the kits we bought were either too fragile or too expensive. This rover costs under 15 dollars in parts, fits on a palm, and follows a black tape line at a good speed. The students tune the PID values from a phone page and see the result straight away. Feel free to use it in your class, and tell me which lessons worked.",
     description:
@@ -483,7 +483,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "air-quality-room-sensor": {
-    stage: "pilot-production-run",
+    stage: "pilot-run",
     story:
       "My daughter's room got stuffy at night and I wanted to know if it was CO2 or just warm air. This sensor measures real CO2, fine dust and VOCs, and the LED ring turns amber when it is time to open a window. We now sleep with the window open a crack and the readings stay under 900 ppm. Put one in a bedroom and one in the kitchen and compare.",
     description:
@@ -552,7 +552,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "gesture-control-glove": {
-    stage: "digital-design",
+    stage: "design",
     story:
       "I do live visuals at small gigs and want to change scenes without walking back to the laptop. The glove will read finger bend and hand tilt and send them as MIDI over Bluetooth, so a closed fist can trigger the next scene and a wrist tilt can fade the lights. The board and the wrist pod are drawn up now. It should work with any app that takes MIDI, so musicians could bend notes with it too.",
     description:
@@ -591,7 +591,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "solar-mppt-controller": {
-    stage: "product-launch-feedback",
+    stage: "launched",
     story:
       "Our village workshop runs off two 100 W panels, and the cheap PWM controller wasted a lot of the morning sun. This MPPT board tracks the panel's best point and gets about 20 % more into the battery on cloudy days. We have built twelve of them for neighbours. It handles 12 V and 24 V lead-acid or LiFePO4, and you can read everything over Bluetooth.",
     description:
@@ -655,7 +655,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "lo-fi-guitar-pedal": {
-    stage: "mass-production",
+    stage: "manufacturing",
     story:
       "I love the warbly sound of old tape decks, and every pedal that does it costs more than my guitar. This one gets close with a bucket-brigade delay chip and a slow wobble. It is fully analog, so there is no firmware to flash. Everything is through-hole and fits a standard 125B box, which makes it a nice second pedal build.",
     description:
@@ -733,7 +733,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "robotic-arm-with-haptics": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "I wanted to feel what the gripper feels when it picks up an egg. The arm copies a small leader arm on my desk, and the force in the gripper comes back as resistance in the leader's trigger. It is slow and careful rather than fast. I use it to teach my students about feedback, and it is also fun for picking up things you should not touch.",
     description:
@@ -771,7 +771,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "smart-plant-watering-hub": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "I kept killing my balcony herbs every time I travelled. This hub waters up to four pots from one 5 L tank, using soil moisture instead of a timer. Two probes have run on my balcony for six weeks on one charge. If you build one, tell me how your soil readings compare.",
     description:
@@ -893,7 +893,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "heart-rate-fitness-band": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "I run three times a week and wanted my heart rate without a subscription or an app that sells my data. The band reads an optical sensor at the wrist and stores everything on the band itself. You pull your runs off over Bluetooth as a plain CSV. It is not a medical device, but it tracks my chest strap within a few beats per minute on steady runs.",
     description:
@@ -949,7 +949,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "bench-power-supply-0-30v": {
-    stage: "manufacturing-preparation",
+    stage: "ready-for-manufacture",
     story:
       "My first bench supply was a modified computer PSU and it scared me every time I switched it on. This one is linear after a switching pre-regulator, so it stays quiet and still runs cool. It does 0 to 30 V at up to 3 A with a real current limit that has saved a lot of my prototypes. Two encoders set voltage and current, and the display shows both at once.",
     description:
@@ -988,7 +988,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "eurorack-noise-module": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "I wanted a noise source with more colour than the usual white and pink. This module gives white, pink, red and a crackly stepped noise from a shift register, all analog. It takes 4 HP and costs very little to build. Patch the red noise into a filter for wind and surf sounds, that is my favourite.",
     description:
@@ -1026,7 +1026,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "self-balancing-two-wheeler": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "This started as a weekend project to finally understand PID control and turned into a little robot that follows me around the flat. It balances on two wheels using an IMU and two stepper motors. I tuned it until it could carry a cup of tea without spilling. If you are learning control loops, the code keeps the balancing loop and the speed loop clearly apart.",
     description:
@@ -1081,7 +1081,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "door-window-contact-sensor": {
-    stage: "pilot-production-run",
+    stage: "pilot-run",
     story:
       "Someone tried our back window last winter, so I put a sensor on every door and window in the house. Each one is a tiny Zigbee board with a reed switch that lasts years on a coin cell. They work with Home Assistant through the USB bridge, or with any Zigbee hub you already own. I printed the cases in white so they disappear on the frames.",
     description:
@@ -1168,7 +1168,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "ar-caption-glasses": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "My grandmother lost most of her hearing and stopped joining family dinners. These glasses show live captions of what people say on a small display at the edge of the lens. Speech recognition runs on the phone, so the clip stays light and only has to draw the text. She follows conversations again. The clip fits most frames, so you can add it to glasses you already wear.",
     description:
@@ -1206,7 +1206,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "usb-c-power-meter": {
-    stage: "mass-production",
+    stage: "manufacturing",
     story:
       "I kept buying cables that claimed 100 W and then charged my laptop at 15 W. This meter sits between the charger and the device and shows voltage, current, the agreed PD profile and the cable's e-marker. It is the tool I reach for most on my bench. You can also log a charging session over Bluetooth and see where your phone slows down.",
     description:
@@ -1273,7 +1273,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "portable-contact-mic-mixer": {
-    stage: "integration-review",
+    stage: "design",
     story:
       "I record the sounds of things, like rain on a tin roof or a bridge humming in the wind. Contact mics need high-impedance inputs, and carrying a big mixer to a bridge is no fun. This box will take four piezo mics, mix them and record straight to microSD. The parts are chosen and I am checking that the board and case fit together before ordering. Tell me if four inputs is enough for you.",
     description:
@@ -1311,7 +1311,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "swarm-beacon-drone": {
-    stage: "preliminary-architecture",
+    stage: "design",
     story:
       "I want to see how far simple rules can take a group of small drones. The plan is for each drone to range to ground beacons and to its neighbours over UWB, so the swarm knows where everyone is indoors without GPS. The ranging works on my bench, and the frame and flight controller are next. The goal is five drones flying a slow figure eight in our sports hall.",
     description:
@@ -1385,7 +1385,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "lora-weather-station": {
-    stage: "manufacturing-preparation",
+    stage: "ready-for-manufacture",
     story:
       "Our farm is in a valley and the forecast for the nearest town is always wrong for us. The station on the hill measures wind, rain, temperature and pressure, and sends it 2 km down to the house over LoRa. It has run on a small solar panel since last spring without a visit. The indoor display shows the last 24 hours, which is all my father checks before cutting hay.",
     description:
@@ -1480,7 +1480,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "posture-tracking-pendant": {
-    stage: "concept-definition",
+    stage: "planning",
     story:
       "I work at a desk all day and my back lets me know about it. The idea is a small pendant that notices when I slump forward for more than a few minutes and gives one short buzz. Nothing more than that. I have a parts list and a first sketch of the case, and I would love to hear where you think it should hang to read posture best.",
     description:
@@ -1517,7 +1517,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "18650-battery-balancer": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "I build e-bike packs from reclaimed laptop cells, and cheap balancers only bleed off a few milliamps. This board moves charge from the fullest cell to the emptiest, so a mismatched pack evens out in hours instead of days. It covers 4 to 8 cells in series. Please use it with a proper BMS. It balances, but it does not protect.",
     description:
@@ -1555,7 +1555,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "tube-preamp-clone": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "My uncle had an old studio tube preamp and I wanted that warmth for my home recordings without paying vintage prices. This clone uses two 12AX7 stages and a proper output transformer, and it sounds closer to the real thing than I expected. The plate supply is 250 V, so build it with care and keep the bleeder resistor. It is the most satisfying thing I have soldered.",
     description:
@@ -1608,7 +1608,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "quadruped-pet-companion": {
-    stage: "integration-review",
+    stage: "design",
     story:
       "Our flat does not allow pets, so I am building one that does not shed. It will walk, sit, tilt its head when you talk to it and go back to its dock to charge. The legs, the dock and the board are drawn, and I am checking that the servos and battery fit before printing. My niece has already named it Biscuit. Tricks will be small scripts, so kids can write new ones without touching the walking code.",
     description:
@@ -1667,7 +1667,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "desk-occupancy-tracker": {
-    stage: "manufacturing-preparation",
+    stage: "ready-for-manufacture",
     story:
       "Our office went hybrid and half the desks sat empty while people hunted for a free one. This sensor clips under a desk and uses a small radar to tell if someone is sitting there, without a camera. The room screen then shows free desks in green. We fitted 40 desks in a day, and nobody has had to change a battery yet.",
     description:
@@ -1721,7 +1721,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "sleep-stage-ring": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "I wanted to understand why I wake up tired, but I did not want to wear a watch to bed. The ring measures pulse, skin temperature and movement through the night and estimates light, deep and REM sleep. It is not as polished as the commercial ones, but I can read every number it takes. The ring size is one parameter in the model, so you can print one that fits.",
     description:
@@ -1806,7 +1806,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "wireless-qi-charge-pad": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "I wanted a charger built into my desk, flush with the wood, and every pad I bought was too thick. This board is 6 mm thick and charges through 5 mm of oak. I routed a pocket from underneath and the phone just charges where it sits. The coil and board fit most desks, so measure your top and print the spacer to match.",
     description:
@@ -1840,7 +1840,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "granular-sampler-box": {
-    stage: "requirement-gathering",
+    stage: "planning",
     story:
       "Granular synthesis turns a two-second recording into a whole evening of texture, and I want it in a box with knobs instead of a plugin. Right now I am writing down what it must do: how long it records, how many grains, which controls get their own knob. I use plugins for ambient sets and for sound in short films, and I would like to stop opening a laptop for that. Tell me which controls you would want under your fingers.",
     description:
@@ -1878,7 +1878,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "pick-and-place-head": {
-    stage: "pilot-production-run",
+    stage: "pilot-run",
     story:
       "I assemble small batches of boards for friends, and placing 0402 parts by hand was eating my weekends. This head bolts onto a 3D printer gantry and turns it into a slow but accurate pick-and-place. It has a vacuum nozzle, a rotation stepper and a camera that looks up to correct each part. Running OpenPnP, it places about 600 parts an hour on my old printer.",
     description:
@@ -1936,7 +1936,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "greenhouse-climate-node": {
-    stage: "testing-refinement",
+    stage: "testing",
     story:
       "My greenhouse cooks the tomatoes on sunny days when I am at work. The node measures air and light, opens the roof vent with a linear actuator when it gets too hot, and closes it again in the evening. It has saved two crops so far. You can set your own limits for each season from the web page, and it keeps working if the Wi-Fi goes down.",
     description:
@@ -2022,7 +2022,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "haptic-navigation-cuff": {
-    stage: "prototype-development",
+    stage: "prototype",
     story:
       "A friend who is blind asked if there was a way to follow walking directions without a voice in her ear all the time. The cuff sits on the forearm with eight small motors in a ring, and the one pointing the right way buzzes. Directions come from the phone's maps over Bluetooth. She now walks to the market with her ears free for traffic.",
     description:
@@ -2092,7 +2092,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "supercapacitor-jump-pack": {
-    stage: "pilot-production-run",
+    stage: "pilot-run",
     story:
       "Lithium jump packs die in a cold car or a hot summer, and mine was flat the one time I needed it. This pack uses supercapacitors that charge from a nearly dead car battery or from USB-C in about two minutes, then deliver a big burst to the starter. It works at minus 30 °C. I keep one in each of our cars and have not needed a call-out since.",
     description:
@@ -2166,7 +2166,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "modular-drum-machine": {
-    stage: "digital-design",
+    stage: "design",
     story:
       "I play in a two-piece band and need a drum machine that grows as our songs get more complicated. The main unit will have eight voices and a sequencer, and pad modules will snap onto the side for live fills. Each voice is a small synth rather than a sample, so one knob can bend a kick into a tom. The boards and case are drawn now. Build the main unit first, the pads are optional.",
     description:
@@ -2235,7 +2235,7 @@ const SEEDS: Record<string, PostSeed> = {
   },
 
   "cable-driven-gripper": {
-    stage: "preliminary-architecture",
+    stage: "design",
     story:
       "Robot grippers are usually heavy at the wrist, which ruins small arms. My plan keeps the motor in the base and pulls the fingers with Dyneema cables, so the hand should weigh about 90 g. The fingers curl around odd shapes like a real hand. I am keeping the finger set separate, so you can print soft or hard fingers for different jobs.",
     description:
@@ -2441,16 +2441,16 @@ const TEMPLATES: Record<ProjectCategory, Template> = {
   },
 };
 
-/** Fallback stages, weighted towards Prototype Development … Pilot Production Run. */
-const TEMPLATE_STAGES: readonly StageId[] = [
-  "prototype-development",
-  "testing-refinement",
-  "prototype-development",
-  "manufacturing-preparation",
-  "pilot-production-run",
-  "testing-refinement",
-  "digital-design",
-  "integration-review",
+/** Fallback stages (project Activity types), weighted towards Prototype … Pilot run. */
+const TEMPLATE_STAGES: readonly string[] = [
+  "prototype",
+  "testing",
+  "prototype",
+  "ready-for-manufacture",
+  "pilot-run",
+  "testing",
+  "design",
+  "design",
 ];
 
 /** FNV-1a, so a template choice depends only on the slug. */

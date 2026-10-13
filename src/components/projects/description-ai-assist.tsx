@@ -150,7 +150,7 @@ export function useDescriptionAiAssist({
       type="button"
       onClick={running ? cancel : () => start()}
       className={cn(
-        "inline-flex min-h-[32px] shrink-0 items-center gap-2 rounded-full border border-solid border-border bg-bg-surface px-5 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none",
+        "inline-flex min-h-[32px] shrink-0 items-center gap-2 rounded-full border border-solid border-border bg-bg-surface px-5 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none",
         pillClassName,
       )}
     >
@@ -172,7 +172,7 @@ export function useDescriptionAiAssist({
   // so each line is read when it changes (P2-SAVE-16).
   const status = (
     <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2", !line && "sr-only")}>
-      <p aria-live="polite" className="min-w-0 text-sm text-text-secondary">
+      <p aria-live="polite" className="min-w-0 text-md text-text-secondary">
         {line}
       </p>
       {state.kind === "done" && (
@@ -180,7 +180,7 @@ export function useDescriptionAiAssist({
           type="button"
           onClick={undo}
           className={cn(
-            "inline-flex min-h-[32px] items-center gap-2 rounded-sm text-sm font-semibold text-text-secondary outline-none transition-colors duration-normal ease-decelerate hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none",
+            "inline-flex min-h-[32px] items-center gap-2 rounded-sm text-md font-semibold text-text-secondary outline-none transition-colors duration-normal ease-decelerate hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none",
             pillClassName,
           )}
         >

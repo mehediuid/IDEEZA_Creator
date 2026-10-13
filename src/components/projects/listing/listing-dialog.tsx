@@ -391,7 +391,7 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
             </Button>
           </div>
           {firstReason && (
-            <p id={reasonId} className="max-w-[40ch] text-sm text-text-secondary [@media(min-width:480px)]:text-right">
+            <p id={reasonId} className="max-w-[40ch] text-md text-text-secondary [@media(min-width:480px)]:text-right">
               {firstReason}
             </p>
           )}
@@ -399,12 +399,12 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
       }
     >
       <div ref={bodyRef} inert={busy || undefined} className="flex flex-col gap-8">
-        <p className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
+        <p className="flex flex-wrap items-center gap-3 text-md text-text-secondary">
           <TestnetDemoBadge />
           {DEMO_LINE}
         </p>
         {error && <Banner tone="error">{error}</Banner>}
-        {!editing && <p className="text-sm font-medium text-text-success">{VIDEOS_READY_LINE}</p>}
+        {!editing && <p className="text-md font-medium text-text-success">{VIDEOS_READY_LINE}</p>}
 
         <ListingFields
           mode={editing ? "edit" : "add"}
@@ -437,11 +437,11 @@ export function ListingDialog({ mode, project, view, brief, now, listing, onClos
 
         <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-2xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+            <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
             <TestnetDemoBadge />
           </div>
           {summary.map((r, i) => (
-            <p key={i} className="text-sm text-text-secondary">
+            <p key={i} className="text-md text-text-secondary">
               {r.label ? (
                 <>
                   <span>{r.label}</span> · <span className="font-medium tabular-nums text-text-primary">{r.value}</span>
@@ -480,10 +480,10 @@ function PlainCost({ line }: { line: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-lg bg-bg-surface-raised p-8">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-2xs font-bold uppercase tracking-caps text-text-tertiary">Cost</span>
+        <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Cost</span>
         <TestnetDemoBadge />
       </div>
-      <p className="text-sm text-text-secondary">{line}</p>
+      <p className="text-md text-text-secondary">{line}</p>
     </div>
   );
 }
@@ -495,11 +495,11 @@ function EditCost({ onChain, network }: { onChain: boolean; network: Network }) 
   return (
     <div className="flex flex-col gap-3 rounded-lg bg-bg-surface-raised p-8">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-2xs font-bold uppercase tracking-caps text-text-tertiary">Cost</span>
+        <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Cost</span>
         <TestnetDemoBadge />
       </div>
-      <p className="text-sm text-text-secondary">Changing an on-chain listing costs a network fee.</p>
-      <div className="flex flex-wrap justify-between gap-x-6 text-sm font-medium text-text-secondary">
+      <p className="text-md text-text-secondary">Changing an on-chain listing costs a network fee.</p>
+      <div className="flex flex-wrap justify-between gap-x-6 text-md font-medium text-text-secondary">
         <span>{gas.label}</span>
         <span className="tabular-nums">
           {gas.fee} {gas.native} <span className="font-regular text-text-tertiary">{gas.note}</span>

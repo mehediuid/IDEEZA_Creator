@@ -46,7 +46,7 @@ import { DEMO_ACCOUNTS } from "../wallet/identities";
 import type { Token } from "../brief/types";
 import type { BusinessPlan } from "./business-plan";
 import { engineeringStateOf, type EngineeringState } from "./engineering-state";
-import { currentStage, type ProjectJourney, type StageDef } from "./journey";
+import { currentOf, defaultPlanningOf, type JourneyEntry, type ProjectJourney } from "./journey";
 import type { Customers } from "./customers";
 import { otherOwnersOf } from "./ownership";
 import type { CanContext, Viewer } from "./permissions";
@@ -661,9 +661,8 @@ export type ProjectView = {
   /** `readiness.edition` reads no product here; an edition's own gate asks `readinessOf` with it. */
   videos: { record: ProjectVideos | null; readiness: Record<ReadinessPurpose, Readiness> };
   editions: EditionTrack[];
-  /** P2-TABS-10: the newest non-Others activity's stage, over the whole journey. */
-  stage: StageDef | null;
-  activityCount: number;
+  /** The project's current activity (spec §4–§5): its newest entry, else its default Planning. */
+  current: JourneyEntry;
   lock: ProjectLock | null;
   /** A market key is present but unparsable (`MarketData.unreadable`): delete's first rule. */
   marketUnreadable: boolean;
@@ -776,7 +775,8 @@ export function projectView(
     Readiness
   >;
   const listingIds = new Set(market.listings.filter((l) => l.projectId === p.id).map((l) => l.id));
-  const activities = ctx.journey?.activities ?? [];
+  const journey: ProjectJourney = ctx.journey ?? { v: 1, activities: [] };
+  const projectTarget = { kind: "project" } as const;
 
   const derived = {
     ...base,
@@ -788,8 +788,7 @@ export function projectView(
     customers: summary.customers,
     videos: { record, readiness },
     editions,
-    stage: currentStage(activities),
-    activityCount: activities.length,
+    current: currentOf(journey, p.id, projectTarget, p.createdAt) ?? defaultPlanningOf(p.id, projectTarget, p.createdAt),
     lock: summary.lock,
     marketUnreadable: market.unreadable,
   };

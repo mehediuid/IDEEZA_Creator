@@ -28,11 +28,12 @@ import { earnStatusOf } from "@/lib/manual/earn-view";
 import { can, hasAudience } from "@/lib/manual/permissions";
 import { headerText } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
+import { labelOf } from "@/lib/manual/journey";
 import type { SlotProps } from "../details/slots";
 import { TAP } from "./surface";
 
 const BACK =
-  "inline-flex min-h-[24px] max-w-full items-center gap-2 self-start rounded-sm text-sm font-medium text-text-secondary outline-none transition-colors duration-normal ease-out hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[24px] max-w-full items-center gap-2 self-start rounded-sm text-md font-medium text-text-secondary outline-none transition-colors duration-normal ease-out hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 export function EarnHeader({
   project,
@@ -42,7 +43,7 @@ export function EarnHeader({
   titleRef,
 }: SlotProps & { commercial: CommercialState; titleRef: React.RefObject<HTMLHeadingElement | null> }) {
   const { summary } = view;
-  const text = headerText(summary, { viewer, stage: view.stage });
+  const text = headerText(summary, { viewer, now: { label: labelOf(view.current) } });
   const status = earnStatusOf(commercial);
   const preview = commercial !== "none" && can(viewer, "preview.enter") && hasAudience(summary.status, summary.showcase);
 

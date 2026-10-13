@@ -1,7 +1,7 @@
 "use client";
 
 // One Activity History entry (P2-TABS-6…8, -11): its title row with the
-// stage's own "?", the date and product-tag line, the 4-line description,
+// stage's own "?", the date line, the 4-line description,
 // its 60×60 media tiles and link cards, its price-snapshot pills, and the
 // owner-only "⋮ Actions for {stage}" menu (Edit / Delete). The lightbox
 // (CNT-18's pattern, generalised to video) lives here too, since only an
@@ -25,7 +25,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/dashboard/icon";
 import { useDialogFocus } from "@/components/create/use-dialog-focus";
 import { Badge, TestnetDemoBadge, Tooltip } from "@/components/ideeza";
-import { STAGES, type Activity, type MediaRef } from "@/lib/manual/journey";
+import { helpOf, labelOf, type JourneyEntry, type MediaRef } from "@/lib/manual/journey";
 import { getMediaFile } from "@/lib/manual/journey-store";
 import { formatDate } from "@/lib/manual/project-summary";
 import { compareAmounts, formatAmount } from "@/lib/wallet/money";
@@ -44,12 +44,6 @@ const USE_LABEL: Record<"private" | "commercial", string> = {
   private: "Private use",
   commercial: "Commercial use",
 };
-
-function stageMetaOf(activity: Activity) {
-  const meta = STAGES.find((s) => s.id === activity.type) ?? null;
-  const title = activity.type === "others" ? activity.customName?.trim() || "Others" : (meta?.label ?? "Activity");
-  return { title, help: meta?.help ?? "" };
-}
 
 async function downloadMedia(m: MediaRef): Promise<void> {
   const blob = await getMediaFile(m.blobKey);
@@ -83,7 +77,7 @@ function InfoBubble({ label, text }: { label: string; text: string }) {
         onKeyDown={(e) => {
           if (e.key === "Escape") setShow(false);
         }}
-        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+        className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
       >
         <Icon icon={HelpCircleIcon} size={14} />
       </button>
@@ -144,7 +138,7 @@ function EntryMenu({
         aria-label={`Actions for ${stage}`}
         data-activity-actions={activityId}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex size-8 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+        className="inline-flex size-[32px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
       >
         <Icon icon={MoreVerticalIcon} size={16} />
       </button>
@@ -176,7 +170,7 @@ function EntryMenu({
               setOpen(false);
               onEdit();
             }}
-            className="block w-full px-4 py-3 text-left text-sm text-text-primary outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
+            className="block w-full px-4 py-3 text-left text-md text-text-primary outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
           >
             Edit Activity
           </button>
@@ -188,7 +182,7 @@ function EntryMenu({
               setOpen(false);
               onDelete();
             }}
-            className="block w-full px-4 py-3 text-left text-sm text-text-error outline-none hover:bg-bg-error-subtle focus-visible:bg-bg-error-subtle"
+            className="block w-full px-4 py-3 text-left text-md text-text-error outline-none hover:bg-bg-error-subtle focus-visible:bg-bg-error-subtle"
           >
             Delete Activity
           </button>
@@ -200,7 +194,7 @@ function EntryMenu({
 
 // ─────────────────────────── media tile (60×60) ───────────────────────────
 
-function MediaTile({ media, onView }: { media: MediaRef; onView: () => void }) {
+export function MediaTile({ media, onView, small = false }: { media: MediaRef; onView: () => void; small?: boolean }) {
   const [url, setUrl] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (media.kind !== "image") return;
@@ -226,13 +220,16 @@ function MediaTile({ media, onView }: { media: MediaRef; onView: () => void }) {
       onClick={() => (downloadable ? void downloadMedia(media) : onView())}
       aria-label={label}
       title={media.name}
-      className="relative flex size-[60px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-solid border-border bg-bg-surface-raised outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus"
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-solid border-border bg-bg-surface-raised outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus",
+        small ? "size-[36px] max-md:size-[44px]" : "size-[60px]",
+      )}
     >
       {media.kind === "image" && url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
       ) : (
-        <Icon icon={KIND_ICON[media.kind]} size={20} className="text-text-tertiary" />
+        <Icon icon={KIND_ICON[media.kind]} size={small ? 16 : 20} className="text-text-tertiary" />
       )}
     </button>
   );
@@ -288,30 +285,30 @@ function EditionPopover({
           aria-label={title}
           className="absolute left-0 top-full z-popover mt-2 w-[280px] rounded-xl border border-solid border-border bg-bg-surface p-4 text-left shadow-3"
         >
-          <p className="text-sm font-semibold text-text-primary">{title}</p>
+          <p className="text-md font-semibold text-text-primary">{title}</p>
           <div className="mt-3 flex flex-col gap-3">
             {rows.map((r, i) => (
               <div key={i} className="flex flex-col gap-1">
-                <p className="text-xs font-medium text-text-tertiary">{productNameOf(products, r.productId)}</p>
-                <div className="flex items-center justify-between text-sm">
+                <p className="text-md font-medium text-text-tertiary">{productNameOf(products, r.productId)}</p>
+                <div className="flex items-center justify-between text-md">
                   <span className="text-text-secondary">{USE_LABEL[r.use]} · Regular</span>
                   <span className="tabular-nums text-text-primary">{formatAmount(r.regular, token)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-md">
                   <span className="text-text-secondary">{USE_LABEL[r.use]} · Extended</span>
                   <span className="tabular-nums text-text-primary">{formatAmount(r.extended, token)}</span>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-text-tertiary">Listed prices when this entry was added — Testnet demo.</p>
+          <p className="mt-3 text-md text-text-tertiary">Listed prices when this entry was added — Testnet demo.</p>
         </div>
       )}
     </span>
   );
 }
 
-function PricePills({ activity, products }: { activity: Activity; products: readonly { id: string; name: string }[] }) {
+function PricePills({ activity, products }: { activity: JourneyEntry; products: readonly { id: string; name: string }[] }) {
   const pricing = activity.pricing;
   if (!pricing) return null;
   const physical = pricing.editions.filter((e) => e.kind === "physical");
@@ -329,25 +326,59 @@ function PricePills({ activity, products }: { activity: Activity; products: read
 
 // ─────────────────────────── the entry card ───────────────────────────
 
-export type ProductTag = { text: string; href?: string };
-
-export function productTagOf(
-  activity: Activity,
-  scope: { productId: string } | undefined,
-  products: readonly { id: string; name: string }[],
-): ProductTag | null {
-  if (!scope) {
-    if (!activity.productId) return null;
-    const p = products.find((x) => x.id === activity.productId);
-    return p ? { text: p.name, href: `/projects/${activity.projectId}/products/${p.id}` } : { text: "A removed product" };
-  }
-  if (activity.productId) return null;
-  return { text: "Whole project" };
+/** An entry's proof: its media tiles, then a card per link (opened through the confirm dialog). */
+export function EntryProof({
+  entry,
+  onOpenMedia,
+  onOpenLink,
+  compact = false,
+}: {
+  entry: JourneyEntry;
+  /** Small tiles in one row and slim link rows: the compact Activity views (owner, 2026-10-13). */
+  compact?: boolean;
+  onOpenMedia: (media: MediaRef[], index: number) => void;
+  onOpenLink: (url: string) => void;
+}) {
+  const viewable = entry.media.filter((m) => m.kind === "image" || m.kind === "video");
+  return (
+    <>
+      {entry.media.length > 0 && (
+        <ul role="list" className={cn("flex flex-wrap gap-2", compact ? "mt-2" : "mt-4")}>
+          {entry.media.map((m) => (
+            <li key={m.id}>
+              <MediaTile small={compact} media={m} onView={() => onOpenMedia(viewable, viewable.indexOf(m))} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {entry.urls.length > 0 && (
+        <ul role="list" className={cn("flex flex-col", compact ? "mt-2 gap-1" : "mt-3 gap-2")}>
+          {entry.urls.map((u, i) => (
+            <li key={i}>
+              <button
+                type="button"
+                onClick={() => onOpenLink(u)}
+                className={cn(
+                  "flex w-full items-center gap-2 text-left text-md text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",
+                  compact
+                    ? "min-h-[32px] rounded-md max-md:min-h-[var(--touch-min)]"
+                    : "rounded-lg border border-solid border-border px-4 py-3 hover:border-border-strong",
+                )}
+              >
+                <Icon icon={Link01Icon} size={16} className="shrink-0 text-text-tertiary" />
+                <span className="min-w-0 flex-1 truncate">{u}</span>
+                <Icon icon={SquareArrowUpRightIcon} size={14} className="shrink-0 text-text-tertiary" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
 }
 
 export function ActivityEntry({
   activity,
-  scope,
   products,
   canWrite,
   onEdit,
@@ -355,18 +386,17 @@ export function ActivityEntry({
   onOpenMedia,
   onOpenLink,
 }: {
-  activity: Activity;
-  scope?: { productId: string };
+  activity: JourneyEntry;
   products: readonly { id: string; name: string }[];
+  /** False for the default Planning: it has no ⋮. */
   canWrite: boolean;
   onEdit: () => void;
   onDeleteRequest: () => void;
   onOpenMedia: (media: MediaRef[], index: number) => void;
   onOpenLink: (url: string) => void;
 }) {
-  const { title, help } = stageMetaOf(activity);
-  const tag = productTagOf(activity, scope, products);
-  const viewable = activity.media.filter((m) => m.kind === "image" || m.kind === "video");
+  const title = labelOf(activity);
+  const help = helpOf(activity);
 
   return (
     <li className="border-b border-solid border-border py-6 first:pt-0 last:border-b-0">
@@ -377,53 +407,11 @@ export function ActivityEntry({
         </div>
         {canWrite && <EntryMenu activityId={activity.id} stage={title} onEdit={onEdit} onDelete={onDeleteRequest} />}
       </div>
-
-      <p className="mt-1 text-sm text-text-tertiary">
-        {formatDate(activity.createdAt)}
-        {tag && (
-          <>
-            {" · "}
-            {tag.href ? (
-              <a href={tag.href} className="underline underline-offset-2 hover:text-text-secondary">
-                {tag.text}
-              </a>
-            ) : (
-              tag.text
-            )}
-          </>
-        )}
-      </p>
-
-      {activity.description && <p className="mt-3 line-clamp-4 text-sm text-text-secondary">{activity.description}</p>}
-
-      {activity.media.length > 0 && (
-        <ul role="list" className="mt-4 flex flex-wrap gap-2">
-          {activity.media.map((m) => (
-            <li key={m.id}>
-              <MediaTile media={m} onView={() => onOpenMedia(viewable, viewable.indexOf(m))} />
-            </li>
-          ))}
-        </ul>
+      <p className="mt-1 text-md text-text-secondary">{formatDate(activity.createdAt)}</p>
+      {activity.description && (
+        <p className="mt-3 line-clamp-4 text-md leading-md text-text-primary max-md:text-lg max-md:leading-lg">{activity.description}</p>
       )}
-
-      {activity.urls.length > 0 && (
-        <ul role="list" className="mt-3 flex flex-col gap-2">
-          {activity.urls.map((u, i) => (
-            <li key={i}>
-              <button
-                type="button"
-                onClick={() => onOpenLink(u)}
-                className="flex w-full items-center gap-2 rounded-lg border border-solid border-border px-4 py-3 text-left text-sm text-text-secondary outline-none transition-colors duration-fast hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-              >
-                <Icon icon={Link01Icon} size={16} className="shrink-0 text-text-tertiary" />
-                <span className="min-w-0 flex-1 truncate">{u}</span>
-                <Icon icon={SquareArrowUpRightIcon} size={14} className="shrink-0 text-text-tertiary" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
+      <EntryProof entry={activity} onOpenMedia={onOpenMedia} onOpenLink={onOpenLink} />
       <PricePills activity={activity} products={products} />
     </li>
   );
@@ -545,7 +533,7 @@ export function ActivityLightbox({
         <span className={cn("relative", "text-text-on-brand")}>Loading…</span>
       )}
 
-      <p onClick={(e) => e.stopPropagation()} className="relative z-10 text-sm text-text-on-brand">
+      <p onClick={(e) => e.stopPropagation()} className="relative z-10 text-md text-text-on-brand">
         {index + 1} of {media.length} · {item.name}
       </p>
     </div>,

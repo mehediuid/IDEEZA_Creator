@@ -52,6 +52,8 @@ import { earnHref, publishOptionsOf } from "@/lib/manual/earn-route";
 import { earnButtonOf } from "@/lib/manual/earn-view";
 import { headerText, type MetaPart } from "@/lib/manual/project-summary";
 import { buyerSide } from "@/lib/manual/project-route";
+import { labelOf } from "@/lib/manual/journey";
+import { ActivityNow } from "./activity/now-block";
 import { can } from "@/lib/manual/permissions";
 import { engineeringMetaOf, pendingNoticesOf, stageLineOf, type PendingNotice } from "@/lib/manual/project-header";
 import { earnSourceOf, useEarnFacts } from "../earn/ladder/use-earn-facts";
@@ -101,7 +103,7 @@ export function ProjectHeader({
 
   const slotProps: SlotProps = { project, view, viewer, brief, now, announce };
   const { summary, canCtx } = view;
-  const text = headerText(summary, { viewer, stage: view.stage, context });
+  const text = headerText(summary, { viewer, now: null, context });
   const owner = can(viewer, "facts.seeOwnerOnly");
   const engineering = context === "project" && !buyerSide(viewer);
   // The ladder's facts, the ones Earn's overview and every commit point read.
@@ -150,7 +152,7 @@ export function ProjectHeader({
     if (text.ownedBy) lead.push(`Owned by ${text.ownedBy.ownedBy}`);
   }
   const meta: MetaPart[] = engineering
-    ? [{ kind: "text", text: stageLineOf(view.engineering, summary) }, ...engineeringMetaOf(summary, view.stage)]
+    ? [{ kind: "text", text: stageLineOf(view.engineering, summary) }, ...engineeringMetaOf(summary, { label: labelOf(view.current) })]
     : text.meta;
   // One editor for the name and the description, opened from ⋯, "Add a description" and the coachmark.
   const canEdit = can(viewer, "project.rename", canCtx) || can(viewer, "project.editDescription", canCtx);
@@ -229,6 +231,9 @@ export function ProjectHeader({
             project={project}
             onAdd={menu && can(viewer, "project.editDescription", canCtx) ? () => edit.open() : undefined}
           />
+          {!engineering && (
+            <ActivityNow projectId={project.id} target={{ kind: "project" }} defaultAt={project.createdAt} heading="Project activity" />
+          )}
           {parts?.afterDescription?.map((Part, i) => <Part key={i} {...slotProps} />)}
         </div>
 

@@ -130,11 +130,11 @@ export function EachSale({ input }: { input: TermsInput }) {
   return (
     <section aria-label="Each sale" className="flex flex-col gap-2 rounded-lg border border-solid border-border p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-2xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
+        <span className="text-xs font-bold uppercase tracking-caps text-text-tertiary">Each sale</span>
         <TestnetDemoBadge />
       </div>
       {rows.map((r) => (
-        <p key={r} className="text-sm tabular-nums text-text-secondary">
+        <p key={r} className="text-md tabular-nums text-text-secondary">
           {r}
         </p>
       ))}

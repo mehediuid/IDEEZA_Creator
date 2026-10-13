@@ -609,7 +609,7 @@ export type SoldBuyerLink = { before: string; label: string; href: string; after
 export type HeaderText = {
   chip: ChipText;
   count: string;
-  meta: MetaPart[]; // COR-10: "4 products · Version 2 · Saved Sep 26, 2026[ · Stage Prototype]"
+  meta: MetaPart[]; // COR-10: "4 products · Version 2 · Saved Sep 26, 2026[ · Now: Prototype]"
   /** The whole meta line as it reads, the ownership lead first. */
   metaText: string;
   version: string | null;
@@ -617,8 +617,8 @@ export type HeaderText = {
   // ── Phase 2 (§3.5.10) ──
   /** P2-CONTRIB-10, rendered before `meta`; null unless someone else holds a majority. */
   ownedBy: OwnedByText | null;
-  /** P2-TABS-10: "Stage Prototype" (also the last part of `meta`); null without a stage. */
-  stage: string | null;
+  /** The project's current activity, "Now: Prototype" (also the last part of `meta`); null when not shown. */
+  now: string | null;
   /** §3.8.5: the owner's lock line under the status line; null when not locked or not the owner. */
   lockLine: string | null;
   /** §3.2: the owner's Sold line in parts, the buyer name a link; null otherwise. */
@@ -630,8 +630,8 @@ export type HeaderText = {
 /** What the header knows beyond the summary. Every field is optional: a v1 caller reads the owner's header. */
 export type HeaderCtx = {
   viewer?: Viewer;
-  /** `view.stage` (T08 `currentStage` over the journey). */
-  stage?: { short: string } | null;
+  /** The project's current activity (`view.current`), for the meta line; null or absent leaves it out. */
+  now?: { label: string } | null;
   /** "market" on `/marketplace/[id]`. */
   context?: "project" | "market";
 };
@@ -705,8 +705,8 @@ export function headerText(s: ProjectSummary, ctx: HeaderCtx = {}): HeaderText {
   else if (version) meta.push({ kind: "text", text: version });
   meta.push({ kind: "time", time: timeOf(s, formatDate(s.when.at)) });
   if (s.source.kind === "build-gone") meta.push({ kind: "text", text: "build not in this browser" });
-  const stage = ctx.stage ? `Stage ${ctx.stage.short}` : null;
-  if (stage) meta.push({ kind: "text", text: stage });
+  const now = ctx.now ? `Now: ${ctx.now.label}` : null;
+  if (now) meta.push({ kind: "text", text: now });
 
   const segment = ownedBySegment(s.ownership, viewer);
   const ownedBy: OwnedByText | null = segment
@@ -737,7 +737,7 @@ export function headerText(s: ProjectSummary, ctx: HeaderCtx = {}): HeaderText {
     version,
     pair: s.next,
     ownedBy,
-    stage,
+    now,
     lockLine: can(viewer, "facts.seeOwnerOnly") && s.lock ? s.lock.line : null,
     soldBuyerLink,
     createdBy:

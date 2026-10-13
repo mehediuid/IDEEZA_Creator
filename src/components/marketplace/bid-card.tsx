@@ -247,7 +247,7 @@ function BidForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-      <label htmlFor={fieldId} className="text-sm font-medium text-text-primary">
+      <label htmlFor={fieldId} className="text-md font-medium text-text-primary">
         Your bid
       </label>
       <div className="flex items-start gap-4">
@@ -282,7 +282,7 @@ function BidForm({
         </Button>
       </div>
       {error && (
-        <p id={errorId} className="text-sm text-text-error">
+        <p id={errorId} className="text-md text-text-error">
           {error}
         </p>
       )}
@@ -361,7 +361,7 @@ function BidHistory({
                   requestAnimationFrame(() => firstRevealed.current?.focus());
                 }}
                 className={cn(
-                  "mt-3 inline-flex min-h-[24px] items-center rounded-sm text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus",
+                  "mt-3 inline-flex min-h-[24px] items-center rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus",
                   TAP,
                 )}
               >

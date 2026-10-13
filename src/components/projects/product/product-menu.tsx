@@ -7,20 +7,15 @@
 //   editor's name field makes, through the same write guard ("editProduct":
 //   a live Buy-now listing asks to pause first; an auction or the lock
 //   refuses, said under the field);
-// - Activity — this product's phase-and-status notes (P2-TABS-5), with the
-//   count;
 // - Open chat “…” — the chat this version was built in, while it is in this
 //   browser: the build is changed there.
 // The menu button is the project menu's (WAI-ARIA APG keys, Escape back to ⋯).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Activity01Icon, BubbleChatIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
+import { BubbleChatIcon, MoreHorizontalIcon, PencilEdit01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, IconButton, ModalFrame, TextInput } from "@/components/ideeza";
-import { activitiesFor } from "@/lib/manual/journey";
-import { useJourney } from "@/lib/manual/journey-store";
-import { isPreview } from "@/lib/manual/buyer-preview";
 import { can } from "@/lib/manual/permissions";
 import { WRITE_FAILED } from "@/lib/manual/project-header";
 import { productRowsOf } from "@/lib/manual/project-read";
@@ -28,7 +23,6 @@ import { displayProductName } from "@/lib/manual/products-tab-view";
 import { PROJECT_NAME_MAX, useManualProjects } from "@/lib/manual/projects";
 import { useWriteGuard } from "@/lib/manual/use-write-guard";
 import { cn } from "@/lib/utils";
-import { ActivityDrawer } from "../details/activity/drawer";
 import { useStoreWrite } from "../details/use-store-write";
 import type { ProductSlotProps } from "./product-slots";
 
@@ -45,29 +39,19 @@ export function ProductMenu({
   /** The chat this version was built in, while this browser has it. */
   chat: { title: string; href: string } | null;
 }) {
-  const { project, view, product, viewer, now, announce } = slot;
+  const { view, viewer } = slot;
   const router = useRouter();
-  const { record } = useJourney(project.id);
   const [open, setOpen] = React.useState(false);
-  const [layer, setLayer] = React.useState<"rename" | "activity" | null>(null);
+  const [layer, setLayer] = React.useState<"rename" | null>(null);
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const menuId = React.useId();
 
-  const products = React.useMemo(() => view.products.map((p) => ({ id: p.id, name: p.name })), [view.products]);
-  const count = activitiesFor(record, { productId: product.id }).length;
   const canRename = can(viewer, "product.openEditor", view.canCtx);
 
   const items: Item[] = [
     ...(canRename ? [{ id: "rename", label: "Rename product", icon: PencilEdit01Icon, run: () => setLayer("rename") }] : []),
-    {
-      id: "activity",
-      label: "Activity",
-      sub: count === 0 ? "Notes on its phase and status" : `${count} ${count === 1 ? "note" : "notes"}`,
-      icon: Activity01Icon,
-      run: () => setLayer("activity"),
-    },
     ...(chat
       ? [{ id: "chat", label: `Open chat “${chat.title}”`, sub: "Where it was built — change it there", icon: BubbleChatIcon, run: () => router.push(chat.href) }]
       : []),
@@ -162,20 +146,6 @@ export function ProductMenu({
         </div>
       )}
 
-      <ActivityDrawer
-        open={layer === "activity"}
-        onClose={() => {
-          setLayer(null);
-          backToTrigger();
-        }}
-        projectId={project.id}
-        scope={{ productId: product.id, productName: product.name }}
-        products={products}
-        canWrite={can(viewer, "activity.write", view.canCtx)}
-        isPreview={isPreview(viewer)}
-        announce={announce}
-        now={now}
-      />
       {layer === "rename" && (
         <RenameDialog
           slot={slot}
@@ -298,7 +268,7 @@ function RenameDialog({ slot, onClose }: { slot: ProductSlotProps; onClose: () =
       >
         <form id={formId} onSubmit={save} noValidate className="flex flex-col gap-2 pt-4">
           <div className="flex items-baseline justify-between gap-4">
-            <label htmlFor={fieldId} className="text-sm font-semibold text-text-primary">
+            <label htmlFor={fieldId} className="text-md font-semibold text-text-primary">
               Name
             </label>
             <span aria-hidden className={cn("text-sm tabular-nums text-text-secondary", tooLong && "text-text-error")}>

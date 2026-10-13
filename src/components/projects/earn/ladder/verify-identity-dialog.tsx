@@ -20,6 +20,8 @@ const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var
 const LABEL = "w-fit text-md text-[color:var(--color-input-label)]";
 const HINT = "text-sm text-[color:var(--color-input-helper)]";
 const ERROR = "text-sm text-[color:var(--color-input-error-text)]";
+/** The form's own alert, a sentence, not a field's helper line. */
+const ALERT = "text-md text-[color:var(--color-input-error-text)]";
 
 export const KYC_DEMO_NOTE = "Demo — no real verification. Nothing you type here is stored or sent anywhere.";
 
@@ -134,7 +136,7 @@ function VerifyIdentityForm({ open, onClose, onVerified }: DialogProps) {
         </div>
 
         {refused && (
-          <p role="alert" className={cn(ERROR, "m-0")}>
+          <p role="alert" className={cn(ALERT, "m-0")}>
             This browser couldn&apos;t save it (storage is full or blocked). Nothing changed.
           </p>
         )}

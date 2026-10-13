@@ -153,7 +153,7 @@ export function MissingSteps({ steps, ...ctx }: FixContext & { steps: readonly (
                 <span className="sr-only">{done ? ", done" : ", not done yet"}</span>
               </span>
               {!done && (
-                <span id={reasonId} className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">
+                <span id={reasonId} className="max-w-[62ch] text-md leading-relaxed text-text-secondary">
                   {s.reason}
                 </span>
               )}

@@ -32,7 +32,7 @@ import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-st
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { postHref, postProductHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
-import { STAGES } from "@/lib/manual/journey";
+import { CATALOGUES } from "@/lib/manual/journey";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
 import { PostComments } from "./comments/post-comments";
@@ -66,8 +66,9 @@ import { ReportDialog } from "./report-dialog";
 import { PostToastProvider, usePostToast } from "./toast";
 import { usePost, type MinePostFacts } from "./use-post";
 
-/** The 11 stages a post's progress counts (Others is not a step). */
-const STEPS = STAGES.filter((s) => s.id !== "others");
+/** The stages a post's progress counts: the project's Activity types, Planning to Improvement
+ *  (Others is not a step). */
+const STEPS = CATALOGUES.project.filter((s) => s.id !== "others");
 
 export function PostPage({ slug }: { slug: string }) {
   return (
@@ -129,7 +130,7 @@ function PostBody({
     if (window.location.hash === "#comments") scrollToComments("auto");
   }, []);
 
-  const stage = post.stage ? (STAGES.find((s) => s.id === post.stage) ?? null) : null;
+  const stage = post.stage ? (STEPS.find((s) => s.id === post.stage) ?? null) : null;
   const makerName = post.creator.name;
 
   return (
@@ -386,7 +387,7 @@ function ProductRow({ slug, product }: { slug: string; product: InnovationPost["
   );
 }
 
-/** Progress: the 11 stages as a bar, this one named with what it means. */
+/** Progress: the stages as a bar, this one named with what it means. */
 function Progress({ stageId }: { stageId: string }) {
   const id = React.useId();
   const at = STEPS.findIndex((s) => s.id === stageId);

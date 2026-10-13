@@ -143,7 +143,7 @@ function Covers({
     <div className="flex flex-col gap-8">
       {kind === "parts" && <PartsSummary job={product} />}
       <section aria-labelledby={id}>
-        <h3 id={id} className="text-sm font-semibold text-text-primary">
+        <h3 id={id} className="text-md font-semibold text-text-primary">
           What this covers
         </h3>
         <ul
@@ -235,7 +235,7 @@ function Downloads({ kind, product, ready }: { kind: BuildItemKind; product: Bui
   if (allowed && !file) return null;
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
-      <h3 id={id} className="text-sm font-semibold text-text-primary">
+      <h3 id={id} className="text-md font-semibold text-text-primary">
         Downloads
       </h3>
       {file ? (

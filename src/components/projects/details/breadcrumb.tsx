@@ -19,7 +19,7 @@ const LINK =
 export function Breadcrumb({ trail }: { trail: readonly Crumb[] }) {
   return (
     <nav aria-label="Breadcrumb">
-      <ol className="flex min-w-0 items-center gap-3 text-sm leading-sm">
+      <ol className="flex min-w-0 items-center gap-3 text-md leading-md">
         {trail.map((crumb, i) => {
           const last = i === trail.length - 1;
           const middle = i > 0 && !last;

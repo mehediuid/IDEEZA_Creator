@@ -8,8 +8,6 @@
 //
 // Pure types, relative imports only (node:test loads the compiled module).
 
-import type { StageId } from "../manual/journey";
-
 export type PostSource = "sample" | "mine";
 
 /** Someone on Innovations: a sample creator or commenter, or `ME` — this browser's maker. */
@@ -82,7 +80,8 @@ export type InnovationPost = {
   description: string;
   /** The maker's own words, up to 500 characters (share-post.ts). */
   story: string;
-  stage: StageId | null;
+  /** The project's current Activity type (journey.ts CATALOGUES.project), the post's status; null for Others. */
+  stage: string | null;
   /** When it was (last) shared. */
   sharedAt: number;
   createdAt: number;

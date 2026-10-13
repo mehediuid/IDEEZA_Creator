@@ -150,7 +150,7 @@ export function StatusPanel({
       {copy.progress !== null && (
         <ProgressBar value={copy.progress} label={`${productName} video`} className="max-w-[320px]" />
       )}
-      {copy.sub && <p className="max-w-[48ch] text-sm text-text-secondary">{copy.sub}</p>}
+      {copy.sub && <p className="max-w-[48ch] text-md text-text-secondary">{copy.sub}</p>}
       {action && onGenerate && (
         <Button hierarchy="secondary" size="md" className="[@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]" onClick={onGenerate}>
           {action}
@@ -242,7 +242,7 @@ function ReadyPlayer({
     box = (
       <div className={cn(BOX, "flex flex-col items-center justify-center gap-4 px-8 text-center")}>
         <StatusGlyph icon="alert" tone="error" size={20} />
-        <p className="max-w-[48ch] text-sm text-text-primary">{broken ? CANNOT_PLAY_COPY : FAILURE_COPY.lost}</p>
+        <p className="max-w-[48ch] text-md text-text-primary">{broken ? CANNOT_PLAY_COPY : FAILURE_COPY.lost}</p>
         {owner && onGenerate && (
           <Button hierarchy="secondary" size="md" className="max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]" onClick={onGenerate}>
             Generate again
@@ -293,7 +293,7 @@ function ReadyPlayer({
         <p id={metaId} className="text-sm text-text-secondary">
           {meta}
         </p>
-        <details className="group text-sm text-text-secondary">
+        <details className="group text-md text-text-secondary">
           <summary className="inline-flex min-h-[24px] cursor-pointer items-center gap-2 rounded-md font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]">
             {"What's in this video"}
           </summary>
@@ -303,7 +303,7 @@ function ReadyPlayer({
             ))}
           </ul>
         </details>
-        <p className="text-xs text-text-tertiary">{honestyLine(productName)}</p>
+        <p className="text-sm text-text-tertiary">{honestyLine(productName)}</p>
       </div>
     </>
   );

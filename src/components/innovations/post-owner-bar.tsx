@@ -1,8 +1,9 @@
 "use client";
 
 // The maker's bar on their own post (plan D8): the post's own controls live
-// beside the post. Shared: "This is your post." with Edit post (story and
-// status, the share's own fields) and Stop sharing. Not shared: "Not
+// beside the post. Shared: "This is your post." with Edit post (the story,
+// the share's own field; the status is the project's Activity) and Stop
+// sharing. Not shared: "Not
 // shared." with Share again (the share dialog, videos and post). Open project
 // either way. Visitors never see it.
 
@@ -14,7 +15,7 @@ import { Button, ConfirmDialog, ModalFrame } from "@/components/ideeza";
 import { SharePostFields, ShareDialog } from "@/components/projects/share-dialog";
 import type { InnovationPost } from "@/lib/innovations/types";
 import { useManualProjects } from "@/lib/manual/projects";
-import { sharePostBlocker, STAGE_MISSING, type SharePost } from "@/lib/manual/share-post";
+import { sharePostBlocker, type SharePost } from "@/lib/manual/share-post";
 import { cn } from "@/lib/utils";
 import { TAP } from "./post-bits";
 import { usePostToast } from "./toast";
@@ -118,23 +119,22 @@ export function PostOwnerBar({ post, mine, className }: { post: InnovationPost; 
   );
 }
 
-/** Edit post: the share's own story and status fields. The shared time stays. */
+/** Edit post: the share's own story. Its status is the project's current Activity, set on the
+ *  project, so it is not edited here (owner, 2026-10-13). The shared time stays. */
 function EditPostDialog({ post, onSave, onClose }: { post: InnovationPost; onSave: (next: SharePost) => void; onClose: () => void }) {
-  const [draft, setDraft] = React.useState<SharePost>({ story: post.story, stage: post.stage });
+  const [draft, setDraft] = React.useState<SharePost>({ story: post.story });
   const [tried, setTried] = React.useState(false);
   const storyRef = React.useRef<HTMLTextAreaElement>(null);
-  const stageRef = React.useRef<HTMLDivElement>(null);
   const errorId = React.useId();
   const blocker = sharePostBlocker(draft);
 
   const save = () => {
     if (blocker) {
       setTried(true);
-      if (blocker === STAGE_MISSING) stageRef.current?.querySelector<HTMLElement>("button")?.focus();
-      else storyRef.current?.focus();
+      storyRef.current?.focus();
       return;
     }
-    onSave({ story: draft.story.trim(), stage: draft.stage });
+    onSave({ story: draft.story.trim() });
   };
 
   return (
@@ -166,7 +166,7 @@ function EditPostDialog({ post, onSave, onClose }: { post: InnovationPost; onSav
     >
       {/* The fields draw a hairline over themselves for the share dialog; here they open the body. */}
       <div className="flex flex-col gap-6 [&>section]:border-t-0 [&>section]:pt-0">
-        <SharePostFields post={draft} onChange={setDraft} storyRef={storyRef} stageRef={stageRef} />
+        <SharePostFields post={draft} onChange={setDraft} storyRef={storyRef} />
         {tried && blocker && (
           <p id={errorId} role="alert" className="text-sm leading-sm text-text-error">
             {blocker}

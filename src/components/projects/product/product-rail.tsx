@@ -2,6 +2,8 @@
 
 // The product page's rail (P2-EDITOR-19, P2-TABS-3 as changed; spec §2.3), in
 // order:
+// 0. Activity (owner only; owner, 2026-10-13): this product's and its own
+//    Physical / Virtual NFTs' current activity, each opening its history.
 // 1. Marketplace: Physical NFT · Virtual NFT editions — PRODUCT_SLOTS.rail
 //    (T27), the buyer's side only since Build and Earn P0 (the owner's
 //    controls are Earn › Sell): it shows only listed tracks, else it is
@@ -10,7 +12,8 @@
 //    out of the header): a built product's labelled facts and its check.
 // 4. Editor: six rows into this product's editor, and the seed caption
 //    (P2-EDITOR-11). Absent in every preview and on a locked project.
-// On an Innovations post (`post`) the post's own blocks replace 1 and 4.
+// On an Innovations post (`post`, read as a visitor) 0 is absent and the
+// post's own blocks replace 1 and 4.
 // From a 1024 px page container it is the 360 px column right of the tabs;
 // below that it follows the tab panel, each block collapsible and closed at
 // 400 px (COR-56). When every block is absent the rail is too: `:empty`
@@ -21,6 +24,8 @@ import { RAIL_SURFACE } from "../details/frame";
 import { cn } from "@/lib/utils";
 import type { ProductConfidence } from "@/lib/create/confidence";
 import type { BuildProduct } from "@/lib/create/history";
+import { can } from "@/lib/manual/permissions";
+import { ActivityCard } from "../details/activity/activity-card";
 import { ProductEditorBlock } from "./product-editor-block";
 import { ProductCheckBlock, ProductSpecsBlock } from "./product-facts";
 import { PRODUCT_SLOTS, type ProductSlotProps } from "./product-slots";
@@ -45,6 +50,7 @@ export function ProductRail({
   const Marketplace = PRODUCT_SLOTS.rail.marketplace;
   return (
     <aside aria-label="Product record" className={cn(RAIL_SURFACE, "empty:hidden")}>
+      {!post && can(slot.viewer, "facts.seeOwnerOnly") && <ActivityCard {...slot} productId={slot.product.id} />}
       {!post && Marketplace ? <Marketplace {...slot} /> : null}
       {built && <ProductSpecsBlock product={built} partChanges={partChanges} />}
       {confidence && <ProductCheckBlock confidence={confidence} />}

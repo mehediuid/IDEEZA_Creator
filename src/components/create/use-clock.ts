@@ -27,7 +27,7 @@ export function elapsedLabel(since: number, now: number): string {
 
 /** "just now", "12 min ago", "3 hr ago", or a short date — a past moment in
  *  words, moved here from image-turn.tsx's `formatRelative` so the rail's
- *  Activity list (chat-rail-redesign spec §2.5) can read it too. */
+ *  build log (chat-rail-redesign spec §2.5) can read it too. */
 export function relativeLabel(ts: number, now: number): string {
   const delta = Math.max(0, now - ts);
   const sec = Math.floor(delta / 1000);

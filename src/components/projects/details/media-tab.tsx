@@ -172,7 +172,7 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
 
   return (
     <section aria-labelledby="media-heading" className="mt-16">
-      <h2 id="media-heading" className="text-lg font-bold text-text-primary">
+      <h2 id="media-heading" className="text-2xl font-semibold leading-2xl text-text-primary">
         Media
       </h2>
 
@@ -182,7 +182,7 @@ export function MediaTab({ project, refs, viewer, canCtx: ctx, announce }: Media
         <EmptyMedia />
       ) : (
         <>
-          <h3 className="mt-7 text-sm font-semibold text-text-secondary">From your builds</h3>
+          <h3 className="mt-7 text-md font-semibold text-text-secondary">From your builds</h3>
           {(coverNote || write.failed) && (
             <Banner tone="attention" className="mt-4">
               {coverNote ?? WRITE_FAILED}
@@ -308,7 +308,7 @@ function VideosGroup({
   return (
     <div className="mt-7 [container-type:inline-size]">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h3 id={headingId} className="text-sm font-semibold text-text-secondary">
+        <h3 id={headingId} className="text-md font-semibold text-text-secondary">
           Videos
         </h3>
         {owner && !loading && <span className="text-sm text-text-secondary">{videosGroupMeta(ready.length, rows.length)}</span>}
@@ -403,15 +403,15 @@ function VideoTileCard({
         </span>
       )}
       <div className="flex flex-col gap-1">
-        <span className="truncate text-sm font-semibold text-text-primary">{caption}</span>
+        <span className="truncate text-md font-semibold text-text-primary">{caption}</span>
         {owner && !take && (
           <>
-            <span className="flex items-center gap-2 text-sm text-text-secondary">
+            <span className="flex items-center gap-2 text-md text-text-secondary">
               <StatusGlyph icon={copy.icon} tone={copy.tone} size={14} />
               <span>{copy.text}</span>
             </span>
             {copy.progress !== null && <ProgressBar value={copy.progress} label={`${name} video`} className="mt-1" />}
-            {copy.sub && <span className="text-xs text-text-tertiary">{copy.sub}</span>}
+            {copy.sub && <span className="text-sm text-text-tertiary">{copy.sub}</span>}
           </>
         )}
       </div>
@@ -465,7 +465,7 @@ function PosterButton({ take, name, onOpen }: { take: VideoTake; name: string; o
       </span>
       <span
         aria-hidden
-        className="absolute bottom-2 right-2 rounded-md bg-[color-mix(in_srgb,var(--color-bg-overlay)_80%,transparent)] px-[6px] py-[1px] text-xs font-semibold tabular-nums text-text-on-brand"
+        className="absolute bottom-2 right-2 rounded-md bg-[color-mix(in_srgb,var(--color-bg-overlay)_80%,transparent)] px-[6px] py-[1px] text-sm font-semibold tabular-nums text-text-on-brand"
       >
         0:10
       </span>
@@ -481,7 +481,7 @@ function EmptyMedia() {
       <span aria-hidden className="text-text-tertiary">
         <Icon icon={Image01Icon} size={24} />
       </span>
-      <p className="max-w-[56ch] text-sm text-text-secondary">
+      <p className="max-w-[56ch] text-md text-text-secondary">
         {"No images yet — concept images from AI builds appear here."}
       </p>
     </div>
@@ -534,11 +534,11 @@ export function MediaTileCard({
           ) : (
             <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-text-tertiary">
               <Icon icon={Image01Icon} size={20} />
-              <span className="text-xs">{"Image didn't load"}</span>
+              <span className="text-sm">{"Image didn't load"}</span>
             </span>
           )}
         </span>
-        <span className="block truncate px-3 py-2 text-xs text-text-secondary">{caption}</span>
+        <span className="block truncate px-3 py-2 text-sm text-text-secondary">{caption}</span>
       </button>
 
       {isCover && !hideCoverChip && (

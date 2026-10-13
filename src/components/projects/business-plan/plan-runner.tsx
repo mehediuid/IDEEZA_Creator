@@ -457,10 +457,10 @@ export function PlanRunner() {
             aria-live="polite"
             className="fixed bottom-16 right-16 z-toast flex items-center gap-6 rounded-xl border border-solid border-border bg-bg-surface px-6 py-4 shadow-3"
           >
-            <span className="text-sm text-text-primary">Business plan ready</span>
+            <span className="text-md text-text-primary">Business plan ready</span>
             <Link
               href={earnHref(toast, "plan")}
-              className="inline-flex min-h-[32px] items-center rounded-md text-sm font-semibold text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
+              className="inline-flex min-h-[32px] items-center rounded-md text-md font-semibold text-text-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]"
               onClick={() => setToast(null)}
             >
               Open
