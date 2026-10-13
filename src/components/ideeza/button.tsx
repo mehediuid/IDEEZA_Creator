@@ -13,13 +13,19 @@
 //
 // Every hierarchy draws a 1 px border — transparent unless it is secondary —
 // so a primary beside a secondary is the same height.
+//
+// Each size states its A01 height (SM 32 · MD 36 · LG 40 · XL 44 · 2XL 48)
+// instead of building it from padding: Figma's stroke sits inside the frame,
+// the CSS border adds 2 px, and `cn` drops any line height written before the
+// size's `text-[length:…]`, so padding-built buttons came out 2–10 px taller.
+// The line height follows the font size's Label style and sits after it.
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-[0.1px] leading-[16px] transition-[background-color,filter,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none ring-offset-bg-surface focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-[0.1px] transition-[background-color,filter,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none ring-offset-bg-surface focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
   {
     variants: {
       hierarchy: {
@@ -33,11 +39,11 @@ const buttonVariants = cva(
           "border border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:brightness-105 active:brightness-95",
       },
       size: {
-        sm: "gap-[var(--spacing-2)] px-[var(--spacing-5)] py-[var(--spacing-4)] rounded-[var(--radius-sm)] text-[length:var(--font-size-xs)]",
-        md: "gap-[var(--spacing-3)] px-[var(--spacing-6)] py-[var(--spacing-5)] rounded-[var(--radius-md)] text-[length:var(--font-size-sm)]",
-        lg: "gap-[var(--spacing-3)] px-[var(--spacing-7)] py-[var(--spacing-6)] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)]",
-        xl: "gap-[var(--spacing-3)] px-[var(--spacing-8)] py-[var(--spacing-7)] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)]",
-        "2xl": "gap-[var(--spacing-4)] px-[var(--spacing-10)] py-[var(--spacing-8)] rounded-[var(--radius-lg)] text-[length:var(--font-size-lg)]",
+        sm: "h-[32px] gap-[var(--spacing-2)] px-[var(--spacing-5)] rounded-[var(--radius-sm)] text-[length:var(--font-size-xs)] leading-xs",
+        md: "h-[36px] gap-[var(--spacing-3)] px-[var(--spacing-6)] rounded-[var(--radius-md)] text-[length:var(--font-size-sm)] leading-xs",
+        lg: "h-[40px] gap-[var(--spacing-3)] px-[var(--spacing-7)] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md",
+        xl: "h-[44px] gap-[var(--spacing-3)] px-[var(--spacing-8)] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md",
+        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[var(--spacing-10)] rounded-[var(--radius-lg)] text-[length:var(--font-size-lg)] leading-lg",
       },
       iconOnly: {
         true: "px-0 py-0 aspect-square",
