@@ -38,6 +38,7 @@ import {
   type CreditPack,
   type PackId,
 } from "@/lib/create/credit-pricing";
+import { useDefaultToken } from "@/lib/account/payment";
 import { BUILD_COST, CONCEPT_COST, buildCost, useCredits } from "@/lib/create/credits";
 import { productsOf, useCreateHistory } from "@/lib/create/history";
 import { useCreditDiscount } from "@/lib/create/plan";
@@ -127,7 +128,8 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
   const short = need !== undefined && hydrated ? Math.max(0, need - balance) : 0;
   const [step, setStep] = React.useState<Step>(picked ? "pay" : "choose");
   const [pick, setPick] = React.useState<CreditPick>(() => picked ?? { kind: "pack", id: packCovering(short).id });
-  const [coin, setCoin] = React.useState<PayCoin>("IDZ");
+  const defaultToken = useDefaultToken();
+  const [coin, setCoin] = React.useState<PayCoin>(defaultToken);
   const [paying, setPaying] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
   const [failure, setFailure] = React.useState<string | null>(null);
@@ -180,14 +182,17 @@ function BuyCreditsDialog({ need, pick: picked, onClose }: OpenArgs & { onClose:
           charge: { network: "baseSepolia", lines: [{ coin, amount: String(amount) }] },
         },
         {
-          commit: () => {
+          commit: (proof) => {
             purchase({
               orderId,
               base: order.base,
               bonus: order.bonus,
               pack: order.pack,
               price: order.price.final,
+              listPrice: order.price.base,
               paidWith: `${coin} · demo wallet`,
+              txHash: proof.txHash,
+              payer: proof.address,
             });
             return { ok: true };
           },

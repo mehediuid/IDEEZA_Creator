@@ -4,14 +4,15 @@
 // "Compare Plans" 41551:109392, checkout 40309:107743, downgrade 41549:158483,
 // cancel 41549:164558). Its requirements, not its look:
 //
-// - Your plan first: what you're on, what it adds each month, when it renews
-//   or changes, and Cancel (or Keep, once a change is waiting).
+// - Your plan sits above every tab (plan-pricing-page's banner, with its
+//   details, Cancel and Keep); this tab is for choosing one.
 // - Monthly | Annual (save 20%), four plans, each button named by how the plan
 //   stands to yours: Your plan · Upgrade to X · Switch to X · Starts on <date>.
 // - Upgrade opens the checkout: the price, the unused share of this period
 //   taken off, and Pay — the Demo wallet on testnet, as Buy credits does.
 // - Switch (a smaller plan, monthly) and Cancel wait for the period's end and
-//   charge nothing; they say so before they're confirmed. Nothing is deleted.
+//   charge nothing; they say so, and list what gets smaller, before they're
+//   confirmed. Cancel offers the smallest paid plan instead. Nothing is deleted.
 // - Compare all features (the rows that differ), and five questions.
 // No plan blocks a mint, a listing or a purchase: plans set amounts only.
 
@@ -20,11 +21,14 @@ import { CheckmarkCircle02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Banner, Button, ModalFrame, Segmented, TestnetDemoBadge } from "@/components/ideeza";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
-import { coinAmount, discountFor, usd, type BillingCycle } from "@/lib/create/credit-pricing";
+import { useDefaultToken } from "@/lib/account/payment";
+import { coinAmount, usd, type BillingCycle } from "@/lib/create/credit-pricing";
 import { useCreatePlan } from "@/lib/create/plan";
 import {
   PLANS,
   YEARLY_OFF,
+  featuresOf,
+  lossesOf,
   planOf,
   priceOf,
   quoteUpgrade,
@@ -46,7 +50,7 @@ type Dialog =
   | null;
 
 export function PlansPanel() {
-  const { hydrated, sub, plan, keep } = useCreatePlan();
+  const { hydrated, sub, plan } = useCreatePlan();
   const [cycle, setCycle] = React.useState<BillingCycle>("monthly");
   const [dialog, setDialog] = React.useState<Dialog>(null);
   const [compare, setCompare] = React.useState(false);
@@ -60,12 +64,6 @@ export function PlansPanel() {
 
   return (
     <div className="flex flex-col gap-[28px]">
-      <YourPlan
-        hydrated={hydrated}
-        onCancel={() => setDialog({ kind: "cancel" })}
-        onKeep={keep}
-      />
-
       <div className="flex flex-wrap items-end justify-between gap-[16px]">
         <div className="flex max-w-[62ch] flex-col gap-[4px]">
           <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Choose a plan</h2>
@@ -123,64 +121,6 @@ export function PlansPanel() {
       {dialog?.kind === "cancel" && <CancelDialog onClose={() => setDialog(null)} />}
     </div>
   );
-}
-
-function YourPlan({ hydrated, onCancel, onKeep }: { hydrated: boolean; onCancel: () => void; onKeep: () => void }) {
-  const { sub, plan } = useCreatePlan();
-  if (!hydrated) return <div aria-hidden className="h-[92px] rounded-xl border border-solid border-border bg-bg-surface" />;
-  const paid = sub.renewsAt !== null;
-  const price = paid ? priceOf(sub.tier, sub.cycle) : null;
-  const pending = sub.pending ? planOf(sub.pending.tier) : null;
-  const status = !paid
-    ? "Free forever"
-    : pending
-      ? pending.tier === "free"
-        ? `Ends on ${date(sub.renewsAt!)}, then you're on Free`
-        : `Switches to ${pending.name}${sub.pending!.cycle !== sub.cycle ? ` (${sub.pending!.cycle})` : ""} on ${date(sub.renewsAt!)}`
-      : `Renews on ${date(sub.renewsAt!)}`;
-
-  return (
-    <section
-      aria-label="Your plan"
-      className="flex flex-wrap items-center justify-between gap-[16px] rounded-xl border border-solid border-border bg-bg-surface p-[20px]"
-    >
-      <div className="flex min-w-0 flex-col gap-[4px]">
-        <p className="text-sm font-medium leading-sm text-text-secondary">Your plan</p>
-        <p className="text-xl font-semibold leading-xl text-text-primary">
-          {plan.name}
-          {price && (
-            <span className="ml-[8px] text-md font-regular leading-md text-text-secondary">
-              {usd(price.perMonth)} a month{sub.cycle === "yearly" ? `, ${usd(price.period)} billed yearly` : ""}
-            </span>
-          )}
-        </p>
-        <p className="text-md leading-md text-text-secondary">
-          {n(plan.credits)} AI credits each month · {status}
-        </p>
-      </div>
-      {paid &&
-        (sub.pending ? (
-          <Button hierarchy="secondary" size="lg" onClick={onKeep}>
-            Keep {plan.name}
-          </Button>
-        ) : (
-          <Button hierarchy="ghost" size="lg" onClick={onCancel}>
-            Cancel plan
-          </Button>
-        ))}
-    </section>
-  );
-}
-
-function features(p: Plan): string[] {
-  const discount = discountFor(p.tier, "monthly");
-  return [
-    `${n(p.credits)} AI credits a month`,
-    p.queue,
-    `${n(p.projects)} ${p.projects === 1 ? "project" : "projects"} · ${n(p.exports)} exports a month`,
-    p.contributors === 0 ? "Just you, no contributors" : `${n(p.contributors)} ${p.contributors === 1 ? "contributor" : "contributors"}`,
-    ...(discount > 0 ? [`${pct(discount)} off credits (${pct(discountFor(p.tier, "yearly"))} yearly)`] : []),
-  ];
 }
 
 function PlanCard({
@@ -246,7 +186,7 @@ function PlanCard({
         {label}
       </Button>
       <ul role="list" className="flex flex-col gap-[8px]">
-        {features(p).map((f) => (
+        {featuresOf(p).map((f) => (
           <li key={f} className="flex items-start gap-[8px] text-md leading-md text-text-secondary">
             <span aria-hidden className="mt-[2px] shrink-0 text-text-brand">
               <Icon icon={CheckmarkCircle02Icon} size={16} />
@@ -410,7 +350,8 @@ function UpgradeDialog({ tier, cycle, onClose }: { tier: PlanTier; cycle: Billin
   const [now] = React.useState(() => Date.now());
   const quote = quoteUpgrade(sub, tier, cycle, now);
   const price = priceOf(tier, cycle);
-  const [coin, setCoin] = React.useState<PayCoin>("IDZ");
+  const defaultToken = useDefaultToken();
+  const [coin, setCoin] = React.useState<PayCoin>(defaultToken);
   const [step, setStep] = React.useState<"pay" | "done" | "failed">("pay");
   const [paying, setPaying] = React.useState(false);
   const [note, setNote] = React.useState<string | null>(null);
@@ -425,7 +366,7 @@ function UpgradeDialog({ tier, cycle, onClose }: { tier: PlanTier; cycle: Billin
   }, [step]);
 
   const finish = (paidWith: string) => {
-    start(tier, cycle, { orderId, amount: quote.due, paidWith });
+    start(tier, cycle, { orderId, amount: quote.due, paidWith, price: quote.price, credit: quote.unused });
     setStep("done");
   };
 
@@ -451,8 +392,16 @@ function UpgradeDialog({ tier, cycle, onClose }: { tier: PlanTier; cycle: Billin
           charge: { network: "baseSepolia", lines: [{ coin, amount: String(coinAmount(quote.due, coin)) }] },
         },
         {
-          commit: () => {
-            start(tier, cycle, { orderId, amount: quote.due, paidWith: `${coin} · demo wallet` });
+          commit: (proof) => {
+            start(tier, cycle, {
+              orderId,
+              amount: quote.due,
+              paidWith: `${coin} · demo wallet`,
+              price: quote.price,
+              credit: quote.unused,
+              txHash: proof.txHash,
+              payer: proof.address,
+            });
             return { ok: true };
           },
         },
@@ -604,21 +553,47 @@ function SwitchDialog({ tier, cycle, onClose }: { tier: PlanTier; cycle: Billing
         </>
       }
     >
-      <div className="flex flex-col gap-[8px] text-md leading-md text-text-secondary">
+      <div className="flex flex-col gap-[12px] text-md leading-md text-text-secondary">
         <p>
           You keep {current.name} until {when}. Then you&apos;re on {target.name}
           {sameTier ? ", billed monthly" : ""}: {n(target.credits)} AI credits a month, {usd(priceOf(tier, cycle).perMonth)} a month.
         </p>
+        <Losses from={current} to={target} />
         <p>Nothing is charged now, and nothing you made is deleted.</p>
       </div>
     </ModalFrame>
   );
 }
 
-function CancelDialog({ onClose }: { onClose: () => void }) {
-  const { sub, plan: current, cancel } = useCreatePlan();
+/** What gets smaller after a switch or a cancel, as a list; nothing when nothing does. */
+function Losses({ from, to }: { from: Plan; to: Plan }) {
+  const losses = lossesOf(from, to);
+  if (losses.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-[6px]">
+      <p className="font-semibold text-text-primary">What changes then</p>
+      <ul role="list" className="flex flex-col gap-[4px]">
+        {losses.map((l) => (
+          <li key={l} className="flex items-start gap-[8px]">
+            <span aria-hidden className="mt-[9px] h-[4px] w-[4px] shrink-0 rounded-full bg-text-tertiary" />
+            {l}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The smallest paid plan, offered before a cancel from a bigger one. */
+const SMALLEST_PAID: PlanTier = "tinkerer";
+
+export function CancelDialog({ onClose }: { onClose: () => void }) {
+  const { sub, plan: current, cancel, schedule } = useCreatePlan();
   const keepRef = React.useRef<HTMLButtonElement>(null);
   const when = sub.renewsAt ? date(sub.renewsAt) : "";
+  const free = planOf("free");
+  const smaller = planOf(SMALLEST_PAID);
+  const offerSmaller = current.monthly > smaller.monthly;
   return (
     <ModalFrame
       open
@@ -644,11 +619,32 @@ function CancelDialog({ onClose }: { onClose: () => void }) {
         </>
       }
     >
-      <div className="flex flex-col gap-[8px] text-md leading-md text-text-secondary">
+      <div className="flex flex-col gap-[12px] text-md leading-md text-text-secondary">
         <p>
-          You keep {current.name} until {when}. Then you&apos;re on Free: {n(planOf("free").credits)} AI credits a month.
+          You keep {current.name} until {when}. Then you&apos;re on Free: {n(free.credits)} AI credits a month.
         </p>
+        <Losses from={current} to={free} />
         <p>Credits you bought stay until they expire, and nothing you made is deleted.</p>
+        {offerSmaller && (
+          <Banner
+            tone="info"
+            title="Pay less instead"
+            action={
+              <Button
+                hierarchy="secondary"
+                size="sm"
+                onClick={() => {
+                  schedule(SMALLEST_PAID, "monthly");
+                  onClose();
+                }}
+              >
+                Switch to {smaller.name}
+              </Button>
+            }
+          >
+            {smaller.name} is {usd(smaller.monthly)} a month with {n(smaller.credits)} AI credits. It starts on {when}.
+          </Banner>
+        )}
       </div>
     </ModalFrame>
   );

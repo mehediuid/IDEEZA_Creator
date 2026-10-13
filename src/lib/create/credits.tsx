@@ -86,11 +86,15 @@ export type CreditEntry = {
   /** A purchase: when its credits expire (VALIDITY_MONTHS after it). */
   expiresAt?: number;
   /** A purchase: the bonus credits inside `delta`, the pack, the dollar price
-   *  paid and how ("IDZ · demo wallet"). */
+   *  paid and how ("IDZ · demo wallet"), the price before the plan's discount,
+   *  and the wallet's transaction and paying address. */
   bonus?: number;
   pack?: string;
   price?: number;
   paidWith?: string;
+  listPrice?: number;
+  txHash?: string;
+  payer?: string;
   /** An expiry: the lot (ledger line id) it empties. */
   lotId?: string;
 };
@@ -234,6 +238,10 @@ export type CreditOrder = {
   /** "IDZ · demo wallet" */
   paidWith: string;
   ts?: number;
+  /** Dollars before the plan's discount. */
+  listPrice?: number;
+  txHash?: string;
+  payer?: string;
 };
 
 // Credits bought: base plus bonus, expiring VALIDITY_MONTHS later. Idempotent
@@ -256,6 +264,9 @@ export function purchaseState(state: CreditsState, order: CreditOrder): CreditsS
     ...(order.pack ? { pack: order.pack } : {}),
     price: order.price,
     paidWith: order.paidWith,
+    ...(order.listPrice !== undefined && order.listPrice !== order.price ? { listPrice: order.listPrice } : {}),
+    ...(order.txHash ? { txHash: order.txHash } : {}),
+    ...(order.payer ? { payer: order.payer } : {}),
   });
 }
 

@@ -23,6 +23,7 @@ import {
   scheduleSwitch,
   startPlan,
   type Plan,
+  type PlanPayment,
   type PlanTier,
   type Subscription,
 } from "./plans";
@@ -48,7 +49,7 @@ type Ctx = {
   sub: Subscription;
   plan: Plan;
   /** A paid start: the plan begins now (an upgrade). */
-  start: (tier: PlanTier, cycle: BillingCycle, pay: { orderId: string; amount: number; paidWith: string }) => void;
+  start: (tier: PlanTier, cycle: BillingCycle, pay: PlanPayment) => void;
   /** A smaller plan or the monthly cycle, from the period's end. */
   schedule: (tier: PlanTier, cycle: BillingCycle) => void;
   cancel: () => void;

@@ -19,7 +19,7 @@
 //
 // Pure, relative imports only.
 
-import { addMonths, type BillingCycle } from "./credit-pricing";
+import { addMonths, discountFor, type BillingCycle } from "./credit-pricing";
 
 export type PlanTier = "free" | "tinkerer" | "builder" | "disruptor";
 
@@ -51,7 +51,45 @@ export function planOf(tier: PlanTier): Plan {
   return PLANS.find((p) => p.tier === tier) as Plan;
 }
 
-const rank = (tier: PlanTier) => PLANS.findIndex((p) => p.tier === tier);
+const pct = (d: number) => `${Math.round(d * 100)}%`;
+const count = (v: number) => v.toLocaleString("en-US");
+
+/** 720p AI video comes with Disruptor only (lib/video/types `qualityOpen`). */
+export const HIGH_VIDEO_TIER: PlanTier = "disruptor";
+
+/** What a plan gives, as its card lists it. */
+export function featuresOf(p: Plan): string[] {
+  const discount = discountFor(p.tier, "monthly");
+  return [
+    `${count(p.credits)} AI credits a month`,
+    p.queue,
+    `${count(p.projects)} ${p.projects === 1 ? "project" : "projects"} · ${count(p.exports)} exports a month`,
+    p.contributors === 0 ? "Just you, no contributors" : `${count(p.contributors)} ${p.contributors === 1 ? "contributor" : "contributors"}`,
+    ...(discount > 0 ? [`${pct(discount)} off credits (${pct(discountFor(p.tier, "yearly"))} yearly)`] : []),
+    ...(p.tier === HIGH_VIDEO_TIER ? ["720p AI video"] : []),
+  ];
+}
+
+/** What gets smaller moving from one plan to another: "AI credits: 300 → 10 a month". Empty when nothing does. */
+export function lossesOf(from: Plan, to: Plan): string[] {
+  const out: string[] = [];
+  const queueName = (q: string) => q.split(",")[0].replace(/ queue$/, "");
+  const people = (n: number) => (n === 0 ? "none" : count(n));
+  if (to.credits < from.credits) out.push(`AI credits: ${count(from.credits)} → ${count(to.credits)} a month`);
+  if (rank(to.tier) < rank(from.tier) && to.queue !== from.queue) out.push(`AI queue: ${queueName(from.queue)} → ${queueName(to.queue)}`);
+  if (to.projects < from.projects) out.push(`Projects: ${count(from.projects)} → ${count(to.projects)}`);
+  if (to.exports < from.exports) out.push(`Exports: ${count(from.exports)} → ${count(to.exports)} a month`);
+  if (to.contributors < from.contributors) out.push(`Contributors: ${people(from.contributors)} → ${people(to.contributors)}`);
+  const d1 = discountFor(from.tier, "monthly");
+  const d2 = discountFor(to.tier, "monthly");
+  if (d2 < d1) out.push(`Credit discount: ${pct(d1)} → ${d2 === 0 ? "none" : pct(d2)}`);
+  if (from.tier === HIGH_VIDEO_TIER && to.tier !== HIGH_VIDEO_TIER) out.push("720p AI video: 480p only");
+  return out;
+}
+
+function rank(tier: PlanTier): number {
+  return PLANS.findIndex((p) => p.tier === tier);
+}
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /** Per month, and what one billing period charges. */
@@ -76,6 +114,26 @@ export type PlanOrder = {
   /** "IDZ · demo wallet"; a renewal: "Not charged (testnet demo)". */
   paidWith: string;
   kind: "start" | "renewal";
+  /** A start: the new period's price, and the unused time of the plan it
+   *  replaced taken off it (`amount` = price − credit). Older orders lack
+   *  them; read `price ?? amount`. */
+  price?: number;
+  credit?: number;
+  creditFrom?: PlanTier;
+  /** The wallet's transaction and the address that paid. */
+  txHash?: string;
+  payer?: string;
+};
+
+/** What `startPlan` records of a payment. */
+export type PlanPayment = {
+  orderId: string;
+  amount: number;
+  paidWith: string;
+  price?: number;
+  credit?: number;
+  txHash?: string;
+  payer?: string;
 };
 
 export type Subscription = {
@@ -129,9 +187,22 @@ export function startPlan(
   tier: PlanTier,
   cycle: BillingCycle,
   now: number,
-  pay: { orderId: string; amount: number; paidWith: string },
+  pay: PlanPayment,
 ): Subscription {
   if (sub.orders.some((o) => o.orderId === pay.orderId)) return sub;
+  const order: PlanOrder = {
+    orderId: pay.orderId,
+    ts: now,
+    tier,
+    cycle,
+    amount: pay.amount,
+    paidWith: pay.paidWith,
+    kind: "start",
+    ...(pay.price !== undefined ? { price: pay.price } : {}),
+    ...(pay.credit ? { credit: pay.credit, creditFrom: sub.tier } : {}),
+    ...(pay.txHash ? { txHash: pay.txHash } : {}),
+    ...(pay.payer ? { payer: pay.payer } : {}),
+  };
   return {
     id: `sub_${pay.orderId}`,
     tier,
@@ -140,7 +211,7 @@ export function startPlan(
     renewsAt: tier === "free" ? null : addMonths(now, cycleMonths(cycle)),
     autoRenew: true,
     pending: null,
-    orders: [...sub.orders, { orderId: pay.orderId, ts: now, tier, cycle, amount: pay.amount, paidWith: pay.paidWith, kind: "start" }],
+    orders: [...sub.orders, order],
   };
 }
 
