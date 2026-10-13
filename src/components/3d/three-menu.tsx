@@ -8,10 +8,14 @@
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { dispatchThreeAction, type ThreeAction } from "./three-menu-bar";
+import { openReportProblem } from "@/lib/support/open-report";
 
 type MenuItem = {
   label: string;
   action?: ThreeAction;
+  /** Runs instead of dispatching an editor action: Report a problem, which
+   *  belongs to the app rather than to this editor. */
+  run?: () => void;
   shortcut?: string;
   divider?: boolean;
 };
@@ -78,6 +82,7 @@ const MENUS: Record<string, MenuItem[]> = {
       action: "help:shortcuts",
       shortcut: "⌘K ⌘S",
     },
+    { label: "Report a problem…", run: openReportProblem },
     { label: "About 3D Module", action: "help:about" },
   ],
 };
@@ -208,7 +213,8 @@ function MenuLabel({
                 role="menuitem"
                 className="ix-menu"
                 onClick={() => {
-                  if (it.action) dispatchThreeAction(it.action);
+                  if (it.run) it.run();
+                  else if (it.action) dispatchThreeAction(it.action);
                   onSelect();
                 }}
                 style={{

@@ -56,6 +56,7 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
+   │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
@@ -114,6 +115,9 @@ ideeza-creator-panel/
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
+   │  ├─ support/            Report a problem: form rules, page names, recent
+   │  │                      errors, image shrink/capture, openReportProblem()
+   │  ├─ server/             server-only: Vercel Blob driver, report store
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)

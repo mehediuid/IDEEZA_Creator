@@ -4,7 +4,7 @@ Next App Router (modified Next 16: read `node_modules/next/dist/docs/` before to
 
 | Folder or file | What lives there | Read before changing |
 |---|---|---|
-| `layout.tsx`, `globals.css` | Root layout: every app-wide provider (theme, PCB store, manual projects, history, credits, plan, market, video jobs), the mounted `BuildSimulator`, the toast layers | [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) (simulator, toasts) |
+| `layout.tsx`, `globals.css` | Root layout: every app-wide provider (theme, PCB store, manual projects, history, credits, plan, market, video jobs), the mounted `BuildSimulator` and `ReportProblemHost`, the toast layers | [features/ai-create-flow.md](../../docs/guides/features/ai-create-flow.md) (simulator, toasts) |
 | `(dashboard)/layout.tsx`, `(create)/layout.tsx` | The two dashboard shells: global sidebar, ⌘K palette, build attention toast | [features/platform-and-projects.md](../../docs/guides/features/platform-and-projects.md) |
 | `(dashboard)/page.tsx` | `/` — home prompt (`components/dashboard/workspace-prompt.tsx`) | features/ai-create-flow.md |
 | `(dashboard)/parts/`, `parts/new/`, `parts/[id]/` | `/parts` library, New Package flow, one part | [features/parts-package.md](../../docs/guides/features/parts-package.md) |
@@ -23,4 +23,5 @@ Next App Router (modified Next 16: read `node_modules/next/dist/docs/` before to
 | `api/concept/*`, `api/refine/`, `api/ai-chat/` | Keyless text + image model routes: concept summarize, companions, image generate/serve, prompt refine, module assistants | [docs/map/OPERATIONS.md](../../docs/map/OPERATIONS.md) (providers, env names) |
 | `api/build/*`, `api/projects/*`, `api/generate/`, `api/feed/` | Synthetic build snapshot + retry, outcome/appreciate/save stubs, draft stub, feed pages | features/ai-create-flow.md |
 | `api/business-plan/section/` | One business-plan section from the keyless text model | features/platform-and-projects.md › Project page |
+| `api/reports/` | Keeps a Report a problem report and its images (private Blob store, else `.ideeza/problem-reports/`) | features/platform-and-projects.md › Platform & shell |
 | `api/three/generate/`, `api/network/automap/`, `api/kicad/` | Image→3D (Meshy when keyed), network AI Auto-Map, headless `kicad-cli` Gerber/DRC | docs/map/OPERATIONS.md |

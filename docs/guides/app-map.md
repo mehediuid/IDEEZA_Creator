@@ -34,4 +34,4 @@ modules in `FLOW_STEPS` order (`src/lib/manual/projects.tsx`): **PCB Design · C
 
 **Monetization:** **minting** (Utility NFT, Lazy or Instant), the Explore marketplace with a 2.5 % IDEEZA fee, all on a local **demo wallet** (Testnet demo, nothing touches a chain); Upgrade to Pro.
 
-**API:** `/api/business-plan/section` writes one business-plan section (keyless text model; 503 on failure, never filler).
+**API:** `/api/business-plan/section` writes one business-plan section (keyless text model; 503 on failure, never filler). `/api/reports` keeps a problem report from the Report a problem dialog (private Blob store, or disk locally; 400 for a body that isn't a report, idempotent per report id).

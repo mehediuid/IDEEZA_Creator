@@ -61,6 +61,8 @@ import { countsFor } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
+import { linkVariants } from "@/components/ideeza";
+import { openReportProblem } from "@/lib/support/open-report";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -524,7 +526,7 @@ function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => vo
   return (
     <div className="border-t border-border p-[12px]">
       <UpgradeButton collapsed={collapsed} />
-      <SupportBlock collapsed={collapsed} />
+      <SupportBlock collapsed={collapsed} onLeave={onLeave} />
       <ProfileRow collapsed={collapsed} onLeave={onLeave} />
     </div>
   );
@@ -578,17 +580,26 @@ const SUPPORT_LINKS: Array<{ label: string; icon: IconValue }> = [
   { label: "Tour Guide", icon: Compass01Icon },
 ];
 
-function SupportBlock({ collapsed }: { collapsed: boolean }) {
+// Report a problem is the one live row: it opens the app's one Report a
+// problem dialog in place. In the phone drawer the drawer closes first, so
+// the dialog's focus trap isn't stacked on the drawer's and focus comes back
+// to the drawer's menu button.
+function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
+  const report = () => {
+    onLeave?.();
+    openReportProblem();
+  };
   if (collapsed) {
     return (
       <ul role="list" className="mb-[12px] flex flex-col gap-[2px]">
-        {[...SUPPORT_LINKS, { label: "Report a Problem", icon: Bug01Icon }].map(
-          (row) => (
-            <li key={row.label}>
-              <SupportAction label={row.label} icon={row.icon} collapsed />
-            </li>
-          ),
-        )}
+        {SUPPORT_LINKS.map((row) => (
+          <li key={row.label}>
+            <SupportAction label={row.label} icon={row.icon} collapsed />
+          </li>
+        ))}
+        <li>
+          <SupportAction label="Report a problem" icon={Bug01Icon} collapsed onClick={report} />
+        </li>
       </ul>
     );
   }
@@ -610,24 +621,49 @@ function SupportBlock({ collapsed }: { collapsed: boolean }) {
         ))}
       </p>
       <p className="mt-[2px]">
-        <SupportAction label="Report a Problem" icon={Bug01Icon} />
+        <SupportAction label="Report a problem" icon={Bug01Icon} onClick={report} />
       </p>
     </div>
   );
 }
 
-// One handler for all four: they open the same help surfaces the command
-// palette lists, which have no page of their own yet — so the control
-// says so instead of pretending to navigate.
+// Help Center, Tutorial and Tour Guide have no page of their own yet, so
+// without an `onClick` the control says so instead of pretending to
+// navigate.
 function SupportAction({
   label,
   icon,
   collapsed,
+  onClick,
 }: {
   label: string;
   icon: IconValue;
   collapsed?: boolean;
+  onClick?: () => void;
 }) {
+  if (onClick) {
+    return collapsed ? (
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-label={label}
+        title={label}
+        onClick={onClick}
+        className="flex h-[32px] w-full items-center justify-center rounded-md text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <Icon icon={icon} />
+      </button>
+    ) : (
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onClick}
+        className={linkVariants({ color: "neutral", size: "md", className: "min-h-[24px] font-regular" })}
+      >
+        {label}
+      </button>
+    );
+  }
   if (collapsed) {
     return (
       <button

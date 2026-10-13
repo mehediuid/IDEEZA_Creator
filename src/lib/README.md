@@ -19,6 +19,8 @@ Pure state, data and algorithms (JSX-light); the UI for each module lives in [sr
 | `wiring/`, `code/` | Wiring types + a build's wiring document; Code's file model + a build's firmware | features/editor-modules.md |
 | `voice/` | `use-voice-input.ts` — the one dictation hook | features/ai-create-flow.md › voice hook |
 | `dashboard/` | `refine.ts` — templated prompt refinement (stub-only, per its header) | features/ai-create-flow.md |
+| `support/` | Report a problem: the form's rules and the route's check (`problem-report.ts`), page names in the maker's words + device (`page-context.ts`), the tab's recent-errors ring, image shrink/paste/tab capture (`report-images.ts`), `openReportProblem()` | features/platform-and-projects.md › Platform & shell |
+| `server/` | Server-only: the Vercel Blob REST driver shared by concept images and reports (`blob-store.ts`), the report store (`report-store.ts`) | [docs/map/OPERATIONS.md](../../docs/map/OPERATIONS.md) |
 | `ui/` | `tab-keys.ts` — the keyboard rules every tablist shares | [ui-ux.md](../../docs/guides/ui-ux.md) |
 | `key-store.ts`, `storage-status.ts` | One live `localStorage` key (`useSyncExternalStore`); refused-write reporting | spec `2026-09-28-project-details-phase2-design.md` |
 | `feed.ts`, `feed-image-manifest.ts` | Innovations feed data; the manifest is **generated** by `scripts/generate-feed-images.mjs` | [docs/map/OPERATIONS.md](../../docs/map/OPERATIONS.md) |

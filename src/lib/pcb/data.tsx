@@ -41,6 +41,7 @@ export const openGridSettingsPanel = (state, actions) => {
 /** Snap presets offered by the right-click menu, in mil. */
 export const SNAP_PRESETS = [1, 2, 5, 10, 25];
 import type { PcbActions } from "./store";
+import { openReportProblem } from "../support/open-report";
 
 // (An earlier generic `buildMenus` lived here. It was superseded by the three
 // mode-aware builders below — `buildMenusSchematic`, `buildMenus2D`,
@@ -446,7 +447,7 @@ export function buildMenusSchematic(state: PcbState, actions: PcbActions) {
       items: [
         item("Community", { icon: "community" }),
         item("Tutorials", { k: "F1", icon: "tutorial" }),
-        item("Contact", { icon: "contact" }),
+        item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
         item("Online chat", { icon: "chat" }),
         item("About", { icon: "about" }),
       ],
@@ -994,7 +995,7 @@ export function buildMenus2D(state: PcbState, actions: PcbActions) {
       items: [
         item("Community", { icon: "community" }),
         item("Tutorials", { k: "F1", icon: "tutorial" }),
-        item("Contact", { icon: "contact" }),
+        item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
         item("Online chat", { icon: "chat" }),
         item("About", { icon: "about" }),
       ],
@@ -1111,7 +1112,7 @@ export function buildMenus3D(state: PcbState, actions: PcbActions) {
       items: [
         item("Community", { icon: "community" }),
         item("Tutorials", { k: "F1", icon: "tutorial" }),
-        item("Contact", { icon: "contact" }),
+        item("Report a problem…", { icon: "bug", onClick: () => { close(); openReportProblem(); } }),
         item("Online Chat", { icon: "chat", onClick: () => actions.toggleChat() }),
         item("About", { icon: "about" }),
       ],

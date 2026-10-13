@@ -8,6 +8,7 @@
 import * as React from "react";
 import dynamic from "next/dynamic";
 import type { AssemblyViewerProps } from "./viewer-types";
+import { recordCaught } from "@/lib/support/recent-errors";
 
 const Impl = dynamic(() => import("./assembly-viewer-impl").then((m) => m.AssemblyViewerImpl), {
   ssr: false,
@@ -22,7 +23,8 @@ class ViewerBoundary extends React.Component<
   static getDerivedStateFromError() {
     return { failed: true };
   }
-  componentDidCatch() {
+  componentDidCatch(error: unknown) {
+    recordCaught(error);
     this.props.onError();
   }
   render() {

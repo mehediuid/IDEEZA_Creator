@@ -8,6 +8,7 @@
 import * as React from "react";
 import { Canvas } from "@react-three/fiber";
 import { Bounds, Center, OrbitControls, Html, useGLTF } from "@react-three/drei";
+import { recordCaught } from "@/lib/support/recent-errors";
 
 function Model({ url, onLoaded }: { url: string; onLoaded?: () => void }) {
   const { scene } = useGLTF(url);
@@ -30,7 +31,8 @@ class GLBErrorBoundary extends React.Component<
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  componentDidCatch() {
+  componentDidCatch(error: unknown) {
+    recordCaught(error);
     this.props.onError();
   }
   render() {
