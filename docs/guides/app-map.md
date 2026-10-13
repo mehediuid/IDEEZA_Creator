@@ -18,6 +18,7 @@ profile dropdown, plan badge (Free/Pro).
 - `/projects/[id]/network` — **Connection Map**: the project's network — read, Edit map, Settings, Delete (see *Add Network & Connection Map* in [features/platform-and-projects.md](features/platform-and-projects.md)).
 - `/marketplace` — **Explore marketplace**: For sale · Sold · Purchased, with the *Shopping as* demo-buyer switch (all Testnet demo).
 - `/marketplace/[id]`, `/marketplace/[id]/products/[productId]` — the buyer view of a listed project and its products: buyer rail, purchase, bids, holder features. A paused listing reads "off the marketplace for now" to anyone who holds none of it.
+- `/messages`, `/messages/[conversationId]`, `/messages/new` (`?to=&project=&about=listing|purchase:<saleId>|team`, `?to=feed:<id>&post=<slug>`, `?team=<projectId>`; any of them `?as=<person>`) — **Messages**: the conversation list (Inbox · Requests) and one conversation, two panes from 1024 px; `new` finds the conversation an entry point names or drafts it. Demo identities in this browser; see [features/messages.md](features/messages.md).
 - `/history` — **History**: Model Generations · Project/Product Generations.
 - `/parts` — **Parts & Agile Module**: the catalogue, captured Agile Modules, and the packages you have authored.
 - `/parts/new` — **New Package flow**: Package → Symbol → Footprint → 3D Place → Finalize (full-viewport).

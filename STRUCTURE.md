@@ -79,7 +79,9 @@ ideeza-creator-panel/
    │  │                      business-plan/ (chip runner + page) — see
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
-   │  │                      bid and support dialogs, demo-buyer banner
+   │  │                      bid dialogs, Ask the creator / Get creator support, demo-buyer banner
+   │  ├─ messages/           Messages: shell + Acting as, list, conversation (header, context card,
+   │  │                      timeline, composer), start view, settings + report dialogs
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
    │  ├─ network/            Add Network: add-network-dialog (the wizard), map-canvas +
    │  │                      map-editor (the connection canvas), link-panel, product-form,
@@ -158,6 +160,8 @@ ideeza-creator-panel/
    │  │                      sell-flow (the Sell copies flow's steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
+   │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration),
+   │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
    │  ├─ key-store.ts · storage-status.ts   one live localStorage key; refused-write reporting
    │  ├─ feed.ts · feed-image-manifest.ts   community-feed data

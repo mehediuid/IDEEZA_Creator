@@ -23,6 +23,7 @@ Start here for any code change: open the area's router, then only the files it n
 | Schematic + PCB editor | [src/components/pcb/README.md](../../src/components/pcb/README.md) | [pcb-architecture.md](../guides/pcb-architecture.md); features pcb-schematic / pcb-board / pcb-tools-menus-panels |
 | Code, 3D, Assembly, Wiring, Preview modules | `src/components/{code,3d,assembly,wiring,preview}/` | [features/editor-modules.md](../guides/features/editor-modules.md) (Assembly not inventoried) |
 | The mint flow, the Brief in Earn (choose → details → review and sign → success) | `src/components/brief/`, `src/lib/brief/` | features/editor-modules.md › The mint flow |
+| Messages: `/messages`, conversations, Requests, entry points, Acting as | `src/app/(create)/messages/`, `src/components/messages/`, `src/lib/messages/` | [features/messages.md](../guides/features/messages.md); spec `2026-10-13-messages-design.md` |
 | Innovations feed | `src/components/newsfeed/`, `src/lib/feed.ts`, `src/app/api/feed/` | features/platform-and-projects.md |
 | Voice dictation | `src/lib/voice/use-voice-input.ts`, `src/components/voice/` | features/ai-create-flow.md |
 | Design tokens and atoms | `src/styles/` (`tokens.css`, `tailwind-preset.ts`), `src/components/ideeza/` | [ui-ux.md](../guides/ui-ux.md) |
