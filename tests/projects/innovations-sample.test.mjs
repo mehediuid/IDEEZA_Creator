@@ -111,10 +111,11 @@ test("every post has products with pieces, specs and parts, and partsCount adds 
       assert.equal(product.build, null);
     });
     assert.equal(post.partsCount, post.products.reduce((n, p) => n + p.parts.length, 0), `${at} partsCount`);
-    // Media: images only, the cover first, then every product image that differs.
-    assert.ok(post.media.every((m) => m.kind === "image" && m.src && m.alt && m.label));
-    assert.equal(post.media[0].label, "Cover");
-    assert.equal(post.media[0].src, PROJECTS.find((p) => p.slug === at).image);
+    // Media: every product's video first (owner, 2026-10-13), then the cover, then every product image that differs.
+    const images = post.media.slice(post.products.length);
+    assert.ok(images.every((m) => m.kind === "image" && m.src && m.alt && m.label));
+    assert.equal(images[0].label, "Cover");
+    assert.equal(images[0].src, PROJECTS.find((p) => p.slug === at).image);
     assert.equal(new Set(post.media.map((m) => m.src)).size, post.media.length, `${at} media repeats`);
   }
   assert.ok(twoProducts >= 8 && twoProducts <= 16, `${twoProducts} posts with two products`);
@@ -179,6 +180,8 @@ test("smart-plant-watering-hub matches the approved mockup", () => {
   assert.deepEqual(
     post.media.map((m) => [m.kind, m.src, m.label]),
     [
+      ["video", "/innovations/videos/smart-plant-watering-hub--hub.mp4", "Watering Hub video"],
+      ["video", "/innovations/videos/smart-plant-watering-hub--probe.mp4", "Soil Probe video"],
       ["image", "/innovations/smart-plant-watering-hub.png", "Cover"],
       ["image", "/innovations/soil-moisture-mesh-network.png", "Soil Probe"],
     ],
@@ -343,4 +346,30 @@ test("every seeded thread obeys the comment rules", () => {
   // Times follow `now`.
   const later = sampleCommentsOf("sample:p12", NOW + 5 * MIN);
   assert.equal(later[0].createdAt, sampleCommentsOf("sample:p12", NOW)[0].createdAt + 5 * MIN);
+});
+
+test("every post and every product opens on its video, and every video file is on disk (owner, 2026-10-13)", async () => {
+  const { existsSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const publicDir = fileURLToPath(new URL("../../public", import.meta.url));
+  for (const post of SAMPLE_POSTS) {
+    const videos = post.media.filter((m) => m.kind === "video");
+    assert.equal(post.media[0].kind, "video", post.slug);
+    // The videos lead, one per product in product order, then the images.
+    assert.deepEqual(
+      post.media.slice(0, post.products.length).map((m) => m.productId),
+      post.products.map((p) => p.id),
+      post.slug,
+    );
+    assert.ok(post.media.slice(post.products.length).every((m) => m.kind === "image"), post.slug);
+    assert.equal(videos.length, post.products.length, post.slug);
+    for (const product of post.products) {
+      const v = product.video;
+      assert.ok(v && v.kind === "video", `${post.slug}/${product.id}`);
+      assert.equal(v.productId, product.id);
+      assert.equal(v.src, `/innovations/videos/${post.slug}--${product.id}.mp4`);
+      assert.ok(v.poster, `${post.slug}/${product.id} has a poster`);
+      assert.ok(existsSync(publicDir + v.src), `${v.src} exists`);
+    }
+  }
 });
