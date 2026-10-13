@@ -61,6 +61,7 @@ import { countsFor } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
+import { useReviewClock } from "@/lib/blog/store";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -74,8 +75,8 @@ const NAV: NavItem[] = [
   { label: "Parts & agile module", href: "/parts", icon: CpuIcon },
   { label: "Explore marketplace", href: "/marketplace", icon: ShoppingBag01Icon },
   { label: "Innovations", href: "/innovations", icon: News01Icon },
+  { label: "Blog", href: "/blog", icon: BookOpen01Icon },
   { label: "Messages", href: MESSAGES_HREF, icon: Mail01Icon },
-  { label: "Blog", href: null, icon: BookOpen01Icon },
 ];
 
 /** The builds that need the maker — minus the one whose chat is open, which
@@ -141,6 +142,8 @@ export function DashboardSidebar({
   onOpenSearch: () => void;
 }) {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
+  // The Blog's demo review decides about a minute after sending, on every page.
+  useReviewClock();
   // The page the drawer was opened on. A drawer is for getting somewhere, so
   // arriving closes it: once the path changes it no longer matches.
   const pathname = usePathname();

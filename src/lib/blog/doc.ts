@@ -1,0 +1,284 @@
+// The article body: BlogDoc v1, a ProseMirror-JSON subset (spec § Body). Every
+// read goes through `normalizeDoc`, which keeps only the nodes and marks below
+// and drops anything else, so the renderer never meets a node it doesn't know
+// and a link is never `javascript:`. The title is the only H1, so the body's
+// headings are 2 and 3. No italic: Manrope ships none.
+
+import { slugify } from "../innovations/slug";
+import { EMPTY_DOC, type BlogDoc, type BlogImageAttrs, type BlogMark, type BlogNode } from "./types";
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const str = (v: unknown, max = 2000): string => (typeof v === "string" ? v.slice(0, max) : "");
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
+
+/** http, https and mailto only; anything else (javascript:, data:, a bare word) is dropped. */
+export function safeHref(href: unknown): string | null {
+  if (typeof href !== "string") return null;
+  const h = href.trim();
+  if (!h) return null;
+  if (/^mailto:[^\s]+$/i.test(h)) return h;
+  try {
+    const u = new URL(h);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function marksOf(v: unknown): BlogMark[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: BlogMark[] = [];
+  for (const m of v) {
+    if (!isObj(m)) continue;
+    if (m.type === "bold" && !out.some((x) => x.type === "bold")) out.push({ type: "bold" });
+    else if (m.type === "code" && !out.some((x) => x.type === "code")) out.push({ type: "code" });
+    else if (m.type === "link" && isObj(m.attrs) && !out.some((x) => x.type === "link")) {
+      const href = safeHref(m.attrs.href);
+      if (href) out.push({ type: "link", attrs: { href } });
+    }
+  }
+  return out.length ? out : undefined;
+}
+
+function inline(v: unknown): BlogNode[] {
+  if (!Array.isArray(v)) return [];
+  const out: BlogNode[] = [];
+  for (const n of v) {
+    if (!isObj(n)) continue;
+    if (n.type === "text" && typeof n.text === "string" && n.text) {
+      const marks = marksOf(n.marks);
+      out.push(marks ? { type: "text", text: n.text, marks } : { type: "text", text: n.text });
+    } else if (n.type === "hardBreak") out.push({ type: "hardBreak" });
+  }
+  return out;
+}
+
+/** Code keeps its text only: no marks, no breaks other than "\n". */
+function plain(v: unknown): BlogNode[] {
+  const text = inline(v)
+    .map((n) => (n.type === "text" ? n.text : "\n"))
+    .join("");
+  return text ? [{ type: "text", text }] : [];
+}
+
+function imageAttrs(a: unknown): BlogImageAttrs | null {
+  if (!isObj(a)) return null;
+  const fileKey = str(a.fileKey, 200);
+  if (!fileKey) return null;
+  return {
+    fileKey,
+    alt: str(a.alt, 300),
+    caption: str(a.caption, 300),
+    decorative: a.decorative === true,
+    width: num(a.width),
+    height: num(a.height),
+  };
+}
+
+function listItems(v: unknown, depth: number): BlogNode[] {
+  if (!Array.isArray(v)) return [];
+  const items: BlogNode[] = [];
+  for (const li of v) {
+    if (!isObj(li) || li.type !== "listItem") continue;
+    const content = blocks(li.content, depth + 1).filter((b) => b.type === "paragraph" || b.type === "bulletList" || b.type === "orderedList");
+    items.push({ type: "listItem", content: content.length ? content : [{ type: "paragraph" }] });
+  }
+  return items;
+}
+
+function block(n: Record<string, unknown>, depth: number): BlogNode | null {
+  switch (n.type) {
+    case "paragraph": {
+      const content = inline(n.content);
+      return content.length ? { type: "paragraph", content } : { type: "paragraph" };
+    }
+    case "heading": {
+      const raw = isObj(n.attrs) ? n.attrs.level : 2;
+      const level: 2 | 3 = raw === 3 || (typeof raw === "number" && raw > 3) ? 3 : 2;
+      const content = inline(n.content);
+      return content.length ? { type: "heading", attrs: { level }, content } : { type: "heading", attrs: { level } };
+    }
+    case "bulletList":
+    case "orderedList": {
+      if (depth > 3) return null;
+      const content = listItems(n.content, depth);
+      return content.length ? { type: n.type, content } : null;
+    }
+    case "blockquote": {
+      const content = blocks(n.content, depth + 1).filter((b) => b.type === "paragraph");
+      return content.length ? { type: "blockquote", content } : null;
+    }
+    case "codeBlock": {
+      const content = plain(n.content);
+      return content.length ? { type: "codeBlock", content } : { type: "codeBlock" };
+    }
+    case "horizontalRule":
+      return { type: "horizontalRule" };
+    case "image": {
+      const attrs = imageAttrs(n.attrs);
+      return attrs ? { type: "image", attrs } : null;
+    }
+    case "imageRow": {
+      if (!Array.isArray(n.content)) return null;
+      const imgs: BlogNode[] = [];
+      for (const c of n.content) {
+        const attrs = isObj(c) && c.type === "image" ? imageAttrs(c.attrs) : null;
+        if (attrs && imgs.length < 3) imgs.push({ type: "image", attrs });
+      }
+      if (imgs.length === 0) return null;
+      return imgs.length === 1 ? imgs[0] : { type: "imageRow", content: imgs };
+    }
+    case "video": {
+      if (!isObj(n.attrs)) return null;
+      const fileKey = str(n.attrs.fileKey, 200);
+      return fileKey ? { type: "video", attrs: { fileKey, caption: str(n.attrs.caption, 300) } } : null;
+    }
+    case "projectCard": {
+      const projectId = isObj(n.attrs) ? str(n.attrs.projectId, 200) : "";
+      return projectId ? { type: "projectCard", attrs: { projectId } } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function blocks(v: unknown, depth: number): BlogNode[] {
+  if (!Array.isArray(v)) return [];
+  const out: BlogNode[] = [];
+  for (const n of v) {
+    if (!isObj(n)) continue;
+    const b = block(n, depth);
+    if (b) out.push(b);
+  }
+  return out;
+}
+
+/** Any value → a valid BlogDoc. Unknown nodes and marks are dropped, never kept. */
+export function normalizeDoc(v: unknown): BlogDoc {
+  if (!isObj(v) || v.type !== "doc") return EMPTY_DOC;
+  return { type: "doc", content: blocks(v.content, 0) };
+}
+
+function each(nodes: readonly BlogNode[] | undefined, fn: (n: BlogNode) => void): void {
+  if (!nodes) return;
+  for (const n of nodes) {
+    fn(n);
+    if ("content" in n && n.content) each(n.content, fn);
+  }
+}
+
+/** The plain text of a run of inline nodes. */
+export function textOf(nodes: readonly BlogNode[] | undefined): string {
+  let s = "";
+  each(nodes, (n) => {
+    if (n.type === "text") s += n.text;
+    else if (n.type === "hardBreak") s += " ";
+  });
+  return s;
+}
+
+/** Every block's text, one per line (code included), for counting and checks. */
+export function blockTexts(doc: BlogDoc): string[] {
+  const out: string[] = [];
+  each(doc.content, (n) => {
+    if (n.type === "paragraph" || n.type === "heading" || n.type === "codeBlock") {
+      const t = textOf(n.content).trim();
+      if (t) out.push(t);
+    }
+  });
+  return out;
+}
+
+const WORD = /[\p{L}\p{N}][\p{L}\p{N}'’_-]*/gu;
+
+export function wordCount(doc: BlogDoc): number {
+  let words = 0;
+  each(doc.content, (n) => {
+    if (n.type === "paragraph" || n.type === "heading") words += (textOf(n.content).match(WORD) ?? []).length;
+  });
+  return words;
+}
+
+/** 238 words a minute (adult non-fiction average), 10 s an image, 3 s a code line; at least 1. */
+export function readingMinutes(doc: BlogDoc): number {
+  let images = 0;
+  let codeLines = 0;
+  each(doc.content, (n) => {
+    if (n.type === "image") images += 1;
+    if (n.type === "codeBlock") codeLines += textOf(n.content).split("\n").length;
+  });
+  const seconds = (wordCount(doc) / 238) * 60 + images * 10 + codeLines * 3;
+  return Math.max(1, Math.ceil(seconds / 60));
+}
+
+export type Heading = { level: 2 | 3; text: string; anchor: string };
+
+/** "On this page": the body's H2s and H3s, each with an anchor unique in the article. */
+export function headingsOf(doc: BlogDoc): Heading[] {
+  const out: Heading[] = [];
+  const used = new Map<string, number>();
+  for (const n of doc.content) {
+    if (n.type !== "heading") continue;
+    const text = textOf(n.content).trim();
+    if (!text) continue;
+    const base = slugify(text) || "section";
+    const seen = used.get(base) ?? 0;
+    used.set(base, seen + 1);
+    out.push({ level: n.attrs.level, text, anchor: seen ? `${base}-${seen + 1}` : base });
+  }
+  return out;
+}
+
+/** Every image in the body, in reading order (rows included). */
+export function imagesOf(doc: BlogDoc): BlogImageAttrs[] {
+  const out: BlogImageAttrs[] = [];
+  each(doc.content, (n) => {
+    if (n.type === "image") out.push(n.attrs);
+  });
+  return out;
+}
+
+/** Images a reader can't follow without a description: no alt and not marked decoration. */
+export function missingAlt(doc: BlogDoc): BlogImageAttrs[] {
+  return imagesOf(doc).filter((i) => !i.decorative && !i.alt.trim());
+}
+
+/** Every stored file the body points at (images and video). */
+export function fileKeysOf(doc: BlogDoc): string[] {
+  const out: string[] = [];
+  each(doc.content, (n) => {
+    if (n.type === "image" || n.type === "video") out.push(n.attrs.fileKey);
+  });
+  return out;
+}
+
+/** Stored files neither body nor any cover uses any more — safe to delete. */
+export function unreferencedKeys(all: readonly string[], keep: { docs: readonly BlogDoc[]; covers: readonly (string | null | undefined)[] }): string[] {
+  const used = new Set<string>();
+  for (const d of keep.docs) for (const k of fileKeysOf(d)) used.add(k);
+  for (const c of keep.covers) if (c) used.add(c);
+  return all.filter((k) => !used.has(k));
+}
+
+/** Nothing worth saving: no text, no image, no video, no card. */
+export function isEmptyDoc(doc: BlogDoc): boolean {
+  let empty = true;
+  each(doc.content, (n) => {
+    if ((n.type === "text" && n.text.trim()) || n.type === "image" || n.type === "video" || n.type === "projectCard" || n.type === "horizontalRule") empty = false;
+  });
+  return empty;
+}
+
+/** Whether two bodies say the same thing (used for "Unsent changes"). */
+export function sameDoc(a: BlogDoc, b: BlogDoc): boolean {
+  return JSON.stringify(normalizeDoc(a)) === JSON.stringify(normalizeDoc(b));
+}
+
+/** Every link in the body. */
+export function linksOf(doc: BlogDoc): string[] {
+  const out: string[] = [];
+  each(doc.content, (n) => {
+    if (n.type === "text") for (const m of n.marks ?? []) if (m.type === "link") out.push(m.attrs.href);
+  });
+  return out;
+}
