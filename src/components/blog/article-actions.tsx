@@ -61,7 +61,7 @@ function confirmCopy(c: Confirm): { title: string; body: string; cta: string; to
       return { title: "Discard your changes?", body: "The changes waiting for review are deleted. Readers keep seeing the live version.", cta: "Discard changes", tone: "danger" };
     case "delete":
       if (s === "draft") return { title: "Delete this draft?", body: `${t} will be deleted. You can't undo this.`, cta: "Delete draft", tone: "danger" };
-      if (s === "review" || s === "needs") return { title: "Delete this article?", body: `${t} will be taken out of review and deleted. You can't undo this.`, cta: "Delete article", tone: "danger" };
+      if (s === "review") return { title: "Delete this article?", body: `${t} will be taken out of review and deleted. You can't undo this.`, cta: "Delete article", tone: "danger" };
       if (s === "live" || s === "changes") return { title: "Delete this article?", body: `${t} will be taken off the IDEEZA Blog and deleted. Links to it will stop working. You can't undo this.`, cta: "Delete article", tone: "danger" };
       return { title: "Delete this article?", body: `${t} will be deleted. You can't undo this.`, cta: "Delete article", tone: "danger" };
   }

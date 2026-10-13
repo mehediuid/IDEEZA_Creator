@@ -24,6 +24,8 @@ import { SearchInput, buttonVariants } from "@/components/ideeza";
 import { Pagination } from "@/components/projects/pagination";
 import { useNow } from "@/components/innovations/comments/comment-dom";
 import { useArticleActions } from "@/components/blog/article-actions";
+import { ChangeCoverDialog } from "@/components/blog/send/change-cover-dialog";
+import { findArticle } from "@/lib/blog/article";
 import { blogQueryHref, countLine, filterArticles, pageOf, parseBlogQuery, tabCounts, type BlogQuery } from "@/lib/blog/list";
 import { newArticleHref } from "@/lib/blog/slug";
 import type { StatusTab } from "@/lib/blog/status";
@@ -48,7 +50,8 @@ export function BlogList() {
   const { hydrated, data, unreadable } = useBlog();
   const params = useSearchParams();
   const now = useNow();
-  const actions = useArticleActions();
+  const [coverFor, setCoverFor] = React.useState<string | null>(null);
+  const actions = useArticleActions({ onChangeCover: (a) => setCoverFor(a.id) });
 
   // ── the view ──
   const query = React.useMemo(() => parseBlogQuery(params), [params]);
@@ -298,6 +301,7 @@ export function BlogList() {
         )}
       </div>
       {actions.dialogs}
+      <ChangeCoverDialog article={coverFor ? findArticle(data, coverFor) : null} onClose={() => setCoverFor(null)} />
     </div>
   );
 }
