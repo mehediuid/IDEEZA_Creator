@@ -11,39 +11,42 @@
 // page-coloured gap showed as a darker band in dark. A caller on the bare
 // page can pass its own `ring-offset-bg-page`.
 //
-// Every hierarchy draws a 1 px border — transparent unless it is secondary —
-// so a primary beside a secondary is the same height.
+// Every hierarchy draws A01's 1.5 px secondary stroke as a border —
+// transparent unless it is secondary — so a primary beside a secondary is the
+// same size.
 //
 // Each size states its A01 height (SM 32 · MD 36 · LG 40 · XL 44 · 2XL 48)
 // instead of building it from padding: Figma's stroke sits inside the frame,
-// the CSS border adds 2 px, and `cn` drops any line height written before the
-// size's `text-[length:…]`, so padding-built buttons came out 2–10 px taller.
-// The line height follows the font size's Label style and sits after it.
+// the CSS border adds to the box, and `cn` drops any line height written
+// before the size's `text-[length:…]`. For the same reason the side padding
+// is A01's (12 · 14 · 16 · 20 · 24) less the border, so the width matches
+// Figma too. Type is A01's Label style per size (MD · LG · LG · XL · XL);
+// the line height sits after the font size.
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-[0.1px] transition-[background-color,filter,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none ring-offset-bg-surface focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
+  "inline-flex items-center justify-center whitespace-nowrap select-none font-[family-name:var(--font-family-display)] font-[var(--font-weight-semibold)] tracking-wide transition-[background-color,filter,box-shadow] [transition-duration:var(--motion-duration-fast)] [transition-timing-function:var(--motion-easing-standard)] cursor-pointer outline-none ring-offset-bg-surface focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--color-border-focus)] disabled:cursor-not-allowed",
   {
     variants: {
       hierarchy: {
         primary:
-          "border border-solid border-transparent bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-primary-bg)] text-[color:var(--color-button-primary-text)] hover:bg-[var(--color-button-primary-bg-hover)] active:bg-[var(--color-button-primary-bg-pressed)] disabled:bg-[var(--color-button-disabled-bg)] disabled:text-[color:var(--color-button-disabled-text)]",
         secondary:
-          "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border border-solid border-[var(--color-button-secondary-border)] hover:bg-[var(--color-bg-subtle)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "bg-[var(--color-button-secondary-bg)] text-[color:var(--color-button-secondary-text)] border-[length:var(--border-width-1-5)] border-solid border-[var(--color-button-secondary-border)] hover:bg-[var(--color-bg-subtle)] disabled:text-[color:var(--color-button-disabled-text)]",
         ghost:
-          "border border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
+          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
         danger:
-          "border border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)]",
+          "border-[length:var(--border-width-1-5)] border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)]",
       },
       size: {
-        sm: "h-[32px] gap-[var(--spacing-2)] px-[var(--spacing-5)] rounded-[var(--radius-sm)] text-[length:var(--font-size-xs)] leading-xs",
-        md: "h-[36px] gap-[var(--spacing-3)] px-[var(--spacing-6)] rounded-[var(--radius-md)] text-[length:var(--font-size-sm)] leading-xs",
-        lg: "h-[40px] gap-[var(--spacing-3)] px-[var(--spacing-7)] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md",
-        xl: "h-[44px] gap-[var(--spacing-3)] px-[var(--spacing-8)] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md",
-        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[var(--spacing-10)] rounded-[var(--radius-lg)] text-[length:var(--font-size-lg)] leading-lg",
+        sm: "h-[32px] gap-[var(--spacing-3)] px-[calc(var(--spacing-6)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-sm)] leading-xs",
+        md: "h-[36px] gap-[var(--spacing-3)] px-[calc(var(--spacing-7)_-_var(--border-width-1-5))] rounded-[var(--radius-lg)] text-[length:var(--font-size-md)] leading-md",
+        lg: "h-[40px] gap-[var(--spacing-3)] px-[calc(var(--spacing-8)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-md)] leading-md",
+        xl: "h-[44px] gap-[var(--spacing-4)] px-[calc(var(--spacing-10)_-_var(--border-width-1-5))] rounded-[var(--radius-xl)] text-[length:var(--font-size-lg)] leading-lg",
+        "2xl": "h-[48px] gap-[var(--spacing-4)] px-[calc(var(--spacing-12)_-_var(--border-width-1-5))] rounded-[var(--radius-2xl)] text-[length:var(--font-size-lg)] leading-lg",
       },
       iconOnly: {
         true: "px-0 py-0 aspect-square",
