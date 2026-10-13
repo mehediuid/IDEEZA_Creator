@@ -11,7 +11,6 @@
 import * as React from "react";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge } from "@/components/ideeza";
 import { isPreview } from "@/lib/manual/buyer-preview";
 import { activitiesOf, ageOf, labelOf, targetNameOf, type ActivityTarget } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
@@ -19,10 +18,11 @@ import { can } from "@/lib/manual/permissions";
 import { displayProductName } from "@/lib/manual/products-tab-view";
 import { formatDateTime } from "@/lib/manual/project-summary";
 import { ActivityDrawer } from "../details/activity/drawer";
+import { TypePill } from "../details/activity/now-block";
 import type { SlotProps } from "../details/slots";
 
 const ADD =
-  "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-solid border-border-strong text-text-primary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]";
+  "inline-flex size-[32px] shrink-0 items-center justify-center rounded-md border border-solid border-border-strong text-text-primary outline-none transition-colors duration-fast hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]";
 
 export function NftActivityLine({
   project,
@@ -49,11 +49,11 @@ export function NftActivityLine({
   });
 
   return (
-    <div className="flex min-h-[36px] min-w-0 items-center gap-2 text-sm">
+    <div className="flex min-h-[40px] min-w-0 items-center gap-2 text-md">
       <span className="shrink-0 text-text-secondary">Activity</span>
       {canWrite && (
         <button ref={addRef} type="button" onClick={() => setDrawer("add")} aria-label={`Add activity for ${name}`} className={ADD}>
-          <Icon icon={PlusSignIcon} size={14} />
+          <Icon icon={PlusSignIcon} size={16} />
         </button>
       )}
       {latest ? (
@@ -62,16 +62,16 @@ export function NftActivityLine({
           type="button"
           onClick={() => setDrawer("list")}
           aria-label={`${name} activity: ${labelOf(latest)}, ${ageOf(latest.createdAt, now)}. History, ${stored.length}`}
-          className="flex min-h-[32px] min-w-0 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
+          className="flex min-h-[36px] min-w-0 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
         >
-          <Badge tone="brand-outline">{labelOf(latest)}</Badge>
-          <span className="min-w-0 truncate text-text-tertiary" title={formatDateTime(latest.createdAt)}>
+          <TypePill>{labelOf(latest)}</TypePill>
+          <span className="min-w-0 truncate text-text-secondary" title={formatDateTime(latest.createdAt)}>
             {ageOf(latest.createdAt, now)}
           </span>
           <span className="shrink-0 font-medium text-text-brand">· {stored.length} ›</span>
         </button>
       ) : (
-        <span className="min-w-0 truncate text-text-tertiary">None yet</span>
+        <span className="min-w-0 truncate text-text-secondary">None yet</span>
       )}
       <ActivityDrawer
         open={drawer !== null}

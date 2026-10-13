@@ -16,7 +16,6 @@
 import * as React from "react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge } from "@/components/ideeza";
 import { ageOf, historyOf, labelOf, type ActivityTarget, type JourneyEntry, type MediaRef } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
@@ -25,10 +24,19 @@ import { LinkConfirmDialog } from "../link-confirm";
 import { useMinuteClock } from "../use-project-page-data";
 import { ActivityLightbox, EntryProof } from "./entry";
 
+/** The type of an entry as a pill, at reading size (owner, 2026-10-13: "fonts far too small"). */
+export function TypePill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-solid border-border-brand px-[10px] py-[1px] text-md leading-md text-text-brand">
+      {children}
+    </span>
+  );
+}
+
 type Overlay = { kind: "lightbox"; media: MediaRef[]; index: number } | { kind: "link"; url: string };
 
 const QUIET_BUTTON =
-  "inline-flex min-h-[32px] items-center gap-2 self-start rounded-lg text-sm font-medium text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[36px] items-center gap-2 self-start rounded-lg text-md font-medium text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
 
 export function ActivityNow({
   projectId,
@@ -105,11 +113,11 @@ export function ActivityNow({
             aria-expanded={open}
             aria-controls={listId}
             onClick={() => setOpen((v) => !v)}
-            className="flex min-h-[36px] w-full items-center gap-2 rounded-md text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
+            className="flex min-h-[40px] w-full items-center gap-2 rounded-md text-left text-md outline-none focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]"
           >
             <span className="shrink-0 text-text-secondary">{label}</span>
-            <Badge tone="brand-outline">{labelOf(current)}</Badge>
-            <span className="min-w-0 truncate text-text-tertiary" title={formatDateTime(current.createdAt)}>
+            <TypePill>{labelOf(current)}</TypePill>
+            <span className="min-w-0 truncate text-text-secondary" title={formatDateTime(current.createdAt)}>
               {ageOf(current.createdAt, now)}
             </span>
             <span
@@ -124,9 +132,9 @@ export function ActivityNow({
             <span className="sr-only">{open ? "Hide details" : "Show details"}</span>
           </button>
         ) : (
-          <p className="m-0 flex min-h-[36px] items-center gap-2 text-sm">
+          <p className="m-0 flex min-h-[40px] items-center gap-2 text-md">
             <span className="text-text-secondary">{label}</span>
-            <span className="text-text-tertiary">{emptyNote}</span>
+            <span className="text-text-secondary">{emptyNote}</span>
           </p>
         )}
         {current && (
@@ -146,11 +154,11 @@ export function ActivityNow({
       className={cn("flex flex-col gap-2", !bare && "rounded-xl border border-solid border-border p-3", className)}
     >
       {heading && (
-        <h3 id={headingId} className="m-0 text-sm font-semibold text-text-primary">
+        <h3 id={headingId} className="m-0 text-md font-semibold text-text-primary">
           {heading}
         </h3>
       )}
-      {!current && <p className="m-0 text-sm text-text-secondary">{emptyNote}</p>}
+      {!current && <p className="m-0 text-md text-text-secondary">{emptyNote}</p>}
       {current && (
         <Entry
           entry={current}
@@ -212,15 +220,15 @@ function Entry({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-        {lead && <span className="text-text-tertiary">{lead}</span>}
-        {pill ? <Badge tone="brand-outline">{label}</Badge> : <span className="font-semibold text-text-primary">{label}</span>}
-        <time dateTime={new Date(entry.createdAt).toISOString()} title={formatDateTime(entry.createdAt)} className="text-text-tertiary">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-md">
+        {lead && <span className="text-text-secondary">{lead}</span>}
+        {pill ? <TypePill>{label}</TypePill> : <span className="font-semibold text-text-primary">{label}</span>}
+        <time dateTime={new Date(entry.createdAt).toISOString()} title={formatDateTime(entry.createdAt)} className="text-text-secondary">
           {pill ? ageOf(entry.createdAt, now) : formatDate(entry.createdAt)}
         </time>
       </div>
       {entry.description && (
-        <p ref={descRef} id={descId} className={cn("m-0 text-sm text-text-secondary", !more && "line-clamp-2")}>
+        <p ref={descRef} id={descId} className={cn("m-0 text-md leading-md text-text-primary max-md:text-lg max-md:leading-lg", !more && "line-clamp-2")}>
           {entry.description}
         </p>
       )}

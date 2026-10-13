@@ -198,14 +198,15 @@ export function ActivityDrawer({
 
   // The ⋮ hint only once there is an entry to edit, drawn as that button's
   // own icon: the "⋮" character fell back to a colon in the UI font.
+  // Set at reading size here: the shared Drawer draws its description at 12 px (owner, 2026-10-13).
   const subtitle = isPreview ? undefined : canWrite && stored > 0 ? (
-    <>
+    <span className="text-md">
       {targetName} · newest first. Use{" "}
       <Icon icon={MoreVerticalIcon} size={14} className="inline-block align-[-2px]" />
       <span className="sr-only">the actions button</span> to edit a stage.
-    </>
+    </span>
   ) : (
-    `${targetName} · newest first.`
+    <span className="text-md">{targetName} · newest first.</span>
   );
 
   const title =

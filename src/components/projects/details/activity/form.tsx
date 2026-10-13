@@ -325,7 +325,7 @@ export function ActivityForm({
 
   return (
     <form ref={formRef} id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
-      <p className="text-sm text-text-secondary">
+      <p className="text-md text-text-secondary">
         {mode === "add"
           ? "Add at least one photo, video, PDF or document as proof — buyers see it in the journey."
           : "Changes update this entry in the journey. It keeps at least one file."}
@@ -355,7 +355,7 @@ export function ActivityForm({
             maxLength={200}
             placeholder="Name this stage"
           />
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-md">
             <span className={cn(showNameError ? "text-text-error" : "text-text-tertiary")}>
               {showNameError ?? ""}
             </span>
@@ -378,7 +378,7 @@ export function ActivityForm({
           rows={4}
           placeholder="What happened at this stage?"
         />
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-md">
           <span className={cn(showDescError ? "text-text-error" : "text-text-tertiary")}>{showDescError ?? ""}</span>
           <span className="tabular-nums text-text-tertiary">
             {descLen}/{DESCRIPTION_MAX}
@@ -403,7 +403,7 @@ export function ActivityForm({
       />
 
       {saveError && (
-        <p role="alert" className="text-sm text-text-error">
+        <p role="alert" className="text-md text-text-error">
           {saveError}
         </p>
       )}
@@ -460,20 +460,26 @@ function UrlsSection({ urls, onChange }: { urls: string[]; onChange: (next: stri
                 type="button"
                 onClick={() => onChange(urls.filter((_, j) => j !== i))}
                 aria-label={`Remove link ${i + 1}`}
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+                className="inline-flex size-[36px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
               >
                 <Icon icon={Cancel01Icon} size={16} />
               </button>
             </div>
             {shown && (
-              <p role="alert" className="text-sm text-text-error">
+              <p role="alert" className="text-md text-text-error">
                 Please enter a valid URL starting with https://
               </p>
             )}
           </div>
         );
       })}
-      <Button type="button" hierarchy="secondary" size="sm" className="self-start" onClick={() => onChange([...urls, ""])}>
+      <Button
+        type="button"
+        hierarchy="secondary"
+        size="md"
+        className="self-start text-[length:var(--font-size-md)] max-md:min-h-[var(--touch-min)]"
+        onClick={() => onChange([...urls, ""])}
+      >
         + Add URL
       </Button>
     </div>
@@ -518,7 +524,7 @@ function MediaSection({
         <span className="sr-only">(required)</span>
       </span>
       {hint && (
-        <p id={hintId} className="m-0 text-sm text-text-secondary">
+        <p id={hintId} className="m-0 text-md text-text-secondary">
           {hint}
         </p>
       )}
@@ -550,11 +556,11 @@ function MediaSection({
         )}
       >
         <Icon icon={CloudUploadIcon} size={22} className="text-text-tertiary" />
-        <p className="text-sm font-medium text-text-primary">Click or drag a file to upload</p>
-        <p className="text-xs text-text-tertiary">PNG, JPG, PDF, DOC, GIF, Video or DOCX</p>
+        <p className="text-md font-medium text-text-primary">Click or drag a file to upload</p>
+        <p className="text-md text-text-tertiary">PNG, JPG, PDF, DOC, GIF, Video or DOCX</p>
       </div>
       {error && (
-        <p id={errorId} role="alert" className="text-sm text-text-error">
+        <p id={errorId} role="alert" className="text-md text-text-error">
           {error}
         </p>
       )}
@@ -570,7 +576,7 @@ function MediaSection({
         }}
       />
       {rejectedCount > 0 && (
-        <p role="alert" className="text-sm text-text-error">
+        <p role="alert" className="text-md text-text-error">
           {rejectedCount === 1 ? "One file wasn't a supported type." : `${rejectedCount} files weren't a supported type.`}{" "}
           <button type="button" onClick={onDismissRejected} className="underline underline-offset-2">
             Dismiss
@@ -586,15 +592,15 @@ function MediaSection({
             >
               {f.kind === "image" && f.previewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={f.previewUrl} alt="" className="size-10 shrink-0 rounded object-cover" />
+                <img src={f.previewUrl} alt="" className="size-[40px] shrink-0 rounded object-cover" />
               ) : (
-                <span className="flex size-10 shrink-0 items-center justify-center rounded bg-bg-subtle text-text-tertiary">
+                <span className="flex size-[40px] shrink-0 items-center justify-center rounded bg-bg-subtle text-text-tertiary">
                   <Icon icon={KIND_ICON[f.kind]} size={18} />
                 </span>
               )}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-text-primary">{f.name}</span>
-                <span className="block text-xs text-text-tertiary">
+                <span className="block truncate text-md text-text-primary">{f.name}</span>
+                <span className="block text-md text-text-tertiary">
                   {formatSize(f.size)}
                   {f.status === "saving" && " · Saving…"}
                   {f.status === "error" && " · Couldn't save this file"}
@@ -604,7 +610,7 @@ function MediaSection({
                 type="button"
                 onClick={() => onRemove(f.id)}
                 aria-label={`Remove ${f.name}`}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+                className="inline-flex size-[32px] shrink-0 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
               >
                 <Icon icon={Cancel01Icon} size={14} />
               </button>

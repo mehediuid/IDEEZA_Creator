@@ -30,7 +30,7 @@ import { ActivityNow } from "./now-block";
 type Props = Pick<SlotProps, "project" | "view" | "viewer" | "now" | "announce">;
 
 const QUIET_LINK =
-  "inline-flex min-h-[32px] items-center gap-1 rounded-sm text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[36px] items-center gap-1 rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
 
 export function ActivityCard({ project, view, viewer, now, announce, productId }: Props & { productId?: string }) {
   const { hydrated, record } = useJourney(project.id);
@@ -61,10 +61,10 @@ export function ActivityCard({ project, view, viewer, now, announce, productId }
             ref={addRef}
             type="button"
             hierarchy="secondary"
-            size="sm"
+            size="md"
             onClick={() => setDrawer("add")}
             aria-label={`Add activity for ${pageName}`}
-            className="max-md:min-h-[var(--touch-min)]"
+            className="text-[length:var(--font-size-md)] max-md:min-h-[var(--touch-min)]"
           >
             + Add
           </Button>

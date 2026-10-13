@@ -77,7 +77,7 @@ function InfoBubble({ label, text }: { label: string; text: string }) {
         onKeyDown={(e) => {
           if (e.key === "Escape") setShow(false);
         }}
-        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+        className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-full text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
       >
         <Icon icon={HelpCircleIcon} size={14} />
       </button>
@@ -138,7 +138,7 @@ function EntryMenu({
         aria-label={`Actions for ${stage}`}
         data-activity-actions={activityId}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex size-8 items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
+        className="inline-flex size-[32px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:size-[var(--touch-min)]"
       >
         <Icon icon={MoreVerticalIcon} size={16} />
       </button>
@@ -170,7 +170,7 @@ function EntryMenu({
               setOpen(false);
               onEdit();
             }}
-            className="block w-full px-4 py-3 text-left text-sm text-text-primary outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
+            className="block w-full px-4 py-3 text-left text-md text-text-primary outline-none hover:bg-bg-subtle focus-visible:bg-bg-subtle"
           >
             Edit Activity
           </button>
@@ -182,7 +182,7 @@ function EntryMenu({
               setOpen(false);
               onDelete();
             }}
-            className="block w-full px-4 py-3 text-left text-sm text-text-error outline-none hover:bg-bg-error-subtle focus-visible:bg-bg-error-subtle"
+            className="block w-full px-4 py-3 text-left text-md text-text-error outline-none hover:bg-bg-error-subtle focus-visible:bg-bg-error-subtle"
           >
             Delete Activity
           </button>
@@ -222,7 +222,7 @@ export function MediaTile({ media, onView, small = false }: { media: MediaRef; o
       title={media.name}
       className={cn(
         "relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-solid border-border bg-bg-surface-raised outline-none transition-colors duration-fast hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus",
-        small ? "size-9 max-md:size-11" : "size-[60px]",
+        small ? "size-[36px] max-md:size-[44px]" : "size-[60px]",
       )}
     >
       {media.kind === "image" && url ? (
@@ -285,23 +285,23 @@ function EditionPopover({
           aria-label={title}
           className="absolute left-0 top-full z-popover mt-2 w-[280px] rounded-xl border border-solid border-border bg-bg-surface p-4 text-left shadow-3"
         >
-          <p className="text-sm font-semibold text-text-primary">{title}</p>
+          <p className="text-md font-semibold text-text-primary">{title}</p>
           <div className="mt-3 flex flex-col gap-3">
             {rows.map((r, i) => (
               <div key={i} className="flex flex-col gap-1">
-                <p className="text-xs font-medium text-text-tertiary">{productNameOf(products, r.productId)}</p>
-                <div className="flex items-center justify-between text-sm">
+                <p className="text-md font-medium text-text-tertiary">{productNameOf(products, r.productId)}</p>
+                <div className="flex items-center justify-between text-md">
                   <span className="text-text-secondary">{USE_LABEL[r.use]} · Regular</span>
                   <span className="tabular-nums text-text-primary">{formatAmount(r.regular, token)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-md">
                   <span className="text-text-secondary">{USE_LABEL[r.use]} · Extended</span>
                   <span className="tabular-nums text-text-primary">{formatAmount(r.extended, token)}</span>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-text-tertiary">Listed prices when this entry was added — Testnet demo.</p>
+          <p className="mt-3 text-md text-text-tertiary">Listed prices when this entry was added — Testnet demo.</p>
         </div>
       )}
     </span>
@@ -359,7 +359,7 @@ export function EntryProof({
                 type="button"
                 onClick={() => onOpenLink(u)}
                 className={cn(
-                  "flex w-full items-center gap-2 text-left text-sm text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",
+                  "flex w-full items-center gap-2 text-left text-md text-text-secondary outline-none transition-colors duration-fast hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus",
                   compact
                     ? "min-h-[32px] rounded-md max-md:min-h-[var(--touch-min)]"
                     : "rounded-lg border border-solid border-border px-4 py-3 hover:border-border-strong",
@@ -407,8 +407,10 @@ export function ActivityEntry({
         </div>
         {canWrite && <EntryMenu activityId={activity.id} stage={title} onEdit={onEdit} onDelete={onDeleteRequest} />}
       </div>
-      <p className="mt-1 text-sm text-text-tertiary">{formatDate(activity.createdAt)}</p>
-      {activity.description && <p className="mt-3 line-clamp-4 text-sm text-text-secondary">{activity.description}</p>}
+      <p className="mt-1 text-md text-text-secondary">{formatDate(activity.createdAt)}</p>
+      {activity.description && (
+        <p className="mt-3 line-clamp-4 text-md leading-md text-text-primary max-md:text-lg max-md:leading-lg">{activity.description}</p>
+      )}
       <EntryProof entry={activity} onOpenMedia={onOpenMedia} onOpenLink={onOpenLink} />
       <PricePills activity={activity} products={products} />
     </li>
@@ -531,7 +533,7 @@ export function ActivityLightbox({
         <span className={cn("relative", "text-text-on-brand")}>Loading…</span>
       )}
 
-      <p onClick={(e) => e.stopPropagation()} className="relative z-10 text-sm text-text-on-brand">
+      <p onClick={(e) => e.stopPropagation()} className="relative z-10 text-md text-text-on-brand">
         {index + 1} of {media.length} · {item.name}
       </p>
     </div>,
