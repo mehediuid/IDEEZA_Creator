@@ -222,7 +222,7 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
             id={MARKETPLACE_FOCUS_ID}
             className={LINK}
           >
-            See customers
+            See sales
             <Icon icon={ArrowRight01Icon} size={16} />
           </Link>
         </>

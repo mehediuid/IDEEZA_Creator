@@ -55,7 +55,7 @@ function LicenseForm({ open, projectId, current, onClose, onSaved }: DialogProps
       onClose={onClose}
       size="sm"
       title="Choose a license"
-      description="The terms buyers get your project under."
+      description="The terms your project is sold under."
       footer={
         <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
           <Button type="button" hierarchy="secondary" size="lg" className={TAP} onClick={onClose}>

@@ -211,7 +211,7 @@ export function statusAfterCommit(intent: Intent | null): ProjectStatus {
 export const COLLECTION_REASON = "Choose a collection to mint into.";
 export const OWNERSHIP_REASON = "Confirm you are the rightful owner of this idea.";
 /** A Sell lists at once, and listing needs a license (the ladder's L3, Build and Earn P1-4). */
-export const SELL_LICENSE_REASON = "Choose the license buyers get it under.";
+export const SELL_LICENSE_REASON = "Choose the license it's sold under.";
 
 /**
  * Why Details can't continue yet — the first thing missing, top-down: the

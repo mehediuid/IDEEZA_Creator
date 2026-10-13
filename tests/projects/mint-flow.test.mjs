@@ -284,7 +284,7 @@ test("detailsMissing: collection first, then a Sell's terms, a Save's confirm, t
   const unlicensed = { ...sell, price: "0.05" };
   // A Sell lists at once, and a listing needs a license (the ladder's L3): asked after the listing's own terms.
   assert.equal(detailsMissing(unlicensed, { now: NOW, creatorPct: 100, readiness: readiness(unlicensed, []) }), SELL_LICENSE_REASON);
-  assert.equal(SELL_LICENSE_REASON, "Choose the license buyers get it under.");
+  assert.equal(SELL_LICENSE_REASON, "Choose the license it's sold under.");
   const priced = { ...unlicensed, license: "mit" };
   assert.equal(detailsMissing(priced, { now: NOW, creatorPct: 100, readiness: readiness(priced, []) }), null);
   // Keep private never asks one.

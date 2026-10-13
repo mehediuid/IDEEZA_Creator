@@ -76,7 +76,7 @@ function EarnCustomers({ project, view, viewer, brief, now, announce }: SlotProp
   return (
     <EarnBlock
       id="customers"
-      title="Customers"
+      title="Sales"
       lead="Everyone who bought the project or a copy of it, and what the sales paid you."
       aside={<TestnetDemoBadge />}
       className={NEXT}
@@ -112,7 +112,7 @@ function EarnRights(props: SlotProps) {
   const editable = can(viewer, "legal.edit", view.canCtx);
   const rows = legalRows(project.legal);
   return (
-    <EarnBlock id="rights" title="Rights" lead="The patent, copyright and trademark details buyers should know, as you state them." className={NEXT}>
+    <EarnBlock id="rights" title="Rights" lead="The patent, copyright and trademark details anyone buying it should know, as you state them." className={NEXT}>
       {/* The legal details are absent while they hold nothing and can't be edited (sold in full). */}
       {editable || rows.length > 0 ? (
         <RailStackScope className="flex flex-col gap-6">

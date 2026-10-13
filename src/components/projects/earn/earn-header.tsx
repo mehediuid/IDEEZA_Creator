@@ -54,7 +54,7 @@ export function EarnHeader({
         <span className="min-w-0 truncate">{project.name}</span>
       </Link>
 
-      {/* As tall as Preview as buyer, so the tabs sit at one height whether it shows or not. */}
+      {/* As tall as Preview as others see it, so the tabs sit at one height whether it shows or not. */}
       <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
           <h1 ref={titleRef} tabIndex={-1} className="m-0 text-3xl font-bold leading-3xl tracking-tight text-text-primary outline-none">
@@ -75,7 +75,7 @@ export function EarnHeader({
             )}
           >
             <Icon icon={EyeIcon} size={16} />
-            Preview as buyer
+            Preview as others see it
           </Link>
         )}
       </div>

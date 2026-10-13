@@ -32,14 +32,14 @@ export const EXTENDED_BELOW = "Can't be less than the price.";
 
 /** "What you can sell": the three things, what each is, and where it applies. */
 export const SELL_RULES: { id: "main" | EditionKind; title: string; line: string; where: string }[] = [
-  { id: "main", title: "Main NFT", line: "The project itself. The buyer gets everything inside it: every product, file and version.", where: "Whole project only" },
-  { id: "physical", title: "Physical NFT", line: "A built unit. You make each one and ship it to the buyer.", where: "Whole project or one product" },
-  { id: "virtual", title: "Virtual NFT", line: "The design files with a licence. Buyers download them.", where: "Whole project or one product" },
+  { id: "main", title: "Main NFT", line: "The project itself. Whoever buys it gets everything inside it: every product, file and version.", where: "Whole project only" },
+  { id: "physical", title: "Physical NFT", line: "A built unit. You make each one and ship it to whoever bought it.", where: "Whole project or one product" },
+  { id: "virtual", title: "Virtual NFT", line: "The design files with a licence. People who buy one download them.", where: "Whole project or one product" },
 ];
 export const SELL_RULES_LEAD =
   "Each one is listed on its own. You can sell Physical or Virtual copies without listing the Main NFT, and copies never sell the project itself.";
 export const MAIN_SALE_NOTE = "Selling the Main NFT sells the project.";
-export const MAIN_SALE_DETAIL = "When all of it is sold, the buyer owns everything and your copy listings stop.";
+export const MAIN_SALE_DETAIL = "When all of it is sold, whoever bought it owns everything and your copy listings stop.";
 
 /** A track by kind and use: "Virtual NFT · Personal use". */
 export function trackNameOf(t: { kind: EditionKind; use: EditionUse }): string {

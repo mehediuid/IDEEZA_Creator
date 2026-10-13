@@ -291,17 +291,17 @@ test("deleteFactsOf fills sold.buyers with the distinct Main buyers (errata #1)"
   const p = project({ mint: lazy });
   const one = view(p, SELL, market({ listings: [listing()], sales: [sale()] })).deleteFacts;
   assert.deepEqual(one.sold, { sharePct: 10, editions: 0, buyers: 1 });
-  assert.equal(deleteBlockOf(one).detail, "A buyer owns 10% of it.");
+  assert.equal(deleteBlockOf(one).detail, "Someone else owns 10% of it.");
   const twoBuyers = [sale(), sale({ id: "sale_b", listingId: "lst_b", buyerId: "buyer-leo", item: { nft: "main", sharePct: 20 } })];
   const two = view(p, SELL, market({ listings: [listing()], sales: twoBuyers })).deleteFacts;
   assert.deepEqual(two.sold, { sharePct: 30, editions: 0, buyers: 2 });
-  assert.equal(deleteBlockOf(two).detail, "Buyers own 30% of it.");
+  assert.equal(deleteBlockOf(two).detail, "Other people own 30% of it.");
   const sameBuyer = [sale(), sale({ id: "sale_b", listingId: "lst_b", item: { nft: "main", sharePct: 20 } })];
   assert.equal(view(p, SELL, market({ listings: [listing()], sales: sameBuyer })).deleteFacts.sold.buyers, 1);
   const edition = sale({ id: "sale_e", listingId: "ed_a", item: { nft: "virtual", trackId: "ed_a", productId: "p1", productName: "RC Car", use: "private", tier: "regular", serial: 1 } });
   const facts = view(p, SELL, market({ sales: [sale(), edition] })).deleteFacts;
   assert.deepEqual(facts.sold, { sharePct: 10, editions: 1, buyers: 1 });
-  assert.equal(deleteBlockOf(facts).detail, "Buyers own 10% of it and hold 1 of its NFTs.");
+  assert.equal(deleteBlockOf(facts).detail, "Other people own 10% of it and hold 1 of its NFTs.");
 });
 
 test("canCtxOf: the page's one CanContext (§3.7)", () => {

@@ -193,7 +193,7 @@ test("P2-MINT-10 · a lazy mint its first sale settled reads on chain, with the 
   const settled = { at: SOLD, txHash: TX, via: "sale" };
   const v = outcomeView(withRecord(lazyRecord, "sell", { settled }), { status: "sold", showcase: null });
   assert.deepEqual(rowsOf(v), [
-    ["Mint", "Minted on chain · Sep 28, 2026", "At its first sale — the buyer's purchase paid the network fee."],
+    ["Mint", "Minted on chain · Sep 28, 2026", "At its first sale — the purchase paid the network fee."],
     ["Network", "Base Sepolia (Testnet)", null],
     ["Collection", "Garden Sensors", null],
     ["Token", "#1", null],

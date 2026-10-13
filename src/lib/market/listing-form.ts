@@ -125,7 +125,7 @@ export function listingProblems(
   }
 
   if (i.percentSelling !== null && i.percentSelling > c.creatorPct) {
-    note("percentSelling", `You can sell up to ${c.creatorPct}% — the rest belongs to contributors or buyers.`);
+    note("percentSelling", `You can sell up to ${c.creatorPct}% — the rest belongs to contributors or people who bought a share.`);
   }
 
   const roy = i.royalties.trim();

@@ -118,7 +118,7 @@ test("LISTING-5: an end over 30 days away", () => {
 
 test("LISTING-5: selling percentage above creatorPct", () => {
   const r = listingProblems(buyNow({ percentSelling: 50 }), ctx({ creatorPct: 30 }));
-  assert.equal(r.fields.percentSelling, "You can sell up to 30% — the rest belongs to contributors or buyers.");
+  assert.equal(r.fields.percentSelling, "You can sell up to 30% — the rest belongs to contributors or people who bought a share.");
 });
 
 test("LISTING-5: royalties empty or out of range", () => {

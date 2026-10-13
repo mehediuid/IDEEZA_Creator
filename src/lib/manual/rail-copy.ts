@@ -70,7 +70,7 @@ const BRIEF_OPEN = "The Brief is open — no outcome chosen yet.";
 const UNREADABLE = "The brief record can't be read in this browser, so its terms aren't shown.";
 /** P2-LISTING-23: a sell or save mint that has a listing, of any status. */
 export const SALE_IN_MARKETPLACE = "Minted. Its sale is in the Marketplace block.";
-const SETTLED_NOTE = "At its first sale — the buyer's purchase paid the network fee.";
+const SETTLED_NOTE = "At its first sale — the purchase paid the network fee.";
 const ON_CHAIN_WALLET_NOTE = "Locked — the token is on chain at this wallet.";
 
 const text = (t: string): MetaPart => ({ kind: "text", text: t });

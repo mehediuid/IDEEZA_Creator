@@ -35,7 +35,7 @@ export function ActivityTimeline({
         <p className="text-md font-semibold text-text-primary">{isPreview ? "No journey shared yet." : "No activities yet"}</p>
         {!isPreview && (
           <p className="max-w-[42ch] text-md text-text-secondary">
-            Add the first one with a photo, video or document — buyers see it on this NFT.
+            Add the first one with a photo, video or document — people who buy it see it on this NFT.
           </p>
         )}
       </div>

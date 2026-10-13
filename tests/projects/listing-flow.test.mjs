@@ -296,7 +296,7 @@ test("marketplaceCardOf paused: what changed, and the kept terms (P2-LISTING-14)
   const l = listing({ status: "paused", pause: { at: NOW, changes: ["rename"] }, metadata: { ...META, name: "Old" } });
   const card = flow.marketplaceCardOf(view(l), { bids: [], now: NOW });
   assert.equal(card.kind, "paused");
-  assert.equal(card.changed, "Buyers can't see or buy it while it's paused. You changed: the name.");
+  assert.equal(card.changed, "Nobody can see or buy it while it's paused. You changed: the name.");
   assert.equal(card.terms, "Price 0.05 MATIC · Selling percentage 10%");
   assert.match(text(card.since), /^Paused · since Sep 28, 2026 · 9:09 PM$/);
 });
@@ -304,7 +304,7 @@ test("marketplaceCardOf paused: what changed, and the kept terms (P2-LISTING-14)
 test("marketplaceCardOf sold: buyer, price, the fee, the payout, share and transfer date (P2-LISTING-16 C)", () => {
   const card = flow.marketplaceCardOf(view(listing(), { sales: [sale()] }), { bids: [], now: NOW });
   assert.equal(card.kind, "sold");
-  assert.equal(factOf(card, "Buyer"), "Mira (demo creator) · 0x68f4…c94e");
+  assert.equal(factOf(card, "Bought by"), "Mira (demo creator) · 0x68f4…c94e");
   assert.equal(factOf(card, "Price"), "0.05 MATIC · Buy now");
   assert.equal(factOf(card, "IDEEZA fee"), "2.5% · 0.00125 MATIC");
   assert.equal(factOf(card, "You received"), "0.04875 MATIC");
@@ -335,7 +335,7 @@ test("closeCopyOf: the winner, a skipped higher bid, and no payable bid (P2-LIST
   const bids = [bid("bid_1", "0.03", "buyer-leo", NOW - 2 * MIN), bid("bid_2", "0.05", "buyer-sam", NOW - MIN)];
   const l = auction();
   const won = flow.closeCopyOf({ kind: "sale", bid: bids[1] }, l, bids);
-  assert.equal(won.body, "Sam (demo creator) wins with 0.05 MATIC. The sale is recorded and they appear in Customers.");
+  assert.equal(won.body, "Sam (demo creator) wins with 0.05 MATIC. The sale is recorded and shows in Sales.");
   assert.equal(won.skipped, null);
   assert.equal(won.confirm, "Close and sell");
   const skipped = flow.closeCopyOf({ kind: "sale", bid: bids[0] }, l, bids);
@@ -360,7 +360,7 @@ test("utilityBenefitsOf: only a live or sold listing with a benefit has the pill
   assert.deepEqual(flow.utilityBenefitsOf(view(listing({ benefits }), { sales: [sale()] })), benefits);
   assert.equal(flow.utilityBenefitsOf(view(listing({ benefits, status: "paused" }))), null);
   assert.deepEqual(benefits.map(flow.benefitLineOf), ["Exclusive group · 12 months", "Premium subscription · For as long as they hold it"]);
-  assert.equal(flow.utilityPillCopy(true).lead, "Buyers of this NFT get:");
+  assert.equal(flow.utilityPillCopy(true).lead, "Whoever owns this NFT gets:");
   assert.equal(flow.utilityPillCopy(false).lead, "Owning this NFT gives you:");
   assert.equal(flow.utilityPillCopy(false).note, "Benefits start on the day you buy.");
 });

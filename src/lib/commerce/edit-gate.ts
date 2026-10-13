@@ -81,7 +81,7 @@ export function lockOf(split: OwnershipSplit, sales: readonly Sale[]): ProjectLo
   if (!mainSales.length) return null;
   const at = mainSales.reduce((max, s) => Math.max(max, s.at), mainSales[0].at);
   const buyers = buyerNamesOf(split.holdings);
-  const who = buyers.length ? joinNames(buyers) : "the buyer";
+  const who = buyers.length ? joinNames(buyers) : "its new owner";
   return {
     kind: "soldInFull",
     at,

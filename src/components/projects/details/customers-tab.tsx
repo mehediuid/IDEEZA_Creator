@@ -116,13 +116,13 @@ export function CustomersPanel({
   });
 
   const wideCols = scope.kind === "project" ? 6 : 5;
-  const captionText = `Customers of ${projectName}, newest first`;
+  const captionText = `Sales of ${projectName}, newest first`;
 
   return (
     <div className={cn("flex flex-col", embedded ? "gap-8" : "gap-16")}>
       {!embedded && (
         <div className="flex flex-wrap items-center gap-8">
-          <h2 className="text-lg font-bold text-text-primary">Customers</h2>
+          <h2 className="text-lg font-bold text-text-primary">Sales</h2>
           <TestnetDemoBadge />
         </div>
       )}
@@ -131,7 +131,7 @@ export function CustomersPanel({
         <StateCard
           tone="error"
           icon={<Icon icon={AlertCircleIcon} size={32} />}
-          title="Customers can't be shown"
+          title="Sales can't be shown"
           body="This browser's sales record couldn't be read. It's been left as it is."
           className="mx-auto"
         />
@@ -151,7 +151,7 @@ export function CustomersPanel({
               Demo purchases from Explore marketplace, made in this browser. Nothing is on a blockchain.
             </p>
             <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
-              To tell every customer at once,{" "}
+              To tell everyone who bought at once,{" "}
               <Link
                 href={`/projects/${projectId}`}
                 className="rounded-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
@@ -168,7 +168,7 @@ export function CustomersPanel({
                 <caption className="sr-only">{captionText}</caption>
                 <thead>
                   <tr className="border-b border-solid border-border">
-                    <Th>Buyer</Th>
+                    <Th>Bought by</Th>
                     <Th>Item</Th>
                     <Th>Price</Th>
                     <Th>Date</Th>
@@ -194,7 +194,7 @@ export function CustomersPanel({
               </table>
             </div>
 
-            <ul aria-label="Customers" className="flex flex-col gap-8 [@container(min-width:600px)]:hidden">
+            <ul aria-label="Sales" className="flex flex-col gap-8 [@container(min-width:600px)]:hidden">
               {pageRows.map((row) => (
                 <ListRow
                   key={row.saleId}

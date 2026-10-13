@@ -36,7 +36,7 @@ export const PRODUCT_TAB_LABEL: Record<ProductTabId, string> = {
   wiring: "Wiring",
   parts: "Parts",
   contributors: "Contributors",
-  customers: "Customers",
+  customers: "Sales",
 };
 
 const PEOPLE: ReadonlySet<ProductTabId> = new Set<ProductTabId>(["contributors", "customers"]);

@@ -160,7 +160,7 @@ test("the Overview's card: mint, then sell, each with its why; later states say 
     assert.match(n.title, /^[A-Z][^—]*$/, n.title);
     assert.match(n.why, /^[A-Z][^—]*\.$/, n.why);
   }
-  assert.equal(earnNextOf("proj_car", "soldOut").action.label, "See customers and payouts");
+  assert.equal(earnNextOf("proj_car", "soldOut").action.label, "See sales and payouts");
   assert.equal(earnNextOf("proj_car", "paused").action.label, "Relist in Sell");
   for (const s of STATES) {
     const n = earnNextOf("proj_car", s);
@@ -180,7 +180,7 @@ test("the Main NFT row: its state in words and one button — Sell (mint or list
   assert.deepEqual(live, { line: "Listed · 0.05 MATIC · 10%", live: true, action: "manage", label: "Manage" });
   assert.equal(row({ status: "paused", listing: { kind: "paused", listing: listing(), changed: [] } }).action, "manage");
   assert.deepEqual(row({ status: "sold", locked: true, listing: { kind: "sold", listing: listing(), sale: sale() } }), {
-    line: "Sold in full · the buyer owns the project",
+    line: "Sold in full · it has a new owner",
     live: false,
     action: "disabled",
     label: "Sold",
@@ -303,11 +303,11 @@ test("the live card's facts: price, copies sold of the copies made (project and 
   assert.deepEqual(facts, [
     { label: "Price", value: "0.05 MATIC" },
     { label: "Copies sold", value: "2 of 10" },
-    { label: "Customers", value: "1" },
+    { label: "Bought by", value: "1 person" },
     { label: "Earned", value: "0.039 MATIC" },
   ]);
   const given = earnLiveFactsOf({ projectId: "proj_car", commercial: "given", listing: { kind: "none" }, sales: [], editions: [], buyers: 0 });
-  assert.deepEqual(given.map((f) => f.value), ["Free", "0", "0", "Nothing yet"]);
+  assert.deepEqual(given.map((f) => f.value), ["Free", "0", "Nobody yet", "Nothing yet"]);
   const auction = earnLiveFactsOf({
     projectId: "proj_car",
     commercial: "listed",
@@ -325,5 +325,5 @@ test("the live card's facts: price, copies sold of the copies made (project and 
     editions: [],
     buyers: 1,
   });
-  assert.deepEqual(sold.map((f) => f.value), ["0.05 MATIC", "0", "1", "0.04875 MATIC"]);
+  assert.deepEqual(sold.map((f) => f.value), ["0.05 MATIC", "0", "1 person", "0.04875 MATIC"]);
 });

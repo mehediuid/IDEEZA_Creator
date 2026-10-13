@@ -114,7 +114,7 @@ export const LADDER_STEPS: readonly LadderStep[] = [
     id: "license",
     level: 3,
     label: "License chosen",
-    reason: "Choose the license buyers get it under.",
+    reason: "Choose the license it's sold under.",
     fix: { kind: "license", label: "Choose a license" },
   },
   {

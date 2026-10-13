@@ -219,7 +219,7 @@ export function usePurchase({
 
 const SOLD_OUT = "These NFTs just sold out.";
 const TRACK_GONE = "The creator took these NFTs off the marketplace.";
-const UNIT_TAKEN = "Another buyer took that NFT a moment ago. Close this and buy again to get the next one.";
+const UNIT_TAKEN = "Someone else bought that NFT a moment ago. Close this and buy again to get the next one.";
 
 export type EditionTier = "regular" | "extended";
 export const TIER_WORD: Record<EditionTier, string> = { regular: "This version", extended: "With future updates" };

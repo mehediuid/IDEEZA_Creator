@@ -240,20 +240,20 @@ test("benefitDurationText", () => {
 // ─────────────────────────── summary and empty copy (#10, #11) ───────────────────────────
 
 test("customersSummaryText: singular and plural", () => {
-  assert.equal(customersSummaryText({ saleCount: 1, buyerCount: 1 }), "1 sale to 1 buyer.");
-  assert.equal(customersSummaryText({ saleCount: 3, buyerCount: 2 }), "3 sales to 2 buyers.");
+  assert.equal(customersSummaryText({ saleCount: 1, buyerCount: 1 }), "1 sale to 1 person.");
+  assert.equal(customersSummaryText({ saleCount: 3, buyerCount: 2 }), "3 sales to 2 people.");
 });
 
 test("customersEmptyCopy: each status and the product scope", () => {
-  assert.equal(customersEmptyCopy({ scope: { kind: "project" }, status: "listed", projectId: "p1" }).title, "No customers yet");
+  assert.equal(customersEmptyCopy({ scope: { kind: "project" }, status: "listed", projectId: "p1" }).title, "No sales yet");
   assert.equal(
     customersEmptyCopy({ scope: { kind: "project" }, status: "private", projectId: "p1" }).body,
-    "Customers come from marketplace sales. Once this project is listed and someone buys it, they show up here.",
+    "Sales come from Explore marketplace. Once this project is listed and someone buys it, they show up here.",
   );
-  assert.equal(customersEmptyCopy({ scope: { kind: "project" }, status: "given", projectId: "p1" }).title, "No customers");
+  assert.equal(customersEmptyCopy({ scope: { kind: "project" }, status: "given", projectId: "p1" }).title, "No sales");
   const product = customersEmptyCopy({ scope: { kind: "product", productId: "prd_ctrl" }, status: "listed", projectId: "p1", productName: "RC Controller" });
-  assert.equal(product.title, "No customers for this product yet");
-  assert.deepEqual(product.link, { label: "Project customers", href: "/projects/p1/earn/money#customers" });
+  assert.equal(product.title, "No sales of this product yet");
+  assert.deepEqual(product.link, { label: "Project sales", href: "/projects/p1/earn/money#customers" });
 });
 
 // ─────────────────────────── pageOfSale (#12) ───────────────────────────

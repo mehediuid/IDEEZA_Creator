@@ -100,7 +100,7 @@ export type MintTypeOptionsResult = {
 
 const SUB = {
   lazy: {
-    sell: "No charge now. You sign, and the token is minted on chain at its first sale — the buyer's purchase pays that network fee.",
+    sell: "No charge now. You sign, and the token is minted on chain at its first sale — the purchase pays that network fee.",
     give: "No charge now. You sign, and the token is minted on chain the first time someone takes it.",
     save: "No charge now. You sign, and the token is minted on chain when it's first listed.",
   },
@@ -179,7 +179,7 @@ export function mintCostRows(type: MintType, network: Network, listing?: { label
     rows.push({
       label: "",
       value: "",
-      note: "At the first sale, the buyer's purchase pays the network fee for minting.",
+      note: "At the first sale, the purchase pays the network fee for minting.",
     });
     return rows;
   }
@@ -377,7 +377,7 @@ export type MintPlanCtx = {
 export type MintPlan = { request: WalletRequest | null; nextRecord: (proof: Proof) => MintRecord | null };
 
 const MINT_NOTE: Record<Intent, string> = {
-  sell: "You're signing a mint voucher. The token is minted on chain at its first sale, and the buyer's purchase pays that network fee.",
+  sell: "You're signing a mint voucher. The token is minted on chain at its first sale, and the purchase pays that network fee.",
   give: "You're signing a mint voucher. The token is minted on chain the first time someone takes it.",
   save: "You're signing a mint voucher. Nothing is on chain until you list it.",
 };

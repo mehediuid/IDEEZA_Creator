@@ -83,8 +83,8 @@ export type CopyScope = { id: string; name: string; product: ProjectProduct | nu
 
 export function helperLineOf(kind: EditionKind, product: string): string {
   return kind === "physical"
-    ? `A licence to build ${product} — buyers get its fabrication files.`
-    : `A licence to ${product}'s digital twin — buyers get the 3D model and preview.`;
+    ? `A licence to build ${product} — whoever buys one gets its fabrication files.`
+    : `A licence to ${product}'s digital twin — whoever buys one gets the 3D model and preview.`;
 }
 
 const firstControlId = (trackId: string) => `edition-${trackId}`;
@@ -314,8 +314,8 @@ export function EditionTracks({
         >
           <div className="flex flex-col gap-6">
             <p>
-              Buyers can&apos;t buy it until you list it again. The {trackCardOf(d.track, view.sales).sold} already sold stay with
-              their buyers.
+              Nobody can buy it until you list it again. The {trackCardOf(d.track, view.sales).sold} already sold stay with the
+              people who bought them.
             </p>
             {removeError && <Banner tone="error">{removeError}</Banner>}
           </div>
