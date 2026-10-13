@@ -2,17 +2,19 @@
 
 // Edit profile (spec 2026-10-14-creator-profile-design.md): the one home of
 // your profile's own words — photo, name in any script, the name in English
-// letters, and a one-line headline. "Suggest from my work" (owner decision
-// D7) drafts the headline from your shared projects only; the draft sits under
-// the field, labelled, until you press Use this, and nothing is saved before
-// Save profile. Cancel with changes asks "Discard changes?".
+// letters, a one-line headline, and (Portfolio, 2026-10-14) About, where you
+// are, two links and what you are open to. "Suggest from my work" (owner
+// decision D7) drafts the headline from your shared projects only; the draft
+// sits under the field, labelled, until you press Use this, and nothing is
+// saved before Save profile. Cancel with changes asks "Discard changes?".
 
 import * as React from "react";
 import { AiMagicIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Avatar, Button, ModalFrame, TextInput } from "@/components/ideeza";
+import { Avatar, Button, ModalFrame, TextInput, Textarea } from "@/components/ideeza";
+import { RadioRow } from "@/components/messages/choice";
 import { cn } from "@/lib/utils";
-import { HEADLINE_MAX, NAME_MAX } from "@/lib/people/fields";
+import { BIO_MAX, HEADLINE_MAX, LINKS_MAX, LOCATION_MAX, NAME_MAX, OPEN_TO_WORDS, linkOf, type OpenTo } from "@/lib/people/fields";
 import { displayNameOf, initialsOf } from "@/lib/people/ids";
 import { deletePhoto, putPhoto, resizePhoto } from "@/lib/people/photo-store";
 import { saveProfile } from "@/lib/people/profile-store";
@@ -26,6 +28,20 @@ const PILL =
 
 const WRITE_FAILED = "Couldn't save. This browser's storage is full or blocked.";
 
+const OPEN_TO_OPTIONS: { value: OpenTo; label: string }[] = [
+  ...(Object.entries(OPEN_TO_WORDS) as [Exclude<OpenTo, "">, string][]).map(([value, label]) => ({ value, label })),
+  { value: "", label: "Don't show this" },
+];
+
+/** This device's time zone, so others see your local time next to where you are. */
+function deviceZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 type Photo = { kind: "keep" } | { kind: "new"; blob: Blob; url: string } | { kind: "remove" };
 type Suggest = { kind: "idle" } | { kind: "running" } | { kind: "draft"; text: string } | { kind: "failed" };
 
@@ -36,7 +52,7 @@ export function EditProfileDialog({
   onClose,
   onSaved,
 }: {
-  initial: { name: string; latinName: string; headline: string };
+  initial: { name: string; latinName: string; headline: string; bio: string; location: string; links: readonly string[]; openTo: OpenTo };
   photoUrl: string | null;
   /** Your shared projects' public words, what the suggestion may read. */
   shared: readonly { title: string; story: string }[];
@@ -48,6 +64,10 @@ export function EditProfileDialog({
   const latinId = React.useId();
   const headlineId = React.useId();
   const headlineHelpId = React.useId();
+  const bioId = React.useId();
+  const locationId = React.useId();
+  const linksId = React.useId();
+  const openToId = React.useId();
   const photoHelpId = React.useId();
   const nameRef = React.useRef<HTMLInputElement>(null);
   const keepRef = React.useRef<HTMLButtonElement>(null);
@@ -56,6 +76,12 @@ export function EditProfileDialog({
   const [name, setName] = React.useState(initial.name);
   const [latinName, setLatinName] = React.useState(initial.latinName);
   const [headline, setHeadline] = React.useState(initial.headline);
+  const [bio, setBio] = React.useState(initial.bio);
+  const [location, setLocation] = React.useState(initial.location);
+  const [links, setLinks] = React.useState<string[]>(() => Array.from({ length: LINKS_MAX }, (_, i) => initial.links[i] ?? ""));
+  const [badLinks, setBadLinks] = React.useState<boolean[]>(() => Array.from({ length: LINKS_MAX }, () => false));
+  const [openTo, setOpenTo] = React.useState<OpenTo>(initial.openTo);
+  const linkRefs = React.useRef<(HTMLInputElement | null)[]>([]);
   const [photo, setPhoto] = React.useState<Photo>({ kind: "keep" });
   const [photoError, setPhotoError] = React.useState<string | null>(null);
   const [suggest, setSuggest] = React.useState<Suggest>({ kind: "idle" });
@@ -73,7 +99,13 @@ export function EditProfileDialog({
     name.trim() !== initial.name.trim() ||
     latinName.trim() !== initial.latinName.trim() ||
     headline.trim() !== initial.headline.trim() ||
+    bio.trim() !== initial.bio.trim() ||
+    location.trim() !== initial.location.trim() ||
+    links.map((l) => l.trim()).join("\n") !== Array.from({ length: LINKS_MAX }, (_, i) => initial.links[i] ?? "").join("\n") ||
+    openTo !== initial.openTo ||
     photo.kind !== "keep";
+
+  const linkBad = (raw: string) => raw.trim() !== "" && linkOf(raw) === null;
 
   const shownPhoto = photo.kind === "new" ? photo.url : photo.kind === "remove" ? null : photoUrl;
 
@@ -123,9 +155,28 @@ export function EditProfileDialog({
       onClose();
       return;
     }
+    const bad = links.map(linkBad);
+    if (bad.some(Boolean)) {
+      setBadLinks(bad);
+      linkRefs.current[bad.indexOf(true)]?.focus();
+      return;
+    }
     setSaving(true);
     setFailed(false);
-    const wrote = saveProfile({ name, latinName, headline });
+    const wrote = saveProfile({
+      name,
+      latinName,
+      headline,
+      bio,
+      location,
+      // Your local time shows only next to where you are, so the zone goes with a location.
+      timeZone: location.trim() ? deviceZone() : null,
+      links: links.flatMap((l) => {
+        const url = linkOf(l);
+        return url ? [url] : [];
+      }),
+      openTo,
+    });
     let photoOk = true;
     if (wrote.ok && photo.kind === "new") photoOk = (await putPhoto(photo.blob)).ok;
     if (wrote.ok && photo.kind === "remove") photoOk = (await deletePhoto()).ok;
@@ -327,6 +378,83 @@ export function EditProfileDialog({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-baseline justify-between gap-4">
+            <label htmlFor={bioId} className={LABEL}>
+              About <span className="font-regular text-text-secondary">(optional)</span>
+            </label>
+            <span aria-hidden className={QUIET}>{`${bio.trim().length}/${BIO_MAX}`}</span>
+          </div>
+          <Textarea id={bioId} rows={4} value={bio} maxLength={BIO_MAX} onValueChange={setBio} placeholder="What you build, who it is for, and what you are working on now" />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor={locationId} className={LABEL}>
+            Location <span className="font-regular text-text-secondary">(optional)</span>
+          </label>
+          <TextInput
+            id={locationId}
+            size="lg"
+            value={location}
+            maxLength={LOCATION_MAX}
+            onValueChange={setLocation}
+            autoComplete="address-level2"
+            placeholder="City, country"
+            containerClassName={TAP}
+          />
+          <p className={HELP}>A city is enough. Your local time shows next to it.</p>
+        </div>
+
+        <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0">
+          <legend id={linksId} className={cn(LABEL, "mb-2 p-0")}>
+            Links <span className="font-regular text-text-secondary">(optional)</span>
+          </legend>
+          {links.map((value, i) => (
+            <div key={i} className="flex flex-col gap-1">
+              <TextInput
+                ref={(el) => {
+                  linkRefs.current[i] = el;
+                }}
+                size="lg"
+                type="url"
+                inputMode="url"
+                value={value}
+                invalid={badLinks[i]}
+                aria-label={`Link ${i + 1}`}
+                aria-invalid={badLinks[i] || undefined}
+                aria-describedby={badLinks[i] ? `${linksId}-${i}` : undefined}
+                onValueChange={(v) => {
+                  setLinks((prev) => prev.map((x, j) => (j === i ? v : x)));
+                  if (badLinks[i]) setBadLinks((prev) => prev.map((x, j) => (j === i ? false : x)));
+                }}
+                onBlur={() => setBadLinks((prev) => prev.map((x, j) => (j === i ? linkBad(value) : x)))}
+                placeholder={i === 0 ? "yoursite.com" : "github.com/you"}
+                autoComplete="url"
+                containerClassName={TAP}
+              />
+              {badLinks[i] && (
+                <p id={`${linksId}-${i}`} className="text-md text-text-error">
+                  Enter a web address, like yoursite.com
+                </p>
+              )}
+            </div>
+          ))}
+        </fieldset>
+
+        {/* relative: the rows' visually hidden inputs are placed in here, so focusing one scrolls
+            the form, never the dialog's frame. */}
+        <div role="radiogroup" aria-labelledby={openToId} aria-describedby={`${openToId}-help`} className="relative flex flex-col gap-1">
+          <p id={openToId} className={LABEL}>
+            Open to
+          </p>
+          <p id={`${openToId}-help`} className={cn(HELP, "mb-1")}>
+            Shown on your profile, so people know when to reach out.
+          </p>
+          {OPEN_TO_OPTIONS.map((o) => (
+            <RadioRow key={o.value || "none"} name={openToId} checked={openTo === o.value} onChange={() => setOpenTo(o.value)} label={o.label} />
+          ))}
         </div>
 
         <div aria-live="polite" className="text-md empty:hidden">

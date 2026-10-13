@@ -15,7 +15,9 @@ function readProfile(): ProfileFields {
   return normalizeProfile(parseStored(readStoredKey(PROFILE_KEY)).value);
 }
 
-export type ProfilePatch = Partial<Pick<ProfileFields, "name" | "latinName" | "headline" | "pins">>;
+export type ProfilePatch = Partial<
+  Pick<ProfileFields, "name" | "latinName" | "headline" | "pins" | "bio" | "location" | "timeZone" | "links" | "openTo">
+>;
 
 export function saveProfile(patch: ProfilePatch): WriteResult {
   if (storedUnreadable(PROFILE_KEY, isProfileShape)) return { ok: false };

@@ -144,6 +144,47 @@ test("madeOfSample lists one creator's posts with their stage", () => {
   assert.deepEqual(madeOfSample(SAMPLE_POSTS, "nobody"), []);
 });
 
+test("Made items carry what the Portfolio shows: stage id, products, summary, category", () => {
+  const [mine] = madeOfMine([P({ id: "p1", name: "Lamp", showcasedAt: 5, journey: jTesting("p1", 6), products: 2, summary: "  A lamp. ", category: null })], []);
+  assert.equal(mine.stageId, "testing");
+  assert.equal(mine.products, 2);
+  assert.equal(mine.summary, "A lamp.");
+  assert.equal(mine.category, null);
+  const [bare] = madeOfMine([P({ id: "p2", name: "Fan", showcasedAt: 5 })], []);
+  assert.equal(bare.products, 0);
+  assert.equal(bare.summary, "");
+  const theirs = SAMPLE_POSTS.filter((p) => p.creator.id === "c1");
+  const list = madeOfSample(SAMPLE_POSTS, "c1");
+  for (const m of list) {
+    const post = theirs.find((p) => p.id === m.key);
+    assert.equal(m.products, post.products.length);
+    assert.equal(m.category, post.category);
+    assert.ok(m.summary.length > 0);
+    assert.ok(typeof m.stageId === "string");
+  }
+});
+
+test("madeOfSample dates Activity from now when given, as the post page does", () => {
+  const now = Date.UTC(2026, 9, 14);
+  const a = madeOfSample(SAMPLE_POSTS, "c1", now);
+  const b = madeOfSample(SAMPLE_POSTS, "c1", now + 86_400_000);
+  assert.equal(a.length, b.length);
+  assert.ok(a.some((m, i) => m.stageAt !== b[i].stageAt || m.changedAt !== b[i].changedAt));
+});
+
+test("every sample creator with posts has profile words, and their zones are real", async () => {
+  const { SAMPLE_PROFILES } = await import("../../.tmp-test/lib/people/sample-profiles.js");
+  const { localTimeOf } = await import("../../.tmp-test/lib/people/portfolio.js");
+  const creators = new Set(SAMPLE_POSTS.map((p) => p.creator.id));
+  for (const id of creators) {
+    const sp = SAMPLE_PROFILES[id];
+    assert.ok(sp, `profile words for ${id}`);
+    assert.ok(sp.headline.length <= 60, `${id} headline fits`);
+    assert.ok(sp.bio.length <= 280, `${id} bio fits`);
+    assert.ok(localTimeOf(sp.timeZone, 0), `${id} zone`);
+  }
+});
+
 // ── listing facts ──
 import { listingFactsOf } from "../../.tmp-test/lib/people/listing-facts.js";
 
@@ -240,4 +281,95 @@ test("a stale pin (unshared or deleted project) never holds one of the three pla
   const r = pinToggled(f, "c", ["a", "b", "c"]);
   assert.equal(r.refused, false);
   assert.deepEqual(r.fields.pins, ["a", "b", "c"]);
+});
+
+// ── Portfolio (owner picked direction A, 2026-10-14) ──
+import { BIO_MAX, OPEN_TO_WORDS, linkOf, normalizeProfile as normalizeProfile2 } from "../../.tmp-test/lib/people/fields.js";
+import { builtWithOf, stageToneOf, inProduction, activityOf, localTimeOf } from "../../.tmp-test/lib/people/portfolio.js";
+
+test("profile fields keep About, location, time zone, two links and Open to", () => {
+  const f = normalizeProfile2({ bio: "b".repeat(400), location: "  Dhaka, Bangladesh ", timeZone: "Asia/Dhaka", links: ["naim.dev", "javascript:alert(1)", "https://github.com/naim", "x.org"], openTo: "both" });
+  assert.equal(f.bio.length, BIO_MAX);
+  assert.equal(f.location, "Dhaka, Bangladesh");
+  assert.equal(f.timeZone, "Asia/Dhaka");
+  assert.deepEqual(f.links, ["https://naim.dev", "https://github.com/naim"]);
+  assert.equal(f.openTo, "both");
+  assert.equal(normalizeProfile2({ openTo: "weird", timeZone: "Not/AZone" }).openTo, "");
+  assert.equal(normalizeProfile2({ timeZone: "Not/AZone" }).timeZone, null);
+  assert.equal(OPEN_TO_WORDS.both, "Open to collaboration and questions");
+});
+
+test("linkOf accepts web addresses only", () => {
+  assert.equal(linkOf("naim.dev"), "https://naim.dev");
+  assert.equal(linkOf("http://a.io/x"), "http://a.io/x");
+  assert.equal(linkOf("ftp://a.io"), null);
+  assert.equal(linkOf("not a link"), null);
+  assert.equal(linkOf("localhost"), null);
+});
+
+test("builtWithOf names the chips and modules a creator uses most, never passives or hardware", () => {
+  const list = builtWithOf([
+    ["ESP32-C3-MINI-1 module", "BMI270 IMU", "100 nF capacitor, 0402", "USB-C receptacle, 16-pin", "Shell, 3D printed", "TP4056 charger"],
+    ["ESP32-C3-MINI-1 module", "M3 × 8 screw", "AP2112K-3.3 regulator", "10 kΩ resistor, 0603"],
+    ["MGM210P module (EFR32MG21)", "BMI270 IMU"],
+  ]);
+  assert.deepEqual(list.slice(0, 2), ["ESP32-C3-MINI-1", "BMI270"]);
+  assert.ok(list.includes("TP4056"));
+  assert.ok(list.includes("MGM210P"));
+  assert.deepEqual(list, ["ESP32-C3-MINI-1", "BMI270", "TP4056", "AP2112K-3.3", "MGM210P"]);
+  assert.equal(builtWithOf([["ESP32"], ["ESP32"], ["NRF52840"], ["STM32F103"], ["RP2040"]], 3).length, 3);
+});
+
+test("stage tones and production follow the Activity catalogue", () => {
+  assert.equal(stageToneOf("planning"), "neutral");
+  assert.equal(stageToneOf("testing"), "blue");
+  assert.equal(stageToneOf("pilot-run"), "warning");
+  assert.equal(stageToneOf("launched"), "success");
+  assert.equal(inProduction("manufacturing"), true);
+  assert.equal(inProduction("prototype"), false);
+});
+
+test("activityOf lists the newest stored entries of shared projects, never the default Planning", () => {
+  const j = (id, rows) => ({ v: 1, activities: rows.map(([type, at, d], i) => ({ v: 2, id: `${id}${i}`, projectId: id, target: { kind: "project" }, type, description: d, urls: [], media: [], createdAt: at, updatedAt: at })) });
+  const list = activityOf([
+    { id: "p1", title: "Lamp", href: "/innovations/lamp", journey: j("p1", [["testing", 30, "Two weeks on the desk."], ["prototype", 10, "First unit."]]) },
+    { id: "p2", title: "Fan", href: "/marketplace/p2", journey: j("p2", [["launched", 20, ""]]) },
+    { id: "p3", title: "Nothing", href: "/x", journey: { v: 1, activities: [] } },
+  ], 2);
+  assert.deepEqual(list.map((a) => [a.type, a.project, a.at]), [["Testing", "Lamp", 30], ["Launched", "Fan", 20]]);
+  assert.equal(list[0].text, "Two weeks on the desk.");
+});
+
+test("localTimeOf reads a time zone, and nothing for a bad one", () => {
+  const t = localTimeOf("Asia/Dhaka", Date.UTC(2026, 9, 14, 15, 40));
+  assert.equal(t, "9:40 pm");
+  assert.equal(localTimeOf(null, 0), null);
+  assert.equal(localTimeOf("Not/AZone", 0), null);
+});
+
+test("worksOnOf: categories by use, blanks dropped", async () => {
+  const { worksOnOf } = await import("../../.tmp-test/lib/people/portfolio.js");
+  assert.deepEqual(
+    worksOnOf([{ category: "IoT" }, { category: "Power" }, { category: "IoT" }, { category: null }, { category: " " }]),
+    ["IoT", "Power"],
+  );
+});
+
+test("featuredOf: a pin leads; else the furthest along, newer on a tie", async () => {
+  const { featuredOf } = await import("../../.tmp-test/lib/people/portfolio.js");
+  const a = { key: "a", pinned: false, stageId: "prototype" };
+  const b = { key: "b", pinned: false, stageId: "launched" };
+  const c = { key: "c", pinned: false, stageId: "launched" };
+  const d = { key: "d", pinned: true, stageId: "design" };
+  assert.equal(featuredOf([]), null);
+  let f = featuredOf([a, b, c]);
+  assert.equal(f.featured.key, "b");
+  assert.equal(f.pinned, false);
+  assert.deepEqual(f.rest.map((m) => m.key), ["a", "c"]);
+  f = featuredOf([d, a, b]);
+  assert.equal(f.featured.key, "d");
+  assert.equal(f.pinned, true);
+  assert.deepEqual(f.rest.map((m) => m.key), ["a", "b"]);
+  f = featuredOf([{ key: "x", pinned: false, stageId: null }, { key: "y", pinned: false, stageId: "others" }]);
+  assert.equal(f.featured.key, "x");
 });

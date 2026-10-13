@@ -1,11 +1,14 @@
 "use client";
 
-// /creators/[handle] — a creator's profile (spec 2026-10-14-creator-profile-design.md).
-// One page for every viewer: your own adds Edit profile and one owner-only
-// line; nothing else differs. The page reads only stores the app already
-// keeps (projects, builds, market, copies, Activity) through the people
-// layer, and shows only what is already public. A skeleton holds the place
-// until the stores are read, so Follow never flashes on your own page.
+// /creators/[handle] — a creator's profile, the Portfolio layout (owner picked
+// direction A, 2026-10-14; spec 2026-10-14-creator-profile-design.md). One
+// page for every viewer: an identity column (who, where, since when, what they
+// are open to, four counts, About, the parts they build with, what they work
+// on, links) beside their work (a featured project, the rest, and recent
+// Activity). Your own adds Edit profile, a prompt where a field is empty, and
+// one owner-only line. Every count and chip is read from work already public;
+// nothing is typed in for you or guessed. A skeleton holds the place until the
+// stores are read, so Follow never flashes on your own page.
 
 import * as React from "react";
 import Link from "next/link";
@@ -17,47 +20,56 @@ import { useMinuteClock } from "@/components/projects/details/use-project-page-d
 import { cn } from "@/lib/utils";
 import { useCreateHistory } from "@/lib/create/history";
 import { readStoredKey, subscribeStores } from "@/lib/key-store";
+import { partsOf } from "@/lib/innovations/mine-post";
+import { countsOf, useReactions } from "@/lib/innovations/reactions";
+import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
-import { JOURNEY_KEY } from "@/lib/manual/journey";
+import { postHref } from "@/lib/innovations/slug";
+import { JOURNEY_KEY, type ProjectJourney } from "@/lib/manual/journey";
 import { decodeJourney } from "@/lib/manual/journey-store";
-import { buildsOf, coverOf } from "@/lib/manual/project-read";
+import { buildsOf, coverOf, productsOfProject } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
 import { useProjectsEditions } from "@/lib/market/editions-store";
 import { useMarket } from "@/lib/market/market-store";
 import { teamOf } from "@/lib/manual/contributors";
 import { unblockPerson } from "@/lib/messages/actions";
 import type { StartParams } from "@/lib/messages/links";
-import type { ProfileFields } from "@/lib/people/fields";
+import { OPEN_TO_WORDS, type ProfileFields } from "@/lib/people/fields";
 import { ME, directory, personByHandle, type Person } from "@/lib/people/ids";
 import { listingFactsOf } from "@/lib/people/listing-facts";
 import { madeOfMine, madeOfSample, ownerCounts, type MadeItem, type MineInput } from "@/lib/people/made";
 import { useMyPhoto } from "@/lib/people/photo-store";
+import { activityOf, builtWithOf, inProduction, localTimeOf, worksOnOf, type ActivityItem } from "@/lib/people/portfolio";
 import { useMyProfile } from "@/lib/people/profile-store";
+import { SAMPLE_PROFILES } from "@/lib/people/sample-profiles";
 import { tiesOf } from "@/lib/people/ties";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { FollowingDialog, useFollowing } from "./following-dialog";
-import { MadeSection } from "./made-section";
+import { ChipRow, IdentityHead, LinkList, OpenToLine, SideSection, StatList } from "./identity";
 import { OWNER_LINE_LINK, OwnerLine } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
-import { ProfileHeader } from "./profile-header";
+import { ActivitySection, WorkSections } from "./work";
 
-const CONTENT = cn(PAGE_CONTENT, "flex max-w-[1120px] flex-col gap-10 max-md:pb-[104px]");
+const CONTENT = cn(PAGE_CONTENT, "flex max-w-[1200px] flex-col gap-8 max-md:pb-[104px]");
 
 const PHONE_BAR =
   "fixed inset-x-0 bottom-0 z-sticky flex gap-3 border-t border-solid border-border bg-bg-surface px-6 pb-6 pt-4 md:hidden";
 
-/** "Oct 2026". */
-function monthYear(at: number): string {
-  return new Date(at).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-}
+// Two columns once the page is 1000 px wide: identity at 300 px, the work beside it. Narrower,
+// one column in reading order: who they are, their work, then what they build with.
+const GRID =
+  "grid grid-cols-1 gap-x-[48px] gap-y-[32px] [@container(min-width:1000px)]:grid-cols-[300px_minmax(0,1fr)] [@container(min-width:1000px)]:grid-rows-[auto_1fr]";
+const ID_TOP = "flex min-w-0 flex-col gap-[24px] [@container(min-width:1000px)]:col-start-1 [@container(min-width:1000px)]:row-start-1";
+const ID_MORE = "flex min-w-0 flex-col gap-[24px] self-start [@container(min-width:1000px)]:col-start-1 [@container(min-width:1000px)]:row-start-2";
+const WORK =
+  "flex min-w-0 flex-col gap-[40px] [container-type:inline-size] [@container(min-width:1000px)]:col-start-2 [@container(min-width:1000px)]:row-span-2 [@container(min-width:1000px)]:row-start-1";
 
-function factsOf(since: number | null, shown: number): string | null {
-  const parts = [
-    since !== null ? `Building here since ${monthYear(since)}` : null,
-    shown > 0 ? `${shown} ${shown === 1 ? "project" : "projects"} shared` : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" · ") : null;
-}
+const PROMPT =
+  "text-left text-lg font-semibold leading-lg text-text-link underline-offset-[3px] outline-none hover:underline focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-border-focus";
+
+const BODY = "max-w-[62ch] whitespace-pre-line text-md leading-md text-text-primary [text-wrap:pretty]";
+
+const firstNameOf = (name: string) => name.split(/\s+/)[0] || name;
 
 /** Moves focus to the h1 once the page is ready, as the app's other pages do on arrival. */
 function useArrivalFocus(ready: boolean): React.RefObject<HTMLHeadingElement | null> {
@@ -78,18 +90,25 @@ export function ProfileSkeleton() {
         <span className="sr-only" role="status">
           Loading the profile
         </span>
-        <div className="flex items-start gap-[20px]">
-          <Skeleton shape="block" className="size-[64px] rounded-full max-md:size-[48px]" />
-          <div className="flex flex-col gap-[10px] pt-[4px]">
-            <Skeleton shape="text" size="lg" className="w-[220px]" />
-            <Skeleton shape="text" size="md" className="w-[320px] max-w-full" />
-            <Skeleton shape="text" size="sm" className="w-[260px] max-w-full" />
+        <div className={GRID}>
+          <div className={ID_TOP}>
+            <Skeleton shape="block" className="size-[64px] rounded-full" />
+            <div className="flex flex-col gap-[10px]">
+              <Skeleton shape="text" size="lg" className="w-[220px] max-w-full" />
+              <Skeleton shape="text" size="md" className="w-[280px] max-w-full" />
+              <Skeleton shape="text" size="sm" className="w-[200px] max-w-full" />
+            </div>
+            <Skeleton shape="block" className="h-[40px] w-full rounded-lg" />
+            <Skeleton shape="block" className="h-[112px] w-full rounded-lg" />
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-[12px] min-[560px]:gap-[24px] min-[900px]:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} shape="block" className="aspect-[16/13] w-full rounded-xl" />
-          ))}
+          <div className={WORK}>
+            <Skeleton shape="block" className="aspect-[16/9] w-full rounded-2xl" />
+            <div className="grid grid-cols-2 gap-[12px] [@container(min-width:560px)]:grid-cols-3 [@container(min-width:560px)]:gap-[20px]">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} shape="block" className="aspect-[4/3] w-full rounded-xl" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -116,6 +135,51 @@ function NotHere() {
         />
       </div>
     </div>
+  );
+}
+
+/** The four counts, from shared work only. Appreciations only once there are some. */
+function statsOf(made: readonly MadeItem[], appreciations: number): { label: string; value: number }[] {
+  if (!made.length) return [];
+  const stats = [
+    { label: "Projects shared", value: made.length },
+    { label: "Products built", value: made.reduce((n, m) => n + m.products, 0) },
+    { label: "In production", value: made.filter((m) => inProduction(m.stageId)).length },
+  ];
+  if (appreciations > 0) stats.push({ label: "Appreciations", value: appreciations });
+  return stats;
+}
+
+/** Built with · Works on · Links: the identity column's second half. */
+function MoreAbout({
+  builtWith,
+  builtWithNote,
+  worksOn,
+  links,
+}: {
+  builtWith: readonly string[];
+  builtWithNote: string;
+  worksOn: readonly string[];
+  links: readonly string[];
+}) {
+  return (
+    <>
+      {builtWith.length > 0 && (
+        <SideSection title="Built with" note={builtWithNote}>
+          <ChipRow chips={builtWith} mono />
+        </SideSection>
+      )}
+      {worksOn.length > 0 && (
+        <SideSection title="Works on">
+          <ChipRow chips={worksOn} />
+        </SideSection>
+      )}
+      {links.length > 0 && (
+        <SideSection title="Links">
+          <LinkList links={links} />
+        </SideSection>
+      )}
+    </>
   );
 }
 
@@ -157,19 +221,53 @@ function OwnProfile({
   const ready = projectsReady && buildsReady && marketReady && editions.hydrated && journeys !== null && now > 0;
   const titleRef = useArrivalFocus(ready);
 
-  const made: MadeItem[] = React.useMemo(() => {
+  // Each project once: its journey, its current products (a later version's drops left out)
+  // and their parts, read the way the project page reads them.
+  const facts = React.useMemo(() => {
     if (!ready || !journeys) return [];
-    const inputs: MineInput[] = projects.map((p, i) => ({
+    return projects.map((p, i) => {
+      const refs = buildsOf(p, builds);
+      const products = productsOfProject(p, refs).filter((x) => x.dropped === null);
+      return {
+        project: p,
+        refs,
+        journey: decodeJourney(journeys[i] ?? null) as ProjectJourney,
+        products: products.length,
+        parts: products.flatMap((x) => (x.built ? partsOf(x.built.product).map((r) => r.name) : [])),
+      };
+    });
+  }, [ready, journeys, projects, builds]);
+
+  const made: MadeItem[] = React.useMemo(() => {
+    const inputs: MineInput[] = facts.map(({ project: p, refs, journey, products }) => ({
       id: p.id,
       name: p.name,
       createdAt: p.createdAt,
       showcasedAt: typeof p.showcasedAt === "number" ? p.showcasedAt : null,
-      cover: coverOf(p, buildsOf(p, builds)),
-      journey: decodeJourney(journeys[i] ?? null),
+      cover: coverOf(p, refs),
+      journey,
+      products,
+      summary: p.post?.story.trim() || p.description.trim(),
+      category: null,
       ...listingFactsOf(p.id, market.listings, market.sales, editions.record),
     }));
     return madeOfMine(inputs, fields.pins);
-  }, [ready, journeys, projects, builds, market, editions.record, fields.pins]);
+  }, [facts, market, editions.record, fields.pins]);
+
+  const portfolio = React.useMemo(() => {
+    const shown = new Map(made.flatMap((m) => (m.projectId ? [[m.projectId, m] as const] : [])));
+    const visible = facts.filter((f) => shown.has(f.project.id));
+    return {
+      builtWith: builtWithOf(visible.map((f) => f.parts)),
+      activity: activityOf(
+        visible.map((f) => {
+          const m = shown.get(f.project.id)!;
+          return { id: f.project.id, title: m.title, href: m.href, journey: f.journey };
+        }),
+        20,
+      ),
+    };
+  }, [facts, made]);
 
   const shared = React.useMemo(
     () =>
@@ -199,47 +297,64 @@ function OwnProfile({
     setNotice(r.refused ? "Up to 3 projects can be pinned. Unpin one first." : r.ok ? null : "Couldn't save. This browser's storage is full or blocked.");
   };
 
-  const addLink = (
-    <button
-      type="button"
-      onClick={openEdit}
-      className="text-lg font-semibold leading-lg text-text-link underline-offset-[3px] outline-none hover:underline focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-border-focus"
-    >
-      {hasName ? "Add what you build" : "Add your name and what you build"}
+  const prompt = (words: string) => (
+    <button type="button" onClick={openEdit} className={PROMPT}>
+      {words}
     </button>
   );
 
   return (
     <div className={PAGE_CONTAINER}>
       <div className={CONTENT}>
-        <ProfileHeader
-          titleRef={titleRef}
-          avatar={{ initials: person.initials, color: null, src: photoUrl }}
-          name={person.name}
-          latinName={person.latinName}
-          headline={fields.headline || null}
-          emptyHeadline={addLink}
-          facts={factsOf(since, counts.shown)}
-          relation={null}
-          demo={false}
-          actions={
-            <Button ref={editButton} type="button" hierarchy="secondary" size="lg" onClick={openEdit}>
-              Edit profile
-            </Button>
-          }
-        />
-        <OwnerLine
-          shown={counts.shown}
-          hidden={counts.hidden}
-          extra={
-            following.hydrated && (
-              <button type="button" onClick={() => setFollowingOpen(true)} className={OWNER_LINE_LINK}>
-                {`You follow ${following.people.length}`}
-              </button>
-            )
-          }
-        />
-        <MadeSection items={made} now={now} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
+        <div className={GRID}>
+          <div className={ID_TOP}>
+            <IdentityHead
+              titleRef={titleRef}
+              avatar={{ initials: person.initials, color: null, src: photoUrl }}
+              name={person.name}
+              latinName={person.latinName}
+              headline={fields.headline || prompt(hasName ? "Add what you build" : "Add your name and what you build")}
+              demo={false}
+              location={fields.location || null}
+              localTime={fields.location ? localTimeOf(fields.timeZone, now) : null}
+              since={since}
+              relation={null}
+            />
+            <div className="max-md:hidden">
+              <Button ref={editButton} type="button" hierarchy="secondary" size="lg" onClick={openEdit} className="w-full">
+                Edit profile
+              </Button>
+            </div>
+            {fields.openTo && <OpenToLine words={OPEN_TO_WORDS[fields.openTo]} />}
+            <StatList stats={statsOf(made, 0)} />
+            <SideSection title="About">
+              {fields.bio ? <p className={BODY}>{fields.bio}</p> : <div>{prompt("Add a few lines about your work")}</div>}
+            </SideSection>
+          </div>
+          <div className={WORK}>
+            <OwnerLine
+              shown={counts.shown}
+              hidden={counts.hidden}
+              extra={
+                following.hydrated && (
+                  <button type="button" onClick={() => setFollowingOpen(true)} className={OWNER_LINE_LINK}>
+                    {`You follow ${following.people.length}`}
+                  </button>
+                )
+              }
+            />
+            <WorkSections items={made} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
+            <ActivitySection items={portfolio.activity} />
+          </div>
+          <div className={ID_MORE}>
+            <MoreAbout
+              builtWith={portfolio.builtWith}
+              builtWithNote="From the parts lists of your shared projects"
+              worksOn={[]}
+              links={fields.links}
+            />
+          </div>
+        </div>
       </div>
       <div role="group" aria-label="Profile actions" className={PHONE_BAR}>
         <Button type="button" hierarchy="secondary" size="xl" onClick={openEdit} className="h-[48px] flex-1">
@@ -249,7 +364,15 @@ function OwnProfile({
       {followingOpen && <FollowingDialog onClose={() => setFollowingOpen(false)} />}
       {editing && (
         <EditProfileDialog
-          initial={{ name: fields.name, latinName: fields.latinName, headline: fields.headline }}
+          initial={{
+            name: fields.name,
+            latinName: fields.latinName,
+            headline: fields.headline,
+            bio: fields.bio,
+            location: fields.location,
+            links: fields.links,
+            openTo: fields.openTo,
+          }}
           photoUrl={photoUrl}
           shared={shared}
           onClose={closeEdit}
@@ -265,16 +388,36 @@ function OwnProfile({
 function OtherProfile({ person }: { person: Person }) {
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: marketReady, data: market } = useMarket();
+  const { hydrated: reactionsReady, reactions } = useReactions();
   const blocks = useBlocked(person.id);
   const now = useMinuteClock();
   const reasonId = React.useId();
   const [notice, setNotice] = React.useState<PersonNotice>(null);
-  const ready = projectsReady && marketReady && blocks.hydrated && now > 0;
+  const ready = projectsReady && marketReady && reactionsReady && blocks.hydrated && now > 0;
   const titleRef = useArrivalFocus(ready);
 
   const feedId = person.kind === "feed" ? person.id.slice("feed:".length) : null;
+  const about = feedId ? (SAMPLE_PROFILES[feedId] ?? null) : null;
   const posts = React.useMemo(() => (feedId ? SAMPLE_POSTS.filter((p) => p.creator.id === feedId) : []), [feedId]);
-  const made = React.useMemo(() => (feedId ? madeOfSample(SAMPLE_POSTS, feedId) : []), [feedId]);
+  const made = React.useMemo(() => (feedId && now > 0 ? madeOfSample(SAMPLE_POSTS, feedId, now) : []), [feedId, now]);
+
+  const portfolio = React.useMemo(() => {
+    const appreciations = new Map(posts.map((p) => [p.id, countsOf(reactions, p.id, p.base).appreciations]));
+    const activity: ActivityItem[] =
+      now > 0
+        ? activityOf(
+            posts.map((p) => ({ id: p.id, title: p.title, href: postHref(p.slug), journey: sampleJourneyOf(p, now) })),
+            20,
+          )
+        : [];
+    return {
+      appreciations,
+      total: [...appreciations.values()].reduce((a, b) => a + b, 0),
+      builtWith: builtWithOf(posts.map((p) => p.products.flatMap((x) => x.parts.map((r) => r.name)))),
+      worksOn: worksOnOf(made),
+      activity,
+    };
+  }, [posts, made, reactions, now]);
 
   const tie = React.useMemo(
     () =>
@@ -306,37 +449,17 @@ function OtherProfile({ person }: { person: Person }) {
   return (
     <div className={PAGE_CONTAINER}>
       <div className={CONTENT}>
-        <ProfileHeader
-          titleRef={titleRef}
-          avatar={{ initials: person.initials, color: person.color, src: null }}
-          name={person.name}
-          latinName={person.latinName}
-          headline={null}
-          facts={factsOf(since, made.length)}
-          relation={blocked ? null : tie}
-          demo
-          actions={
-            <>
-              <div className="flex items-center gap-[8px]">
-                {!blocked && <FollowButton person={person} />}
-                {!blocked && <MessageButton person={person} start={start} reasonId={reasonId} />}
-                {menu}
-              </div>
-              {!blocked && refusal && (
-                <p id={reasonId} className="max-w-[40ch] text-right text-md leading-md text-text-secondary">
-                  {refusal}
-                </p>
-              )}
-            </>
-          }
-          phoneMenu={menu}
-        />
         {blocked && (
           <Banner
             tone="info"
             title={`You blocked ${person.name}`}
             action={
-              <Button type="button" hierarchy="secondary" size="md" onClick={() => setNotice(unblockPerson(ME, person.id).ok ? null : { kind: "error", text: "Couldn't save. This browser's storage is full or blocked." })}>
+              <Button
+                type="button"
+                hierarchy="secondary"
+                size="md"
+                onClick={() => setNotice(unblockPerson(ME, person.id).ok ? null : { kind: "error", text: "Couldn't save. This browser's storage is full or blocked." })}
+              >
                 Unblock
               </Button>
             }
@@ -345,14 +468,76 @@ function OtherProfile({ person }: { person: Person }) {
           </Banner>
         )}
         {notice?.kind === "reported" && (
-          <Banner tone="good" title="Report saved" action={<Button type="button" hierarchy="ghost" size="md" onClick={() => setNotice(null)}>Dismiss</Button>}>
+          <Banner
+            tone="good"
+            title="Report saved"
+            action={
+              <Button type="button" hierarchy="ghost" size="md" onClick={() => setNotice(null)}>
+                Dismiss
+              </Button>
+            }
+          >
             {`Saved in this browser. Reports aren't reviewed yet in this demo.${notice.blocked ? ` You blocked ${person.name} too.` : ""}`}
           </Banner>
         )}
-        {notice?.kind === "error" && (
-          <Banner tone="error">{notice.text}</Banner>
-        )}
-        <MadeSection items={made} now={now} own={false} ownerName={person.name} />
+        {notice?.kind === "error" && <Banner tone="error">{notice.text}</Banner>}
+        <div className={GRID}>
+          <div className={ID_TOP}>
+            <IdentityHead
+              titleRef={titleRef}
+              avatar={{ initials: person.initials, color: person.color, src: null }}
+              name={person.name}
+              latinName={person.latinName}
+              headline={about?.headline ?? null}
+              demo
+              location={about?.location ?? null}
+              localTime={about ? localTimeOf(about.timeZone, now) : null}
+              since={since}
+              relation={blocked ? null : tie}
+              phoneMenu={menu}
+            />
+            <div className="flex flex-col gap-[8px] max-md:hidden">
+              {blocked ? (
+                <div className="flex justify-end">{menu}</div>
+              ) : (
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px] gap-[8px]">
+                  <FollowButton person={person} className="w-full" />
+                  <MessageButton person={person} start={start} reasonId={reasonId} className="w-full" />
+                  {menu}
+                </div>
+              )}
+              {!blocked && refusal && (
+                <p id={reasonId} className="text-md leading-md text-text-secondary">
+                  {refusal}
+                </p>
+              )}
+            </div>
+            {!blocked && about?.openTo && <OpenToLine words={OPEN_TO_WORDS[about.openTo]} />}
+            <StatList stats={statsOf(made, portfolio.total)} />
+            {about?.bio && (
+              <SideSection title="About">
+                <p className={BODY}>{about.bio}</p>
+              </SideSection>
+            )}
+          </div>
+          <div className={WORK}>
+            <WorkSections
+              items={made}
+              own={false}
+              ownerName={person.name}
+              appreciationsOf={(m) => portfolio.appreciations.get(m.key) ?? null}
+            />
+            <ActivitySection items={portfolio.activity} />
+          </div>
+          <div className={ID_MORE}>
+            <MoreAbout
+              builtWith={portfolio.builtWith}
+              builtWithNote={`From the parts lists of ${firstNameOf(person.name)}'s shared projects`}
+              worksOn={portfolio.worksOn}
+              links={[]}
+            />
+          </div>
+        </div>
       </div>
       {!blocked && (
         <div role="group" aria-label={`Actions for ${person.name}`} className={PHONE_BAR}>

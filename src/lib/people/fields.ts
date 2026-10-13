@@ -9,6 +9,18 @@ export const PROFILE_KEY = "ideeza:profile";
 export const NAME_MAX = 60;
 export const HEADLINE_MAX = 60;
 export const PINS_MAX = 3;
+export const BIO_MAX = 280;
+export const LOCATION_MAX = 60;
+export const LINKS_MAX = 2;
+const LINK_MAX = 120;
+
+/** What you are open to, said on your profile (owner picked direction A, 2026-10-14). */
+export type OpenTo = "" | "questions" | "collaboration" | "both";
+export const OPEN_TO_WORDS: Record<Exclude<OpenTo, "">, string> = {
+  questions: "Open to questions",
+  collaboration: "Open to collaboration",
+  both: "Open to collaboration and questions",
+};
 
 export type ProfileFields = {
   v: 1;
@@ -21,9 +33,57 @@ export type ProfileFields = {
   pins: string[];
   /** Set once, the first time the profile is saved. */
   since: number | null;
+  /** About: a few lines, in your own words. */
+  bio: string;
+  /** Free text, city level at most ("Dhaka, Bangladesh"). */
+  location: string;
+  /** This device's IANA time zone when you saved, so others see your local time. */
+  timeZone: string | null;
+  /** Up to two web addresses, each with its scheme. */
+  links: string[];
+  openTo: OpenTo;
 };
 
-export const EMPTY_PROFILE: ProfileFields = { v: 1, name: "", latinName: "", headline: "", pins: [], since: null };
+export const EMPTY_PROFILE: ProfileFields = {
+  v: 1,
+  name: "",
+  latinName: "",
+  headline: "",
+  pins: [],
+  since: null,
+  bio: "",
+  location: "",
+  timeZone: null,
+  links: [],
+  openTo: "",
+};
+
+/** A web address someone typed, with https:// added when it has no scheme; null when it isn't one. */
+export function linkOf(raw: string): string | null {
+  const text = raw.trim().slice(0, LINK_MAX);
+  if (!text || /\s/.test(text)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (!u.hostname.includes(".")) return null;
+    return withScheme;
+  } catch {
+    return null;
+  }
+}
+
+function zoneOf(v: unknown): string | null {
+  if (typeof v !== "string" || !v) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: v });
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+const OPEN_TO = new Set<string>(["questions", "collaboration", "both"]);
 
 const text = (v: unknown, max: number): string => (typeof v === "string" ? v.trim().slice(0, max).trim() : "");
 
@@ -43,6 +103,13 @@ export function normalizeProfile(raw: unknown): ProfileFields {
     headline: text(r.headline, HEADLINE_MAX),
     pins,
     since: typeof r.since === "number" && Number.isFinite(r.since) ? r.since : null,
+    bio: typeof r.bio === "string" ? r.bio.trim().slice(0, BIO_MAX) : "",
+    location: text(r.location, LOCATION_MAX),
+    timeZone: zoneOf(r.timeZone),
+    links: Array.isArray(r.links)
+      ? r.links.flatMap((l) => (typeof l === "string" ? [linkOf(l)] : [])).filter((l): l is string => l !== null).slice(0, LINKS_MAX)
+      : [],
+    openTo: typeof r.openTo === "string" && OPEN_TO.has(r.openTo) ? (r.openTo as OpenTo) : "",
   };
 }
 
