@@ -94,7 +94,19 @@ export function SetupTurn({
   const [projectName, setProjectName] = React.useState("");
   const projectId = chosenId ?? (projectName === "" ? (addTo?.id ?? "") : "");
 
-  if (status === "loading") {
+  // A chat started from a project's "Add a product" already knows its project: the maker chose
+  // it on that page and started the concept there, its credit in view. So the project is never
+  // asked again (owner, 2026-10-13). With one product nothing is left to ask, and the question
+  // answers itself once the idea is read; with more, only "What should we build?" is asked.
+  const answeredForProject = React.useRef(false);
+  const answersItself = status === "asking" && addTo !== null && companions.length === 0;
+  React.useEffect(() => {
+    if (!answersItself || !addTo || answeredForProject.current) return;
+    answeredForProject.current = true;
+    onAnswer({ projectId: addTo.id, projectName: "", picked: [] });
+  }, [answersItself, addTo, onAnswer]);
+
+  if (status === "loading" || answersItself) {
     return (
       <Card>
         <p className="flex items-center gap-[8px] text-md text-text-secondary">
@@ -129,7 +141,11 @@ export function SetupTurn({
         <Question
           chip="Products"
           ask="What should we build?"
-          note="Your idea needs more than one product to work. Everything ticked gets its own concept."
+          note={
+            addTo
+              ? `Your idea needs more than one product to work. Everything ticked gets its own concept and goes into ${addTo.name}.`
+              : "Your idea needs more than one product to work. Everything ticked gets its own concept."
+          }
         >
           <Row
             checked
@@ -159,9 +175,13 @@ export function SetupTurn({
         </Question>
         <Footer
           note={`${extra.length + 1} concept${extra.length ? "s" : ""} · ${extra.length + 1} credit${extra.length ? "s" : ""}`}
-          label="Continue"
+          label={addTo ? "Start drawing" : "Continue"}
           ready
-          onGo={() => setStep("project")}
+          onGo={() =>
+            addTo
+              ? onAnswer({ projectId: addTo.id, projectName: "", picked: extra.map((c) => c.id) })
+              : setStep("project")
+          }
         />
       </Card>
     );

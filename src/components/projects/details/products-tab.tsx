@@ -15,9 +15,11 @@
 //   40 %", "Video ready", "Render failed" — as text, never a control
 //   (P2-VIDEO-12), and any card its stage pill, "Stage: {label}" to a screen
 //   reader (P2-TABS-10).
-// - The owner's first tile is "Add a product": a link to `/?addTo={id}`
-//   (SAVE takes it from there). A live Buy-now listing asks to pause first;
-//   a running auction refuses, with its reason (`guard("addProduct")`,
+// - The owner's first tile is "Add a product": it opens the Add a product
+//   dialog over this page (./add-product-dialog.tsx; owner, 2026-10-13) —
+//   Build with AI starts the chat, Build manually adds the product and opens
+//   its editor. A live Buy-now listing asks to pause before a product is
+//   added; a running auction refuses, with its reason (`guard("addProduct")`,
 //   P2-LISTING-13). The lock hides it: `can("product.add")` is false.
 //
 // A built product's Build check is shown twice, on purpose, in two shapes.
@@ -28,11 +30,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Image02Icon, ImageNotFound02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { ConfidenceBadge } from "@/components/create/confidence-badge";
 import { useProjectEditGate } from "@/components/projects/use-edit-gate";
+import { AddProductDialog } from "./add-product-dialog";
+import { useManualProjects } from "@/lib/manual/projects";
 import {
   checkBuild,
   TIER_LABEL,
@@ -170,29 +173,20 @@ export function ProductsTab({
   );
 }
 
-/** P2-TABS-29: the grid's first tile. Its link name is "Add a product"; the sub-line describes it. */
+/** P2-TABS-29: the grid's first tile. Its button name is "Add a product"; the sub-line describes
+ *  it. It opens the Add a product dialog over this page (owner, 2026-10-13: never a trip to Home):
+ *  Build with AI or Build manually, both adding to this project. While the project can't take a
+ *  product (a running auction, a sale in full) it says why instead of opening. */
 function AddProductTile({ projectId, projectName }: { projectId: string; projectName: string }) {
-  const router = useRouter();
+  const { projects } = useManualProjects();
+  const project = projects.find((p) => p.id === projectId) ?? null;
   const gate = useProjectEditGate(projectId);
   const reason = gate.reasonOf("addProduct");
-  const [refused, setRefused] = React.useState<string | null>(null);
-  const [leaving, setLeaving] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+  const [tried, setTried] = React.useState(false);
   const subId = React.useId();
   const reasonId = React.useId();
-  const href = `/?addTo=${encodeURIComponent(projectId)}`;
-  const shown = reason ?? refused;
-
-  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // A modified click opens a tab and leaves this page as it was; Save still runs the gate.
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-    e.preventDefault();
-    if (leaving) return;
-    const out = gate.guard("addProduct", () => {
-      setLeaving(true);
-      router.push(href);
-    });
-    setRefused(out.kind === "refused" ? out.reason : null);
-  };
+  const shown = tried ? reason : null;
 
   return (
     <li>
@@ -200,26 +194,32 @@ function AddProductTile({ projectId, projectName }: { projectId: string; project
         className={cn(
           CARD,
           "min-h-[160px] items-center justify-center gap-3 border-dashed p-7 text-center",
-          shown && "hover:border-border",
+          reason && "hover:border-border",
         )}
       >
         <span aria-hidden className="inline-flex size-[40px] items-center justify-center rounded-full bg-bg-subtle text-text-secondary">
           <Icon icon={PlusSignIcon} size={20} />
         </span>
         <h3 className="text-md font-semibold text-text-primary">
-          <Link
-            href={href}
-            onClick={onClick}
-            aria-disabled={shown ? true : undefined}
-            aria-busy={leaving || undefined}
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-disabled={reason ? true : undefined}
             aria-describedby={shown ? `${subId} ${reasonId}` : subId}
+            onClick={() => {
+              if (reason) {
+                setTried(true);
+                return;
+              }
+              if (project) setOpen(true);
+            }}
             className="rounded-sm outline-none after:absolute after:inset-0 after:content-[''] focus-visible:ring-0 [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:items-center"
           >
-            {leaving ? "Opening…" : "Add a product"}
-          </Link>
+            Add a product
+          </button>
         </h3>
         <p id={subId} className="text-md text-text-secondary">
-          Describe it in a new chat — its build joins {projectName}.
+          Build it with AI or by hand. It joins {projectName}.
         </p>
         {shown && (
           <p id={reasonId} className="text-md font-medium text-text-primary">
@@ -227,7 +227,7 @@ function AddProductTile({ projectId, projectName }: { projectId: string; project
           </p>
         )}
       </div>
-      {gate.dialog}
+      {open && project && <AddProductDialog project={project} onClose={() => setOpen(false)} />}
     </li>
   );
 }
