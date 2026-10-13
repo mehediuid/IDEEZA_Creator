@@ -22,6 +22,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { AvatarLabelGroup, Badge, Button, buttonVariants, IconButton } from "@/components/ideeza";
+import { MessageCreator, useMessageRefusal } from "@/components/newsfeed/creator-row";
 import { CREATORS, formatCount } from "@/lib/feed";
 import { follows, useReactions } from "@/lib/innovations/reactions";
 import { SAMPLE_POSTS } from "@/lib/innovations/sample-posts";
@@ -68,6 +69,8 @@ export function MakerBlock({ post, owner, layout, className }: { post: Innovatio
   const maker = post.creator;
   const following = follows(reactions, maker.id, CREATORS.find((c) => c.id === maker.id)?.following ?? false);
   const supporting = count > 0 ? `${count} ${count === 1 ? "project" : "projects"} on Innovations` : "Nothing on Innovations right now";
+  const refusal = useMessageRefusal(maker);
+  const reasonId = React.useId();
 
   const name = (
     <span className="inline-flex min-w-0 items-center gap-3">
@@ -88,19 +91,43 @@ export function MakerBlock({ post, owner, layout, className }: { post: Innovatio
       {following ? "Following" : "Follow"}
     </Button>
   );
+  const message = owner ? null : (
+    <MessageCreator creator={maker} slug={post.slug} refusal={refusal} reasonId={reasonId} className={cn(TAP, layout === "card" && "w-full")} />
+  );
+  const why = refusal && !owner && (
+    <p id={reasonId} className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+      {refusal}
+    </p>
+  );
 
   if (layout === "row") {
     return (
-      <div className={cn("flex items-center gap-6", className)}>
-        <AvatarLabelGroup size="md" initials={maker.initials} color={maker.color} name={name} supporting={supporting} className="flex-1" />
-        {follow}
+      <div className={cn("flex flex-col gap-4", className)}>
+        <div className="flex flex-wrap items-center gap-6">
+          <AvatarLabelGroup size="md" initials={maker.initials} color={maker.color} name={name} supporting={supporting} className="min-w-[min(100%,200px)] flex-1" />
+          {follow && (
+            <div className="flex shrink-0 items-center gap-4">
+              {follow}
+              {message}
+            </div>
+          )}
+        </div>
+        {why}
       </div>
     );
   }
   return (
     <section aria-label={`The maker, ${maker.name}`} className={cn(CARD, "flex flex-col gap-7", className)}>
       <AvatarLabelGroup size="md" initials={maker.initials} color={maker.color} name={name} supporting={supporting} />
-      {follow ?? <p className="text-sm leading-sm text-text-secondary">This is you. Visitors can follow you from here.</p>}
+      {follow ? (
+        <div className="grid grid-cols-2 gap-4">
+          {follow}
+          {message}
+        </div>
+      ) : (
+        <p className="text-sm leading-sm text-text-secondary">This is you. Visitors can follow you from here.</p>
+      )}
+      {why}
     </section>
   );
 }

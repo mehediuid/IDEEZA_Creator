@@ -294,9 +294,9 @@ function pct(n: number): string {
 function soldDetail(sold: DeleteFacts["sold"]): string {
   const share = sold.sharePct > 0;
   const nfts = sold.editions > 0;
-  if (share && nfts) return `Buyers own ${pct(sold.sharePct)} of it and hold ${sold.editions} of its NFTs.`;
-  if (nfts) return sold.editions === 1 ? "A buyer holds 1 of its NFTs." : `Buyers hold ${sold.editions} of its NFTs.`;
-  return (sold.buyers ?? 1) > 1 ? `Buyers own ${pct(sold.sharePct)} of it.` : `A buyer owns ${pct(sold.sharePct)} of it.`;
+  if (share && nfts) return `Other people own ${pct(sold.sharePct)} of it and hold ${sold.editions} of its NFTs.`;
+  if (nfts) return sold.editions === 1 ? "Someone else holds 1 of its NFTs." : `Other people hold ${sold.editions} of its NFTs.`;
+  return (sold.buyers ?? 1) > 1 ? `Other people own ${pct(sold.sharePct)} of it.` : `Someone else owns ${pct(sold.sharePct)} of it.`;
 }
 
 /**

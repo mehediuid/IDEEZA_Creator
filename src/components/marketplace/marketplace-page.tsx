@@ -411,7 +411,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
         tone="empty"
         icon={<Icon icon={Tag01Icon} size={32} />}
         title="Nothing sold yet"
-        body="A sale shows here once a demo buyer buys a listing."
+        body="A sale shows here once a demo creator buys a listing."
         className="mx-auto mt-[24px]"
       />
     );

@@ -348,7 +348,7 @@ export function ListingFields({
           onLeave("percentSelling");
         }}
         options={steps}
-        hint="How much of the project's ownership this sale passes to the buyer."
+        hint="How much of the project's ownership this sale passes to whoever buys it."
         error={errors.percentSelling}
       />
 
@@ -382,7 +382,7 @@ export function ListingFields({
             Holder benefits (optional)
           </h3>
           <p id={ids.benefitsNote} className="text-md text-text-secondary">
-            Perks buyers get while they hold this NFT, like a private group or a subscription.
+            Perks people get while they hold this NFT, like a private group or a subscription.
             {editing && " Changes apply to future sales only."}
           </p>
         </div>

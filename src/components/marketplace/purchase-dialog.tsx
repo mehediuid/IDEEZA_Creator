@@ -74,7 +74,7 @@ const UNREADABLE = "This browser's marketplace records couldn't be read, so the 
 const SOLD_IN_FULL = "This project was just sold in full, so its NFTs are off the marketplace.";
 
 export function buyerNameOf(id: DemoBuyerId): string {
-  return DEMO_BUYERS.find((b) => b.id === id)?.name ?? "Demo buyer";
+  return DEMO_BUYERS.find((b) => b.id === id)?.name ?? "Demo creator";
 }
 
 /** The listing as the market holds it now, or why it can't be bought. `auction` asks for a running auction. */
@@ -219,7 +219,7 @@ export function usePurchase({
 
 const SOLD_OUT = "These NFTs just sold out.";
 const TRACK_GONE = "The creator took these NFTs off the marketplace.";
-const UNIT_TAKEN = "Another buyer took that NFT a moment ago. Close this and buy again to get the next one.";
+const UNIT_TAKEN = "Someone else bought that NFT a moment ago. Close this and buy again to get the next one.";
 
 export type EditionTier = "regular" | "extended";
 export const TIER_WORD: Record<EditionTier, string> = { regular: "This version", extended: "With future updates" };

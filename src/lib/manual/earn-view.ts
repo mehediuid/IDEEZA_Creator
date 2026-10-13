@@ -194,7 +194,7 @@ export function earnNextOf(projectId: string, commercial: CommercialState, copie
       };
     case "minted":
       if (copiesOnSale) {
-        return live("Your copies are on the marketplace", "Buyers can find them on Explore marketplace. You get paid when one sells.", "Manage in Sell", sell);
+        return live("Your copies are on the marketplace", "Anyone can find them on Explore marketplace. You get paid when one sells.", "Manage in Sell", sell);
       }
       return {
         step,
@@ -205,15 +205,15 @@ export function earnNextOf(projectId: string, commercial: CommercialState, copie
         action: { label: "Choose what to sell", href: sell },
       };
     case "listed":
-      return live("Your project is on the marketplace", "Buyers can find it on Explore marketplace. You get paid when it sells.", "Manage in Sell", sell);
+      return live("Your project is on the marketplace", "Anyone can find it on Explore marketplace. You get paid when it sells.", "Manage in Sell", sell);
     case "paused":
-      return live("Your listing is paused", "Buyers can't see or buy it until you relist it.", "Relist in Sell", sell);
+      return live("Your listing is paused", "Nobody can see or buy it until you relist it.", "Relist in Sell", sell);
     case "given":
       return live("Given to the community", "It's free for everyone, so there is nothing to sell.", "See it in Sell", sell);
     case "soldPartial":
-      return live("Part of your project is sold", "Each sale paid your payout wallet. You can still sell the share you hold.", "See customers and payouts", customers);
+      return live("Part of your project is sold", "Each sale paid your payout wallet. You can still sell the share you hold.", "See sales and payouts", customers);
     case "soldOut":
-      return live("Sold in full", "It belongs to its buyers now, so the project is read-only.", "See customers and payouts", customers);
+      return live("Sold in full", "It belongs to whoever bought it now, so the project is read-only.", "See sales and payouts", customers);
   }
 }
 
@@ -240,7 +240,7 @@ export function earnLiveFactsOf(i: {
   return [
     { label: "Price", value: priceOf(i.listing, i.commercial) },
     { label: "Copies sold", value: supply > 0 ? `${copies} of ${supply}` : `${copies}` },
-    { label: "Customers", value: `${i.buyers}` },
+    { label: "Bought by", value: i.buyers === 0 ? "Nobody yet" : i.buyers === 1 ? "1 person" : `${i.buyers} people` },
     { label: "Earned", value: earned.length ? payoutLinesText(earned) : "Nothing yet" },
   ];
 }
@@ -329,7 +329,7 @@ export function mainRowStateOf(f: {
   });
   const sellOr = (line: string) => row(line, f.canList ? "list" : "none");
   if (f.status === "draft") return row("Not minted yet", "mint");
-  if (f.locked) return row("Sold in full · the buyer owns the project", "disabled", "Sold");
+  if (f.locked) return row("Sold in full · it has a new owner", "disabled", "Sold");
   if (f.status === "given") return row("Given to the community, so it isn't sold.", "disabled");
   const v = f.listing;
   switch (v.kind) {
@@ -342,7 +342,7 @@ export function mainRowStateOf(f: {
       return row(line, f.manage ? "manage" : "none", "Manage", true);
     }
     case "paused":
-      return row("Paused · buyers can't see or buy it", f.manage ? "manage" : "none", "Manage");
+      return row("Paused · nobody can see or buy it", f.manage ? "manage" : "none", "Manage");
     case "sold": {
       const pct = v.sale.item.nft === "main" ? v.sale.item.sharePct : 0;
       return sellOr(`Sold ${pct}% · ${formatAmount(v.sale.price, v.sale.token)}`);

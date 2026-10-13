@@ -19,6 +19,10 @@
 //   don't need the Main NFT (owner, 2026-10-11): with no Main listing the block
 //   holds the copies alone. Only the lock (sold in full) hides them.
 // - A project with neither has no block.
+// - A demo buyer's block ends with its one way to the creator, a link into
+//   Messages: "Get creator support" for a holder of any sale of the project
+//   (Main or a copy), about the newest one, else "Ask the creator", about the
+//   listing. A preview has none.
 //
 // Every `can()` passes `view.canCtx` (listingLive, auction, holding); an auction
 // asks again at the card's own clock, so Place bid goes the moment it ends.
@@ -28,7 +32,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight01Icon, Wallet01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Badge, Banner, Button, TestnetDemoBadge } from "@/components/ideeza";
+import { Badge, Banner, Button, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
 import { royaltyText, SHARE_SALE_NOTE } from "@/lib/commerce/share-copy";
 import { can } from "@/lib/manual/permissions";
 import type { ProjectView } from "@/lib/manual/project-read";
@@ -36,7 +40,9 @@ import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { auctionStateOf, timeLeftLabel } from "@/lib/market/auction";
 import { useMarket } from "@/lib/market/market-store";
 import { holdingOf } from "@/lib/market/sales";
-import type { AuctionState, Listing } from "@/lib/market/types";
+import type { AuctionState, Listing, Sale } from "@/lib/market/types";
+import { startHref } from "@/lib/messages/links";
+import { ME } from "@/lib/messages/types";
 import { availableOf } from "@/lib/wallet/balances";
 import { demoAddress, shortAddress } from "@/lib/wallet/demo-wallet";
 import { formatAmount } from "@/lib/wallet/money";
@@ -176,10 +182,13 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
   const clock = useAuctionClock(listing?.type === "auction" ? listing.endsAt : undefined, now);
   if (viewer.kind === "local-owner" || !can(viewer, "listing.seePublic", view.canCtx)) return null;
   const copies = view.lock === null && view.editions.some((t) => t.listing !== null);
+  const ask =
+    viewer.kind === "demo-buyer" ? <AskCreator projectId={project.id} sales={view.sales} buyerId={viewer.buyerId} /> : null;
   if (!listing) {
     return copies ? (
       <RailBlock title="Marketplace" meta="Copies" collapsible={false}>
         <EditionOffers project={project} view={view} viewer={viewer} announce={announce} alone />
+        {ask}
       </RailBlock>
     ) : null;
   }
@@ -218,7 +227,37 @@ export function BuyerRail({ project, view, viewer, now, announce }: SlotProps) {
         <PreviewBody project={project} view={view} listing={listing} auction={auction} clock={clock} announce={announce} />
       )}
       <EditionOffers project={project} view={view} viewer={viewer} announce={announce} />
+      {ask}
     </RailBlock>
+  );
+}
+
+/** Get creator support (a holder, about the buyer's newest sale) or Ask the creator (about the
+ *  listing): opens the buyer's conversation with the creator in Messages, acting as the buyer. */
+function AskCreator({ projectId, sales, buyerId }: { projectId: string; sales: Sale[]; buyerId: DemoBuyerId }) {
+  const latest = sales
+    .filter((s) => s.buyerId === buyerId)
+    .reduce<Sale | null>((a, s) => (!a || s.at > a.at ? s : a), null);
+  const href = startHref(
+    {
+      kind: "direct",
+      to: ME,
+      projectId,
+      about: latest ? { kind: "purchase", saleId: latest.id } : { kind: "listing" },
+    },
+    buyerId,
+  );
+  return (
+    <Link
+      href={href}
+      // The reset colours every a:hover as a link; the button keeps its own text colour.
+      className={cn(
+        buttonVariants({ hierarchy: "secondary", size: "lg" }),
+        "h-[44px] w-full hover:text-[color:var(--color-button-secondary-text)]",
+      )}
+    >
+      {latest ? "Get creator support" : "Ask the creator"}
+    </Link>
   );
 }
 
@@ -300,7 +339,6 @@ function BuyerBody({
   clock: number;
   announce: (m: string) => void;
 }) {
-  const { data } = useMarket();
   const { busy, buy } = usePurchase({ project, view, buyerId });
   const summaryRef = React.useRef<HTMLButtonElement>(null);
   const afterClose = useAfterDialogClose();
@@ -311,7 +349,6 @@ function BuyerBody({
   const closed = closedLine(view);
   const canBuy = live && can(viewer, "listing.buy", ctx);
   const canBid = live && auction !== null && can(viewer, "listing.bid", { ...ctx, auction: auction.phase });
-  const support = React.useMemo(() => data.support.filter((r) => r.projectId === project.id), [data.support, project.id]);
 
   const purchase = async (via: "buyNow" | "auctionBuyNow") => {
     const done = await buy(listing, via);
@@ -327,13 +364,7 @@ function BuyerBody({
   return (
     <>
       {holding && can(viewer, "purchase.seeSummary", ctx) && (
-        <PurchasedSummary
-          holding={holding}
-          buyerId={buyerId}
-          support={support}
-          toggleRef={summaryRef}
-          announce={announce}
-        />
+        <PurchasedSummary holding={holding} toggleRef={summaryRef} />
       )}
       {live && listing.type === "buyNow" ? (
         <div className={cn("flex flex-col gap-8", holding && "border-t border-solid border-border pt-8")}>

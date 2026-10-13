@@ -204,8 +204,8 @@ function NumberField({
 }
 
 const PROMISES: { field: "leadTime" | "refund" | "seller"; text: string }[] = [
-  { field: "leadTime", text: "Lead time: I'll tell each buyer when to expect it, and ship within that time." },
-  { field: "refund", text: "Refund promise: if I can't make or ship an order, I'll refund the buyer in full." },
+  { field: "leadTime", text: "Lead time: I'll tell everyone who orders when to expect it, and ship within that time." },
+  { field: "refund", text: "Refund promise: if I can't make or ship an order, I'll refund the order in full." },
   { field: "seller", text: "I'm the seller: I make, ship and support each one myself. IDEEZA doesn't make or ship it." },
 ];
 

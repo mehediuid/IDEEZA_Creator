@@ -15,7 +15,7 @@ import { formatDate, formatDateTime, type ProjectStatus } from "./project-summar
 import type { ManualProject } from "./projects";
 import { earnHref } from "./earn-route";
 
-// The buyer's label ("Mira (demo buyer)") is the wallet identities' own
+// The buyer's label ("Mira (demo creator)") is the wallet identities' own
 // (spec §3.5.3); re-exported so ownership.ts and the panels keep one import.
 export { buyerLabel };
 
@@ -137,7 +137,7 @@ export function benefitDurationText(d: UtilityBenefit["duration"]): string {
   return d.months === 1 ? "1 month" : `${d.months} months`;
 }
 
-export const BENEFITS_NOTE = "IDEEZA records benefits with each sale. Giving buyers access is up to you for now.";
+export const BENEFITS_NOTE = "IDEEZA records benefits with each sale. Giving access is up to you for now.";
 
 function benefitLine(b: UtilityBenefit, state: BenefitState): string {
   if (state.kind === "whileHeld") return `${b.name}, for as long as they hold it`;
@@ -218,7 +218,7 @@ export function customerRowText(row: CustomerRow, ctx: { projectName: string; no
 
 export function customersSummaryText(c: Customers): string {
   const sales = c.saleCount === 1 ? "1 sale" : `${c.saleCount} sales`;
-  const buyers = c.buyerCount === 1 ? "1 buyer" : `${c.buyerCount} buyers`;
+  const buyers = c.buyerCount === 1 ? "1 person" : `${c.buyerCount} people`;
   return `${sales} to ${buyers}.`;
 }
 
@@ -230,20 +230,20 @@ export function customersEmptyCopy(ctx: {
 }): { title: string; body: string; link?: { label: string; href: string } } {
   if (ctx.scope.kind === "product") {
     return {
-      title: "No customers for this product yet",
-      body: `People who buy ${ctx.productName ?? "this product"}'s physical or virtual NFTs show up here. Main NFT sales are on the project's Customers tab.`,
-      link: { label: "Project customers", href: earnHref(ctx.projectId, "customers") },
+      title: "No sales of this product yet",
+      body: `People who buy ${ctx.productName ?? "this product"}'s physical or virtual NFTs show up here. Main NFT sales are in the project's Sales.`,
+      link: { label: "Project sales", href: earnHref(ctx.projectId, "customers") },
     };
   }
   if (ctx.status === "given") {
-    return { title: "No customers", body: "This project is given to the community for free, so nobody buys it." };
+    return { title: "No sales", body: "This project is given to the community for free, so nobody buys it." };
   }
   if (ctx.status === "listed") {
-    return { title: "No customers yet", body: "When someone buys this project's NFT on Explore marketplace, they show up here." };
+    return { title: "No sales yet", body: "When someone buys this project's NFT on Explore marketplace, they show up here." };
   }
   return {
-    title: "No customers yet",
-    body: "Customers come from marketplace sales. Once this project is listed and someone buys it, they show up here.",
+    title: "No sales yet",
+    body: "Sales come from Explore marketplace. Once this project is listed and someone buys it, they show up here.",
   };
 }
 

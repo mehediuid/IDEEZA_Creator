@@ -315,7 +315,7 @@ export function ProjectWorkspace({
       <EditorStateCard
         icon={LockIcon}
         title={`${project.name} was sold in full`}
-        body="Its products are read-only now — the buyer owns them."
+        body="Its products are read-only now — whoever bought it owns them."
         backHref={projectHref}
       />
     );

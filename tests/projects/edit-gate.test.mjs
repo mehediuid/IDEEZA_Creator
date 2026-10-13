@@ -129,7 +129,7 @@ const mainSale = (over = {}) => ({
 
 describe("lockOf", () => {
   it("is null while the maker holds more than 0, even with sales", () => {
-    const s = split(70, [{ holder: { kind: "buyer", saleId: "sale_1", buyerId: "buyer-mira", name: "Mira (demo buyer)" }, percent: 30, since: T }]);
+    const s = split(70, [{ holder: { kind: "buyer", saleId: "sale_1", buyerId: "buyer-mira", name: "Mira (demo creator)" }, percent: 30, since: T }]);
     assert.equal(lockOf(s, [mainSale({ at: T })]), null);
   });
 
@@ -140,15 +140,15 @@ describe("lockOf", () => {
 
   it("is set when the maker holds 0 after a Main sale, with the header's exact line", () => {
     const s = split(0, [
-      { holder: { kind: "buyer", saleId: "sale_1", buyerId: "buyer-mira", name: "Mira (demo buyer)" }, percent: 100, since: T },
+      { holder: { kind: "buyer", saleId: "sale_1", buyerId: "buyer-mira", name: "Mira (demo creator)" }, percent: 100, since: T },
     ]);
     const lock = lockOf(s, [mainSale({ at: T })]);
     assert.equal(lock.kind, "soldInFull");
     assert.equal(lock.at, T);
-    assert.deepEqual(lock.buyers, ["Mira (demo buyer)"]);
+    assert.deepEqual(lock.buyers, ["Mira (demo creator)"]);
     assert.equal(
       lock.line,
-      "Sold in full to Mira (demo buyer) on Sep 22, 2026 — it's theirs now, so this project is read-only.",
+      "Sold in full to Mira (demo creator) on Sep 22, 2026 — it's theirs now, so this project is read-only.",
     );
   });
 
@@ -162,13 +162,13 @@ describe("lockOf", () => {
 
   it("names every distinct buyer once, joined, at the latest sale's date", () => {
     const s = split(0, [
-      { holder: { kind: "buyer", saleId: "sale_1", buyerId: "buyer-mira", name: "Mira (demo buyer)" }, percent: 60, since: T },
-      { holder: { kind: "buyer", saleId: "sale_2", buyerId: "buyer-leo", name: "Leo (demo buyer)" }, percent: 40, since: T + DAY },
+      { holder: { kind: "buyer", saleId: "sale_1", buyerId: "buyer-mira", name: "Mira (demo creator)" }, percent: 60, since: T },
+      { holder: { kind: "buyer", saleId: "sale_2", buyerId: "buyer-leo", name: "Leo (demo creator)" }, percent: 40, since: T + DAY },
     ]);
     const lock = lockOf(s, [mainSale({ id: "sale_1", at: T, buyerId: "buyer-mira" }), mainSale({ id: "sale_2", at: T + DAY, buyerId: "buyer-leo" })]);
-    assert.deepEqual(lock.buyers, ["Mira (demo buyer)", "Leo (demo buyer)"]);
+    assert.deepEqual(lock.buyers, ["Mira (demo creator)", "Leo (demo creator)"]);
     assert.equal(lock.at, T + DAY);
-    assert.match(lock.line, /Mira \(demo buyer\) and Leo \(demo buyer\)/);
+    assert.match(lock.line, /Mira \(demo creator\) and Leo \(demo creator\)/);
   });
 });
 
@@ -176,7 +176,7 @@ describe("lockOf", () => {
 
 describe("editGateOf", () => {
   it("the lock wins over free", () => {
-    const lock = { kind: "soldInFull", at: T, buyers: ["Mira (demo buyer)"], line: "Sold in full to Mira (demo buyer) on Sep 22, 2026 — it's theirs now, so this project is read-only." };
+    const lock = { kind: "soldInFull", at: T, buyers: ["Mira (demo creator)"], line: "Sold in full to Mira (demo creator) on Sep 22, 2026 — it's theirs now, so this project is read-only." };
     const gate = editGateOf({ listing: { kind: "none" }, lock }, "rename");
     assert.deepEqual(gate, { kind: "locked", reason: lock.line });
   });
@@ -222,7 +222,7 @@ describe("projectLockOf", () => {
     assert.equal(projectLockOf(p, [mainSale({ item: { nft: "main", sharePct: 60 } })]), null);
     const lock = projectLockOf(p, [mainSale({ item: { nft: "main", sharePct: 100 } })]);
     assert.equal(lock.kind, "soldInFull");
-    assert.deepEqual(lock.buyers, ["Mira (demo buyer)"]);
+    assert.deepEqual(lock.buyers, ["Mira (demo creator)"]);
   });
   it("counts co-owners, and ignores another project's sales and edition sales", () => {
     const withAna = { ...p, contributors: [{ id: "ctb_ana00001", name: "Ana", role: "coOwner", share: 40, addedAt: T }] };

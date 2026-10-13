@@ -180,7 +180,7 @@ export function BuyerPreviewBanner() {
     <div ref={ref} tabIndex={-1} className="sticky top-0 z-sticky -mt-4 mb-10 bg-bg-page pt-4 outline-none">
       <Banner
         tone="info"
-        title="Previewing as a buyer"
+        title="Previewing as others see it"
         action={
           <button
             type="button"

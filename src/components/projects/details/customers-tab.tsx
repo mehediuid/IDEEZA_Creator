@@ -7,14 +7,18 @@
 // read the same `customersOf` derivation, and this file only turns its rows
 // into the table (from a 600 px panel width) or the stacked list below it.
 //
-// No display string is joined here — every word comes from `customerRowText`
-// (`../../../lib/manual/customers.ts`, T05) or is one of this panel's own
-// fixed lines (the demo disclaimer, the footer, the empty/error copy is
-// `customersEmptyCopy`). The sale-details disclosure is this file's own
-// addition (P2-CUSTOMERS-8): the Figma has no row action, and the benefit
-// names and the wallet need a home.
+// No display string is joined here but "Message {first name}" — every other
+// word comes from `customerRowText` (`../../../lib/manual/customers.ts`, T05)
+// or is one of this panel's own fixed lines (the demo disclaimer, the footer,
+// the Activity line; the empty/error copy is `customersEmptyCopy`). The
+// sale-details disclosure is this file's own addition (P2-CUSTOMERS-8): the
+// Figma has no row action, and the benefit names and the wallet need a home.
+// It ends with "Message Mira", the row's way into Messages about that sale;
+// telling every customer at once is Activity's job, so a line above the rows
+// points there (Messages spec §6).
 
 import * as React from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   AlertCircleIcon,
@@ -38,10 +42,16 @@ import {
   type Customers,
 } from "@/lib/manual/customers";
 import type { ProjectStatus } from "@/lib/manual/project-summary";
+import { startHref } from "@/lib/messages/links";
+import { ME } from "@/lib/messages/types";
 import { DEMO_BUYERS } from "@/lib/wallet/identities";
 import { cn } from "@/lib/utils";
 import { Pagination } from "../pagination";
 import { When } from "../product/when";
+
+/** A quiet link at reading size; 44 px at phone width and on a coarse pointer. */
+const QUIET_LINK =
+  "inline-flex min-h-[24px] items-center self-start rounded-sm text-md font-medium leading-md text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia(REDUCED_MOTION).matches;
@@ -106,13 +116,13 @@ export function CustomersPanel({
   });
 
   const wideCols = scope.kind === "project" ? 6 : 5;
-  const captionText = `Customers of ${projectName}, newest first`;
+  const captionText = `Sales of ${projectName}, newest first`;
 
   return (
     <div className={cn("flex flex-col", embedded ? "gap-8" : "gap-16")}>
       {!embedded && (
         <div className="flex flex-wrap items-center gap-8">
-          <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Customers</h2>
+          <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Sales</h2>
           <TestnetDemoBadge />
         </div>
       )}
@@ -121,7 +131,7 @@ export function CustomersPanel({
         <StateCard
           tone="error"
           icon={<Icon icon={AlertCircleIcon} size={32} />}
-          title="Customers can't be shown"
+          title="Sales can't be shown"
           body="This browser's sales record couldn't be read. It's been left as it is."
           className="mx-auto"
         />
@@ -140,15 +150,25 @@ export function CustomersPanel({
             <p className="text-sm text-text-tertiary">
               Demo purchases from Explore marketplace, made in this browser. Nothing is on a blockchain.
             </p>
+            <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+              To tell everyone who bought at once,{" "}
+              <Link
+                href={`/projects/${projectId}`}
+                className="rounded-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+              >
+                add to Activity
+              </Link>
+              .
+            </p>
           </div>
 
           <div className="[container-type:inline-size]">
-            <div className="hidden overflow-x-auto [@container(min-width:600px)]:block">
+            <div className="hidden overflow-x-auto [@container(min-width:640px)]:block">
               <table className="w-full border-collapse text-left text-md">
                 <caption className="sr-only">{captionText}</caption>
                 <thead>
                   <tr className="border-b border-solid border-border">
-                    <Th>Buyer</Th>
+                    <Th>Bought by</Th>
                     <Th>Item</Th>
                     <Th>Price</Th>
                     <Th>Date</Th>
@@ -160,6 +180,7 @@ export function CustomersPanel({
                   {pageRows.map((row) => (
                     <TableRow
                       key={row.saleId}
+                      projectId={projectId}
                       row={row}
                       text={customerRowText(row, { projectName, now })}
                       scope={scope}
@@ -173,10 +194,11 @@ export function CustomersPanel({
               </table>
             </div>
 
-            <ul aria-label="Customers" className="flex flex-col gap-8 [@container(min-width:600px)]:hidden">
+            <ul aria-label="Sales" className="flex flex-col gap-8 [@container(min-width:640px)]:hidden">
               {pageRows.map((row) => (
                 <ListRow
                   key={row.saleId}
+                  projectId={projectId}
                   row={row}
                   text={customerRowText(row, { projectName, now })}
                   initialOpen={row.saleId === initialSaleId}
@@ -265,6 +287,7 @@ function DisclosureBody({
   id,
   labelledBy,
   open,
+  projectId,
   row,
   text,
   announce,
@@ -272,6 +295,7 @@ function DisclosureBody({
   id: string;
   labelledBy: string;
   open: boolean;
+  projectId: string;
   row: CustomerRow;
   text: CustomerRowText;
   announce: (message: string) => void;
@@ -279,6 +303,7 @@ function DisclosureBody({
   const [copied, setCopied] = React.useState(false);
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const buyerName = DEMO_BUYERS.find((b) => b.id === row.buyerId)?.name ?? "the buyer";
 
   const copyWallet = () => {
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
@@ -336,6 +361,16 @@ function DisclosureBody({
           <p className="m-0 text-sm text-text-tertiary">
             Testnet demo: bought with a demo wallet in this browser. No transaction was sent.
           </p>
+          <Link
+            href={startHref(
+              { kind: "direct", to: row.buyerId, projectId, about: { kind: "purchase", saleId: row.saleId } },
+              ME,
+            )}
+            tabIndex={open ? 0 : -1}
+            className={QUIET_LINK}
+          >
+            Message {buyerName}
+          </Link>
         </div>
       </div>
     </div>
@@ -359,6 +394,7 @@ function Chevron({ open }: { open: boolean }) {
 // ─────────────────────────── the wide table row ───────────────────────────
 
 function TableRow({
+  projectId,
   row,
   text,
   scope,
@@ -367,6 +403,7 @@ function TableRow({
   registerRef,
   announce,
 }: {
+  projectId: string;
   row: CustomerRow;
   text: CustomerRowText;
   scope: CustomerScope;
@@ -391,10 +428,10 @@ function TableRow({
             aria-controls={regionId}
             aria-label={`${text.buyer}, sale details`}
             onClick={() => setOpen((v) => !v)}
-            className="flex min-h-[36px] w-full items-center gap-8 rounded-md text-left outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[44px]"
+            className="flex min-h-[36px] w-full min-w-max items-center gap-8 rounded-md text-left outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[44px]"
           >
             <BuyerAvatar buyerId={row.buyerId} />
-            <span className="min-w-0 truncate font-semibold text-text-primary">{text.buyer}</span>
+            <span className="min-w-0 max-w-[24ch] truncate font-semibold text-text-primary">{text.buyer}</span>
             <Chevron open={open} />
           </button>
         </th>
@@ -414,7 +451,15 @@ function TableRow({
       </tr>
       <tr>
         <td colSpan={colSpan} className="p-0">
-          <DisclosureBody id={regionId} labelledBy={buttonId} open={open} row={row} text={text} announce={announce} />
+          <DisclosureBody
+            id={regionId}
+            labelledBy={buttonId}
+            open={open}
+            projectId={projectId}
+            row={row}
+            text={text}
+            announce={announce}
+          />
         </td>
       </tr>
     </>
@@ -424,12 +469,14 @@ function TableRow({
 // ─────────────────────────── the narrow list item ───────────────────────────
 
 function ListRow({
+  projectId,
   row,
   text,
   initialOpen,
   registerRef,
   announce,
 }: {
+  projectId: string;
   row: CustomerRow;
   text: CustomerRowText;
   initialOpen: boolean;
@@ -464,7 +511,15 @@ function ListRow({
       <p className="mt-2 flex items-center gap-4 text-sm text-text-tertiary">
         <When at={row.at} /> <span aria-hidden>·</span> {text.benefits ?? <NoneCell />}
       </p>
-      <DisclosureBody id={regionId} labelledBy={buttonId} open={open} row={row} text={text} announce={announce} />
+      <DisclosureBody
+        id={regionId}
+        labelledBy={buttonId}
+        open={open}
+        projectId={projectId}
+        row={row}
+        text={text}
+        announce={announce}
+      />
     </li>
   );
 }

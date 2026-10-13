@@ -210,7 +210,7 @@ export function ActivityForm({
     type === "delay-notice" || type === "fix-notice"
       ? "A screenshot of your supplier's email or a written notice works as proof."
       : target.kind === "virtual"
-        ? "Don't attach the paid files: buyers get those with their copy. A changelog or a screenshot works."
+        ? "Don't attach the paid files: people who buy a copy get those with it. A changelog or a screenshot works."
         : null;
 
   // After a refused save, the keyboard goes to the first field at fault (spec §6.2).
@@ -327,7 +327,7 @@ export function ActivityForm({
     <form ref={formRef} id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
       <p className="text-md text-text-secondary">
         {mode === "add"
-          ? "Add at least one photo, video, PDF or document as proof — buyers see it in the journey."
+          ? "Add at least one photo, video, PDF or document as proof — people who buy it see it in the journey."
           : "Changes update this entry in the journey. It keeps at least one file."}
       </p>
 

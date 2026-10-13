@@ -278,7 +278,7 @@ export const KIND_WORD: Record<EditionKind, string> = { physical: "Physical", vi
 export const USE_WORD: Record<EditionUse, string> = { private: "Private use", commercial: "Commercial use" };
 export const TIER_HELP: Record<"regular" | "extended", string> = {
   regular: "For the current version only.",
-  extended: "Buyers get every future version of this design.",
+  extended: "Includes every future version of this design.",
 };
 
 export type TrackCard = {

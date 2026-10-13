@@ -86,7 +86,7 @@ export function requestGateOf(req: WalletRequest, w: DemoWallet | undefined): Re
   return gateOf(req, w);
 }
 
-/** "Demo account 1" · "Mira (demo buyer)". */
+/** "Demo account 1" · "Mira (demo creator)". */
 export function identityLabelOf(id: IdentityId): string {
   const account = accountOf(id);
   if (account !== null) return DEMO_ACCOUNTS.find((a) => a.index === account)?.label ?? `Demo account ${account}`;

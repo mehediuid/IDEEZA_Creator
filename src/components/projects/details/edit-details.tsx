@@ -229,7 +229,7 @@ function EditDetailsDialog({
         covered={gate.confirming}
         size="sm"
         title="Edit name and description"
-        description="Buyers and the community see these."
+        description="People who buy it and the community see these."
         initialFocus={nameRef}
         closeUnavailable={write.saving}
         footer={

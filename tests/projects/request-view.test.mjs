@@ -91,7 +91,7 @@ test("connectionLineOf is the MINT-3 header strip", () => {
   const on = walletConnect(defaultWallet(), "maker-1");
   assert.equal(rv.connectionLineOf("maker-1", on), "Connected: 0x955d…ed95 · Demo account 1 · Base Sepolia (Testnet)");
   assert.equal(rv.connectionLineOf("maker-1", defaultWallet()), "Not connected · Demo account 1");
-  assert.match(rv.connectionLineOf("buyer-mira", walletConnect(defaultWallet(), "buyer-mira")), /· Mira \(demo buyer\) ·/);
+  assert.match(rv.connectionLineOf("buyer-mira", walletConnect(defaultWallet(), "buyer-mira")), /· Mira \(demo creator\) ·/);
 });
 
 test("sumCharge adds same-coin lines, so price + fee in one coin is checked as one amount", () => {

@@ -259,14 +259,14 @@ test("rule 1 · sold: its reason, and the detail for a share, for NFTs and for b
   assert.deepEqual(sold({ sharePct: 10 }), {
     id: "sold",
     reason: "A sold project can't be deleted.",
-    detail: "A buyer owns 10% of it.",
+    detail: "Someone else owns 10% of it.",
   });
-  assert.equal(sold({ sharePct: 10, buyers: 1 }).detail, "A buyer owns 10% of it.");
-  assert.equal(sold({ sharePct: 30, buyers: 3 }).detail, "Buyers own 30% of it.");
-  assert.equal(sold({ editions: 3 }).detail, "Buyers hold 3 of its NFTs.");
-  assert.equal(sold({ editions: 1 }).detail, "A buyer holds 1 of its NFTs.");
-  assert.equal(sold({ sharePct: 10, editions: 3 }).detail, "Buyers own 10% of it and hold 3 of its NFTs.");
-  assert.equal(sold({ sharePct: 12.5 }).detail, "A buyer owns 12.5% of it.");
+  assert.equal(sold({ sharePct: 10, buyers: 1 }).detail, "Someone else owns 10% of it.");
+  assert.equal(sold({ sharePct: 30, buyers: 3 }).detail, "Other people own 30% of it.");
+  assert.equal(sold({ editions: 3 }).detail, "Other people hold 3 of its NFTs.");
+  assert.equal(sold({ editions: 1 }).detail, "Someone else holds 1 of its NFTs.");
+  assert.equal(sold({ sharePct: 10, editions: 3 }).detail, "Other people own 10% of it and hold 3 of its NFTs.");
+  assert.equal(sold({ sharePct: 12.5 }).detail, "Someone else owns 12.5% of it.");
 });
 
 test("rule 2 · auction: its reason, and the end date in the detail", () => {

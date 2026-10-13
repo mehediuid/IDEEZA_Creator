@@ -3,7 +3,7 @@
 // Bidding History (P2-LISTING-11, Figma 41505:142256 / 142375): a real table
 // of MARKETPLACE's bids — Bid · Bidder · Time, highest (so newest) first.
 // The Figma's USD column is dropped: test tokens have no dollar value.
-// Bidders read "Mira (demo buyer)". On a narrow dialog the time wraps under
+// Bidders read "Mira (demo creator)". On a narrow dialog the time wraps under
 // its date, so each row reads as two lines.
 
 import * as React from "react";

@@ -76,7 +76,7 @@ function EditPauseDialogOpen({ onCancel, onConfirm, error }: EditPauseDialogProp
     >
       <div className="flex flex-col gap-[12px] text-md leading-relaxed text-text-secondary">
         <p>
-          Buyers see this project as it was listed. Changing it takes the listing off the marketplace until you
+          The marketplace shows this project as it was listed. Changing it takes the listing off the marketplace until you
           relist it.
         </p>
         <Banner tone="attention">

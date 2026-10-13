@@ -52,7 +52,7 @@ export function stepFactText(fact: StepFact | undefined): string | null {
 
 export type LogLine = {
   key: string;
-  /** "Created by hand" · "Lazy minted · Listed · Base Sepolia (Testnet)" · "Sold 10% to Mira (demo buyer)" */
+  /** "Created by hand" · "Lazy minted · Listed · Base Sepolia (Testnet)" · "Sold 10% to Mira (demo creator)" */
   title: string;
   /** A second line where the title can't stand alone: the token, what was paid, a support message. */
   note: string | null;

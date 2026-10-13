@@ -172,9 +172,9 @@ test("statusLineOf · Paused names the Marketplace block", () => {
 
 test("statusLineOf · Sold: one sale, 100 %, several, and a visitor's line", () => {
   const p = project({ mint: lazy });
-  assert.equal(sum(p, SELL, market({ listings: [listing()], sales: [sale()] })).statusLine, "Sold 10% to Mira (demo buyer) · Sep 28, 2026");
+  assert.equal(sum(p, SELL, market({ listings: [listing()], sales: [sale()] })).statusLine, "Sold 10% to Mira (demo creator) · Sep 28, 2026");
   const all = sale({ item: { nft: "main", sharePct: 100 } });
-  assert.equal(sum(p, SELL, market({ listings: [listing({ percentSelling: 100 })], sales: [all] })).statusLine, "Sold to Mira (demo buyer) · Sep 28, 2026");
+  assert.equal(sum(p, SELL, market({ listings: [listing({ percentSelling: 100 })], sales: [all] })).statusLine, "Sold to Mira (demo creator) · Sep 28, 2026");
   const three = [
     sale(),
     sale({ id: "sale_b", listingId: "lst_b", at: SOLD - 60 * MIN, buyerId: "buyer-leo" }),
@@ -234,7 +234,7 @@ test("headerText · lockLine (§3.8.5) for the owner of a project sold in full",
   assert.ok(s.lock);
   assert.equal(
     headerText(s).lockLine,
-    "Sold in full to Mira (demo buyer) on Sep 28, 2026 — it's theirs now, so this project is read-only.",
+    "Sold in full to Mira (demo creator) on Sep 28, 2026 — it's theirs now, so this project is read-only.",
   );
   assert.equal(headerText(s, { viewer: { kind: "owner-preview" } }).lockLine, null);
   assert.equal(headerText(sum(project(), SAVE)).lockLine, null);
@@ -244,7 +244,7 @@ test("headerText · the sold buyer-link part (§3.2): the owner's link to the Cu
   const s = sum(project({ mint: lazy }), SELL, market({ listings: [listing()], sales: [sale()] }));
   assert.deepEqual(headerText(s).soldBuyerLink, {
     before: "Sold 10% to ",
-    label: "Mira (demo buyer)",
+    label: "Mira (demo creator)",
     href: "/projects/proj_car/earn/money?sale=sale_a#customers",
     after: " · Sep 28, 2026",
   });
@@ -291,17 +291,17 @@ test("deleteFactsOf fills sold.buyers with the distinct Main buyers (errata #1)"
   const p = project({ mint: lazy });
   const one = view(p, SELL, market({ listings: [listing()], sales: [sale()] })).deleteFacts;
   assert.deepEqual(one.sold, { sharePct: 10, editions: 0, buyers: 1 });
-  assert.equal(deleteBlockOf(one).detail, "A buyer owns 10% of it.");
+  assert.equal(deleteBlockOf(one).detail, "Someone else owns 10% of it.");
   const twoBuyers = [sale(), sale({ id: "sale_b", listingId: "lst_b", buyerId: "buyer-leo", item: { nft: "main", sharePct: 20 } })];
   const two = view(p, SELL, market({ listings: [listing()], sales: twoBuyers })).deleteFacts;
   assert.deepEqual(two.sold, { sharePct: 30, editions: 0, buyers: 2 });
-  assert.equal(deleteBlockOf(two).detail, "Buyers own 30% of it.");
+  assert.equal(deleteBlockOf(two).detail, "Other people own 30% of it.");
   const sameBuyer = [sale(), sale({ id: "sale_b", listingId: "lst_b", item: { nft: "main", sharePct: 20 } })];
   assert.equal(view(p, SELL, market({ listings: [listing()], sales: sameBuyer })).deleteFacts.sold.buyers, 1);
   const edition = sale({ id: "sale_e", listingId: "ed_a", item: { nft: "virtual", trackId: "ed_a", productId: "p1", productName: "RC Car", use: "private", tier: "regular", serial: 1 } });
   const facts = view(p, SELL, market({ sales: [sale(), edition] })).deleteFacts;
   assert.deepEqual(facts.sold, { sharePct: 10, editions: 1, buyers: 1 });
-  assert.equal(deleteBlockOf(facts).detail, "Buyers own 10% of it and hold 1 of its NFTs.");
+  assert.equal(deleteBlockOf(facts).detail, "Other people own 10% of it and hold 1 of its NFTs.");
 });
 
 test("canCtxOf: the page's one CanContext (§3.7)", () => {

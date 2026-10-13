@@ -381,7 +381,7 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
     case "paused": {
       const l = view.listing;
       const at = l.pause?.at ?? l.updatedAt;
-      const lead = "Buyers can't see or buy it while it's paused.";
+      const lead = "Nobody can see or buy it while it's paused.";
       return {
         kind: "paused",
         since: [text("Paused · since "), time(formatDateTime(at), at)],
@@ -396,7 +396,7 @@ export function marketplaceCardOf(view: ListingView, ctx: { bids: Bid[]; now: nu
         kind: "sold",
         state: [text("Sold · "), time(formatDateTime(s.at), s.at)],
         facts: [
-          fact("Buyer", text(`${buyerLabel(s.buyerId)} · ${shortAddress(s.buyerAddress)}`)),
+          fact("Bought by", text(`${buyerLabel(s.buyerId)} · ${shortAddress(s.buyerAddress)}`)),
           fact("Price", text(`${formatAmount(s.price, s.token)} · ${s.via === "auctionWin" ? "winning bid" : "Buy now"}`)),
           fact("IDEEZA fee", text(`${feePercentText(s.fees.ideezaBps)} · ${formatAmount(s.fees.ideeza, s.token)}`)),
           fact("You received", text(formatAmount(s.payout, s.token))),
@@ -446,7 +446,7 @@ export function closeCopyOf(result: SettleResult, l: Listing, bids: Bid[]): Clos
     const skipped = ordered.slice(0, ordered.findIndex((b) => b.id === result.bid.id));
     return {
       title: "Close the auction?",
-      body: `${buyerLabel(result.bid.bidderId)} wins with ${formatAmount(result.bid.amount, l.token)}. The sale is recorded and they appear in Customers.`,
+      body: `${buyerLabel(result.bid.bidderId)} wins with ${formatAmount(result.bid.amount, l.token)}. The sale is recorded and shows in Sales.`,
       skipped: skipped.length
         ? `${skipped.length === 1 ? "A higher bid is" : `${skipped.length} higher bids are`} skipped: ${skipped
             .map((b) => `${buyerLabel(b.bidderId)}, ${formatAmount(b.amount, l.token)}`)
@@ -488,7 +488,7 @@ export function benefitLineOf(b: UtilityBenefit): string {
 
 export function utilityPillCopy(owner: boolean): { lead: string; note: string } {
   return owner
-    ? { lead: "Buyers of this NFT get:", note: "IDEEZA records these with every sale. Giving buyers access is up to you for now." }
+    ? { lead: "Whoever owns this NFT gets:", note: "IDEEZA records these with every sale. Giving access is up to you for now." }
     : { lead: "Owning this NFT gives you:", note: "Benefits start on the day you buy." };
 }
 
