@@ -57,3 +57,29 @@ export function pageOf<T>(items: readonly T[], page: number): { items: T[]; page
   const slice = items.slice(start, start + PAGE_SIZE);
   return { items: slice, page: p, pageCount, from: slice.length ? start + 1 : 0, to: start + slice.length };
 }
+
+/** "12 articles" · "1 article matches" · "Showing 13–14 of 14 articles" · "No articles match" ·
+ *  "No articles": the list's polite count line, for the rows on screen. */
+export function countLine(p: { from: number; to: number; total: number; pageCount: number; searching: boolean }): string {
+  if (p.total === 0) return p.searching ? "No articles match" : "No articles";
+  const n = `${p.total} article${p.total === 1 ? "" : "s"}`;
+  if (p.pageCount > 1) return `Showing ${p.from}–${p.to} of ${n}`;
+  return p.searching ? `${n} ${p.total === 1 ? "matches" : "match"}` : n;
+}
+
+/** A tab's count, read out with it: "Drafts, 2 articles". */
+export const articlesLabel = (n: number) => `${n} article${n === 1 ? "" : "s"}`;
+
+/** The draft's details differ from what readers see (a new title, category, topics, project or
+ *  a cover that waits for review). The body is compared by the caller, from the stored keys. */
+export function draftMetaChanged(a: BlogArticle): boolean {
+  if (!a.live) return false;
+  const { draft: d, live: l } = a;
+  return (
+    d.title !== l.title ||
+    d.categoryId !== l.categoryId ||
+    d.projectId !== l.projectId ||
+    d.topics.join("\u0000") !== l.topics.join("\u0000") ||
+    JSON.stringify(d.cover) !== JSON.stringify(l.cover)
+  );
+}

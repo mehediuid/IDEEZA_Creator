@@ -1,88 +1,303 @@
 "use client";
 
-// Your articles (spec § Screens 1). First pass: the header, the teaching empty
-// state, and one row per article (cover, title, category, status, last change).
+// Your articles — /blog (spec § Screens 1, mockup Main / PhoneList / States).
+// The header (Blog, what happens to an article, New article), then one surface
+// holding the status tabs with their counts, the title search, the rows (a
+// table from a 600 px content box, cards below it) and a footer with the count
+// line and the pages. Every value comes from the Blog store (useBlog), through
+// the pure list helpers (lib/blog/list.ts).
+//
+// The view lives in the URL — ?tab=&q=&page=, defaults left out — written with
+// replaceState as My projects does: Next keeps useSearchParams in step, a
+// keystroke never waits on a navigation, nothing scrolls, and Back leaves the
+// list (from an article it lands on the same view). The ⋯ actions are the
+// shared useArticleActions, so the list and the article page behave alike;
+// when an action takes a row away (delete, take offline from the Live tab),
+// focus goes to the row that took its place, else to the heading.
 
 import * as React from "react";
 import NextLink from "next/link";
-import { Add01Icon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
+import { useSearchParams } from "next/navigation";
+import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { buttonVariants, Skeleton, StateCard } from "@/components/ideeza";
-import { CoverImage } from "@/components/blog/cover-image";
-import { StatusBadges } from "@/components/blog/status-badges";
-import { displayTitle, thingsToFix } from "@/lib/blog/article";
-import { categoryLabel } from "@/lib/blog/categories";
-import { filterArticles } from "@/lib/blog/list";
-import { editHref, articleHref, newArticleHref, slugOf } from "@/lib/blog/slug";
-import { opensEditor, statusOf, whenLine } from "@/lib/blog/status";
-import { useBlog } from "@/lib/blog/store";
+import { SearchInput, buttonVariants } from "@/components/ideeza";
+import { Pagination } from "@/components/projects/pagination";
 import { useNow } from "@/components/innovations/comments/comment-dom";
+import { useArticleActions } from "@/components/blog/article-actions";
+import { blogQueryHref, countLine, filterArticles, pageOf, parseBlogQuery, tabCounts, type BlogQuery } from "@/lib/blog/list";
+import { newArticleHref } from "@/lib/blog/slug";
+import type { StatusTab } from "@/lib/blog/status";
+import { useBlog } from "@/lib/blog/store";
+import { cn } from "@/lib/utils";
+import { ArticleRow, ArticleRowSkeleton, ROW_COLS } from "./article-row";
+import { BLOG_PANEL_ID, BlogTabs, blogTabId } from "./blog-tabs";
+import { EmptyTabState, FirstVisitState, NoMatchState, UnreadableState } from "./list-states";
+
+/** The results heading a page turn focuses (visually hidden). */
+const HEADING: Record<StatusTab, string> = {
+  all: "All articles",
+  drafts: "Drafts",
+  review: "Articles in review",
+  needs: "Articles that need changes",
+  live: "Live articles",
+};
+
+const LIST = "m-0 flex list-none flex-col gap-5 p-0 [@container(min-width:600px)]:gap-0";
 
 export function BlogList() {
-  const { hydrated, data } = useBlog();
+  const { hydrated, data, unreadable } = useBlog();
+  const params = useSearchParams();
   const now = useNow();
-  const rows = filterArticles(data.articles, { tab: "all", q: "" });
+  const actions = useArticleActions();
+
+  // ── the view ──
+  const query = React.useMemo(() => parseBlogQuery(params), [params]);
+  // The field keeps its own copy of q, so typing never waits on the URL. A
+  // navigation that brings another q (a pasted link, the sidebar's bare /blog)
+  // is adopted; our own echo of what was typed is not.
+  const [text, setText] = React.useState(query.q);
+  const [seenQ, setSeenQ] = React.useState(query.q);
+  if (seenQ !== query.q) {
+    setSeenQ(query.q);
+    if (text.trim() !== query.q.trim()) setText(query.q);
+  }
+  const view = React.useMemo<BlogQuery>(() => ({ ...query, q: text }), [query, text]);
+  const write = React.useCallback((next: BlogQuery) => {
+    window.history.replaceState(null, "", blogQueryHref(next));
+  }, []);
+  const changeTab = (tab: StatusTab) => write({ ...view, tab, page: 1 });
+  const changeQuery = (q: string) => {
+    setText(q);
+    write({ ...view, q, page: 1 });
+  };
+
+  // ── the rows ──
+  const counts = React.useMemo(() => tabCounts(data.articles), [data]);
+  const filtered = React.useMemo(() => filterArticles(data.articles, view), [data, view]);
+  const paged = pageOf(filtered, view.page);
+  const searching = view.q.trim() !== "";
+
+  // A page the list no longer reaches (a delete emptied it, a stale link) shows
+  // the last one, and the URL follows so Back lands there too.
+  React.useEffect(() => {
+    if (hydrated && paged.page !== view.page) write({ ...view, page: paged.page });
+  }, [hydrated, paged.page, view, write]);
+
+  // ── focus ──
+  const h1Ref = React.useRef<HTMLHeadingElement>(null);
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const sectionRef = React.useRef<HTMLElement>(null);
+  const listRef = React.useRef<HTMLUListElement>(null);
+  const searchRef = React.useRef<HTMLInputElement>(null);
+  const lastRow = React.useRef<number | null>(null);
+  const rowsKey = paged.items.map((a) => a.id).join("|");
+
+  // Which row the keyboard or pointer was last on — forgotten once either moves
+  // somewhere else on the page (a menu or dialog the row opened doesn't count).
+  React.useEffect(() => {
+    const away = (t: EventTarget | null) =>
+      t instanceof Element && !listRef.current?.contains(t) && !t.closest('[role="menu"], [role="dialog"], [role="alertdialog"]');
+    const forget = (e: Event) => {
+      if (away(e.target)) lastRow.current = null;
+    };
+    document.addEventListener("focusin", forget);
+    document.addEventListener("pointerdown", forget, true);
+    return () => {
+      document.removeEventListener("focusin", forget);
+      document.removeEventListener("pointerdown", forget, true);
+    };
+  }, []);
+
+  // A row that had focus went away with what its menu did: once the dialog has
+  // handed focus back (to a ⋯ that is gone, so to nothing), the row now in its
+  // place takes it, else the one above, else the page's heading.
+  React.useEffect(() => {
+    const at = lastRow.current;
+    if (at === null) return;
+    const frame = requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body && active.isConnected) return;
+      const links = listRef.current?.querySelectorAll<HTMLElement>("[data-row-link]");
+      const target = links && links.length ? links[Math.min(at, links.length - 1)] : h1Ref.current;
+      target?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [rowsKey]);
+
+  const changePage = (page: number) => {
+    write({ ...view, page });
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    sectionRef.current?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+    headingRef.current?.focus({ preventScroll: true });
+  };
+
+  const clearSearch = () => {
+    changeQuery("");
+    searchRef.current?.focus();
+  };
+
+  const firstVisit = hydrated && !unreadable && data.articles.length === 0;
+
+  // The table's column heads, from 600 px: visual only, as each row reads in order (title, category, status, date).
+  const heads = (
+    <div
+      aria-hidden
+      className={cn("hidden gap-x-8 px-8 py-5 text-sm font-semibold leading-xs text-text-secondary [@container(min-width:600px)]:grid", ROW_COLS)}
+    >
+      <span>Article</span>
+      <span>Status</span>
+      <span>Last change</span>
+      <span />
+    </div>
+  );
+
+  let body: React.ReactNode;
+  if (!hydrated) {
+    body = (
+      <>
+        {heads}
+        <ul aria-busy="true" aria-label="Loading your articles" className={LIST}>
+          {Array.from({ length: 4 }, (_, i) => (
+            <ArticleRowSkeleton key={i} />
+          ))}
+        </ul>
+      </>
+    );
+  } else if (paged.items.length === 0) {
+    // The tab itself holds nothing; else the search emptied it.
+    body =
+      view.tab !== "all" && counts[view.tab] === 0 ? (
+        <EmptyTabState tab={view.tab} />
+      ) : (
+        <NoMatchState
+          tab={view.tab}
+          query={view.q}
+          onClear={clearSearch}
+          onSearchAll={() => {
+            changeTab("all");
+            searchRef.current?.focus();
+          }}
+        />
+      );
+  } else {
+    body = (
+      <>
+        {heads}
+        <ul
+          ref={listRef}
+          aria-label="Your articles"
+          onFocus={(e) => {
+            const row = (e.target as HTMLElement).closest<HTMLElement>("li[data-row]");
+            if (row) lastRow.current = Number(row.dataset.row);
+          }}
+          className={LIST}
+        >
+          {paged.items.map((a, i) => (
+            <ArticleRow key={a.id} article={a} index={i} now={now} menuItems={actions.menuItems(a)} />
+          ))}
+        </ul>
+      </>
+    );
+  }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-8 py-12 md:px-16">
-      <header className="flex flex-wrap items-end justify-between gap-8">
-        <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="m-0 text-3xl font-semibold leading-4xl">Blog</h1>
-          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
+    <div className="mx-auto w-full max-w-[1120px] px-8 pb-24 pt-12 min-[640px]:px-16">
+      <div className="flex flex-col gap-10 [container-type:inline-size]">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-8 gap-y-2">
+          <h1
+            ref={h1Ref}
+            tabIndex={-1}
+            className="col-start-1 row-start-1 m-0 text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none"
+          >
+            Blog
+          </h1>
+          <NextLink
+            href={newArticleHref()}
+            className={cn(
+              buttonVariants({ hierarchy: "primary", size: "lg" }),
+              "col-start-2 row-start-1 ring-offset-bg-page [@container(max-width:599px)]:min-h-[var(--touch-min)] [@container(min-width:600px)]:row-span-2 [@container(min-width:600px)]:self-end [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
+            )}
+          >
+            <Icon icon={Add01Icon} size={16} />
+            New article
+          </NextLink>
+          <p className="col-span-2 row-start-2 m-0 max-w-[62ch] text-md leading-md text-text-secondary [@container(min-width:600px)]:col-span-1">
             Write about what you build. The IDEEZA team reads each article before it goes live.
           </p>
-        </div>
-        <NextLink href={newArticleHref()} className={buttonVariants({ hierarchy: "primary", size: "lg" })}>
-          <Icon icon={Add01Icon} size={16} />
-          New article
-        </NextLink>
-      </header>
+        </header>
 
-      {!hydrated ? (
-        <div className="flex flex-col gap-6" aria-busy="true" aria-label="Loading your articles">
-          <Skeleton shape="block" className="h-[64px] w-full" />
-          <Skeleton shape="block" className="h-[64px] w-full" />
-        </div>
-      ) : rows.length === 0 ? (
-        <StateCard
-          tone="empty"
-          icon={<Icon icon={PencilEdit02Icon} size={24} />}
-          title="Write your first article"
-          body="Share how you built something, what went wrong, or tips for other makers. You write it, the IDEEZA team reads it, then it goes live."
-          action={
-            <NextLink href={newArticleHref()} className={buttonVariants({ hierarchy: "primary", size: "lg" })}>
-              New article
-            </NextLink>
-          }
-        />
-      ) : (
-        <ul className="m-0 flex list-none flex-col rounded-xl border border-solid border-border-subtle bg-bg-surface p-0">
-          {rows.map((a) => {
-            const s = statusOf(a);
-            const slug = slugOf(a);
-            const fix = thingsToFix(a);
-            return (
-              <li key={a.id} className="flex items-center gap-8 border-0 border-t border-solid border-border-subtle px-8 py-6 first:border-t-0">
-                <CoverImage cover={(a.live ?? a.draft).cover} decorative className="w-[72px] shrink-0 rounded-md" />
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <NextLink
-                    href={opensEditor(s) ? editHref(slug) : articleHref(slug)}
-                    className="line-clamp-2 text-md font-medium leading-md text-text-primary no-underline hover:underline"
-                  >
-                    {displayTitle(a)}
-                  </NextLink>
-                  <span className="text-sm leading-sm text-text-secondary">{categoryLabel(a.draft.categoryId) ?? "No category yet"}</span>
-                </div>
-                <div className="flex shrink-0 flex-col items-start gap-2">
-                  <StatusBadges article={a} />
-                  {fix && <span className="text-sm font-medium leading-sm text-text-warning">{fix}</span>}
-                </div>
-                <span className="w-[160px] shrink-0 text-sm leading-sm text-text-secondary">{whenLine(a, now)}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+        {unreadable ? (
+          <UnreadableState />
+        ) : firstVisit ? (
+          <FirstVisitState />
+        ) : (
+          <section
+            ref={sectionRef}
+            aria-label="Your articles"
+            className="flex scroll-mt-12 flex-col [@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:bg-bg-surface"
+          >
+            {/* Tabs and search: one row from a 760 px content box (tabs, then the
+                search on the right); narrower, the search on top at full width and
+                the tabs under it, scrolling sideways. On the surface from 600 px. */}
+            <div className="flex flex-col gap-4 [@container(min-width:600px)]:border-b [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:px-8 [@container(min-width:600px)]:pt-6 [@container(min-width:760px)]:flex-row [@container(min-width:760px)]:items-end [@container(min-width:760px)]:justify-between [@container(min-width:760px)]:gap-8">
+              <BlogTabs
+                tab={view.tab}
+                counts={hydrated ? counts : null}
+                onChange={changeTab}
+                className="-mx-8 px-8 [@container(min-width:760px)]:mx-0 [@container(min-width:760px)]:min-w-0 [@container(min-width:760px)]:flex-1 [@container(min-width:760px)]:px-0"
+              />
+              <form
+                role="search"
+                onSubmit={(e) => e.preventDefault()}
+                className="order-first [@container(min-width:760px)]:order-none [@container(min-width:760px)]:w-[280px] [@container(min-width:760px)]:shrink-0 [@container(min-width:760px)]:pb-4"
+              >
+                <SearchInput
+                  ref={searchRef}
+                  value={text}
+                  onValueChange={changeQuery}
+                  onClear={() => searchRef.current?.focus()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && text) {
+                      e.preventDefault();
+                      changeQuery("");
+                    }
+                  }}
+                  placeholder="Search your articles"
+                  aria-label="Search articles by title"
+                  enterKeyHint="search"
+                  className="text-[length:var(--font-size-md)]"
+                  containerClassName="min-h-[36px] [@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)] [&>button]:before:-inset-[15.5px]"
+                />
+              </form>
+            </div>
+
+            <div
+              role="tabpanel"
+              id={BLOG_PANEL_ID}
+              aria-labelledby={blogTabId(view.tab)}
+              className="flex flex-col pt-6 [@container(min-width:600px)]:pt-0"
+            >
+              <h2 ref={headingRef} tabIndex={-1} className="sr-only">
+                {HEADING[view.tab]}
+              </h2>
+              {body}
+              <div className="flex flex-wrap items-center justify-between gap-6 pt-8 [@container(min-width:600px)]:border-t [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:px-8 [@container(min-width:600px)]:py-6">
+                <p role="status" aria-atomic="true" className="m-0 text-sm leading-sm text-text-secondary">
+                  {hydrated
+                    ? countLine({ from: paged.from, to: paged.to, total: filtered.length, pageCount: paged.pageCount, searching })
+                    : "Loading your articles…"}
+                </p>
+                {hydrated && paged.pageCount > 1 && (
+                  <div className="[&>nav]:mt-0">
+                    <Pagination page={paged.page} pageCount={paged.pageCount} onChange={changePage} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+      {actions.dialogs}
     </div>
   );
 }
