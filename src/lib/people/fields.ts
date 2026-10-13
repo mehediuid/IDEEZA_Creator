@@ -46,9 +46,12 @@ export function normalizeProfile(raw: unknown): ProfileFields {
   };
 }
 
-/** Pins or unpins a project. A fourth pin is refused, and the fields come back unchanged. */
-export function pinToggled(f: ProfileFields, projectId: string): { fields: ProfileFields; refused: boolean } {
-  if (f.pins.includes(projectId)) return { fields: { ...f, pins: f.pins.filter((id) => id !== projectId) }, refused: false };
-  if (f.pins.length >= PINS_MAX) return { fields: f, refused: true };
-  return { fields: { ...f, pins: [...f.pins, projectId] }, refused: false };
+/** Pins or unpins a project. A fourth pin is refused, and the fields come back unchanged.
+ *  `valid` (the projects still public) drops a pin whose project was unshared or deleted, so a
+ *  stale pin never holds one of the three places. */
+export function pinToggled(f: ProfileFields, projectId: string, valid?: readonly string[]): { fields: ProfileFields; refused: boolean } {
+  const pins = valid ? f.pins.filter((id) => valid.includes(id)) : f.pins;
+  if (pins.includes(projectId)) return { fields: { ...f, pins: pins.filter((id) => id !== projectId) }, refused: false };
+  if (pins.length >= PINS_MAX) return { fields: f, refused: true };
+  return { fields: { ...f, pins: [...pins, projectId] }, refused: false };
 }

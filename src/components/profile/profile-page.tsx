@@ -86,7 +86,7 @@ export function ProfileSkeleton() {
             <Skeleton shape="text" size="sm" className="w-[260px] max-w-full" />
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-[24px] min-[560px]:grid-cols-2 min-[900px]:grid-cols-3">
+        <div className="grid grid-cols-2 gap-[12px] min-[560px]:gap-[24px] min-[900px]:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} shape="block" className="aspect-[16/13] w-full rounded-xl" />
           ))}
@@ -139,7 +139,7 @@ function OwnProfile({
   person: Person;
   fields: ProfileFields;
   photoUrl: string | null;
-  togglePin: (projectId: string) => { ok: boolean; refused: boolean };
+  togglePin: (projectId: string, valid?: readonly string[]) => { ok: boolean; refused: boolean };
 }) {
   const { hydrated: projectsReady, projects } = useManualProjects();
   const { hydrated: buildsReady, builds } = useCreateHistory();
@@ -195,7 +195,7 @@ function OwnProfile({
 
   const onTogglePin = (item: MadeItem) => {
     if (!item.projectId) return;
-    const r = togglePin(item.projectId);
+    const r = togglePin(item.projectId, made.flatMap((m) => (m.projectId ? [m.projectId] : [])));
     setNotice(r.refused ? "Up to 3 projects can be pinned. Unpin one first." : r.ok ? null : "Couldn't save. This browser's storage is full or blocked.");
   };
 

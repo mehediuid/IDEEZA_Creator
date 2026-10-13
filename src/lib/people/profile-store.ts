@@ -28,12 +28,12 @@ export function useMyProfile(): {
   fields: ProfileFields;
   save: (patch: ProfilePatch) => WriteResult;
   /** `refused`: a fourth pin; `ok: false`: the browser refused the write. */
-  togglePin: (projectId: string) => { ok: boolean; refused: boolean };
+  togglePin: (projectId: string, valid?: readonly string[]) => { ok: boolean; refused: boolean };
 } {
   const { hydrated, raw } = useStoredKey(PROFILE_KEY);
   const fields = React.useMemo(() => normalizeProfile(parseStored(raw).value), [raw]);
-  const togglePin = React.useCallback((projectId: string) => {
-    const { fields: next, refused } = pinToggled(readProfile(), projectId);
+  const togglePin = React.useCallback((projectId: string, valid?: readonly string[]) => {
+    const { fields: next, refused } = pinToggled(readProfile(), projectId, valid);
     if (refused) return { ok: true, refused: true };
     return { ok: saveProfile({ pins: next.pins }).ok, refused: false };
   }, []);

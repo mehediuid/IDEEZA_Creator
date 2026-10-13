@@ -234,3 +234,10 @@ test("profileHrefOf links you, sample people and demo creators, and nobody else"
   assert.equal(profileHrefOf("buyer-sam"), "/creators/sam");
   assert.equal(profileHrefOf("ctb_abc"), null);
 });
+
+test("a stale pin (unshared or deleted project) never holds one of the three places", () => {
+  const f = { ...EMPTY_PROFILE, pins: ["gone", "a", "b"] };
+  const r = pinToggled(f, "c", ["a", "b", "c"]);
+  assert.equal(r.refused, false);
+  assert.deepEqual(r.fields.pins, ["a", "b", "c"]);
+});

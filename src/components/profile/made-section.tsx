@@ -36,7 +36,7 @@ function MadeCard({
         href={item.href}
         className="group flex h-full flex-col overflow-hidden rounded-xl border border-solid border-border bg-bg-surface outline-none transition-colors duration-normal ease-out hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
       >
-        <span className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-bg-subtle text-text-tertiary">
+        <span className="relative flex aspect-square items-center justify-center overflow-hidden bg-bg-subtle text-text-tertiary min-[560px]:aspect-[16/10]">
           {item.cover ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.cover} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
@@ -51,14 +51,14 @@ function MadeCard({
             </span>
           )}
         </span>
-        <span className="flex flex-col gap-[6px] px-[12px] pb-[14px] pt-[12px]">
-          <span className="truncate text-lg font-semibold leading-lg text-text-primary group-hover:underline group-hover:underline-offset-[3px]">
+        <span className="flex flex-col gap-[6px] px-[10px] pb-[12px] pt-[10px] min-[560px]:px-[12px] min-[560px]:pb-[14px] min-[560px]:pt-[12px]">
+          <span className="truncate text-md font-semibold leading-md text-text-primary group-hover:underline group-hover:underline-offset-[3px] min-[560px]:text-lg min-[560px]:leading-lg">
             {item.title}
           </span>
           <span className="flex flex-wrap items-center gap-x-[6px] gap-y-[4px]">
             {item.stage && <Badge tone="neutral">{item.stage}</Badge>}
-            {age && <span className="text-sm leading-sm text-text-tertiary">{age}</span>}
-            {item.sale && <Badge tone="brand-outline" className="px-[6px] py-[1px] text-xs">{SALE_WORD[item.sale]}</Badge>}
+            {age && <span className="text-sm leading-sm text-text-tertiary max-[559px]:hidden">{age}</span>}
+            {item.sale && <Badge tone="blue">{SALE_WORD[item.sale]}</Badge>}
           </span>
         </span>
       </Link>
@@ -119,7 +119,7 @@ export function MadeSection({
         </p>
       )}
       {items.length > 0 ? (
-        <ul role="list" className="m-0 grid list-none grid-cols-1 gap-[24px] p-0 min-[560px]:grid-cols-2 min-[900px]:grid-cols-3">
+        <ul role="list" className="m-0 grid list-none grid-cols-2 gap-[12px] p-0 min-[560px]:gap-[24px] min-[900px]:grid-cols-3">
           {items.map((item) => (
             <MadeCard key={item.key} item={item} now={now} own={own} onTogglePin={onTogglePin} />
           ))}
