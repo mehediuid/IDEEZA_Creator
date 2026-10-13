@@ -14,7 +14,7 @@ import type { ManualProject } from "../manual/projects";
 import { formatAmount } from "../manual/rail-copy";
 import { ME } from "./people";
 import { mineSlugOf, postIdOfProject } from "./slug";
-import type { InnovationPost, PostMedia, PostPart, PostPiece, PostProduct } from "./types";
+import type { InnovationPost, PostMedia, PostPart, PostPiece, PostProduct, PostVideo } from "./types";
 
 const PIECE_ORDER: readonly BuildItemKind[] = ["3d", "pcb", "code", "wiring", "parts"];
 
@@ -31,7 +31,16 @@ export function partsOf(product: BuildProduct): PostPart[] {
   return rows;
 }
 
-function postProductOf(p: ProjectProduct): PostProduct {
+/** A product's video in use, as the post plays it from this browser's clip store. */
+function clipOf(p: ProjectProduct, view: ProjectView): PostVideo | null {
+  const pv = view.videos.record?.products[p.id];
+  const take = pv?.inUseId ? pv.takes.find((t) => t.id === pv.inUseId) : null;
+  if (!take) return null;
+  const name = p.name.trim() || "Untitled product";
+  return { kind: "clip", takeId: take.id, alt: `${name}, its video`, label: `${name} video`, durationMs: take.clip?.durationMs ?? null, productId: p.id };
+}
+
+function postProductOf(p: ProjectProduct, view: ProjectView): PostProduct {
   const built = p.built?.product ?? null;
   const pieces: PostPiece[] = built
     ? PIECE_ORDER.filter((k) => built.items.some((i) => i.kind === k && i.status === "ready"))
@@ -45,6 +54,7 @@ function postProductOf(p: ProjectProduct): PostProduct {
     specs: built?.spec ? productFacts(built.spec, built.parts).map((f) => ({ label: f.label, value: f.value })) : [],
     parts: built ? partsOf(built) : [],
     build: p.built ? { buildId: p.built.ref.buildId, productId: built?.id ?? "primary" } : null,
+    video: clipOf(p, view),
   };
 }
 
@@ -71,14 +81,9 @@ export function listingOf(project: ManualProject, view: ProjectView): Innovation
 
 export function minePostOf(project: ManualProject, view: ProjectView, network: string | null = null): InnovationPost {
   const current = view.products.filter((p) => p.dropped === null);
-  const products = current.map(postProductOf);
-  const media: PostMedia[] = [];
-  const record = view.videos.record;
-  for (const p of current) {
-    const pv = record?.products[p.id];
-    const take = pv?.inUseId ? pv.takes.find((t) => t.id === pv.inUseId) : null;
-    if (take) media.push({ kind: "clip", takeId: take.id, alt: `${p.name}, its video`, label: `${p.name} video`, durationMs: take.clip?.durationMs ?? null });
-  }
+  const products = current.map((p) => postProductOf(p, view));
+  // The videos lead, one per product in product order (owner, 2026-10-13); the images follow.
+  const media: PostMedia[] = products.flatMap((p) => (p.video ? [p.video] : []));
   const cover = coverOf(project, view.refs);
   const seen = new Set<string>();
   const addImage = (src: string | null, label: string, alt: string) => {

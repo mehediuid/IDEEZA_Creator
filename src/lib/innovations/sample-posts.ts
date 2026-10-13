@@ -2499,21 +2499,37 @@ function feedNumberOf(feedId: string): number {
   return m ? Number(m[1]) : hashOf(feedId) % 1000;
 }
 
-function productOf(seed: ProductSeed, index: number, coverImage: string | null): PostProduct {
+/** A sample product's video, rendered by scripts/generate-feed-videos.mjs from its image (or the
+ *  post's cover) in the app's own three-scene clip plan (lib/video/frames.ts). */
+export const SAMPLE_VIDEO_MS = 10_000;
+export const sampleVideoSrc = (slug: string, productId: string) => `/innovations/videos/${slug}--${productId}.mp4`;
+
+function productOf(seed: ProductSeed, index: number, coverImage: string | null, slug: string): PostProduct {
+  const image = index === 0 ? seed.image ?? coverImage : seed.image ?? null;
   return {
     id: seed.id,
     name: seed.name,
     summary: seed.summary,
-    image: index === 0 ? seed.image ?? coverImage : seed.image ?? null,
+    image,
     pieces: ALL_PIECES.filter((p) => (seed.pieces ?? ALL_PIECES).includes(p)),
     specs: seed.specs.map(([label, value]): PostSpec => ({ label, value })),
     parts: seed.parts.map(([name, qty, use]): PostPart => ({ name, qty, use })),
     build: null,
+    video: {
+      kind: "video",
+      src: sampleVideoSrc(slug, seed.id),
+      poster: image ?? coverImage,
+      alt: `${seed.name}, its video: ${seed.summary}`,
+      label: `${seed.name} video`,
+      durationMs: SAMPLE_VIDEO_MS,
+      productId: seed.id,
+    },
   };
 }
 
+/** Every product's video first, in product order (owner, 2026-10-13); then the cover and the images. */
 function mediaOf(products: readonly PostProduct[], coverImage: string | null): PostMedia[] {
-  const media: PostMedia[] = [];
+  const media: PostMedia[] = products.flatMap((p) => (p.video ? [p.video] : []));
   const first = products[0];
   if (coverImage) media.push({ kind: "image", src: coverImage, alt: `${first.name}: ${first.summary}`, label: "Cover" });
   for (const p of products) {
@@ -2529,7 +2545,7 @@ export function samplePostOf(project: Project): InnovationPost {
   const seed = seedOf(project);
   const n = feedNumberOf(project.id);
   const cover = project.image ?? null;
-  const products = seed.products.map((p, i) => productOf(p, i, cover));
+  const products = seed.products.map((p, i) => productOf(p, i, cover, project.slug));
   const category = CATEGORIES.find((c) => c.id === project.category)?.label ?? null;
   return {
     id: postIdOfSample(project.id),
