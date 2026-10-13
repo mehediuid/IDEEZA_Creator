@@ -25,7 +25,6 @@ import {
   type Tab,
 } from "@/lib/messages/rules";
 import { cn } from "@/lib/utils";
-import { ActingAsSelect } from "./acting-as";
 import { Avatar } from "./avatar";
 import { useMessagesView } from "./messages-context";
 import { SettingsDialog } from "./settings-dialog";
@@ -177,7 +176,6 @@ export function ConversationList() {
             className="max-md:size-[var(--touch-min)]"
           />
         </div>
-        <ActingAsSelect />
         <p className="text-md leading-md text-text-tertiary">Demo · messages stay in this browser.</p>
       </div>
       <div className="flex shrink-0 flex-col gap-3 px-6 pb-4">

@@ -59,6 +59,7 @@ import { useStoredActingAs } from "@/lib/messages/identity";
 import { MESSAGES_HREF } from "@/lib/messages/links";
 import { countsFor } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
+import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
@@ -91,8 +92,10 @@ function useAttentionElsewhere(): BuildAttention[] {
   }, [attentionBuilds, pathname]);
 }
 
-/** Unread Inbox conversations of the tab's acting person; 0 until both stores are read. */
+/** Unread Inbox conversations of the tab's acting person; 0 until both stores are read. The
+ *  demo conversations are planted here, so the badge counts them from the first visit. */
 function useMessagesUnread(): number {
+  useDemoMessagesSeed();
   const { data, hydrated } = useMessages();
   const people = useMessagePeople();
   const asId = useStoredActingAs();

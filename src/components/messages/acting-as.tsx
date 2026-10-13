@@ -1,13 +1,14 @@
 "use client";
 
-// Acting as (spec §3, demo only): the switch in the list's header and, while
-// this tab acts as anyone but You, the line that says so with Back to you.
-// The choice is kept for this tab; a `?as=` in the address is dropped on a
-// switch, since it would otherwise win over the choice just made.
+// Acting as (spec §3, demo only): there is no switch on the page any more
+// (owner, 2026-10-13). A `?as=` link still sets it — Explore marketplace's Ask
+// the creator writes as the demo creator you're shopping as — and while this
+// tab acts as anyone but You, this line says so with Back to you, which also
+// drops the `?as=` so it can't win over the choice just made.
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Banner, Button, SelectMenu } from "@/components/ideeza";
+import { Banner, Button } from "@/components/ideeza";
 import { setActingAs } from "@/lib/messages/identity";
 import { ME, type PersonId } from "@/lib/messages/types";
 import { useMessagesView } from "./messages-context";
@@ -26,28 +27,6 @@ function useSwitchActing(): (id: PersonId) => void {
       router.replace(rest ? `${pathname}?${rest}` : pathname);
     },
     [router, pathname, params],
-  );
-}
-
-export function ActingAsSelect() {
-  const { ready, me, choices } = useMessagesView();
-  const switchTo = useSwitchActing();
-  const options = React.useMemo(() => choices.map((c) => ({ value: c.id, label: c.label, section: c.group })), [choices]);
-  return (
-    <div className="flex items-center gap-4">
-      <span aria-hidden className="shrink-0 text-md font-medium leading-md text-text-secondary">
-        Acting as
-      </span>
-      <SelectMenu
-        ariaLabel="Acting as"
-        value={me}
-        options={options}
-        placeholder="You"
-        disabled={!ready}
-        onChange={switchTo}
-        className="min-w-0 flex-1"
-      />
-    </div>
   );
 }
 
