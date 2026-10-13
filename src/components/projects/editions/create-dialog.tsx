@@ -54,7 +54,7 @@ export function failureCopy(result: RequestResult): string | null {
 /** The Testnet demo pill, then "Nothing is minted or listed on a real blockchain." */
 export function DemoLine() {
   return (
-    <p className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
+    <p className="flex flex-wrap items-center gap-3 text-md text-text-secondary">
       <TestnetDemoBadge />
       {EDITION_DEMO_LINE}
     </p>
@@ -149,7 +149,7 @@ export function CheckRow({
       aria-describedby={describedBy}
       onClick={onToggle}
       className={cn(
-        "flex items-start gap-4 rounded-md p-1 text-left text-sm font-medium leading-relaxed text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+        "flex items-start gap-4 rounded-md p-1 text-left text-md font-medium leading-relaxed text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
         TAP,
       )}
     >
@@ -200,7 +200,7 @@ export function DialogFooter({
         <p
           id={reasonId}
           role="alert"
-          className="max-w-[40ch] text-sm text-[color:var(--color-input-error-text)] [@media(min-width:480px)]:text-right"
+          className="max-w-[40ch] text-md text-[color:var(--color-input-error-text)] [@media(min-width:480px)]:text-right"
         >
           {reason}
         </p>

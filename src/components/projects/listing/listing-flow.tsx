@@ -105,7 +105,7 @@ export function ListingFlow({
         </button>
       )}
       {blocked && (
-        <p id={reasonId} className="text-sm text-text-secondary">
+        <p id={reasonId} className="text-md text-text-secondary">
           {blocked}
         </p>
       )}

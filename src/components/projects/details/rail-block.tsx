@@ -105,7 +105,7 @@ export function RailBlock({
             onClick={() => setOpen((o) => !o)}
             className="flex min-h-[44px] w-full items-center gap-4 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
           >
-            <span className="shrink-0 text-xl font-bold text-text-primary">{title}</span>
+            <span className="shrink-0 text-2xl font-semibold leading-2xl text-text-primary">{title}</span>
             {meta && (
               <span className="min-w-0 truncate text-md font-medium text-text-secondary">· {meta}</span>
             )}
@@ -122,13 +122,13 @@ export function RailBlock({
         </h2>
       ) : action ? (
         <div className="flex items-center justify-between gap-4">
-          <h2 id={headingId} className="m-0 text-xl font-bold text-text-primary">
+          <h2 id={headingId} className="m-0 text-2xl font-semibold leading-2xl text-text-primary">
             {title}
           </h2>
           {action}
         </div>
       ) : (
-        <h2 id={headingId} className="m-0 text-xl font-bold text-text-primary">
+        <h2 id={headingId} className="m-0 text-2xl font-semibold leading-2xl text-text-primary">
           {title}
         </h2>
       )}

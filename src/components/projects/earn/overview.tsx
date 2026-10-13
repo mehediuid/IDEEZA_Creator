@@ -183,7 +183,7 @@ function StepGroup({
         </span>
       </div>
 
-      {current && why && <p className={cn(EARN_LEAD, "pl-[40px] text-sm leading-sm")}>{why}</p>}
+      {current && why && <p className={cn(EARN_LEAD, "pl-[40px]")}>{why}</p>}
 
       {step.state !== "done" && ready && (
         <ul className={cn("m-0 flex list-none flex-col gap-1 p-0", !current && "opacity-60")}>
@@ -199,7 +199,7 @@ function StepGroup({
                   </span>
                   {open && (
                     <>
-                      <span className="text-sm leading-sm text-text-secondary">{t.reason}</span>
+                      <span className="text-md leading-md text-text-secondary">{t.reason}</span>
                       <span className="self-start">
                         <StepFix step={t} project={project} brief={brief} announce={announce} />
                       </span>
@@ -216,7 +216,7 @@ function StepGroup({
                 <span className="text-md font-medium leading-md text-text-primary">{action.label}</span>
                 {canAct ? (
                   <>
-                    <span className="text-sm leading-sm text-text-secondary">{ACTION_LINE[step.id]}</span>
+                    <span className="text-md leading-md text-text-secondary">{ACTION_LINE[step.id]}</span>
                     <Link
                       href={action.href}
                       // The reset colours every a:hover as a link; the button keeps its own text colour.
@@ -230,7 +230,7 @@ function StepGroup({
                     </Link>
                   </>
                 ) : (
-                  <span className="text-sm leading-sm text-text-secondary">Unlocks when the steps above are done.</span>
+                  <span className="text-md leading-md text-text-secondary">Unlocks when the steps above are done.</span>
                 )}
               </div>
             </li>

@@ -127,7 +127,7 @@ export function ProductsTab({
   return (
     <div className="[container-type:inline-size]">
       <div className="mb-8 flex flex-col gap-2">
-        <h2 className="text-xl font-bold text-text-primary">Products</h2>
+        <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Products</h2>
         {/* A `<p>` here would be invalid HTML: ConfidenceBadge's open panel
             (ConfidenceIssuesPanel) renders block content — div/section/ul —
             and a <p> can't contain block children (breaks hydration). */}
@@ -218,11 +218,11 @@ function AddProductTile({ projectId, projectName }: { projectId: string; project
             {leaving ? "Opening…" : "Add a product"}
           </Link>
         </h3>
-        <p id={subId} className="text-sm text-text-secondary">
+        <p id={subId} className="text-md text-text-secondary">
           Describe it in a new chat — its build joins {projectName}.
         </p>
         {shown && (
-          <p id={reasonId} className="text-sm font-medium text-text-primary">
+          <p id={reasonId} className="text-md font-medium text-text-primary">
             {shown}
           </p>
         )}
@@ -309,16 +309,16 @@ function ProductCard({
             )}
           </div>
           {confidence && <BuildCheckPill tier={confidence.tier} />}
-          {note && <p className="text-sm text-text-secondary">{note}</p>}
+          {note && <p className="text-md text-text-secondary">{note}</p>}
           {!built && pp.description && (
-            <p className="line-clamp-3 text-sm text-text-tertiary">{pp.description}</p>
+            <p className="line-clamp-3 text-md text-text-tertiary">{pp.description}</p>
           )}
           {facts.length > 0 && (
-            <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+            <dl className="mt-1 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 items-baseline text-sm">
               {facts.map((f) => (
                 <React.Fragment key={f.label}>
                   <dt className="font-medium text-text-tertiary">{f.label}</dt>
-                  <dd className="min-w-0 text-text-secondary">{f.value}</dd>
+                  <dd className="min-w-0 text-md text-text-secondary">{f.value}</dd>
                 </React.Fragment>
               ))}
             </dl>
@@ -331,7 +331,7 @@ function ProductCard({
           {card.video && <p className="text-sm text-text-secondary">{card.video}</p>}
           {versionLine && <p className="text-sm text-text-tertiary">{versionLine}</p>}
           {partChangesLine && (
-            <p className="text-sm text-text-secondary">
+            <p className="text-md text-text-secondary">
               Built with your part changes: {partChangesLine}
             </p>
           )}

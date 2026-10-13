@@ -59,7 +59,7 @@ export function MintTypeField({
 
   const label = (
     <div className="flex flex-wrap items-center gap-[8px]">
-      <span id={labelId} className="text-sm font-semibold text-text-primary">
+      <span id={labelId} className="text-md font-semibold text-text-primary">
         Minting type
       </span>
       <TestnetDemoBadge />
@@ -77,7 +77,7 @@ export function MintTypeField({
         {label}
         <div className="flex flex-col gap-[2px] rounded-lg border border-solid border-border bg-bg-surface-raised px-[14px] py-[12px]">
           <span className="text-md font-semibold text-text-primary">{title}</span>
-          {opts.lockedText?.note && <span className="text-sm text-text-secondary">{opts.lockedText.note}</span>}
+          {opts.lockedText?.note && <span className="text-md text-text-secondary">{opts.lockedText.note}</span>}
         </div>
       </div>
     );
@@ -128,7 +128,7 @@ export function MintTypeField({
               <Radio checked={on} decorative size="sm" className="mt-[2px]" />
               <span className="flex min-w-0 flex-1 flex-col gap-[6px]">
                 <span className="text-md font-semibold text-text-primary">{o.title}</span>
-                <span className="text-sm leading-relaxed text-text-secondary">{o.sub}</span>
+                <span className="text-md leading-relaxed text-text-secondary">{o.sub}</span>
                 <Badge tone="neutral" className="self-start tabular-nums">
                   {o.cost}
                 </Badge>

@@ -270,7 +270,7 @@ function LegalForm({
           Cancel
         </Button>
       </div>
-      {write.failed && <p className="text-sm text-text-error">{WRITE_FAILED}</p>}
+      {write.failed && <p className="text-md text-text-error">{WRITE_FAILED}</p>}
     </div>
   );
 }
@@ -294,7 +294,7 @@ function LegalField({
   const errorId = React.useId();
   return (
     <div className="flex flex-col gap-[6px]">
-      <label htmlFor={fieldId} className="text-sm font-medium text-text-primary">
+      <label htmlFor={fieldId} className="text-md font-medium text-text-primary">
         {label}
       </label>
       <TextInput
@@ -309,7 +309,7 @@ function LegalField({
         aria-describedby={error ? errorId : undefined}
       />
       {error && (
-        <p id={errorId} className="text-sm text-text-error">
+        <p id={errorId} className="text-md text-text-error">
           {error}
         </p>
       )}

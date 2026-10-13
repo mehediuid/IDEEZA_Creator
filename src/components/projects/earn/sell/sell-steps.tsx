@@ -132,11 +132,11 @@ function ChoiceGroup<V extends string>({
             >
               <Radio checked={on} disabled={c.disabled} decorative size="sm" />
               <span className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className={cn("break-words text-sm font-semibold", c.disabled ? "text-text-secondary" : "text-text-primary")}>
+                <span className={cn("break-words text-md font-semibold", c.disabled ? "text-text-secondary" : "text-text-primary")}>
                   {c.title}
                 </span>
                 {c.lines.map((line) => (
-                  <span key={line} className="text-sm leading-relaxed text-text-secondary">
+                  <span key={line} className="text-md leading-relaxed text-text-secondary">
                     {line}
                   </span>
                 ))}
@@ -320,7 +320,7 @@ export function PriceStep({
       )}
 
       <details open={moreOpen} onToggle={(e) => onMoreOpen(e.currentTarget.open)} className="group rounded-lg border border-solid border-border">
-        <summary className="flex min-h-[var(--touch-min)] cursor-pointer list-none items-center justify-between gap-4 rounded-lg px-6 text-sm font-semibold text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-[var(--touch-min)] cursor-pointer list-none items-center justify-between gap-4 rounded-lg px-6 text-md font-semibold text-text-primary outline-none hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus [&::-webkit-details-marker]:hidden">
           More options
           <span
             aria-hidden
@@ -397,7 +397,7 @@ function ReadinessRows({
                 {c.title}
                 <span className="sr-only">{c.ok ? ", ready" : ", not ready yet"}</span>
               </span>
-              {c.detail && <span className="max-w-[62ch] text-sm leading-relaxed text-text-secondary">{c.detail}</span>}
+              {c.detail && <span className="max-w-[62ch] text-md leading-relaxed text-text-secondary">{c.detail}</span>}
               {fix && (
                 <Button
                   ref={ref as React.RefObject<HTMLButtonElement> | undefined}
@@ -450,7 +450,7 @@ export function ReviewStep({
         {rows.map((r) => (
           <div key={r.label} className="flex flex-col gap-1 px-6 py-4 [@media(min-width:480px)]:flex-row [@media(min-width:480px)]:gap-6">
             <dt className="shrink-0 text-sm text-text-secondary [@media(min-width:480px)]:w-[96px]">{r.label}</dt>
-            <dd className="m-0 min-w-0 break-words text-sm font-medium text-text-primary">{r.value}</dd>
+            <dd className="m-0 min-w-0 break-words text-md font-medium text-text-primary">{r.value}</dd>
           </div>
         ))}
       </dl>
@@ -467,7 +467,7 @@ export function ReviewStep({
           I understand each copy is minted only when it&apos;s bought, so nothing is charged now.
         </CheckRow>
       </div>
-      <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-text-secondary">{NO_INCOME_LINE}</p>
+      <p className="m-0 max-w-[62ch] text-md leading-relaxed text-text-secondary">{NO_INCOME_LINE}</p>
     </>
   );
 }

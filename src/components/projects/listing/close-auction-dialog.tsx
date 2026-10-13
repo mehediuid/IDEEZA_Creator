@@ -187,7 +187,7 @@ export function CloseAuctionDialog({
         </div>
       }
     >
-      <div className="flex flex-col gap-6 text-sm leading-relaxed text-text-secondary">
+      <div className="flex flex-col gap-6 text-md leading-relaxed text-text-secondary">
         <p>{copy.body}</p>
         {copy.skipped && <p>{copy.skipped}</p>}
         {refused && (

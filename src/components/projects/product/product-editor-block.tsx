@@ -272,7 +272,7 @@ function SeedCaption({
 
   return (
     <div ref={rootRef} className="flex flex-col gap-[8px]">
-      <p className="m-0 max-w-[62ch] text-sm leading-md text-text-secondary">
+      <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
         {caption ? caption.lines.join(" ") : "—"}
       </p>
       {caption && (caption.load || caption.restore) && (

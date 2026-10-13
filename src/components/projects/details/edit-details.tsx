@@ -37,7 +37,7 @@ import { publishDescriptionEditorOpen, registerDescriptionEditor } from "./descr
 import { useStoreWrite } from "./use-store-write";
 
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
-const LABEL = "text-sm font-semibold text-text-primary";
+const LABEL = "text-md font-semibold text-text-primary";
 const QUIET = "text-sm tabular-nums text-text-secondary";
 
 /** Characters as a person counts them (an emoji is one). */
@@ -286,7 +286,7 @@ function EditDetailsDialog({
               autoComplete="off"
               containerClassName={TAP}
             />
-            <p id={nameMsgId} aria-live="polite" className="text-sm">
+            <p id={nameMsgId} aria-live="polite" className="text-md">
               {nameError ? (
                 <span className="text-text-error">{nameError}</span>
               ) : nameCheck.note ? (
@@ -317,13 +317,13 @@ function EditDetailsDialog({
               }}
             />
             {ai.status}
-            <div id={areaMsgId} className="flex flex-wrap items-baseline justify-between gap-x-4 text-sm">
+            <div id={areaMsgId} className="flex flex-wrap items-baseline justify-between gap-x-4 text-md">
               <span className={descError ? "text-text-error" : "text-text-secondary"}>{descError ?? ""}</span>
               {descCheck.counter && <span className={cn(QUIET, descError && "text-text-error")}>{descCheck.counter}</span>}
             </div>
           </div>
 
-          <div id={messageId} aria-live="polite" className="text-sm empty:hidden">
+          <div id={messageId} aria-live="polite" className="text-md empty:hidden">
             {write.failed && <p className="text-text-error">{WRITE_FAILED}</p>}
             {reason && <p className="text-text-secondary">{reason}</p>}
           </div>

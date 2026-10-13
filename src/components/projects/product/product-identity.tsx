@@ -64,7 +64,7 @@ export function ClampedText({ text }: { text: string }) {
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((o) => !o)}
-          className="min-h-[24px] rounded-sm text-sm font-semibold text-text-link outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
+          className="min-h-[24px] rounded-sm text-md font-semibold text-text-link outline-none transition-colors duration-normal ease-decelerate hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
         >
           {open ? "Show less" : "Show more"}
         </button>

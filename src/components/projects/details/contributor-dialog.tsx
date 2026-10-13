@@ -239,7 +239,7 @@ export function ContributorDialog({
         {refusal && <Banner tone="error">{REFUSAL_COPY[refusal]}</Banner>}
 
         <div className="flex flex-col gap-2">
-          <label htmlFor={nameId} className="text-sm font-medium text-text-primary">
+          <label htmlFor={nameId} className="text-md font-medium text-text-primary">
             Name
           </label>
           <TextInput
@@ -257,7 +257,7 @@ export function ContributorDialog({
             autoComplete="off"
           />
           {errors.name && (
-            <p id={nameErrId} className="text-sm text-text-error">
+            <p id={nameErrId} className="text-md text-text-error">
               {errors.name}
             </p>
           )}
@@ -294,9 +294,9 @@ export function ContributorDialog({
                   <Radio checked={checked} disabled={disabled} decorative className="mt-1" />
                   <span className="min-w-0">
                     <span className="block text-md font-semibold text-text-primary">{ROLE_WORD[role]}</span>
-                    <span className="mt-1 block text-sm text-text-secondary">{ROLE_INFO[role]}</span>
+                    <span className="mt-1 block text-md text-text-secondary">{ROLE_INFO[role]}</span>
                     {disabled && (
-                      <span className="mt-1 block text-sm text-text-secondary">You have no share left to give.</span>
+                      <span className="mt-1 block text-md text-text-secondary">You have no share left to give.</span>
                     )}
                   </span>
                 </button>
@@ -304,12 +304,12 @@ export function ContributorDialog({
             })}
           </div>
           {errors.role && (
-            <p id={roleErrId} className="text-sm text-text-error">
+            <p id={roleErrId} className="text-md text-text-error">
               {errors.role}
             </p>
           )}
           {revertsShare && editing && (
-            <p id={revertNoteId} className="text-sm text-text-secondary">
+            <p id={revertNoteId} className="text-md text-text-secondary">
               {`Their ${editing.share}% share comes back to you.`}
             </p>
           )}
@@ -317,7 +317,7 @@ export function ContributorDialog({
 
         {draft.role === "coOwner" && (
           <div className="flex flex-col gap-2">
-            <label htmlFor={shareId} className="text-sm font-medium text-text-primary">
+            <label htmlFor={shareId} className="text-md font-medium text-text-primary">
               Share (%)
             </label>
             <NumberInput
@@ -336,12 +336,12 @@ export function ContributorDialog({
               {shareHint(maxShare, ownership.reserved)}
             </p>
             {errors.share && (
-              <p id={shareErrId} className="text-sm text-text-error">
+              <p id={shareErrId} className="text-md text-text-error">
                 {errors.share}
               </p>
             )}
             {majority && (
-              <p id={majorityId} className="text-sm text-text-secondary">
+              <p id={majorityId} className="text-md text-text-secondary">
                 {majority}
               </p>
             )}

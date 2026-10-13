@@ -268,7 +268,7 @@ function RenameDialog({ slot, onClose }: { slot: ProductSlotProps; onClose: () =
       >
         <form id={formId} onSubmit={save} noValidate className="flex flex-col gap-2 pt-4">
           <div className="flex items-baseline justify-between gap-4">
-            <label htmlFor={fieldId} className="text-sm font-semibold text-text-primary">
+            <label htmlFor={fieldId} className="text-md font-semibold text-text-primary">
               Name
             </label>
             <span aria-hidden className={cn("text-sm tabular-nums text-text-secondary", tooLong && "text-text-error")}>

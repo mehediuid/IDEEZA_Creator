@@ -145,12 +145,12 @@ export function StepSuccess({
             <TestnetDemoBadge />
           </div>
           <p className="m-0 text-md font-medium tabular-nums text-text-primary">{termsLineOf(listed)}</p>
-          <p className="m-0 text-sm text-text-secondary">{LISTING_HOME_NOTE}</p>
+          <p className="m-0 text-md text-text-secondary">{LISTING_HOME_NOTE}</p>
           {/* Only while there is a listing to see: a removed or ended one opens nothing there. */}
           {onMarket && (
             <Link
               href={`/marketplace/${projectId}`}
-              className={`mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-sm font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
+              className={`mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-md font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
             >
               {VIEW_ON_MARKETPLACE}
             </Link>
@@ -162,7 +162,7 @@ export function StepSuccess({
 
       {ready.length > 0 && (
         <section aria-label="Videos" className="flex w-full flex-col gap-[10px] text-left">
-          <div className="text-sm font-medium text-text-tertiary">{projectName || "Videos"}</div>
+          <div className="text-md font-medium text-text-tertiary">{projectName || "Videos"}</div>
           <ul role="list" className="m-0 grid list-none grid-cols-2 gap-[8px] p-0 sm:grid-cols-3">
             {ready.map(({ product, take }) => (
               <li key={product.id}>
@@ -204,7 +204,7 @@ export function StepSuccess({
         <div className="flex items-center justify-center">
           <Link
             href="/"
-            className={`inline-flex items-center rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-sm font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
+            className={`inline-flex items-center rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-md font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
           >
             Back to home
           </Link>
@@ -242,7 +242,7 @@ function PosterTile({ take, name, onOpen }: { take: VideoTake; name: string; onO
       <span className="relative inline-flex h-[32px] w-[32px] items-center justify-center rounded-full bg-bg-surface text-text-brand shadow-2">
         <Icon icon={PlayIcon} size={14} />
       </span>
-      <span className="absolute inset-x-0 bottom-0 truncate bg-[color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent)] px-[6px] py-[3px] text-left text-xs font-semibold text-[var(--color-white)]">
+      <span className="absolute inset-x-0 bottom-0 truncate bg-[color-mix(in_srgb,var(--color-bg-overlay)_70%,transparent)] px-[6px] py-[3px] text-left text-sm font-semibold text-[var(--color-white)]">
         {name}
       </span>
     </button>
@@ -329,7 +329,7 @@ function SuccessShowcase({ projectId }: { projectId: string }) {
             <Icon icon={EyeIcon} size={16} />
             {SUCCESS_SHOWCASE.action}
           </button>
-          <p id={lineId} className="m-0 text-sm text-text-secondary">
+          <p id={lineId} className="m-0 text-md text-text-secondary">
             {blocked ? showcaseGateLine(readiness.counts.ready, readiness.counts.total) : SUCCESS_SHOWCASE.line}
           </p>
         </>
@@ -371,7 +371,7 @@ function PendingCard({
         {rows.map(({ product, status }) =>
           status.state === "rendering" ? (
             <li key={product.id} className="flex flex-col gap-[4px]">
-              <div className="flex items-center justify-between gap-[8px] text-sm font-semibold text-text-brand">
+              <div className="flex items-center justify-between gap-[8px] text-md font-semibold text-text-brand">
                 <span className="truncate">{displayProductName(product.name)}</span>
                 <span className="tabular-nums">{status.eta} left</span>
               </div>

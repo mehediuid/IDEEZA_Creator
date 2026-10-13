@@ -100,12 +100,12 @@ export function RequestPayout({
             Request payout (demo)
           </Button>
           {why && (
-            <p id={whyId} className="m-0 text-sm text-text-secondary">
+            <p id={whyId} className="m-0 text-md text-text-secondary">
               {why}
             </p>
           )}
           {refused && (
-            <p role="alert" className="m-0 text-sm text-[color:var(--color-input-error-text)]">
+            <p role="alert" className="m-0 text-md text-[color:var(--color-input-error-text)]">
               This browser couldn&apos;t save the request (storage is full or blocked). Nothing changed.
             </p>
           )}

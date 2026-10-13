@@ -86,7 +86,7 @@ export function SellRow({
         </span>
         <div
           id={stateId}
-          className="order-3 col-span-2 min-w-0 text-sm leading-sm text-text-secondary [@container(min-width:560px)]:order-none [@container(min-width:560px)]:col-span-1"
+          className="order-3 col-span-2 min-w-0 text-md leading-md text-text-secondary [@container(min-width:560px)]:order-none [@container(min-width:560px)]:col-span-1"
         >
           {state}
         </div>
@@ -164,7 +164,7 @@ export function RowLink({ href, label }: { href: string; label: string }) {
 
 export function DoneNote({ note }: { note: string }) {
   return (
-    <p className="m-0 flex items-start gap-2 text-sm font-medium text-text-success">
+    <p className="m-0 flex items-start gap-2 text-md font-medium text-text-success">
       <span aria-hidden className="mt-[2px] inline-flex">
         <Icon icon={CheckmarkCircle02Icon} size={14} />
       </span>

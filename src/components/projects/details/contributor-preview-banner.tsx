@@ -74,7 +74,7 @@ export function ContributorPreviewBanner({ viewer }: { viewer: ContributorPrevie
           <button
             type="button"
             onClick={exit}
-            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-sm font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
+            className="inline-flex h-[var(--touch-min)] shrink-0 items-center gap-4 rounded-lg border border-solid border-border bg-bg-surface px-8 text-md font-semibold text-text-primary outline-none transition-colors duration-normal ease-decelerate hover:border-border-strong focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
           >
             Exit preview
           </button>

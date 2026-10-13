@@ -24,7 +24,7 @@ import type { SlotProps } from "./slots";
 /** 44 px at phone width and on a coarse pointer (the page's other phone targets). */
 const PHONE_TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const QUIET_LINK =
-  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus";
+  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus";
 
 export function TeamTab({ project, view, viewer }: SlotProps) {
   const team = teamOf(project.contributors ?? []);
@@ -35,7 +35,7 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
     if (!can(viewer, "people.seeRoster")) return null;
     return (
       <div className="flex flex-col gap-8">
-        <h2 className="text-xl font-bold text-text-primary">Team</h2>
+        <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Team</h2>
         <StateCard
           tone="empty"
           icon={<Icon icon={UserGroupIcon} size={32} />}
@@ -62,13 +62,13 @@ export function TeamTab({ project, view, viewer }: SlotProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-xl font-bold text-text-primary">Team</h2>
+      <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Team</h2>
       <ul className="flex flex-col gap-4">
         {team.map((t) => (
           <li key={t.id} className="flex items-center gap-3">
             <span
               aria-hidden
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-xs font-semibold text-text-secondary"
+              className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-full bg-bg-subtle text-sm font-semibold text-text-secondary"
             >
               {initialsOf(t.name)}
             </span>

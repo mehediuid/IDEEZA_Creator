@@ -84,7 +84,7 @@ export function ListingCard({
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-[4px] text-text-tertiary">
               <Icon icon={hasCover ? ImageNotFound01Icon : CpuIcon} size={18} strokeWidth={1.4} />
-              {hasCover && <span className="px-[6px] text-center text-2xs leading-2xs">Image didn&apos;t load</span>}
+              {hasCover && <span className="px-[6px] text-center text-sm leading-xs">Image didn&apos;t load</span>}
             </div>
           )}
           {/* Grid mode: the chip floats over the cover. */}

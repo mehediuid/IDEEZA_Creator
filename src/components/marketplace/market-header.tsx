@@ -18,7 +18,7 @@ import { ProjectHeader } from "@/components/projects/details/header";
 import type { HeaderSlotProps } from "@/components/projects/details/slots";
 
 const QUIET_LINK =
-  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
 
 export function MarketHeader(props: HeaderSlotProps) {
   return (

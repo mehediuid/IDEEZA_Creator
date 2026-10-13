@@ -213,7 +213,7 @@ function PayoutWalletControl({ projectId, record }: { projectId: string; record:
         }
       }}
       className={cn(
-        "mt-1 inline-flex items-center rounded-md text-sm font-medium text-text-brand outline-none transition-colors duration-normal ease-decelerate hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-60",
+        "mt-1 inline-flex items-center rounded-md text-md font-medium text-text-brand outline-none transition-colors duration-normal ease-decelerate hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus disabled:cursor-not-allowed disabled:opacity-60",
         stacked ? "min-h-[44px]" : "min-h-[32px]",
       )}
     >

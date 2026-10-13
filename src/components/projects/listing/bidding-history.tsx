@@ -40,12 +40,12 @@ export function BiddingHistoryDialog({
       <div className="flex flex-col gap-6 [container-type:inline-size]">
         <TestnetDemoBadge className="self-start" />
         {rows.length === 0 ? (
-          <p className="text-sm text-text-secondary">No bids yet.</p>
+          <p className="text-md text-text-secondary">No bids yet.</p>
         ) : (
-          <table className="w-full border-collapse text-left text-sm">
+          <table className="w-full border-collapse text-left text-md">
             <caption className="sr-only">{`Bids on ${projectName}, newest first`}</caption>
             <thead>
-              <tr className="border-b border-solid border-border text-xs font-semibold text-text-tertiary">
+              <tr className="border-b border-solid border-border text-sm font-semibold text-text-tertiary">
                 <th scope="col" className="py-4 pr-6 font-semibold">
                   Bid
                 </th>

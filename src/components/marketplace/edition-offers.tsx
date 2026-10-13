@@ -194,7 +194,7 @@ function BuyableOffer({
   return (
     <OfferFrame track={track} view={view}>
       {oneTier ? (
-        <p className="m-0 text-sm leading-relaxed text-text-secondary">Includes every future version of this design.</p>
+        <p className="m-0 text-md leading-relaxed text-text-secondary">Includes every future version of this design.</p>
       ) : (
       <div className="flex flex-col gap-2">
         <span id={labelId} className="text-sm font-medium text-text-secondary">
@@ -230,12 +230,12 @@ function BuyableOffer({
                 <Radio checked={on} decorative size="sm" className="mt-[2px]" />
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="flex flex-wrap items-baseline justify-between gap-x-4">
-                    <span className="text-sm font-semibold text-text-primary">{TIER_WORD[t]}</span>
-                    <span className="text-sm font-semibold tabular-nums text-text-primary">
+                    <span className="text-md font-semibold text-text-primary">{TIER_WORD[t]}</span>
+                    <span className="text-md font-semibold tabular-nums text-text-primary">
                       {formatAmount(price, track.listing.token)}
                     </span>
                   </span>
-                  <span className="text-xs leading-relaxed text-text-secondary">{TIER_HELP[t]}</span>
+                  <span className="text-md leading-relaxed text-text-secondary">{TIER_HELP[t]}</span>
                 </span>
               </button>
             );
@@ -262,7 +262,7 @@ function BuyableOffer({
           {`Buy now · ${formatAmount(tier === "regular" ? track.listing.regular : track.listing.extended, track.listing.token)}`}
         </Button>
       ) : card.soldOut ? (
-        <p className="m-0 text-sm text-text-secondary">All {card.total} are sold.</p>
+        <p className="m-0 text-md text-text-secondary">All {card.total} are sold.</p>
       ) : null}
     </OfferFrame>
   );

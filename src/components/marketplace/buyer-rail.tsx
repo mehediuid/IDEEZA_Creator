@@ -54,7 +54,7 @@ import { buyerNameOf, usePurchase } from "./purchase-dialog";
 import { PurchasedSummary } from "./purchased-summary";
 
 const QUIET_LINK =
-  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-sm font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[24px] items-center gap-2 self-start rounded-sm text-md font-medium text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[var(--touch-min)] max-md:min-h-[var(--touch-min)]";
 
 /** The words of a listing that can't be bought now (P2-MARKETPLACE-10's other states). */
 function closedLine(view: ProjectView): { title: string; detail?: string } | null {
@@ -139,7 +139,7 @@ function WalletLine({ buyerId, listing, verb, now }: { buyerId: DemoBuyerId; lis
   const connected = wallet?.identities[buyerId]?.connected === true;
   const have = availableOf(buyerId, listing.token, listing.network, { wallet, market: data, now });
   return (
-    <div className="flex flex-col gap-3 text-sm text-text-secondary">
+    <div className="flex flex-col gap-3 text-md text-text-secondary">
       <div className="flex items-start gap-3">
         <span aria-hidden className="mt-[2px] inline-flex shrink-0 text-text-tertiary">
           <Icon icon={Wallet01Icon} size={14} />
@@ -276,7 +276,7 @@ function ClosedLine({ line }: { line: { title: string; detail?: string } }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-md font-medium text-text-primary">{line.title}</p>
-      {line.detail && <p className="text-sm tabular-nums text-text-secondary">{line.detail}</p>}
+      {line.detail && <p className="text-md tabular-nums text-text-secondary">{line.detail}</p>}
     </div>
   );
 }

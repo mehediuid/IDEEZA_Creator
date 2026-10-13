@@ -422,13 +422,13 @@ export function SellFlowDialog({
         <p
           id={reasonId}
           role="alert"
-          className="m-0 max-w-[40ch] text-sm text-[color:var(--color-input-error-text)] [@media(min-width:480px)]:text-right"
+          className="m-0 max-w-[40ch] text-md text-[color:var(--color-input-error-text)] [@media(min-width:480px)]:text-right"
         >
           {reason}
         </p>
       ) : (
         blocked && (
-          <p id={reasonId} className="m-0 max-w-[40ch] text-sm text-text-secondary [@media(min-width:480px)]:text-right">
+          <p id={reasonId} className="m-0 max-w-[40ch] text-md text-text-secondary [@media(min-width:480px)]:text-right">
             {readiness.blocker ?? "Finish the steps above to sell."}
           </p>
         )

@@ -81,7 +81,7 @@ export function BusinessPlanPanel({
               {project.name} · Version {current.n} · Generated {formatDate(current.createdAt)} · {doneCount} sections
             </p>
             {lockReason && (
-              <p id={lockId} className="mt-3 flex max-w-[62ch] items-start gap-2 text-sm text-text-secondary">
+              <p id={lockId} className="mt-3 flex max-w-[62ch] items-start gap-2 text-md text-text-secondary">
                 <span aria-hidden className="mt-[2px] inline-flex shrink-0 text-text-tertiary">
                   <Icon icon={LockIcon} size={14} />
                 </span>
@@ -150,7 +150,7 @@ export function BusinessPlanPanel({
         ) : (
           <div className="mt-10 grid grid-cols-1 gap-10 [@container(min-width:1024px)]:grid-cols-[200px_minmax(0,1fr)]">
             <nav aria-label="Sections" className="hidden [@container(min-width:1024px)]:block print:hidden">
-              <ol className="sticky top-10 flex flex-col gap-1 border-l border-solid border-border-subtle pl-4 text-sm">
+              <ol className="sticky top-10 flex flex-col gap-1 border-l border-solid border-border-subtle pl-4 text-md">
                 {current.sections.map((s) => (
                   <li key={s.id}>
                     <a href={`#section-${s.id}`} className="block truncate py-1 text-text-secondary hover:text-text-primary">

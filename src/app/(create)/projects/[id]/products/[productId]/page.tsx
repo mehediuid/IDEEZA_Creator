@@ -6,7 +6,6 @@
 
 import * as React from "react";
 import { ProductPage } from "@/components/projects/product/product-page";
-import { ReadingScale } from "@/components/projects/reading-scale";
 
 export default async function ProjectProductPage({
   params,
@@ -14,9 +13,5 @@ export default async function ProjectProductPage({
   params: Promise<{ id: string; productId: string }>;
 }) {
   const { id, productId } = await params;
-  return (
-    <ReadingScale>
-      <ProductPage id={id} productId={productId} />
-    </ReadingScale>
-  );
+  return <ProductPage id={id} productId={productId} />;
 }

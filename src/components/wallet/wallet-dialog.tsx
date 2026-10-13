@@ -121,7 +121,7 @@ const RESET = "Reset the demo wallet";
 // 44 px at phone width and on a coarse pointer (P2-MINT-2 "Size").
 const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 const FADE = "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-normal motion-safe:ease-out";
-const SECTION = "text-2xs font-bold uppercase tracking-caps text-text-tertiary";
+const SECTION = "text-xs font-bold uppercase tracking-caps text-text-tertiary";
 
 const MINUTE = 60_000;
 
@@ -228,7 +228,7 @@ function CopyButton({
 function Row({ label, value, note, strong }: { label: string; value: React.ReactNode; note?: string; strong?: boolean }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-[12px] gap-y-[2px]">
-      <dt className={cn("min-w-0", strong ? "font-bold text-text-primary" : "text-text-secondary")}>{label}</dt>
+      <dt className={cn("min-w-0", strong ? "font-bold text-text-primary" : "text-sm text-text-secondary")}>{label}</dt>
       <dd className={cn("ml-auto min-w-0 text-right tabular-nums", strong ? "font-bold text-text-primary" : "font-medium text-text-primary")}>
         {value}
         {note && <span className="ml-[6px] font-regular text-text-tertiary">{note}</span>}
@@ -280,7 +280,7 @@ function RadioRows<T extends string | number>({
               }
             }}
             className={cn(
-              "flex min-h-[36px] w-full items-center gap-[10px] rounded-lg border border-solid px-[12px] py-[6px] text-left text-sm outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
+              "flex min-h-[36px] w-full items-center gap-[10px] rounded-lg border border-solid px-[12px] py-[6px] text-left text-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus",
               TAP,
               on ? "border-border-brand bg-bg-brand-subtle text-text-primary" : "border-border bg-bg-surface text-text-primary hover:bg-bg-subtle",
             )}
@@ -389,7 +389,7 @@ function ManageDialog({ wallet, market, write, onClose }: WalletDialogProps) {
       description="Test funds only. Nothing here is real money or on a real blockchain."
       footer={footer}
     >
-      <div className="flex flex-col gap-[16px] text-sm text-text-secondary">
+      <div className="flex flex-col gap-[16px] text-md text-text-secondary">
         {unreadable ? (
           <div role="alert" className="flex flex-col items-start gap-[8px]">
             <Banner tone="error">{WALLET_UNREADABLE}</Banner>
@@ -486,7 +486,7 @@ function ManageDialog({ wallet, market, write, onClose }: WalletDialogProps) {
 
         {wallet && (
           <section aria-labelledby={buyersLabelId} className="flex flex-col gap-[8px] border-t border-solid border-border pt-[16px]">
-            <h3 id={buyersLabelId} className="text-sm font-semibold text-text-primary">
+            <h3 id={buyersLabelId} className="text-md font-semibold text-text-primary">
               Demo buyers (for Explore marketplace)
             </h3>
             <ul className="flex flex-col gap-[6px]">
@@ -497,7 +497,7 @@ function ManageDialog({ wallet, market, write, onClose }: WalletDialogProps) {
                   <li key={b.id} className="flex flex-wrap items-center justify-between gap-[8px]">
                     <span className="min-w-0 flex-1 text-text-primary tabular-nums">
                       {buyerRowOf(b.id, b.name, wallet, ctx)}
-                      <span className="ml-[6px] text-xs text-text-tertiary">{on ? "· Connected" : "· Not connected"}</span>
+                      <span className="ml-[6px] text-sm text-text-tertiary">{on ? "· Connected" : "· Not connected"}</span>
                     </span>
                     <Button
                       type="button"
@@ -821,7 +821,7 @@ function RequestDialog({ wallet, market, actions, view }: WalletDialogProps & { 
       title={req.title}
       footer={footer ? <div className="ml-auto flex flex-wrap items-center justify-end gap-6">{footer}</div> : undefined}
     >
-      <div className="flex flex-col gap-[12px] text-sm text-text-secondary">
+      <div className="flex flex-col gap-[12px] text-md text-text-secondary">
         <div className="flex flex-wrap items-center gap-[8px] rounded-lg bg-bg-surface-raised px-[12px] py-[8px]">
           <TestnetDemoBadge />
           <span className="min-w-0 break-words text-text-primary">{connectionLineOf(identity, wallet)}</span>

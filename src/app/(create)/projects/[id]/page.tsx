@@ -11,7 +11,6 @@ import type { Metadata } from "next";
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { ProjectPage } from "@/components/projects/details/project-page";
-import { ReadingScale } from "@/components/projects/reading-scale";
 import { projectRedirectOf } from "@/lib/manual/project-route";
 
 // Before the store is read the page can't know the project's name; the client
@@ -28,9 +27,5 @@ export default async function ProjectDetailsPage({
   const { id } = await params;
   const moved = projectRedirectOf(id, await searchParams);
   if (moved) redirect(moved);
-  return (
-    <ReadingScale>
-      <ProjectPage id={id} />
-    </ReadingScale>
-  );
+  return <ProjectPage id={id} />;
 }

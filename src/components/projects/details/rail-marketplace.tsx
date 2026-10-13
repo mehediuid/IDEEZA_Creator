@@ -150,7 +150,7 @@ export function ListingBody({ project, view, viewer, brief, now, announce }: Slo
             {card.lead}
           </p>
           <p className="m-0 text-md text-text-secondary">{card.when}</p>
-          <p className="m-0 text-sm text-text-secondary">{card.terms}</p>
+          <p className="m-0 text-md text-text-secondary">{card.terms}</p>
         </div>
       )}
 
@@ -270,7 +270,7 @@ function pausedFacts(card: Extract<MarketplaceCard, { kind: "paused" }>) {
   return (
     <>
       <p className="m-0 text-md leading-relaxed text-text-secondary">{card.changed}</p>
-      <p className="m-0 text-sm text-text-secondary">{card.terms}</p>
+      <p className="m-0 text-md text-text-secondary">{card.terms}</p>
     </>
   );
 }
@@ -302,7 +302,7 @@ function StateRow({ card }: { card: MarketplaceCard }) {
         </p>
       )}
       {card.kind === "auction" && (
-        <span className={cn("inline-flex items-center rounded-full px-4 py-1 text-xs font-semibold tabular-nums", PILL_TONE[card.pill.tone])}>
+        <span className={cn("inline-flex items-center rounded-full px-4 py-1 text-sm font-semibold tabular-nums whitespace-nowrap", PILL_TONE[card.pill.tone])}>
           {card.pill.text}
         </span>
       )}

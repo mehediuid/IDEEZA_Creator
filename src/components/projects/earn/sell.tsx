@@ -64,7 +64,7 @@ function SellRules() {
               <KindDot kind={r.id} />
               {r.title}
             </span>
-            <span className="text-sm leading-sm text-text-secondary">{r.line}</span>
+            <span className="text-md leading-md text-text-secondary">{r.line}</span>
             <span className="mt-1 text-sm font-semibold leading-sm text-text-tertiary">{r.where}</span>
           </li>
         ))}
@@ -86,12 +86,12 @@ function WholeProject(props: SlotProps) {
           <CopyRow key={kind} {...props} kind={kind} scope={WHOLE_PROJECT} />
         ))}
       </div>
-      <p className="m-0 rounded-xl bg-bg-subtle px-6 py-5 text-sm leading-sm text-text-secondary">
+      <p className="m-0 rounded-xl bg-bg-subtle px-6 py-5 text-md leading-md text-text-secondary">
         <strong className="font-semibold text-text-primary">{MAIN_SALE_NOTE}</strong> {MAIN_SALE_DETAIL}
       </p>
       <MintDetails summary={view.summary} commerce={view.commerce} viewer={viewer} view={view} announce={announce}>
         {summaryOf && (
-          <Link href={summaryOf.href} className={cn(EARN_LINK, "text-sm")}>
+          <Link href={summaryOf.href} className={EARN_LINK}>
             Open the mint summary
             <Icon icon={ArrowRight01Icon} size={14} />
           </Link>

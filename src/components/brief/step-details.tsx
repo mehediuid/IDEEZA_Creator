@@ -158,7 +158,7 @@ export function StepDetails({
       <div ref={bodyRef} className="flex flex-col gap-[20px]">
         <div>
           <h1 className="m-0 text-2xl font-bold tracking-tight text-text-primary">{HEADING[intent]}</h1>
-          <p className="mt-[6px] max-w-[62ch] text-sm text-text-secondary">{SUB_BY_INTENT[intent]}</p>
+          <p className="mt-[6px] max-w-[62ch] text-md text-text-secondary">{SUB_BY_INTENT[intent]}</p>
         </div>
 
         {intent === "sell" && (
@@ -238,7 +238,7 @@ export function StepDetails({
             />
             <div className="flex flex-col gap-[8px]">
               {collectionField}
-              <p className="m-0 text-sm text-text-secondary">{SAVE_SIGNATURE_LINE}</p>
+              <p className="m-0 text-md text-text-secondary">{SAVE_SIGNATURE_LINE}</p>
             </div>
             <div className="flex flex-col gap-[10px]">
               <OwnerAndShare state={state} onChange={onChange} />
@@ -260,7 +260,7 @@ export function StepDetails({
             Continue to review
           </button>
           {missing ? (
-            <p id={reasonId} className="m-0 text-center text-sm leading-relaxed text-text-secondary">
+            <p id={reasonId} className="m-0 text-center text-md leading-relaxed text-text-secondary">
               {missing}
             </p>
           ) : null}
@@ -326,7 +326,7 @@ function StoryPanel({
           {state.story.length}/{MAX_STORY}
         </span>
       </div>
-      {note ? <div className="text-sm leading-relaxed text-text-secondary">{note}</div> : null}
+      {note ? <div className="text-md leading-relaxed text-text-secondary">{note}</div> : null}
     </div>
   );
 }
@@ -423,7 +423,7 @@ function CollectionField({
             onClick={create}
             disabled={!newName.trim()}
             className={[
-              "h-[44px] flex-none rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-sm font-semibold",
+              "h-[44px] flex-none rounded-lg border border-solid border-border bg-bg-surface px-[16px] text-md font-semibold",
               newName.trim() ? "cursor-pointer text-text-primary" : "cursor-not-allowed text-text-disabled",
             ].join(" ")}
           >
@@ -432,7 +432,7 @@ function CollectionField({
           <button
             type="button"
             onClick={cancel}
-            className="h-[44px] flex-none cursor-pointer rounded-lg border-0 bg-transparent px-[12px] text-sm font-semibold text-text-secondary"
+            className="h-[44px] flex-none cursor-pointer rounded-lg border-0 bg-transparent px-[12px] text-md font-semibold text-text-secondary"
           >
             Cancel
           </button>

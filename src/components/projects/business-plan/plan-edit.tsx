@@ -108,7 +108,7 @@ function TiersEditor({ tiers, onChange }: { tiers: PricingTier[]; onChange: (nex
 function FieldEditor({ label, value, onChange }: { label: string; value: PlanSection["fields"][string]; onChange: (v: PlanSection["fields"][string]) => void }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-semibold text-text-primary">{label}</span>
+      <span className="text-md font-semibold text-text-primary">{label}</span>
       {typeof value === "string" ? (
         <AutoTextarea value={value} onValueChange={onChange} rows={2} aria-label={label} />
       ) : isPricingTiers(value) ? (
@@ -152,7 +152,7 @@ function SectionMenu({ onImprove, onMoveUp, onMoveDown, onDelete, canMoveUp, can
         setOpen(false);
         onClick();
       }}
-      className="w-full rounded-md px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-subtle disabled:cursor-not-allowed disabled:text-text-disabled disabled:hover:bg-transparent"
+      className="w-full rounded-md px-3 py-2 text-left text-md text-text-primary hover:bg-bg-subtle disabled:cursor-not-allowed disabled:text-text-disabled disabled:hover:bg-transparent"
     >
       {label}
     </button>
@@ -184,13 +184,13 @@ function ImproveBar({ onImprove, onClose, busy }: { onImprove: (instruction: str
             type="button"
             disabled={busy}
             onClick={() => setText((t) => (t ? `${t}. ${c}.` : `${c}.`))}
-            className="rounded-full border border-solid border-border px-3 py-1 text-xs text-text-secondary hover:bg-bg-surface disabled:cursor-not-allowed"
+            className="rounded-full border border-solid border-border px-3 py-1 text-sm text-text-secondary hover:bg-bg-surface disabled:cursor-not-allowed"
           >
             {c}
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-text-tertiary">Rewrites this section only.</p>
+      <p className="mt-2 text-sm text-text-tertiary">Rewrites this section only.</p>
       <div className="mt-3 flex items-center gap-3">
         <Button type="button" hierarchy="primary" size="sm" loading={busy} onClick={() => onImprove(text.trim())}>
           Improve
@@ -258,7 +258,7 @@ function SectionEditor({
           ) : (
             <h3 className="text-lg font-semibold text-text-primary">{section.title}</h3>
           )}
-          <p className="mt-1 text-xs text-text-tertiary">{provenanceLabel(section.origin)}</p>
+          <p className="mt-1 text-sm text-text-tertiary">{provenanceLabel(section.origin)}</p>
         </div>
         <SectionMenu
           onImprove={() => setImproving((v) => !v)}
@@ -279,14 +279,14 @@ function SectionEditor({
             onChange={(v) => onChange({ ...section, fields: { ...section.fields, [key]: v } })}
           />
         ))}
-        {(section.kind === "market" || section.kind === "pricing") && <p className="text-xs text-text-tertiary">{ESTIMATE_NOTE}</p>}
+        {(section.kind === "market" || section.kind === "pricing") && <p className="text-sm text-text-tertiary">{ESTIMATE_NOTE}</p>}
       </div>
 
       {improving && !proposal && (
         <>
           <ImproveBar busy={busy} onImprove={runImprove} onClose={() => setImproving(false)} />
           {failed && (
-            <p role="status" className="mt-2 text-xs text-text-error">
+            <p role="status" className="mt-2 text-md text-text-error">
               Couldn&apos;t rewrite this section. Try again in a moment.
             </p>
           )}
@@ -295,12 +295,12 @@ function SectionEditor({
 
       {proposal && (
         <div className="mt-4 rounded-xl border border-solid border-border-brand bg-bg-brand-subtle p-4">
-          <p className="text-sm font-semibold text-text-primary">Proposed rewrite</p>
+          <p className="text-md font-semibold text-text-primary">Proposed rewrite</p>
           <div className="mt-3 flex flex-col gap-3">
             {Object.entries(proposal).map(([key, value]) => (
               <div key={key}>
-                <p className="text-xs font-semibold text-text-secondary">{labelize(key)}</p>
-                <p className="text-sm text-text-primary">{Array.isArray(value) ? (value as string[]).join(" · ") : String(value)}</p>
+                <p className="text-sm font-semibold text-text-secondary">{labelize(key)}</p>
+                <p className="text-md text-text-primary">{Array.isArray(value) ? (value as string[]).join(" · ") : String(value)}</p>
               </div>
             ))}
           </div>
@@ -342,7 +342,7 @@ function AddSectionSlot({ planPrompt, precedingDone, onAdd }: { planPrompt: stri
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-full px-3 py-1 text-xs font-semibold text-text-tertiary opacity-0 transition-opacity hover:bg-bg-subtle focus-visible:opacity-100 group-hover:opacity-100"
+          className="rounded-full px-3 py-1 text-sm font-semibold text-text-tertiary opacity-0 transition-opacity hover:bg-bg-subtle focus-visible:opacity-100 group-hover:opacity-100"
         >
           <Icon icon={PlusSignIcon} size={12} /> Add section here
         </button>
@@ -376,10 +376,10 @@ function AddSectionSlot({ planPrompt, precedingDone, onAdd }: { planPrompt: stri
       <TextInput value={title} onValueChange={setTitle} placeholder="Section title" aria-label="New section title" />
       {proposal ? (
         <div className="mt-3">
-          <p className="text-xs font-semibold text-text-success">Written by AI · just now — edit it freely, it stays when you regenerate the plan.</p>
+          <p className="text-sm font-semibold text-text-success">Written by AI · just now — edit it freely, it stays when you regenerate the plan.</p>
           <div className="mt-2 flex flex-col gap-2">
             {Object.entries(proposal).map(([key, value]) => (
-              <p key={key} className="text-sm text-text-secondary">
+              <p key={key} className="text-md text-text-secondary">
                 <span className="font-semibold text-text-primary">{labelize(key)}: </span>
                 {Array.isArray(value) ? (value as string[]).join(" · ") : String(value)}
               </p>
@@ -407,9 +407,9 @@ function AddSectionSlot({ planPrompt, precedingDone, onAdd }: { planPrompt: stri
         </div>
       ) : (
         <>
-          <p className="mt-2 text-xs text-text-tertiary">Describe what this section should cover — AI will write it, or type it yourself below.</p>
+          <p className="mt-2 text-sm text-text-tertiary">Describe what this section should cover — AI will write it, or type it yourself below.</p>
           <Textarea value={brief} onValueChange={setBrief} rows={2} placeholder="What should this section say?" aria-label="What this section should cover" className="mt-2" />
-          {failed && <p className="mt-2 text-xs text-text-error">Couldn&apos;t write this section. Try again, or write it yourself below.</p>}
+          {failed && <p className="mt-2 text-md text-text-error">Couldn&apos;t write this section. Try again, or write it yourself below.</p>}
           <div className="mt-2 flex items-center gap-3">
             <Button type="button" hierarchy="primary" size="sm" loading={busy} iconLeading={<Icon icon={AiMagicIcon} size={14} />} onClick={writeWithAI}>
               Write with AI
@@ -509,7 +509,7 @@ export function PlanEditView({
         </div>
       </div>
       {saveBlocked && (
-        <p id={blockedId} role="status" className="mt-4 text-sm text-text-secondary">
+        <p id={blockedId} role="status" className="mt-4 text-md text-text-secondary">
           {saveBlocked}
         </p>
       )}

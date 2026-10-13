@@ -381,7 +381,7 @@ export function ListingFields({
           <h3 id={ids.benefitsHead} className="text-md font-semibold text-text-primary">
             Holder benefits (optional)
           </h3>
-          <p id={ids.benefitsNote} className="text-sm text-text-secondary">
+          <p id={ids.benefitsNote} className="text-md text-text-secondary">
             Perks buyers get while they hold this NFT, like a private group or a subscription.
             {editing && " Changes apply to future sales only."}
           </p>
@@ -409,7 +409,7 @@ export function ListingFields({
               onChange({ benefits: [...value.benefits, { id: newBenefitId(), name: "", duration: { months: 12 } }] })
             }
             className={cn(
-              "inline-flex min-h-[36px] items-center gap-3 self-start rounded-lg border border-solid border-border bg-bg-surface px-6 text-sm font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
+              "inline-flex min-h-[36px] items-center gap-3 self-start rounded-lg border border-solid border-border bg-bg-surface px-6 text-md font-semibold text-text-primary outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
               TAP,
             )}
           >
@@ -433,7 +433,7 @@ export function ListingFields({
             onLeave("confirmOwner");
           }}
           className={cn(
-            "flex items-start gap-4 rounded-md p-1 text-left text-sm font-medium leading-relaxed text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+            "flex items-start gap-4 rounded-md p-1 text-left text-md font-medium leading-relaxed text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
             TAP,
           )}
         >

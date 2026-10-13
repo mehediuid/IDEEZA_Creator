@@ -42,7 +42,7 @@ export function BusinessPlanChip({ project, view, viewer }: SlotProps) {
   const writes = can(viewer, "businessPlan.manage", view.canCtx);
 
   const chipClass =
-    "ml-auto inline-flex h-[28px] items-center gap-2 whitespace-nowrap rounded-full border border-solid border-border bg-bg-surface px-3 text-xs font-semibold text-text-secondary outline-none transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
+    "ml-auto inline-flex h-[28px] items-center gap-2 whitespace-nowrap rounded-full border border-solid border-border bg-bg-surface px-3 text-sm font-semibold text-text-secondary outline-none transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus max-md:min-h-[var(--touch-min)]";
 
   if (!writes) {
     return state === "none" ? null : (

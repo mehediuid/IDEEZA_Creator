@@ -33,7 +33,7 @@ import type { SlotProps } from "../details/slots";
 import { TAP } from "./surface";
 
 const BACK =
-  "inline-flex min-h-[24px] max-w-full items-center gap-2 self-start rounded-sm text-sm font-medium text-text-secondary outline-none transition-colors duration-normal ease-out hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+  "inline-flex min-h-[24px] max-w-full items-center gap-2 self-start rounded-sm text-md font-medium text-text-secondary outline-none transition-colors duration-normal ease-out hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 export function EarnHeader({
   project,

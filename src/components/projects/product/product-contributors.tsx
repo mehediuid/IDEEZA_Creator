@@ -23,7 +23,7 @@ function Avatar({ name, maker }: { name: string; maker?: boolean }) {
   return (
     <span
       aria-hidden
-      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-bg-subtle text-xs font-semibold text-text-secondary"
+      className="inline-flex size-[24px] shrink-0 items-center justify-center rounded-full bg-bg-subtle text-sm font-semibold text-text-secondary"
     >
       {maker ? <Icon icon={UserIcon} size={14} /> : initialsOf(name)}
     </span>
@@ -40,7 +40,7 @@ export function ProductContributorsPanel({ project, view, viewer }: ProductSlotP
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-xl font-bold text-text-primary">Contributors</h2>
+      <h2 className="text-2xl font-semibold leading-2xl text-text-primary">Contributors</h2>
 
       {canSeeRoster ? (
         <ul className="flex flex-col gap-4">

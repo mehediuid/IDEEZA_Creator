@@ -76,7 +76,7 @@ export function ProjectCard({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-[4px] text-text-tertiary">
               <Icon icon={hasCover ? ImageNotFound01Icon : CpuIcon} size={18} strokeWidth={1.4} />
               {hasCover && (
-                <span className="px-[6px] text-center text-xs leading-tight">Image didn&apos;t load</span>
+                <span className="px-[6px] text-center text-sm leading-tight">Image didn&apos;t load</span>
               )}
             </div>
           )}
@@ -115,7 +115,7 @@ export function ProjectCard({
       </div>
 
       {/* The hint: text, not a control. mt-auto keeps it on the card's floor, so a row's hints line up. */}
-      <p className="mt-auto flex min-w-0 items-center gap-[6px] text-sm font-medium text-text-secondary [@container(max-width:559px)]:pl-[108px] [@container(min-width:560px)]:px-[14px] [@container(min-width:560px)]:pb-[14px] [@container(min-width:560px)]:pt-[12px]">
+      <p className="mt-auto flex min-w-0 items-center gap-[6px] text-md font-medium text-text-secondary [@container(max-width:559px)]:pl-[108px] [@container(min-width:560px)]:px-[14px] [@container(min-width:560px)]:pb-[14px] [@container(min-width:560px)]:pt-[12px]">
         <span className="truncate">{text.hint}</span>
         <Icon icon={ArrowRight02Icon} size={14} className="shrink-0" />
       </p>

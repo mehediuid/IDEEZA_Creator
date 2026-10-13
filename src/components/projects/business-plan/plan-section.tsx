@@ -105,20 +105,20 @@ function FieldBlock({ label, value }: { label: string; value: PlanSection["field
   if (typeof value === "string") {
     return (
       <div>
-        <p className="text-sm font-semibold text-text-primary">{label}</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-text-secondary">{value}</p>
+        <p className="text-md font-semibold text-text-primary">{label}</p>
+        <p className="mt-1 whitespace-pre-wrap text-md leading-relaxed text-text-secondary">{value}</p>
       </div>
     );
   }
   if (isPricingTiers(value)) {
     return (
       <div>
-        <p className="text-sm font-semibold text-text-primary">{label}</p>
+        <p className="text-md font-semibold text-text-primary">{label}</p>
         <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {value.map((tier, i) => (
             <div
               key={`${tier.name}-${i}`}
-              className="rounded-xl border border-solid border-border px-4 py-3 text-sm"
+              className="rounded-xl border border-solid border-border px-4 py-3 text-md"
               style={tier.recommended ? { borderColor: "var(--color-border-brand)" } : undefined}
             >
               <p className="font-semibold text-text-primary">{tier.name}</p>
@@ -141,8 +141,8 @@ function FieldBlock({ label, value }: { label: string; value: PlanSection["field
   }
   return (
     <div>
-      <p className="text-sm font-semibold text-text-primary">{label}</p>
-      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-text-secondary">
+      <p className="text-md font-semibold text-text-primary">{label}</p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-md leading-relaxed text-text-secondary">
         {value.map((line, i) => (
           <li key={i}>{line}</li>
         ))}
@@ -177,15 +177,15 @@ export function PlanSectionView({
           </Badge>
         )}
       </div>
-      {showEstimate && <p className="mt-2 text-xs text-text-tertiary">{ESTIMATE_NOTE}</p>}
+      {showEstimate && <p className="mt-2 text-sm text-text-tertiary">{ESTIMATE_NOTE}</p>}
       {section.state === "pending" && (
-        <div className="mt-4 flex items-center gap-3 text-sm text-text-tertiary">
+        <div className="mt-4 flex items-center gap-3 text-md text-text-tertiary">
           <Spinner size={16} />
           Writing…
         </div>
       )}
       {section.state === "failed" && (
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-text-error">
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-md text-text-error">
           <span>Couldn&apos;t write {section.title}.</span>
           {retry}
         </div>
