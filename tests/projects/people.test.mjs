@@ -143,3 +143,19 @@ test("madeOfSample lists one creator's posts with their stage", () => {
   assert.ok(list.every((m) => typeof m.stage === "string" && m.stage.length > 0));
   assert.deepEqual(madeOfSample(SAMPLE_POSTS, "nobody"), []);
 });
+
+// ── listing facts ──
+import { listingFactsOf } from "../../.tmp-test/lib/people/listing-facts.js";
+
+const L = (o) => ({ id: "l1", projectId: "p1", slot: "main", status: "live", listedAt: 10, ...o });
+const T = (o) => ({ id: "t1", projectId: "p1", productId: "project", kind: "virtual", use: "private", supply: { total: 5 }, createdAt: 1, lazy: true, listing: { listedAt: 20 }, ...o });
+
+test("listingFactsOf reads only the newest Main listing and live copies", () => {
+  assert.deepEqual(listingFactsOf("p1", [L()], [], []), { mainLive: true, copiesLive: false, listedAt: 10 });
+  assert.equal(listingFactsOf("p1", [L({ status: "paused" })], [], []).mainLive, false);
+  assert.equal(listingFactsOf("p1", [L({ id: "old", listedAt: 1 }), L({ id: "new", listedAt: 5, status: "removed" })], [], []).mainLive, false);
+  assert.equal(listingFactsOf("p1", [L()], [{ listingId: "l1", item: { nft: "main" } }], []).mainLive, false);
+  assert.deepEqual(listingFactsOf("p1", [], [], [T()]), { mainLive: false, copiesLive: true, listedAt: 20 });
+  assert.equal(listingFactsOf("p1", [], [], [T({ listing: null })]).copiesLive, false);
+  assert.equal(listingFactsOf("p2", [L()], [], [T()]).mainLive, false);
+});
