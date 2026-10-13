@@ -217,7 +217,7 @@ export function FloatingPanel({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          "overflow-y-auto overscroll-contain border border-solid border-border shadow-2 outline-none",
+          "overflow-y-auto overflow-x-hidden overscroll-contain border border-solid border-border shadow-2 outline-none",
           tone === "raised" ? "bg-bg-surface-raised" : "bg-bg-surface",
           radius === "xl" ? "rounded-xl" : "rounded-lg",
           className,
@@ -295,20 +295,11 @@ function SoonRow({ icon, label, why }: { icon: IconValue; label: string; why: st
 
 // ────────────────────────────────── account ─────────────────────────────
 
-/** Fits the "Get the mobile app" flyout beside the panel, or not (the phone
- *  drawer, a narrow window) — then it opens inside the panel instead. */
-function useFlyoutFits(panelRef: React.RefObject<HTMLDivElement | null>): boolean {
-  const [fits, setFits] = React.useState(true);
-  React.useLayoutEffect(() => {
-    const measure = () => {
-      const r = panelRef.current?.getBoundingClientRect();
-      if (r) setFits(r.right + GAP + 248 + MARGIN <= window.innerWidth);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [panelRef]);
-  return fits;
+/** Whether the "Get the mobile app" flyout fits beside the panel. Where it
+ *  doesn't (the phone drawer, a narrow window) it opens inside the panel. */
+function flyoutFits(panel: HTMLElement | null): boolean {
+  const r = panel?.getBoundingClientRect();
+  return !!r && r.right + GAP + 248 + MARGIN <= window.innerWidth;
 }
 
 export function AccountPopover({
@@ -337,24 +328,23 @@ export function AccountPopover({
   const { ledger, hydrated } = useCredits();
   const totals = creditTotals(ledger);
   const level = levelOf(xpOf(ledger));
-  const [appOpen, setAppOpen] = React.useState(false);
-  const [appFocus, setAppFocus] = React.useState(false);
+  // The flyout: open or not, beside the panel or inside it (decided as it
+  // opens), and whether focus goes into it (opened from the keyboard).
+  const [app, setApp] = React.useState<{ beside: boolean; focus: boolean } | null>(null);
+  const appOpen = app !== null;
+  const beside = app?.beside ?? false;
   const appRowRef = React.useRef<HTMLButtonElement>(null);
   const appPanelRef = React.useRef<HTMLDivElement>(null);
-  const fits = useFlyoutFits(panelRef);
   const appId = React.useId();
 
   React.useLayoutEffect(() => {
-    // The inline flyout (no room beside) is in the panel, not a FloatingPanel.
-    if (appOpen && appFocus && !fits) appPanelRef.current?.focus({ preventScroll: true });
-  }, [appOpen, appFocus, fits]);
+    // Inside the panel it is a plain group, not a FloatingPanel, so it takes focus here.
+    if (app?.focus && !app.beside) appPanelRef.current?.focus({ preventScroll: true });
+  }, [app]);
 
-  const openApp = (withFocus: boolean) => {
-    setAppFocus(withFocus);
-    setAppOpen(true);
-  };
+  const openApp = (withFocus: boolean) => setApp({ beside: flyoutFits(panelRef.current), focus: withFocus });
   const closeApp = (backToRow: boolean) => {
-    setAppOpen(false);
+    setApp(null);
     if (backToRow) appRowRef.current?.focus({ preventScroll: true });
   };
 
@@ -392,7 +382,7 @@ export function AccountPopover({
           className="flex flex-col gap-[2px]"
           onPointerMove={(e) => {
             // Over another row: the flyout goes, as a submenu's does.
-            if (appOpen && fits && !appRowRef.current?.contains(e.target as Node)) closeApp(false);
+            if (beside && !appRowRef.current?.contains(e.target as Node)) closeApp(false);
           }}
         >
           {/* Who you are. No chevron: "My profile" below is where it goes, and
@@ -423,15 +413,17 @@ export function AccountPopover({
               aria-haspopup="dialog"
               aria-expanded={appOpen}
               aria-controls={appOpen ? appId : undefined}
-              onClick={() => (appOpen ? closeApp(false) : openApp(false))}
-              onPointerEnter={() => fits && !appOpen && openApp(false)}
+              // Beside the panel it already opened on hover, so a click keeps
+              // it; inside the panel (phones) the row toggles it.
+              onClick={() => (!appOpen ? openApp(false) : !beside && closeApp(false))}
+              onPointerEnter={() => !appOpen && flyoutFits(panelRef.current) && openApp(false)}
               onKeyDown={(e) => {
-                if (e.key === "ArrowRight" && fits) {
+                if (e.key === "ArrowRight" && !appOpen && flyoutFits(panelRef.current)) {
                   e.preventDefault();
                   openApp(true);
                 } else if ((e.key === "Enter" || e.key === " ") && !appOpen) {
                   e.preventDefault();
-                  openApp(fits);
+                  openApp(true);
                 }
               }}
               className={cn(ROW, ROW_LIVE, appOpen && "bg-bg-surface text-text-brand")}
@@ -440,12 +432,12 @@ export function AccountPopover({
               <span className="min-w-0 flex-1 truncate">Get Mobile App</span>
               <span
                 aria-hidden
-                className={cn("shrink-0 transition-transform duration-fast", !fits && appOpen && "rotate-90")}
+                className={cn("shrink-0 transition-transform duration-fast", appOpen && !beside && "rotate-90")}
               >
                 <Icon icon={ArrowRight01Icon} />
               </span>
             </button>
-            {appOpen && !fits && (
+            {appOpen && !beside && (
               <div
                 id={appId}
                 ref={appPanelRef}
@@ -473,7 +465,7 @@ export function AccountPopover({
         </div>
       </FloatingPanel>
 
-      {appOpen && fits && (
+      {appOpen && beside && (
         <FloatingPanel
           id={appId}
           role="dialog"
@@ -484,7 +476,7 @@ export function AccountPopover({
           valign="center"
           radius="lg"
           panelRef={appPanelRef}
-          initialFocus={appFocus ? "panel" : "none"}
+          initialFocus={app.focus ? "panel" : "none"}
           onKeyDown={(e) => {
             if (e.key === "Escape" || e.key === "ArrowLeft") {
               e.preventDefault();
@@ -604,7 +596,9 @@ function AppearanceRow() {
     refs.current[next]?.focus();
   };
   return (
-    <div className="flex h-[40px] items-center justify-between gap-[10px] px-[10px]">
+    // At phone width the choices drop under the label: three 44 px targets
+    // don't fit beside it.
+    <div className="flex h-[40px] items-center justify-between gap-[10px] px-[10px] max-md:h-auto max-md:flex-col max-md:items-start max-md:gap-[6px] max-md:py-[8px]">
       <span className="flex items-center gap-[10px] text-md font-medium leading-md text-text-primary">
         <Icon icon={Moon02Icon} size={20} />
         <span id={labelId}>Appearance</span>
@@ -612,7 +606,7 @@ function AppearanceRow() {
       <span
         role="radiogroup"
         aria-labelledby={labelId}
-        className="flex items-center gap-[4px]"
+        className="flex items-center gap-[4px] max-md:w-full max-md:justify-between max-md:pl-[30px]"
         onKeyDown={(e) => {
           if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
             e.preventDefault();

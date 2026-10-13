@@ -55,7 +55,7 @@ ideeza-creator-panel/
    │
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
-   │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
+   │  ├─ dashboard/          sidebar (+ sidebar-account: account / wallet popovers), workspace-prompt (hero), command-palette (⌘K)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,

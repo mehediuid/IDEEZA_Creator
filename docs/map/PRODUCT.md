@@ -7,7 +7,7 @@ Start here for any code change: open the area's router, then only the files it n
 | Find which route renders what | [src/app/README.md](../../src/app/README.md) | URL-level behaviour: [app-map.md](../guides/app-map.md) |
 | Find a component or UI module | [src/components/README.md](../../src/components/README.md) | UI rules: [ui-ux.md](../guides/ui-ux.md) |
 | Find a store, model or algorithm | [src/lib/README.md](../../src/lib/README.md) | Stores persist to `localStorage` (`ideeza:*`) |
-| Global shell: sidebar, phone drawer, ⌘K, theme | `src/components/dashboard/`, `theme-provider.tsx` | [features/platform-and-projects.md](../guides/features/platform-and-projects.md) › Platform & shell |
+| Global shell: sidebar, phone drawer, account / wallet popovers, ⌘K, theme | `src/components/dashboard/`, `theme-provider.tsx` | [features/platform-and-projects.md](../guides/features/platform-and-projects.md) › Platform & shell |
 | Home prompt, concept chat, build, review card, credits, history, toasts | `src/components/create/`, `src/lib/create/` | [features/ai-create-flow.md](../guides/features/ai-create-flow.md); Part 4 spec |
 | Product spec sheet | `src/lib/spec/`, `src/components/create/spec-*.tsx` | features/ai-create-flow.md; spec `2026-09-25-product-spec-sheet-design.md` |
 | Build review's 3D tab | `src/components/create/model-panel/`, `src/lib/three/assembly.ts` | features/ai-create-flow.md; spec `2026-09-25-3d-model-review-design.md` |
