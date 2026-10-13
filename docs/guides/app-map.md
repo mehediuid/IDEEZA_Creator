@@ -4,7 +4,7 @@ Moved verbatim from `CLAUDE.md` §3 on 2026-09-29. Keep it current: [AGENTS.md �
 
 **Global shell** (`components/app-chrome`, `components/dashboard/sidebar`):
 left sidebar nav — **Home · History · My projects · Parts & agile module ·
-Explore marketplace · Innovations · Messages · Blog**; top bar — Search + **⌘K
+Explore marketplace · Innovations · Blog · Messages**; top bar — Search + **⌘K
 command palette**, Upgrade to Pro, Tutorial / Tour guide / Help / Report,
 profile dropdown, plan badge (Free/Pro).
 
@@ -19,6 +19,7 @@ profile dropdown, plan badge (Free/Pro).
 - `/marketplace` — **Explore marketplace**: For sale · Sold · Purchased, with the *Shopping as* demo-buyer switch (all Testnet demo).
 - `/marketplace/[id]`, `/marketplace/[id]/products/[productId]` — the buyer view of a listed project and its products: buyer rail, purchase, bids, holder features. A paused listing reads "off the marketplace for now" to anyone who holds none of it.
 - `/messages`, `/messages/[conversationId]`, `/messages/new` (`?to=&project=&about=listing|purchase:<saleId>|team`, `?to=feed:<id>&post=<slug>`, `?team=<projectId>`; any of them `?as=<person>`) — **Messages**: the conversation list (Inbox · Requests) and one conversation, two panes from 1024 px; `new` finds the conversation an entry point names or drafts it. Demo identities in this browser; see [features/messages.md](features/messages.md).
+- `/blog`, `/blog/new`, `/blog/[slug]`, `/blog/[slug]/edit`, `/blog/[slug]/preview` (`/blog?tab=&q=&page=`) — **Blog**: your articles, the editor (new or one article), the article page with its status, and the draft in the reader view. An article is found by the end of its id, so an old title's address still opens it; see [features/blog.md](features/blog.md).
 - `/history` — **History**: Model Generations · Project/Product Generations.
 - `/parts` — **Parts & Agile Module**: the catalogue, captured Agile Modules, and the packages you have authored.
 - `/parts/new` — **New Package flow**: Package → Symbol → Footprint → 3D Place → Finalize (full-viewport).
