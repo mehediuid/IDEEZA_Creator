@@ -30,7 +30,9 @@ import {
   Notification03Icon,
 } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
+import { buildCost } from "@/lib/create/credits";
+import { productsOf, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
+import { TopUpButton } from "./top-up-dialog";
 // "PCB" · "PCB and Firmware code" — the build page's own join rule, so
 // the two surfaces can't word one list two ways.
 import { joinLabels } from "./build-status";
@@ -117,16 +119,13 @@ export function BuildAttentionBanner() {
         ? `${name} is paused — top up credits to start it`
         : `${name} is ready`;
 
-  const ctaLabel = reason === "credits" ? "Top up credits" : "Open build";
   // The build's home is the chat it was started from — that is where its
   // pipeline and its output are. /build/<id> stays as the destination for a
-  // job whose chat this browser no longer holds.
-  const ctaHref =
-    reason === "credits"
-      ? "/history#credits"
-      : job.chatId
-        ? `/chat/${job.chatId}`
-        : `/build/${job.id}`;
+  // job whose chat this browser no longer holds. A paused build's way out is
+  // the Top up credits dialog, in place: the build starts once it's covered.
+  const ctaHref = job.chatId ? `/chat/${job.chatId}` : `/build/${job.id}`;
+  const ctaClass =
+    "inline-flex h-[36px] shrink-0 items-center gap-[8px] rounded-lg bg-bg-brand px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus";
 
   return createPortal(
     <div
@@ -163,13 +162,17 @@ export function BuildAttentionBanner() {
           {message}
         </p>
       </div>
-      <Link
-        href={ctaHref}
-        className="inline-flex h-[36px] shrink-0 items-center gap-[8px] rounded-lg bg-bg-brand px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus"
-      >
-        {ctaLabel}
-        <Icon icon={ArrowRight01Icon} />
-      </Link>
+      {reason === "credits" ? (
+        <TopUpButton need={buildCost(productsOf(job).length)} className={ctaClass}>
+          Top up credits
+          <Icon icon={ArrowRight01Icon} />
+        </TopUpButton>
+      ) : (
+        <Link href={ctaHref} className={ctaClass}>
+          Open build
+          <Icon icon={ArrowRight01Icon} />
+        </Link>
+      )}
       <button
         type="button"
         aria-label="Dismiss this notification"

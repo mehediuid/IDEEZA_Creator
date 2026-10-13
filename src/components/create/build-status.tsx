@@ -35,6 +35,7 @@ import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, type BannerTone } from "@/components/ideeza";
 import { buildCost } from "@/lib/create/credits";
+import { TopUpButton } from "./top-up-dialog";
 import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
@@ -76,7 +77,8 @@ export type StateRow = {
   // The link that closes the footer — home everywhere except the
   // credits pause, where the one thing that moves the build on is a
   // top-up.
-  footerLink: { label: string; href: string };
+  /** `topUp`: the link opens Top up credits for this build's price instead of navigating. */
+  footerLink: { label: string; href: string; topUp?: number };
   // The whole-build action this state offers: the retry after a system
   // failure, or the cancel a queued build is allowed (Part 4 §4.6).
   actions?: "retryAll" | "cancelQueued";
@@ -151,7 +153,7 @@ export function stateRowFor(
       meta: "Waiting for credits",
       actions: "cancelQueued",
       footer: "Your place in the queue is kept — nothing else is needed from you.",
-      footerLink: { label: "Top up credits →", href: "/history#credits" },
+      footerLink: { label: "Top up credits →", href: "/history#credits", topUp: cost },
     };
   }
 
@@ -475,13 +477,22 @@ export function BuildStatus({
 
       <div className="text-center">
         <p className="text-sm text-text-tertiary">{row.footer}</p>
-        {!(inChat && row.footerLink.href === HOME_LINK.href) && (
-          <Link
-            href={row.footerLink.href}
-            className="mt-[4px] inline-block text-sm font-semibold text-text-link no-underline outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+        {row.footerLink.topUp !== undefined ? (
+          <TopUpButton
+            need={row.footerLink.topUp}
+            className="mt-[4px] inline-block text-sm font-semibold text-text-link outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             {row.footerLink.label}
-          </Link>
+          </TopUpButton>
+        ) : (
+          !(inChat && row.footerLink.href === HOME_LINK.href) && (
+            <Link
+              href={row.footerLink.href}
+              className="mt-[4px] inline-block text-sm font-semibold text-text-link no-underline outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              {row.footerLink.label}
+            </Link>
+          )
         )}
       </div>
     </section>

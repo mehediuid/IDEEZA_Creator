@@ -12,8 +12,6 @@
 // not motion).
 
 import * as React from "react";
-import { ArrowUpRight01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
 import { useCreatePlan } from "@/lib/create/plan";
 
 export function QuotaCard() {
@@ -79,21 +77,11 @@ export function QuotaCard() {
         </div>
       </div>
 
-      {/* Right: upgrade affordance */}
-      <div className="flex shrink-0 items-center gap-[16px]">
-        <p className="hidden text-sm font-medium text-text-secondary sm:block">
-          {exhausted
-            ? "You've hit today's limit — upgrade for more."
-            : "Get unlimited submissions by upgrading"}
-        </p>
-        <a
-          href="/upgrade"
-          className="inline-flex h-[40px] items-center gap-[8px] rounded-lg bg-violet-600 px-[16px] text-md font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-violet-500 focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          Upgrade Now
-          <Icon icon={ArrowUpRight01Icon} />
-        </a>
-      </div>
+      {/* Right: plans. "Upgrade Now" linked to /upgrade, which doesn't
+          exist; until plans are on sale the card says so instead. */}
+      <p className="shrink-0 text-sm font-medium text-text-tertiary">
+        Plans aren&apos;t on sale yet
+      </p>
     </Shell>
   );
 }

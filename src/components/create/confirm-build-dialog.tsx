@@ -31,6 +31,7 @@ import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost, useCredits } from "@/lib/create/credits";
 import { useDialogFocus } from "./use-dialog-focus";
+import { TopUpButton, useTopUp } from "./top-up-dialog";
 import { BUILD_ESTIMATE_MIN } from "@/lib/create/history";
 import {
   describeFallback,
@@ -155,10 +156,13 @@ export function ConfirmBuildDialog({
   submitting: boolean;
 }) {
   const { hydrated: creditsHydrated, balance } = useCredits();
+  // Top up credits opens over the gate when the balance falls short; while it
+  // is up it owns the keyboard, and the gate takes it back when it closes.
+  const { isOpen: toppingUp } = useTopUp();
   const panelRef = React.useRef<HTMLDivElement>(null);
   // Focus in on open, held inside while open, back to the build button on
   // close — focus used to stay on <body> with the page behind still tabbable.
-  useDialogFocus(open, panelRef);
+  useDialogFocus(open && !toppingUp, panelRef);
   const [resolved, setResolved] = React.useState<{
     turnId: string;
     concept: ConceptSummary;
@@ -191,13 +195,13 @@ export function ConfirmBuildDialog({
 
   // Esc / outside-click dismiss.
   React.useEffect(() => {
-    if (!open) return;
+    if (!open || toppingUp) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCancel();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
+  }, [open, onCancel, toppingUp]);
 
   if (!open) return null;
 
@@ -301,6 +305,17 @@ export function ConfirmBuildDialog({
           >
             Cancel
           </button>
+          {/* Short of credits: the way on is right here, not a greyed Build
+              that only says no. The balance updates in place, so Build
+              wakes up as soon as the top up covers it. */}
+          {shortOnCredits && (
+            <TopUpButton
+              need={cost}
+              className="inline-flex h-[40px] items-center rounded-lg border border-solid border-border-brand bg-bg-surface px-[14px] text-md font-semibold text-text-brand outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:ring-2 focus-visible:ring-border-focus"
+            >
+              Top up credits
+            </TopUpButton>
+          )}
           {/* Busy is a spinner, not a word swap. Confirming reads each
               product's concept back before the build can be booked, which is
               a round-trip per product, and "Generate" quietly becoming

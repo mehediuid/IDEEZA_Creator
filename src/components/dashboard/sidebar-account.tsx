@@ -21,7 +21,6 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import {
   AndroidIcon,
   AppleIcon,
@@ -35,10 +34,11 @@ import {
   UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
+import { useTopUp } from "@/components/create/top-up-dialog";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
-import { useCredits } from "@/lib/create/credits";
+import { BUILD_COST, useCredits } from "@/lib/create/credits";
 import { useCreatePlan } from "@/lib/create/plan";
 import { menuEntryOf } from "@/lib/wallet/request-view";
 import { useDemoWallet } from "@/lib/wallet/use-demo-wallet";
@@ -315,9 +315,13 @@ export function AccountPopover({
     }
   };
 
-  const leave = () => {
-    onClose(false);
+  // Top up opens its dialog in place. The popover closes first and hands
+  // focus to the avatar, so the dialog has somewhere to give it back.
+  const { open: openTopUp } = useTopUp();
+  const topUp = () => {
+    onClose(true);
     onLeave?.();
+    openTopUp();
   };
 
   return (
@@ -356,7 +360,7 @@ export function AccountPopover({
             total={totals.total}
             remaining={totals.remaining}
             level={level}
-            onLeave={leave}
+            onTopUp={topUp}
           />
 
           <div className="mt-[2px] flex flex-col gap-[2px]">
@@ -456,14 +460,17 @@ function BalanceCard({
   total,
   remaining,
   level,
-  onLeave,
+  onTopUp,
 }: {
   hydrated: boolean;
   total: number;
   remaining: number;
   level: ReturnType<typeof levelOf>;
-  onLeave: () => void;
+  onTopUp: () => void;
 }) {
+  // Quiet while there is enough for a build; the strongest thing on the card
+  // once there isn't.
+  const low = hydrated && remaining < BUILD_COST;
   const share = total > 0 ? remaining / total : 0;
   const xpText = level.cap === null ? `${level.xp.toLocaleString()} XP` : `${level.xp.toLocaleString()} / ${level.cap.toLocaleString()} XP`;
   return (
@@ -473,17 +480,21 @@ function BalanceCard({
           <CreditRing share={share} />
           <span className="text-md font-semibold leading-md tracking-wide text-text-primary">Balance</span>
         </span>
-        {/* The Builder plan isn't on sale yet, so more credits is the top-up
-            on the credits ledger — where Upgrade takes you. */}
-        <Link
-          href="/history#credits"
+        {/* Top up, not Upgrade: it adds credits, it doesn't change the plan
+            (pricing study, 2026-10-13). Plans have their own home. */}
+        <button
+          type="button"
           data-nav-item
-          onClick={onLeave}
-          title="The Builder plan isn't on sale yet. Top up free credits on your credits page."
-          className={cn(buttonVariants({ hierarchy: "primary", size: "md" }), "h-[32px] rounded-lg py-0")}
+          aria-haspopup="dialog"
+          aria-label="Top up credits"
+          onClick={onTopUp}
+          className={cn(
+            buttonVariants({ hierarchy: low ? "primary" : "secondary", size: "md" }),
+            "h-[32px] rounded-lg py-0",
+          )}
         >
-          Upgrade
-        </Link>
+          Top up
+        </button>
       </div>
       <dl className="flex flex-col gap-[4px] text-sm">
         <div className="flex items-center justify-between">

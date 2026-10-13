@@ -74,6 +74,8 @@ export type CreditEntry = {
   /** What was charged: a build id, or a concept turn id. The field keeps
    *  its name because ledgers are already stored under it. */
   buildId?: string;
+  /** A top-up's order: one press of "Add credits". The same order adds once. */
+  orderId?: string;
   ts: number;
 };
 
@@ -84,7 +86,6 @@ export type CreditsState = {
 
 const STORAGE_KEY = "ideeza:create:credits";
 const SEED_BALANCE = 8;
-const TOP_UP_AMOUNT = 10;
 
 // Safe placeholder for the pre-hydration render only — never shown,
 // since both QuotaCard's and CreditsCard's convention is to render a
@@ -207,13 +208,23 @@ export function refundState(
 }
 
 // Adds credits with no charge behind them — there's no payment
-// integration, so every call site that offers this must say so (see
-// describeEntry's "topup" line and the CreditsCard copy).
-export function topUpState(state: CreditsState, n: number): CreditsState {
+// integration, so every call site that offers this must say so (the Top up
+// credits dialog does). Idempotent per `orderId`: an order already in the
+// ledger returns the state unchanged, so a double click or a replayed
+// confirm adds once.
+export function topUpState(
+  state: CreditsState,
+  n: number,
+  orderId?: string,
+): CreditsState {
+  const amount = Math.trunc(n);
+  if (amount <= 0) return state;
+  if (orderId && state.ledger.some((e) => e.orderId === orderId)) return state;
   return applyEntry(state, {
     id: makeId(),
-    delta: n,
+    delta: amount,
     reason: "topup",
+    ...(orderId ? { orderId } : {}),
     ts: Date.now(),
   });
 }
@@ -236,6 +247,10 @@ export function describeEntry(entry: CreditEntry, subject?: string): string {
       return `${sign}${amount} Concept render`;
     case "refund":
       return `${sign}${amount} Refund${about}`;
+    default:
+      // A reason this build doesn't know (a ledger written by newer code)
+      // still reads as an amount rather than a blank row.
+      return `${sign}${amount} Credits`;
   }
 }
 
@@ -248,7 +263,8 @@ type Ctx = {
   canAfford: (cost?: number) => boolean;
   charge: (buildId: string, cost?: number, reason?: ChargeReason) => boolean;
   refund: (buildId: string) => boolean;
-  topUp: (n: number) => void;
+  /** Adds `n` credits once per `orderId`; false when that order already added. */
+  topUp: (n: number, orderId?: string) => boolean;
 };
 
 const CreditsContext = React.createContext<Ctx | null>(null);
@@ -269,6 +285,20 @@ export function CreditsProvider({
   React.useEffect(() => {
     setState(loadStored());
     setHydrated(true);
+  }, []);
+
+  // Another tab wrote the ledger (a top up there, a build charged there):
+  // adopt it, so this tab's next write doesn't put back a stale balance.
+  // Writing the same value back raises no event, so the tabs don't echo.
+  React.useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || e.newValue === null) return;
+      const next = loadStored();
+      stateRef.current = next;
+      setState(next);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   // Persist on change post-hydration.
@@ -326,8 +356,15 @@ export function CreditsProvider({
     return result.ok;
   }, []);
 
-  const topUp = React.useCallback((n: number) => {
-    setState((prev) => topUpState(prev, n));
+  // Through the ref like charge and refund: a top up that only queued a
+  // setState updater was lost when a build charged in the same tick, since
+  // the charge wrote its state from the ref the top up never advanced.
+  const topUp = React.useCallback((n: number, orderId?: string) => {
+    const next = topUpState(stateRef.current, n, orderId);
+    if (next === stateRef.current) return false;
+    stateRef.current = next;
+    setState(next);
+    return true;
   }, []);
 
   const value: Ctx = {
@@ -353,6 +390,3 @@ export function useCredits(): Ctx {
   return ctx;
 }
 
-// Exported for the Top-up affordance's copy — kept here so the amount
-// can't drift from what topUp() actually adds.
-export const TOP_UP_CREDITS = TOP_UP_AMOUNT;

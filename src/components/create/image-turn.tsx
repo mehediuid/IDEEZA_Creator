@@ -31,7 +31,7 @@ import {
   Refresh01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
-import Link from "next/link";
+import { TopUpButton } from "./top-up-dialog";
 import { Icon } from "@/components/dashboard/icon";
 import { Checkbox } from "@/components/ideeza/checkbox";
 import { BUILD_COST, CONCEPT_COST, useCredits } from "@/lib/create/credits";
@@ -375,12 +375,12 @@ export function InsufficientCreditsBanner({ cost }: { cost: number }) {
           Building it costs {cost} credits — {BUILD_COST} per product — and
           each concept render costs {CONCEPT_COST}.
         </p>
-        <Link
-          href="/history#credits"
-          className="w-fit text-sm font-semibold text-text-warning no-underline outline-none transition-opacity duration-fast hover:opacity-80 focus-visible:ring-2 focus-visible:ring-border-focus"
+        <TopUpButton
+          need={cost}
+          className="w-fit text-left text-sm font-semibold text-text-warning outline-none transition-opacity duration-fast hover:opacity-80 focus-visible:ring-2 focus-visible:ring-border-focus"
         >
           Top up credits →
-        </Link>
+        </TopUpButton>
       </div>
     </aside>
   );

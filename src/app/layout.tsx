@@ -12,6 +12,7 @@ import { ManualProjectsProvider } from "@/lib/manual/projects";
 import { MarketProvider } from "@/lib/market/market-store";
 import { BuildSimulator } from "@/components/create/build-simulator";
 import { WalletProvider } from "@/components/wallet/wallet-provider";
+import { TopUpProvider } from "@/components/create/top-up-dialog";
 import { VideosDialogHost } from "@/components/projects/make-videos";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
@@ -115,11 +116,15 @@ export default function RootLayout({
                               useWalletRequest(), inside the projects and
                               market stores its requests write to. */}
                           <WalletProvider>
-                            {children}
-                            {/* The products' videos dialog a missing-video step
-                                opens (make-videos.tsx): here, so it outlives the
-                                step's row when the last video lands. */}
-                            <VideosDialogHost />
+                            {/* TopUpProvider: the one Top up credits dialog,
+                                opened in place from every shortfall. */}
+                            <TopUpProvider>
+                              {children}
+                              {/* The products' videos dialog a missing-video step
+                                  opens (make-videos.tsx): here, so it outlives the
+                                  step's row when the last video lands. */}
+                              <VideosDialogHost />
+                            </TopUpProvider>
                           </WalletProvider>
                           {/* A build is a background job: it has to keep
                               running whatever page the user is on, so the
