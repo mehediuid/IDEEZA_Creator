@@ -159,3 +159,29 @@ test("listingFactsOf reads only the newest Main listing and live copies", () => 
   assert.equal(listingFactsOf("p1", [], [], [T({ listing: null })]).copiesLive, false);
   assert.equal(listingFactsOf("p2", [L()], [], [T()]).mainLive, false);
 });
+
+// ── the headline suggestion ──
+import { headlinePrompt, cleanHeadline } from "../../.tmp-test/lib/people/headline.js";
+
+test("headlinePrompt needs a shared project and clips its inputs", () => {
+  assert.equal(headlinePrompt([]), null);
+  assert.equal(headlinePrompt([{ title: "  ", story: "" }]), null);
+  const p = headlinePrompt([{ title: "Smart Lamp", story: "x".repeat(900) }]);
+  assert.ok(p.includes("Smart Lamp"));
+  assert.ok(p.length < 700);
+  const many = headlinePrompt(Array.from({ length: 9 }, (_, i) => ({ title: `Thing ${i}`, story: "" })));
+  assert.ok(many.includes("Thing 5"));
+  assert.ok(!many.includes("Thing 6"));
+});
+
+test("cleanHeadline returns one plain line of at most 60 characters", () => {
+  assert.equal(cleanHeadline('"Headline: Desk lamps and plant sensors."'), "Desk lamps and plant sensors");
+  assert.equal(cleanHeadline("**Builds solar soil sensors**\nfor farms"), "Builds solar soil sensors");
+  assert.equal(cleanHeadline('{"a":1}'), null);
+  assert.equal(cleanHeadline("   "), null);
+  assert.equal(cleanHeadline("Rate limit reached, please try again later"), null);
+  const long = cleanHeadline("Builds tiny solar powered soil moisture sensors and pump timers for small family farms in Bangladesh");
+  assert.ok(long.length <= 60);
+  assert.ok(!long.endsWith(" "));
+  assert.ok("Builds tiny solar powered soil moisture sensors and pump timers".startsWith(long));
+});

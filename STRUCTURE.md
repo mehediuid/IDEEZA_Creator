@@ -36,6 +36,7 @@ ideeza-creator-panel/
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
    │  │   │   ├─ new/                 "/parts/new" — New Package authoring flow
    │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
+   │  │   ├─ creators/[handle]/       a creator's profile (me = yours)
    │  │   └─ innovations/[slug]/      community feed + the post (+ products/[productId]/)
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/                    "/projects" — My projects (index)
@@ -83,6 +84,7 @@ ideeza-creator-panel/
    │  │                      docs/guides/features/platform-and-projects.md
    │  ├─ marketplace/        Explore marketplace page + cards, the buyer view and rail, purchase,
    │  │                      bid dialogs, Ask the creator / Get creator support, demo-buyer banner
+   │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, settings + report dialogs
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
@@ -167,6 +169,8 @@ ideeza-creator-panel/
    │  │                      sell-flow (the Sell copies flow's steps), fees, market-store (local "Testnet demo" data)
    │  ├─ wallet/             the demo wallet: identities, mint, balances, requests
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
+   │  ├─ people/             the creator profile's people layer: one person id and handles, profile
+   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
    │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),
    │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)

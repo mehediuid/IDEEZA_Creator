@@ -18,6 +18,7 @@ UI grouped by module; logic and data for the same module live in [src/lib/](../l
 | `wallet/` | The Demo wallet provider and dialog, its menu entry, the shared mint-type field, cost rows, proof card and `use-mint` | features/platform-and-projects.md › Mint |
 | `network/` | Add Network wizard, connection canvas, Connection Map page, project Network section | features/platform-and-projects.md; spec `2026-09-24-add-network-design.md` |
 | `parts/`, `package/` | `/parts` library + part detail; the New Package flow (entry, symbol, footprint, 3D place, finalize) | [features/parts-package.md](../../docs/guides/features/parts-package.md) |
+| `profile/` | The creator profile at `/creators/[handle]`: the page (own and someone else's view), the header, the owner-only line, the Made grid with pins, Edit profile with Suggest from my work | features/platform-and-projects.md › Creator profile; spec `2026-10-14-creator-profile-design.md` |
 | `messages/` | Messages: the shell (Acting as, the two panes), the conversation list, one conversation (header, request bar, context card, timeline, composer), the start view behind `/messages/new`, the settings and report dialogs | [features/messages.md](../../docs/guides/features/messages.md); spec `2026-10-13-messages-design.md` |
 | `newsfeed/` | Innovations feed, cards, controls, minted badge, the post's creator row (Message) | features/platform-and-projects.md |
 | `pcb/` | The schematic + PCB editor | [pcb/README.md](pcb/README.md) |

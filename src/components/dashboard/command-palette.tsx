@@ -134,7 +134,7 @@ export function CommandPalette({
         icon: ComputerIcon, onActivate: exit(() => setTheme("system")) },
       // Account
       { id: "profile", label: "Profile", category: "Account",
-        icon: User02Icon, onActivate: exit(() => {}) },
+        icon: User02Icon, onActivate: exit(() => router.push("/creators/me")) },
       { id: "wallet", label: "Wallet & tokens", category: "Account",
         icon: Wallet01Icon, onActivate: exit(() => {}) },
       { id: "settings", label: "Settings", category: "Account",

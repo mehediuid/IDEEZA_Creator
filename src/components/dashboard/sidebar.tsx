@@ -18,7 +18,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowDown01Icon,
   BookOpen01Icon,
@@ -63,6 +63,9 @@ import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
 import { linkVariants } from "@/components/ideeza";
 import { openReportProblem } from "@/lib/support/open-report";
+import { displayNameOf, initialsOf } from "@/lib/people/ids";
+import { useMyPhoto } from "@/lib/people/photo-store";
+import { useMyProfile } from "@/lib/people/profile-store";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -104,11 +107,6 @@ function useMessagesUnread(): number {
   if (!hydrated || !people.hydrated) return 0;
   return countsFor(data, asId, people.teamIdsOf).unread;
 }
-
-const USER = {
-  name: "You",
-  initials: "Y",
-};
 
 const COLLAPSED_KEY = "ideeza:sidebar:collapsed";
 
@@ -737,6 +735,11 @@ function ProfileRow({
     };
   }, [openPanel]);
 
+  const { fields: profile } = useMyProfile();
+  const photo = useMyPhoto();
+  const meName = displayNameOf(profile.name);
+  const meInitials = initialsOf(meName, profile.latinName || null);
+
   return (
     <div ref={ref} className="relative border-t border-border pt-[12px]">
       <div className="flex items-center gap-[6px]">
@@ -748,8 +751,8 @@ function ProfileRow({
           }
           aria-haspopup="menu"
           aria-expanded={openPanel === "menu"}
-          aria-label={`${USER.name} — open account menu`}
-          title={collapsed ? `${USER.name} — account` : undefined}
+          aria-label={`${meName} — open account menu`}
+          title={collapsed ? `${meName} — account` : undefined}
           className={[
             "flex min-w-0 flex-1 items-center rounded-lg outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
             collapsed
@@ -759,14 +762,19 @@ function ProfileRow({
         >
           <span
             aria-hidden
-            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-bg-brand text-md font-bold text-text-on-brand"
+            className="relative inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full bg-bg-brand text-md font-bold text-text-on-brand"
           >
-            {USER.initials}
+            {photo.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              meInitials
+            )}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1 text-left">
               <span className="block truncate text-md font-medium text-text-primary">
-                {USER.name}
+                {meName}
               </span>
               <span className="block truncate text-xs font-regular text-text-tertiary">
                 Free plan
@@ -922,6 +930,7 @@ function AccountMenu({
   onOpenWallet: () => void;
 }) {
   const [walletOpen, setWalletOpen] = React.useState(false);
+  const router = useRouter();
   return (
     <div
       role="menu"
@@ -939,6 +948,7 @@ function AccountMenu({
           label="Profile"
           onClick={() => {
             onClose();
+            router.push("/creators/me");
           }}
         />
         <MenuRow
