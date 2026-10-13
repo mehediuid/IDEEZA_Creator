@@ -378,7 +378,6 @@ function Workspace({
   const savedName = article?.draft.title.trim();
   const tabTitle = savedName ? `Edit “${savedName}” · Blog · IDEEZA` : `${isNew ? "New article" : "Edit article"} · Blog · IDEEZA`;
   React.useEffect(() => {
-    const previous = document.title;
     const apply = () => {
       if (document.title !== tabTitle) document.title = tabTitle;
     };
@@ -387,10 +386,8 @@ function Workspace({
     // (the usePageArrival note): apply again whenever <head> changes.
     const watch = new MutationObserver(apply);
     watch.observe(document.head, { childList: true, subtree: true, characterData: true });
-    return () => {
-      watch.disconnect();
-      document.title = previous;
-    };
+    // No restore on the way out: it ran after the next page had named its tab and undid it.
+    return () => watch.disconnect();
   }, [tabTitle]);
 
   // ── the What to change panel has been read ──

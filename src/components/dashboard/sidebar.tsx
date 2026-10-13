@@ -807,10 +807,12 @@ function NotificationBell({
   const outcomes = blog.hydrated ? unseenOutcomes(blog.data) : [];
   const count = attentionBuilds.length + outcomes.length;
 
-  const label =
-    count > 0
-      ? `Notifications, ${count} need${count === 1 ? "s" : ""} attention`
-      : "No notifications yet";
+  const builds = attentionBuilds.length;
+  const parts = [
+    builds ? `${builds} need${builds === 1 ? "s" : ""} attention` : "",
+    outcomes.length ? `${outcomes.length} Blog review result${outcomes.length === 1 ? "" : "s"}` : "",
+  ].filter(Boolean);
+  const label = count > 0 ? `Notifications, ${parts.join(", ")}` : "No notifications yet";
 
   return (
     <div className="relative shrink-0">

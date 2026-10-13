@@ -51,6 +51,11 @@ export function BlogList() {
   const params = useSearchParams();
   const now = useNow();
   const [coverFor, setCoverFor] = React.useState<string | null>(null);
+  // Coming back from the editor or an article keeps the layout's metadata, so Next leaves the
+  // tab named after the last article: name it again.
+  React.useEffect(() => {
+    document.title = "Blog · IDEEZA";
+  }, []);
   const actions = useArticleActions({ onChangeCover: (a) => setCoverFor(a.id) });
 
   // ── the view ──
