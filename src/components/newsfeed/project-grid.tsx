@@ -1,13 +1,15 @@
 "use client";
 
 // ProjectGrid — responsive thumbnail grid + pagination. Refetches whenever the
-// feed params change (mode / category / sort / search); appends on "Load more".
+// feed params change (mode / category / sort / search) or, in Following, whom
+// this browser follows (a Follow on a post counts here); appends on "Load more".
 // Skeletons cover the initial load; empty + error states are explicit.
 
 import * as React from "react";
 import { ProjectCard } from "./project-card";
 import { EmptyState } from "./empty-state";
-import { fetchFeed, type FeedParams, type Project } from "@/lib/feed";
+import { fetchFeed, followParamOf, type FeedParams, type Project } from "@/lib/feed";
+import { useReactions } from "@/lib/innovations/reactions";
 
 // Up to 4 columns, never more — collapses 4 → 3 → 2 → 1 as the viewport
 // narrows. Capping the column count makes each card fill a larger share of the
@@ -28,14 +30,19 @@ export function ProjectGrid({
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [reloadToken, setReloadToken] = React.useState(0);
 
-  const key = `${params.mode}|${params.category}|${params.sort}|${params.q}`;
+  const { hydrated, reactions } = useReactions();
+  const follow = reactions.follow;
+  const following = params.mode === "following" ? followParamOf(follow) : "";
+  const key = `${params.mode}|${params.category}|${params.sort}|${params.q}|${following}`;
 
   React.useEffect(() => {
+    // Following waits for this browser's follows, so it never flashes the dataset's list first.
+    if (params.mode === "following" && !hydrated) return;
     let cancelled = false;
     setStatus("loading");
     setItems([]);
     setCursor(null);
-    fetchFeed(params, null)
+    fetchFeed(params, null, follow)
       .then((res) => {
         if (cancelled) return;
         setItems(res.projects);
@@ -48,15 +55,15 @@ export function ProjectGrid({
     return () => {
       cancelled = true;
     };
-    // params is fully encoded by `key`; reloadToken forces a manual retry.
+    // params and follow are fully encoded by `key`; reloadToken forces a manual retry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reloadToken]);
+  }, [key, reloadToken, hydrated]);
 
   const loadMore = async () => {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await fetchFeed(params, cursor);
+      const res = await fetchFeed(params, cursor, follow);
       setItems((prev) => [...prev, ...res.projects]);
       setCursor(res.nextCursor);
     } catch {

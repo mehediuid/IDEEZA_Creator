@@ -22,6 +22,17 @@ export { Banner, type BannerProps, type BannerTone } from "./banner";
 export { Segmented, type SegmentedProps, type SegmentedOption, type SegmentedSize } from "./segmented";
 export { Tooltip } from "./tooltip";
 export { Badge, type BadgeTone } from "./badge";
+export {
+  Avatar,
+  AvatarLabelGroup,
+  type AvatarProps,
+  type AvatarSize,
+  type AvatarLabelGroupProps,
+  type AvatarLabelGroupSize,
+} from "./avatar";
+export { Tag, type TagProps, type TagSize } from "./tag";
+export { Skeleton, type SkeletonProps, type SkeletonShape, type SkeletonSize } from "./skeleton";
+export { Menu, type MenuItem, type MenuProps, type MenuTriggerProps } from "./menu";
 export { TestnetDemoBadge, TESTNET_DEMO_LABEL } from "./testnet-demo-badge";
 export { Spinner } from "./spinner";
 export { ProgressBar } from "./progress-bar";

@@ -5,14 +5,16 @@
 // project). The feed below is a sample dataset with no write path, so a
 // shared project shows here, at the top of Innovations, newest first: a
 // cover, the name with the post's status, its story, its product count and
-// when it was shared, linking to its project page. Nothing renders until the
-// stores are read, or when nothing is shared.
+// when it was shared, linking to its post — what visitors see, with the
+// maker's own controls on top (plan D8). Nothing renders until the stores are
+// read, or when nothing is shared.
 
 import * as React from "react";
 import Link from "next/link";
 import { CpuIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { useCreateHistory } from "@/lib/create/history";
+import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { buildsOf, coverOf, productRowsOf } from "@/lib/manual/project-read";
 import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
@@ -30,6 +32,7 @@ export function SharedByYou() {
         .sort((a, b) => (b.showcasedAt ?? 0) - (a.showcasedAt ?? 0))
         .map((p) => ({
           id: p.id,
+          href: postHref(mineSlugOf(p)),
           name: p.name.trim() || "Untitled project",
           products: productRowsOf(p).length,
           at: p.showcasedAt as number,
@@ -51,7 +54,7 @@ export function SharedByYou() {
         {shared.map((p) => (
           <li key={p.id}>
             <Link
-              href={`/projects/${p.id}`}
+              href={p.href}
               className="group flex items-start gap-[12px] rounded-xl border border-solid border-border bg-bg-surface p-[10px] outline-none transition-colors duration-normal ease-out hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus motion-reduce:transition-none"
             >
               <span className="relative flex size-[56px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-bg-subtle text-text-tertiary">

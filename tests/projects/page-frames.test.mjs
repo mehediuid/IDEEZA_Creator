@@ -191,7 +191,7 @@ test("no Premium Parts tab on either page (P2-TABS-30); the project's one ⋯ me
   }
   const menu = read(DETAILS + "project-menu.tsx");
   assert.match(menu, /aria-label="Project actions"\s+aria-haspopup="menu"/);
-  for (const item of ["Edit name and description", "Share to Innovations", "Stop sharing", "Activity", "Delete project…"]) {
+  for (const item of ["Edit name and description", "Share to Innovations", "View post", "Activity", "Delete project…"]) {
     assert.ok(menu.includes(`"${item}"`), item);
   }
   assert.match(read(DETAILS + "header.tsx"), /<ProjectMenu \{\.\.\.slotProps\}/);

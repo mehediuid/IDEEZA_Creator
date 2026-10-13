@@ -22,7 +22,8 @@ profile dropdown, plan badge (Free/Pro).
 - `/parts` — **Parts & Agile Module**: the catalogue, captured Agile Modules, and the packages you have authored.
 - `/parts/new` — **New Package flow**: Package → Symbol → Footprint → 3D Place → Finalize (full-viewport).
 - `/parts/[id]` — one part, with its land pattern.
-- `/innovations`, `/innovations/[slug]` — **community feed** (Discover/Following, categories, minted badges).
+- `/innovations` — **community feed** (Discover/Following, categories, minted badges, Shared by you).
+- `/innovations/[slug]` — **one post**: a sample feed project, or this browser's shared project (`<name>-<id tail>`); `?focus=comments` and `#comment-<id>` deep-link into the thread. `/innovations/[slug]/products/[productId]` — one product of the post.
 - `/(create)/chat/[chatId]`, `/(create)/build/[jobId]` — **AI concept chat → build job**.
 - `/(create)/build/[jobId]/brief` — the old address of a saved build's Brief: it redirects to its project's mint flow (below). A ready build no project holds goes to `/build/[jobId]?save=1`; a still-building job goes back to its chat (or to `/build/[jobId]` when the chat is gone).
 - `/(create)/projects/[id]/earn/mint` — **the mint flow** (the Brief, Build and Earn P1-2; `earnMintHref`): Choose · Details · Review and sign · Success, opened from Earn › Overview and Earn › Sell (Start mint · Continue mint · Open the mint summary). A static segment, so it wins over `earn/[section]`. A minted Brief opens read-only on its success step; a project minted from its page says it is already minted.

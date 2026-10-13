@@ -8,10 +8,13 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export type BadgeTone = "blue" | "brand-outline" | "neutral" | "success" | "info" | "warning";
+export type BadgeTone = "blue" | "brand" | "brand-outline" | "neutral" | "success" | "info" | "warning";
 
 const TONE_CLASS: Record<BadgeTone, string> = {
   blue: "bg-badge-blue-bg px-[6px] py-[2px] text-xs leading-xs text-badge-blue-text",
+  // M100 Comments' author-badge (an Innovations post's Maker): Figma color/badge/brand-bg and
+  // -text, which resolve to the brand-subtle fill and the brand ink.
+  brand: "bg-bg-brand-subtle px-[6px] py-[2px] text-xs leading-xs text-text-brand",
   "brand-outline": "border border-solid border-border-brand px-[8px] py-[4px] text-sm leading-xs text-text-brand",
   neutral: "bg-bg-subtle px-[8px] py-[2px] text-xs leading-xs text-text-secondary",
   success: "bg-bg-success-subtle px-[8px] py-[2px] text-xs leading-xs text-text-success",

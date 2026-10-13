@@ -5,8 +5,9 @@
 //
 // The engineering header — the owner and a contributor preview. Two columns
 // from a 720 px header, stacked below it:
-// - left: the h1 with the "Shared" chip while the project is on Innovations
-//   (and, in a contributor preview, the role chip, P2-CONTRIB-13); one meta
+// - left: the h1 with the "Shared" chip while the project is on Innovations —
+//   for the owner a link to the post with its comment count (plan P5,
+//   2026-10-13) — (and, in a contributor preview, the role chip, P2-CONTRIB-13); one meta
 //   line — the stage line, then Saved {date} · … (`stageLineOf`,
 //   `engineeringMetaOf`); the lock line once the project is sold in full; the
 //   description (or "Add a description"), then `headerParts.afterDescription`
@@ -43,6 +44,7 @@ import { ArrowRight02Icon, BubbleChatIcon, Coins01Icon, Rocket01Icon, UserIcon }
 import { Icon } from "@/components/dashboard/icon";
 import { Badge, Banner } from "@/components/ideeza";
 import { LeaveButton } from "@/components/create/leave-button";
+import { SharedPostChip } from "@/components/innovations/shared-post-chip";
 import { ShowcaseChip, StatusChip } from "@/components/projects/status-chip";
 import { LockLine } from "@/components/projects/product/product-states";
 import { roleChipOf } from "@/lib/manual/contributors";
@@ -175,7 +177,7 @@ export function ProjectHeader({
               <ProjectTitle project={project} titleRef={titleRef} />
             </div>
             {engineering && owner && <StatusChip status={summary.status} word={text.chip.word} />}
-            {engineering && text.chip.badge && <ShowcaseChip />}
+            {engineering && text.chip.badge && (owner ? <SharedPostChip project={project} /> : <ShowcaseChip />)}
             {parts?.titleRow?.map((Part, i) => <Part key={i} {...slotProps} />)}
             {role && (
               <Badge tone="neutral" icon={<Icon icon={UserIcon} size={12} />}>
