@@ -12,11 +12,13 @@
 // A heading names what it is about for a screen reader ("Main NFT activity"),
 // and is shown on a block. Read-only: no ⋮, no Add, no price snapshot. With no
 // history it shows `emptyNote` ("No activity yet · listed 3 Oct"), else nothing.
+// `journey` hands it a journey that isn't stored in this browser (a sample
+// Innovations post's, lib/innovations/sample-activity.ts).
 
 import * as React from "react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { ageOf, historyOf, labelOf, type ActivityTarget, type JourneyEntry, type MediaRef } from "@/lib/manual/journey";
+import { ageOf, historyOf, labelOf, type ActivityTarget, type JourneyEntry, type MediaRef, type ProjectJourney } from "@/lib/manual/journey";
 import { useJourney } from "@/lib/manual/journey-store";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,7 @@ export function ActivityNow({
   earlier: showEarlier = true,
   emptyNote,
   className,
+  journey,
 }: {
   projectId: string;
   target: ActivityTarget;
@@ -69,8 +72,12 @@ export function ActivityNow({
   /** Shown when there is no history yet; without it, nothing renders. */
   emptyNote?: string;
   className?: string;
+  /** A journey to read instead of this browser's stored one. */
+  journey?: ProjectJourney;
 }) {
-  const { hydrated, record } = useJourney(projectId);
+  const stored = useJourney(journey ? null : projectId);
+  const hydrated = journey ? true : stored.hydrated;
+  const record = journey ?? stored.record;
   const [open, setOpen] = React.useState(false);
   const [overlay, setOverlay] = React.useState<Overlay | null>(null);
   const listId = React.useId();

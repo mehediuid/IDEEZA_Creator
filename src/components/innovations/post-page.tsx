@@ -2,8 +2,10 @@
 
 // An Innovations post (plan §5, decision D0 "a story page"; mockup
 // Main.dc.html, Phone.dc.html): read top to bottom, the media, the title and
-// status, the maker's story, what the project is, what is inside it, how far
-// it has come, then the conversation; beside it a sticky rail with the maker,
+// status, the maker's story, what the project is, what is inside it, its
+// Activity (now, and earlier — owner, 2026-10-13, decision A: no progress bar,
+// so an "Others" entry, a step back or a project never meant for a factory
+// all read true), then the conversation; beside it a sticky rail with the maker,
 // the visitor's actions, the Marketplace, About and more from the maker.
 //
 // - One page for both sources (usePost): a sample post, or a project this
@@ -32,7 +34,9 @@ import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-st
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { postHref, postProductHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
-import { CATALOGUES } from "@/lib/manual/journey";
+import { sampleJourneyOf, sampleStatusOf } from "@/lib/innovations/sample-activity";
+import { shortOf } from "@/lib/manual/journey";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
 import { PostComments } from "./comments/post-comments";
@@ -66,9 +70,6 @@ import { ReportDialog } from "./report-dialog";
 import { PostToastProvider, usePostToast } from "./toast";
 import { usePost, type MinePostFacts } from "./use-post";
 
-/** The stages a post's progress counts: the project's Activity types, Planning to Improvement
- *  (Others is not a step). */
-const STEPS = CATALOGUES.project.filter((s) => s.id !== "others");
 
 export function PostPage({ slug }: { slug: string }) {
   return (
@@ -130,7 +131,8 @@ function PostBody({
     if (window.location.hash === "#comments") scrollToComments("auto");
   }, []);
 
-  const stage = post.stage ? (STEPS.find((s) => s.id === post.stage) ?? null) : null;
+  // The status chip is the project's current Activity, "Others" under its own name.
+  const status = mine ? shortOf(mine.view.current) : sampleStatusOf(post);
   const makerName = post.creator.name;
 
   return (
@@ -156,10 +158,10 @@ function PostBody({
                 >
                   {post.title}
                 </h1>
-                {stage && (
-                  <span title={stage.label} className="inline-flex items-center rounded-full bg-bg-brand-subtle px-5 py-1 text-sm font-semibold leading-sm text-text-brand">
+                {status && (
+                  <span title={status} className="inline-flex max-w-[24ch] items-center truncate rounded-full bg-bg-brand-subtle px-5 py-1 text-sm font-semibold leading-sm text-text-brand">
                     <span className="sr-only">Status: </span>
-                    {stage.short}
+                    {status}
                   </span>
                 )}
                 {post.minted && (
@@ -188,7 +190,7 @@ function PostBody({
 
             {post.description && <AboutProject text={post.description} />}
             {post.products.length > 0 && <WhatsInside post={post} />}
-            {stage && stage.id !== "others" && <Progress stageId={stage.id} />}
+            <PostActivity post={post} mine={mine} />
 
             <MarketplaceCard post={post} className={NARROW_ONLY} />
             <AboutCard post={post} collapsible className={NARROW_ONLY} />
@@ -387,34 +389,18 @@ function ProductRow({ slug, product }: { slug: string; product: InnovationPost["
   );
 }
 
-/** Progress: the stages as a bar, this one named with what it means. */
-function Progress({ stageId }: { stageId: string }) {
+/** The project's Activity as a visitor reads it: what is happening now, with its proof, and Earlier. */
+function PostActivity({ post, mine }: { post: InnovationPost; mine: MinePostFacts | null }) {
   const id = React.useId();
-  const at = STEPS.findIndex((s) => s.id === stageId);
-  if (at < 0) return null;
-  const step = STEPS[at];
+  const [now] = React.useState(() => Date.now());
+  const journey = React.useMemo(() => (mine ? undefined : sampleJourneyOf(post, now)), [mine, post, now]);
+  const projectId = mine ? mine.project.id : post.id;
   return (
     <section aria-labelledby={id} className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
-          Progress
-        </h2>
-        <span className="text-md leading-md text-text-secondary">
-          Stage {at + 1} of {STEPS.length}
-        </span>
-      </div>
-      <div role="img" aria-label={`Stage ${at + 1} of ${STEPS.length}: ${step.label}`} className="flex gap-2">
-        {STEPS.map((s, i) => (
-          <span key={s.id} className={cn("h-4 flex-1 rounded-sm", i <= at ? "bg-bg-brand" : "bg-border")} />
-        ))}
-      </div>
-      <div aria-hidden className="flex justify-between text-sm leading-sm text-text-secondary">
-        <span>{STEPS[0].short}</span>
-        <span>{STEPS[STEPS.length - 1].short}</span>
-      </div>
-      <p className="max-w-[62ch] text-md leading-relaxed text-text-primary">
-        <span className="font-semibold">{step.label}.</span> <span className="text-text-secondary">{step.help}</span>
-      </p>
+      <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
+        Activity
+      </h2>
+      <ActivityNow projectId={projectId} target={{ kind: "project" }} defaultAt={mine ? mine.project.createdAt : post.createdAt} journey={journey} bare />
     </section>
   );
 }

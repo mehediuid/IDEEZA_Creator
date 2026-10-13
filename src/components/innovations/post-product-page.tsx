@@ -34,6 +34,8 @@ import { lightboxTile } from "./post-media";
 import { POST_COLUMNS, POST_CONTENT, POST_PAGE, PostMissing, PostProductSkeleton } from "./post-states";
 import { ProductPage } from "@/components/projects/product/product-page";
 import { isLockedPiece, LockedPiecePanel, PostProductLinks, type LockedId } from "./post-product-bits";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { usePost, type MinePostFacts } from "./use-post";
 
 type TabId = "media" | "3d" | "parts" | "pcb" | "code" | "wiring";
@@ -117,6 +119,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
             </h1>
             <p className="text-md leading-md text-text-secondary">{meta}</p>
             {product.summary && <p className="max-w-[62ch] text-md leading-relaxed text-text-primary">{product.summary}</p>}
+            <SampleProductActivity post={post} productId={product.id} name={product.name} />
           </div>
         </header>
 
@@ -296,5 +299,20 @@ function PartsPanel({ post, product, build }: { post: InnovationPost; product: P
       </div>
       <p className="max-w-[62ch] text-md leading-md text-text-secondary">The parts list is open to everyone, so anyone can see what goes into it.</p>
     </div>
+  );
+}
+
+/** The product's own Activity, as on a product page read by a visitor (a sample post's journey). */
+function SampleProductActivity({ post, productId, name }: { post: InnovationPost; productId: string; name: string }) {
+  const [now] = React.useState(() => Date.now());
+  const journey = React.useMemo(() => sampleJourneyOf(post, now), [post, now]);
+  return (
+    <ActivityNow
+      projectId={post.id}
+      target={{ kind: "product", productId }}
+      defaultAt={post.createdAt}
+      heading={`${name} activity`}
+      journey={journey}
+    />
   );
 }

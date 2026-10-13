@@ -122,6 +122,16 @@ export async function putMediaFile(file: MediaFile): Promise<WriteResult> {
 }
 
 export async function getMediaFile(key: string): Promise<Blob | null> {
+  // A sample Innovations post's proof is an image the app ships (`/innovations/…`), not a
+  // file in this browser (lib/innovations/sample-activity.ts).
+  if (key.startsWith("/")) {
+    try {
+      const res = await fetch(key);
+      return res.ok ? await res.blob() : null;
+    } catch {
+      return null;
+    }
+  }
   const db = await openMedia();
   if (!db) return null;
   try {
