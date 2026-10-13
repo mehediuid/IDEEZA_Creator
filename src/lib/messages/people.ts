@@ -30,7 +30,7 @@ export function feedPersonId(creatorId: string): PersonId {
 export function initialsOfName(name: string): string {
   const words = name.replace(/\(.*?\)/g, "").trim().split(/\s+/).filter(Boolean);
   if (!words.length) return "?";
-  return (words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[words.length - 1][0]).toUpperCase();
+  return (words.length === 1 ? words[0][0] : words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
 export function kindOf(id: PersonId): PersonKind {
@@ -115,6 +115,6 @@ export function contextLineOf(c: ContextRef | null, info: { sale?: SaleLike | nu
 export function contextSentenceOf(c: ContextRef, info: { sale?: SaleLike | null; teamRole?: string | null } = {}): string {
   if (c.kind === "listing") return "About the listing";
   if (c.kind === "post") return "About the Innovations post";
-  if (c.kind === "team") return "Team conversation";
+  if (c.kind === "team") return info.teamRole ? `About the team · ${info.teamRole}` : "About the team";
   return `About: ${contextLineOf(c, info)}`;
 }

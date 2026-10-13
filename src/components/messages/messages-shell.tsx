@@ -17,6 +17,7 @@ import { useMarket } from "@/lib/market/market-store";
 import { migrateSupportOnce } from "@/lib/messages/actions";
 import { useActingAs } from "@/lib/messages/identity";
 import { MESSAGES_HREF } from "@/lib/messages/links";
+import { countsFor } from "@/lib/messages/rules";
 import { cn } from "@/lib/utils";
 import { ActingBanner } from "./acting-as";
 import { ConversationList } from "./conversation-list";
@@ -35,11 +36,22 @@ function useSupportMigration() {
   }, [ready, projectsRead, marketRead, market.support, people.nameOf, projects]);
 }
 
+/** "(2) Messages · IDEEZA" while conversations are unread. Set here, after the page it came
+ *  from has put its own title back on the way out. */
+function useMessagesTitle() {
+  const { ready, data, me, people } = useMessagesView();
+  const unread = ready ? countsFor(data, me, people.teamIdsOf).unread : 0;
+  React.useEffect(() => {
+    document.title = unread ? `(${unread}) Messages · IDEEZA` : "Messages · IDEEZA";
+  }, [unread]);
+}
+
 function Panes({ children }: { children: React.ReactNode }) {
   const { unreadable } = useMessagesView();
   const pathname = usePathname();
   const open = pathname !== MESSAGES_HREF;
   useSupportMigration();
+  useMessagesTitle();
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-surface">
       <div className="flex shrink-0 flex-col gap-3 px-4 py-3 empty:hidden md:px-6">
