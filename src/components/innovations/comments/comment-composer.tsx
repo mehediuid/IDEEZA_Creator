@@ -8,7 +8,10 @@
 // - "edit", a comment's own words in place: the field, Cancel and Save.
 //
 // Enter sends and Shift+Enter starts a new line, as every box in the app;
-// Escape cancels a reply or an edit. Post stays reachable while it can't go
+// Escape cancels a reply or an edit. Typing "@" (at the start or after a
+// space) offers the people in the conversation under the field, as a
+// combobox: focus stays in the field, ↑ ↓ move, Enter or Tab picks, Escape
+// closes the list; the @ button opens the same people as a menu. Post stays reachable while it can't go
 // (aria-disabled) and says why when pressed. A write that fails keeps the
 // text, says so, and turns the button into Try again (States: couldn't post).
 
@@ -16,7 +19,7 @@ import * as React from "react";
 import { Alert02Icon, AtIcon, Cancel01Icon, Image01Icon, Link01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Avatar, Button, IconButton, Menu, type MenuItem } from "@/components/ideeza";
-import { bodyProblem, COMMENT_COUNTER_FROM, COMMENT_MAX } from "@/lib/innovations/comments";
+import { bodyProblem, COMMENT_COUNTER_FROM, COMMENT_MAX, mentionMatches, mentionQueryAt } from "@/lib/innovations/comments";
 import { personOf } from "@/lib/innovations/people";
 import type { PostPerson } from "@/lib/innovations/types";
 import { cn } from "@/lib/utils";
@@ -75,6 +78,10 @@ export function CommentComposer({
   const [reading, setReading] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   const [tried, setTried] = React.useState(false);
+  // The "@…" suggestions: where the caret is, which row is active, and the "@" the maker closed with Escape.
+  const [caret, setCaret] = React.useState(initial.length);
+  const [activeRow, setActiveRow] = React.useState(0);
+  const [closedAt, setClosedAt] = React.useState<number | null>(null);
   const fieldRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const photoBtnRef = React.useRef<HTMLButtonElement>(null);
@@ -83,6 +90,7 @@ export function CommentComposer({
   const reasonId = `${ownId}-reason`;
   const counterId = `${ownId}-counter`;
   const failId = `${ownId}-failed`;
+  const listId = `${ownId}-mentions`;
 
   React.useEffect(() => {
     if (!autoFocus) return;
@@ -126,6 +134,34 @@ export function CommentComposer({
     const pad = before && !/\s$/.test(before) ? " " : "";
     const head = before + pad + snippet;
     setText(head + text.slice(end));
+    setFailed(false);
+    requestAnimationFrame(() => {
+      const t = fieldRef.current;
+      if (!t) return;
+      t.focus();
+      t.setSelectionRange(head.length, head.length);
+    });
+  };
+
+  const typed = mentionables.length ? mentionQueryAt(text, caret) : null;
+  const suggestions =
+    typed && typed.start !== closedAt
+      ? mentionMatches(
+          mentionables.map((pid) => personOf(pid)),
+          typed.query,
+        )
+      : [];
+  const suggesting = suggestions.length > 0;
+  const active = Math.min(activeRow, Math.max(0, suggestions.length - 1));
+  const optionId = (i: number) => `${listId}-${i}`;
+
+  /** Replaces the "@…" being typed with the picked name, and leaves the caret after it. */
+  const pickSuggestion = (person: PostPerson) => {
+    if (!typed) return;
+    const head = `${text.slice(0, typed.start)}@${person.name} `;
+    setText(head + text.slice(caret));
+    setCaret(head.length);
+    setActiveRow(0);
     setFailed(false);
     requestAnimationFrame(() => {
       const t = fieldRef.current;
@@ -206,11 +242,38 @@ export function CommentComposer({
           placeholder={placeholder}
           aria-invalid={failed || (tried && !!problem) || undefined}
           aria-describedby={describedBy || undefined}
+          role={mentionables.length ? "combobox" : undefined}
+          aria-autocomplete={mentionables.length ? "list" : undefined}
+          aria-expanded={mentionables.length ? suggesting : undefined}
+          aria-controls={suggesting ? listId : undefined}
+          aria-activedescendant={suggesting ? optionId(active) : undefined}
           onChange={(e) => {
             setText(e.target.value);
+            setCaret(e.target.selectionStart);
+            setActiveRow(0);
             setFailed(false);
           }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={(e) => {
+            if (suggesting) {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                const step = e.key === "ArrowDown" ? 1 : -1;
+                setActiveRow((active + step + suggestions.length) % suggestions.length);
+                return;
+              }
+              if ((e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) || e.key === "Tab") {
+                e.preventDefault();
+                pickSuggestion(suggestions[active]);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                setClosedAt(typed?.start ?? null);
+                return;
+              }
+            }
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();
@@ -223,6 +286,38 @@ export function CommentComposer({
           className="min-h-[62px] min-w-0 flex-1 resize-y bg-transparent text-md leading-md text-[color:var(--color-input-text)] outline-none placeholder:text-[color:var(--color-input-placeholder)] max-md:text-lg max-md:leading-lg [@media(pointer:coarse)]:text-lg [@media(pointer:coarse)]:leading-lg"
         />
       </div>
+
+      {suggesting ? (
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label="People in this conversation"
+          className="-mt-2 flex max-w-[320px] flex-col gap-[2px] self-start rounded-xl border border-solid border-border-subtle bg-bg-surface p-2 shadow-2"
+        >
+          {suggestions.map((person, i) => (
+            <li
+              key={person.id}
+              id={optionId(i)}
+              role="option"
+              aria-selected={i === active}
+              // Keeps focus in the field: the pick happens on press, before the field would blur.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pickSuggestion(person);
+              }}
+              onMouseEnter={() => setActiveRow(i)}
+              className={cn(
+                "flex min-h-[40px] cursor-pointer items-center gap-5 rounded-md px-6 text-md leading-md text-text-primary",
+                i === active ? "bg-bg-subtle" : "",
+                TAP,
+              )}
+            >
+              <Avatar initials={person.initials} color={person.color} size="2xs" />
+              {person.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <p
         id={reasonId}

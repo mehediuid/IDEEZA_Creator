@@ -3,7 +3,9 @@
 // useProjectPageData — every store read a project page needs, then the one
 // derivation (Phase 2 spec §3.6.2, §3.7). `/projects/[id]` and its product
 // pages read it with the "project" context; Explore marketplace's buyer view
-// (`/marketplace/[id]`, T23) with "market".
+// (`/marketplace/[id]`, T23) with "market"; an Innovations post's product view
+// (`/innovations/[slug]/products/[productId]`, plan §6) with "post", read as a
+// visitor so no owner control shows.
 //
 // - It resolves the address to a project, by id and then by slug (COR-1).
 // - It decides who is looking: on the project page, `?view=buyer` and
@@ -40,8 +42,8 @@ import { useProjectNetwork } from "@/lib/network/store";
 import { useProjectVideos } from "@/lib/video/store";
 import { useActiveBuyer } from "@/lib/wallet/use-demo-wallet";
 
-/** Which page reads it: the maker's project page, or Explore marketplace's buyer view. */
-export type ProjectPageContext = "project" | "market";
+/** Which page reads it: the maker's project page, Explore marketplace's buyer view, or an Innovations post. */
+export type ProjectPageContext = "project" | "market" | "post";
 
 export type ProjectPageData =
   /** A store hasn't been read yet: show the skeleton (COR-2). */
@@ -114,7 +116,9 @@ export function useProjectPageData(id: string, context: ProjectPageContext): Pro
     () =>
       context === "market"
         ? { kind: "demo-buyer", buyerId: buyer.id }
-        : viewerFromParams(viewParam, asParam, contributors),
+        : context === "post"
+          ? { kind: "owner-preview" }
+          : viewerFromParams(viewParam, asParam, contributors),
     [context, buyer.id, viewParam, asParam, contributors],
   );
 

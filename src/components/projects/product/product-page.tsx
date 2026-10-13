@@ -28,6 +28,13 @@
 // (`DeliverablesAccess`, from `can(viewer, "deliverables.download", …)` with
 // the product-scoped `canCtxOf(view, viewer, { productId })`: an edition NFT
 // of this product holds its files too, R5-20).
+//
+// In the "post" context (`/innovations/[slug]/products/[productId]` for this
+// browser's own shared project, plan §6) the page reads as a visitor: the
+// breadcrumb starts at Innovations, the post's product switcher and the way
+// to its comments sit above the header, PCB, Firmware code and Wiring are
+// locked to a copy (D2), and the rail's Marketplace and Editor blocks give way
+// to the post's own.
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -52,6 +59,11 @@ import { DemoBuyerBanner } from "@/components/marketplace/demo-buyer-banner";
 import { NotOnMarketplace } from "@/components/marketplace/market-project-page";
 import { SLOTS as PROJECT_SLOTS } from "../details/project-page";
 import { useProjectPageData, type ProjectPageContext } from "../details/use-project-page-data";
+import { LockedPiecePanel, PostProductLinks, PostRailBlocks } from "@/components/innovations/post-product-bits";
+import { PostMissing } from "@/components/innovations/post-states";
+import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
+import { minePostOf } from "@/lib/innovations/mine-post";
+import { postHref } from "@/lib/innovations/slug";
 import { DeliverablesAccess } from "./product-deliverables";
 import { ClampedText, ConceptImage } from "./product-identity";
 import { ProductMenu } from "./product-menu";
@@ -93,6 +105,8 @@ export function ProductPage({
     </React.Suspense>
   );
 }
+
+const NO_SEED: CommentSeed = () => [];
 
 function ProductPageBody({ id, productId, context }: { id: string; productId: string; context: ProjectPageContext }) {
   const router = useRouter();
@@ -138,6 +152,11 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
     return changes ? partChangesText(changes) : null;
   }, [job, bp, chats, ownerFacts]);
 
+  // The Innovations post this page belongs to ("post" context): its title, slug, listing and comments.
+  const postCtx = context === "post";
+  const post = React.useMemo(() => (postCtx && project && view ? minePostOf(project, view) : null), [postCtx, project, view]);
+  const comments = useCommentCount(post ? post.id : null, NO_SEED);
+
   const name = product ? displayProductName(product.name) : "";
   // COR-7 — focus to the h1 and a polite "{product}" on arrival, once per
   // product (a version or tab change keeps focus where the maker put it);
@@ -145,7 +164,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   const { titleRef, live, announce } = usePageArrival(
     project && product ? `${project.id}/${product.id}` : "",
     name,
-    project && product ? productDocTitle(name, project.name) : "",
+    project && product ? (postCtx ? `${name} · ${project.name} · Innovations · IDEEZA` : productDocTitle(name, project.name)) : "",
   );
   // PPL-5: this page has no Preview as buyer button, so Exit preview hands
   // focus to the h1 once the owner view is back.
@@ -154,14 +173,24 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
   if (data.state === "loading") return <ProductLoading />;
   const market = context === "market";
   if (data.state === "missing" || !ready || !project || !view || !viewer) {
-    return market ? <NotOnMarketplace id={id} /> : <ProjectNotFound id={id} />;
+    return postCtx ? <PostMissing /> : market ? <NotOnMarketplace id={id} /> : <ProjectNotFound id={id} />;
   }
 
-  const projectHref = market ? `/marketplace/${project.id}` : `/projects/${project.id}${previewQuery(viewer)}`;
+  const projectHref = post
+    ? postHref(post.slug)
+    : market
+      ? `/marketplace/${project.id}`
+      : `/projects/${project.id}${previewQuery(viewer)}`;
   if (!product) return <ProductMissing projectName={project.name} href={projectHref} />;
 
   const slot: ProductSlotProps = { project, view, product, version: version ?? NO_VERSION, viewer, now: ready.now, announce };
-  const trail: Crumb[] = market
+  const trail: Crumb[] = post
+    ? [
+        { label: "Innovations", href: "/innovations" },
+        { label: post.title, href: projectHref },
+        { label: name },
+      ]
+    : market
     ? [
         { label: "Explore marketplace", href: "/marketplace" },
         { label: project.name, href: projectHref },
@@ -200,7 +229,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
         // The project page's own banners, each null unless it applies (buyer, contributor);
         // Explore marketplace's Testnet demo banner on the buyer view.
         banner={
-          market ? (
+          postCtx ? null : market ? (
             <DemoBuyerBanner className="mb-10" />
           ) : (
             PROJECT_SLOTS.banners?.map((B, i) => (
@@ -211,6 +240,7 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
         breadcrumb={<Breadcrumb trail={trail} />}
         main={
           <div className="flex flex-col gap-10">
+            {post && <PostProductLinks post={post} productId={product.id} comments={comments} />}
             <header className="flex flex-col gap-6 [container-type:inline-size]">
               <div className="flex flex-col gap-6 [@container(min-width:720px)]:flex-row [@container(min-width:720px)]:items-start [@container(min-width:720px)]:justify-between [@container(min-width:720px)]:gap-10">
                 <div className="flex min-w-0 flex-1 items-start gap-6">
@@ -284,11 +314,20 @@ function ProductPageBody({ id, productId, context }: { id: string; productId: st
                 chatHref={ownerFacts && job && chats.some((c) => c.id === job.chatId) ? `/chat/${job.chatId}` : null}
                 asked={query.get("tab")}
                 onTab={(tab) => router.replace(`${pathname}${withQuery(search, { tab })}`, { scroll: false })}
+                post={post ? { locked: (tab) => <LockedPiecePanel post={post} kind={tab} /> } : undefined}
               />
             </DeliverablesAccess.Provider>
           </div>
         }
-        rail={<ProductRail slot={slot} built={bp} confidence={confidence} partChanges={partChanges} />}
+        rail={
+          <ProductRail
+            slot={slot}
+            built={bp}
+            confidence={confidence}
+            partChanges={partChanges}
+            post={post ? <PostRailBlocks post={post} productName={name} comments={comments} /> : undefined}
+          />
+        }
       />
       <LiveRegion text={live} />
     </>

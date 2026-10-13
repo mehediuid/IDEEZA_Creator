@@ -6,19 +6,18 @@
 // and the wiring come with a copy, so their tabs say what a copy includes and
 // where to get one, and never show the files.
 //
-// - A post of this browser's own project shows the build itself: the 3D model
-//   and the parts list are the project page's own piece panels, with the
-//   downloads closed (`DeliverablesAccess` false). A sample post has no build
-//   files, so its 3D tab shows its render and says so, and its parts are the
-//   post's list.
+// - A post of this browser's own project is the project's own product page in
+//   its "post" context (product-page.tsx, plan §6): the real media, 3D model,
+//   parts and specs, read as a visitor, with this view's locked pieces and
+//   links. A sample post has no project behind it, so this page draws it: its
+//   3D tab shows its render and says so, and its parts are the post's list.
 // - Comments are per post, not per product: the header and the rail link back
 //   to the post's thread.
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight01Icon, Comment01Icon, CpuIcon, SquareLock02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, CpuIcon, SquareLock02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { buttonVariants } from "@/components/ideeza";
 import { MediaLightbox } from "@/components/projects/details/media-tab";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { TabStrip, type TabDef } from "@/components/projects/details/tab-strip";
@@ -26,40 +25,29 @@ import { DeliverablesAccess, ProductPiecePanel } from "@/components/projects/pro
 import { VideoPlayer } from "@/components/video-jobs/video-player";
 import { productsOf, useCreateHistory, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
-import { postHref, postProductHref } from "@/lib/innovations/slug";
-import { ME_ID, PIECE_LABEL, type InnovationPost, type PostPiece, type PostProduct } from "@/lib/innovations/types";
+import { postHref } from "@/lib/innovations/slug";
+import { PIECE_LABEL, type InnovationPost, type PostPiece, type PostProduct } from "@/lib/innovations/types";
 import type { VideoTake } from "@/lib/video/types";
 import { cn } from "@/lib/utils";
-import { CARD, ImageGone, partsLabel, PostBreadcrumb, PostImg, TAP } from "./post-bits";
+import { CARD, ImageGone, partsLabel, PostBreadcrumb, PostImg } from "./post-bits";
 import { lightboxTile } from "./post-media";
 import { POST_COLUMNS, POST_CONTENT, POST_PAGE, PostMissing, PostProductSkeleton } from "./post-states";
+import { ProductPage } from "@/components/projects/product/product-page";
+import { isLockedPiece, LockedPiecePanel, PostProductLinks, type LockedId } from "./post-product-bits";
 import { usePost, type MinePostFacts } from "./use-post";
 
 type TabId = "media" | "3d" | "parts" | "pcb" | "code" | "wiring";
-type LockedId = "pcb" | "code" | "wiring";
-
-const LOCKED: Record<LockedId, { title: string; includes: string[] }> = {
-  pcb: {
-    title: "PCB files come with a copy",
-    includes: ["The schematic, converted into a board layout", "The board's bill of materials", "The fab profile it was laid out for"],
-  },
-  code: {
-    title: "Firmware comes with a copy",
-    includes: ["The source code, fully commented", "The library list, pinned to versions", "The map from the code to the board's pins"],
-  },
-  wiring: {
-    title: "Wiring comes with a copy",
-    includes: ["The netlist and a pin-to-pin table", "Wire colours, harness lengths and connector pinouts", "A continuity test checklist"],
-  },
-};
-
-const isLocked = (t: TabId): t is LockedId => t === "pcb" || t === "code" || t === "wiring";
+const isLocked = (t: TabId): t is LockedId => isLockedPiece(t);
 
 export function PostProductPage({ slug, productId }: { slug: string; productId: string }) {
   const data = usePost(slug);
   if (data.state === "loading") return <PostProductSkeleton />;
   if (data.state === "missing") return <PostMissing />;
   const product = data.post.products.find((p) => p.id === productId);
+  // The project's own product page, read as a visitor (plan §6).
+  if (data.post.source === "mine" && data.post.projectId) {
+    return <ProductPage id={data.post.projectId} productId={productId} context="post" />;
+  }
   if (!product) {
     return (
       <PostMissing
@@ -101,13 +89,11 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
   for (const k of ["3d", "parts"] as const) if (product.pieces.includes(k)) open.push({ id: k, label: PIECE_LABEL[k] });
   const locked: TabDef<TabId>[] = (["pcb", "code", "wiring"] as const)
     .filter((k) => product.pieces.includes(k as PostPiece))
-    .map((k) => ({ id: k, label: PIECE_LABEL[k] }));
+    .map((k) => ({ id: k, label: PIECE_LABEL[k], icon: <Icon icon={SquareLock02Icon} size={14} /> }));
   const first = open[0]?.id ?? locked[0]?.id ?? null;
   const [tab, setTab] = React.useState<TabId | null>(first);
 
   const threadHref = `${postHref(post.slug)}#comments`;
-  const commentsLabel =
-    comments === null ? "Comments on the post" : comments === 0 ? "Comment on the post" : `${comments} ${comments === 1 ? "comment" : "comments"} on the post`;
   const meta = [`Product ${index + 1} of ${post.products.length}`, product.parts.length > 0 ? partsLabel(product.parts.length) : null].filter(Boolean).join(" · ");
 
   return (
@@ -115,19 +101,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
       <div className={POST_CONTENT}>
         <PostBreadcrumb trail={[{ label: post.title, href: postHref(post.slug) }, { label: product.name }]} />
 
-        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-6">
-          {post.products.length > 1 && <ProductSwitcher post={post} current={product.id} />}
-          <Link
-            href={threadHref}
-            className={cn(
-              "ml-auto inline-flex items-center gap-3 rounded-sm text-md font-semibold leading-md text-text-brand outline-none hover:text-text-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus",
-              TAP,
-            )}
-          >
-            <Icon icon={Comment01Icon} size={16} />
-            {commentsLabel}
-          </Link>
-        </div>
+        <PostProductLinks post={post} productId={product.id} comments={comments} />
 
         <header className="flex items-start gap-8 max-md:gap-6">
           <span className="relative flex size-[88px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-solid border-border bg-bg-surface-raised text-text-tertiary max-md:size-[64px]">
@@ -155,7 +129,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
                   {tab === "media" && <MediaPanel post={post} product={product} mine={mine} take={take} />}
                   {tab === "3d" && <ModelPanel post={post} product={product} build={build} />}
                   {tab === "parts" && <PartsPanel post={post} product={product} build={build} />}
-                  {isLocked(tab) && <LockedPanel post={post} kind={tab} />}
+                  {isLocked(tab) && <LockedPiecePanel post={post} kind={tab} />}
                 </div>
               </>
             ) : (
@@ -214,36 +188,6 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
       </div>
       <LiveRegion text={live} />
     </div>
-  );
-}
-
-/** The post's other products, each its own page. */
-function ProductSwitcher({ post, current }: { post: InnovationPost; current: string }) {
-  return (
-    <nav aria-label="Products in this post" className="max-w-full overflow-x-auto">
-      <ul role="list" className="inline-flex overflow-hidden rounded-lg border border-solid border-border">
-        {post.products.map((p, i) => {
-          const on = p.id === current;
-          return (
-            <li key={p.id} className={cn(i > 0 && "border-l border-solid border-border")}>
-              <Link
-                href={postProductHref(post.slug, p.id)}
-                aria-current={on ? "page" : undefined}
-                replace
-                scroll={false}
-                className={cn(
-                  "inline-flex min-h-[36px] items-center whitespace-nowrap px-7 text-md font-semibold leading-md outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus motion-reduce:transition-none",
-                  TAP,
-                  on ? "bg-bg-brand-subtle text-text-brand" : "bg-bg-surface text-text-secondary hover:bg-bg-subtle hover:text-text-primary",
-                )}
-              >
-                {p.name}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
   );
 }
 
@@ -352,51 +296,5 @@ function PartsPanel({ post, product, build }: { post: InnovationPost; product: P
       </div>
       <p className="max-w-[62ch] text-md leading-md text-text-secondary">The parts list is open to everyone, so anyone can see what goes into it.</p>
     </div>
-  );
-}
-
-function LockedPanel({ post, kind }: { post: InnovationPost; kind: LockedId }) {
-  const id = React.useId();
-  const copy = LOCKED[kind];
-  const who = post.creator.id === ME_ID ? "You share" : `${post.creator.name.split(" ")[0] || post.creator.name} shares`;
-  const listing = post.listing;
-  return (
-    <section aria-labelledby={id} className="flex flex-col items-start gap-6 rounded-xl border border-dashed border-border-strong bg-bg-surface p-16 max-md:p-8">
-      <span aria-hidden className="inline-flex size-[44px] items-center justify-center rounded-xl bg-bg-brand-subtle text-text-brand">
-        <Icon icon={SquareLock02Icon} size={22} />
-      </span>
-      <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
-        {copy.title}
-      </h2>
-      <p className="max-w-[62ch] text-md leading-relaxed text-text-secondary">
-        {who} the PCB, firmware and wiring with people who get a copy. The 3D model, parts list and specs stay open to everyone.
-      </p>
-      <div className="flex flex-col gap-2">
-        <p className="text-md font-semibold leading-md text-text-primary">A copy includes</p>
-        <ul className="flex list-disc flex-col gap-2 pl-8 text-md leading-relaxed text-text-secondary marker:text-text-tertiary">
-          {copy.includes.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
-      {listing ? (
-        <>
-          <Link href={listing.href} className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "hover:text-[color:var(--color-button-secondary-text)]", TAP)}>
-            Get a copy on Marketplace
-            <Icon icon={ArrowRight01Icon} size={16} />
-          </Link>
-          <dl className="grid grid-cols-[minmax(0,auto)_auto] gap-x-8 gap-y-2 text-sm leading-sm">
-            {listing.rows.map((r) => (
-              <React.Fragment key={`${r.label}:${r.price}`}>
-                <dt className="text-text-secondary">{r.label}</dt>
-                <dd className="font-semibold tabular-nums text-text-primary">{r.price}</dd>
-              </React.Fragment>
-            ))}
-          </dl>
-        </>
-      ) : (
-        <p className="text-md font-semibold leading-md text-text-secondary">Not for sale right now.</p>
-      )}
-    </section>
   );
 }

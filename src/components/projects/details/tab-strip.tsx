@@ -28,7 +28,8 @@ import { Icon } from "@/components/dashboard/icon";
 import { moveTab, revealDelta } from "@/lib/ui/tab-keys";
 import { cn } from "@/lib/utils";
 
-export type TabDef<T extends string> = { id: T; label: string };
+/** `icon` is a picture before the label (the Innovations post's locked pieces wear a lock); the label stays the name. */
+export type TabDef<T extends string> = { id: T; label: string; icon?: React.ReactNode };
 
 export const TAB =
   "inline-flex h-[36px] shrink-0 items-center whitespace-nowrap rounded-t-lg border-b-2 border-solid px-8 text-md font-semibold leading-md outline-none transition-colors duration-normal ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus max-md:h-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)]";
@@ -137,7 +138,7 @@ export function TabStrip<T extends string>({
             {g > 0 && (
               <span aria-hidden data-divider className="mx-4 mb-3 h-[20px] w-px shrink-0 self-end bg-border-strong" />
             )}
-            {group.map(({ id, label: text }) => {
+            {group.map(({ id, label: text, icon }) => {
               const on = id === active;
               return (
                 <button
@@ -150,8 +151,13 @@ export function TabStrip<T extends string>({
                   tabIndex={on ? 0 : -1}
                   data-tab={id}
                   onClick={() => onSelect(id)}
-                  className={cn(TAB, on ? TAB_ON : TAB_OFF)}
+                  className={cn(TAB, on ? TAB_ON : TAB_OFF, icon ? "gap-2" : null)}
                 >
+                  {icon ? (
+                    <span aria-hidden className="inline-flex shrink-0">
+                      {icon}
+                    </span>
+                  ) : null}
                   {text}
                 </button>
               );

@@ -122,7 +122,7 @@ test("P0: the product page is engineering for the owner — no Customers panel, 
   assert.match(slots, /return buyerSide\(props\.viewer\) \? <EditionBlock \{\.\.\.props\} \/> : null;/);
   const page = read(PRODUCT + "product-page.tsx");
   assert.match(page, /<VersionSelect/);
-  assert.match(page, /<ProductRail slot=\{slot\} built=\{bp\} confidence=\{confidence\} partChanges=\{partChanges\} \/>/, "Specs and Build check are the rail's");
+  assert.match(page, /<ProductRail\s+slot=\{slot\}\s+built=\{bp\}\s+confidence=\{confidence\}\s+partChanges=\{partChanges\}/, "Specs and Build check are the rail's");
   assert.match(page, /<ProductMenu slot=\{slot\}/, "the owner's ⋯ menu");
   assert.match(page, /\{lockLine && <LockLine line=\{lockLine\} \/>\}/);
 });

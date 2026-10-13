@@ -166,6 +166,28 @@ export function mentionablesOf(list: readonly PostComment[], meId: string): stri
   return out;
 }
 
+/** The "@…" being typed at the caret, when there is one: an "@" at the start or after a space,
+ *  then up to three words on one line. The composer offers names for it as you type. */
+export function mentionQueryAt(text: string, caret: number): { start: number; query: string } | null {
+  const before = text.slice(0, Math.max(0, Math.min(caret, text.length)));
+  const at = before.lastIndexOf("@");
+  if (at < 0 || (at > 0 && !/\s/.test(before[at - 1]))) return null;
+  const query = before.slice(at + 1);
+  if (query.length > 30 || /[\n@]/.test(query) || /\s\s/.test(query) || query.split(" ").length > 3) return null;
+  return { start: at, query };
+}
+
+/** Who matches what is typed after "@": the whole name or any of its words starts with it. */
+export function mentionMatches<P extends { name: string }>(people: readonly P[], query: string, max = 6): P[] {
+  const q = query.toLowerCase();
+  return people
+    .filter((p) => {
+      const n = p.name.toLowerCase();
+      return !q || n.startsWith(q) || n.split(/\s+/).some((w) => w.startsWith(q));
+    })
+    .slice(0, max);
+}
+
 /** Long bodies read clamped until "See more". */
 export function clampBody(body: string, open: boolean): { text: string; clamped: boolean } {
   if (open || body.length <= CLAMP_CHARS) return { text: body, clamped: false };

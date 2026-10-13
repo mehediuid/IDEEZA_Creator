@@ -166,3 +166,17 @@ test("post addresses: a project's slug carries its id, so it never collides", ()
   assert.equal(S.postIdOfSample("p12"), "sample:p12");
   assert.equal(S.postProductHref("lamp-x", "prd 1"), "/innovations/lamp-x/products/prd%201");
 });
+
+test("typing @ offers names: the query at the caret, and who matches it", () => {
+  assert.deepEqual(C.mentionQueryAt("Thanks @so", 10), { start: 7, query: "so" });
+  assert.deepEqual(C.mentionQueryAt("@", 1), { start: 0, query: "" });
+  assert.equal(C.mentionQueryAt("mail me@home", 12), null);
+  assert.equal(C.mentionQueryAt("@a b c d", 8), null);
+  assert.equal(C.mentionQueryAt("@sora\nhi", 8), null);
+  assert.deepEqual(C.mentionQueryAt("hi @sora min", 12), { start: 3, query: "sora min" });
+  const people = [{ name: "Sora Min" }, { name: "Diego Alvarez" }, { name: "Aiko Tanaka" }];
+  assert.deepEqual(C.mentionMatches(people, "al").map((p) => p.name), ["Diego Alvarez"]);
+  assert.deepEqual(C.mentionMatches(people, "sora m").map((p) => p.name), ["Sora Min"]);
+  assert.equal(C.mentionMatches(people, "").length, 3);
+  assert.equal(C.mentionMatches(people, "Sora Min ").length, 0);
+});
