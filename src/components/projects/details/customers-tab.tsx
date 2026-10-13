@@ -163,7 +163,7 @@ export function CustomersPanel({
           </div>
 
           <div className="[container-type:inline-size]">
-            <div className="hidden overflow-x-auto [@container(min-width:600px)]:block">
+            <div className="hidden overflow-x-auto [@container(min-width:640px)]:block">
               <table className="w-full border-collapse text-left text-md">
                 <caption className="sr-only">{captionText}</caption>
                 <thead>
@@ -194,7 +194,7 @@ export function CustomersPanel({
               </table>
             </div>
 
-            <ul aria-label="Sales" className="flex flex-col gap-8 [@container(min-width:600px)]:hidden">
+            <ul aria-label="Sales" className="flex flex-col gap-8 [@container(min-width:640px)]:hidden">
               {pageRows.map((row) => (
                 <ListRow
                   key={row.saleId}
@@ -428,10 +428,10 @@ function TableRow({
             aria-controls={regionId}
             aria-label={`${text.buyer}, sale details`}
             onClick={() => setOpen((v) => !v)}
-            className="flex min-h-[36px] w-full items-center gap-8 rounded-md text-left outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[44px]"
+            className="flex min-h-[36px] w-full min-w-max items-center gap-8 rounded-md text-left outline-none transition-colors duration-normal ease-decelerate hover:bg-bg-subtle focus-visible:ring-2 focus-visible:ring-border-focus [@media(pointer:coarse)]:min-h-[44px]"
           >
             <BuyerAvatar buyerId={row.buyerId} />
-            <span className="min-w-0 truncate font-semibold text-text-primary">{text.buyer}</span>
+            <span className="min-w-0 max-w-[24ch] truncate font-semibold text-text-primary">{text.buyer}</span>
             <Chevron open={open} />
           </button>
         </th>
