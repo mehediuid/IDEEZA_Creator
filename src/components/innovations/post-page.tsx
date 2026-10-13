@@ -3,9 +3,10 @@
 // An Innovations post (plan §5, decision D0 "a story page"; mockup
 // Main.dc.html, Phone.dc.html): read top to bottom, the media, the title and
 // status, the maker's story, what the project is, what is inside it, its
-// Activity (now, and earlier — owner, 2026-10-13, decision A: no progress bar,
-// so an "Others" entry, a step back or a project never meant for a factory
-// all read true), then the conversation; beside it a sticky rail with the maker,
+// Activity (owner, 2026-10-13, decision B: no progress bar, so an "Others"
+// entry, a step back or a project never meant for a factory all read true —
+// a small path of what was logged, oldest first, then now and earlier), then
+// the conversation; beside it a sticky rail with the maker,
 // the visitor's actions, the Marketplace, About and more from the maker.
 //
 // - One page for both sources (usePost): a sample post, or a project this
@@ -35,7 +36,8 @@ import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { postHref, postProductHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
 import { sampleJourneyOf, sampleStatusOf } from "@/lib/innovations/sample-activity";
-import { shortOf } from "@/lib/manual/journey";
+import { historyOf, labelOf, shortOf, type JourneyEntry } from "@/lib/manual/journey";
+import { useJourney } from "@/lib/manual/journey-store";
 import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
@@ -389,18 +391,72 @@ function ProductRow({ slug, product }: { slug: string; product: InnovationPost["
   );
 }
 
-/** The project's Activity as a visitor reads it: what is happening now, with its proof, and Earlier. */
+/** The project's Activity as a visitor reads it (decision B): the path of what was logged, then what is
+ *  happening now, with its proof, and Earlier. */
 function PostActivity({ post, mine }: { post: InnovationPost; mine: MinePostFacts | null }) {
   const id = React.useId();
   const [now] = React.useState(() => Date.now());
-  const journey = React.useMemo(() => (mine ? undefined : sampleJourneyOf(post, now)), [mine, post, now]);
+  const sample = React.useMemo(() => (mine ? undefined : sampleJourneyOf(post, now)), [mine, post, now]);
   const projectId = mine ? mine.project.id : post.id;
+  const defaultAt = mine ? mine.project.createdAt : post.createdAt;
+  const stored = useJourney(mine ? projectId : null);
+  const record = sample ?? stored.record;
+  const path = React.useMemo(() => historyOf(record, projectId, { kind: "project" }, defaultAt).reverse(), [record, projectId, defaultAt]);
   return (
     <section aria-labelledby={id} className="flex flex-col gap-5">
       <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
         Activity
       </h2>
-      <ActivityNow projectId={projectId} target={{ kind: "project" }} defaultAt={mine ? mine.project.createdAt : post.createdAt} journey={journey} bare />
+      {(sample || stored.hydrated) && path.length > 1 && <ActivityPath entries={path} />}
+      <ActivityNow projectId={projectId} target={{ kind: "project" }} defaultAt={defaultAt} journey={sample} bare />
     </section>
+  );
+}
+
+/** At most this many steps on the path; older ones fold into "+n earlier". */
+const PATH_MAX = 6;
+
+/** What was logged, oldest first, as dots on a line, the current one ringed. Not a scale: it never says
+ *  how many steps are left, so an "Others" entry, a step back or a short journey all read true. */
+function ActivityPath({ entries }: { entries: JourneyEntry[] }) {
+  const hidden = Math.max(0, entries.length - PATH_MAX);
+  const shown = entries.slice(-PATH_MAX);
+  return (
+    <ol aria-label="Activity so far, oldest first" className="m-0 flex list-none items-start gap-0 p-0">
+      {hidden > 0 && (
+        <li className="flex shrink-0 flex-col gap-3 pr-4">
+          <span aria-hidden className="flex h-[14px] items-center text-sm leading-sm text-text-tertiary">
+            ···
+          </span>
+          <span className="text-sm leading-sm text-text-tertiary">+{hidden} earlier</span>
+        </li>
+      )}
+      {shown.map((e, i) => {
+        const last = i === shown.length - 1;
+        return (
+          <li key={e.id} aria-current={last ? "step" : undefined} className={cn("flex min-w-0 flex-col gap-3", last ? "shrink-0" : "flex-1")}>
+            <span aria-hidden className="flex h-[14px] items-center">
+              <span
+                className={cn(
+                  "shrink-0 rounded-full",
+                  last ? "size-[14px] border-2 border-solid border-border-brand bg-bg-surface" : "size-[10px] bg-bg-brand",
+                )}
+              />
+              {!last && <span className="h-[2px] flex-1 bg-border-strong" />}
+            </span>
+            <span
+              title={labelOf(e)}
+              className={cn(
+                "truncate pr-3 text-sm leading-sm",
+                last ? "max-w-[24ch] font-semibold text-text-primary" : "max-w-[14ch] text-text-secondary",
+              )}
+            >
+              {last && <span className="sr-only">Now: </span>}
+              {shortOf(e)}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
