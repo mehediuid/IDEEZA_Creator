@@ -1,9 +1,10 @@
 // What the account popover says about the maker, derived from the credits
 // ledger (lib/create/credits.tsx) — never stored beside it.
 //
-// Balance: `total` is every credit the account was given (the starting seed
-// and each top-up), `remaining` is what is left of it. A refund only gives a
-// charge back, so it is in `remaining` but not in `total`.
+// Balance: `total` is every credit the account was given (the starting seed,
+// each purchase with its bonus, and the free top-ups of earlier builds),
+// `remaining` is what is left of it. A refund only gives a charge back, so it
+// is in `remaining` but not in `total`; an expiry takes from `remaining`.
 //
 // Level: XP is earned by making — each concept render and each product build
 // that was charged and not refunded. The levels and their thresholds are
@@ -21,7 +22,7 @@ export function creditTotals(ledger: LedgerLine[]): CreditTotals {
   let remaining = 0;
   for (const e of ledger) {
     remaining += e.delta;
-    if (e.reason === "seed" || e.reason === "topup") total += e.delta;
+    if (e.reason === "seed" || e.reason === "topup" || e.reason === "purchase") total += e.delta;
   }
   return { total, remaining: Math.max(0, remaining) };
 }

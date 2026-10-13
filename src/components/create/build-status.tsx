@@ -34,8 +34,9 @@ import {
 import type { IconValue } from "@/components/dashboard/icon";
 import { Icon } from "@/components/dashboard/icon";
 import { Banner, type BannerTone } from "@/components/ideeza";
+import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
 import { buildCost } from "@/lib/create/credits";
-import { TopUpButton } from "./top-up-dialog";
+import { BuyCreditsButton } from "@/components/credits/buy-credits";
 import {
   ITEM_LABELS,
   ITEM_SUBTITLES,
@@ -75,10 +76,10 @@ export type StateRow = {
   meta: string;
   footer: string;
   // The link that closes the footer — home everywhere except the
-  // credits pause, where the one thing that moves the build on is a
-  // top-up.
-  /** `topUp`: the link opens Top up credits for this build's price instead of navigating. */
-  footerLink: { label: string; href: string; topUp?: number };
+  // credits pause, where the one thing that moves the build on is
+  // buying credits.
+  /** `buyFor`: the link opens Buy credits for this build's price instead of navigating. */
+  footerLink: { label: string; href: string; buyFor?: number };
   // The whole-build action this state offers: the retry after a system
   // failure, or the cancel a queued build is allowed (Part 4 §4.6).
   actions?: "retryAll" | "cancelQueued";
@@ -148,12 +149,12 @@ export function stateRowFor(
       banner: {
         tone: "warning",
         title: "Not enough credits to start this build",
-        body: "Top up and it starts automatically. Nothing is charged until it does.",
+        body: "Buy credits and it starts automatically. Nothing is charged until it does.",
       },
       meta: "Waiting for credits",
       actions: "cancelQueued",
       footer: "Your place in the queue is kept — nothing else is needed from you.",
-      footerLink: { label: "Top up credits →", href: "/history#credits", topUp: cost },
+      footerLink: { label: "Buy credits →", href: PLAN_PRICING_HREF, buyFor: cost },
     };
   }
 
@@ -477,13 +478,13 @@ export function BuildStatus({
 
       <div className="text-center">
         <p className="text-sm text-text-tertiary">{row.footer}</p>
-        {row.footerLink.topUp !== undefined ? (
-          <TopUpButton
-            need={row.footerLink.topUp}
+        {row.footerLink.buyFor !== undefined ? (
+          <BuyCreditsButton
+            need={row.footerLink.buyFor}
             className="mt-[4px] inline-block text-sm font-semibold text-text-link outline-none transition-colors duration-fast hover:text-text-link-hover focus-visible:ring-2 focus-visible:ring-border-focus"
           >
             {row.footerLink.label}
-          </TopUpButton>
+          </BuyCreditsButton>
         ) : (
           !(inChat && row.footerLink.href === HOME_LINK.href) && (
             <Link

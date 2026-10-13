@@ -918,7 +918,7 @@ export function nextStep(args: {
     if (short) {
       return {
         tone: "attention",
-        text: `The build costs ${cost} credits. You have ${balance}. Top up to build.`,
+        text: `The build costs ${cost} credits. You have ${balance}. Buy credits to build.`,
         target: { kind: "credits" },
         targetLabel: "Show on canvas — the credits notice",
       };

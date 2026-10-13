@@ -273,6 +273,7 @@ const ACTIVITY_VERB: Record<RequestPurpose, string> = {
   bid: "Placed a bid",
   createEditions: "Created editions",
   listEdition: "Signed an edition listing",
+  buyCredits: "Bought AI credits",
 };
 
 /** "Minted on chain · Car": the verb for the purpose, then the request's "Project" row (else its title). */

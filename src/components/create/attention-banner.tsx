@@ -10,7 +10,7 @@
 //     not-yet-dismissed attention item, prioritised by build order).
 //   • Auto-hides when the user is already on the target build page —
 //     no point telling them about something they're already looking at.
-//   • Renders a primary CTA ("Open build" / "Top up credits") + a ×
+//   • Renders a primary CTA ("Open build" / "Buy credits") + a ×
 //     dismiss that records a dismiss timestamp. The red dot on the
 //     sidebar's History row stays on independently (until the user
 //     actually resolves the situation), so dismiss never hides the
@@ -32,7 +32,7 @@ import {
 import { Icon } from "@/components/dashboard/icon";
 import { buildCost } from "@/lib/create/credits";
 import { productsOf, useCreateHistory, ITEM_LABELS, type BuildItem } from "@/lib/create/history";
-import { TopUpButton } from "./top-up-dialog";
+import { BuyCreditsButton } from "@/components/credits/buy-credits";
 // "PCB" · "PCB and Firmware code" — the build page's own join rule, so
 // the two surfaces can't word one list two ways.
 import { joinLabels } from "./build-status";
@@ -116,13 +116,13 @@ export function BuildAttentionBanner() {
           return `${name} · the ${joinLabels(labels)} ${step} failed`;
         })()
       : reason === "credits"
-        ? `${name} is paused — top up credits to start it`
+        ? `${name} is paused — buy credits to start it`
         : `${name} is ready`;
 
   // The build's home is the chat it was started from — that is where its
   // pipeline and its output are. /build/<id> stays as the destination for a
   // job whose chat this browser no longer holds. A paused build's way out is
-  // the Top up credits dialog, in place: the build starts once it's covered.
+  // the Buy credits dialog, in place: the build starts once it's covered.
   const ctaHref = job.chatId ? `/chat/${job.chatId}` : `/build/${job.id}`;
   const ctaClass =
     "inline-flex h-[36px] shrink-0 items-center gap-[8px] rounded-lg bg-bg-brand px-[14px] text-sm font-semibold text-text-on-brand outline-none transition-colors duration-fast hover:bg-bg-brand-hover focus-visible:ring-2 focus-visible:ring-border-focus";
@@ -163,10 +163,10 @@ export function BuildAttentionBanner() {
         </p>
       </div>
       {reason === "credits" ? (
-        <TopUpButton need={buildCost(productsOf(job).length)} className={ctaClass}>
-          Top up credits
+        <BuyCreditsButton need={buildCost(productsOf(job).length)} className={ctaClass}>
+          Buy credits
           <Icon icon={ArrowRight01Icon} />
-        </TopUpButton>
+        </BuyCreditsButton>
       ) : (
         <Link href={ctaHref} className={ctaClass}>
           Open build

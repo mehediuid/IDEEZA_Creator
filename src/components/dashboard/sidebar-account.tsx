@@ -22,6 +22,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
+  Alert02Icon,
   AndroidIcon,
   AppleIcon,
   ArrowRight01Icon,
@@ -34,7 +35,8 @@ import {
   UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { Avatar, Button, Divider, ProgressBar, TestnetDemoBadge, buttonVariants } from "@/components/ideeza";
-import { useTopUp } from "@/components/create/top-up-dialog";
+import Link from "next/link";
+import { PLAN_PRICING_HREF } from "@/lib/create/credit-pricing";
 import { useTheme } from "@/components/theme-provider";
 import { useWalletRequest } from "@/components/wallet/wallet-provider";
 import { creditTotals, levelOf, xpOf } from "@/lib/account/summary";
@@ -315,13 +317,10 @@ export function AccountPopover({
     }
   };
 
-  // Top up opens its dialog in place. The popover closes first and hands
-  // focus to the avatar, so the dialog has somewhere to give it back.
-  const { open: openTopUp } = useTopUp();
-  const topUp = () => {
-    onClose(true);
+  // Following a link out of the popover closes it, and the phone drawer too.
+  const leave = () => {
+    onClose(false);
     onLeave?.();
-    openTopUp();
   };
 
   return (
@@ -360,7 +359,7 @@ export function AccountPopover({
             total={totals.total}
             remaining={totals.remaining}
             level={level}
-            onTopUp={topUp}
+            onLeave={leave}
           />
 
           <div className="mt-[2px] flex flex-col gap-[2px]">
@@ -460,13 +459,13 @@ function BalanceCard({
   total,
   remaining,
   level,
-  onTopUp,
+  onLeave,
 }: {
   hydrated: boolean;
   total: number;
   remaining: number;
   level: ReturnType<typeof levelOf>;
-  onTopUp: () => void;
+  onLeave: () => void;
 }) {
   // Quiet while there is enough for a build; the strongest thing on the card
   // once there isn't.
@@ -480,21 +479,20 @@ function BalanceCard({
           <CreditRing share={share} />
           <span className="text-md font-semibold leading-md tracking-wide text-text-primary">Balance</span>
         </span>
-        {/* Top up, not Upgrade: it adds credits, it doesn't change the plan
-            (pricing study, 2026-10-13). Plans have their own home. */}
-        <button
-          type="button"
+        {/* Buy credits, not Upgrade: it adds credits, it doesn't change the
+            plan. As the design's profile dropdown, it goes to the Credits
+            page (Settings › Plan & pricing). */}
+        <Link
+          href={PLAN_PRICING_HREF}
           data-nav-item
-          aria-haspopup="dialog"
-          aria-label="Top up credits"
-          onClick={onTopUp}
+          onClick={onLeave}
           className={cn(
             buttonVariants({ hierarchy: low ? "primary" : "secondary", size: "md" }),
             "h-[32px] rounded-lg py-0",
           )}
         >
-          Top up
-        </button>
+          Buy credits
+        </Link>
       </div>
       <dl className="flex flex-col gap-[4px] text-sm">
         <div className="flex items-center justify-between">
@@ -510,6 +508,12 @@ function BalanceCard({
           </dd>
         </div>
       </dl>
+      {low && (
+        <p className="flex items-center gap-[6px] text-sm font-medium leading-sm text-text-warning">
+          <Icon icon={Alert02Icon} size={14} />
+          Running low on credits
+        </p>
+      )}
       <Divider />
       <div className="flex flex-col gap-[7px]">
         <div className="flex items-center justify-between gap-[8px]">
