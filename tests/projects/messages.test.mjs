@@ -33,7 +33,7 @@ import {
 } from "../../.tmp-test/lib/messages/rules.js";
 import { isRisky } from "../../.tmp-test/lib/messages/risk.js";
 import { parseStart, startHref, conversationHref, aboutIn } from "../../.tmp-test/lib/messages/links.js";
-import { actingChoices, contextLineOf, personOf, roleTagOf, MAKER_NAME } from "../../.tmp-test/lib/messages/people.js";
+import { actingChoices, contextLineOf, personOf, relationOf, sideOf, MAKER_NAME } from "../../.tmp-test/lib/messages/people.js";
 import { migrateSupport } from "../../.tmp-test/lib/messages/migrate.js";
 
 const LAMP = { kind: "project", projectId: "proj_lamp", name: "Smart Lamp" };
@@ -204,7 +204,7 @@ test("the list: newest first, tab, filters, project and search", () => {
   const read = markRead(data, "cnv_leo", ME, T0 + 11);
   assert.deepEqual(listFor(read, ME, { ...base, filter: "unread" }).map((r) => r.other.id), ["buyer-mira"]);
   assert.equal(listFor(data, MIRA.id, base)[0].preview, "You: Does it ship with firmware?");
-  assert.deepEqual(subjectsFor(data, ME, noTeam).map((s) => s.name), ["Plant Monitor", "Smart Lamp"]);
+  assert.deepEqual(subjectsFor(data, ME, noTeam, () => ME).map((s) => s.name), ["Plant Monitor", "Smart Lamp"]);
 });
 
 test("normalize drops broken rows and entries of unknown conversations", () => {
@@ -245,23 +245,65 @@ test("links round-trip every entry point", () => {
   assert.equal(aboutIn("purchase:"), null);
 });
 
-test("people: names, role tags and the Acting as list", () => {
+test("people: names and the Acting as list, with nobody named as a kind of person", () => {
   const teams = [{ projectId: "proj_lamp", projectName: "Smart Lamp", members: [{ id: "ctb_rafi", name: "Rafi Ahmed", role: "Editor" }] }];
   const src = { teams, creators: [{ id: "c1", name: "Nadia Islam" }] };
-  assert.equal(personOf(ME, src).name, MAKER_NAME);
+  assert.equal(personOf(ME, src).name, "You");
   assert.equal(personOf("buyer-leo", src).name, "Leo");
+  assert.equal(personOf("buyer-leo", src).initials, "L");
   assert.equal(personOf("ctb_rafi", src).initials, "RA");
   assert.equal(personOf("feed:c1", src).name, "Nadia Islam");
   assert.equal(personOf("ctb_gone", src, [{ id: "ctb_gone", name: "Old Friend" }]).name, "Old Friend");
-  const sales = [{ projectId: "proj_lamp", buyerId: "buyer-mira" }];
-  assert.equal(roleTagOf("buyer-mira", LAMP, { sales, teams }), "Customer");
-  assert.equal(roleTagOf("buyer-leo", LAMP, { sales, teams }), "Buyer");
-  assert.equal(roleTagOf("ctb_rafi", LAMP, { sales, teams }), "Team · Editor");
-  assert.equal(roleTagOf(ME, LAMP, { sales, teams }), "Creator");
   const withNadia = createDirect(EMPTY_MESSAGES, { id: "c", subject: POST, from: YOU, to: { id: "feed:c1", name: "Nadia Islam" }, folder: "requests", now: T0 }).data;
-  assert.deepEqual(actingChoices(src, withNadia).map((c) => c.id), [ME, "buyer-mira", "buyer-leo", "buyer-sam", "ctb_rafi", "feed:c1"]);
+  const choices = actingChoices(src, withNadia);
+  assert.deepEqual(choices.map((c) => c.id), [ME, "buyer-mira", "buyer-leo", "buyer-sam", "ctb_rafi", "feed:c1"]);
+  assert.deepEqual(choices.map((c) => c.label), ["You", "Mira", "Leo", "Sam", "Rafi Ahmed · Smart Lamp team", "Nadia Islam · from Innovations"]);
+  assert.equal(choices[1].who, "Mira (demo creator)");
+  assert.equal(choices.some((c) => /buyer|customer|maker/i.test(`${c.label} ${c.who} ${c.group}`)), false);
   const sale = { id: "s", at: T0, item: { nft: "physical", productName: "Smart Lamp" } };
   assert.match(contextLineOf({ kind: "purchase", saleId: "s" }, { sale }), /^Physical copy of Smart Lamp · bought Oct 13, 2026$/);
+});
+
+test("relationships: what the other creator did with this project, seen from your side", () => {
+  const teams = [{ projectId: "proj_lamp", projectName: "Smart Lamp", members: [{ id: "ctb_rafi", name: "Rafi Ahmed", role: "Editor" }] }];
+  const sales = [
+    { projectId: "proj_lamp", buyerId: "buyer-mira", at: T0, item: { nft: "virtual", productName: "VoxLamp" } },
+    { projectId: "proj_lamp", buyerId: "buyer-sam", at: T0, item: { nft: "main", sharePct: 5 } },
+    { projectId: "proj_lamp", buyerId: "buyer-sam", at: T0 + 1, item: { nft: "main", sharePct: 5 } },
+    { projectId: "proj_lamp", buyerId: "buyer-sam", at: T0 + 2, item: { nft: "physical", productName: "VoxLamp" } },
+    { projectId: "proj_lamp", buyerId: "buyer-leo", at: T0, item: { nft: "physical", productName: "VoxLamp" } },
+    { projectId: "proj_lamp", buyerId: "buyer-leo", at: T0 + 1, item: { nft: "virtual", productName: "Smart Lamp" } },
+  ];
+  const ownerOf = (s) => (s.kind === "project" ? ME : "feed:c1");
+  const ctx = { sales, teams, ownerOf };
+  // You, reading about your own project:
+  assert.deepEqual(relationOf(ME, "buyer-mira", LAMP, ctx), { short: "owns a copy", long: "Owns a Virtual copy of VoxLamp" });
+  assert.deepEqual(relationOf(ME, "buyer-sam", LAMP, ctx), { short: "holds 10%", long: "Holds 10% of Smart Lamp" });
+  assert.deepEqual(relationOf(ME, "buyer-leo", LAMP, ctx), { short: "owns 2 copies", long: "Owns 2 copies from Smart Lamp" });
+  assert.deepEqual(relationOf(ME, "ctb_rafi", LAMP, ctx), { short: "Editor", long: "Editor on Smart Lamp" });
+  assert.deepEqual(relationOf(ME, "buyer-sam", { ...LAMP, projectId: "other" }, ctx), { short: null, long: null });
+  assert.deepEqual(relationOf(ME, "buyer-sam", { ...LAMP, projectId: "other" }, ctx, { askedListing: true }), { short: null, long: "Asked about your listing" });
+  // The other side reads you as the one who made it, never as a kind of person:
+  assert.deepEqual(relationOf("buyer-mira", ME, LAMP, ctx), { short: "their project", long: "Made Smart Lamp" });
+  assert.deepEqual(relationOf("ctb_rafi", ME, LAMP, ctx, { askedListing: true }), { short: "their project", long: "Made Smart Lamp" });
+  // A post is its creator's:
+  assert.deepEqual(relationOf(ME, "feed:c1", POST, ctx), { short: "their post", long: "Posted Solar Rover" });
+  assert.deepEqual(relationOf("feed:c1", ME, POST, ctx), { short: null, long: null });
+  assert.equal(sideOf(LAMP, ME, ownerOf), "mine");
+  assert.equal(sideOf(LAMP, "buyer-mira", ownerOf), "theirs");
+  assert.equal(sideOf(POST, ME, ownerOf), "theirs");
+});
+
+test("the list splits into your projects and other creators' projects", () => {
+  let { data } = miraAsks();
+  const post = createDirect(data, { id: "cnv_post", subject: POST, from: YOU, to: { id: "feed:c1", name: "Nadia" }, folder: "requests", now: T0 + 20 });
+  data = send(post.data, { conversationId: "cnv_post", from: ME, draft: draft("Love the rover"), context: { kind: "post" }, now: T0 + 20, id: "mp", contextId: "cp" }).value.data;
+  const ownerOf = (s) => (s.kind === "project" ? ME : "feed:c1");
+  const base = { tab: "inbox", filter: "all", teamIdsOf: noTeam, nameOf, ownerOf };
+  assert.deepEqual(listFor(data, ME, { ...base, side: "mine" }).map((r) => r.conversation.subject.kind), ["project"]);
+  assert.deepEqual(listFor(data, ME, { ...base, side: "theirs" }).map((r) => r.conversation.subject.kind), ["post"]);
+  assert.equal(listFor(data, ME, base).length, 2);
+  assert.deepEqual(subjectsFor(data, ME, noTeam, ownerOf).map((s) => [s.name, s.side]), [["Smart Lamp", "mine"], ["Solar Rover", "theirs"]]);
 });
 
 test("support requests migrate once, as the buyer's first message after a purchase context", () => {

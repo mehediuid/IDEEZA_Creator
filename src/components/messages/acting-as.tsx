@@ -42,7 +42,7 @@ export function ActingAsSelect() {
         ariaLabel="Acting as"
         value={me}
         options={options}
-        placeholder="You (maker)"
+        placeholder="You"
         disabled={!ready}
         onChange={switchTo}
         className="min-w-0 flex-1"
@@ -55,7 +55,7 @@ export function ActingBanner() {
   const { ready, me, meAs, choices } = useMessagesView();
   const switchTo = useSwitchActing();
   if (!ready || me === ME) return null;
-  const label = choices.find((c) => c.id === me)?.label ?? meAs.name;
+  const who = choices.find((c) => c.id === me)?.who ?? meAs.name;
   return (
     <Banner
       tone="info"
@@ -65,7 +65,7 @@ export function ActingBanner() {
         </Button>
       }
     >
-      You&apos;re acting as {label}. What you send now is from {meAs.name}.
+      You&apos;re acting as {who}. What you send now is from {meAs.name}.
     </Banner>
   );
 }

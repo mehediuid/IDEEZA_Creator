@@ -59,7 +59,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             checked={allowNew === "known"}
             onChange={() => choose("known")}
             label="Only people you work with"
-            hint="Buyers, customers and your team."
+            hint="People who bought from your projects, asked about your listing, or work on your team."
           />
         </div>
         <section aria-labelledby={blockedId} className="flex flex-col gap-3">

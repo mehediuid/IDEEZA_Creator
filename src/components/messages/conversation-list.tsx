@@ -21,6 +21,7 @@ import {
   subjectsFor,
   type ListFilter,
   type ListRow,
+  type Side,
   type Tab,
 } from "@/lib/messages/rules";
 import { cn } from "@/lib/utils";
@@ -36,15 +37,17 @@ const FILTERS: { value: ListFilter; label: string }[] = [
 ];
 
 const ALL_PROJECTS = "all";
+const SIDE_MINE = "side:mine";
+const SIDE_THEIRS = "side:theirs";
 
 function Row({ row, current }: { row: ListRow; current: boolean }) {
-  const { now, people } = useMessagesView();
+  const { now, me, people } = useMessagesView();
   const c = row.conversation;
   const team = c.kind === "team";
   const subjectName = subjectNameOf(c.subject);
   const person = row.other ? people.personOf(row.other.id, c.participants) : null;
   const title = team ? `${subjectName} team` : (person?.name ?? "Someone");
-  const role = !team && row.other ? people.roleTagOf(row.other.id, c.subject) : null;
+  const relation = !team && row.other ? people.relationOf(me, row.other.id, c.subject).short : null;
   const teamSize = team && c.subject.kind === "project" ? 1 + people.teamIdsOf(c.subject.projectId).length : 0;
   const href = conversationHref(c.id);
   return (
@@ -68,13 +71,12 @@ function Row({ row, current }: { row: ListRow; current: boolean }) {
             >
               {title}
             </span>
-            {role && <span className="min-w-0 max-w-[50%] shrink-0 truncate text-md leading-md text-text-secondary">{role}</span>}
             <span className="ml-auto shrink-0 pl-2 text-md leading-md text-text-tertiary">
               <time dateTime={new Date(row.lastAt).toISOString()}>{shortTimeOf(row.lastAt, now)}</time>
             </span>
           </span>
           <span className="truncate text-md leading-md text-text-secondary">
-            {team ? `Team · ${teamSize} ${teamSize === 1 ? "person" : "people"}` : subjectName}
+            {team ? `Team · ${teamSize} ${teamSize === 1 ? "person" : "people"}` : relation ? `${subjectName} · ${relation}` : subjectName}
           </span>
           <span className="flex items-center gap-2">
             <span
@@ -123,13 +125,42 @@ export function ConversationList() {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
 
   const counts = React.useMemo(() => countsFor(data, me, people.teamIdsOf), [data, me, people.teamIdsOf]);
-  const subjects = React.useMemo(() => subjectsFor(data, me, people.teamIdsOf), [data, me, people.teamIdsOf]);
-  const subjectKey = subjects.some((s) => s.key === subjectPick) ? subjectPick : null;
-  const rows = React.useMemo(
-    () => listFor(data, me, { tab, filter, subjectKey, q, teamIdsOf: people.teamIdsOf, nameOf: people.nameOf }),
-    [data, me, tab, filter, subjectKey, q, people.teamIdsOf, people.nameOf],
+  const subjects = React.useMemo(
+    () => subjectsFor(data, me, people.teamIdsOf, people.ownerOf),
+    [data, me, people.teamIdsOf, people.ownerOf],
   );
-  const narrowed = q.trim() !== "" || filter !== "all" || subjectKey !== null;
+  const bothSides = subjects.some((s) => s.side === "mine") && subjects.some((s) => s.side === "theirs");
+  const side: Side | null =
+    bothSides && subjectPick === SIDE_MINE ? "mine" : bothSides && subjectPick === SIDE_THEIRS ? "theirs" : null;
+  const subjectKey = subjects.some((s) => s.key === subjectPick) ? subjectPick : null;
+  const projectOptions = React.useMemo(
+    () => [
+      { value: ALL_PROJECTS, label: "All projects" },
+      ...(bothSides
+        ? [
+            { value: SIDE_MINE, label: "Your projects" },
+            { value: SIDE_THEIRS, label: "Others' projects" },
+          ]
+        : []),
+      ...subjects.map((s) => ({ value: s.key, label: s.name, section: s.side === "mine" ? "Your projects" : "Others' projects" })),
+    ],
+    [subjects, bothSides],
+  );
+  const rows = React.useMemo(
+    () =>
+      listFor(data, me, {
+        tab,
+        filter,
+        subjectKey,
+        side,
+        ownerOf: people.ownerOf,
+        q,
+        teamIdsOf: people.teamIdsOf,
+        nameOf: people.nameOf,
+      }),
+    [data, me, tab, filter, subjectKey, side, q, people.ownerOf, people.teamIdsOf, people.nameOf],
+  );
+  const narrowed = q.trim() !== "" || filter !== "all" || subjectKey !== null || side !== null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col max-md:overflow-y-auto">
@@ -189,9 +220,9 @@ export function ConversationList() {
         {subjects.length > 1 && (
           <SelectMenu
             ariaLabel="Project"
-            value={subjectKey ?? ALL_PROJECTS}
+            value={subjectKey ?? (side === "mine" ? SIDE_MINE : side === "theirs" ? SIDE_THEIRS : ALL_PROJECTS)}
             placeholder="All projects"
-            options={[{ value: ALL_PROJECTS, label: "All projects" }, ...subjects.map((s) => ({ value: s.key, label: s.name }))]}
+            options={projectOptions}
             onChange={setSubjectPick}
           />
         )}
@@ -208,7 +239,7 @@ export function ConversationList() {
         ) : tab === "inbox" ? (
           <Empty
             title="No messages yet"
-            body="Conversations start from a project: buyers ask from your listing, and you can message a customer from Earn › Money › Customers or a teammate from the project's Team tab."
+            body="Conversations start from a project: people ask from your listing, and you can write to someone who bought from you (Earn › Money) or to a teammate (Team tab)."
           />
         ) : (
           <Empty title="No requests" body="Messages from people you haven't worked with land here first." />

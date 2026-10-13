@@ -83,6 +83,8 @@ export function ConversationView({
   const subjectName = subjectNameOf(subject);
   const title = team ? `${subjectName} team` : (otherPerson?.name ?? "Someone");
   const memberCount = 1 + teamIds.length;
+  const askedListing = [...entries.map((e) => (e.kind === "context" ? e.context : null)), pending].some((c) => c?.kind === "listing");
+  const relation = other ? people.relationOf(me, other.id, subject, { askedListing }).long : null;
   const block = other ? blockStateOf(data, me, other.id) : "none";
   const state = conversation ? stateOf(conversation, me) : null;
   const inRequests = !!conversation && !team && state?.folder === "requests";
@@ -193,7 +195,7 @@ export function ConversationView({
     <div ref={paneRef} className="flex min-h-0 flex-1 flex-col">
       <ConversationHeader
         title={title}
-        sub={team ? `${memberCount} ${memberCount === 1 ? "person" : "people"}` : other ? people.roleTagOf(other.id, subject) : null}
+        sub={team ? `${memberCount} ${memberCount === 1 ? "person" : "people"}` : relation}
         initials={otherPerson?.initials ?? ""}
         team={team}
         items={items}

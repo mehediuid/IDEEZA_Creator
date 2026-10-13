@@ -30,16 +30,28 @@ Out of scope, said plainly: real accounts, email/push, a moderation queue, readi
 
 ## 3. People in the demo
 
-A person is a `PersonId` plus a display name, resolved live from the stores that already exist, with a name snapshot kept on the conversation for when the source is gone:
+**Every user is a creator** (owner, 2026-10-13): one creator buys another's project or product, so nobody is shown as a kind of person (no buyer, customer or maker). A person is a `PersonId` plus a display name, resolved live from the stores that already exist, with a name snapshot kept on the conversation for when the source is gone:
 
-| PersonId | Who | Source | Role tag shown to others |
-|---|---|---|---|
-| `me` | You, the maker (owns every project in this browser) | — | **Creator** |
-| `buyer-mira` · `buyer-leo` · `buyer-sam` | The three demo buyers | `DEMO_BUYERS` | **Customer** when they hold any sale of the subject project, else **Buyer** |
-| `ctb_…` | A project's team member | `project.contributors` | **Team · {Role}** |
-| `feed:<creatorId>` | A creator of a sample Innovations post | `PROJECTS` in `lib/feed.ts` | **Creator** |
+| PersonId | Who | Source |
+|---|---|---|
+| `me` | You, this browser's account (every project here is yours), shown as **You** | — |
+| `buyer-mira` · `buyer-leo` · `buyer-sam` | The three demo creators (ids kept from the marketplace) | `DEMO_BUYERS` |
+| `ctb_…` | A project's team member | `project.contributors` |
+| `feed:<creatorId>` | A creator of a sample Innovations post | `PROJECTS` in `lib/feed.ts` |
 
-**Acting as (demo only, per tab).** `/messages` carries a switch: You · Mira · Leo · Sam · each team member (named with their project) · each Innovations creator someone has written to. The choice lives in `sessionStorage` (`ideeza:messages:as`), so two tabs can be two people; any `/messages…?as=<id>` link sets it. Acting as anyone but You shows a line: "You're acting as Mira (demo buyer). What you send now is from Mira." with **Back to you**. The switch is a demo affordance and leaves at the production cut (`demo-only-items`).
+**Relationship, not type** (plan https://claude.ai/artifact/3XdpjyNQf8TPpUUbGhMMjc, R1–R3). How the other person stands to the conversation's subject, from the reader's side; the first that holds:
+
+| They… | List row (after the subject) | Header |
+|---|---|---|
+| made the project / posted the post | their project / their post | Made {project} / Posted {post} |
+| are on your project's team | {Role} | {Role} on {project} |
+| hold a share of the Main NFT | holds {n}% | Holds {n}% of {project} |
+| own copies | owns a copy / owns {n} copies | Owns a {Kind} copy of {item} / Owns {n} copies from {project} |
+| only asked about your listing | — | Asked about your listing |
+
+The Project filter is grouped by side (owner R2): **All projects · Your projects · Others' projects**, then each subject under "Your projects" or "Others' projects" (the side rows only when both sides exist).
+
+**Acting as (demo only, per tab).** `/messages` carries a switch: You · Mira · Leo · Sam · each team member (named with their project) · each Innovations creator someone has written to. The choice lives in `sessionStorage` (`ideeza:messages:as`), so two tabs can be two people; any `/messages…?as=<id>` link sets it. Acting as anyone but You shows a line: "You're acting as Mira (demo creator). What you send now is from Mira." with **Back to you**. The switch is a demo affordance and leaves at the production cut (`demo-only-items`).
 
 ## 4. Data
 
@@ -110,13 +122,13 @@ All new text is ≥ 14 px (`text-md`; owner, type scale), tokens only, light + d
 - **List pane header:** h1 "Messages", the **Acting as** select, a settings icon button ("Message settings"). Under it, one quiet line: "Demo · messages stay in this browser."
 - **Tabs** (`ButtonGroup`, a view switch): **Inbox** (unread count) · **Requests** (count).
 - **Search** (people, subject and message text) and filter chips **All · Unread · Archived** (`aria-pressed`) plus a **Project** select (the subjects present).
-- **Row** (a link; `aria-current` on the open one): initials avatar, name, role tag, the subject's name, the last message's first line ("You: …" when it is yours; "Sent a file" or "Shared a project" when it has no text), short time (now · 5m · 2h · Mon · 12 Oct), and an unread dot with the name in bold. A muted conversation shows a muted icon.
-- **Empty Inbox:** "No messages yet" + "Conversations start from a project: buyers ask from your listing, and you can message a customer from Earn › Money › Customers or a teammate from the project's Team tab." **Empty Requests:** "No requests" + "Messages from people you haven't worked with land here first."
-- **Conversation header:** the person (or "{Project} team" with the member count), the role tag, and ⋯ (portalled menu): Mute/Unmute · Archive/Unarchive · Block/Unblock (direct only) · Report…
+- **Row** (a link; `aria-current` on the open one): initials avatar, name, the subject's name with the relationship (§3), the last message's first line ("You: …" when it is yours; "Sent a file" or "Shared a project" when it has no text), short time (now · 5m · 2h · Mon · 12 Oct), and an unread dot with the name in bold. A muted conversation shows a muted icon.
+- **Empty Inbox:** "No messages yet" + "Conversations start from a project: people ask from your listing, and you can write to someone who bought from you (Earn › Money) or to a teammate (Team tab)." **Empty Requests:** "No requests" + "Messages from people you haven't worked with land here first."
+- **Conversation header:** the person (or "{Project} team" with the member count), the relationship sentence (§3), and ⋯ (portalled menu): Mute/Unmute · Archive/Unarchive · Block/Unblock (direct only) · Report…
 - **Request bar** (when it is in my Requests): "{Name} wants to message you about {subject}." **Accept** · **Delete** · **Block**.
 - **Context card** under the header, for the latest context: the project's cover (`coverOf`) or an initials tile, the subject name, a line ("Main NFT listing" / "Physical copy · bought 12 Oct" / "Team · Editor" / "Innovations post"), and **Open** when the reader may open it (the maker → `/projects/<id>`; anyone else → `/marketplace/<id>` while the project has a live Main listing or live copies; a post → `/innovations/<slug>`). Otherwise: "Only the creator can open this project." / "Project deleted".
 - **Timeline** (`role="log"`): a safety line at the top ("IDEEZA never asks you to pay or share your wallet phrase in Messages."); day dividers; bubbles — mine right (brand-subtle), others left (subtle), the sender's name above in a team conversation; time under each group; "Edited"; "Message deleted"; context entries as a centred line ("Mira bought a Physical copy of Smart Lamp", "Leo asked about the Main NFT listing"); images as thumbnails that open full size, PDFs as a file row (name, size) that opens; project cards like the context card. The risk warning sits under a received risky message. Own messages within 15 minutes get ⋯ → Edit · Delete; others' get ⋯ → Report message.
-- **Composer:** the pending-context chip ("About: Physical copy of Smart Lamp"), an autosizing textarea ("Write a message…", labelled "Message to {Name}"), **+** (Photo or PDF · Project — Project only for the maker), chips for attached files and cards with remove, **Send** (primary). Enter sends, Shift+Enter adds a line; a counter from 1,800 characters; errors inline ("This browser's storage is full — your message wasn't sent."). Replaced by the block / read-only line when sending isn't possible.
+- **Composer:** the pending-context chip ("About: Physical copy of Smart Lamp"), an autosizing textarea ("Write a message…", labelled "Message to {Name}"), **+** (Photo or PDF · Project — Project only when acting as You), chips for attached files and cards with remove, **Send** (primary). Enter sends, Shift+Enter adds a line; a counter from 1,800 characters; errors inline ("This browser's storage is full — your message wasn't sent."). Replaced by the block / read-only line when sending isn't possible.
 - **Live:** another tab's write updates this one; a new entry from someone else in the open conversation is announced politely and marks it read while the page is visible.
 - **`/messages/new`** resolves an entry point: `?to=<personId>&project=<id>&about=listing|purchase:<saleId>|team` or `?to=feed:<id>&post=<slug>` or `?team=<projectId>`, plus `?as=`. An existing conversation → replace the URL with it (the `about` becomes its pending context). None → a draft view of the same screen; the first Send creates it. An impossible start (blocked, `known` only, missing project) says why with a link back.
 - **Message settings** (dialog): "Who can start a conversation with you" — **Anyone** (new people go to Requests) · **Only people you work with** (buyers, customers and your team); the blocked list with **Unblock**. Per acting person.

@@ -378,14 +378,23 @@ export type ListRow = {
   lastAt: number;
 };
 
+export type Side = "mine" | "theirs";
+
 type ListOpts = {
   tab: Tab;
   filter: ListFilter;
   subjectKey?: string | null;
+  /** Your own projects and posts, or other creators'; needs `ownerOf`. */
+  side?: Side | null;
+  ownerOf?: (subject: Subject) => PersonId | null;
   q?: string;
   teamIdsOf: (projectId: string) => PersonId[];
   nameOf: (id: PersonId) => string;
 };
+
+function sideFor(subject: Subject, person: PersonId, ownerOf: (subject: Subject) => PersonId | null): Side {
+  return ownerOf(subject) === person ? "mine" : "theirs";
+}
 
 function teamIdsFor(c: Conversation, teamIdsOf: (projectId: string) => PersonId[]): PersonId[] {
   return c.kind === "team" && c.subject.kind === "project" ? teamIdsOf(c.subject.projectId) : [];
@@ -416,6 +425,7 @@ export function listFor(data: MessagesData, person: PersonId, o: ListOpts): List
     const team = teamIdsFor(c, o.teamIdsOf);
     if (!visibleTo(c, person, team) || folderFor(c, person) !== o.tab) continue;
     if (o.subjectKey && subjectKeyOf(c.subject) !== o.subjectKey) continue;
+    if (o.side && o.ownerOf && sideFor(c.subject, person, o.ownerOf) !== o.side) continue;
     const s = stateOf(c, person);
     const unread = isUnread(data, c, person);
     if (o.filter === "archived" ? !s.archived : s.archived) continue;
@@ -459,17 +469,20 @@ export function countsFor(
   return { unread, requests };
 }
 
-/** The subjects of a person's conversations, for the Project filter. */
+/** The subjects of a person's conversations, for the Project filter: their own first, then other creators'. */
 export function subjectsFor(
   data: MessagesData,
   person: PersonId,
   teamIdsOf: (projectId: string) => PersonId[],
-): { key: string; name: string }[] {
-  const out = new Map<string, string>();
+  ownerOf: (subject: Subject) => PersonId | null,
+): { key: string; name: string; side: Side }[] {
+  const out = new Map<string, { key: string; name: string; side: Side }>();
   for (const c of data.conversations) {
-    if (visibleTo(c, person, teamIdsFor(c, teamIdsOf))) out.set(subjectKeyOf(c.subject), subjectNameOf(c.subject));
+    if (!visibleTo(c, person, teamIdsFor(c, teamIdsOf))) continue;
+    const key = subjectKeyOf(c.subject);
+    out.set(key, { key, name: subjectNameOf(c.subject), side: sideFor(c.subject, person, ownerOf) });
   }
-  return [...out].map(([key, name]) => ({ key, name })).sort((a, b) => a.name.localeCompare(b.name));
+  return [...out.values()].sort((a, b) => (a.side === b.side ? a.name.localeCompare(b.name) : a.side === "mine" ? -1 : 1));
 }
 
 // ─────────────────────────── time ───────────────────────────
