@@ -344,3 +344,21 @@ test("media: what an article accepts, and each refusal names the file and the fi
   assert.deepEqual(fitWithin(4000, 3000), { width: 2000, height: 1500 });
   assert.deepEqual(fitWithin(800, 600), { width: 800, height: 600 }, "never enlarged");
 });
+
+test("the cover crop: drag, arrow keys, zoom and center agree and stay in bounds", async () => {
+  const { coverFrom, dragCover, nudgeCover, zoomCover, centerCover, sameCover } = await import("../../.tmp-test/lib/blog/cover.js");
+  const c = coverFrom("f1", "Board");
+  assert.deepEqual(c, { fileKey: "f1", x: 50, y: 50, zoom: 1, alt: "Board" });
+  assert.deepEqual([dragCover(c, 60, 0, 600, 400).x, dragCover(c, 0, -40, 600, 400).y], [40, 60], "dragging right shows more of the left");
+  assert.equal(dragCover({ ...c, zoom: 2 }, 60, 0, 600, 400).x, 45, "zoomed in, the same drag moves less");
+  assert.equal(dragCover(c, -10_000, 0, 600, 400).x, 100);
+  assert.equal(nudgeCover(c, "ArrowLeft", false).x, 51);
+  assert.equal(nudgeCover(c, "ArrowRight", true).x, 40);
+  assert.equal(nudgeCover(c, "ArrowUp", false).y, 51);
+  assert.equal(nudgeCover(c, "Enter", false), c);
+  assert.equal(zoomCover(c, 9).zoom, 3);
+  assert.equal(zoomCover(c, 0.2).zoom, 1);
+  assert.deepEqual(centerCover({ ...c, x: 10, y: 90 }), c);
+  assert.equal(sameCover(c, { ...c }), true);
+  assert.equal(sameCover(c, null), false);
+});

@@ -61,7 +61,9 @@ import { countsFor } from "@/lib/messages/rules";
 import { useMessages } from "@/lib/messages/store";
 import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
-import { useReviewClock } from "@/lib/blog/store";
+import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
+import { findArticle, markSeen, unseenOutcomes, type Outcome } from "@/lib/blog/article";
+import { articleHref, editHref, slugOf } from "@/lib/blog/slug";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -801,7 +803,9 @@ function NotificationBell({
 }) {
   const attentionBuilds = useAttentionElsewhere();
   const { getChat } = useCreateHistory();
-  const count = attentionBuilds.length;
+  const blog = useBlog();
+  const outcomes = blog.hydrated ? unseenOutcomes(blog.data) : [];
+  const count = attentionBuilds.length + outcomes.length;
 
   const label =
     count > 0
@@ -843,10 +847,13 @@ function NotificationBell({
           </p>
           {count === 0 ? (
             <p className="px-[16px] py-[16px] text-sm font-regular text-text-tertiary">
-              No notifications yet — builds that need you show up here.
+              No notifications yet — builds that need you and Blog review results show up here.
             </p>
           ) : (
             <ul role="none" className="py-[4px]">
+              {outcomes.map((o) => (
+                <BlogOutcomeItem key={`blog-${o.id}-${o.at}`} outcome={o} onClose={onClose} />
+              ))}
               {attentionBuilds.map((att) => (
                 <li key={att.job.id} role="none">
                   <Link
@@ -875,6 +882,40 @@ function NotificationBell({
         </div>
       )}
     </div>
+  );
+}
+
+/** A Blog review result in the bell (D10): opening it marks it seen and lands on the
+ *  screen that answers it — the editor when changes were asked, the article when it's live. */
+function BlogOutcomeItem({ outcome: o, onClose }: { outcome: Outcome; onClose: () => void }) {
+  const { data } = useBlog();
+  const article = findArticle(data, o.id);
+  if (!article) return null;
+  const slug = slugOf(article);
+  const needs = o.outcome === "changes";
+  const href = needs && !article.live ? editHref(slug) : articleHref(slug);
+  const kicker = needs ? "Blog · Needs changes" : "Blog · Live";
+  const things = o.things === 1 ? "1 thing to fix" : `${o.things} things to fix`;
+  const message = needs
+    ? `The IDEEZA team asked for changes to “${o.title}”${o.things ? ` · ${things}` : ""}`
+    : o.kind === "changes"
+      ? `Your changes to “${o.title}” are live`
+      : `“${o.title}” is live on the IDEEZA Blog`;
+  return (
+    <li role="none">
+      <Link
+        href={href}
+        role="menuitem"
+        onClick={() => {
+          updateBlog((d) => markSeen(d, o.id));
+          onClose();
+        }}
+        className="block px-[16px] py-[10px] outline-none transition-colors duration-fast hover:bg-bg-brand-subtle focus-visible:bg-bg-brand-subtle"
+      >
+        <span className="block text-2xs font-bold uppercase tracking-wider text-text-tertiary">{kicker}</span>
+        <span className="mt-[2px] block text-sm font-regular text-text-primary">{message}</span>
+      </Link>
+    </li>
   );
 }
 
