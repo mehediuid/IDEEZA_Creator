@@ -185,3 +185,52 @@ test("cleanHeadline returns one plain line of at most 60 characters", () => {
   assert.ok(!long.endsWith(" "));
   assert.ok("Builds tiny solar powered soil moisture sensors and pump timers".startsWith(long));
 });
+
+// ── ties ──
+import { tiesOf } from "../../.tmp-test/lib/people/ties.js";
+
+const CTX = (o = {}) => ({ projects: [{ id: "p1", name: "Smart Lamp" }, { id: "p2", name: "Desk Fan" }], sales: [], teams: [], ...o });
+const COPY = (o) => ({ projectId: "p1", buyerId: "buyer-leo", at: 5, item: { nft: "physical", productId: "project", productName: "Smart Lamp" }, ...o });
+
+test("tiesOf says how someone is connected to you, in verbs, from your side", () => {
+  assert.equal(tiesOf("buyer-leo", CTX()), null);
+  assert.equal(tiesOf("buyer-leo", CTX({ sales: [COPY()] })), "Owns a Physical copy of your Smart Lamp");
+  assert.equal(
+    tiesOf("buyer-leo", CTX({ sales: [COPY({ item: { nft: "virtual", productId: "b1", productName: "Lamp Base" } })] })),
+    "Owns a Virtual copy of your Lamp Base",
+  );
+  assert.equal(tiesOf("buyer-leo", CTX({ sales: [COPY(), COPY({ at: 6 })] })), "Owns 2 copies from your Smart Lamp");
+  assert.equal(tiesOf("buyer-mira", CTX({ sales: [{ projectId: "p2", buyerId: "buyer-mira", at: 9, item: { nft: "main", sharePct: 10 } }] })), "Holds 10% of your Desk Fan");
+  assert.equal(tiesOf("ctb_1", CTX({ teams: [{ projectId: "p1", members: [{ id: "ctb_1", role: "Editor" }] }] })), "Editor on your Smart Lamp");
+});
+
+test("the most recent tie wins, and someone else's sales never show", () => {
+  const ctx = CTX({ sales: [COPY({ at: 1 }), { projectId: "p2", buyerId: "buyer-leo", at: 9, item: { nft: "main", sharePct: 5 } }, COPY({ buyerId: "buyer-sam", at: 99 })] });
+  assert.equal(tiesOf("buyer-leo", ctx), "Holds 5% of your Desk Fan");
+  assert.equal(tiesOf("buyer-leo", CTX({ sales: [COPY({ projectId: "gone" })] })), null);
+});
+
+// ── profile reports ──
+import { REPORT_REASONS, normalizeReports, withReport } from "../../.tmp-test/lib/people/reports.js";
+
+test("profile reports keep only well-formed records and clip the note", () => {
+  assert.equal(REPORT_REASONS[0].label, "Pretending to be someone else");
+  assert.deepEqual(normalizeReports("x"), []);
+  const list = normalizeReports([{ id: "r1", by: "me", who: "feed:c1", reason: "scam", note: "n".repeat(900), at: 1 }, { id: "r2", by: "me", who: "x", reason: "bogus", at: 2 }, null]);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].note.length, 500);
+  const next = withReport(list, { id: "r3", by: "me", who: "buyer-leo", reason: "spam", note: "  hi  ", at: 3 });
+  assert.equal(next.length, 2);
+  assert.equal(next[1].note, "hi");
+});
+
+import { profileHrefOf } from "../../.tmp-test/lib/people/ids.js";
+
+test("profileHrefOf links you, sample people and demo creators, and nobody else", () => {
+  assert.equal(profileHrefOf("me"), "/creators/me");
+  assert.equal(profileHrefOf("you", "innovations"), "/creators/me");
+  assert.equal(profileHrefOf("c1", "innovations"), "/creators/naim-rahman");
+  assert.equal(profileHrefOf("feed:k1"), "/creators/kai-moreno");
+  assert.equal(profileHrefOf("buyer-sam"), "/creators/sam");
+  assert.equal(profileHrefOf("ctb_abc"), null);
+});

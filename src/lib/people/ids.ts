@@ -121,3 +121,14 @@ export function personById(dir: readonly Person[], id: PersonId): Person | null 
 export function profileHref(person: Pick<Person, "handle">): string {
   return `/creators/${person.handle}`;
 }
+
+const SAMPLE_DIRECTORY: readonly Person[] = directory({ name: "", latinName: "" }).slice(1);
+
+/** Where a person's name links: `/creators/me` for you, a sample person's handle, or null for
+ *  someone with no profile (a name typed into a project team). Takes either id scheme. */
+export function profileHrefOf(raw: string, from: "innovations" | "messages" = "messages"): string | null {
+  const id = canonicalId(raw, from);
+  if (id === ME) return "/creators/me";
+  const p = SAMPLE_DIRECTORY.find((x) => x.id === id);
+  return p ? profileHref(p) : null;
+}

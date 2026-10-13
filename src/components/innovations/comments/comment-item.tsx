@@ -12,6 +12,7 @@
 // reads what they hid, under a note with Unhide; its author reads it under a
 // note that says the maker hid it.
 
+import { PersonName } from "@/components/profile/person-name";
 import * as React from "react";
 import { Delete02Icon, FavouriteIcon, MoreHorizontalIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
@@ -88,9 +89,9 @@ export function CommentItem({ c, depth }: { c: PostComment; depth: number }) {
       <Avatar initials={person.initials} color={person.color} size={depth === 0 ? "md" : "xs"} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span id={nameId} className="text-md font-semibold leading-md tracking-wide text-text-primary">
+          <PersonName id={c.authorId} from="innovations" linkId={nameId} className="text-md font-semibold leading-md tracking-wide">
             {person.name}
-          </span>
+          </PersonName>
           {c.authorId === ui.makerId ? <Badge tone="brand">Maker</Badge> : null}
           <Dot />
           <TimeAgo at={c.createdAt} now={ui.now} />

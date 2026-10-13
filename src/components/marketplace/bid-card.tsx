@@ -19,6 +19,7 @@
 // wallet dialog closes, and the live region says the sentence
 // (`useAfterDialogClose`, which the purchase uses too).
 
+import { PersonName } from "@/components/profile/person-name";
 import * as React from "react";
 import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
@@ -345,7 +346,9 @@ function BidHistory({
                 >
                   <span className="font-semibold tabular-nums">{formatAmount(b.amount, b.token)}</span>
                   {" · "}
-                  {b.bidderId === buyerId ? `You (${buyerNameOf(b.bidderId)})` : buyerLabel(b.bidderId)}
+                  <PersonName id={b.bidderId}>
+                    {b.bidderId === buyerId ? `You (${buyerNameOf(b.bidderId)})` : buyerLabel(b.bidderId)}
+                  </PersonName>
                   {" · "}
                   <time dateTime={new Date(b.at).toISOString()} title={formatDateTime(b.at)} className="text-text-secondary">
                     {ago(b.at, now)}

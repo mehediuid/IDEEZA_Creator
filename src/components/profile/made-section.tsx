@@ -142,7 +142,7 @@ export function MadeSection({
         />
       ) : (
         <p className="rounded-xl border border-dashed border-border px-[24px] py-[32px] text-center text-md leading-md text-text-secondary">
-          {ownerName} hasn&apos;t shared a project yet.
+          {`${ownerName} hasn't shared a project yet.`}
         </p>
       )}
     </section>

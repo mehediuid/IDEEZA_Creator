@@ -20,6 +20,7 @@ export function ProfileHeader({
   relation,
   demo,
   actions,
+  phoneMenu,
   titleRef,
 }: {
   avatar: { initials: string; color: string | null; src: string | null };
@@ -33,10 +34,12 @@ export function ProfileHeader({
   /** A demo person (everyone but you, until there are accounts). */
   demo: boolean;
   actions: React.ReactNode;
+  /** At phone width the actions move to a bottom bar; ⋯ stays here, at the header's end. */
+  phoneMenu?: React.ReactNode;
   titleRef?: React.Ref<HTMLHeadingElement>;
 }) {
   return (
-    <header className="flex flex-wrap items-start gap-x-[24px] gap-y-[16px]">
+    <header className="flex items-start gap-x-[24px] gap-y-[16px] md:flex-wrap">
       <div className="flex min-w-0 flex-[1_1_420px] items-start gap-[16px] md:gap-[20px]">
         <Avatar
           size="xl"
@@ -71,7 +74,8 @@ export function ProfileHeader({
           )}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-[8px] max-md:hidden">{actions}</div>
+      {actions && <div className="flex flex-col items-end gap-[8px] max-md:hidden">{actions}</div>}
+      {phoneMenu && <div className="ml-auto md:hidden">{phoneMenu}</div>}
     </header>
   );
 }
