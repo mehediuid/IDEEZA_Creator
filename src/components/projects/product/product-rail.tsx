@@ -10,6 +10,7 @@
 //    out of the header): a built product's labelled facts and its check.
 // 4. Editor: six rows into this product's editor, and the seed caption
 //    (P2-EDITOR-11). Absent in every preview and on a locked project.
+// On an Innovations post (`post`) the post's own blocks replace 1 and 4.
 // From a 1024 px page container it is the 360 px column right of the tabs;
 // below that it follows the tab panel, each block collapsible and closed at
 // 400 px (COR-56). When every block is absent the rail is too: `:empty`
@@ -29,6 +30,7 @@ export function ProductRail({
   built,
   confidence,
   partChanges,
+  post,
 }: {
   slot: ProductSlotProps;
   /** This product inside the build of the version on screen; null when none stands behind it. */
@@ -36,19 +38,24 @@ export function ProductRail({
   confidence: ProductConfidence | null;
   /** The owner's "Built with your part changes: …" (PPL-7); null otherwise. */
   partChanges: string | null;
+  /** An Innovations post's own blocks, which stand in for the Marketplace and Editor blocks (plan §6):
+   *  the post shows the prices and buying stays on the Marketplace page. */
+  post?: React.ReactNode;
 }) {
   const Marketplace = PRODUCT_SLOTS.rail.marketplace;
   return (
     <aside aria-label="Product record" className={cn(RAIL_SURFACE, "empty:hidden")}>
-      {Marketplace ? <Marketplace {...slot} /> : null}
+      {!post && Marketplace ? <Marketplace {...slot} /> : null}
       {built && <ProductSpecsBlock product={built} partChanges={partChanges} />}
       {confidence && <ProductCheckBlock confidence={confidence} />}
-      <ProductEditorBlock
-        project={slot.project}
-        productId={slot.product.id}
-        viewer={slot.viewer}
-        canCtx={slot.view.canCtx}
-      />
+      {post ?? (
+        <ProductEditorBlock
+          project={slot.project}
+          productId={slot.product.id}
+          viewer={slot.viewer}
+          canCtx={slot.view.canCtx}
+        />
+      )}
     </aside>
   );
 }

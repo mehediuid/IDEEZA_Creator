@@ -117,7 +117,7 @@ const GRADIENTS = [
   "linear-gradient(135deg, var(--color-red-400), var(--color-violet-700))",
 ];
 
-const CREATORS: Creator[] = [
+export const CREATORS: Creator[] = [
   { id: "c1", name: "Naim Rahman", initials: "NR", color: "var(--color-violet-600)", pro: true, following: true },
   { id: "c2", name: "Sora Min", initials: "SM", color: "var(--color-blue-600)", pro: true, following: false },
   { id: "c3", name: "Diego Alvarez", initials: "DA", color: "var(--color-green-600)", pro: false, following: true },
@@ -234,11 +234,31 @@ export const PROJECTS: Project[] = buildProjects();
 
 // ── Query logic (used by /api/feed) ─────────────────────────────────────────
 
-export function getFeedPage(params: FeedParams, cursor: string | null): FeedResponse {
+/** This browser's own Follow choices (lib/innovations/reactions.ts), over the dataset's. */
+export type FollowOverrides = Record<string, boolean>;
+
+/** "c4:1,c1:0" ⇄ { c4: true, c1: false } — how the grid tells /api/feed whom this browser follows. */
+export function followParamOf(follow: FollowOverrides): string {
+  return Object.entries(follow)
+    .map(([id, on]) => `${id}:${on ? 1 : 0}`)
+    .sort()
+    .join(",");
+}
+
+export function parseFollowParam(raw: string | null): FollowOverrides {
+  const out: FollowOverrides = {};
+  for (const part of (raw ?? "").split(",")) {
+    const m = /^([a-z0-9_-]{1,40}):([01])$/i.exec(part.trim());
+    if (m) out[m[1]] = m[2] === "1";
+  }
+  return out;
+}
+
+export function getFeedPage(params: FeedParams, cursor: string | null, follow: FollowOverrides = {}): FeedResponse {
   let list = PROJECTS.slice();
 
   if (params.mode === "following") {
-    list = list.filter((p) => p.creator.following);
+    list = list.filter((p) => follow[p.creator.id] ?? p.creator.following);
   }
   if (params.category !== "all") {
     list = list.filter((p) => p.category === params.category);
@@ -308,9 +328,12 @@ export function toUrlQuery(p: FeedParams): string {
 export async function fetchFeed(
   params: FeedParams,
   cursor: string | null,
+  follow: FollowOverrides = {},
 ): Promise<FeedResponse> {
   const sp = new URLSearchParams();
   sp.set("mode", params.mode);
+  const followParam = followParamOf(follow);
+  if (params.mode === "following" && followParam) sp.set("follow", followParam);
   sp.set("category", params.category);
   sp.set("sort", params.sort);
   if (params.q.trim()) sp.set("q", params.q.trim());

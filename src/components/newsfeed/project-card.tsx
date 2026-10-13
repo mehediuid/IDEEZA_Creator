@@ -26,38 +26,25 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { MintedBadge } from "./minted-badge";
-import { formatCount, postAppreciate, postSave, type Project } from "@/lib/feed";
+import { formatCount, type Project } from "@/lib/feed";
+import { useCommentCount } from "@/lib/innovations/comments-store";
+import { countsOf, useReactions } from "@/lib/innovations/reactions";
+import { sampleSeedOf } from "@/lib/innovations/sample-posts";
+import { postIdOfSample } from "@/lib/innovations/slug";
 
 export function ProjectCard({ project }: { project: Project }) {
   const router = useRouter();
   const detailHref = `/innovations/${project.slug}`;
 
-  const [appreciated, setAppreciated] = React.useState(project.appreciated);
-  const [appreciations, setAppreciations] = React.useState(project.appreciations);
-  const [saved, setSaved] = React.useState(project.saved);
   const [imgOk, setImgOk] = React.useState(true);
+  // The same reactions and comment count the post reads (plan P1), so card and post agree.
+  const postId = postIdOfSample(project.id);
+  const { reactions, toggle } = useReactions();
+  const { appreciated, appreciations, saved, views } = countsOf(reactions, postId, project);
+  const comments = useCommentCount(postId, sampleSeedOf(postId));
 
-  const toggleAppreciate = async () => {
-    const next = !appreciated;
-    setAppreciated(next);
-    setAppreciations((c) => c + (next ? 1 : -1));
-    try {
-      await postAppreciate(project.id, next);
-    } catch {
-      setAppreciated(!next);
-      setAppreciations((c) => c + (next ? -1 : 1));
-    }
-  };
-
-  const toggleSave = async () => {
-    const next = !saved;
-    setSaved(next);
-    try {
-      await postSave(project.id, next);
-    } catch {
-      setSaved(!next);
-    }
-  };
+  const toggleAppreciate = () => toggle("appreciated", postId);
+  const toggleSave = () => toggle("saved", postId);
 
   const openComments = () => router.push(`${detailHref}?focus=comments`);
 
@@ -155,11 +142,20 @@ export function ProjectCard({ project }: { project: Project }) {
           </span>
           <span
             className="inline-flex items-center gap-[4px] text-text-tertiary"
-            title={`${project.views} views`}
+            title={`${views} views`}
           >
             <Icon icon={ViewIcon} size={13} strokeWidth={1.6} />
-            {formatCount(project.views)}
+            {formatCount(views)}
           </span>
+          {comments ? (
+            <span
+              className="inline-flex items-center gap-[4px] text-text-tertiary"
+              title={`${comments} ${comments === 1 ? "comment" : "comments"}`}
+            >
+              <Icon icon={Comment01Icon} size={13} strokeWidth={1.6} />
+              {formatCount(comments)}
+            </span>
+          ) : null}
         </div>
       </div>
     </article>

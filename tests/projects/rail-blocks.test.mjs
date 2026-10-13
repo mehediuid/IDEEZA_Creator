@@ -29,10 +29,11 @@ test("Sharing and the owner-only facts ask the one permission source (PPL-1, COM
   assert.match(menu, /can\(viewer, "project\.showcase", view\.canCtx\)/);
   assert.match(menu, /can\(viewer, "project\.delete"\)/);
   assert.match(read("header.tsx"), /const menu = engineering && owner;/, "the ⋯ menu is the owner's, never a preview's");
-  // "Stop sharing" is never gated; "Share to Innovations" always opens the share dialog — the videos
-  // (P2-VIDEO-15), then the post's story and status (owner, 2026-10-12) — and shares with that post.
+  // "Share to Innovations" always opens the share dialog — the videos (P2-VIDEO-15), then the post's
+  // story and status (owner, 2026-10-12) — and shares with that post. Once shared the item opens the
+  // post, where Stop sharing lives (plan D8, 2026-10-13).
   assert.match(menu, /setShowcase\(project\.id, true, undefined, post\)/);
-  assert.match(menu, /setShowcase\(project\.id, false\)/);
+  assert.match(menu, /router\.push\(postHref\(mineSlugOf\(project\)\)\)/);
   assert.match(menu, /<ShareDialog/);
   assert.match(read("rail-details.tsx"), /can\(viewer, "facts\.seeOwnerOnly"\)/);
 });

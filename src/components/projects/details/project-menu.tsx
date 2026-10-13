@@ -4,13 +4,14 @@
 // actions"). Every action on the project itself, in one place beside "Earn
 // from this project", owner-only and absent in a preview (PPL-6):
 // - Edit name and description — the one editor for both (edit-details.tsx);
-// - Share to Innovations / Stop sharing — what Showcase was: a flag that puts
+// - Share to Innovations / View post — what Showcase was: a flag that puts
 //   the project on the Innovations page for this browser (no sale, no wallet).
 //   On a Draft it reads "Mint it first · Go to mint" and opens the mint
 //   (owner, 2026-10-12: never a greyed item that leaves the maker guessing);
 //   sharing first runs the
 //   videos-and-ownership gate (P2-VIDEO-15), opening the ReadinessDialog when
-//   something is missing. "Stop sharing" is never gated;
+//   something is missing. Once shared it opens the post, where Edit post and
+//   Stop sharing live (plan D8, 2026-10-13);
 // - Activity — the phase-and-status notes drawer (P2-TABS-5), with its count;
 // - Delete project… — set apart at the end, in the error colour. While a rule
 //   blocks it (§3.8.4: a sale, an auction, a listing, a co-owner) it stays in
@@ -42,6 +43,7 @@ import { formatDate } from "@/lib/manual/project-summary";
 import { useManualProjects } from "@/lib/manual/projects";
 import { outcomeView } from "@/lib/manual/rail-copy";
 import { shareAnnouncement } from "@/lib/manual/showcase-copy";
+import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { cn } from "@/lib/utils";
 import { ActivityDrawer } from "./activity/drawer";
 import { ShareDialog } from "../share-dialog";
@@ -94,15 +96,9 @@ export function ProjectMenu({
   const shareShown = canShare || (shareCopy === null && view.lock === null && can(viewer, "facts.seeOwnerOnly"));
   const block = deleteBlockOf(view.deleteFacts);
 
-  const share = () => {
-    if (shared) {
-      setShowcase(project.id, false);
-      announce(shareAnnouncement(false, project.name));
-      return;
-    }
-    // Always the share dialog: the videos, then the post's story and status (owner, 2026-10-12).
-    setLayer("share");
-  };
+  // Always the share dialog: the videos, then the post's story and status (owner, 2026-10-12).
+  // Once shared, the post's own controls (Edit post, Stop sharing) live on the post (plan D8).
+  const share = () => setLayer("share");
 
   const items: Item[][] = [
     [
@@ -110,7 +106,13 @@ export function ProjectMenu({
       ...(shareShown
         ? [
             shared
-              ? { id: "share", label: "Stop sharing", sub: `On Innovations since ${formatDate(shared.at)}`, icon: News01Icon, run: share }
+              ? {
+                  id: "share",
+                  label: "View post",
+                  sub: `On Innovations since ${formatDate(shared.at)}`,
+                  icon: News01Icon,
+                  run: () => router.push(postHref(mineSlugOf(project))),
+                }
               : {
                   id: "share",
                   label: "Share to Innovations",

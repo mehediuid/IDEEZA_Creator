@@ -36,7 +36,7 @@ ideeza-creator-panel/
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
    │  │   │   ├─ new/                 "/parts/new" — New Package authoring flow
    │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
-   │  │   └─ innovations/[slug]/      community feed + detail
+   │  │   └─ innovations/[slug]/      community feed + the post (+ products/[productId]/)
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/                    "/projects" — My projects (index)
    │  │   │   └─ [id]/                    "/projects/<id>" — Project details
@@ -70,6 +70,8 @@ ideeza-creator-panel/
    │  │                      confirmation, and the chrome both editors share
    │  ├─ parts/              Parts & Agile Module library page + part detail
    │  ├─ newsfeed/           newsfeed, project-card/grid, feed-controls, minted-badge
+   │  ├─ innovations/        the post page (post-*), its product view, the post toast,
+   │  │                      report dialog, the header's Shared chip; comments/ = DS M100
    │  ├─ projects/           my-projects + project-card; details/ (the project page: shell, SLOTS,
    │  │                      header, tabs, rail, activity/); product/ (the product page + Editor block);
    │  │                      listing/ (Add to marketplace, Relist, Close auction); editions/ (Physical
@@ -102,7 +104,8 @@ ideeza-creator-panel/
    │  ├─ voice/              voice-listening (what a composer becomes while the mic is
    │  │                      open — dot, live waveform, Cancel / Stop & review)
    │  ├─ ideeza/             In-house design-system primitives (button, select, toggle,
-   │  │                      text-input, number-input, slider, banner, select-menu…)
+   │  │                      text-input, number-input, slider, banner, select-menu,
+   │  │                      avatar, tag, skeleton, menu…)
    │  ├─ ui/                 shadcn-style primitives (badge, button, card, input)
    │  ├─ brand/              ideeza-logo
    │  └─ theme-provider.tsx · theme-toggle.tsx
@@ -161,6 +164,8 @@ ideeza-creator-panel/
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)
    │  ├─ key-store.ts · storage-status.ts   one live localStorage key; refused-write reporting
    │  ├─ feed.ts · feed-image-manifest.ts   community-feed data
+   │  ├─ innovations/        Innovations posts: types, sample posts, a shared project as a
+   │  │                      post (mine-post), comments + store, reactions, slugs
    │  └─ utils.ts            shared helpers (cn, etc.)
    │
    └─ styles/

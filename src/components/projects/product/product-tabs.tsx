@@ -18,8 +18,13 @@
 // - Panels come from PRODUCT_SLOTS.panels, and a missing panel means a
 //   missing tab; Media, the one tab every product has, is VIDEO's panel.
 // - The ┆ is an `aria-hidden` hairline, never a tab stop; the arrows cross it.
+// - On an Innovations post (`post`, plan §6, D2) Media leads, then the open
+//   pieces (3D model, Parts) ┆ the locked ones (PCB, Firmware code, Wiring)
+//   with a lock: their panel says what a copy includes, never the files.
 
 import * as React from "react";
+import { SquareLock02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
 import type { BuildJob, BuildProduct } from "@/lib/create/history";
 import { can } from "@/lib/manual/permissions";
 import { pickProductTab, productTabsOf, type ProductTabId } from "@/lib/manual/product-page";
@@ -40,6 +45,9 @@ export const PRODUCT_TAB_LABEL: Record<ProductTabId, string> = {
 };
 
 const PEOPLE: ReadonlySet<ProductTabId> = new Set<ProductTabId>(["contributors", "customers"]);
+/** The pieces an Innovations post keeps for a copy (D2). */
+export type PostLockedTab = "pcb" | "code" | "wiring";
+const POST_LOCKED: ReadonlySet<ProductTabId> = new Set<ProductTabId>(["pcb", "code", "wiring"]);
 const PIECE: Partial<Record<ProductTabId, BuildProduct["items"][number]["kind"]>> = {
   "3d": "3d",
   pcb: "pcb",
@@ -55,6 +63,7 @@ export function ProductTabs({
   chatHref,
   asked,
   onTab,
+  post,
 }: {
   /** What every product slot renders with. */
   slot: ProductSlotProps;
@@ -67,21 +76,29 @@ export function ProductTabs({
   asked: string | null;
   /** Writes `?tab=` (null drops it: Media is never written). */
   onTab: (tab: string | null) => void;
+  /** An Innovations post: the locked pieces' panel. */
+  post?: { locked: (tab: PostLockedTab) => React.ReactNode };
 }) {
   const { project, product, viewer } = slot;
   const panels = PRODUCT_SLOTS.panels;
   const contributors = project.contributors?.length ?? 0;
   // The page's product-scoped download grant (an edition holder of this product has it too).
   const downloads = React.useContext(DeliverablesAccess);
-  const tabs = productTabsOf(product, job && bp ? bp.items : null, {
-    firmware: downloads,
-    contributors:
-      panels.contributors !== undefined &&
-      buyerSide(viewer) &&
-      (can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && contributors > 0)),
-    customers: false,
-    mediaFirst: buyerSide(viewer),
-  });
+  const tabs = productTabsOf(
+    product,
+    job && bp ? bp.items : null,
+    post
+      ? { firmware: true, contributors: false, customers: false, mediaFirst: true }
+      : {
+          firmware: downloads,
+          contributors:
+            panels.contributors !== undefined &&
+            buyerSide(viewer) &&
+            (can(viewer, "people.seeRoster") || (can(viewer, "people.seeTeam") && contributors > 0)),
+          customers: false,
+          mediaFirst: buyerSide(viewer),
+        },
+  );
   // The pick shows at once; the URL follows it by replace.
   const [picked, setPicked] = React.useState<ProductTabId | null>(null);
   const active = pickProductTab(tabs, picked ?? asked);
@@ -92,21 +109,26 @@ export function ProductTabs({
     onTab(id === tabs[0] ? null : id);
   };
 
-  const def = (id: ProductTabId): TabDef<ProductTabId> => ({ id, label: PRODUCT_TAB_LABEL[id] });
-  const groups = [tabs.filter((t) => !PEOPLE.has(t)).map(def), tabs.filter((t) => PEOPLE.has(t)).map(def)];
+  const def = (id: ProductTabId): TabDef<ProductTabId> =>
+    post && POST_LOCKED.has(id)
+      ? { id, label: PRODUCT_TAB_LABEL[id], icon: <Icon icon={SquareLock02Icon} size={14} /> }
+      : { id, label: PRODUCT_TAB_LABEL[id] };
+  const second = post ? POST_LOCKED : PEOPLE;
+  const groups = [tabs.filter((t) => !second.has(t)).map(def), tabs.filter((t) => second.has(t)).map(def)];
 
-  const piece = PIECE[active];
+  const lockedPanel = post && POST_LOCKED.has(active) ? post.locked(active as PostLockedTab) : null;
+  const piece = lockedPanel ? undefined : PIECE[active];
   const Panel = active === "media" ? panels.media : active === "contributors" ? panels.contributors : undefined;
 
   // One tab is no choice: its panel stands alone, without a strip.
   if (tabs.length === 1) {
     return (
       <div>
-        {piece && job && bp ? (
+        {lockedPanel ?? (piece && job && bp ? (
           <ProductPiecePanel key={`${job.id}:${bp.id}:${piece}`} job={job} product={bp} kind={piece} chatHref={chatHref} />
         ) : Panel ? (
           <Panel {...slot} />
-        ) : null}
+        ) : null)}
       </div>
     );
   }
@@ -121,11 +143,11 @@ export function ProductTabs({
         tabIndex={0}
         className="rounded-lg pt-10 outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
       >
-        {piece && job && bp ? (
+        {lockedPanel ?? (piece && job && bp ? (
           <ProductPiecePanel key={`${job.id}:${bp.id}:${piece}`} job={job} product={bp} kind={piece} chatHref={chatHref} />
         ) : Panel ? (
           <Panel {...slot} />
-        ) : null}
+        ) : null)}
       </div>
     </div>
   );
