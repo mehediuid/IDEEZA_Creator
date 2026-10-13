@@ -22,18 +22,18 @@ import { MediaLightbox } from "@/components/projects/details/media-tab";
 import { LiveRegion, usePageArrival } from "@/components/projects/details/arrival";
 import { TabStrip, type TabDef } from "@/components/projects/details/tab-strip";
 import { DeliverablesAccess, ProductPiecePanel } from "@/components/projects/product/product-deliverables";
-import { VideoPlayer } from "@/components/video-jobs/video-player";
 import { productsOf, useCreateHistory, type BuildJob, type BuildProduct } from "@/lib/create/history";
 import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-store";
 import { postHref } from "@/lib/innovations/slug";
 import { PIECE_LABEL, type InnovationPost, type PostPiece, type PostProduct } from "@/lib/innovations/types";
-import type { VideoTake } from "@/lib/video/types";
 import { cn } from "@/lib/utils";
 import { CARD, ImageGone, partsLabel, PostBreadcrumb, PostImg } from "./post-bits";
-import { lightboxTile } from "./post-media";
+import { lightboxTile, PostVideoStage } from "./post-media";
 import { POST_COLUMNS, POST_CONTENT, POST_PAGE, PostMissing, PostProductSkeleton } from "./post-states";
 import { ProductPage } from "@/components/projects/product/product-page";
 import { isLockedPiece, LockedPiecePanel, PostProductLinks, type LockedId } from "./post-product-bits";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
+import { sampleJourneyOf } from "@/lib/innovations/sample-activity";
 import { usePost, type MinePostFacts } from "./use-post";
 
 type TabId = "media" | "3d" | "parts" | "pcb" | "code" | "wiring";
@@ -60,12 +60,6 @@ export function PostProductPage({ slug, productId }: { slug: string; productId: 
   return <ProductBody key={`${data.post.id}:${product.id}`} post={data.post} product={product} seed={data.seed} mine={data.mine} />;
 }
 
-/** The product's video in use, for a post of this browser's own project. */
-function takeOfProduct(mine: MinePostFacts | null, productId: string): VideoTake | null {
-  const pv = mine?.view.videos.record?.products[productId];
-  return pv?.inUseId ? (pv.takes.find((t) => t.id === pv.inUseId) ?? null) : null;
-}
-
 /** The build behind a "mine" product, when this browser still has it. */
 function useBuildOf(product: PostProduct): { job: BuildJob; bp: BuildProduct } | null {
   const { builds } = useCreateHistory();
@@ -81,11 +75,11 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
   const index = post.products.indexOf(product);
   const comments = useCommentCount(post.id, seed);
   const build = useBuildOf(product);
-  const take = takeOfProduct(mine, product.id);
   const { titleRef, live } = usePageArrival(`${post.id}:${product.id}`, product.name, `${product.name} · ${post.title} · Innovations · IDEEZA`);
 
   const open: TabDef<TabId>[] = [];
-  if (take || product.image) open.push({ id: "media", label: "Media" });
+  // Media leads and opens on the product's video (owner, 2026-10-13).
+  if (product.video || product.image) open.push({ id: "media", label: "Media" });
   for (const k of ["3d", "parts"] as const) if (product.pieces.includes(k)) open.push({ id: k, label: PIECE_LABEL[k] });
   const locked: TabDef<TabId>[] = (["pcb", "code", "wiring"] as const)
     .filter((k) => product.pieces.includes(k as PostPiece))
@@ -117,6 +111,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
             </h1>
             <p className="text-md leading-md text-text-secondary">{meta}</p>
             {product.summary && <p className="max-w-[62ch] text-md leading-relaxed text-text-primary">{product.summary}</p>}
+            <SampleProductActivity post={post} productId={product.id} name={product.name} />
           </div>
         </header>
 
@@ -126,7 +121,7 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
               <>
                 <TabStrip label="What this product includes" groups={[open, locked]} active={tab} onSelect={setTab} />
                 <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-w-0 [container-type:inline-size]">
-                  {tab === "media" && <MediaPanel post={post} product={product} mine={mine} take={take} />}
+                  {tab === "media" && <MediaPanel post={post} product={product} mine={mine} />}
                   {tab === "3d" && <ModelPanel post={post} product={product} build={build} />}
                   {tab === "parts" && <PartsPanel post={post} product={product} build={build} />}
                   {isLocked(tab) && <LockedPiecePanel post={post} kind={tab} />}
@@ -193,11 +188,16 @@ function ProductBody({ post, product, seed, mine }: { post: InnovationPost; prod
 
 // ─────────────────────────── panels ───────────────────────────
 
-function MediaPanel({ post, product, mine, take }: { post: InnovationPost; product: PostProduct; mine: MinePostFacts | null; take: VideoTake | null }) {
+/** The product's video first, at full width; then its image. */
+function MediaPanel({ post, product, mine }: { post: InnovationPost; product: PostProduct; mine: MinePostFacts | null }) {
   const [zoom, setZoom] = React.useState(false);
   return (
     <div className="grid grid-cols-1 gap-8 [@container(min-width:640px)]:grid-cols-2">
-      {take && mine && <VideoPlayer take={take} productName={product.name} projectId={mine.project.id} />}
+      {product.video && (
+        <div className="[@container(min-width:640px)]:col-span-2">
+          <PostVideoStage post={post} mine={mine} video={product.video} />
+        </div>
+      )}
       {product.image && (
         <button
           type="button"
@@ -296,5 +296,20 @@ function PartsPanel({ post, product, build }: { post: InnovationPost; product: P
       </div>
       <p className="max-w-[62ch] text-md leading-md text-text-secondary">The parts list is open to everyone, so anyone can see what goes into it.</p>
     </div>
+  );
+}
+
+/** The product's own Activity, as on a product page read by a visitor (a sample post's journey). */
+function SampleProductActivity({ post, productId, name }: { post: InnovationPost; productId: string; name: string }) {
+  const [now] = React.useState(() => Date.now());
+  const journey = React.useMemo(() => sampleJourneyOf(post, now), [post, now]);
+  return (
+    <ActivityNow
+      projectId={post.id}
+      target={{ kind: "product", productId }}
+      defaultAt={post.createdAt}
+      heading={`${name} activity`}
+      journey={journey}
+    />
   );
 }

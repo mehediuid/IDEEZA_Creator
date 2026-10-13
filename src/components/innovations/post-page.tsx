@@ -2,8 +2,11 @@
 
 // An Innovations post (plan §5, decision D0 "a story page"; mockup
 // Main.dc.html, Phone.dc.html): read top to bottom, the media, the title and
-// status, the maker's story, what the project is, what is inside it, how far
-// it has come, then the conversation; beside it a sticky rail with the maker,
+// status, the maker's story, what the project is, what is inside it, its
+// Activity (owner, 2026-10-13, decision B: no progress bar, so an "Others"
+// entry, a step back or a project never meant for a factory all read true —
+// a small path of what was logged, oldest first, then now and earlier), then
+// the conversation; beside it a sticky rail with the maker,
 // the visitor's actions, the Marketplace, About and more from the maker.
 //
 // - One page for both sources (usePost): a sample post, or a project this
@@ -32,7 +35,10 @@ import { useCommentCount, type CommentSeed } from "@/lib/innovations/comments-st
 import { countsOf, useReactions } from "@/lib/innovations/reactions";
 import { postHref, postProductHref } from "@/lib/innovations/slug";
 import type { InnovationPost } from "@/lib/innovations/types";
-import { CATALOGUES } from "@/lib/manual/journey";
+import { sampleJourneyOf, sampleStatusOf } from "@/lib/innovations/sample-activity";
+import { historyOf, labelOf, shortOf, type JourneyEntry } from "@/lib/manual/journey";
+import { useJourney } from "@/lib/manual/journey-store";
+import { ActivityNow } from "@/components/projects/details/activity/now-block";
 import { formatDate, formatDateTime } from "@/lib/manual/project-summary";
 import { cn } from "@/lib/utils";
 import { PostComments } from "./comments/post-comments";
@@ -66,9 +72,6 @@ import { ReportDialog } from "./report-dialog";
 import { PostToastProvider, usePostToast } from "./toast";
 import { usePost, type MinePostFacts } from "./use-post";
 
-/** The stages a post's progress counts: the project's Activity types, Planning to Improvement
- *  (Others is not a step). */
-const STEPS = CATALOGUES.project.filter((s) => s.id !== "others");
 
 export function PostPage({ slug }: { slug: string }) {
   return (
@@ -130,7 +133,8 @@ function PostBody({
     if (window.location.hash === "#comments") scrollToComments("auto");
   }, []);
 
-  const stage = post.stage ? (STEPS.find((s) => s.id === post.stage) ?? null) : null;
+  // The status chip is the project's current Activity, "Others" under its own name.
+  const status = mine ? shortOf(mine.view.current) : sampleStatusOf(post);
   const makerName = post.creator.name;
 
   return (
@@ -156,10 +160,10 @@ function PostBody({
                 >
                   {post.title}
                 </h1>
-                {stage && (
-                  <span title={stage.label} className="inline-flex items-center rounded-full bg-bg-brand-subtle px-5 py-1 text-sm font-semibold leading-sm text-text-brand">
+                {status && (
+                  <span title={status} className="inline-flex max-w-[24ch] items-center truncate rounded-full bg-bg-brand-subtle px-5 py-1 text-sm font-semibold leading-sm text-text-brand">
                     <span className="sr-only">Status: </span>
-                    {stage.short}
+                    {status}
                   </span>
                 )}
                 {post.minted && (
@@ -188,7 +192,7 @@ function PostBody({
 
             {post.description && <AboutProject text={post.description} />}
             {post.products.length > 0 && <WhatsInside post={post} />}
-            {stage && stage.id !== "others" && <Progress stageId={stage.id} />}
+            <PostActivity post={post} mine={mine} />
 
             <MarketplaceCard post={post} className={NARROW_ONLY} />
             <AboutCard post={post} collapsible className={NARROW_ONLY} />
@@ -387,34 +391,72 @@ function ProductRow({ slug, product }: { slug: string; product: InnovationPost["
   );
 }
 
-/** Progress: the stages as a bar, this one named with what it means. */
-function Progress({ stageId }: { stageId: string }) {
+/** The project's Activity as a visitor reads it (decision B): the path of what was logged, then what is
+ *  happening now, with its proof, and Earlier. */
+function PostActivity({ post, mine }: { post: InnovationPost; mine: MinePostFacts | null }) {
   const id = React.useId();
-  const at = STEPS.findIndex((s) => s.id === stageId);
-  if (at < 0) return null;
-  const step = STEPS[at];
+  const [now] = React.useState(() => Date.now());
+  const sample = React.useMemo(() => (mine ? undefined : sampleJourneyOf(post, now)), [mine, post, now]);
+  const projectId = mine ? mine.project.id : post.id;
+  const defaultAt = mine ? mine.project.createdAt : post.createdAt;
+  const stored = useJourney(mine ? projectId : null);
+  const record = sample ?? stored.record;
+  const path = React.useMemo(() => historyOf(record, projectId, { kind: "project" }, defaultAt).reverse(), [record, projectId, defaultAt]);
   return (
     <section aria-labelledby={id} className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
-          Progress
-        </h2>
-        <span className="text-md leading-md text-text-secondary">
-          Stage {at + 1} of {STEPS.length}
-        </span>
-      </div>
-      <div role="img" aria-label={`Stage ${at + 1} of ${STEPS.length}: ${step.label}`} className="flex gap-2">
-        {STEPS.map((s, i) => (
-          <span key={s.id} className={cn("h-4 flex-1 rounded-sm", i <= at ? "bg-bg-brand" : "bg-border")} />
-        ))}
-      </div>
-      <div aria-hidden className="flex justify-between text-sm leading-sm text-text-secondary">
-        <span>{STEPS[0].short}</span>
-        <span>{STEPS[STEPS.length - 1].short}</span>
-      </div>
-      <p className="max-w-[62ch] text-md leading-relaxed text-text-primary">
-        <span className="font-semibold">{step.label}.</span> <span className="text-text-secondary">{step.help}</span>
-      </p>
+      <h2 id={id} className="text-xl font-bold leading-xl text-text-primary">
+        Activity
+      </h2>
+      {(sample || stored.hydrated) && path.length > 1 && <ActivityPath entries={path} />}
+      <ActivityNow projectId={projectId} target={{ kind: "project" }} defaultAt={defaultAt} journey={sample} bare />
     </section>
+  );
+}
+
+/** At most this many steps on the path; older ones fold into "+n earlier". */
+const PATH_MAX = 6;
+
+/** What was logged, oldest first, as dots on a line, the current one ringed. Not a scale: it never says
+ *  how many steps are left, so an "Others" entry, a step back or a short journey all read true. */
+function ActivityPath({ entries }: { entries: JourneyEntry[] }) {
+  const hidden = Math.max(0, entries.length - PATH_MAX);
+  const shown = entries.slice(-PATH_MAX);
+  return (
+    <ol aria-label="Activity so far, oldest first" className="m-0 flex list-none items-start gap-0 p-0">
+      {hidden > 0 && (
+        <li className="flex shrink-0 flex-col gap-3 pr-4">
+          <span aria-hidden className="flex h-[14px] items-center text-sm leading-sm text-text-tertiary">
+            ···
+          </span>
+          <span className="text-sm leading-sm text-text-tertiary">+{hidden} earlier</span>
+        </li>
+      )}
+      {shown.map((e, i) => {
+        const last = i === shown.length - 1;
+        return (
+          <li key={e.id} aria-current={last ? "step" : undefined} className={cn("flex min-w-0 flex-col gap-3", last ? "shrink-0" : "flex-1")}>
+            <span aria-hidden className="flex h-[14px] items-center">
+              <span
+                className={cn(
+                  "shrink-0 rounded-full",
+                  last ? "size-[14px] border-2 border-solid border-border-brand bg-bg-surface" : "size-[10px] bg-bg-brand",
+                )}
+              />
+              {!last && <span className="h-[2px] flex-1 bg-border-strong" />}
+            </span>
+            <span
+              title={labelOf(e)}
+              className={cn(
+                "truncate pr-3 text-sm leading-sm",
+                last ? "max-w-[24ch] font-semibold text-text-primary" : "max-w-[14ch] text-text-secondary",
+              )}
+            >
+              {last && <span className="sr-only">Now: </span>}
+              {shortOf(e)}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
