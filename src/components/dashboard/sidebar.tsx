@@ -667,7 +667,6 @@ function ProfileRow({
   const rowRef = React.useRef<HTMLDivElement>(null);
   const railRef = React.useRef<HTMLElement | null>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
-  const avatarRef = React.useRef<HTMLSpanElement>(null);
   const accountButton = React.useRef<HTMLButtonElement>(null);
   const walletButton = React.useRef<HTMLButtonElement>(null);
   const bellButton = React.useRef<HTMLButtonElement>(null);
@@ -731,11 +730,12 @@ function ProfileRow({
         collapsed
           ? "size-[40px] justify-center max-md:size-[var(--touch-min)]"
           : "min-w-0 flex-1 gap-[8px] p-[4px] max-md:min-h-[var(--touch-min)]",
+        // Pressed while its popover is open, in the popover's own fill: that
+        // is what ties the two together, where the design had an arrow.
+        openPanel === "account" ? "bg-bg-surface-raised" : "",
       ].join(" ")}
     >
-      <span ref={avatarRef} className="inline-flex shrink-0">
-        <Avatar initials={ACCOUNT.initials} size="sm" />
-      </span>
+      <Avatar initials={ACCOUNT.initials} size="sm" />
       {!collapsed && (
         <span className="flex min-w-0 flex-1 flex-col gap-[2px] text-left">
           <span className="truncate text-md font-medium leading-md text-text-primary">
@@ -791,7 +791,7 @@ function ProfileRow({
       )}
 
       {openPanel === "account" && (
-        <AccountPopover id={ids.account} anchorRef={avatarRef} {...popover} />
+        <AccountPopover id={ids.account} anchorRef={accountButton} {...popover} />
       )}
       {openPanel === "wallet" && (
         <WalletPopover id={ids.wallet} anchorRef={walletButton} {...popover} />

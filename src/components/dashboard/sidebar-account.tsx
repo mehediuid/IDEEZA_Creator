@@ -5,9 +5,10 @@
 // credits and level, then the account rows — with the "Get the mobile app"
 // flyout beside it, and the wallet popover behind the wallet button.
 //
-// Placement (FloatingPanel): on the open sidebar a popover sits above the
-// footer row, as wide as the row, its notch on the button that opened it; on
-// the collapsed rail it opens beside the rail with the notch on its left. It
+// Placement (FloatingPanel): on the open sidebar a popover sits 8 px above the
+// footer row, as wide as the row; on the collapsed rail it opens 8 px beside
+// the rail, its bottom on the button's. No arrow points at the button: the
+// button that opened it stays pressed, which ties the two together. It
 // portals into the phone drawer when it is in one (the drawer is modal, so
 // anything outside it is out of reach) and into <body> otherwise, `position:
 // fixed`, clamped into the viewport; one too tall for the room scrolls inside.
@@ -55,10 +56,8 @@ export function usePlanLabel(): string {
 // ────────────────────────────────── placement ───────────────────────────
 
 const MARGIN = 8;
-/** Panel edge to anchor: the notch's depth and a little air before its tip. */
-const GAP = 18;
-/** The notch's centre keeps this far from a corner: radius + half its width. */
-const NOTCH_EDGE = 30;
+/** Panel edge to the button that opened it (spacing-4). */
+const GAP = 8;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
 
@@ -94,8 +93,8 @@ export function moveFocus(e: React.KeyboardEvent, root: HTMLElement | null): boo
   return false;
 }
 
-/** The popover frame: a fixed panel beside or above its anchor, with a notch
- *  pointing at it. `frameRef` is what it lines up with — the footer row above
+/** The popover frame: a fixed panel above or beside the button that opened it
+ *  (`anchorRef`). `frameRef` is what it lines up with — the footer row above
  *  (its width, less `inset` each side), or the rail / panel it opens beside. */
 export function FloatingPanel({
   anchorRef,
@@ -130,7 +129,6 @@ export function FloatingPanel({
   children: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, "className" | "children">) {
   const outerRef = React.useRef<HTMLDivElement>(null);
-  const notchRef = React.useRef<HTMLSpanElement>(null);
   const [host, setHost] = React.useState<Element | null>(null);
 
   React.useLayoutEffect(() => {
@@ -141,10 +139,9 @@ export function FloatingPanel({
   const place = React.useCallback(() => {
     const outer = outerRef.current;
     const inner = panelRef.current;
-    const notch = notchRef.current;
     const a = anchorRef.current?.getBoundingClientRect();
     const f = frameRef.current?.getBoundingClientRect();
-    if (!outer || !inner || !notch || !a || !f) return;
+    if (!outer || !inner || !a || !f) return;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     inner.style.maxHeight = "";
@@ -157,20 +154,15 @@ export function FloatingPanel({
       const left = clamp(f.left + inset, MARGIN, vw - MARGIN - w);
       outer.style.left = `${left}px`;
       outer.style.top = `${a.top - GAP - h}px`;
-      notch.style.left = `${clamp(a.left + a.width / 2 - left, NOTCH_EDGE, w - NOTCH_EDGE) - 18}px`;
-      notch.style.top = "";
     } else {
       const w = Math.min(width, vw - f.right - GAP - MARGIN);
       outer.style.width = `${w}px`;
       const room = vh - 2 * MARGIN;
       const h = Math.min(inner.offsetHeight, room);
       if (inner.offsetHeight > room) inner.style.maxHeight = `${room}px`;
-      const ideal = valign === "end" ? a.bottom + MARGIN - h : a.top + a.height / 2 - h / 2;
-      const top = clamp(ideal, MARGIN, vh - MARGIN - h);
+      const ideal = valign === "end" ? a.bottom - h : a.top + a.height / 2 - h / 2;
       outer.style.left = `${f.right + GAP}px`;
-      outer.style.top = `${top}px`;
-      notch.style.top = `${clamp(a.top + a.height / 2 - top, NOTCH_EDGE, h - NOTCH_EDGE) - 8}px`;
-      notch.style.left = "";
+      outer.style.top = `${clamp(ideal, MARGIN, vh - MARGIN - h)}px`;
     }
     outer.style.visibility = "";
   }, [anchorRef, frameRef, panelRef, side, inset, width, valign]);
@@ -226,44 +218,8 @@ export function FloatingPanel({
       >
         {children}
       </div>
-      <Notch ref={notchRef} side={side} tone={tone} />
     </div>,
     host,
-  );
-}
-
-// The design's tip (Figma "Tooltip", Group 11008): 36 × 16, the panel's fill
-// over its border, so it reads as one shape with the panel.
-function Notch({
-  ref,
-  side,
-  tone,
-}: {
-  ref: React.RefObject<HTMLSpanElement | null>;
-  side: Side;
-  tone: "raised" | "surface";
-}) {
-  return (
-    <span
-      ref={ref}
-      aria-hidden
-      className={cn(
-        "pointer-events-none absolute h-[16px] w-[36px]",
-        // Beside the rail the tip turns to point left, at the anchor.
-        side === "top" ? "top-[calc(100%-1px)]" : "left-[-25px] origin-center rotate-90",
-      )}
-    >
-      <svg width="36" height="17" viewBox="0 0 36 16.3" className="block overflow-visible">
-        <path
-          d="M34.62 1.8 18.96 14.85a1.5 1.5 0 0 1-1.92 0L1.38 1.8Z"
-          className="[fill:none] [stroke:var(--color-border-default)]"
-        />
-        <path
-          d="M0 0h36L18.64 14.47a1 1 0 0 1-1.28 0Z"
-          className={tone === "raised" ? "[fill:var(--color-bg-surface-raised)]" : "[fill:var(--color-bg-surface)]"}
-        />
-      </svg>
-    </span>
   );
 }
 
