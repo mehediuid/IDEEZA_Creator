@@ -4,11 +4,12 @@
 // three more tones on the same tokens — "neutral" (the Draft status chip),
 // "success" (every minted status chip) and "info" (the Showcase badge) — so
 // src/components/projects/status-chip.tsx and its consumers don't hand-roll
-// their own pill styling.
+// their own pill styling. "error" is A17 Subtle · Error · SM (Figma 494:273):
+// color/badge/error-*, 11/16 on 2 × 6 — 5.91 : 1 light, 6.93 : 1 dark.
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export type BadgeTone = "blue" | "brand" | "brand-outline" | "neutral" | "success" | "info" | "warning";
+export type BadgeTone = "blue" | "brand" | "brand-outline" | "neutral" | "success" | "info" | "warning" | "error";
 
 const TONE_CLASS: Record<BadgeTone, string> = {
   blue: "bg-badge-blue-bg px-[6px] py-[2px] text-xs leading-xs text-badge-blue-text",
@@ -21,6 +22,7 @@ const TONE_CLASS: Record<BadgeTone, string> = {
   info: "bg-badge-blue-bg px-[8px] py-[2px] text-xs leading-xs text-badge-blue-text",
   // Phase 2: the "Testnet demo" pill (TestnetDemoBadge). Existing tokens only; 4.76 : 1 light, 5.66 : 1 dark.
   warning: "bg-bg-warning-subtle px-[8px] py-[2px] text-xs leading-xs text-text-warning",
+  error: "bg-badge-error-bg px-[6px] py-[2px] text-xs leading-xs text-badge-error-text",
 };
 
 export function Badge({

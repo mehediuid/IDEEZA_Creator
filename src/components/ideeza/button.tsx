@@ -36,7 +36,7 @@ const buttonVariants = cva(
         ghost:
           "border border-solid border-transparent bg-transparent text-[color:var(--color-button-ghost-text)] hover:bg-[var(--color-button-ghost-bg-hover)] disabled:text-[color:var(--color-button-disabled-text)]",
         danger:
-          "border border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:brightness-105 active:brightness-95",
+          "border border-solid border-transparent bg-[var(--color-button-danger-bg)] text-[color:var(--color-button-danger-text)] hover:bg-[var(--color-button-danger-bg-hover)] active:bg-[var(--color-button-danger-bg-pressed)]",
       },
       size: {
         sm: "h-[32px] gap-[var(--spacing-2)] px-[var(--spacing-5)] rounded-[var(--radius-sm)] text-[length:var(--font-size-xs)] leading-xs",
