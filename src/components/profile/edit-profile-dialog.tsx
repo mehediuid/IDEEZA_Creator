@@ -3,15 +3,16 @@
 // Edit profile (spec 2026-10-14-creator-profile-design.md): the one home of
 // your profile's own words — cover (owner, 2026-10-14), photo, name in any
 // script, the name in English letters, a one-line headline, and (Portfolio,
-// 2026-10-14) About, where you are, two links and what you are open to. "Suggest from my work" (owner
+// 2026-10-14) About, where you are, up to five links (Add link adds one, ✕
+// takes one away) and what you are open to. "Suggest from my work" (owner
 // decision D7) drafts the headline from your shared projects only; the draft
 // sits under the field, labelled, until you press Use this, and nothing is
 // saved before Save profile. Cancel with changes asks "Discard changes?".
 
 import * as React from "react";
-import { AiMagicIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, AiMagicIcon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Avatar, Button, ModalFrame, TextInput, Textarea } from "@/components/ideeza";
+import { Avatar, Button, IconButton, ModalFrame, TextInput, Textarea } from "@/components/ideeza";
 import { RadioRow } from "@/components/messages/choice";
 import { cn } from "@/lib/utils";
 import { BIO_MAX, HEADLINE_MAX, LINKS_MAX, LOCATION_MAX, NAME_MAX, OPEN_TO_WORDS, linkOf, type OpenTo } from "@/lib/people/fields";
@@ -41,6 +42,11 @@ function deviceZone(): string | null {
     return null;
   }
 }
+
+/** One link field; `key` keeps a row's input in place when a row above it is taken away. */
+type LinkRow = { key: number; value: string; bad: boolean };
+
+const LINK_PLACEHOLDERS = ["yoursite.com", "github.com/you", "linkedin.com/in/you", "youtube.com/@you", "x.com/you"];
 
 type Photo = { kind: "keep" } | { kind: "new"; blob: Blob; url: string } | { kind: "remove" };
 type Suggest = { kind: "idle" } | { kind: "running" } | { kind: "draft"; text: string } | { kind: "failed" };
@@ -86,10 +92,19 @@ export function EditProfileDialog({
   const [headline, setHeadline] = React.useState(initial.headline);
   const [bio, setBio] = React.useState(initial.bio);
   const [location, setLocation] = React.useState(initial.location);
-  const [links, setLinks] = React.useState<string[]>(() => Array.from({ length: LINKS_MAX }, (_, i) => initial.links[i] ?? ""));
-  const [badLinks, setBadLinks] = React.useState<boolean[]>(() => Array.from({ length: LINKS_MAX }, () => false));
+  // At least one field, so there is somewhere to type the first link.
+  const [links, setLinks] = React.useState<LinkRow[]>(() =>
+    (initial.links.length ? initial.links : [""]).map((value, key) => ({ key, value, bad: false })),
+  );
+  const nextLinkKey = React.useRef(Math.max(1, initial.links.length));
+  const focusLink = React.useRef<number | null>(null);
   const [openTo, setOpenTo] = React.useState<OpenTo>(initial.openTo);
-  const linkRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const linkRefs = React.useRef(new Map<number, HTMLInputElement>());
+  React.useEffect(() => {
+    if (focusLink.current === null) return;
+    linkRefs.current.get(focusLink.current)?.focus();
+    focusLink.current = null;
+  }, [links]);
   const [photo, setPhoto] = React.useState<Photo>({ kind: "keep" });
   const [photoError, setPhotoError] = React.useState<string | null>(null);
   const [cover, setCover] = React.useState<Photo>({ kind: "keep" });
@@ -114,12 +129,32 @@ export function EditProfileDialog({
     headline.trim() !== initial.headline.trim() ||
     bio.trim() !== initial.bio.trim() ||
     location.trim() !== initial.location.trim() ||
-    links.map((l) => l.trim()).join("\n") !== Array.from({ length: LINKS_MAX }, (_, i) => initial.links[i] ?? "").join("\n") ||
+    links.flatMap((l) => (l.value.trim() ? [l.value.trim()] : [])).join("\n") !== initial.links.join("\n") ||
     openTo !== initial.openTo ||
     photo.kind !== "keep" ||
     cover.kind !== "keep";
 
   const linkBad = (raw: string) => raw.trim() !== "" && linkOf(raw) === null;
+  const editLink = (key: number, patch: Partial<LinkRow>) => setLinks((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const addLink = () => {
+    const key = nextLinkKey.current++;
+    focusLink.current = key;
+    setLinks((prev) => (prev.length >= LINKS_MAX ? prev : [...prev, { key, value: "", bad: false }]));
+  };
+  /** Takes a link away; the last one left is emptied instead, so the field stays. Focus moves to
+   *  the row that takes its place, else the one above, else Add link. */
+  const removeLink = (key: number) => {
+    setLinks((prev) => {
+      if (prev.length === 1) {
+        focusLink.current = key;
+        return [{ ...prev[0], value: "", bad: false }];
+      }
+      const at = prev.findIndex((l) => l.key === key);
+      const next = prev.filter((l) => l.key !== key);
+      focusLink.current = (next[at] ?? next[at - 1]).key;
+      return next;
+    });
+  };
 
   const shownPhoto = photo.kind === "new" ? photo.url : photo.kind === "remove" ? null : photoUrl;
   const ownCover = cover.kind === "new" ? cover.url : cover.kind === "remove" ? null : coverUrl;
@@ -185,10 +220,10 @@ export function EditProfileDialog({
       onClose();
       return;
     }
-    const bad = links.map(linkBad);
-    if (bad.some(Boolean)) {
-      setBadLinks(bad);
-      linkRefs.current[bad.indexOf(true)]?.focus();
+    const firstBad = links.find((l) => linkBad(l.value));
+    if (firstBad) {
+      setLinks((prev) => prev.map((l) => ({ ...l, bad: linkBad(l.value) })));
+      linkRefs.current.get(firstBad.key)?.focus();
       return;
     }
     setSaving(true);
@@ -202,7 +237,7 @@ export function EditProfileDialog({
       // Your local time shows only next to where you are, so the zone goes with a location.
       timeZone: location.trim() ? deviceZone() : null,
       links: links.flatMap((l) => {
-        const url = linkOf(l);
+        const url = linkOf(l.value);
         return url ? [url] : [];
       }),
       openTo,
@@ -495,36 +530,61 @@ export function EditProfileDialog({
           <legend id={linksId} className={cn(LABEL, "mb-2 p-0")}>
             Links <span className="font-regular text-text-secondary">(optional)</span>
           </legend>
-          {links.map((value, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              <TextInput
-                ref={(el) => {
-                  linkRefs.current[i] = el;
-                }}
-                size="lg"
-                type="url"
-                inputMode="url"
-                value={value}
-                invalid={badLinks[i]}
-                aria-label={`Link ${i + 1}`}
-                aria-invalid={badLinks[i] || undefined}
-                aria-describedby={badLinks[i] ? `${linksId}-${i}` : undefined}
-                onValueChange={(v) => {
-                  setLinks((prev) => prev.map((x, j) => (j === i ? v : x)));
-                  if (badLinks[i]) setBadLinks((prev) => prev.map((x, j) => (j === i ? false : x)));
-                }}
-                onBlur={() => setBadLinks((prev) => prev.map((x, j) => (j === i ? linkBad(value) : x)))}
-                placeholder={i === 0 ? "yoursite.com" : "github.com/you"}
-                autoComplete="url"
-                containerClassName={TAP}
-              />
-              {badLinks[i] && (
-                <p id={`${linksId}-${i}`} className="text-md text-text-error">
+          {links.map((link, i) => (
+            <div key={link.key} className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                <TextInput
+                  ref={(el) => {
+                    if (el) linkRefs.current.set(link.key, el);
+                    else linkRefs.current.delete(link.key);
+                  }}
+                  size="lg"
+                  type="url"
+                  inputMode="url"
+                  value={link.value}
+                  invalid={link.bad}
+                  aria-label={`Link ${i + 1}`}
+                  aria-invalid={link.bad || undefined}
+                  aria-describedby={link.bad ? `${linksId}-${link.key}` : undefined}
+                  onValueChange={(v) => editLink(link.key, link.bad ? { value: v, bad: false } : { value: v })}
+                  onBlur={() => editLink(link.key, { bad: linkBad(link.value) })}
+                  placeholder={LINK_PLACEHOLDERS[i] ?? "yoursite.com"}
+                  autoComplete="url"
+                  containerClassName={cn(TAP, "min-w-0 flex-1")}
+                />
+                {(links.length > 1 || link.value.trim() !== "") && (
+                  <IconButton
+                    type="button"
+                    hierarchy="ghost"
+                    size="lg"
+                    aria-label={`Remove link ${i + 1}`}
+                    icon={<Icon icon={Cancel01Icon} size={18} />}
+                    onClick={() => removeLink(link.key)}
+                    className="shrink-0 max-md:size-[var(--touch-min)]"
+                  />
+                )}
+              </div>
+              {link.bad && (
+                <p id={`${linksId}-${link.key}`} className="text-md text-text-error">
                   Enter a web address, like yoursite.com
                 </p>
               )}
             </div>
           ))}
+          {links.length < LINKS_MAX ? (
+            <Button
+              type="button"
+              hierarchy="ghost"
+              size="md"
+              onClick={addLink}
+              iconLeading={<Icon icon={Add01Icon} size={16} />}
+              className={cn(TAP, "self-start")}
+            >
+              Add link
+            </Button>
+          ) : (
+            <p className={QUIET}>{`Up to ${LINKS_MAX} links.`}</p>
+          )}
         </fieldset>
 
         {/* relative: the rows' visually hidden inputs are placed in here, so focusing one scrolls

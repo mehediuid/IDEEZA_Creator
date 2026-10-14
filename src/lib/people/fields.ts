@@ -11,7 +11,8 @@ export const HEADLINE_MAX = 60;
 export const PINS_MAX = 3;
 export const BIO_MAX = 280;
 export const LOCATION_MAX = 60;
-export const LINKS_MAX = 2;
+/** Owner, 2026-10-14: two was too few; a website plus the usual places. */
+export const LINKS_MAX = 5;
 const LINK_MAX = 120;
 
 /** What you are open to, said on your profile (owner picked direction A, 2026-10-14). */
@@ -39,7 +40,7 @@ export type ProfileFields = {
   location: string;
   /** This device's IANA time zone when you saved, so others see your local time. */
   timeZone: string | null;
-  /** Up to two web addresses, each with its scheme. */
+  /** Up to LINKS_MAX web addresses, each with its scheme. */
   links: string[];
   openTo: OpenTo;
 };

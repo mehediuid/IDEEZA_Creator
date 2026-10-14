@@ -287,16 +287,23 @@ test("a stale pin (unshared or deleted project) never holds one of the three pla
 import { BIO_MAX, OPEN_TO_WORDS, linkOf, normalizeProfile as normalizeProfile2 } from "../../.tmp-test/lib/people/fields.js";
 import { builtWithOf, stageToneOf, inProduction, activityOf, localTimeOf } from "../../.tmp-test/lib/people/portfolio.js";
 
-test("profile fields keep About, location, time zone, two links and Open to", () => {
+test("profile fields keep About, location, time zone, links and Open to", () => {
   const f = normalizeProfile2({ bio: "b".repeat(400), location: "  Dhaka, Bangladesh ", timeZone: "Asia/Dhaka", links: ["naim.dev", "javascript:alert(1)", "https://github.com/naim", "x.org"], openTo: "both" });
   assert.equal(f.bio.length, BIO_MAX);
   assert.equal(f.location, "Dhaka, Bangladesh");
   assert.equal(f.timeZone, "Asia/Dhaka");
-  assert.deepEqual(f.links, ["https://naim.dev", "https://github.com/naim"]);
+  assert.deepEqual(f.links, ["https://naim.dev", "https://github.com/naim", "https://x.org"]);
   assert.equal(f.openTo, "both");
   assert.equal(normalizeProfile2({ openTo: "weird", timeZone: "Not/AZone" }).openTo, "");
   assert.equal(normalizeProfile2({ timeZone: "Not/AZone" }).timeZone, null);
   assert.equal(OPEN_TO_WORDS.both, "Open to collaboration and questions");
+});
+
+test("profile links stop at five, bad ones dropped first", async () => {
+  const { LINKS_MAX } = await import("../../.tmp-test/lib/people/fields.js");
+  assert.equal(LINKS_MAX, 5);
+  const many = ["a.dev", "not a link", "b.dev", "c.dev", "d.dev", "e.dev", "f.dev"];
+  assert.deepEqual(normalizeProfile2({ links: many }).links, ["https://a.dev", "https://b.dev", "https://c.dev", "https://d.dev", "https://e.dev"]);
 });
 
 test("linkOf accepts web addresses only", () => {
