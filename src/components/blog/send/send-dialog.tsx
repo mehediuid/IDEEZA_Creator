@@ -1,51 +1,100 @@
 "use client";
 
-// Send for review (spec § Send dialog; mockup Editor.dc.html): everything that
-// isn't writing lives here, in one column — the cover (picked from the first
-// image), Category (required), Topics, About a project, and under More options
-// the reuse permission, unticked (D3). It says plainly that the IDEEZA team
-// reads the article first (the Figma's "Publish" sent it to review without a
-// word). Choices are kept when the writer goes back to editing.
+// The publish modal (Figma frames 14–19): "Do you want to publish your blog?"
+// ("…update your blog?" for a published one) over two columns — the Thumbnail
+// on the left; on the right "Add or change topics (up to 5) so readers know
+// what your blog is about", then "Give access to IDEEZA for future use" with
+// its ? help, and Save and publish (Update). The Figma ticks the access box for
+// the writer; here it starts unticked — consent is the writer's to give (named
+// in the requirements). Once IDEEZA has shared the blog the box is locked on
+// and the help says why. The line under the button says the IDEEZA team reads
+// it first. Category, tags and tag link are the editor page's; the modal still
+// refuses a blog without a category, and it needs a thumbnail (the Figma's
+// button stays off without one). Choices are kept when the writer closes it.
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
+import { HelpCircleIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { Banner, Button, Checkbox, ModalFrame, SelectMenu } from "@/components/ideeza";
+import { Banner, Button, Checkbox, IconButton, ModalFrame } from "@/components/ideeza";
 import { usePostToast } from "@/components/innovations/toast";
 import { CoverPicker } from "@/components/blog/send/cover-picker";
 import { TopicsField } from "@/components/blog/send/topics-field";
-import { patchDraft, sendLabel, sendProblems, setReuse, submissionKindOf, submit, SEND_PROBLEM_TEXT } from "@/lib/blog/article";
-import { BLOG_CATEGORIES } from "@/lib/blog/categories";
+import { patchDraft, sendProblems, setReuse, submissionKindOf, submit, SEND_PROBLEM_TEXT } from "@/lib/blog/article";
 import { coverFrom } from "@/lib/blog/cover";
 import { imagesOf, missingAlt } from "@/lib/blog/doc";
 import { blogHref } from "@/lib/blog/slug";
 import { updateBlog } from "@/lib/blog/store";
-import type { ArticleMeta, BlogArticle, BlogDoc } from "@/lib/blog/types";
-import { useManualProjects } from "@/lib/manual/projects";
+import { TOPICS_MAX, type ArticleMeta, type BlogArticle, type BlogDoc } from "@/lib/blog/types";
+import { cn } from "@/lib/utils";
 
 const LEAD = {
-  first: "The IDEEZA team reads every article before it goes live. We'll let you know when it's live, or if anything needs changing.",
-  again: "Your fixes go back to the IDEEZA team. We'll let you know when it's live, or if anything still needs changing.",
-  changes: "Readers keep seeing the live version until the IDEEZA team has checked your changes.",
+  first: "The IDEEZA team reviews every blog before it goes live. We'll let you know when it's approved.",
+  again: "Your blog goes back to the IDEEZA team. We'll let you know when it's approved.",
+  changes: "Readers keep seeing the published version until the IDEEZA team approves your update.",
 } as const;
 
 const SENT = {
-  first: "Sent for review. We'll let you know when it's live.",
-  again: "Sent again. The IDEEZA team will take another look.",
-  changes: "Changes sent for review. Readers still see the live version.",
+  first: "Blog sent for review. We'll let you know when it's approved.",
+  again: "Blog sent again. The IDEEZA team will take another look.",
+  changes: "Update sent for review. Readers still see the published version.",
 } as const;
 
-type Choices = Pick<ArticleMeta, "cover" | "categoryId" | "topics" | "projectId">;
+const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+/** Off, as the Figma draws it, yet still focusable so a click can say why (aria-disabled). */
+export const OFF =
+  "aria-disabled:cursor-not-allowed aria-disabled:bg-[var(--color-button-disabled-bg)] aria-disabled:text-[color:var(--color-button-disabled-text)] aria-disabled:hover:bg-[var(--color-button-disabled-bg)] aria-disabled:active:bg-[var(--color-button-disabled-bg)]";
+
+type Choices = Pick<ArticleMeta, "cover" | "topics">;
 
 function initialChoices(article: BlogArticle, doc: BlogDoc): Choices {
   const first = imagesOf(doc)[0];
   return {
     cover: article.draft.cover ?? (first ? coverFrom(first.fileKey, first.alt) : null),
-    categoryId: article.draft.categoryId,
     topics: article.draft.topics,
-    projectId: article.draft.projectId,
   };
+}
+
+/** The ? beside the access box: opens on hover, on focus and on a tap; Esc closes it. */
+function HelpTip({ open, setOpen, label, children }: { open: boolean; setOpen: (v: boolean) => void; label: string; children: React.ReactNode }) {
+  const id = React.useId();
+  return (
+    <span className="relative inline-flex" onPointerEnter={() => setOpen(true)} onPointerLeave={() => setOpen(false)}>
+      <IconButton
+        type="button"
+        hierarchy="ghost"
+        size="sm"
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={id}
+        className="max-md:!size-[var(--touch-min)]"
+        icon={<Icon icon={HelpCircleIcon} size={20} />}
+        onClick={() => setOpen(!open)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && open) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+          }
+        }}
+      />
+      <span
+        id={id}
+        role="status"
+        className={cn(
+          "absolute bottom-full right-[-8px] z-popover mb-2 w-[300px] max-w-[calc(100vw-48px)] flex-col items-end",
+          open ? "flex" : "hidden",
+        )}
+      >
+        <span className="rounded-lg bg-bg-inverse px-[12px] py-[8px] text-sm font-medium leading-sm text-text-inverse">{children}</span>
+        <svg aria-hidden width="10" height="6" viewBox="0 0 10 6" className="mr-[19px] fill-[var(--color-bg-inverse)]">
+          <path d="M0 0h10L5 6z" />
+        </svg>
+      </span>
+    </span>
+  );
 }
 
 export function SendDialog({
@@ -64,13 +113,12 @@ export function SendDialog({
 }) {
   const router = useRouter();
   const toast = usePostToast();
-  const { projects } = useManualProjects();
   const [choices, setChoices] = React.useState<Choices>(() => initialChoices(article, doc));
   const [reuse, setReuseChoice] = React.useState(article.reuse.allowed);
-  const [more, setMore] = React.useState(article.reuse.allowed);
-  const [categoryError, setCategoryError] = React.useState(false);
+  const [tip, setTip] = React.useState(false);
+  const [noCover, setNoCover] = React.useState(false);
   const [failed, setFailed] = React.useState<string | null>(null);
-  const categoryId = React.useId();
+  const pickerRef = React.useRef<HTMLDivElement>(null);
 
   // A fresh start each time it opens: the latest draft and body.
   const [openedFor, setOpenedFor] = React.useState<boolean>(false);
@@ -79,17 +127,19 @@ export function SendDialog({
     if (open) {
       setChoices(initialChoices(article, doc));
       setReuseChoice(article.reuse.allowed);
-      setMore(article.reuse.allowed);
-      setCategoryError(false);
+      setTip(false);
+      setNoCover(false);
       setFailed(null);
     }
   }
 
   const kind = submissionKindOf(article);
-  const label = sendLabel(article);
+  const update = kind === "changes";
+  const locked = !!article.reuse.sharedOn;
   const noAlt = missingAlt(doc).length;
-  // Category is chosen here; the title and the body are the editor's.
-  const textProblems = sendProblems({ ...article.draft, ...choices }, doc).filter((p) => p !== "category");
+  // Title, body and category are the editor page's; any still missing stops the send here too.
+  const problems = sendProblems({ ...article.draft, ...choices }, doc);
+  const ready = problems.length === 0 && !!choices.cover;
 
   const keep = () => {
     const now = Date.now();
@@ -102,9 +152,10 @@ export function SendDialog({
   };
 
   const send = () => {
-    if (!choices.categoryId) {
-      setCategoryError(true);
-      document.getElementById(categoryId)?.focus();
+    if (problems.length) return;
+    if (!choices.cover) {
+      setNoCover(true);
+      pickerRef.current?.querySelector<HTMLElement>("button, [tabindex='0']")?.focus();
       return;
     }
     const now = Date.now();
@@ -118,116 +169,95 @@ export function SendDialog({
     router.push(blogHref());
   };
 
-  const projectOptions = [{ value: "none", label: "None" }, ...projects.map((p) => ({ value: p.id, label: p.name || "Untitled project" }))];
-  const projectValue = choices.projectId && projects.some((p) => p.id === choices.projectId) ? choices.projectId : "none";
-
   return (
     <ModalFrame
       open={open}
       onClose={close}
-      title={label}
-      description={LEAD[kind]}
-      size="md"
+      title={update ? "Do you want to update your blog?" : "Do you want to publish your blog?"}
+      size="lg"
       sheet
-      footer={
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-          <Button type="button" hierarchy="secondary" size="lg" className="max-md:min-h-[var(--touch-min)]" onClick={close}>
-            Back to editing
-          </Button>
-          <Button type="button" hierarchy="primary" size="lg" className="max-md:min-h-[var(--touch-min)]" aria-disabled={textProblems.length > 0 || undefined} onClick={send}>
-            {label}
-          </Button>
-        </div>
-      }
+      bodyClassName="pb-10"
     >
-      <div className="flex flex-col gap-10">
-        {textProblems.length > 0 && (
-          <Banner tone="error">{textProblems.map((p) => SEND_PROBLEM_TEXT[p]).join(" ")} Go back to editing to fix it.</Banner>
-        )}
-        {failed && <Banner tone="error">{failed}</Banner>}
-
-        <CoverPicker
-          articleId={article.id}
-          value={choices.cover}
-          onChange={(cover) => setChoices((c) => ({ ...c, cover }))}
-          images={imagesOf(doc)}
-          idPrefix={`send-${article.id}`}
-        />
-
-        <SelectMenu
-          id={categoryId}
-          label="Category"
-          placeholder="Choose a category"
-          value={choices.categoryId}
-          options={BLOG_CATEGORIES.map((c) => ({ value: c.id, label: c.label }))}
-          error={categoryError && !choices.categoryId ? "Choose a category." : undefined}
-          onChange={(v) => {
-            setChoices((c) => ({ ...c, categoryId: v }));
-            setCategoryError(false);
-          }}
-        />
-
-        <TopicsField id={`topics-${article.id}`} value={choices.topics} onChange={(topics) => setChoices((c) => ({ ...c, topics }))} />
-
-        <SelectMenu
-          label="About a project (optional)"
-          hint="Readers get a link to it."
-          placeholder="None"
-          value={projectValue}
-          options={projectOptions}
-          onChange={(v) => setChoices((c) => ({ ...c, projectId: v === "none" ? null : v }))}
-        />
-
-        <div className="flex flex-col gap-6">
-          <Button
-            type="button"
-            hierarchy="ghost"
-            size="md"
-            className="self-start max-md:min-h-[var(--touch-min)]"
-            aria-expanded={more}
-            iconTrailing={<Icon icon={more ? ArrowUp01Icon : ArrowDown01Icon} size={16} />}
-            onClick={() => setMore((m) => !m)}
-          >
-            More options
-          </Button>
-          {more && (
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={reuse}
-              onClick={() => setReuseChoice((r) => !r)}
-              className="flex cursor-pointer items-start gap-8 rounded-xl border border-solid border-border-subtle bg-transparent p-8 text-left outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-            >
-              <Checkbox checked={reuse} decorative className="mt-[2px]" />
-              <span className="flex flex-col gap-2">
-                <span className="text-md font-medium leading-md text-text-primary">Let IDEEZA reuse this article</span>
-                <span className="text-sm leading-sm text-text-secondary">
-                  IDEEZA may share it on Medium, in newsletters and in learning guides, always with your name and a link back. You can
-                  turn this off until it has been shared.
-                </span>
-              </span>
-            </button>
-          )}
+      <div className="grid gap-12 md:grid-cols-2">
+        <div ref={pickerRef} className="min-w-0">
+          <CoverPicker
+            articleId={article.id}
+            value={choices.cover}
+            onChange={(cover) => {
+              setChoices((c) => ({ ...c, cover }));
+              setNoCover(false);
+            }}
+            images={imagesOf(doc)}
+            idPrefix={`send-${article.id}`}
+          />
         </div>
 
-        {noAlt > 0 && (
-          <Banner tone="attention">
-            {noAlt === 1 ? "1 image has no description yet." : `${noAlt} images have no description yet.`} Add one so everyone can follow
-            your article.{" "}
-            {onAddDescriptions && (
+        <div className="flex min-w-0 flex-col gap-8">
+          {problems.length > 0 && (
+            <Banner tone="error">
+              {problems.map((p) => SEND_PROBLEM_TEXT[p]).join(" ")} Close this and fix it on the page.
+            </Banner>
+          )}
+          {failed && <Banner tone="error">{failed}</Banner>}
+
+          <TopicsField
+            id={`topics-${article.id}`}
+            label={`Add or change topics (up to ${TOPICS_MAX}) so readers know what your blog is about`}
+            value={choices.topics}
+            onChange={(topics) => setChoices((c) => ({ ...c, topics }))}
+          />
+
+          {noAlt > 0 && (
+            <Banner tone="attention">
+              {noAlt === 1 ? "1 image has no description yet." : `${noAlt} images have no description yet.`} Add one so everyone can follow
+              your blog.{" "}
+              {onAddDescriptions && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    close();
+                    onAddDescriptions();
+                  }}
+                  className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-text-primary underline underline-offset-2"
+                >
+                  Add descriptions
+                </button>
+              )}
+            </Banner>
+          )}
+
+          <div className="mt-auto flex flex-col gap-6 pt-4">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  close();
-                  onAddDescriptions();
-                }}
-                className="cursor-pointer border-0 bg-transparent p-0 font-semibold text-text-primary underline underline-offset-2"
+                role="checkbox"
+                aria-checked={reuse}
+                aria-disabled={locked || undefined}
+                onClick={() => (locked ? setTip(true) : setReuseChoice((r) => !r))}
+                className={cn(
+                  "flex min-h-[32px] items-center gap-6 rounded-md border-0 bg-transparent p-0 pr-2 text-left text-md leading-md text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-border-focus",
+                  locked ? "cursor-not-allowed" : "cursor-pointer",
+                  TAP,
+                )}
               >
-                Add descriptions
+                <Checkbox checked={reuse} decorative disabled={locked} />
+                Give access to IDEEZA for future use
               </button>
-            )}
-          </Banner>
-        )}
+              <HelpTip open={tip} setOpen={setTip} label="About giving IDEEZA access">
+                {locked
+                  ? `This option can't be unchecked: IDEEZA has already shared your blog on ${article.reuse.sharedOn?.where}. Contact IDEEZA support to change it.`
+                  : "IDEEZA may share your blog on Medium, in newsletters and in learning guides, always with your name and a link back. You can change this until it's shared."}
+              </HelpTip>
+            </div>
+
+            <Button type="button" hierarchy="primary" size="xl" className={cn("w-full", TAP, OFF)} aria-disabled={!ready || undefined} onClick={send}>
+              {update ? "Update" : "Save and publish"}
+            </Button>
+            <p className={cn("text-sm leading-sm", noCover && !choices.cover ? "text-text-error" : "text-text-secondary")} role={noCover ? "alert" : undefined}>
+              {!choices.cover ? "Add a thumbnail to publish your blog." : LEAD[kind]}
+            </p>
+          </div>
+        </div>
       </div>
     </ModalFrame>
   );

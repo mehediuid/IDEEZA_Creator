@@ -170,7 +170,7 @@ export const DISPLAY_SENTENCE: Readonly<Record<DisplayStatus, string>> = {
   resubmitted: "Sent again. The IDEEZA team is reviewing it.",
   removed: "The IDEEZA team removed this from the Blog. Only you can see it.",
   pending: "Waiting for the IDEEZA team to review it.",
-  rejected: "The IDEEZA team asked for changes. See the reasons, then send it again.",
+  rejected: "The IDEEZA team rejected it. See the reasons, then edit it and publish it again.",
 };
 
 export function displayStatusOf(a: BlogArticle): DisplayStatus {

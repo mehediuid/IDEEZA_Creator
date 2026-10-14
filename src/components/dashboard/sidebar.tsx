@@ -63,7 +63,7 @@ import { useDemoMessagesSeed } from "@/lib/messages/use-demo-seed";
 import { useMessagePeople } from "@/lib/messages/use-people";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
 import { findArticle, markSeen, unseenOutcomes, type Outcome } from "@/lib/blog/article";
-import { articleHref, editHref, slugOf } from "@/lib/blog/slug";
+import { articleHref, slugOf } from "@/lib/blog/slug";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -887,22 +887,23 @@ function NotificationBell({
   );
 }
 
-/** A Blog review result in the bell (D10): opening it marks it seen and lands on the
- *  screen that answers it — the editor when changes were asked, the article when it's live. */
+/** A Blog review result in the bell (D10), in the Figma's status words: opening it marks it
+ *  seen and lands on the blog's details, where a rejection's reasons sit above the blog. */
 function BlogOutcomeItem({ outcome: o, onClose }: { outcome: Outcome; onClose: () => void }) {
   const { data } = useBlog();
   const article = findArticle(data, o.id);
   if (!article) return null;
-  const slug = slugOf(article);
-  const needs = o.outcome === "changes";
-  const href = needs && !article.live ? editHref(slug) : articleHref(slug);
-  const kicker = needs ? "Blog · Needs changes" : "Blog · Live";
-  const things = o.things === 1 ? "1 thing to fix" : `${o.things} things to fix`;
-  const message = needs
-    ? `The IDEEZA team asked for changes to “${o.title}”${o.things ? ` · ${things}` : ""}`
+  const rejected = o.outcome === "changes";
+  const href = articleHref(slugOf(article));
+  const kicker = rejected ? "Blog · Rejected" : "Blog · Approved";
+  const reasons = o.things === 1 ? "1 reason" : `${o.things} reasons`;
+  const message = rejected
+    ? o.kind === "changes"
+      ? `Your update to “${o.title}” was rejected${o.things ? ` · ${reasons}` : ""}`
+      : `“${o.title}” was rejected${o.things ? ` · ${reasons}` : ""}`
     : o.kind === "changes"
-      ? `Your changes to “${o.title}” are live`
-      : `“${o.title}” is live on the IDEEZA Blog`;
+      ? `Your update to “${o.title}” is approved and live`
+      : `“${o.title}” is approved and live on the IDEEZA Blog`;
   return (
     <li role="none">
       <Link

@@ -98,7 +98,7 @@ export function sendProblems(meta: ArticleMeta, doc: BlogDoc): SendProblem[] {
 export const SEND_PROBLEM_TEXT: Readonly<Record<SendProblem, string>> = {
   title: "Add a title first.",
   body: "Write something first.",
-  category: "Choose a category.",
+  category: "Choose a blog category.",
 };
 
 export function submissionKindOf(a: BlogArticle): SubmissionKind {

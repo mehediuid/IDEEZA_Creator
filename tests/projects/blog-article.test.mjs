@@ -1,24 +1,20 @@
-// Blog article page (spec 2026-10-14-blog-design.md § Screens 4): which version the page shows,
-// the byline's date, the status card's line, reasons and earlier rounds, the card's buttons
-// against its ⋯ (one control, one home), the contents' anchors and the scroll-spy's choice.
+// Blog details page (Figma frames 20–22): which version the page shows, the byline's date, the line
+// under the rail's status badge, the reject-reason panel, the contents' anchors and the scroll-spy's choice.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EMPTY_BLOG } from "../../.tmp-test/lib/blog/types.js";
 import { createArticle, decide, submit, takeOffline } from "../../.tmp-test/lib/blog/article.js";
-import { actionsFor, longDate, STATUS_SENTENCE } from "../../.tmp-test/lib/blog/status.js";
+import { DISPLAY_SENTENCE, longDate } from "../../.tmp-test/lib/blog/status.js";
 import {
   bylineDate,
-  cardActions,
-  cardMenu,
-  cardReasons,
   currentHeading,
-  earlierReviews,
   headingAnchors,
   metaDiffers,
   minRead,
   readerVersion,
+  reasonPanel,
   showContents,
-  statusLine,
+  statusNote,
 } from "../../.tmp-test/lib/blog/article-view.js";
 
 const T0 = Date.UTC(2026, 9, 1, 12);
@@ -79,92 +75,68 @@ test("the byline's date: the day it went live, else sent or edited", () => {
   assert.equal(minRead(5), "5 min read");
 });
 
-test("the card's line is the status sentence, or what waits on a live article", () => {
-  assert.deepEqual(statusLine(article(), false), { lead: null, text: STATUS_SENTENCE.draft });
+test("the line under the status badge is the Figma status's sentence, or what waits on a live blog", () => {
+  assert.equal(statusNote(article(), false), DISPLAY_SENTENCE.draft);
+  assert.equal(statusNote(article((d) => sent(d)), false), DISPLAY_SENTENCE.pending);
   const live = article((d) => approve(sent(d), T0 + 2 * DAY));
-  assert.deepEqual(statusLine(live, false), { lead: null, text: STATUS_SENTENCE.live });
-  assert.equal(statusLine(live, true).lead, "Unsent changes.");
+  assert.equal(statusNote(live, false), DISPLAY_SENTENCE.approved);
+  assert.match(statusNote(live, true), /changes readers don't see yet/);
   const backAgain = article((d) => sendBack(sent(approve(sent(d), T0 + 2 * DAY), T0 + 3 * DAY), T0 + 4 * DAY, [{ id: "needs-detail", detail: "" }]));
-  assert.equal(statusLine(backAgain, false).lead, "Update needs changes.");
-  assert.equal(statusLine(backAgain, true).lead, "Update needs changes.", "the review's ask comes before unsent edits");
+  assert.match(statusNote(backAgain, false), /update was rejected/);
+  assert.match(statusNote(backAgain, true), /update was rejected/, "the review's ask comes before unsent edits");
 });
 
-test("the card's reasons: the review's own detail, else the reason's fix; demo rounds say so", () => {
-  const needs = article((d) =>
+test("the reject-reason panel: every reason since the last approval, newest first, dated; open until sent again", () => {
+  const rejected = article((d) =>
     sendBack(sent(d), T0 + 2 * DAY, [
       { id: "needs-detail", detail: "Write at least 150 words; you have 92." },
       { id: "hard-to-follow", detail: "  " },
     ]),
   );
-  const r = cardReasons(needs);
-  assert.equal(r.title, `What to change (reviewed ${longDate(T0 + 2 * DAY)})`);
-  assert.equal(r.demo, true);
-  assert.deepEqual(r.lines, [
-    { title: "Needs more detail.", detail: "Write at least 150 words; you have 92." },
-    { title: "Hard to follow.", detail: "Split it into short sections, each with its own heading." },
-  ]);
-  assert.equal(cardReasons(article()), null);
-  assert.equal(cardReasons(article((d) => sent(d))), null, "in review: nothing to fix yet");
+  const p = reasonPanel(rejected);
+  assert.equal(p.title, "Reject reason");
+  assert.equal(p.demo, true);
+  assert.equal(p.open, true, "rejected: open, there is something to fix");
+  assert.deepEqual(
+    p.rows.map((r) => [r.title, r.detail, r.date]),
+    [
+      ["Needs more detail.", "Write at least 150 words; you have 92.", longDate(T0 + 2 * DAY)],
+      ["Hard to follow.", "Split it into short sections, each with its own heading.", longDate(T0 + 2 * DAY)],
+    ],
+  );
+
+  const resubmitted = article((d) => sent(sendBack(sent(d), T0 + 2 * DAY, [{ id: "needs-detail", detail: "" }]), T0 + 3 * DAY));
+  assert.equal(reasonPanel(resubmitted).open, false, "re-submitted: the reasons fold away (frame 21)");
+
+  const twice = article((d) =>
+    sendBack(sent(sendBack(sent(d, T0 + DAY), T0 + 2 * DAY, [{ id: "needs-detail", detail: "" }]), T0 + 3 * DAY), T0 + 4 * DAY, [
+      { id: "reads-like-ad", detail: "" },
+    ]),
+  );
+  assert.deepEqual(
+    reasonPanel(twice).rows.map((r) => [r.title, r.at]),
+    [
+      ["Reads like an ad.", T0 + 4 * DAY],
+      ["Needs more detail.", T0 + 2 * DAY],
+    ],
+  );
+
+  const approvedAfter = article((d) => approve(sent(sendBack(sent(d), T0 + 2 * DAY, [{ id: "needs-detail", detail: "" }]), T0 + 3 * DAY), T0 + 4 * DAY));
+  assert.equal(reasonPanel(approvedAfter), null, "approved since: nothing left to fix");
+  assert.equal(reasonPanel(article()), null);
+  assert.equal(reasonPanel(article((d) => sent(d))), null, "pending: nothing to fix yet");
+
+  const updateRejected = article((d) => sendBack(sent(approve(sent(d), T0 + 2 * DAY), T0 + 3 * DAY), T0 + 4 * DAY, [{ id: "image-rights", detail: "" }]));
+  assert.equal(reasonPanel(updateRejected).rows[0].title, "Image rights unclear.", "a rejected update of a live blog shows its reasons too");
 
   const live = article((d) => approve(sent(d), T0 + 2 * DAY));
   const down = { ...live, takenDown: { at: T0 + 5 * DAY, reasons: [{ id: "reads-like-ad", detail: "" }] } };
-  const why = cardReasons(down);
-  assert.equal(why.title, `Why it was taken down (${longDate(T0 + 5 * DAY)})`);
+  const why = reasonPanel(down);
+  assert.equal(why.title, "Removal reason");
   assert.equal(why.demo, false);
-  assert.deepEqual(why.lines, [{ title: "Reads like an ad.", detail: "Share how you made it. One link to your product or project is fine." }]);
-  const unknown = cardReasons({ ...live, takenDown: { at: T0, reasons: [{ id: "gone-reason", detail: "" }] } });
-  assert.equal(unknown.lines[0].title, "Needs changes.");
-});
-
-test("earlier reviews are every round the card doesn't show, newest first", () => {
-  const twice = article((d) =>
-    sent(sendBack(sent(d, T0 + DAY), T0 + 2 * DAY, [{ id: "needs-detail", detail: "" }]), T0 + 3 * DAY),
-  );
-  const inReview = earlierReviews(twice);
-  assert.equal(inReview.length, 1);
-  assert.equal(inReview[0].outcome, "Sent back: 1 thing to fix");
-  assert.equal(inReview[0].date, longDate(T0 + 2 * DAY));
-
-  const needsAgain = article((d) =>
-    sendBack(
-      sent(sendBack(sent(d, T0 + DAY), T0 + 2 * DAY, [{ id: "needs-detail", detail: "" }]), T0 + 3 * DAY),
-      T0 + 4 * DAY,
-      [
-        { id: "needs-detail", detail: "" },
-        { id: "reads-like-ad", detail: "" },
-      ],
-    ),
-  );
-  const earlier = earlierReviews(needsAgain);
-  assert.equal(earlier.length, 1, "the open round is in the card, not repeated");
-  assert.equal(earlier[0].at, T0 + 2 * DAY);
-
-  const updated = article((d) => approve(sent(approve(sent(d, T0 + DAY), T0 + 2 * DAY), T0 + 3 * DAY), T0 + 4 * DAY));
-  assert.deepEqual(
-    earlierReviews(updated).map((r) => r.outcome),
-    ["Changes approved", "Approved, went live"],
-  );
-  assert.equal(earlierReviews(article()).length, 0);
-});
-
-test("one control, one home: no card button is also in the card's ⋯", () => {
-  for (const s of ["draft", "review", "needs", "live", "changes", "down"]) {
-    const { buttons } = cardActions(s);
-    const menu = cardMenu(s);
-    for (const b of buttons) assert.ok(!menu.includes(b), `${s}: ${b} is both a button and a menu row`);
-    for (const a of menu) assert.ok(actionsFor(s).includes(a), `${s}: ${a} isn't an action of the status`);
-  }
-  assert.deepEqual(cardActions("live").buttons, ["copy-link", "edit"]);
-  assert.deepEqual(cardMenu("live"), ["change-cover", "take-offline", "delete"]);
-  assert.deepEqual(cardActions("changes").buttons, ["discard-changes"]);
-  assert.deepEqual(cardMenu("changes"), ["copy-link", "delete"]);
-  assert.deepEqual(cardActions("review").buttons, ["edit"]);
-  assert.deepEqual(cardMenu("review"), ["delete"]);
-  assert.deepEqual(cardActions("needs").buttons, ["fix"]);
-  assert.deepEqual(cardMenu("needs"), ["delete"]);
-  assert.deepEqual(cardActions("draft").buttons, ["continue"]);
-  assert.deepEqual(cardActions("down").buttons, []);
-  assert.deepEqual(cardMenu("down"), ["delete"]);
+  assert.deepEqual(why.rows.map((r) => [r.title, r.date]), [["Reads like an ad.", longDate(T0 + 5 * DAY)]]);
+  const noReason = reasonPanel({ ...live, takenDown: { at: T0, reasons: [] } });
+  assert.equal(noReason.rows.length, 1, "a removal without a stated reason still says something");
 });
 
 test("contents: from two headings; anchors follow the listed headings, empty ones skipped", () => {

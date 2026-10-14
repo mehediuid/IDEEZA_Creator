@@ -1,23 +1,28 @@
 "use client";
 
-// Change cover (the list's and the article page's ⋯ on a live article). One of
-// the article's own photos was already read by the IDEEZA team, so it applies at
-// once (D2); a new upload waits in the draft and goes with the next changes the
-// writer sends. Save is unavailable until something changed.
+// Change thumbnail (Figma frames 23–25; the list's and the details page's ⋯):
+// the image with − / + and the reposition hint, "Select a thumbnail from your
+// images" with its scrolling strip, Upload, and Update — off until something
+// changed. One of the blog's own images was already read by the IDEEZA team,
+// so it applies at once; a new upload waits in the draft and goes with the
+// writer's next update, and the modal says so before Update.
 
 import * as React from "react";
 import { Button, ModalFrame } from "@/components/ideeza";
 import { usePostToast } from "@/components/innovations/toast";
 import { CoverPicker } from "@/components/blog/send/cover-picker";
+import { OFF } from "@/components/blog/send/send-dialog";
 import { changeCover } from "@/lib/blog/article";
 import { sameCover } from "@/lib/blog/cover";
 import { imagesOf } from "@/lib/blog/doc";
 import { updateBlog, useBody } from "@/lib/blog/store";
 import type { BlogArticle, BlogCover } from "@/lib/blog/types";
 
+const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+
 export function ChangeCoverDialog({ article, onClose }: { article: BlogArticle | null; onClose: () => void }) {
   const toast = usePostToast();
-  const { body } = useBody(article?.id ?? null, "live");
+  const { body } = useBody(article?.id ?? null, article?.live ? "live" : "doc");
   const current = article ? (article.live ?? article.draft).cover : null;
   const [cover, setCover] = React.useState<BlogCover | null>(current);
   const [shownFor, setShownFor] = React.useState<string | null>(null);
@@ -29,44 +34,38 @@ export function ChangeCoverDialog({ article, onClose }: { article: BlogArticle |
   if (!article) return null;
   const images = imagesOf(body.doc);
   const changed = !sameCover(cover, current);
+  const reviewed = !!cover && (images.some((i) => i.fileKey === cover.fileKey) || cover.fileKey === current?.fileKey);
+  const waits = !!article.live && changed && !reviewed;
 
   const save = () => {
     if (!cover || !changed) return;
-    const reviewed = images.some((i) => i.fileKey === cover.fileKey) || cover.fileKey === current?.fileKey;
     const res = updateBlog((d) => changeCover(d, article.id, cover, { reviewed }, Date.now()));
-    if (!res.ok) return toast("Couldn't save the cover: this browser's storage is full.");
-    toast(reviewed ? "Cover saved." : "New cover saved to your draft. Readers see it once you send your changes and they're approved.");
+    if (!res.ok) return toast("Couldn't save the thumbnail: this browser's storage is full.");
+    toast(waits ? "New thumbnail saved to your draft. Readers see it once your update is approved." : "Thumbnail updated.");
     onClose();
   };
 
   return (
-    <ModalFrame
-      open
-      onClose={onClose}
-      title="Change cover"
-      description="Photos from your article change right away. A new upload is checked by the IDEEZA team with your next changes."
-      size="md"
-      sheet
-      footer={
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-6">
-          <Button type="button" hierarchy="secondary" size="lg" className="max-md:min-h-[var(--touch-min)]" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            hierarchy="primary"
-            size="lg"
-            className="max-md:min-h-[var(--touch-min)]"
-            aria-disabled={!changed || !cover || undefined}
-            title={!changed ? "Pick a different image or move it to save." : undefined}
-            onClick={save}
-          >
-            Save cover
-          </Button>
-        </div>
-      }
-    >
-      <CoverPicker articleId={article.id} value={cover} onChange={setCover} images={images} idPrefix={`cover-${article.id}`} />
+    <ModalFrame open onClose={onClose} title="Change thumbnail" size="md" sheet bodyClassName="pb-10">
+      <div className="flex flex-col gap-8">
+        <CoverPicker articleId={article.id} value={cover} onChange={setCover} images={images} idPrefix={`cover-${article.id}`} showLegend={false} />
+        {waits && (
+          <p className="text-sm leading-sm text-text-secondary">
+            A new image is checked by the IDEEZA team: readers see it once you update your blog and it&apos;s approved.
+          </p>
+        )}
+        <Button
+          type="button"
+          hierarchy="primary"
+          size="xl"
+          className={`w-full ${TAP} ${OFF}`}
+          aria-disabled={!changed || !cover || undefined}
+          title={!changed ? "Pick a different image or move it to update." : undefined}
+          onClick={save}
+        >
+          Update
+        </Button>
+      </div>
     </ModalFrame>
   );
 }

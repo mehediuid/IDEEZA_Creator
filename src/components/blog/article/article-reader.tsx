@@ -1,27 +1,25 @@
 "use client";
 
-// The article as readers see it (spec § Screens 4, mockup Article.dc): the
-// title (DS Heading/H2 28/36, the page's only H1), the byline (You · n min read
-// · date), the 3:2 cover and the body; beside it from a 1024 px page container
-// a sticky rail — On this page, Category and topics, About a project, Reuse by
-// IDEEZA — and in one column the rail follows the article while "On this page"
-// folds under the cover. The article page and the preview both draw it, so the
-// preview is exactly what readers get.
+// The blog as readers see it, in the Figma's card (frames 20–22): a top row
+// (the breadcrumb and the page's own buttons) over a rule; the title (the
+// page's only H1), the writer on the left and "n min read · date" on the right,
+// the 3:2 thumbnail and the body; beside it from a 1024 px page container a
+// sticky rail — the details page's status first, then Category, On this page,
+// the tags and the tag link — each block under a rule. In one column the rail
+// follows the blog while "On this page" folds under the thumbnail. The details
+// page and the preview both draw it, so the preview is exactly what readers get.
 
 import * as React from "react";
 import Link from "next/link";
 import { News01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { AvatarLabelGroup, Badge, Skeleton, StateCard, Tag, Toggle, buttonVariants } from "@/components/ideeza";
+import { AvatarLabelGroup, Badge, Skeleton, StateCard, Tag, buttonVariants } from "@/components/ideeza";
 import { CoverImage } from "@/components/blog/cover-image";
-import { usePostToast } from "@/components/innovations/toast";
 import { useStickyTop } from "@/components/innovations/post-bits";
-import { setReuse } from "@/lib/blog/article";
 import { bylineDate, minRead, showContents, type BodyKind } from "@/lib/blog/article-view";
 import { categoryLabel } from "@/lib/blog/categories";
 import { headingsOf, isEmptyDoc, readingMinutes } from "@/lib/blog/doc";
 import { blogHref } from "@/lib/blog/slug";
-import { updateBlog } from "@/lib/blog/store";
 import type { ArticleMeta, BlogArticle, BlogDoc } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 import { ArticleBody, ArticleBodySkeleton, ProjectTile } from "./article-body";
@@ -31,7 +29,9 @@ import { ContentsDisclosure, ContentsList, scrollToHeading, useScrollSpy } from 
  *  so a visually hidden label inside stays inside <main>'s scroll instead of stretching the page. */
 export const ARTICLE_PAGE = "relative [container-type:inline-size]";
 /** The content box: 1040 px at most, 16 px gutters, 32 px from a 640 px page. */
-export const ARTICLE_CONTENT = "mx-auto flex w-full max-w-[1040px] flex-col gap-10 px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16";
+export const ARTICLE_CONTENT = "mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16";
+/** The Figma's white card the blog sits in, on the grey page. */
+const CARD = "flex min-w-0 flex-col rounded-2xl border border-solid border-border-subtle bg-bg-surface px-8 py-8 [@container(min-width:640px)]:px-12 [@container(min-width:640px)]:py-10";
 /** One column; from 1024 px the 680 px article and the rail beside it. */
 const COLUMNS =
   "flex flex-col gap-16 [@container(min-width:1024px)]:grid [@container(min-width:1024px)]:grid-cols-[minmax(0,680px)_minmax(0,280px)] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:justify-between [@container(min-width:1024px)]:gap-x-16";
@@ -42,62 +42,37 @@ const NARROW_ONLY = "[@container(min-width:1024px)]:hidden";
 const RAIL_LABEL = "text-lg font-semibold leading-lg text-text-primary";
 const BADGE_MD = "gap-2 px-4 py-2 text-sm leading-xs";
 
+/** Each rail block under a rule, as the Figma draws them. */
+const RAIL = "flex min-w-0 flex-col [&>*+*]:mt-10 [&>*+*]:border-0 [&>*+*]:border-t [&>*+*]:border-solid [&>*+*]:border-border-subtle [&>*+*]:pt-10";
+
 function CategoryBlock({ meta }: { meta: ArticleMeta }) {
   const label = categoryLabel(meta.categoryId);
   return (
     <section className="flex flex-col gap-4">
-      <h3 className={RAIL_LABEL}>Category and topics</h3>
-      {label || meta.topics.length ? (
-        <div className="flex flex-wrap items-center gap-3">
-          {label && (
-            <Badge tone="neutral" className={BADGE_MD}>
-              {label}
-            </Badge>
-          )}
-          {meta.topics.map((t) => (
-            <Tag key={t} size="md">
-              {t}
-            </Tag>
-          ))}
-        </div>
+      <h3 className={RAIL_LABEL}>Category</h3>
+      {label ? (
+        <Badge tone="brand" className={cn(BADGE_MD, "self-start")}>
+          {label}
+        </Badge>
       ) : (
-        <p className="text-md leading-md text-text-secondary">You choose these when you send it for review.</p>
+        <p className="text-md leading-md text-text-secondary">Not chosen yet.</p>
       )}
     </section>
   );
 }
 
-function ReuseBlock({ article }: { article: BlogArticle }) {
-  const toast = usePostToast();
-  const on = article.reuse.allowed;
-  const flip = () => {
-    const res = updateBlog((d) => setReuse(d, article.id, !on, Date.now()));
-    toast(res.ok ? (on ? "Reuse turned off. IDEEZA won't share this article." : "Reuse turned on. IDEEZA may share this article.") : "Couldn't save that: this browser's storage is full.");
-  };
-  return (
-    <section className="flex flex-col gap-4">
-      <h3 className={RAIL_LABEL}>Reuse by IDEEZA</h3>
-      {/* A label round the switch: its words toggle it too. */}
-      <label className="flex min-h-[32px] cursor-pointer items-center justify-between gap-6 text-md font-medium leading-md text-text-primary max-md:min-h-[var(--touch-min)]">
-        Let IDEEZA reuse this article
-        <Toggle checked={on} onChange={flip} aria-label="Let IDEEZA reuse this article" />
-      </label>
-      <p className="text-md leading-md text-text-secondary">
-        IDEEZA may share it on Medium, in newsletters and in learning guides, always with your name and a link back. You can turn this off until it has been shared.
-      </p>
-    </section>
-  );
-}
-
-/** The article and its rail. `article` holds the record (dates, reuse); `meta` and `doc`
- *  are the version on show. `reuse` adds the owner's switch (not in the preview). */
+/** The blog and its rail, in the card. `article` holds the record (dates); `meta` and `doc`
+ *  are the version on show. `header` is the card's top row; `status` opens the rail (the
+ *  details page's status, not the preview's); `dated` adds the date after the read time. */
 export function ArticleReader({
   article,
   meta,
   doc,
   bodyReady,
   body,
-  reuse,
+  header,
+  status,
+  dated = true,
   stickyGap = 24,
 }: {
   article: BlogArticle;
@@ -105,8 +80,10 @@ export function ArticleReader({
   doc: BlogDoc;
   bodyReady: boolean;
   body: BodyKind;
-  reuse: boolean;
-  /** How far below the top of <main> the rail sticks (clear of a bar pinned above it). */
+  header: React.ReactNode;
+  status?: React.ReactNode;
+  dated?: boolean;
+  /** How far below the top of <main> the rail sticks. */
   stickyGap?: number;
 }) {
   const headings = React.useMemo(() => headingsOf(doc), [doc]);
@@ -118,6 +95,8 @@ export function ArticleReader({
   const railId = React.useId();
   const contents = bodyReady && showContents(headings.length);
   const title = meta.title.trim() || "Untitled draft";
+  const readTime = bodyReady && !isEmptyDoc(doc) ? minRead(readingMinutes(doc)) : null;
+  const byline = [readTime, dated ? bylineDate(article, body) : null].filter(Boolean).join(" · ");
 
   // An address with #anchor lands on that heading once the body is drawn.
   const landed = React.useRef(false);
@@ -135,18 +114,20 @@ export function ArticleReader({
   }, [bodyReady, anchors]);
 
   return (
-    <>
-      <div className={COLUMNS}>
+    <div className={CARD}>
+      <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 border-0 border-b border-solid border-border-subtle pb-8">
+        {header}
+      </div>
+      <div className={cn(COLUMNS, "pt-12")}>
         <article aria-labelledby={titleId} className="flex w-full min-w-0 max-w-[680px] flex-col gap-12">
           <header className="flex flex-col gap-8">
             <h1 id={titleId} className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary [overflow-wrap:anywhere] max-md:leading-3xl">
               {title}
             </h1>
-            <AvatarLabelGroup
-              initials="YO"
-              name="You"
-              supporting={bodyReady && !isEmptyDoc(doc) ? `${minRead(readingMinutes(doc))} · ${bylineDate(article, body)}` : bylineDate(article, body)}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
+              <AvatarLabelGroup initials="YO" name="You" size="sm" />
+              {byline && <p className="text-sm leading-sm text-text-secondary">{byline}</p>}
+            </div>
           </header>
           {meta.cover && <CoverImage cover={meta.cover} className="rounded-2xl border border-solid border-border-subtle" />}
           {contents && (
@@ -167,57 +148,71 @@ export function ArticleReader({
 
         {/* The offset is measured (useStickyTop), so it is data on the element. */}
         <div ref={railRef} style={{ top: railTop }} className="min-w-0 [@container(min-width:1024px)]:sticky">
-          <aside aria-labelledby={railId} className="flex min-w-0 flex-col gap-12">
+          <aside aria-labelledby={railId} className="min-w-0">
             <h2 id={railId} className="sr-only">
-              About this article
+              About this blog
             </h2>
-            {contents && (
-              <div className={cn(WIDE_ONLY, "flex-col")}>
-                <ContentsList headings={headings} current={current} onGo={setCurrent} />
-              </div>
-            )}
-            <CategoryBlock meta={meta} />
-            {meta.projectId && (
-              <section className="flex flex-col gap-4">
-                <h3 className={RAIL_LABEL}>About a project</h3>
-                <ProjectTile projectId={meta.projectId} />
-              </section>
-            )}
-            {reuse && <ReuseBlock article={article} />}
+            <div className={RAIL}>
+              {status}
+              <CategoryBlock meta={meta} />
+              {contents && (
+                <div className={cn(WIDE_ONLY, "flex-col")}>
+                  <ContentsList headings={headings} current={current} onGo={setCurrent} />
+                </div>
+              )}
+              {meta.topics.length > 0 && (
+                <section aria-label="Tags" className="flex flex-wrap items-center gap-3">
+                  {meta.topics.map((t) => (
+                    <Tag key={t} size="md">
+                      {t}
+                    </Tag>
+                  ))}
+                </section>
+              )}
+              {meta.projectId && (
+                <section className="flex flex-col gap-4">
+                  <h3 className={RAIL_LABEL}>Tag link</h3>
+                  <ProjectTile projectId={meta.projectId} />
+                </section>
+              )}
+            </div>
           </aside>
         </div>
       </div>
       {/* The foot of the page: in view, the reader can scroll no further. */}
       <div ref={endRef} aria-hidden className="h-px" />
-    </>
+    </div>
   );
 }
 
-/** Loading: the page's own shape, so nothing jumps when the article arrives. */
-export function ArticleSkeleton({ card = true }: { card?: boolean }) {
+/** Loading: the page's own shape, so nothing jumps when the blog arrives. */
+export function ArticleSkeleton() {
   return (
     <div className={ARTICLE_PAGE}>
       <div className={ARTICLE_CONTENT} aria-busy="true">
         <span className="sr-only" role="status">
-          Loading the article
+          Loading the blog
         </span>
-        <Skeleton shape="text" size="md" className="w-[220px]" />
-        {card && <Skeleton shape="block" className="h-[72px] w-full rounded-xl" />}
-        <div className={COLUMNS}>
-          <div className="flex min-w-0 flex-col gap-12">
-            <div className="flex flex-col gap-8">
-              <Skeleton shape="text" size="lg" className="h-[28px] w-[80%]" />
-              <div className="flex items-center gap-4">
-                <Skeleton shape="circle" size="md" />
-                <Skeleton shape="text" size="md" className="w-[160px]" />
-              </div>
-            </div>
-            <Skeleton shape="block" className="aspect-[3/2] h-auto w-full rounded-2xl" />
-            <ArticleBodySkeleton />
+        <div className={CARD}>
+          <div className="border-0 border-b border-solid border-border-subtle pb-8">
+            <Skeleton shape="text" size="md" className="w-[220px]" />
           </div>
-          <div className="flex min-w-0 flex-col gap-8">
-            <Skeleton shape="block" className="h-[120px] w-full rounded-xl" />
-            <Skeleton shape="block" className="h-[96px] w-full rounded-xl" />
+          <div className={cn(COLUMNS, "pt-12")}>
+            <div className="flex min-w-0 flex-col gap-12">
+              <div className="flex flex-col gap-8">
+                <Skeleton shape="text" size="lg" className="h-[28px] w-[80%]" />
+                <div className="flex items-center gap-4">
+                  <Skeleton shape="circle" size="md" />
+                  <Skeleton shape="text" size="md" className="w-[160px]" />
+                </div>
+              </div>
+              <Skeleton shape="block" className="aspect-[3/2] h-auto w-full rounded-2xl" />
+              <ArticleBodySkeleton />
+            </div>
+            <div className="flex min-w-0 flex-col gap-8">
+              <Skeleton shape="block" className="h-[48px] w-[120px] rounded-xl" />
+              <Skeleton shape="block" className="h-[96px] w-full rounded-xl" />
+            </div>
           </div>
         </div>
       </div>
@@ -225,7 +220,7 @@ export function ArticleSkeleton({ card = true }: { card?: boolean }) {
   );
 }
 
-/** No article at this address (a wrong link, or it was deleted): say so, and the way back. */
+/** No blog at this address (a wrong link, or it was deleted): say so, and the way back. */
 export function ArticleMissing() {
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   React.useEffect(() => {
@@ -237,8 +232,8 @@ export function ArticleMissing() {
         <StateCard
           tone="empty"
           icon={<Icon icon={News01Icon} size={32} />}
-          title="We couldn't find this article"
-          body="The link may be wrong, or the article was deleted."
+          title="We couldn't find this blog"
+          body="The link may be wrong, or the blog was deleted."
           titleAs="h1"
           titleRef={titleRef}
           action={
@@ -246,7 +241,7 @@ export function ArticleMissing() {
               href={blogHref()}
               className={cn(buttonVariants({ hierarchy: "secondary", size: "lg" }), "no-underline hover:text-[color:var(--color-button-secondary-text)] max-md:min-h-[var(--touch-min)]")}
             >
-              Back to your articles
+              Back to your blogs
             </Link>
           }
         />

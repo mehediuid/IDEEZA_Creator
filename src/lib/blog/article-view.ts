@@ -1,12 +1,11 @@
-// The article page's words and choices (spec § Screens 4), pure so each rule is
-// tested: which version the page shows, the byline's date, the status card's
-// line, its reasons and earlier rounds, which actions are buttons (the rest sit
-// in the ⋯, never both), and which "On this page" entry is current. Relative
-// imports only (node:test loads these).
+// The blog's details page in words (Figma frames 20–22), pure so each rule is
+// tested: which version the page shows, the byline's date, the line under the
+// rail's status badge, the reject-reason panel above the page, and which "On
+// this page" entry is current. Relative imports only (node:test loads these).
 
 import { headingsOf, textOf } from "./doc";
 import { reasonInfo } from "./reasons";
-import { actionsFor, liveNote, longDate, openReasons, STATUS_SENTENCE, statusOf, type ArticleAction, type ArticleStatus } from "./status";
+import { DISPLAY_SENTENCE, displayStatusOf, liveNote, longDate, statusOf } from "./status";
 import type { ArticleMeta, BlogArticle, BlogDoc, ReviewReason, ReviewRound } from "./types";
 
 export type BodyKind = "live" | "doc";
@@ -38,78 +37,36 @@ export function bylineDate(a: BlogArticle, body: BodyKind): string {
 
 export const minRead = (n: number) => `${n} min read`;
 
-/** The card's one line. A live article with something waiting says that first. */
-export function statusLine(a: BlogArticle, draftDiffers: boolean): { lead: string | null; text: string } {
+/** The line under the rail's status badge. A live blog with something waiting says that instead. */
+export function statusNote(a: BlogArticle, draftDiffers: boolean): string {
   const note = liveNote(a, draftDiffers);
-  if (note === "Update needs changes") return { lead: "Update needs changes.", text: "Readers still see the live version. See what to change below." };
-  if (note === "Unsent changes") return { lead: "Unsent changes.", text: "Readers see the live version until you send your changes for review." };
-  return { lead: null, text: STATUS_SENTENCE[statusOf(a)] };
+  if (note === "Update needs changes") return "Your update was rejected. Readers still see the published version. See the reasons above.";
+  if (note === "Unsent changes") return "You have changes readers don't see yet. Edit, then Update to send them for review.";
+  return DISPLAY_SENTENCE[displayStatusOf(a)];
 }
 
-export type ReasonLine = { title: string; detail: string };
+export type ReasonRow = { title: string; detail: string; at: number; date: string };
+export type ReasonPanel = { title: string; demo: boolean; open: boolean; rows: ReasonRow[] };
 
-const reasonLines = (reasons: readonly ReviewReason[]): ReasonLine[] =>
-  reasons.map((r) => ({ title: reasonInfo(r.id).title, detail: r.detail.trim() || reasonInfo(r.id).fix }));
+const rowsOf = (reasons: readonly ReviewReason[], at: number): ReasonRow[] => {
+  const list = reasons.length ? reasons : [{ id: "", detail: "" }];
+  return list.map((r) => ({ title: reasonInfo(r.id).title, detail: r.detail.trim() || reasonInfo(r.id).fix, at, date: longDate(at) }));
+};
 
-export type CardReasons = { title: string; at: number; demo: boolean; lines: ReasonLine[] };
-
-/** The reasons the card shows: why it was taken down, or what the latest review asked for. */
-export function cardReasons(a: BlogArticle): CardReasons | null {
-  if (statusOf(a) === "down" && a.takenDown) {
-    return { title: `Why it was taken down (${longDate(a.takenDown.at)})`, at: a.takenDown.at, demo: false, lines: reasonLines(a.takenDown.reasons) };
-  }
-  const r = openReasons(a);
-  if (!r) return null;
-  return { title: `What to change (reviewed ${longDate(r.at)})`, at: r.at, demo: r.demo, lines: reasonLines(r.reasons) };
-}
-
-export type EarlierRound = { at: number; date: string; outcome: string; demo: boolean; lines: ReasonLine[] };
-
-/** Every round the card doesn't already show, newest first. */
-export function earlierReviews(a: BlogArticle): EarlierRound[] {
-  const shown = statusOf(a) === "down" ? null : openReasons(a);
-  return a.reviews
-    .filter((r) => r !== shown)
-    .reverse()
-    .map((r: ReviewRound) => ({
-      at: r.at,
-      date: longDate(r.at),
-      outcome:
-        r.outcome === "approved"
-          ? r.kind === "changes"
-            ? "Changes approved"
-            : "Approved, went live"
-          : `Sent back: ${r.reasons.length} thing${r.reasons.length === 1 ? "" : "s"} to fix`,
-      demo: r.demo,
-      lines: reasonLines(r.reasons),
-    }));
-}
-
-/** A button on the card: one of the shared actions, or the link into the editor. */
-export type CardButton = Extract<ArticleAction, "copy-link" | "edit" | "discard-changes"> | "continue" | "fix";
-
-/** The card's buttons, and the shared actions its ⋯ leaves out because a button has them. */
-export function cardActions(s: ArticleStatus): { buttons: CardButton[]; omit: ArticleAction[] } {
-  switch (s) {
-    case "live":
-      return { buttons: ["copy-link", "edit"], omit: ["copy-link", "edit"] };
-    case "changes":
-      return { buttons: ["discard-changes"], omit: ["discard-changes"] };
-    case "review":
-      return { buttons: ["edit"], omit: ["edit"] };
-    case "needs":
-      return { buttons: ["fix"], omit: [] };
-    case "draft":
-      return { buttons: ["continue"], omit: [] };
-    case "down":
-      return { buttons: [], omit: [] };
-  }
-}
-
-/** The ⋯ rows left once the buttons have taken theirs. */
-export function cardMenu(s: ArticleStatus): ArticleAction[] {
-  const { omit } = cardActions(s);
-  return actionsFor(s).filter((a) => !omit.includes(a));
+/** The panel above the blog's details (Figma frames 21–22): why the IDEEZA team removed it, or
+ *  every reason it gave since the blog was last approved, newest first, each with its date. Open
+ *  while there is something to fix; folded once the blog has been sent again. */
+export function reasonPanel(a: BlogArticle): ReasonPanel | null {
+  if (a.takenDown) return { title: "Removal reason", demo: false, open: true, rows: rowsOf(a.takenDown.reasons, a.takenDown.at) };
+  const rounds: ReviewRound[] = [];
+  for (let i = a.reviews.length - 1; i >= 0 && a.reviews[i].outcome === "changes"; i--) rounds.push(a.reviews[i]);
+  if (!rounds.length) return null;
+  return {
+    title: "Reject reason",
+    demo: rounds.some((r) => r.demo),
+    open: !a.submission,
+    rows: rounds.flatMap((r) => rowsOf(r.reasons, r.at)),
+  };
 }
 
 /** "On this page" earns its place from two headings. */

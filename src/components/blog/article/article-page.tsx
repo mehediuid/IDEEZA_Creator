@@ -1,28 +1,33 @@
 "use client";
 
-// /blog/<slug> — the writer's article page (spec § Screens 4). Found by the
-// slug's id tail (an old title's address still works), then the address is
-// replaced with the current one. Due demo reviews are settled on arrival and an
-// outcome shown here counts as seen (the bell stops listing it). The status card
-// is the only home of the status and its actions; under it the article exactly
-// as readers see it — the live version while there is one (a live article's
-// pending changes stay in the editor and the preview), the draft otherwise.
+// /blog/<slug> — Blog details (Figma frames 21–22). Found by the slug's id tail
+// (an old title's address still works), then the address is replaced with the
+// current one. Due demo reviews are settled on arrival and an outcome shown here
+// counts as seen (the bell stops listing it). In the Figma's order: the reject-
+// reason panel when there is one, then the card — "Blog › Blog details" with
+// Edit (and the ⋯ for the status's other actions) — the blog exactly as readers
+// see it, and the rail opening on its status. Readers' version shows while there
+// is one (a live blog's pending changes stay in the editor and the preview).
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { MoreHorizontalIcon, PencilEdit02Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/dashboard/icon";
+import { Button, IconButton, Menu } from "@/components/ideeza";
 import { useArticleActions } from "@/components/blog/article-actions";
+import { StatusBadges } from "@/components/blog/status-badges";
 import { ChangeCoverDialog } from "@/components/blog/send/change-cover-dialog";
 import { useTabTitle } from "@/components/blog/use-tab-title";
 import { markSeen } from "@/lib/blog/article";
-import { metaDiffers, readerVersion } from "@/lib/blog/article-view";
+import { metaDiffers, readerVersion, reasonPanel, statusNote } from "@/lib/blog/article-view";
 import { sameDoc } from "@/lib/blog/doc";
 import { articleHref, blogHref, findBySlug, slugOf } from "@/lib/blog/slug";
-import { statusOf } from "@/lib/blog/status";
+import { menuFor, statusOf } from "@/lib/blog/status";
 import { settleDueReviews, updateBlog, useBlog, useBody } from "@/lib/blog/store";
 import type { BlogArticle } from "@/lib/blog/types";
 import { ARTICLE_CONTENT, ARTICLE_PAGE, ArticleMissing, ArticleReader, ArticleSkeleton } from "./article-reader";
 import { BlogBreadcrumb } from "./breadcrumb";
-import { StatusCard } from "./status-card";
+import { ReasonPanel } from "./reason-panel";
 
 /** Keeps the address on the article's current slug (and its #anchor). */
 export function useCanonicalPath(path: string | null) {
@@ -48,6 +53,8 @@ function Gone() {
   return late ? <ArticleMissing /> : <div className={ARTICLE_PAGE} aria-busy="true" />;
 }
 
+const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
+
 function ArticleView({ article, actions }: { article: BlogArticle; actions: ReturnType<typeof useArticleActions> }) {
   const version = readerVersion(article);
   const shown = useBody(article.id, version.body);
@@ -58,12 +65,65 @@ function ArticleView({ article, actions }: { article: BlogArticle; actions: Retu
   const title = version.meta.title.trim() || "Untitled draft";
   useDocumentTitle(title);
 
+  const panel = reasonPanel(article);
+  const canEdit = menuFor(article).includes("edit");
+  // Edit is the card's own button, so the ⋯ leaves it out; View and Quick view lead here.
+  const menu = actions.menuItems(article, { omit: ["edit", "view", "quick-view"] });
+
   return (
     <div className={ARTICLE_PAGE}>
       <div className={ARTICLE_CONTENT}>
-        <BlogBreadcrumb trail={[{ label: title }]} />
-        <StatusCard article={article} draftDiffers={draftDiffers} actions={actions} />
-        <ArticleReader article={article} meta={version.meta} doc={shown.body.doc} bodyReady={shown.hydrated} body={version.body} reuse />
+        {panel && <ReasonPanel key={`${article.id}:${panel.rows[0]?.at ?? 0}:${panel.open}`} panel={panel} />}
+        <ArticleReader
+          article={article}
+          meta={version.meta}
+          doc={shown.body.doc}
+          bodyReady={shown.hydrated}
+          body={version.body}
+          header={
+            <>
+              <BlogBreadcrumb trail={[{ label: "Blog details" }]} />
+              <div className="flex items-center gap-4">
+                {canEdit && (
+                  <Button
+                    type="button"
+                    hierarchy="secondary"
+                    size="md"
+                    className={TAP}
+                    iconLeading={<Icon icon={PencilEdit02Icon} size={16} />}
+                    onClick={() => actions.run("edit", article)}
+                  >
+                    Edit
+                  </Button>
+                )}
+                {menu.length > 0 && (
+                  <Menu
+                    label="More actions for this blog"
+                    align="end"
+                    items={menu}
+                    trigger={(props) => (
+                      <IconButton
+                        {...props}
+                        type="button"
+                        hierarchy="secondary"
+                        size="md"
+                        aria-label="More actions for this blog"
+                        icon={<Icon icon={MoreHorizontalIcon} size={20} />}
+                        className="shrink-0 border-solid max-md:!size-[var(--touch-min)] [@media(pointer:coarse)]:!size-[var(--touch-min)]"
+                      />
+                    )}
+                  />
+                )}
+              </div>
+            </>
+          }
+          status={
+            <section aria-label="Status" className="flex flex-col items-start gap-4">
+              <StatusBadges article={article} />
+              <p className="text-sm leading-sm text-text-secondary">{statusNote(article, draftDiffers)}</p>
+            </section>
+          }
+        />
       </div>
     </div>
   );

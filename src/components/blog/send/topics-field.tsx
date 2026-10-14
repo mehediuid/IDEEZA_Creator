@@ -1,6 +1,6 @@
 "use client";
 
-// Topics (D4): up to five chips. Enter or a comma adds what was typed, Backspace
+// Topics (the Figma's "Add or change topics (up to 5)", the editor's Tags): up to five chips. Enter or a comma adds what was typed, Backspace
 // in an empty field removes the last chip, suggestions come from the browser's
 // own list. At five the field says why it takes no more.
 
@@ -10,7 +10,18 @@ import { TOPIC_SUGGESTIONS } from "@/lib/blog/categories";
 import { TOPICS_MAX } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 
-export function TopicsField({ id, value, onChange }: { id: string; value: string[]; onChange: (v: string[]) => void }) {
+export function TopicsField({
+  id,
+  value,
+  onChange,
+  label,
+}: {
+  id: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  /** The field's label; "Topics (up to 5)" when not given. */
+  label?: React.ReactNode;
+}) {
   const [text, setText] = React.useState("");
   const [note, setNote] = React.useState<string | null>(null);
   const [said, setSaid] = React.useState("");
@@ -40,7 +51,11 @@ export function TopicsField({ id, value, onChange }: { id: string; value: string
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor={id} className="text-md font-medium leading-md text-text-primary">
-        Topics <span className="font-regular text-text-secondary">(up to {TOPICS_MAX})</span>
+        {label ?? (
+          <>
+            Topics <span className="font-regular text-text-secondary">(up to {TOPICS_MAX})</span>
+          </>
+        )}
       </label>
       <div
         // A tap anywhere in the field (between chips too) types into it.
@@ -91,7 +106,7 @@ export function TopicsField({ id, value, onChange }: { id: string; value: string
         </datalist>
       </div>
       <p id={hintId} className={cn("m-0 text-sm leading-sm", note ? "text-text-warning" : "text-text-secondary")}>
-        {note ?? (full ? `You've added ${TOPICS_MAX} topics. Remove one to add another.` : "Helps readers find your article. Press Enter after each one.")}
+        {note ?? (full ? `You've added ${TOPICS_MAX} topics. Remove one to add another.` : "Press Enter after each one.")}
       </p>
       <span role="status" aria-live="polite" className="sr-only">
         {said}
