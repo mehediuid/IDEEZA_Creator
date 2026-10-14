@@ -8,6 +8,7 @@ Start here for any code change: open the area's router, then only the files it n
 | Find a component or UI module | [src/components/README.md](../../src/components/README.md) | UI rules: [ui-ux.md](../guides/ui-ux.md) |
 | Find a store, model or algorithm | [src/lib/README.md](../../src/lib/README.md) | Stores persist to `localStorage` (`ideeza:*`) |
 | Global shell: sidebar, phone drawer, ⌘K, theme | `src/components/dashboard/`, `theme-provider.tsx` | [features/platform-and-projects.md](../guides/features/platform-and-projects.md) › Platform & shell |
+| Report a problem: the dialog, its entry points, `/api/reports` | `src/components/support/`, `src/lib/support/`, `src/lib/server/`, `src/app/api/reports/`, `src/instrumentation-client.ts` | features/platform-and-projects.md › Platform & shell |
 | Home prompt, concept chat, build, review card, credits, history, toasts | `src/components/create/`, `src/lib/create/` | [features/ai-create-flow.md](../guides/features/ai-create-flow.md); Part 4 spec |
 | Product spec sheet | `src/lib/spec/`, `src/components/create/spec-*.tsx` | features/ai-create-flow.md; spec `2026-09-25-product-spec-sheet-design.md` |
 | Build review's 3D tab | `src/components/create/model-panel/`, `src/lib/three/assembly.ts` | features/ai-create-flow.md; spec `2026-09-25-3d-model-review-design.md` |
@@ -25,6 +26,7 @@ Start here for any code change: open the area's router, then only the files it n
 | The mint flow, the Brief in Earn (choose → details → review and sign → success) | `src/components/brief/`, `src/lib/brief/` | features/editor-modules.md › The mint flow |
 | Messages: `/messages`, conversations, Requests, entry points, Acting as | `src/app/(create)/messages/`, `src/components/messages/`, `src/lib/messages/` | [features/messages.md](../guides/features/messages.md); spec `2026-10-13-messages-design.md` |
 | Blog: `/blog`, the editor, Send for review, demo review, the article page | `src/app/(create)/blog/`, `src/components/blog/`, `src/lib/blog/` | [features/blog.md](../guides/features/blog.md); spec `2026-10-14-blog-design.md` |
+| Creator profile: `/creators/[handle]`, Edit profile, the people layer | `src/components/profile/`, `src/lib/people/`, `src/app/api/profile/` | features/platform-and-projects.md › Creator profile; spec `2026-10-14-creator-profile-design.md` |
 | Innovations feed, posts, comments | `src/components/newsfeed/`, `src/components/innovations/`, `src/lib/feed.ts`, `src/lib/innovations/`, `src/app/api/feed/` | features/platform-and-projects.md; plan https://claude.ai/artifact/XEhXzAt3kt3YPmaSLxjmxr |
 | Voice dictation | `src/lib/voice/use-voice-input.ts`, `src/components/voice/` | features/ai-create-flow.md |
 | Design tokens and atoms | `src/styles/` (`tokens.css`, `tailwind-preset.ts`), `src/components/ideeza/` | [ui-ux.md](../guides/ui-ux.md) |

@@ -15,6 +15,7 @@ import { WalletProvider } from "@/components/wallet/wallet-provider";
 import { VideosDialogHost } from "@/components/projects/make-videos";
 import { PlanRunner } from "@/components/projects/business-plan/plan-runner";
 import { CommerceRoot } from "@/components/commerce/commerce-root";
+import { ReportProblemHost } from "@/components/support/report-problem";
 
 export const metadata: Metadata = {
   title: "IDEEZA Creator Panel",
@@ -120,6 +121,11 @@ export default function RootLayout({
                                 opens (make-videos.tsx): here, so it outlives the
                                 step's row when the last video lands. */}
                             <VideosDialogHost />
+                            {/* Report a problem: one dialog for every page,
+                                editors included, since they sit outside
+                                both sidebar layouts. Opened by
+                                openReportProblem() from anywhere. */}
+                            <ReportProblemHost />
                           </WalletProvider>
                           {/* A build is a background job: it has to keep
                               running whatever page the user is on, so the

@@ -1,8 +1,11 @@
 /* The typefaces the tokens name — --font-family-display/body resolve to
    Manrope and --font-family-mono to Roboto Mono, so they load app-wide here.
    They used to be imported only by src/app/pcb/fonts.css, which the project
-   workspace layout loads, so every other route rendered in system-ui. */
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap");
+   workspace layout loads, so every other route rendered in system-ui.
+   Noto Sans Bengali (owner decision D11, 2026-10-14) follows Manrope in the
+   stacks for names and words in Bengali script; its font files carry a
+   unicode-range, so a page with no Bengali text never downloads them. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap");
 @import "../styles/tokens.css";
 @import "../styles/reset.css";
 

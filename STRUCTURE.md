@@ -36,6 +36,7 @@ ideeza-creator-panel/
    │  │   ├─ parts/                   "/parts" — Parts & Agile Module library
    │  │   │   ├─ new/                 "/parts/new" — New Package authoring flow
    │  │   │   └─ [id]/                "/parts/<id>" — one part + its land pattern
+   │  │   ├─ creators/[handle]/       a creator's profile (me = yours)
    │  │   └─ innovations/[slug]/      community feed + the post (+ products/[productId]/)
    │  ├─ (create)/           AI create flow
    │  │   ├─ projects/                    "/projects" — My projects (index)
@@ -56,6 +57,7 @@ ideeza-creator-panel/
    ├─ components/            UI, grouped by module/area
    │  ├─ app-chrome/         profile dropdown (shared chrome)
    │  ├─ dashboard/          sidebar, workspace-prompt (hero), command-palette (⌘K)
+   │  ├─ support/            report-problem (the one Report a problem dialog + host)
    │  ├─ create/             build-shell/status, build-simulator, concept-chat,
    │  │                      chat-thread, confirm-build-dialog, credits-card,
    │  │                      history-*, image-editor/turn, prompt-bar, quota-card,
@@ -84,6 +86,7 @@ ideeza-creator-panel/
    │  │                      bid dialogs, Ask the creator / Get creator support, demo-buyer banner
    │  ├─ blog/               Blog: list/, editor/ (TipTap, editor routes only), article/ (page, reader,
    │  │                      renderer, preview), send/ (Send for review, cover picker, Change cover)
+   │  ├─ profile/            the creator profile: page, header, owner line, Made grid, Edit profile
    │  ├─ messages/           Messages: shell + acting line, list, conversation (header, context card,
    │  │                      timeline, composer), start view, settings + report dialogs
    │  ├─ wallet/             Demo wallet provider + dialog, menu entry, mint-type field, cost rows, proof card
@@ -116,6 +119,9 @@ ideeza-creator-panel/
    │
    ├─ lib/                   Logic & data (no JSX-heavy UI)
    │  ├─ pcb/                ★ PCB engine (see below)
+   │  ├─ support/            Report a problem: form rules, page names, recent
+   │  │                      errors, image shrink/capture, openReportProblem()
+   │  ├─ server/             server-only: Vercel Blob driver, report store
    │  ├─ package/            ★ New Package model: types (PackageDraft + gating +
    │  │                      units), store, wizard (24 families), kicad parsers,
    │  │                      library (save/publish, version lock)
@@ -167,6 +173,8 @@ ideeza-creator-panel/
    │  ├─ video/              product-video takes, IndexedDB clip store, frames, preview-clip job maths
    │  ├─ blog/               Blog: the model (doc, statuses, actions, demo review, list, slugs, cover),
    │  │                      the local store (ideeza:blog + rev'd bodies), IndexedDB files (ideeza-blog)
+   │  ├─ people/             the creator profile's people layer: one person id and handles, profile
+   │  │                      fields (ideeza:profile), the photo (IndexedDB), the Made list, headline prompt
    │  ├─ messages/           Messages: the model (rules, people, links, scam hint, support migration, demo seed),
    │  │                      the local store (ideeza:messages), IndexedDB files, acting-as, actions
    │  ├─ ui/                 tab-keys.ts (the keyboard rules every tablist shares)

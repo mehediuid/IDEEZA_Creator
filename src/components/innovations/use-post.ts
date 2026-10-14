@@ -21,6 +21,7 @@ import type { ProjectView } from "@/lib/manual/project-read";
 import { useManualProjects, type ManualProject } from "@/lib/manual/projects";
 import { protocolShort } from "@/lib/network/catalog";
 import { useProjectNetwork } from "@/lib/network/store";
+import { useMe } from "@/lib/people/profile-store";
 
 export type MinePostFacts = { project: ManualProject; view: ProjectView; brief: StoredDraft | null };
 
@@ -41,10 +42,13 @@ export function usePost(slug: string): PostPageData {
   const networkLabel = network
     ? `${protocolShort(network.protocol)} · ${network.productIds.length} ${network.productIds.length === 1 ? "product" : "products"}`
     : null;
-  const mine = React.useMemo(
-    () => (data.state === "ready" ? minePostOf(data.project, data.view, networkLabel) : null),
-    [data, networkLabel],
-  );
+  // Your own post carries your profile name and initials ("You" until you give a name).
+  const me = useMe();
+  const mine = React.useMemo(() => {
+    if (data.state !== "ready") return null;
+    const post = minePostOf(data.project, data.view, networkLabel);
+    return { ...post, creator: { ...post.creator, name: me.name, initials: me.initials } };
+  }, [data, networkLabel, me]);
 
   if (sample) return { state: "ready", post: sample, owner: false, seed: sampleSeedOf(sample.id), mine: null };
   if (!hydrated) return { state: "loading" };

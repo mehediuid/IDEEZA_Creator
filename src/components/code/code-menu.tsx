@@ -9,10 +9,14 @@
 import * as React from "react";
 import { C } from "@/lib/pcb/colors";
 import { dispatchCodeAction, type CodeAction } from "./code-menu-strip";
+import { openReportProblem } from "@/lib/support/open-report";
 
 type MenuItem = {
   label: string;
   action?: CodeAction;
+  /** Runs instead of dispatching an editor action: Report a problem, which
+   *  belongs to the app rather than to this editor. */
+  run?: () => void;
   shortcut?: string;
   divider?: boolean;
 };
@@ -50,6 +54,7 @@ const MENUS: Record<string, MenuItem[]> = {
       action: "help:shortcuts",
       shortcut: "⌘K ⌘S",
     },
+    { label: "Report a problem…", run: openReportProblem },
     { label: "About IDEEZA Code", action: "help:about" },
   ],
 };
@@ -179,7 +184,8 @@ function MenuLabel({
                 role="menuitem"
                 className="ix-menu"
                 onClick={() => {
-                  if (it.action) dispatchCodeAction(it.action);
+                  if (it.run) it.run();
+                  else if (it.action) dispatchCodeAction(it.action);
                   onSelect();
                 }}
                 style={{

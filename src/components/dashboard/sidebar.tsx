@@ -18,7 +18,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowDown01Icon,
   BookOpen01Icon,
@@ -64,6 +64,11 @@ import { useMessagePeople } from "@/lib/messages/use-people";
 import { useBlog, useReviewClock, updateBlog } from "@/lib/blog/store";
 import { findArticle, markSeen, unseenOutcomes, type Outcome } from "@/lib/blog/article";
 import { articleHref, slugOf } from "@/lib/blog/slug";
+import { linkVariants } from "@/components/ideeza";
+import { openReportProblem } from "@/lib/support/open-report";
+import { displayNameOf, initialsOf } from "@/lib/people/ids";
+import { useMyPhoto } from "@/lib/people/photo-store";
+import { useMyProfile } from "@/lib/people/profile-store";
 
 // `href: null` is a section with no page behind it yet. It stays in the list,
 // so the shape of the product is visible, but it says it is not open rather
@@ -105,11 +110,6 @@ function useMessagesUnread(): number {
   if (!hydrated || !people.hydrated) return 0;
   return countsFor(data, asId, people.teamIdsOf).unread;
 }
-
-const USER = {
-  name: "You",
-  initials: "Y",
-};
 
 const COLLAPSED_KEY = "ideeza:sidebar:collapsed";
 
@@ -529,7 +529,7 @@ function Footer({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => vo
   return (
     <div className="border-t border-border p-[12px]">
       <UpgradeButton collapsed={collapsed} />
-      <SupportBlock collapsed={collapsed} />
+      <SupportBlock collapsed={collapsed} onLeave={onLeave} />
       <ProfileRow collapsed={collapsed} onLeave={onLeave} />
     </div>
   );
@@ -583,17 +583,26 @@ const SUPPORT_LINKS: Array<{ label: string; icon: IconValue }> = [
   { label: "Tour Guide", icon: Compass01Icon },
 ];
 
-function SupportBlock({ collapsed }: { collapsed: boolean }) {
+// Report a problem is the one live row: it opens the app's one Report a
+// problem dialog in place. In the phone drawer the drawer closes first, so
+// the dialog's focus trap isn't stacked on the drawer's and focus comes back
+// to the drawer's menu button.
+function SupportBlock({ collapsed, onLeave }: { collapsed: boolean; onLeave?: () => void }) {
+  const report = () => {
+    onLeave?.();
+    openReportProblem();
+  };
   if (collapsed) {
     return (
       <ul role="list" className="mb-[12px] flex flex-col gap-[2px]">
-        {[...SUPPORT_LINKS, { label: "Report a Problem", icon: Bug01Icon }].map(
-          (row) => (
-            <li key={row.label}>
-              <SupportAction label={row.label} icon={row.icon} collapsed />
-            </li>
-          ),
-        )}
+        {SUPPORT_LINKS.map((row) => (
+          <li key={row.label}>
+            <SupportAction label={row.label} icon={row.icon} collapsed />
+          </li>
+        ))}
+        <li>
+          <SupportAction label="Report a problem" icon={Bug01Icon} collapsed onClick={report} />
+        </li>
       </ul>
     );
   }
@@ -615,24 +624,49 @@ function SupportBlock({ collapsed }: { collapsed: boolean }) {
         ))}
       </p>
       <p className="mt-[2px]">
-        <SupportAction label="Report a Problem" icon={Bug01Icon} />
+        <SupportAction label="Report a problem" icon={Bug01Icon} onClick={report} />
       </p>
     </div>
   );
 }
 
-// One handler for all four: they open the same help surfaces the command
-// palette lists, which have no page of their own yet — so the control
-// says so instead of pretending to navigate.
+// Help Center, Tutorial and Tour Guide have no page of their own yet, so
+// without an `onClick` the control says so instead of pretending to
+// navigate.
 function SupportAction({
   label,
   icon,
   collapsed,
+  onClick,
 }: {
   label: string;
   icon: IconValue;
   collapsed?: boolean;
+  onClick?: () => void;
 }) {
+  if (onClick) {
+    return collapsed ? (
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-label={label}
+        title={label}
+        onClick={onClick}
+        className="flex h-[32px] w-full items-center justify-center rounded-md text-text-secondary outline-none transition-colors duration-fast hover:bg-bg-subtle hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
+      >
+        <Icon icon={icon} />
+      </button>
+    ) : (
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={onClick}
+        className={linkVariants({ color: "neutral", size: "md", className: "min-h-[24px] font-regular" })}
+      >
+        {label}
+      </button>
+    );
+  }
   if (collapsed) {
     return (
       <button
@@ -706,6 +740,11 @@ function ProfileRow({
     };
   }, [openPanel]);
 
+  const { fields: profile } = useMyProfile();
+  const photo = useMyPhoto();
+  const meName = displayNameOf(profile.name);
+  const meInitials = initialsOf(meName, profile.latinName || null);
+
   return (
     <div ref={ref} className="relative border-t border-border pt-[12px]">
       <div className="flex items-center gap-[6px]">
@@ -717,8 +756,8 @@ function ProfileRow({
           }
           aria-haspopup="menu"
           aria-expanded={openPanel === "menu"}
-          aria-label={`${USER.name} — open account menu`}
-          title={collapsed ? `${USER.name} — account` : undefined}
+          aria-label={`${meName} — open account menu`}
+          title={collapsed ? `${meName} — account` : undefined}
           className={[
             "flex min-w-0 flex-1 items-center rounded-lg outline-none transition-colors duration-fast hover:bg-bg-surface-raised focus-visible:ring-2 focus-visible:ring-border-focus",
             collapsed
@@ -728,14 +767,19 @@ function ProfileRow({
         >
           <span
             aria-hidden
-            className="inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-bg-brand text-md font-bold text-text-on-brand"
+            className="relative inline-flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full bg-bg-brand text-md font-bold text-text-on-brand"
           >
-            {USER.initials}
+            {photo.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              meInitials
+            )}
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1 text-left">
               <span className="block truncate text-md font-medium text-text-primary">
-                {USER.name}
+                {meName}
               </span>
               <span className="block truncate text-xs font-regular text-text-tertiary">
                 Free plan
@@ -933,6 +977,7 @@ function AccountMenu({
   onOpenWallet: () => void;
 }) {
   const [walletOpen, setWalletOpen] = React.useState(false);
+  const router = useRouter();
   return (
     <div
       role="menu"
@@ -950,6 +995,7 @@ function AccountMenu({
           label="Profile"
           onClick={() => {
             onClose();
+            router.push("/creators/me");
           }}
         />
         <MenuRow
