@@ -106,11 +106,10 @@ export function submissionKindOf(a: BlogArticle): SubmissionKind {
   return a.reviews.some((r) => r.outcome === "changes") ? "again" : "first";
 }
 
-/** The button's words: Send for review · Send again · Send changes for review. */
+/** The button's words, the Figma's (P7, P8): Publish, or Update for a published blog. Publishing
+ *  sends it to the IDEEZA team first; the publish step says so. */
 export function sendLabel(a: BlogArticle | null): string {
-  if (!a) return "Send for review";
-  const kind = submissionKindOf(a);
-  return kind === "again" ? "Send again" : kind === "changes" ? "Send changes for review" : "Send for review";
+  return a && submissionKindOf(a) === "changes" ? "Update" : "Publish";
 }
 
 export function submit(data: BlogData, id: string, now: number, delay = REVIEW_DELAY_MS): BlogData {

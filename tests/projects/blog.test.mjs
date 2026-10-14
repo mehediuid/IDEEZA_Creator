@@ -141,7 +141,7 @@ test("changes asked → Needs changes, n things to fix, then Send again", () => 
   const a = article(data, "art_abc123xyz9");
   assert.equal(statusOf(a), "needs");
   assert.equal(thingsToFix(a), "2 things to fix");
-  assert.equal(sendLabel(a), "Send again");
+  assert.equal(sendLabel(a), "Publish");
   assert.equal(opensEditor("needs"), true);
   data = submit(data, a.id, T0 + 100_000);
   assert.equal(article(data, a.id).submission.kind, "again");
@@ -158,7 +158,7 @@ test("approval publishes; editing a live article sends changes while the live ve
   assert.equal(liveNote(a, true), "Unsent changes");
   data = patchDraft(data, a.id, { title: "Smart lamp board, v2" }, T0 + 70_000);
   assert.equal(displayTitle(article(data, a.id)), "Smart lamp board", "readers still see the live title");
-  assert.equal(sendLabel(article(data, a.id)), "Send changes for review");
+  assert.equal(sendLabel(article(data, a.id)), "Update");
   data = submit(data, a.id, T0 + 80_000);
   a = article(data, a.id);
   assert.equal(statusOf(a), "changes");
