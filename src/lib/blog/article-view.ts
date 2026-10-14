@@ -3,10 +3,9 @@
 // rail's status badge, the reject-reason panel above the page, and which "On
 // this page" entry is current. Relative imports only (node:test loads these).
 
-import { headingsOf, textOf } from "./doc";
 import { reasonInfo } from "./reasons";
 import { DISPLAY_SENTENCE, displayStatusOf, liveNote, longDate, statusOf } from "./status";
-import type { ArticleMeta, BlogArticle, BlogDoc, ReviewReason, ReviewRound } from "./types";
+import type { ArticleMeta, BlogArticle, ReviewReason, ReviewRound } from "./types";
 
 export type BodyKind = "live" | "doc";
 
@@ -71,19 +70,6 @@ export function reasonPanel(a: BlogArticle): ReasonPanel | null {
 
 /** "On this page" earns its place from two headings. */
 export const showContents = (count: number) => count >= 2;
-
-/** The anchor of each top-level heading the contents lists, by its index in the body. */
-export function headingAnchors(doc: BlogDoc): Map<number, string> {
-  const list = headingsOf(doc);
-  const out = new Map<number, string>();
-  let next = 0;
-  doc.content.forEach((n, i) => {
-    if (n.type !== "heading" || !textOf(n.content).trim()) return;
-    const h = list[next++];
-    if (h) out.set(i, h.anchor);
-  });
-  return out;
-}
 
 /** The current "On this page" entry: the last heading above the reading line, the first
  *  before any has passed, and once the page is scrolled to its end the last heading in view

@@ -3,12 +3,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EMPTY_BLOG } from "../../.tmp-test/lib/blog/types.js";
+import { anchorsByNode } from "../../.tmp-test/lib/blog/doc.js";
 import { createArticle, decide, submit, takeOffline } from "../../.tmp-test/lib/blog/article.js";
 import { DISPLAY_SENTENCE, longDate } from "../../.tmp-test/lib/blog/status.js";
 import {
   bylineDate,
   currentHeading,
-  headingAnchors,
   metaDiffers,
   minRead,
   readerVersion,
@@ -151,10 +151,10 @@ test("contents: from two headings; anchors follow the listed headings, empty one
       { type: "heading", attrs: { level: 3 }, content: [{ type: "text", text: "The board" }] },
     ],
   };
-  const anchors = headingAnchors(doc);
-  assert.equal(anchors.get(1), "the-board");
-  assert.equal(anchors.has(2), false);
-  assert.equal(anchors.get(3), "the-board-2");
+  const anchors = anchorsByNode(doc);
+  assert.equal(anchors.get(doc.content[1]), "the-board");
+  assert.equal(anchors.has(doc.content[2]), false);
+  assert.equal(anchors.get(doc.content[3]), "the-board-2");
 });
 
 test("the current heading: the last above the line, the first before any, the last in view at the end", () => {

@@ -48,7 +48,7 @@ function Strip({ label, children }: { label: string; children: React.ReactNode }
     const el = ref.current;
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
   };
-  const arrow = "absolute top-1/2 -translate-y-1/2 rounded-full shadow-2 max-md:!size-[var(--touch-min)]";
+  const arrow = "absolute top-1/2 -translate-y-1/2 rounded-full border-solid shadow-2 max-md:!size-[var(--touch-min)]";
   return (
     <div className="relative min-w-0">
       <div ref={ref} role="radiogroup" aria-label={label} onScroll={measure} className="relative flex gap-4 overflow-x-auto scroll-smooth p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
