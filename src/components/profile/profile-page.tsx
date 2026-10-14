@@ -47,7 +47,7 @@ import { tiesOf } from "@/lib/people/ties";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { FollowingDialog, useFollowing } from "./following-dialog";
 import { ChipRow, CoverBand, IdentityHead, LinkList, OpenToLine, SideSection, StatList } from "./identity";
-import { OWNER_LINE_LINK, OwnerLine } from "./owner-line";
+import { OwnerFacts } from "./owner-line";
 import { FollowButton, MessageButton, PersonMenu, useBlocked, useMessageRefusalFor, type PersonNotice } from "./person-actions";
 import { WorkTabs } from "./work";
 
@@ -347,6 +347,12 @@ function OwnProfile({
                 Edit profile
               </Button>
             </div>
+            <OwnerFacts
+              shown={counts.shown}
+              hidden={counts.hidden}
+              following={following.hydrated ? following.people.length : null}
+              onFollowing={() => setFollowingOpen(true)}
+            />
             {fields.openTo && <OpenToLine words={OPEN_TO_WORDS[fields.openTo]} />}
             <StatList stats={statsOf(made, 0)} />
             <SideSection title="About">
@@ -354,17 +360,6 @@ function OwnProfile({
             </SideSection>
           </div>
           <div className={WORK}>
-            <OwnerLine
-              shown={counts.shown}
-              hidden={counts.hidden}
-              extra={
-                following.hydrated && (
-                  <button type="button" onClick={() => setFollowingOpen(true)} className={OWNER_LINE_LINK}>
-                    {`You follow ${following.people.length}`}
-                  </button>
-                )
-              }
-            />
             <WorkTabs items={made} activity={portfolio.activity} own ownerName={person.name} onTogglePin={onTogglePin} pinNotice={notice} />
           </div>
           <div className={ID_MORE}>
