@@ -14,11 +14,11 @@ import { Badge, Button, Drawer, buttonVariants } from "@/components/ideeza";
 import { CoverImage } from "@/components/blog/cover-image";
 import { ArticleBody, ArticleBodySkeleton } from "@/components/blog/article/article-body";
 import { StatusBadges } from "@/components/blog/status-badges";
-import { cardReasons } from "@/lib/blog/article-view";
+import { reasonPanel } from "@/lib/blog/article-view";
 import { categoryLabel } from "@/lib/blog/categories";
 import { isEmptyDoc } from "@/lib/blog/doc";
 import { articleHref, slugOf } from "@/lib/blog/slug";
-import { DISPLAY_SENTENCE, dateTime, displayStatusOf, longDate } from "@/lib/blog/status";
+import { DISPLAY_SENTENCE, dateTime, displayStatusOf } from "@/lib/blog/status";
 import { useBody } from "@/lib/blog/store";
 import type { BlogArticle } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,8 @@ export function QuickView({ article, onClose, onEdit }: { article: BlogArticle |
   const meta = article.draft;
   const title = meta.title.trim() || "Untitled draft";
   const status = displayStatusOf(article);
-  const reasons = status === "rejected" ? cardReasons(article) : null;
+  // The same reasons the blog's details page shows above it (Rejected, and Re-submitted after a rejection).
+  const reasons = reasonPanel(article);
   const category = categoryLabel(meta.categoryId);
 
   return (
@@ -71,30 +72,32 @@ export function QuickView({ article, onClose, onEdit }: { article: BlogArticle |
 
         {reasons && (
           <section aria-labelledby={`${titleId}-reasons`} className="flex flex-col gap-6 rounded-xl border border-solid border-border-error bg-bg-surface p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <h4 id={`${titleId}-reasons`} className="m-0 text-lg font-semibold leading-lg text-text-primary">
-                Reject reasons
+                {reasons.title}
               </h4>
-              <span className="flex items-center gap-4 text-sm leading-sm text-text-secondary">
-                <time dateTime={new Date(reasons.at).toISOString()}>{longDate(reasons.at)}</time>
-                {reasons.demo && (
-                  <Badge tone="neutral" className="gap-2 px-4 py-2 text-sm leading-xs">
-                    Demo review
-                  </Badge>
-                )}
-              </span>
+              {reasons.demo && (
+                <Badge tone="neutral" className="gap-2 px-4 py-2 text-sm leading-xs">
+                  Demo review
+                </Badge>
+              )}
             </div>
-            {reasons.lines.length > 0 ? (
-              <ol className="m-0 flex list-decimal flex-col gap-4 pl-12 text-md leading-md marker:text-text-secondary">
-                {reasons.lines.map((r, i) => (
-                  <li key={i} className="pl-2">
-                    <strong className="font-semibold text-text-primary">{r.title}</strong> <span className="text-text-secondary">{r.detail}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="m-0 text-md leading-md text-text-secondary">The IDEEZA team gave no reason. Edit it and publish it again.</p>
-            )}
+            <ul className="m-0 flex list-none flex-col p-0">
+              {reasons.rows.map((r, i) => (
+                <li
+                  key={`${r.at}:${i}`}
+                  className="flex flex-col gap-2 border-0 border-solid border-border-subtle py-5 first:pt-0 last:pb-0 [&+&]:border-t"
+                >
+                  <p className="m-0 flex flex-col gap-1 text-md leading-md">
+                    <span className="font-medium text-text-primary">{r.title}</span>
+                    <span className="text-text-secondary">{r.detail}</span>
+                  </p>
+                  <time dateTime={new Date(r.at).toISOString()} className="text-sm leading-sm text-text-secondary">
+                    {r.date}
+                  </time>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

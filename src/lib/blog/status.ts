@@ -149,8 +149,8 @@ export function whenLine(a: BlogArticle, now: number): string {
 
 export type DisplayStatus = "featured" | "approved" | "draft" | "resubmitted" | "removed" | "pending" | "rejected";
 
-/** The Figma's Status filter, in its order (Featured added: the list shows it). */
-export const DISPLAY_STATUSES: readonly DisplayStatus[] = ["approved", "featured", "pending", "resubmitted", "rejected", "draft", "removed"];
+/** The Status filter's order, the Figma's (frame 04), with Featured beside Approved. */
+export const DISPLAY_STATUSES: readonly DisplayStatus[] = ["approved", "featured", "pending", "rejected", "draft", "removed", "resubmitted"];
 
 export const DISPLAY_LABEL: Readonly<Record<DisplayStatus, string>> = {
   featured: "Featured",
