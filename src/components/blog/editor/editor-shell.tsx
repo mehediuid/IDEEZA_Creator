@@ -1,21 +1,25 @@
 "use client";
 
-// The article editor (spec § Screens 2, mockups Editor / EditorFix / PhoneEditor).
-// /blog/new stores nothing until there is something to keep (a title, words, a
-// picture); then the article is created and the address becomes its edit
+// The blog editor (spec § Screens 2; Figma frames 10–13, E1–E7). The Figma's
+// page: Blog › Create new blog (or Edit blog) with the save state, Preview and
+// Publish (Update for a published blog); then Blog category (required), Tag and
+// Tag link; then the writing — Title, and "Start your story here…" with the "+"
+// toolbar. /blog/new stores nothing until there is something to keep (a title,
+// words, a picture); then the blog is created and the address becomes its edit
 // address in place (history.replaceState, which Next's router follows), so the
-// caret and the words never move. Every change is saved about a second after
-// typing rests, and again on leaving the field, hiding the tab, leaving the page.
-// The bar says what happened in words; a save that failed, or waits for the
-// network, keeps the text in the page and asks before leaving it behind. A
-// second tab that saved first is never written over silently.
+// caret and the words never move. Every change — the details above the writing
+// too — is saved about a second after typing rests, and again on leaving the
+// field, hiding the tab, leaving the page; the bar then says "Drafted". A save
+// that failed, or waits for the network, keeps the text in the page and asks
+// before leaving it behind. A second tab that saved first is never written over
+// silently.
 //
-// An article in review is shown as sent (read-only) with one way out; a taken
-// down one can't be edited at all. One that needs changes pins the team's
-// reasons above the title.
+// A blog in review is shown as sent (read-only) with one way out; a taken down
+// one can't be edited at all. One that needs changes pins the team's reasons
+// above the details.
 //
-// Sending: the bar's button calls `onRequestSend` (the one integration point
-// for the Send dialog) with the saved article and body.
+// Publishing: the bar's button calls `onRequestSend` (the one integration point
+// for the publish step) with the saved blog and body.
 
 import * as React from "react";
 import { useTabTitle } from "@/components/blog/use-tab-title";
@@ -37,7 +41,6 @@ import { Badge, Banner, Button, buttonVariants, IconButton, iconButtonVariants, 
 import { useArticleActions } from "@/components/blog/article-actions";
 import { StatusBadges } from "@/components/blog/status-badges";
 import { usePostToast } from "@/components/innovations/toast";
-import { useNow } from "@/components/innovations/comments/comment-dom";
 import { canEdit, createArticle, findArticle, markSeen, patchDraft, sendLabel, touchArticle } from "@/lib/blog/article";
 import { DEMO_REVIEW_NOTE } from "@/lib/blog/demo-review";
 import { articleHref, blogHref, editHref, findBySlug, previewHref, slugOf } from "@/lib/blog/slug";
@@ -55,28 +58,34 @@ import {
   internalTarget,
   SAVE_DELAY_MS,
   saveLine,
+  type EditProblem,
   type SaveState,
 } from "./editor-logic";
+import { MetaFields, sameMeta, type DraftMeta } from "./meta-fields";
 
 const BodyEditor = dynamic(() => import("./body-editor"), {
   ssr: false,
   loading: () => <BodySkeleton />,
 });
 
-/** What the bar's send button hands the page: the article as saved, and a way to say
+/** What the bar's Publish button hands the page: the blog as saved, and a way to say
  *  what is missing next to its field. */
 export type SendRequest = {
   /** Null on /blog/new before anything was written. */
   article: BlogArticle | null;
+  /** What the page shows now (the category, tags and tag link included). */
   meta: ArticleMeta;
   doc: BlogDoc;
   /** Pictures still being stored (their names). */
   uploading: string[];
-  /** Says "Add a title first." / "Write something first." by the field and moves there. */
-  showProblems: (problems: ("title" | "body")[]) => void;
+  /** Says "Choose a category." / "Add a title first." / "Write something first." by the
+   *  field and moves to the first of them. */
+  showProblems: (problems: EditProblem[]) => void;
 };
 
-const PROBLEM_TEXT = { title: "Add a title first.", body: "Write something first." } as const;
+const PROBLEM_TEXT = { category: "Choose a category.", title: "Add a title first.", body: "Write something first." } as const;
+
+const metaOf = (m: ArticleMeta | undefined): DraftMeta => ({ categoryId: m?.categoryId ?? null, topics: m?.topics ?? [], projectId: m?.projectId ?? null });
 
 // ─────────────────────────── media ───────────────────────────
 
@@ -145,12 +154,12 @@ function Workspace({
   const router = useRouter();
   const toast = usePostToast();
   const actions = useArticleActions();
-  const now = useNow(30_000);
   const apiRef = React.useRef<BodyApi | null>(null);
   const titleRef = React.useRef<HTMLTextAreaElement>(null);
   const ids = React.useId();
   const titleProblemId = `${ids}-title-problem`;
   const bodyProblemId = `${ids}-body-problem`;
+  const categoryFieldId = `${ids}-category`;
 
   const [startDoc] = React.useState(storedDoc);
   const [title, setTitle] = React.useState(() => article?.draft.title ?? "");
@@ -159,6 +168,10 @@ function Workspace({
   const savedDoc = React.useRef(bodyKey(startDoc));
   const titleVal = React.useRef(title);
   const savedTitle = React.useRef(title);
+  // Category, tags and tag link: what the page shows, and what was last written.
+  const [meta, setMeta] = React.useState<DraftMeta>(() => metaOf(article?.draft));
+  const metaVal = React.useRef(meta);
+  const savedMeta = React.useRef(meta);
   const baseRev = React.useRef(storedRev);
   const timer = React.useRef<number | undefined>(undefined);
   // A newer copy from another tab, or a body this editor can't show: never write.
@@ -169,7 +182,7 @@ function Workspace({
   const [conflict, setConflict] = React.useState(false);
   const [contentError, setContentError] = React.useState(false);
   const [filled, setFilled] = React.useState(() => hasContent(title, startDoc));
-  const [problems, setProblems] = React.useState<("title" | "body")[]>([]);
+  const [problems, setProblems] = React.useState<EditProblem[]>([]);
   const [leaveTo, setLeaveTo] = React.useState<string | null>(null);
   const keepRef = React.useRef<HTMLButtonElement>(null);
 
@@ -182,12 +195,14 @@ function Workspace({
     const id = newBlogId("art_");
     const at = Date.now();
     const titleNow = titleVal.current;
-    if (!updateBlog((d) => createArticle(d, id, at, { title: titleNow })).ok) {
+    const metaNow = metaVal.current;
+    if (!updateBlog((d) => createArticle(d, id, at, { title: titleNow, ...metaNow })).ok) {
       setSave({ kind: "failed" });
       return null;
     }
     idRef.current = id;
     savedTitle.current = titleNow;
+    savedMeta.current = metaNow;
     const res = writeBody(id, "doc", docRef.current, 0);
     if (res.ok) {
       baseRev.current = res.rev;
@@ -206,10 +221,11 @@ function Workspace({
     timer.current = undefined;
     if (blocked.current) return false;
     const titleNow = titleVal.current;
+    const metaNow = metaVal.current;
     const key = bodyKey(docRef.current);
-    const titleDirty = titleNow !== savedTitle.current;
+    const draftDirty = titleNow !== savedTitle.current || !sameMeta(metaNow, savedMeta.current);
     const docDirty = key !== savedDoc.current;
-    if (!titleDirty && !docDirty) {
+    if (!draftDirty && !docDirty) {
       // Nothing new to keep (a picture still on its way isn't part of the body yet).
       setSave((s) => (s.kind === "pending" ? (lastSaved.current ? { kind: "saved", at: lastSaved.current } : { kind: "idle" }) : s));
       return true;
@@ -230,12 +246,13 @@ function Workspace({
     const fresh = findArticle(readBlogNow(), id);
     if (!fresh || !canEdit(fresh)) return false;
     const at = Date.now();
-    if (titleDirty) {
-      if (!updateBlog((d) => patchDraft(d, id, { title: titleNow }, at)).ok) {
+    if (draftDirty) {
+      if (!updateBlog((d) => patchDraft(d, id, { title: titleNow, ...metaNow }, at)).ok) {
         setSave({ kind: "failed" });
         return false;
       }
       savedTitle.current = titleNow;
+      savedMeta.current = metaNow;
     }
     if (docDirty) {
       const res = writeBody(id, "doc", docRef.current, baseRev.current);
@@ -320,6 +337,12 @@ function Workspace({
     titleVal.current = t;
     savedTitle.current = t;
     setTitle(t);
+    if (fresh) {
+      const m = metaOf(fresh.draft);
+      metaVal.current = m;
+      savedMeta.current = m;
+      setMeta(m);
+    }
     setFilled(hasContent(t, stored.doc));
     blocked.current = false;
     setConflict(false);
@@ -341,6 +364,18 @@ function Workspace({
     flush();
     setSave({ kind: "saved", at: Date.now() });
   };
+
+  // The publish step (or another tab) changed the category, tags or tag link: show them,
+  // unless the writer has changes here still on their way (those are written next).
+  const storeMeta = metaOf(article?.draft);
+  const storeKey = JSON.stringify(storeMeta);
+  React.useEffect(() => {
+    const fresh: DraftMeta = JSON.parse(storeKey);
+    if (!idRef.current || sameMeta(fresh, savedMeta.current) || !sameMeta(metaVal.current, savedMeta.current)) return;
+    savedMeta.current = fresh;
+    metaVal.current = fresh;
+    setMeta(fresh);
+  }, [storeKey]);
 
   // ── leaving with words not saved ──
 
@@ -377,7 +412,7 @@ function Workspace({
   }, [canonical]);
 
   const savedName = article?.draft.title.trim();
-  const tabTitle = savedName ? `Edit “${savedName}” · Blog · IDEEZA` : `${isNew ? "New article" : "Edit article"} · Blog · IDEEZA`;
+  const tabTitle = savedName ? `Edit “${savedName}” · Blog · IDEEZA` : `${isNew ? "Create new blog" : "Edit blog"} · Blog · IDEEZA`;
   useTabTitle(tabTitle);
 
   // ── the What to change panel has been read ──
@@ -399,6 +434,14 @@ function Workspace({
     setTitle(t);
     setFilled(hasContent(t, docRef.current));
     if (t.trim()) setProblems((p) => p.filter((x) => x !== "title"));
+    schedule();
+  };
+
+  const onMeta = (patch: Partial<DraftMeta>) => {
+    const next = { ...metaVal.current, ...patch };
+    metaVal.current = next;
+    setMeta(next);
+    if (next.categoryId) setProblems((p) => p.filter((x) => x !== "category"));
     schedule();
   };
 
@@ -425,11 +468,15 @@ function Workspace({
     return () => window.removeEventListener("resize", fit);
   }, [title]);
 
-  const showProblems = React.useCallback((ps: ("title" | "body")[]) => {
-    setProblems(ps);
-    if (ps[0] === "title") titleRef.current?.focus();
-    else if (ps[0] === "body") apiRef.current?.focus("start");
-  }, []);
+  const showProblems = React.useCallback(
+    (ps: EditProblem[]) => {
+      setProblems(ps);
+      if (ps[0] === "category") document.getElementById(categoryFieldId)?.focus();
+      else if (ps[0] === "title") titleRef.current?.focus();
+      else if (ps[0] === "body") apiRef.current?.focus("start");
+    },
+    [categoryFieldId],
+  );
 
   const requestSend = () => {
     flush();
@@ -437,7 +484,7 @@ function Workspace({
     const fresh = id ? findArticle(readBlogNow(), id) : null;
     onRequestSend({
       article: fresh,
-      meta: fresh?.draft ?? { ...EMPTY_META, title: titleVal.current },
+      meta: { ...(fresh?.draft ?? EMPTY_META), title: titleVal.current, ...metaVal.current },
       doc: docRef.current,
       uploading: apiRef.current?.uploading() ?? [],
       showProblems,
@@ -446,28 +493,149 @@ function Workspace({
 
   const label = sendLabel(article);
   const preview = filled && article ? previewHref(slugOf(article)) : null;
-  const crumb = isNew ? "New article" : "Edit article";
+  const crumb = isNew ? "Create new blog" : "Edit blog";
+
+  const banners = (
+    <>
+      {conflict && (
+        <Banner
+          tone="attention"
+          title="This blog changed in another tab."
+          action={
+            <span className="flex flex-wrap items-center gap-4">
+              <Button type="button" hierarchy="secondary" size="md" onClick={loadNewer}>
+                Load newer version
+              </Button>
+              <Button type="button" hierarchy="ghost" size="md" onClick={keepMine}>
+                Keep mine
+              </Button>
+            </span>
+          }
+        >
+          Nothing here is saved until you choose. Keep mine replaces the other tab&apos;s version.
+        </Banner>
+      )}
+
+      {contentError && (
+        <Banner tone="error" title="This blog can't be edited here yet.">
+          It has a part this editor can&apos;t show, so it opens read-only and nothing is changed.
+        </Banner>
+      )}
+
+      {frozen && article && (
+        <Banner
+          tone="info"
+          title={statusOf(article) === "changes" ? "Your changes are in review." : "This blog is in review."}
+          action={
+            <Button type="button" hierarchy="secondary" size="md" onClick={() => actions.run("edit", article)}>
+              Take it out of review to edit
+            </Button>
+          }
+        >
+          {statusOf(article) === "changes"
+            ? "Readers still see the live version. The IDEEZA team reads exactly what you sent, so it can't change now."
+            : "The IDEEZA team reads exactly what you sent, so it can't change now."}
+        </Banner>
+      )}
+
+      {round && !frozen && <FixPanel round={round} label={label} />}
+    </>
+  );
+
+  const fields = (
+    <MetaFields
+      value={meta}
+      onChange={onMeta}
+      disabled={!editable}
+      categoryId={categoryFieldId}
+      categoryError={problems.includes("category") ? PROBLEM_TEXT.category : null}
+    />
+  );
+
+  const writing = (
+    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-12">
+      <div className="flex flex-col gap-4">
+        <textarea
+          ref={titleRef}
+          rows={1}
+          aria-label="Blog title"
+          placeholder="Title"
+          maxLength={TITLE_MAX}
+          readOnly={!editable}
+          value={title}
+          aria-invalid={problems.includes("title") || undefined}
+          aria-describedby={problems.includes("title") ? titleProblemId : undefined}
+          onChange={(e) => onTitle(e.target.value)}
+          onBlur={() => flush()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (editable) apiRef.current?.focus("start");
+            } else if (e.key === "ArrowDown" && e.currentTarget.selectionStart === e.currentTarget.value.length) {
+              e.preventDefault();
+              apiRef.current?.focus("start");
+            }
+          }}
+          className="w-full resize-none overflow-hidden bg-transparent p-0 text-4xl font-semibold leading-4xl text-text-primary outline-none placeholder:text-text-tertiary max-md:leading-3xl"
+        />
+        {problems.includes("title") && <Problem id={titleProblemId} text={PROBLEM_TEXT.title} />}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <BodyEditor
+          key={editable ? "edit" : "read"}
+          initialDoc={storedDoc}
+          editable={editable}
+          touch={touch}
+          apiRef={apiRef}
+          ensureArticle={ensureArticle}
+          onChange={onDoc}
+          onBlur={flush}
+          onExitUp={() => {
+            const el = titleRef.current;
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(el.value.length, el.value.length);
+          }}
+          onContentError={() => {
+            blocked.current = true;
+            setContentError(true);
+          }}
+          describedBy={problems.includes("body") ? bodyProblemId : undefined}
+        />
+        {problems.includes("body") && <Problem id={bodyProblemId} text={PROBLEM_TEXT.body} />}
+      </div>
+    </div>
+  );
 
   return (
-    <div className={cn("flex min-h-full flex-col", touch ? "bg-bg-surface" : "bg-bg-page")}>
+    <div className={cn("flex min-h-full flex-col", touch ? "bg-bg-surface" : "bg-bg-page px-16 pb-24 pt-12")}>
+      <h1 className="sr-only">{crumb}</h1>
       {touch ? (
-        <PhoneTopBar
-          article={article}
-          frozen={frozen}
-          save={save}
-          now={now}
-          onRetry={flush}
-          preview={preview}
-          onPreviewBlocked={() => toast("Write something first.")}
-          label={label}
-          onSend={requestSend}
-        />
+        <>
+          <PhoneTopBar
+            article={article}
+            frozen={frozen}
+            save={save}
+            onRetry={flush}
+            preview={preview}
+            onPreviewBlocked={() => toast("Write something first.")}
+            label={label}
+            onSend={requestSend}
+          />
+          <div className="flex flex-1 flex-col gap-12 px-8 pb-32 pt-10">
+            {banners}
+            {fields}
+            <hr className="m-0 h-0 border-0 border-t border-solid border-border-subtle" />
+            {writing}
+          </div>
+        </>
       ) : (
-        <div className="sticky top-0 z-sticky border-0 border-b border-solid border-border-subtle bg-bg-surface">
-          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 px-16 py-6">
+        <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col rounded-2xl bg-bg-surface">
+          <div className="sticky top-0 z-sticky flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-t-2xl border-0 border-b border-solid border-border-subtle bg-bg-surface px-12 py-6">
             <Crumbs current={crumb} />
             <div className="flex flex-wrap items-center gap-6">
-              <SaveStatus save={save} now={now} onRetry={flush} />
+              {!frozen && <SaveStatus save={save} onRetry={flush} />}
               {frozen && article ? (
                 <StatusBadges article={article} />
               ) : (
@@ -500,109 +668,24 @@ function Workspace({
               )}
             </div>
           </div>
+          <div className="flex flex-1 flex-col gap-12 px-12 pb-12 pt-10">
+            {banners}
+            {fields}
+            <section
+              aria-label="Writing"
+              // A click on the card's empty space below the words continues the blog.
+              onMouseDown={(e) => {
+                if (e.target !== e.currentTarget || !editable) return;
+                e.preventDefault();
+                apiRef.current?.focus("end");
+              }}
+              className="flex min-h-[560px] flex-1 flex-col rounded-xl border border-solid border-border-subtle px-24 py-24"
+            >
+              {writing}
+            </section>
+          </div>
         </div>
       )}
-
-      <div className={cn("flex-1", touch ? "px-8 pb-32 pt-10" : "px-24 pb-32 pt-16")}>
-        <div className="mx-auto flex w-full max-w-[680px] flex-col gap-12">
-          <h1 className="sr-only">{crumb}</h1>
-
-          {conflict && (
-            <Banner
-              tone="attention"
-              title="This article changed in another tab."
-              action={
-                <span className="flex flex-wrap items-center gap-4">
-                  <Button type="button" hierarchy="secondary" size="md" onClick={loadNewer}>
-                    Load newer version
-                  </Button>
-                  <Button type="button" hierarchy="ghost" size="md" onClick={keepMine}>
-                    Keep mine
-                  </Button>
-                </span>
-              }
-            >
-              Nothing here is saved until you choose. Keep mine replaces the other tab&apos;s version.
-            </Banner>
-          )}
-
-          {contentError && (
-            <Banner tone="error" title="This article can't be edited here yet.">
-              It has a part this editor can&apos;t show, so it opens read-only and nothing is changed.
-            </Banner>
-          )}
-
-          {frozen && article && (
-            <Banner
-              tone="info"
-              title={statusOf(article) === "changes" ? "Your changes are in review." : "This article is in review."}
-              action={
-                <Button type="button" hierarchy="secondary" size="md" onClick={() => actions.run("edit", article)}>
-                  Take it out of review to edit
-                </Button>
-              }
-            >
-              {statusOf(article) === "changes"
-                ? "Readers still see the live version. The IDEEZA team reads exactly what you sent, so it can't change now."
-                : "The IDEEZA team reads exactly what you sent, so it can't change now."}
-            </Banner>
-          )}
-
-          {round && !frozen && <FixPanel round={round} label={label} />}
-
-          <div className="flex flex-col gap-4">
-            <textarea
-              ref={titleRef}
-              rows={1}
-              aria-label="Article title"
-              placeholder="Title"
-              maxLength={TITLE_MAX}
-              readOnly={!editable}
-              value={title}
-              aria-invalid={problems.includes("title") || undefined}
-              aria-describedby={problems.includes("title") ? titleProblemId : undefined}
-              onChange={(e) => onTitle(e.target.value)}
-              onBlur={() => flush()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (editable) apiRef.current?.focus("start");
-                } else if (e.key === "ArrowDown" && e.currentTarget.selectionStart === e.currentTarget.value.length) {
-                  e.preventDefault();
-                  apiRef.current?.focus("start");
-                }
-              }}
-              className="w-full resize-none overflow-hidden bg-transparent p-0 text-4xl font-semibold leading-4xl text-text-primary outline-none placeholder:text-text-tertiary max-md:leading-3xl"
-            />
-            {problems.includes("title") && <Problem id={titleProblemId} text={PROBLEM_TEXT.title} />}
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <BodyEditor
-              key={editable ? "edit" : "read"}
-              initialDoc={storedDoc}
-              editable={editable}
-              touch={touch}
-              apiRef={apiRef}
-              ensureArticle={ensureArticle}
-              onChange={onDoc}
-              onBlur={flush}
-              onExitUp={() => {
-                const el = titleRef.current;
-                if (!el) return;
-                el.focus();
-                el.setSelectionRange(el.value.length, el.value.length);
-              }}
-              onContentError={() => {
-                blocked.current = true;
-                setContentError(true);
-              }}
-              describedBy={problems.includes("body") ? bodyProblemId : undefined}
-            />
-            {problems.includes("body") && <Problem id={bodyProblemId} text={PROBLEM_TEXT.body} />}
-          </div>
-        </div>
-      </div>
 
       {actions.dialogs}
       <ModalFrame
@@ -673,8 +756,8 @@ function Crumbs({ current }: { current: string }) {
   );
 }
 
-function SaveStatus({ save, now, onRetry, compact = false }: { save: SaveState; now: number; onRetry: () => void; compact?: boolean }) {
-  const line = saveLine(save, now);
+function SaveStatus({ save, onRetry, compact = false }: { save: SaveState; onRetry: () => void; compact?: boolean }) {
+  const line = saveLine(save);
   const bad = save.kind === "failed" || save.kind === "conflict";
   const icon = save.kind === "saved" ? CloudSavingDone01Icon : save.kind === "offline" ? WifiOff01Icon : bad ? Alert02Icon : null;
   return (
@@ -703,7 +786,6 @@ function PhoneTopBar({
   article,
   frozen,
   save,
-  now,
   onRetry,
   preview,
   onPreviewBlocked,
@@ -713,7 +795,6 @@ function PhoneTopBar({
   article: BlogArticle | null;
   frozen: boolean;
   save: SaveState;
-  now: number;
   onRetry: () => void;
   preview: string | null;
   onPreviewBlocked: () => void;
@@ -723,10 +804,10 @@ function PhoneTopBar({
   const router = useRouter();
   return (
     <div className="sticky top-0 z-sticky flex min-h-[56px] items-center gap-2 border-0 border-b border-solid border-border-subtle bg-bg-surface py-2 pl-2 pr-4">
-      <NextLink href={blogHref()} aria-label="Back to your articles" className={iconButtonVariants({ hierarchy: "ghost", size: "xl" })}>
+      <NextLink href={blogHref()} aria-label="Back to your blogs" className={iconButtonVariants({ hierarchy: "ghost", size: "xl" })}>
         <Icon icon={ArrowLeft01Icon} size={20} />
       </NextLink>
-      <SaveStatus save={save} now={now} onRetry={onRetry} compact />
+      {frozen ? <span className="flex-1" /> : <SaveStatus save={save} onRetry={onRetry} compact />}
       {frozen && article ? (
         <StatusBadges article={article} />
       ) : (
@@ -745,8 +826,8 @@ function PhoneTopBar({
             ]}
             trigger={(p) => <IconButton {...p} type="button" hierarchy="ghost" size="xl" aria-label="More actions" icon={<Icon icon={MoreVerticalIcon} size={20} />} />}
           />
-          <Button type="button" hierarchy="primary" size="xl" aria-label={label} onClick={onSend}>
-            Send
+          <Button type="button" hierarchy="primary" size="xl" onClick={onSend}>
+            {label}
           </Button>
         </>
       )}
@@ -836,10 +917,16 @@ function BodySkeleton() {
 
 function EditorSkeleton() {
   return (
-    <div className="flex min-h-full flex-col bg-bg-page" aria-busy="true" aria-label="Loading the editor">
-      <div className="h-[57px] border-0 border-b border-solid border-border-subtle bg-bg-surface" />
-      <div className="px-8 pt-16 md:px-24">
-        <div className="mx-auto flex w-full max-w-[680px] flex-col gap-12">
+    <div className="flex min-h-full flex-col bg-bg-surface md:bg-bg-page md:px-16 md:pt-12" aria-busy="true" aria-label="Loading the editor">
+      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-12 rounded-2xl bg-bg-surface px-8 pb-12 md:px-12">
+        <div className="h-[56px] border-0 border-b border-solid border-border-subtle md:h-[69px]" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex flex-col gap-4">
+            <Skeleton shape="text" size="md" className="w-[120px]" />
+            <Skeleton shape="block" className="h-[40px] w-full rounded-lg" />
+          </div>
+        ))}
+        <div className="mx-auto flex w-full max-w-[680px] flex-col gap-12 pt-12">
           <Skeleton shape="block" className="h-[36px] w-2/3" />
           <BodySkeleton />
         </div>
@@ -863,11 +950,11 @@ function NotFound() {
         titleAs="h1"
         titleRef={ref}
         icon={<Icon icon={FileNotFoundIcon} size={32} />}
-        title="We can't find this article"
+        title="We can't find this blog"
         body="It may have been deleted, or the link is incomplete."
         action={
           <NextLink href={blogHref()} className={buttonVariants({ hierarchy: "primary", size: "lg" })}>
-            Back to your articles
+            Back to your blogs
           </NextLink>
         }
       />
@@ -884,11 +971,11 @@ function TakenDown({ article }: { article: BlogArticle }) {
         titleAs="h1"
         titleRef={ref}
         icon={<Icon icon={ViewOffSlashIcon} size={32} />}
-        title="This article can't be edited"
+        title="This blog can't be edited"
         body="The IDEEZA team took it off the Blog. Its page says why."
         action={
           <NextLink href={articleHref(slugOf(article))} className={buttonVariants({ hierarchy: "primary", size: "lg" })}>
-            Go to the article
+            Go to the blog
           </NextLink>
         }
       />

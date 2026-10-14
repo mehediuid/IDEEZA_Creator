@@ -1,12 +1,13 @@
-// The article editor's rules that need no browser (spec § Screens 2): what the
-// save line says, what counts as something to keep, how a typed link becomes a
-// safe one, what a paste from another page brings in, and the words of the
-// What to change panel. Relative imports only, so node:test loads it.
+// The blog editor's rules that need no browser (spec § Screens 2, Figma E1–E7):
+// what the save line says, what counts as something to keep, what stops
+// Publish, how a typed link becomes a safe one, what a paste from another page
+// brings in, the words of the What to change panel, the "+" toolbar's tools and
+// the Tag field's rules. Relative imports only, so node:test loads it.
 
 import { safeHref, isEmptyDoc } from "../../../lib/blog/doc";
 import { reasonInfo } from "../../../lib/blog/reasons";
 import { sendProblems, type SendProblem } from "../../../lib/blog/article";
-import { TITLE_MAX, type ArticleMeta, type BlogDoc, type BlogNode, type ReviewRound } from "../../../lib/blog/types";
+import { TITLE_MAX, TOPICS_MAX, type ArticleMeta, type BlogAlign, type BlogDoc, type BlogNode, type ReviewRound } from "../../../lib/blog/types";
 
 /** How long typing rests before it is written. */
 export const SAVE_DELAY_MS = 800;
@@ -22,29 +23,21 @@ export type SaveState =
   | { kind: "offline" }
   | { kind: "conflict" };
 
-const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
-
-/** "Saved 4:12 PM" today, "Saved Oct 12" before. */
-export function savedLine(at: number, now: number): string {
-  const when = sameDay(at, now)
-    ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(at)
-    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(at);
-  return `Saved ${when}`;
-}
-
+/** The Figma's word once the draft is kept (E7). */
+export const DRAFTED_LINE = "Drafted";
 export const FAILED_LINE = "Couldn't save. Your text is kept on this device.";
 export const OFFLINE_LINE = "You're offline. Changes save when you're back.";
-export const CONFLICT_LINE = "Not saved: this article changed in another tab.";
+export const CONFLICT_LINE = "Not saved: this blog changed in another tab.";
 
 /** The editor bar's save line; empty before anything was written. */
-export function saveLine(s: SaveState, now: number): string {
+export function saveLine(s: SaveState): string {
   switch (s.kind) {
     case "idle":
       return "";
     case "pending":
       return "Saving…";
     case "saved":
-      return savedLine(s.at, now);
+      return DRAFTED_LINE;
     case "failed":
       return FAILED_LINE;
     case "offline":
@@ -94,10 +87,27 @@ export function hasContent(title: string, doc: BlogDoc): boolean {
   return title.trim() !== "" || !isEmptyDoc(doc);
 }
 
-/** What the editor itself says before sending: a missing title or body. The
- *  category is asked in the Send dialog. */
-export function editProblems(meta: ArticleMeta, doc: BlogDoc): Extract<SendProblem, "title" | "body">[] {
-  return sendProblems(meta, doc).filter((p): p is "title" | "body" => p === "title" || p === "body");
+export type EditProblem = Extract<SendProblem, "category" | "title" | "body">;
+
+/** What stops Publish, said next to its field on the page, in the page's order: the
+ *  category (above the writing), then the title, then the body. */
+export function editProblems(meta: ArticleMeta, doc: BlogDoc): EditProblem[] {
+  const found = sendProblems(meta, doc);
+  return (["category", "title", "body"] as const).filter((p) => found.includes(p));
+}
+
+/** The Tag field (E3): a typed tag as it is kept — one line of spaces, at most 32 characters. */
+export function cleanTag(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").slice(0, 32);
+}
+
+/** Adding a typed tag: the new list, or why it isn't added. */
+export function addTag(tags: readonly string[], raw: string): { tags: string[] } | { note: string | null } {
+  const t = cleanTag(raw);
+  if (!t) return { note: null };
+  if (tags.some((v) => v.toLowerCase() === t.toLowerCase())) return { note: `“${t}” is already added.` };
+  if (tags.length >= TOPICS_MAX) return { note: `You've added ${TOPICS_MAX} tags. Remove one to add another.` };
+  return { tags: [...tags, t] };
 }
 
 export const LINK_REFUSED = "Use a web address (https://…) or an email address.";
@@ -172,22 +182,78 @@ export function internalTarget(href: string, here: string): string | null {
   return `${to.pathname}${to.search}${to.hash}`;
 }
 
-export type BlockId = "heading" | "subheading" | "image" | "row" | "video" | "bullet" | "ordered" | "code" | "quote" | "divider" | "project";
+export type ToolId =
+  | "image"
+  | "video"
+  | "col1"
+  | "col2"
+  | "col3"
+  | "left"
+  | "center"
+  | "right"
+  | "justify"
+  | "bullet"
+  | "ordered"
+  | "code"
+  | "heading"
+  | "subheading"
+  | "quote"
+  | "divider"
+  | "row"
+  | "project";
 
-/** The "+" list, in the mockup's order. */
-export const BLOCKS: readonly { id: BlockId; label: string; hint?: string }[] = [
-  { id: "heading", label: "Heading", hint: "Starts a section. Shows in “On this page”." },
-  { id: "subheading", label: "Subheading" },
-  { id: "image", label: "Image", hint: "Asks for a short description." },
-  { id: "row", label: "Images side by side", hint: "2 or 3. They stack on phones." },
-  { id: "video", label: "Video", hint: "MP4 or WebM, up to 50 MB." },
-  { id: "bullet", label: "Bulleted list" },
-  { id: "ordered", label: "Numbered list" },
-  { id: "code", label: "Code" },
-  { id: "quote", label: "Quote" },
-  { id: "divider", label: "Divider" },
-  { id: "project", label: "IDEEZA project", hint: "A card that links to one of your projects." },
+/** Groups split the toolbar with a rule, and name the phone sheet's sections. */
+export type ToolGroup = "media" | "columns" | "align" | "lists" | "code" | "blocks";
+
+export type Tool = {
+  id: ToolId;
+  label: string;
+  group: ToolGroup;
+  /** Whether it can be used inside columns (a column holds text, headings, lists and images). */
+  inColumns: boolean;
+  /** Its keyboard shortcut, as the tooltip shows it and as aria-keyshortcuts names it. */
+  keys?: { show: string; aria: string };
+};
+
+/** The "+" toolbar (Figma frame 13, in its order), then the tools the Figma lacks but a blog
+ *  needs: headings for "On this page", quote, divider, images side by side, a project card. */
+export const TOOLS: readonly Tool[] = [
+  { id: "image", label: "Image", group: "media", inColumns: true },
+  { id: "video", label: "Video", group: "media", inColumns: false },
+  { id: "col1", label: "1 column", group: "columns", inColumns: true },
+  { id: "col2", label: "2 columns", group: "columns", inColumns: true },
+  { id: "col3", label: "3 columns", group: "columns", inColumns: true },
+  { id: "left", label: "Align left", group: "align", inColumns: true, keys: { show: "⌘⇧L", aria: "Meta+Shift+L" } },
+  { id: "center", label: "Center", group: "align", inColumns: true, keys: { show: "⌘⇧E", aria: "Meta+Shift+E" } },
+  { id: "right", label: "Align right", group: "align", inColumns: true, keys: { show: "⌘⇧R", aria: "Meta+Shift+R" } },
+  { id: "justify", label: "Justify", group: "align", inColumns: true, keys: { show: "⌘⇧J", aria: "Meta+Shift+J" } },
+  { id: "bullet", label: "Bulleted list", group: "lists", inColumns: true },
+  { id: "ordered", label: "Numbered list", group: "lists", inColumns: true },
+  { id: "code", label: "Code", group: "code", inColumns: false },
+  { id: "heading", label: "Heading", group: "blocks", inColumns: true },
+  { id: "subheading", label: "Subheading", group: "blocks", inColumns: true },
+  { id: "quote", label: "Quote", group: "blocks", inColumns: false },
+  { id: "divider", label: "Divider", group: "blocks", inColumns: false },
+  { id: "row", label: "Images side by side", group: "blocks", inColumns: false },
+  { id: "project", label: "IDEEZA project", group: "blocks", inColumns: false },
 ];
+
+export const NOT_IN_COLUMNS = "Not inside columns";
+
+/** The tool's alignment, for the align tools. */
+export const ALIGN_OF: Partial<Record<ToolId, BlogAlign>> = { left: "left", center: "center", right: "right", justify: "justify" };
+
+/** The column count a column tool sets. */
+export const COLUMNS_OF: Partial<Record<ToolId, 1 | 2 | 3>> = { col1: 1, col2: 2, col3: 3 };
+
+/** Whether a tool is on where the caret is: its alignment, or its column count. */
+export function toolPressed(id: ToolId, at: { align: BlogAlign; columns: 1 | 2 | 3 }): boolean | undefined {
+  const align = ALIGN_OF[id];
+  if (align) return at.align === align;
+  const cols = COLUMNS_OF[id];
+  if (cols) return at.columns === cols;
+  return undefined;
+}
 
 /** Images side by side take 2 or 3: how many of the picked files to use, and what to say. */
 export function rowPick(picked: number): { take: number; message: string | null } {

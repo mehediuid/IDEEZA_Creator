@@ -10,11 +10,14 @@ export const blogLiveKey = (id: string) => `ideeza:blog:live:${id}`;
 /** Text in the body, as ProseMirror JSON (doc.ts keeps it to the BlogDoc v1 subset). */
 export type BlogMark = { type: "bold" } | { type: "code" } | { type: "link"; attrs: { href: string } };
 
+/** How a line of text sits (Figma E6). Left is the default and is never stored. */
+export type BlogAlign = "left" | "center" | "right" | "justify";
+
 export type BlogNode =
   | { type: "text"; text: string; marks?: BlogMark[] }
   | { type: "hardBreak" }
-  | { type: "paragraph"; content?: BlogNode[] }
-  | { type: "heading"; attrs: { level: 2 | 3 }; content?: BlogNode[] }
+  | { type: "paragraph"; attrs?: { align: BlogAlign }; content?: BlogNode[] }
+  | { type: "heading"; attrs: { level: 2 | 3; align?: BlogAlign }; content?: BlogNode[] }
   | { type: "bulletList"; content: BlogNode[] }
   | { type: "orderedList"; content: BlogNode[] }
   | { type: "listItem"; content: BlogNode[] }
@@ -24,7 +27,10 @@ export type BlogNode =
   | { type: "image"; attrs: BlogImageAttrs }
   | { type: "imageRow"; content: BlogNode[] }
   | { type: "video"; attrs: { fileKey: string; caption: string } }
-  | { type: "projectCard"; attrs: { projectId: string } };
+  | { type: "projectCard"; attrs: { projectId: string } }
+  /** 2 or 3 columns side by side (Figma E6); each holds paragraphs, headings, lists and images. */
+  | { type: "columns"; attrs: { count: 2 | 3 }; content: BlogNode[] }
+  | { type: "column"; content: BlogNode[] };
 
 export type BlogImageAttrs = {
   fileKey: string;

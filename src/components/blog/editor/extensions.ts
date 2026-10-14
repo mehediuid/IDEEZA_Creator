@@ -8,15 +8,24 @@
 // - Image is ours (a stored file, its description, caption, decoration flag);
 //   so are image rows (2–3 images side by side, stacking on phones), video (a
 //   stored file and a caption) and the IDEEZA project card.
+// - Columns (Figma E6): 2 or 3 columns at the top level, each holding text,
+//   headings, lists and images; side by side from a 600 px box, stacked below.
+//   Each column is outlined while writing so the writer sees where it ends.
+// - Alignment (Figma E6): paragraphs and headings take centre, right or justify
+//   (left is no alignment); ⌘⇧L/E/R/J as in Google Docs. Our own attribute, not
+//   a new dependency.
 
-import { Extension, Node, mergeAttributes, wrappingInputRule, type AnyExtension, type Editor } from "@tiptap/core";
+import { Extension, Node, mergeAttributes, wrappingInputRule, type AnyExtension } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
+import { ALIGN_CLASS } from "@/components/blog/article/article-body";
+import { alignOf } from "@/lib/blog/doc";
 import { allowedLinkUri, MAX_LIST_DEPTH } from "./editor-logic";
 import { ImageView } from "./image-view";
+import { onEmptyLine, setAlign } from "./layout";
 import { ProjectCardView, VideoView } from "./media-views";
 
 const QuoteNode = Node.create({
@@ -183,6 +192,93 @@ const ProjectCardNode = Node.create({
   },
 });
 
+/** Keeps each columns block's count equal to the columns it holds. */
+const fixColumnCount = new Plugin({
+  key: new PluginKey("blogColumnCount"),
+  appendTransaction: (trs, _old, state) => {
+    if (!trs.some((t) => t.docChanged)) return null;
+    let tr: Transaction | null = null;
+    state.doc.forEach((node, pos) => {
+      if (node.type.name !== "columns" || node.attrs.count === node.childCount) return;
+      tr = tr ?? state.tr;
+      tr.setNodeMarkup(pos, undefined, { ...node.attrs, count: node.childCount });
+    });
+    return tr;
+  },
+});
+
+const ColumnNode = Node.create({
+  name: "column",
+  content: "(paragraph | heading | bulletList | orderedList | image)+",
+  isolating: true,
+  parseHTML: () => [{ tag: "div[data-column]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "div",
+    mergeAttributes({ "data-column": "", class: "min-w-0 rounded-lg border border-dashed border-border px-6 py-4" }, HTMLAttributes),
+    0,
+  ],
+});
+
+const ColumnsNode = Node.create({
+  name: "columns",
+  group: "block",
+  content: "column{2,3}",
+  isolating: true,
+  addAttributes() {
+    return {
+      count: {
+        default: 2,
+        parseHTML: (el: HTMLElement) => (el.getAttribute("data-count") === "3" ? 3 : 2),
+        renderHTML: (attrs: Record<string, unknown>) => ({ "data-count": String(attrs.count) }),
+      },
+    };
+  },
+  addProseMirrorPlugins() {
+    return [fixColumnCount];
+  },
+  parseHTML: () => [{ tag: "div[data-columns]" }],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "div",
+    mergeAttributes(
+      {
+        "data-columns": "",
+        class: `blog-block grid grid-cols-1 gap-8 ${node.childCount === 3 ? "[@container(min-width:600px)]:grid-cols-3" : "[@container(min-width:600px)]:grid-cols-2"}`,
+      },
+      HTMLAttributes,
+    ),
+    0,
+  ],
+});
+
+/** Alignment on paragraphs and headings: stored as `align`, drawn with the reading view's class. */
+const AlignAttr = Extension.create({
+  name: "blogAlign",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["paragraph", "heading"],
+        attributes: {
+          align: {
+            default: null,
+            parseHTML: (el: HTMLElement) => alignOf(el.getAttribute("data-align") ?? el.style.textAlign),
+            renderHTML: (attrs: Record<string, unknown>) => {
+              const a = alignOf(attrs.align);
+              return a ? { "data-align": a, class: ALIGN_CLASS[a] } : {};
+            },
+          },
+        },
+      },
+    ];
+  },
+  addKeyboardShortcuts() {
+    const to = (a: "left" | "center" | "right" | "justify") => () => {
+      setAlign(this.editor, a);
+      return true;
+    };
+    return { "Mod-Shift-l": to("left"), "Mod-Shift-e": to("center"), "Mod-Shift-r": to("right"), "Mod-Shift-j": to("justify") };
+  },
+});
+
 /** What the editor asks of the page around it, read at the moment a key is pressed. */
 export type EditorKeyHandlers = {
   /** ⌘K: open the link field. */
@@ -192,12 +288,6 @@ export type EditorKeyHandlers = {
   /** ↑ on the first line: back to the title. */
   exitUp: () => void;
 };
-
-function onEmptyLine(editor: Editor): boolean {
-  const { selection } = editor.state;
-  const $a = selection.$anchor;
-  return selection.empty && $a.depth === 1 && $a.parent.type.name === "paragraph" && $a.parent.content.size === 0;
-}
 
 /** Where the keys find the page's current handlers (set after each render). */
 export type KeyBus = { set: (h: EditorKeyHandlers) => void; get: () => EditorKeyHandlers };
@@ -234,8 +324,6 @@ function BlogKeys(handlers: KeyBus) {
   });
 }
 
-export { onEmptyLine };
-
 export function blogExtensions(handlers: KeyBus): AnyExtension[] {
   return [
     StarterKit.configure({
@@ -261,11 +349,16 @@ export function blogExtensions(handlers: KeyBus): AnyExtension[] {
     ImageRowNode,
     VideoNode,
     ProjectCardNode,
+    ColumnsNode,
+    ColumnNode,
+    AlignAttr,
+    // The line with the caret (top level). An empty line in a column says "Write…" by itself
+    // (prose.ts), so an empty column never looks like nothing is there.
     Placeholder.configure({
       placeholder: ({ editor, node, pos }) => {
         if (node.type.name === "heading") return node.attrs.level === 3 ? "Subheading" : "Heading";
-        if (editor.isEmpty) return "Write your article…";
-        return editor.state.doc.resolve(pos).depth === 0 && node.type.name === "paragraph" ? "Write, or type / to add a heading, image or list" : "";
+        if (editor.isEmpty) return "Start your story here…";
+        return editor.state.doc.resolve(pos).depth === 0 && node.type.name === "paragraph" ? "Write, or type / for an image, columns or a list" : "";
       },
     }),
     BlogKeys(handlers),

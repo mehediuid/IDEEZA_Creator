@@ -3,9 +3,14 @@
 // and drops anything else, so the renderer never meets a node it doesn't know
 // and a link is never `javascript:`. The title is the only H1, so the body's
 // headings are 2 and 3. No italic: Manrope ships none.
+//
+// Layout (Figma E6): a paragraph or heading may be centred, right-aligned or
+// justified (left is the default and isn't stored), and 2 or 3 columns sit side
+// by side, each holding paragraphs, headings, lists and images. Columns live at
+// the top level only; their count is always the number of columns they hold.
 
 import { slugify } from "../innovations/slug";
-import { EMPTY_DOC, type BlogDoc, type BlogImageAttrs, type BlogMark, type BlogNode } from "./types";
+import { EMPTY_DOC, type BlogAlign, type BlogDoc, type BlogImageAttrs, type BlogMark, type BlogNode } from "./types";
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown, max = 2000): string => (typeof v === "string" ? v.slice(0, max) : "");
@@ -86,17 +91,50 @@ function listItems(v: unknown, depth: number): BlogNode[] {
   return items;
 }
 
+const STORED_ALIGN: readonly BlogAlign[] = ["center", "right", "justify"];
+
+/** A stored alignment: centre, right or justify; left (the default) and anything else is none. */
+export function alignOf(v: unknown): Exclude<BlogAlign, "left"> | null {
+  return STORED_ALIGN.includes(v as BlogAlign) ? (v as Exclude<BlogAlign, "left">) : null;
+}
+
+/** What a column may hold. */
+const IN_COLUMN = new Set(["paragraph", "heading", "bulletList", "orderedList", "image"]);
+const emptyColumn = (): BlogNode => ({ type: "column", content: [{ type: "paragraph" }] });
+
+/** Columns → 2 or 3 columns of allowed blocks. One column is no columns (its blocks stand
+ *  alone); a fourth and later column join the third, so no words are lost. */
+function columnsOf(v: unknown, depth: number): BlogNode[] {
+  if (!Array.isArray(v)) return [];
+  const cols: BlogNode[][] = [];
+  for (const c of v) {
+    if (!isObj(c) || c.type !== "column") continue;
+    const kept = blocks(c.content, depth + 1).filter((b) => IN_COLUMN.has(b.type));
+    if (cols.length < 3) cols.push(kept);
+    else cols[2].push(...kept);
+  }
+  if (cols.length === 0) return [];
+  if (cols.length === 1) return cols[0];
+  const count = cols.length as 2 | 3;
+  const content = cols.map((b) => (b.length ? { type: "column" as const, content: b } : emptyColumn()));
+  return [{ type: "columns", attrs: { count }, content }];
+}
+
 function block(n: Record<string, unknown>, depth: number): BlogNode | null {
   switch (n.type) {
     case "paragraph": {
       const content = inline(n.content);
-      return content.length ? { type: "paragraph", content } : { type: "paragraph" };
+      const align = alignOf(isObj(n.attrs) ? n.attrs.align : null);
+      const p: BlogNode = align ? { type: "paragraph", attrs: { align } } : { type: "paragraph" };
+      return content.length ? { ...p, content } : p;
     }
     case "heading": {
       const raw = isObj(n.attrs) ? n.attrs.level : 2;
       const level: 2 | 3 = raw === 3 || (typeof raw === "number" && raw > 3) ? 3 : 2;
+      const align = alignOf(isObj(n.attrs) ? n.attrs.align : null);
+      const attrs = align ? { level, align } : { level };
       const content = inline(n.content);
-      return content.length ? { type: "heading", attrs: { level }, content } : { type: "heading", attrs: { level } };
+      return content.length ? { type: "heading", attrs, content } : { type: "heading", attrs };
     }
     case "bulletList":
     case "orderedList": {
@@ -147,8 +185,27 @@ function blocks(v: unknown, depth: number): BlogNode[] {
   const out: BlogNode[] = [];
   for (const n of v) {
     if (!isObj(n)) continue;
+    // Columns stand at the top level only; anywhere else they are dropped.
+    if (n.type === "columns") {
+      if (depth === 0) out.push(...columnsOf(n.content, depth));
+      continue;
+    }
     const b = block(n, depth);
     if (b) out.push(b);
+  }
+  return out;
+}
+
+/** The body's blocks in reading order, columns opened (column 1, then 2, then 3), as a
+ *  phone shows them stacked. */
+export function readingBlocks(doc: BlogDoc): BlogNode[] {
+  const out: BlogNode[] = [];
+  for (const n of doc.content) {
+    if (n.type !== "columns") {
+      out.push(n);
+      continue;
+    }
+    for (const col of n.content) if (col.type === "column") out.push(...col.content);
   }
   return out;
 }
@@ -213,20 +270,30 @@ export function readingMinutes(doc: BlogDoc): number {
 
 export type Heading = { level: 2 | 3; text: string; anchor: string };
 
-/** "On this page": the body's H2s and H3s, each with an anchor unique in the article. */
-export function headingsOf(doc: BlogDoc): Heading[] {
-  const out: Heading[] = [];
+/** Each heading "On this page" lists, with its anchor, in reading order (columns included). */
+function anchoredHeadings(doc: BlogDoc): { node: BlogNode; heading: Heading }[] {
+  const out: { node: BlogNode; heading: Heading }[] = [];
   const used = new Map<string, number>();
-  for (const n of doc.content) {
+  for (const n of readingBlocks(doc)) {
     if (n.type !== "heading") continue;
     const text = textOf(n.content).trim();
     if (!text) continue;
     const base = slugify(text) || "section";
     const seen = used.get(base) ?? 0;
     used.set(base, seen + 1);
-    out.push({ level: n.attrs.level, text, anchor: seen ? `${base}-${seen + 1}` : base });
+    out.push({ node: n, heading: { level: n.attrs.level, text, anchor: seen ? `${base}-${seen + 1}` : base } });
   }
   return out;
+}
+
+/** "On this page": the body's H2s and H3s (those in columns too), each with an anchor unique in the blog. */
+export function headingsOf(doc: BlogDoc): Heading[] {
+  return anchoredHeadings(doc).map((h) => h.heading);
+}
+
+/** The anchor of every listed heading node, wherever it stands (for drawing the body). */
+export function anchorsByNode(doc: BlogDoc): Map<BlogNode, string> {
+  return new Map(anchoredHeadings(doc).map((h) => [h.node, h.heading.anchor]));
 }
 
 /** Every image in the body, in reading order (rows included). */

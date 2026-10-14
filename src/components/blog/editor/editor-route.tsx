@@ -1,9 +1,9 @@
 "use client";
 
-// The editor as a page: the shell plus what its send button does. Sending checks
-// what the editor owns (a title, a body, no picture still uploading, the latest
-// text saved), then opens the Send dialog for the rest — cover, category,
-// topics, project, reuse.
+// The editor as a page: the shell plus what its Publish (or Update) button does.
+// It checks what the page owns (a category, a title, a body — each said next to
+// its field — no picture still uploading, the latest text saved), then opens the
+// publish step for the rest: the thumbnail, the tags, reuse.
 
 import * as React from "react";
 import { SendDialog } from "@/components/blog/send/send-dialog";

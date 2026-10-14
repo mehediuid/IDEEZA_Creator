@@ -1,15 +1,16 @@
-// How an article's body looks while it is written — the reading view's own
+// How a blog's body looks while it is written — the reading view's own
 // element styles (U-ui-ds §5), so what the writer sees is what readers get:
 // Body/MD 16/24, Heading H2 = DS H4 20/28, Subheading H3 = DS H5 18/26 (both
 // re-paired on phones, where the size tokens shrink but line heights don't),
 // lists with quiet markers, a quote with a left rule and no italic (Manrope has
 // none), code in Roboto Mono 14/20 on the subtle ground, prose links
 // underlined (brand ink alone is under 3:1 against body text). Spacing is the
-// DS rhythm: 16 between blocks, 32 above a heading, 24 around a figure.
+// DS rhythm: 16 between blocks, 32 above a heading, 24 around a figure. Columns
+// keep the same rhythm inside each column, and sit side by side from 600 px.
 
 export const PROSE = [
-  "min-h-[160px] break-words text-lg leading-lg text-text-primary outline-none",
-  "[&>*+*]:mt-8",
+  "min-h-[160px] break-words text-lg leading-lg text-text-primary outline-none [container-type:inline-size]",
+  "[&>*+*]:mt-8 [&_[data-column]>*+*]:mt-8 [&_[data-column]>*+h2]:mt-12 [&_[data-column]>*+h3]:mt-8",
   "[&>*+h2]:mt-16 [&>*+h3]:mt-12 [&>h2+*]:mt-6 [&>h3+*]:mt-4",
   "[&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:leading-2xl max-md:[&_h2]:leading-xl",
   "[&_h3]:text-xl [&_h3]:font-semibold [&_h3]:leading-xl max-md:[&_h3]:leading-lg",
@@ -26,5 +27,6 @@ export const PROSE = [
   "[&>*+.blog-block]:mt-12 [&>.blog-block+*]:mt-12",
   // The placeholder ProseMirror's Placeholder extension marks on the empty line.
   "[&_.is-empty]:before:pointer-events-none [&_.is-empty]:before:float-left [&_.is-empty]:before:h-0 [&_.is-empty]:before:text-text-tertiary [&_.is-empty]:before:content-[attr(data-placeholder)]",
+  "[&_[data-column]>p:has(>br:only-child)]:before:pointer-events-none [&_[data-column]>p:has(>br:only-child)]:before:float-left [&_[data-column]>p:has(>br:only-child)]:before:h-0 [&_[data-column]>p:has(>br:only-child)]:before:text-text-tertiary [&_[data-column]>p:has(>br:only-child)]:before:content-['Write…']",
   "[&_.ProseMirror-gapcursor]:after:border-t-[color:var(--color-text-primary)]",
 ].join(" ");
