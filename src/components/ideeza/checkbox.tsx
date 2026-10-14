@@ -53,13 +53,17 @@ export function Checkbox({ checked, onChange, size = "md", disabled, className, 
       onClick={disabled ? undefined : onChange}
       {...keyProps(onChange, disabled, decorative)}
       className={cn("inline-flex items-center justify-center shrink-0 transition-colors", className)}
+      // Edges and fills meet 3:1 against the surface in light and dark (WCAG 1.4.11): the empty
+      // box's edge is the secondary icon ink, the ticked fill the brand fill. A disabled box that
+      // is ticked (a choice that can no longer change) stays grey but solid, so the tick still
+      // reads; only an empty disabled box fades.
       style={{
         width: s.box,
         height: s.box,
         borderRadius: s.radius,
-        border: `var(--border-width-1-5) solid ${checked ? "var(--color-violet-600)" : "var(--color-border-strong)"}`,
-        background: checked ? "var(--color-violet-600)" : "var(--color-bg-surface)",
-        opacity: disabled ? "var(--opacity-disabled, .4)" : 1,
+        border: `var(--border-width-1-5) solid ${checked ? (disabled ? "var(--color-icon-secondary)" : "var(--color-bg-brand)") : "var(--color-icon-secondary)"}`,
+        background: checked ? (disabled ? "var(--color-icon-secondary)" : "var(--color-bg-brand)") : "var(--color-bg-surface)",
+        opacity: disabled && !checked ? "var(--opacity-disabled, .4)" : 1,
         cursor: disabled ? "not-allowed" : "pointer",
       }}
     >

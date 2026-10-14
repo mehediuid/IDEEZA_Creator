@@ -356,7 +356,7 @@ export function SelectMenu<V extends string = string>({
           setTip(-1);
         }}
         className={cn(
-          "flex items-center gap-[var(--spacing-4)] px-[var(--spacing-6)] py-[var(--spacing-4)] text-[length:var(--font-size-md)] transition-colors [transition-duration:var(--motion-duration-fast)]",
+          "flex items-center gap-[var(--spacing-4)] px-[var(--spacing-6)] py-[var(--spacing-4)] text-[length:var(--font-size-md)] transition-colors [transition-duration:var(--motion-duration-fast)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]",
           o.disabled
             ? "cursor-not-allowed text-[color:var(--color-text-disabled)]"
             : isSelected
