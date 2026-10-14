@@ -1,12 +1,15 @@
-// Blog editor (spec 2026-10-14-blog-design.md § Screens 2): the save line, what counts as
-// something to keep, typed links, pasted pictures and headings, the What to change panel,
-// the leave guard's targets and the "+" list.
+// Blog editor (spec 2026-10-14-blog-design.md § Screens 2; Figma requirements E1–E7): the save
+// line, what counts as something to keep, what stops Publish, the Tag field, typed links, pasted
+// pictures and headings, the What to change panel, the leave guard's targets, the "+" toolbar,
+// and the body's columns and alignment (BlogDoc v1, lib/blog/doc.ts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   saveLine,
-  savedLine,
+  DRAFTED_LINE,
   cleanTitle,
+  cleanTag,
+  addTag,
   bodyKey,
   editableDoc,
   hasContent,
@@ -19,32 +22,43 @@ import {
   changesHeading,
   fixLines,
   internalTarget,
-  BLOCKS,
+  TOOLS,
+  toolPressed,
+  NOT_IN_COLUMNS,
   rowPick,
   FAILED_LINE,
   OFFLINE_LINE,
   LINK_REFUSED,
 } from "../../.tmp-test/components/blog/editor/editor-logic.js";
 import { EMPTY_DOC, EMPTY_META, TITLE_MAX } from "../../.tmp-test/lib/blog/types.js";
+import {
+  normalizeDoc,
+  alignOf,
+  readingBlocks,
+  wordCount,
+  readingMinutes,
+  headingsOf,
+  anchorsByNode,
+  imagesOf,
+  fileKeysOf,
+  isEmptyDoc,
+  blockTexts,
+} from "../../.tmp-test/lib/blog/doc.js";
 
 const para = (text) => ({ type: "paragraph", content: [{ type: "text", text }] });
 const doc = (...content) => ({ type: "doc", content });
 
-test("the save line says what happened to the writing", () => {
+test("the save line says what happened to the writing: Saving…, then the Figma's Drafted (E7)", () => {
   const at = new Date(2026, 9, 14, 16, 12).getTime();
-  assert.equal(saveLine({ kind: "idle" }, at), "");
-  assert.equal(saveLine({ kind: "pending" }, at), "Saving…");
-  assert.equal(saveLine({ kind: "saved", at }, at + 60_000), "Saved 4:12 PM");
-  assert.equal(saveLine({ kind: "failed" }, at), FAILED_LINE);
+  assert.equal(saveLine({ kind: "idle" }), "");
+  assert.equal(saveLine({ kind: "pending" }), "Saving…");
+  assert.equal(saveLine({ kind: "saved", at }), "Drafted");
+  assert.equal(DRAFTED_LINE, "Drafted");
+  assert.equal(saveLine({ kind: "failed" }), FAILED_LINE);
   assert.equal(FAILED_LINE, "Couldn't save. Your text is kept on this device.");
-  assert.equal(saveLine({ kind: "offline" }, at), OFFLINE_LINE);
+  assert.equal(saveLine({ kind: "offline" }), OFFLINE_LINE);
   assert.equal(OFFLINE_LINE, "You're offline. Changes save when you're back.");
-  assert.match(saveLine({ kind: "conflict" }, at), /another tab/);
-});
-
-test("a save from another day shows the date, not a time", () => {
-  const at = new Date(2026, 9, 12, 9, 5).getTime();
-  assert.equal(savedLine(at, new Date(2026, 9, 14, 10, 0).getTime()), "Saved Oct 12");
+  assert.equal(saveLine({ kind: "conflict" }), "Not saved: this blog changed in another tab.");
 });
 
 test("a title is one line and stops at the limit", () => {
@@ -78,10 +92,22 @@ test("nothing is kept until there is a title, words or a block", () => {
   assert.equal(hasContent("", doc({ type: "image", attrs: { fileKey: "file_1", alt: "", caption: "", decorative: false, width: 1, height: 1 } })), true);
 });
 
-test("the editor checks the title and the body; the category waits for the Send dialog", () => {
-  assert.deepEqual(editProblems(EMPTY_META, EMPTY_DOC), ["title", "body"]);
-  assert.deepEqual(editProblems({ ...EMPTY_META, title: "Lamp" }, EMPTY_DOC), ["body"]);
-  assert.deepEqual(editProblems({ ...EMPTY_META, title: "Lamp" }, doc(para("Words"))), []);
+test("Publish needs the category (E2), the title and the body, in the page's order", () => {
+  assert.deepEqual(editProblems(EMPTY_META, EMPTY_DOC), ["category", "title", "body"]);
+  assert.deepEqual(editProblems({ ...EMPTY_META, title: "Lamp" }, EMPTY_DOC), ["category", "body"]);
+  assert.deepEqual(editProblems({ ...EMPTY_META, title: "Lamp" }, doc(para("Words"))), ["category"]);
+  assert.deepEqual(editProblems({ ...EMPTY_META, title: "Lamp", categoryId: "howto" }, doc(para("Words"))), []);
+  assert.deepEqual(editProblems({ ...EMPTY_META, categoryId: "howto" }, doc(para("Words"))), ["title"]);
+});
+
+test("the Tag field (E3): one clean line each, no repeats in any case, five at most", () => {
+  assert.equal(cleanTag("  ESP32   board \n"), "ESP32 board");
+  assert.equal(cleanTag("x".repeat(40)).length, 32);
+  assert.deepEqual(addTag([], " ESP32 "), { tags: ["ESP32"] });
+  assert.deepEqual(addTag(["ESP32"], "Sensors"), { tags: ["ESP32", "Sensors"] });
+  assert.deepEqual(addTag(["ESP32"], "esp32"), { note: "“esp32” is already added." });
+  assert.deepEqual(addTag(["ESP32"], "   "), { note: null });
+  assert.deepEqual(addTag(["a", "b", "c", "d", "e"], "f"), { note: "You've added 5 tags. Remove one to add another." });
 });
 
 test("a typed link becomes a safe one, and javascript: is refused", () => {
@@ -153,11 +179,51 @@ test("the leave guard holds back in-app pages only", () => {
   assert.equal(internalTarget("https://example.com/", here), null);
 });
 
-test("the + list has the eleven blocks, in the mockup's order", () => {
+test("the + toolbar is the Figma's (frame 13), in its order, then what a blog needs besides", () => {
   assert.deepEqual(
-    BLOCKS.map((b) => b.label),
-    ["Heading", "Subheading", "Image", "Images side by side", "Video", "Bulleted list", "Numbered list", "Code", "Quote", "Divider", "IDEEZA project"],
+    TOOLS.map((t) => t.label),
+    [
+      "Image",
+      "Video",
+      "1 column",
+      "2 columns",
+      "3 columns",
+      "Align left",
+      "Center",
+      "Align right",
+      "Justify",
+      "Bulleted list",
+      "Numbered list",
+      "Code",
+      "Heading",
+      "Subheading",
+      "Quote",
+      "Divider",
+      "Images side by side",
+      "IDEEZA project",
+    ],
   );
+  assert.equal(new Set(TOOLS.map((t) => t.id)).size, TOOLS.length);
+  // A column holds text, headings, lists and images; the rest is greyed there, with the reason.
+  assert.deepEqual(
+    TOOLS.filter((t) => !t.inColumns).map((t) => t.id),
+    ["video", "code", "quote", "divider", "row", "project"],
+  );
+  assert.equal(NOT_IN_COLUMNS, "Not inside columns");
+  assert.deepEqual(
+    TOOLS.filter((t) => t.keys).map((t) => t.keys.show),
+    ["⌘⇧L", "⌘⇧E", "⌘⇧R", "⌘⇧J"],
+  );
+});
+
+test("the toolbar shows which alignment and how many columns the caret's line has", () => {
+  const at = { align: "center", columns: 2, inColumns: true };
+  assert.equal(toolPressed("center", at), true);
+  assert.equal(toolPressed("left", at), false);
+  assert.equal(toolPressed("col2", at), true);
+  assert.equal(toolPressed("col1", at), false);
+  assert.equal(toolPressed("image", at), undefined);
+  assert.equal(toolPressed("col1", { align: "left", columns: 1, inColumns: false }), true);
 });
 
 test("images side by side take 2 or 3, and say so otherwise", () => {
@@ -165,4 +231,113 @@ test("images side by side take 2 or 3, and say so otherwise", () => {
   assert.deepEqual(rowPick(2), { take: 2, message: null });
   assert.deepEqual(rowPick(3), { take: 3, message: null });
   assert.deepEqual(rowPick(5), { take: 3, message: "Only the first 3 images are used side by side." });
+});
+
+// ── BlogDoc v1: alignment and columns (Figma E6) ──
+
+const img = (k, w = 600, h = 400) => ({ type: "image", attrs: { fileKey: k, alt: "", caption: "", decorative: false, width: w, height: h } });
+const col = (...content) => ({ type: "column", content });
+const cols = (count, ...columns) => ({ type: "columns", attrs: { count }, content: columns });
+const heading = (level, text) => ({ type: "heading", attrs: { level }, content: [{ type: "text", text }] });
+
+test("alignment: centre, right and justify are kept on paragraphs and headings; left and anything else are not stored", () => {
+  assert.equal(alignOf("center"), "center");
+  assert.equal(alignOf("justify"), "justify");
+  assert.equal(alignOf("left"), null);
+  assert.equal(alignOf("start"), null);
+  assert.equal(alignOf(3), null);
+  const d = normalizeDoc(
+    doc(
+      { type: "paragraph", attrs: { align: "right" }, content: [{ type: "text", text: "R" }] },
+      { type: "paragraph", attrs: { align: "left" }, content: [{ type: "text", text: "L" }] },
+      { type: "paragraph", attrs: { align: "javascript:x" } },
+      { type: "heading", attrs: { level: 2, align: "center" }, content: [{ type: "text", text: "H" }] },
+      { type: "heading", attrs: { level: 3, align: null }, content: [{ type: "text", text: "S" }] },
+    ),
+  );
+  assert.deepEqual(d.content, [
+    { type: "paragraph", attrs: { align: "right" }, content: [{ type: "text", text: "R" }] },
+    { type: "paragraph", content: [{ type: "text", text: "L" }] },
+    { type: "paragraph" },
+    { type: "heading", attrs: { level: 2, align: "center" }, content: [{ type: "text", text: "H" }] },
+    { type: "heading", attrs: { level: 3 }, content: [{ type: "text", text: "S" }] },
+  ]);
+  // A list item's line and a quote's line keep theirs too.
+  const li = normalizeDoc(doc({ type: "bulletList", content: [{ type: "listItem", content: [{ type: "paragraph", attrs: { align: "justify" }, content: [{ type: "text", text: "x" }] }] }] }));
+  assert.equal(li.content[0].content[0].content[0].attrs.align, "justify");
+});
+
+test("columns: 2 or 3, the count always the columns they hold", () => {
+  const two = normalizeDoc(doc(cols(3, col(para("a")), col(para("b")))));
+  assert.deepEqual(two.content, [cols(2, col(para("a")), col(para("b")))]);
+  const three = normalizeDoc(doc({ type: "columns", content: [col(para("a")), col(para("b")), col(para("c"))] }));
+  assert.equal(three.content[0].attrs.count, 3);
+  // A fourth and fifth column join the third: no words are lost.
+  const five = normalizeDoc(doc(cols(2, col(para("a")), col(para("b")), col(para("c")), col(para("d")), col(para("e")))));
+  assert.deepEqual(five.content, [cols(3, col(para("a")), col(para("b")), col(para("c"), para("d"), para("e")))]);
+});
+
+test("columns: one column is no columns, none is nothing, an empty column keeps an empty line", () => {
+  assert.deepEqual(normalizeDoc(doc(para("x"), cols(2, col(para("only"), img("file_1"))), para("y"))).content, [para("x"), para("only"), img("file_1"), para("y")]);
+  assert.deepEqual(normalizeDoc(doc(cols(2), para("y"))).content, [para("y")]);
+  assert.deepEqual(normalizeDoc(doc(cols(2, { type: "column" }, col(para("b"))))).content, [cols(2, col({ type: "paragraph" }), col(para("b")))]);
+  // Not-a-column children are dropped before counting.
+  assert.deepEqual(normalizeDoc(doc(cols(3, col(para("a")), para("stray"), col(para("b"))))).content, [cols(2, col(para("a")), col(para("b")))]);
+});
+
+test("columns hold text, headings, lists and images only; columns stand at the top level only", () => {
+  const list = { type: "orderedList", content: [{ type: "listItem", content: [para("1")] }] };
+  const d = normalizeDoc(
+    doc(
+      cols(
+        2,
+        col(para("p"), heading(3, "h"), list, img("file_1"), { type: "codeBlock", content: [{ type: "text", text: "x" }] }, { type: "video", attrs: { fileKey: "file_v", caption: "" } }),
+        col({ type: "blockquote", content: [para("q")] }, { type: "projectCard", attrs: { projectId: "p1" } }, cols(2, col(para("nested")), col(para("n2"))), { type: "horizontalRule" }, { type: "imageRow", content: [img("file_2"), img("file_3")] }),
+      ),
+    ),
+  );
+  assert.deepEqual(d.content, [cols(2, col(para("p"), heading(3, "h"), list, img("file_1")), col({ type: "paragraph" }))]);
+  // Inside a quote or a list, columns are dropped.
+  assert.deepEqual(normalizeDoc(doc({ type: "blockquote", content: [para("q"), cols(2, col(para("a")), col(para("b")))] })).content, [{ type: "blockquote", content: [para("q")] }]);
+  // A bare column outside columns is unknown.
+  assert.deepEqual(normalizeDoc(doc(col(para("lost")), para("kept"))).content, [para("kept")]);
+});
+
+test("reading through columns: words, minutes, images, files, emptiness, headings and their anchors", () => {
+  const d = normalizeDoc(
+    doc(
+      heading(2, "Intro"),
+      para("one two three"),
+      cols(2, col(heading(2, "Left side"), para("four five"), img("file_a")), col(heading(3, "Intro"), para("six"), img("file_b"))),
+      heading(2, "End"),
+    ),
+  );
+  assert.deepEqual(readingBlocks(d).map((n) => n.type), ["heading", "paragraph", "heading", "paragraph", "image", "heading", "paragraph", "image", "heading"]);
+  assert.equal(wordCount(d), 11);
+  assert.equal(readingMinutes(d), 1);
+  assert.deepEqual(imagesOf(d).map((i) => i.fileKey), ["file_a", "file_b"]);
+  assert.deepEqual(fileKeysOf(d), ["file_a", "file_b"]);
+  assert.deepEqual(blockTexts(d), ["Intro", "one two three", "Left side", "four five", "Intro", "six", "End"]);
+  assert.deepEqual(
+    headingsOf(d).map((h) => `${h.level}:${h.anchor}`),
+    ["2:intro", "2:left-side", "3:intro-2", "2:end"],
+  );
+  const anchors = anchorsByNode(d);
+  const inColumn = d.content[2].content[1].content[0];
+  assert.equal(anchors.get(inColumn), "intro-2");
+  assert.equal(anchors.get(d.content[3]), "end");
+  assert.equal(anchors.size, 4);
+  assert.equal(isEmptyDoc(normalizeDoc(doc(cols(2, col({ type: "paragraph" }), col({ type: "paragraph" }))))), true);
+  assert.equal(isEmptyDoc(normalizeDoc(doc(cols(2, col({ type: "paragraph" }), col(img("file_c")))))), false);
+  assert.equal(isEmptyDoc(normalizeDoc(doc(cols(3, col({ type: "paragraph" }), col({ type: "paragraph" }), col(para("w")))))), false);
+});
+
+test("a stored body with columns and alignment reads back the same (normalising twice changes nothing)", () => {
+  const once = normalizeDoc(
+    doc(
+      { type: "paragraph", attrs: { align: "center" }, content: [{ type: "text", text: "c" }] },
+      cols(3, col(para("a")), col(img("file_x")), col({ type: "heading", attrs: { level: 2, align: "right" }, content: [{ type: "text", text: "r" }] })),
+    ),
+  );
+  assert.deepEqual(normalizeDoc(JSON.parse(JSON.stringify(once))), once);
 });

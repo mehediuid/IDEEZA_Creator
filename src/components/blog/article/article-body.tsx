@@ -6,7 +6,9 @@
 // on phones, line heights paired); the title is the only H1. No italic: Manrope
 // ships none, so the quote is a left rule. Prose links are underlined (the link
 // ink alone is under 3:1 against body text) and open in a new tab. `PROSE` holds
-// every element's classes, so the editor draws the same article it saves.
+// every element's classes, so the editor draws the same blog it saves. A line may
+// be centred, right-aligned or justified; 2 or 3 columns stand side by side once
+// the body is 600 px wide and stack, in reading order, below that.
 
 import * as React from "react";
 import Link from "next/link";
@@ -17,9 +19,9 @@ import { BlogImage } from "@/components/blog/cover-image";
 import { useCreateHistory } from "@/lib/create/history";
 import { buildsOf, coverOf } from "@/lib/manual/project-read";
 import { useManualProjects } from "@/lib/manual/projects";
-import { headingAnchors } from "@/lib/blog/article-view";
+import { alignOf, anchorsByNode } from "@/lib/blog/doc";
 import { useBlogFileUrl } from "@/lib/blog/files";
-import type { BlogDoc, BlogImageAttrs, BlogMark, BlogNode } from "@/lib/blog/types";
+import type { BlogAlign, BlogDoc, BlogImageAttrs, BlogMark, BlogNode } from "@/lib/blog/types";
 import { cn } from "@/lib/utils";
 
 /** One rule per element: margins (not gaps) set the rhythm, so a block keeps its space
@@ -46,7 +48,23 @@ export const PROSE = {
   row: "mt-12 mb-4 flex flex-col gap-6 first:mt-0 [@container(min-width:600px)]:flex-row [@container(min-width:600px)]:items-start",
   /** A picture in a row: its width in proportion to its shape (`--grow`), so all stand equally tall. */
   rowItem: "[@container(min-width:600px)]:[flex:var(--grow)_1_0%]",
+  columns: "mt-12 mb-4 grid grid-cols-1 gap-12 first:mt-0 [@container(min-width:600px)]:gap-8",
+  columns2: "[@container(min-width:600px)]:grid-cols-2",
+  columns3: "[@container(min-width:600px)]:grid-cols-3",
+  column: "flex min-w-0 flex-col",
 } as const;
+
+/** A line's alignment as a class; left is the default and needs none. */
+export const ALIGN_CLASS: Readonly<Record<Exclude<BlogAlign, "left">, string>> = {
+  center: "text-center",
+  right: "text-right",
+  justify: "text-justify",
+};
+
+const alignClass = (attrs: { align?: BlogAlign } | undefined) => {
+  const a = alignOf(attrs?.align);
+  return a ? ALIGN_CLASS[a] : undefined;
+};
 
 const NEW_TAB = "(opens in a new tab)";
 
@@ -91,7 +109,7 @@ function List({ node, depth }: { node: Extract<BlogNode, { type: "bulletList" | 
           <li key={i} className={PROSE.listItem}>
             {li.content.map((child, j) =>
               child.type === "paragraph" ? (
-                <p key={j}>
+                <p key={j} className={alignClass(child.attrs)}>
                   <Inline nodes={child.content} />
                 </p>
               ) : child.type === "bulletList" || child.type === "orderedList" ? (
@@ -198,19 +216,28 @@ export function ProjectTile({ projectId, className }: { projectId: string; class
   );
 }
 
-function Block({ node, anchor }: { node: BlogNode; anchor?: string }) {
+/** Each listed heading's anchor, by node (columns included). */
+type Anchors = ReadonlyMap<BlogNode, string>;
+
+function Block({ node, anchors }: { node: BlogNode; anchors: Anchors }) {
   switch (node.type) {
     case "paragraph":
       return hasText(node.content) ? (
-        <p className={PROSE.paragraph}>
+        <p className={cn(PROSE.paragraph, alignClass(node.attrs))}>
           <Inline nodes={node.content} />
         </p>
       ) : null;
     case "heading": {
       if (!hasText(node.content)) return null;
       const H = node.attrs.level === 2 ? "h2" : "h3";
+      const anchor = anchors.get(node);
       return (
-        <H id={anchor} tabIndex={anchor ? -1 : undefined} data-anchor={anchor ? "" : undefined} className={node.attrs.level === 2 ? PROSE.h2 : PROSE.h3}>
+        <H
+          id={anchor}
+          tabIndex={anchor ? -1 : undefined}
+          data-anchor={anchor ? "" : undefined}
+          className={cn(node.attrs.level === 2 ? PROSE.h2 : PROSE.h3, alignClass(node.attrs))}
+        >
           <Inline nodes={node.content} />
         </H>
       );
@@ -223,7 +250,7 @@ function Block({ node, anchor }: { node: BlogNode; anchor?: string }) {
         <blockquote className={PROSE.quote}>
           {node.content.map((p, i) =>
             p.type === "paragraph" ? (
-              <p key={i}>
+              <p key={i} className={alignClass(p.attrs)}>
                 <Inline nodes={p.content} />
               </p>
             ) : null,
@@ -254,6 +281,20 @@ function Block({ node, anchor }: { node: BlogNode; anchor?: string }) {
       return <Video fileKey={node.attrs.fileKey} caption={node.attrs.caption} />;
     case "projectCard":
       return <ProjectTile projectId={node.attrs.projectId} className={PROSE.space} />;
+    case "columns":
+      return (
+        <div className={cn(PROSE.columns, node.attrs.count === 3 ? PROSE.columns3 : PROSE.columns2)}>
+          {node.content.map((col, i) =>
+            col.type === "column" ? (
+              <div key={i} className={PROSE.column}>
+                {col.content.map((b, j) => (
+                  <Block key={j} node={b} anchors={anchors} />
+                ))}
+              </div>
+            ) : null,
+          )}
+        </div>
+      );
     default:
       return null;
   }
@@ -261,11 +302,11 @@ function Block({ node, anchor }: { node: BlogNode; anchor?: string }) {
 
 /** The body. `doc` is already normalised (store reads go through normalizeDoc). */
 export function ArticleBody({ doc, className }: { doc: BlogDoc; className?: string }) {
-  const anchors = React.useMemo(() => headingAnchors(doc), [doc]);
+  const anchors = React.useMemo(() => anchorsByNode(doc), [doc]);
   return (
     <div className={cn(PROSE.root, className)}>
       {doc.content.map((n, i) => (
-        <Block key={i} node={n} anchor={anchors.get(i)} />
+        <Block key={i} node={n} anchors={anchors} />
       ))}
     </div>
   );

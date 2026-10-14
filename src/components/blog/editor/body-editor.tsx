@@ -1,13 +1,15 @@
 "use client";
 
-// The article body (spec § Screens 2, owner decision D7): TipTap v3, loaded only on
+// The blog's body (spec § Screens 2, owner decision D7): TipTap v3, loaded only on
 // the editor routes (next/dynamic, no server render). It hands the page the body as
 // BlogDoc v1 — normalizeDoc on every change, so nothing the schema doesn't know is
 // ever stored — and takes pictures in four ways: "+" › Image, the phone's Add,
 // dropping files, and pasting image files. Pictures that come with pasted HTML
 // (Google Docs, a web page) live on another site and can't be copied: they are
-// left out and counted in a toast. Pasted text keeps only the marks an article
-// has (bold, code, links), so a page's colours never come along.
+// left out and counted in a toast. Pasted text keeps only the marks a blog has
+// (bold, code, links), so a page's colours never come along. Inside columns,
+// pictures land in the column; a video, a project card or images side by side
+// can't stand in a column, so their tools are greyed there.
 
 import * as React from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
@@ -18,14 +20,14 @@ import { deleteBlogFiles } from "@/lib/blog/files";
 import { storeImage, storeVideo, type StoredImage } from "@/lib/blog/image";
 import { IMAGE_TYPES, VIDEO_TYPES } from "@/lib/blog/media";
 import type { BlogDoc } from "@/lib/blog/types";
-import { asksFirst, BlockInserter, BlockSheet, runBlock, type BlockPick } from "./block-menu";
+import { asksFirst, BlockInserter, BlockSheet, runTool, useCaretAt, type ToolPick } from "./block-menu";
 import { ProjectPicker } from "./project-picker";
-import { rowPick } from "./editor-logic";
-import { editableDoc, pastedHeadings, pastedImageCount, pastedImagesNote, type BlockId } from "./editor-logic";
+import { editableDoc, pastedHeadings, pastedImageCount, pastedImagesNote, rowPick, type ToolId } from "./editor-logic";
 import { blogExtensions, keyBus } from "./extensions";
 import { FormatBubble } from "./format-bubble";
 import { prepareLink } from "./format";
 import { UploadsContext, type Upload, type UploadsApi } from "./image-view";
+import { dropPos, insertBlock } from "./layout";
 import { PhoneBar } from "./phone-bar";
 import { PROSE } from "./prose";
 
@@ -43,7 +45,7 @@ export type BodyEditorProps = {
   /** Phone or touch screen: the format bar and the Add sheet instead of the bubble and "+". */
   touch: boolean;
   apiRef: React.RefObject<BodyApi | null>;
-  /** The article's id, creating the article first when there is none yet (/blog/new). */
+  /** The blog's id, creating the blog first when there is none yet (/blog/new). */
   ensureArticle: () => string | null;
   onChange: (doc: BlogDoc) => void;
   onBlur: () => void;
@@ -78,28 +80,6 @@ function placeFile(editor: Editor, uploadId: string, file: StoredImage): boolean
     tr.setMeta("addToHistory", false);
     return true;
   });
-}
-
-/** Where dropped files go: in place of an empty line, else after the block under the pointer. */
-/** Puts a new block where the writer is without replacing anything: an empty line becomes
- *  the block; a selected picture, a row or text keeps its place and the block goes after it. */
-function insertBlock(editor: Editor, content: Parameters<Editor["commands"]["insertContent"]>[0]): void {
-  const { selection } = editor.state;
-  const $from = selection.$from;
-  const onEmptyLine = selection.empty && $from.depth === 1 && $from.parent.isTextblock && $from.parent.content.size === 0;
-  if (onEmptyLine) {
-    editor.chain().focus().insertContent(content).run();
-    return;
-  }
-  const at = $from.depth === 0 ? selection.to : $from.after(1);
-  editor.chain().focus().insertContentAt(at, content).run();
-}
-
-function dropPos(editor: Editor, pos: number): number {
-  const $p = editor.state.doc.resolve(pos);
-  if ($p.depth === 0) return pos;
-  if ($p.parent.isTextblock && $p.parent.content.size === 0 && $p.depth === 1) return pos;
-  return $p.after(1);
 }
 
 export default function BodyEditor(props: BodyEditorProps) {
@@ -158,8 +138,8 @@ export default function BodyEditor(props: BodyEditorProps) {
         return next;
       });
       const nodes = items.map((i) => ({ type: "image", attrs: { uploadId: i.uploadId } }));
-      if (typeof at === "number") ed.chain().focus().insertContentAt(dropPos(ed, at), nodes).run();
-      else insertBlock(ed, nodes);
+      if (typeof at === "number") ed.chain().focus().insertContentAt(dropPos(ed.state, at), nodes).run();
+      else insertBlock(ed, nodes, true);
       if (!articleId) return;
       for (const i of items) await upload(i.uploadId, i.file, articleId);
     },
@@ -182,7 +162,7 @@ export default function BodyEditor(props: BodyEditorProps) {
         for (const i of items) next[i.uploadId] = { name: i.file.name, error: articleId ? null : storageFull(i.file.name) };
         return next;
       });
-      insertBlock(ed, { type: "imageRow", content: items.map((i) => ({ type: "image", attrs: { uploadId: i.uploadId } })) });
+      insertBlock(ed, { type: "imageRow", content: items.map((i) => ({ type: "image", attrs: { uploadId: i.uploadId } })) }, false);
       if (!articleId) return;
       for (const i of items) await upload(i.uploadId, i.file, articleId);
     },
@@ -200,7 +180,7 @@ export default function BodyEditor(props: BodyEditorProps) {
     if (!res.ok) return toastRef.current(res.error);
     const now = editorRef.current;
     if (!now || now.isDestroyed) return;
-    insertBlock(now, { type: "video", attrs: { fileKey: res.value.fileKey, caption: "" } });
+    insertBlock(now, { type: "video", attrs: { fileKey: res.value.fileKey, caption: "" } }, false);
     toastRef.current(`${file.name} added.`);
   }, []);
 
@@ -228,7 +208,7 @@ export default function BodyEditor(props: BodyEditorProps) {
       onUpdate: ({ editor: ed }) => latest.current.onChange(normalizeDoc(ed.getJSON())),
       onBlur: () => latest.current.onBlur(),
       editorProps: {
-        attributes: { class: PROSE, role: "textbox", "aria-multiline": "true", "aria-label": "Article" },
+        attributes: { class: PROSE, role: "textbox", "aria-multiline": "true", "aria-label": "Blog" },
         transformPastedHTML: pastedHeadings,
         handlePaste: (_view, event) => {
           const data = event.clipboardData;
@@ -324,14 +304,14 @@ export default function BodyEditor(props: BodyEditorProps) {
     }
   }, [editor, props.describedBy]);
 
-  const pick = (what: BlockPick) => {
+  const pick = (what: ToolPick) => {
     if (what === "image") fileRef.current?.click();
     else if (what === "row") rowRef.current?.click();
     else if (what === "video") videoRef.current?.click();
     else setProjectOpen(true);
   };
-  const onBlock = (id: BlockId) => {
-    if (editor) runBlock(editor, id, pick);
+  const onTool = (id: ToolId) => {
+    if (editor) runTool(editor, id, pick);
   };
 
   return (
@@ -346,24 +326,25 @@ export default function BodyEditor(props: BodyEditorProps) {
         <EditorContent editor={editor} />
         {editor && props.editable && !props.touch && (
           <>
-            <BlockInserter editor={editor} onBlock={onBlock} openRef={openMenu} />
+            <BlockInserter editor={editor} onTool={onTool} openRef={openMenu} />
             <FormatBubble editor={editor} linkOpen={linkOpen} setLinkOpen={setLinkOpen} />
           </>
         )}
         {editor && props.editable && props.touch && (
           <>
             <PhoneBar editor={editor} linkOpen={linkOpen} setLinkOpen={setLinkOpen} onAdd={() => setSheetOpen(true)} />
-            <BlockSheet
+            <PhoneSheet
+              editor={editor}
               open={sheetOpen}
               onClose={() => {
                 setSheetOpen(false);
                 window.requestAnimationFrame(() => editor.commands.focus());
               }}
-              onBlock={(id) => {
+              onTool={(id) => {
                 // A file picker must open inside the tap itself, or the phone refuses it.
                 if (asksFirst(id)) pick(id);
                 setSheetOpen(false);
-                if (!asksFirst(id)) window.requestAnimationFrame(() => runBlock(editor, id, pick));
+                if (!asksFirst(id)) window.requestAnimationFrame(() => runTool(editor, id, pick));
               }}
             />
           </>
@@ -404,7 +385,7 @@ export default function BodyEditor(props: BodyEditorProps) {
             }}
             onPick={(projectId) => {
               setProjectOpen(false);
-              insertBlock(editor, { type: "projectCard", attrs: { projectId } });
+              insertBlock(editor, { type: "projectCard", attrs: { projectId } }, false);
             }}
           />
         )}
@@ -425,4 +406,10 @@ export default function BodyEditor(props: BodyEditorProps) {
       </div>
     </UploadsContext.Provider>
   );
+}
+
+/** The phone's Add sheet, told where the caret is (columns grey what they can't hold). */
+function PhoneSheet({ editor, ...props }: { editor: Editor; open: boolean; onClose: () => void; onTool: (id: ToolId) => void }) {
+  const at = useCaretAt(editor);
+  return <BlockSheet {...props} at={at} />;
 }
