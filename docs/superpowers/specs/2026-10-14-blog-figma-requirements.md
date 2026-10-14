@@ -9,6 +9,8 @@ named below.
 
 Status key: **was** = what the first build did · **now** = what this pass builds.
 
+**Built and checked in the browser, 2026-10-14** (feat/blog, 1440 and 390, light and dark): every row below. Where a row's "now" differs from the Figma's drawing, the reason is in that row or under "Differences, named" at the end.
+
 ## List (frames 01–09)
 | ID | Figma requirement | was | now |
 |---|---|---|---|
@@ -58,3 +60,16 @@ Status key: **was** = what the first build did · **now** = what this pass build
 | D2 | Details: Reject Reason panel above (collapsible, dated), Blog › Blog Details, Edit top right, rail with the status badge, Category, On this page, tags | status card | Figma order: reasons panel, breadcrumb + Edit, rail starts with the status |
 | D3 | Change Thumbnail modal (from ⋯): image, zoom, strip with scroller, Upload, Update (off until changed) | ✓ ("Change cover") | "Change thumbnail", "Update" |
 | D4 | Likes / comments / "Date posted" (hidden layers in 20) | not built | not built: hidden in the Figma itself |
+
+## Differences, named (requirement built; one detail changed for a hard rule)
+- **P5 reuse checkbox** starts unticked (the Figma pre-ticks it): consent is the writer's to give.
+- **P6 Medium lock**: built in the data and the modal; nothing sets it until IDEEZA has a Medium link.
+- **P2 thumbnail**: no description field (the Figma has none); a thumbnail picked from the blog keeps that image's description, an upload is drawn as decoration under the title.
+- **P7 Save and publish** stays off without a thumbnail (as the Figma draws it), but stays focusable and says "Add a thumbnail to publish your blog."
+- **L7, L8, P5, E6 tooltips** also open on keyboard focus and tap, not hover only.
+- **L9 Rejected** badge is error ink on an error outline (the DS error fill under 12 px text fails AA); **Featured** uses a star (the Figma's gem reads as "paid").
+- **E1 Publish** stays enabled before anything is written and says what is missing next to each field (the Figma greys it).
+- **D2 details** keeps a ⋯ beside Edit for the status's other actions (the same menu as the list), and a one-line sentence under the status badge.
+- **D4 likes / comments / "Date posted"** are not built: hidden layers in the Figma itself.
+- Labels are in DS sentence case ("Reuse access", "Date & time", "Create a new blog").
+

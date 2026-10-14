@@ -148,8 +148,8 @@ test("pasted headings land on Heading and Subheading", () => {
 });
 
 test("the What to change panel counts the changes and says how to fix each", () => {
-  assert.equal(changesHeading(1), "The IDEEZA team asked for 1 change");
-  assert.equal(changesHeading(2), "The IDEEZA team asked for 2 changes");
+  assert.equal(changesHeading(1), "Reject reason");
+  assert.equal(changesHeading(2), "Reject reasons (2)");
   const round = {
     at: 1,
     outcome: "changes",

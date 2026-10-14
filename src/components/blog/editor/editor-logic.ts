@@ -154,9 +154,9 @@ export function pastedHeadings(html: string): string {
 
 export type FixLine = { id: string; title: string; text: string };
 
-/** "The IDEEZA team asked for 2 changes". */
+/** The panel's title in the Figma's words: "Reject reason", "Reject reasons (2)". */
 export function changesHeading(n: number): string {
-  return `The IDEEZA team asked for ${n} change${n === 1 ? "" : "s"}`;
+  return n === 1 ? "Reject reason" : `Reject reasons (${n})`;
 }
 
 /** Each reason of the round: its name, then the round's own detail or the reason's fix. */

@@ -874,7 +874,7 @@ function FixPanel({ round, label }: { round: ReviewRound; label: string }) {
             )}
           </div>
           <p className="m-0 text-md leading-md text-text-secondary">
-            Reviewed {longDate(round.at)}. Fix these, then press <b className="font-semibold text-text-primary">{label}</b>.
+            Rejected {longDate(round.at)}. Fix these, then press <b className="font-semibold text-text-primary">{label}</b>.
           </p>
         </div>
         <Button
