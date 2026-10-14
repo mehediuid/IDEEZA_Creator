@@ -46,7 +46,7 @@ export function createArticle(data: BlogData, id: string, now: number, meta: Par
     live: null,
     submission: null,
     reviews: [],
-    reuse: { allowed: false, at: null },
+    reuse: { allowed: false, at: null, sharedOn: null },
     featured: false,
     takenDown: null,
   };
@@ -176,8 +176,9 @@ export function removeArticle(data: BlogData, id: string): BlogData {
   return data.articles.some((a) => a.id === id) ? { ...data, articles: data.articles.filter((a) => a.id !== id) } : data;
 }
 
+/** Turns reuse on or off. Refused (the same data back) once IDEEZA has shared the blog. */
 export function setReuse(data: BlogData, id: string, allowed: boolean, now: number): BlogData {
-  return patch(data, id, (a) => (a.reuse.allowed === allowed ? null : { ...a, reuse: { allowed, at: now } }));
+  return patch(data, id, (a) => (a.reuse.allowed === allowed || a.reuse.sharedOn ? null : { ...a, reuse: { allowed, at: now, sharedOn: null } }));
 }
 
 /** A new cover. One of the article's own (already reviewed) images on a live article applies

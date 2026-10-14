@@ -77,7 +77,10 @@ export type BlogArticle = {
   live: (ArticleMeta & { approvedAt: number }) | null;
   submission: Submission | null;
   reviews: ReviewRound[];
-  reuse: { allowed: boolean; at: number | null };
+  /** Reuse by IDEEZA (D3, Figma P5/P6). `sharedOn` is set by IDEEZA once it has used the blog
+   *  (e.g. on Medium); from then on the writer can't turn reuse off here. Nothing in this build
+   *  sets it: there is no Medium link yet. */
+  reuse: { allowed: boolean; at: number | null; sharedOn: { where: string; at: number } | null };
   /** Set by the IDEEZA team only; the demo never sets it. */
   featured: boolean;
   /** Set by the IDEEZA team only; the demo never sets it. */

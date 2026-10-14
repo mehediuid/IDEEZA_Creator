@@ -82,7 +82,7 @@ export function liveNote(a: BlogArticle, draftDiffers: boolean): "Update needs c
   return draftDiffers ? "Unsent changes" : null;
 }
 
-export type ArticleAction = "copy-link" | "change-cover" | "edit" | "take-offline" | "discard-changes" | "delete";
+export type ArticleAction = "view" | "quick-view" | "copy-link" | "change-cover" | "edit" | "take-offline" | "discard-changes" | "delete";
 
 /** What the row's ⋯ holds. The row itself opens the article, so "open" is never here. */
 export function actionsFor(s: ArticleStatus): ArticleAction[] {
@@ -139,4 +139,70 @@ export function whenLine(a: BlogArticle, now: number): string {
   }
   if (s === "live" && a.live) return `Live since ${shortDate(a.live.approvedAt)}`;
   return `Edited ${relative(a.updatedAt, now)}`;
+}
+
+// ─────────────────────────── the Figma's words ───────────────────────────
+// The Figma requirements (spec 2026-10-14-blog-figma-requirements.md, L3/L9): the list and
+// the badges speak the Figma's seven statuses. They are a reading of the same record —
+// Pending and Re-submitted are both "waiting for the IDEEZA team", told apart by whether it
+// was sent before; Featured is an approved blog the team picked.
+
+export type DisplayStatus = "featured" | "approved" | "draft" | "resubmitted" | "removed" | "pending" | "rejected";
+
+/** The Figma's Status filter, in its order (Featured added: the list shows it). */
+export const DISPLAY_STATUSES: readonly DisplayStatus[] = ["approved", "featured", "pending", "resubmitted", "rejected", "draft", "removed"];
+
+export const DISPLAY_LABEL: Readonly<Record<DisplayStatus, string>> = {
+  featured: "Featured",
+  approved: "Approved",
+  draft: "Draft",
+  resubmitted: "Re-submitted",
+  removed: "Removed",
+  pending: "Pending",
+  rejected: "Rejected",
+};
+
+/** One sentence for each, shown with the badge where there is room (tooltip, details). */
+export const DISPLAY_SENTENCE: Readonly<Record<DisplayStatus, string>> = {
+  featured: "Live on the IDEEZA Blog, and picked by the IDEEZA team.",
+  approved: "Approved and live on the IDEEZA Blog.",
+  draft: "Only you can see this.",
+  resubmitted: "Sent again. The IDEEZA team is reviewing it.",
+  removed: "The IDEEZA team removed this from the Blog. Only you can see it.",
+  pending: "Waiting for the IDEEZA team to review it.",
+  rejected: "The IDEEZA team asked for changes. See the reasons, then send it again.",
+};
+
+export function displayStatusOf(a: BlogArticle): DisplayStatus {
+  if (a.takenDown) return "removed";
+  if (a.live) return a.submission ? "resubmitted" : a.featured ? "featured" : "approved";
+  if (a.submission) return a.submission.kind === "again" ? "resubmitted" : "pending";
+  return lastReview(a)?.outcome === "changes" ? "rejected" : "draft";
+}
+
+/** The ⋯ menu the Figma draws for each status (L10–L13), plus Copy link, Take offline and
+ *  Discard changes where they apply. */
+export function menuFor(a: BlogArticle): ArticleAction[] {
+  const d = displayStatusOf(a);
+  switch (d) {
+    case "featured":
+    case "approved":
+      return ["view", "edit", "change-cover", "copy-link", "take-offline", "delete"];
+    case "draft":
+      return ["edit", "delete"];
+    case "pending":
+    case "rejected":
+      return ["quick-view", "edit", "change-cover", "delete"];
+    case "resubmitted":
+      return a.live ? ["view", "quick-view", "edit", "change-cover", "discard-changes", "delete"] : ["quick-view", "edit", "change-cover", "delete"];
+    case "removed":
+      return ["view", "delete"];
+  }
+}
+
+/** "Mar 24, 2025 · 03:32 AM" — the Figma's Date & Time column. */
+export function dateTime(t: number): string {
+  const d = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(t);
+  const h = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }).format(t);
+  return `${d} · ${h}`;
 }

@@ -208,7 +208,7 @@ test("topics: trimmed, unique, at most 5; reuse can be turned on and off", () =>
   let data = patchDraft(fresh(), "art_abc123xyz9", { topics: [" PCB ", "pcb", "ESP32", "Power", "Thermal", "USB-C", "Sixth"] }, T0 + 1);
   assert.deepEqual(article(data, "art_abc123xyz9").draft.topics, ["PCB", "ESP32", "Power", "Thermal", "USB-C"]);
   data = setReuse(data, "art_abc123xyz9", true, T0 + 2);
-  assert.deepEqual(article(data, "art_abc123xyz9").reuse, { allowed: true, at: T0 + 2 });
+  assert.deepEqual(article(data, "art_abc123xyz9").reuse, { allowed: true, at: T0 + 2, sharedOn: null });
   data = setReuse(data, "art_abc123xyz9", false, T0 + 3);
   assert.equal(article(data, "art_abc123xyz9").reuse.allowed, false);
 });
@@ -361,4 +361,46 @@ test("the cover crop: drag, arrow keys, zoom and center agree and stay in bounds
   assert.deepEqual(centerCover({ ...c, x: 10, y: 90 }), c);
   assert.equal(sameCover(c, { ...c }), true);
   assert.equal(sameCover(c, null), false);
+});
+
+test("the Figma's seven statuses read the same record (requirements L9)", async () => {
+  const { displayStatusOf, menuFor, DISPLAY_LABEL } = await import("../../.tmp-test/lib/blog/status.js");
+  const id = "art_abc123xyz9";
+  let data = fresh();
+  const label = () => DISPLAY_LABEL[displayStatusOf(article(data, id))];
+  assert.equal(label(), "Draft");
+  data = submit(data, id, T0);
+  assert.equal(label(), "Pending");
+  data = decide(data, id, "changes", [{ id: "needs-detail", detail: "" }], T0 + 1, true);
+  assert.equal(label(), "Rejected");
+  data = submit(data, id, T0 + 2);
+  assert.equal(label(), "Re-submitted");
+  data = decide(data, id, "approved", [], T0 + 3, true);
+  assert.equal(label(), "Approved");
+  data = { ...data, articles: data.articles.map((a) => ({ ...a, featured: true })) };
+  assert.equal(label(), "Featured");
+  data = submit(patchDraft(data, id, { title: "v2" }, T0 + 4), id, T0 + 5);
+  assert.equal(label(), "Re-submitted", "an approved blog's changes waiting for review");
+  assert.deepEqual(menuFor(article(data, id)), ["view", "quick-view", "edit", "change-cover", "discard-changes", "delete"]);
+  const removed = { ...article(data, id), takenDown: { at: T0, reasons: [] } };
+  assert.equal(DISPLAY_LABEL[displayStatusOf(removed)], "Removed");
+  assert.deepEqual(menuFor(removed), ["view", "delete"]);
+});
+
+test("the ⋯ menus are the Figma's (L10–L13)", async () => {
+  const { menuFor } = await import("../../.tmp-test/lib/blog/status.js");
+  const id = "art_abc123xyz9";
+  assert.deepEqual(menuFor(article(fresh(), id)), ["edit", "delete"]);
+  assert.deepEqual(menuFor(article(submit(fresh(), id, T0), id)), ["quick-view", "edit", "change-cover", "delete"]);
+  const live = decide(submit(fresh(), id, T0), id, "approved", [], T0 + 1, true);
+  assert.deepEqual(menuFor(article(live, id)), ["view", "edit", "change-cover", "copy-link", "take-offline", "delete"]);
+});
+
+test("once IDEEZA has shared a blog, reuse can't be turned off here (P6)", () => {
+  const id = "art_abc123xyz9";
+  let data = setReuse(fresh(), id, true, T0);
+  data = { ...data, articles: data.articles.map((a) => ({ ...a, reuse: { ...a.reuse, sharedOn: { where: "Medium", at: T0 + 1 } } })) };
+  assert.equal(setReuse(data, id, false, T0 + 2), data);
+  const back = normalizeBlog({ v: 1, articles: [{ id: "x1", createdAt: T0, reuse: { allowed: false, sharedOn: { where: "Medium", at: T0 } } }] });
+  assert.deepEqual(back.articles[0].reuse, { allowed: true, at: null, sharedOn: { where: "Medium", at: T0 } }, "shared means it was allowed");
 });

@@ -69,6 +69,14 @@ function submission(v: unknown): Submission | null {
   return at !== null && decideAt !== null ? { at, decideAt, kind: kindOf(v.kind) } : null;
 }
 
+function reuseOf(v: unknown): BlogArticle["reuse"] {
+  if (!isObj(v)) return { allowed: false, at: null, sharedOn: null };
+  const shared = isObj(v.sharedOn) ? { where: str(v.sharedOn.where, 40), at: time(v.sharedOn.at) } : null;
+  const sharedOn = shared && shared.where && shared.at !== null ? { where: shared.where, at: shared.at } : null;
+  // Shared means it was allowed: a stored "not allowed" next to a share can't stand.
+  return { allowed: v.allowed === true || !!sharedOn, at: time(v.at), sharedOn };
+}
+
 function article(v: unknown): BlogArticle | null {
   if (!isObj(v) || typeof v.id !== "string" || !v.id) return null;
   const createdAt = time(v.createdAt) ?? Date.now();
@@ -86,7 +94,7 @@ function article(v: unknown): BlogArticle | null {
     live,
     submission: submission(v.submission),
     reviews: Array.isArray(v.reviews) ? v.reviews.map(round).filter((r): r is ReviewRound => r !== null) : [],
-    reuse: isObj(v.reuse) ? { allowed: v.reuse.allowed === true, at: time(v.reuse.at) } : { allowed: false, at: null },
+    reuse: reuseOf(v.reuse),
     featured: v.featured === true && live !== null,
     takenDown: takenAt !== null && isObj(v.takenDown) ? { at: takenAt, reasons: reasons(v.takenDown.reasons) } : null,
   };
