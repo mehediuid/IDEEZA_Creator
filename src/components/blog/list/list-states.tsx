@@ -1,29 +1,43 @@
 "use client";
 
-// What "Your articles" says when there are no rows to show (content report
-// § 2.4). A first visit teaches the three steps and offers New article; a
-// store that can't be read says so and that nothing is written over it. Both
-// replace the list, so they are the DS StateCard. An empty tab and a search
-// with no match sit inside the list's own surface, so they are the StateCard's
-// content without its card (never a card inside a card).
+// What "Your blogs" says when there are no rows to show, in the Figma's words
+// ("blog", "Create a new blog"). A first visit teaches the three steps and
+// offers Create a new blog; a store that can't be read says so and that nothing
+// is written over it. Both replace the list, so they are the DS StateCard. A
+// status that holds nothing and a search or filters with no match sit inside
+// the list's own surface, under the toolbar, so they are the StateCard's
+// content without its card (never a card inside a card), and they offer the way
+// back — never a second Create button (the toolbar has it).
 
 import * as React from "react";
 import NextLink from "next/link";
-import { AlertCircleIcon, Clock01Icon, PencilEdit02Icon, Search01Icon, Tick02Icon, ViewIcon } from "@hugeicons/core-free-icons";
+import {
+  AlertCircleIcon,
+  CancelCircleIcon,
+  Clock01Icon,
+  FilterIcon,
+  PencilEdit02Icon,
+  RefreshIcon,
+  Search01Icon,
+  StarIcon,
+  Tick02Icon,
+  ViewOffSlashIcon,
+} from "@hugeicons/core-free-icons";
 import { Icon, type IconValue } from "@/components/dashboard/icon";
 import { Badge, Button, StateCard, buttonVariants } from "@/components/ideeza";
 import { newArticleHref } from "@/lib/blog/slug";
-import type { StatusTab } from "@/lib/blog/status";
+import type { DisplayStatus } from "@/lib/blog/status";
 import { cn } from "@/lib/utils";
 
-const STEPS = ["You write", "IDEEZA team reads it", "It goes live"] as const;
+const STEPS = ["You write", "The IDEEZA team reviews it", "It's published"] as const;
+const TAP = "[@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 export function FirstVisitState() {
   return (
     <StateCard
       tone="empty"
       icon={<Icon icon={PencilEdit02Icon} size={32} />}
-      title="Write your first article"
+      title="Write your first blog"
       body="Share how you built something, what went wrong, or tips for other makers."
       action={
         <div className="flex flex-col items-center gap-10">
@@ -45,8 +59,8 @@ export function FirstVisitState() {
               </React.Fragment>
             ))}
           </ol>
-          <NextLink href={newArticleHref()} className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "[@media(pointer:coarse)]:min-h-[var(--touch-min)]")}>
-            New article
+          <NextLink href={newArticleHref()} className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), TAP)}>
+            Create a new blog
           </NextLink>
         </div>
       }
@@ -60,8 +74,8 @@ export function UnreadableState() {
     <StateCard
       tone="error"
       icon={<Icon icon={AlertCircleIcon} size={32} />}
-      title="Your articles can't be shown"
-      body="The articles saved in this browser couldn't be read. They've been left as they are, so nothing will be overwritten."
+      title="Your blogs can't be shown"
+      body="The blogs saved in this browser couldn't be read. They've been left as they are, so nothing will be overwritten."
       className="mx-auto"
     />
   );
@@ -83,68 +97,63 @@ function ListMessage({ icon, title, body, action }: { icon: IconValue; title: st
   );
 }
 
-const EMPTY_TAB: Record<Exclude<StatusTab, "all">, { icon: IconValue; title: string; body: string; write?: true }> = {
-  drafts: { icon: PencilEdit02Icon, title: "No drafts", body: "Articles you start and don't send yet show up here.", write: true },
-  review: { icon: Clock01Icon, title: "Nothing in review", body: "When you send an article, it waits here while the IDEEZA team reads it." },
-  needs: { icon: Tick02Icon, title: "Nothing to fix", body: "When the IDEEZA team asks for changes, the article shows up here." },
-  live: { icon: ViewIcon, title: "Nothing live yet", body: "Once the IDEEZA team approves an article, it goes live and shows up here." },
+const EMPTY_STATUS: Record<DisplayStatus, { icon: IconValue; title: string; body: string }> = {
+  featured: { icon: StarIcon, title: "No featured blogs", body: "When the IDEEZA team picks one of your approved blogs to feature, it shows up here." },
+  approved: { icon: Tick02Icon, title: "No approved blogs", body: "Once the IDEEZA team approves a blog, it's published on the IDEEZA Blog and shows up here." },
+  draft: { icon: PencilEdit02Icon, title: "No drafts", body: "Blogs you start and don't publish yet show up here." },
+  resubmitted: { icon: RefreshIcon, title: "No re-submitted blogs", body: "A blog you publish again after changes waits here while the IDEEZA team reviews it." },
+  removed: { icon: ViewOffSlashIcon, title: "No removed blogs", body: "If the IDEEZA team removes one of your blogs, it shows up here with the reasons." },
+  pending: { icon: Clock01Icon, title: "No pending blogs", body: "When you publish a blog, it waits here while the IDEEZA team reviews it." },
+  rejected: { icon: CancelCircleIcon, title: "No rejected blogs", body: "When the IDEEZA team asks for changes, the blog shows up here with the reasons." },
 };
 
-/** A status tab that holds nothing (the search plays no part). */
-export function EmptyTabState({ tab }: { tab: Exclude<StatusTab, "all"> }) {
-  const copy = EMPTY_TAB[tab];
+/** The Status filter alone narrows the list, and that status holds nothing. */
+export function EmptyStatusState({ status, onShowAll }: { status: DisplayStatus; onShowAll: () => void }) {
+  const copy = EMPTY_STATUS[status];
   return (
     <ListMessage
       icon={copy.icon}
       title={copy.title}
       body={copy.body}
       action={
-        copy.write ? (
-          <NextLink href={newArticleHref()} className={cn(buttonVariants({ hierarchy: "primary", size: "lg" }), "[@media(pointer:coarse)]:min-h-[var(--touch-min)]")}>
-            New article
-          </NextLink>
-        ) : undefined
+        <Button type="button" hierarchy="secondary" size="lg" onClick={onShowAll} className={TAP}>
+          Show all blogs
+        </Button>
       }
     />
   );
 }
 
-/** The search's words, said for the tab it looked in. */
-const NO_MATCH: Record<StatusTab, (q: string) => string> = {
-  all: (q) => `No articles called “${q}”`,
-  drafts: (q) => `No drafts called “${q}”`,
-  review: (q) => `Nothing in review called “${q}”`,
-  needs: (q) => `No articles needing changes called “${q}”`,
-  live: (q) => `No live articles called “${q}”`,
-};
-
-/** The search found no title with those words in this tab. From a status tab it
- *  can look again over every article. */
+/** The search, the filters or both found nothing. Each way out takes away what narrowed it. */
 export function NoMatchState({
-  tab,
   query,
-  onClear,
-  onSearchAll,
+  filtered,
+  onClearSearch,
+  onClearFilters,
 }: {
-  tab: StatusTab;
   query: string;
-  onClear: () => void;
-  onSearchAll: () => void;
+  filtered: boolean;
+  onClearSearch: () => void;
+  onClearFilters: () => void;
 }) {
-  const narrowed = tab !== "all";
+  const q = query.trim();
+  const title = !filtered ? `No blogs called “${q}”` : q ? `No blogs called “${q}” with these filters` : "No blogs match these filters";
+  const body = filtered ? "Try another status, reuse access or date range." : "Check the spelling or try another word.";
   return (
     <ListMessage
-      icon={Search01Icon}
-      title={NO_MATCH[tab](query.trim())}
-      body={narrowed ? "Check the spelling, or search all your articles." : "Check the spelling or try another word."}
+      icon={filtered ? FilterIcon : Search01Icon}
+      title={title}
+      body={body}
       action={
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <Button type="button" hierarchy="secondary" size="lg" onClick={onClear} className="[@media(pointer:coarse)]:min-h-[var(--touch-min)]">
-            Clear search
-          </Button>
-          {narrowed && (
-            <Button type="button" hierarchy="ghost" size="lg" onClick={onSearchAll} className="[@media(pointer:coarse)]:min-h-[var(--touch-min)]">
-              Search all articles
+          {q && (
+            <Button type="button" hierarchy="secondary" size="lg" onClick={onClearSearch} className={TAP}>
+              Clear search
+            </Button>
+          )}
+          {filtered && (
+            <Button type="button" hierarchy={q ? "ghost" : "secondary"} size="lg" onClick={onClearFilters} className={TAP}>
+              Clear filters
             </Button>
           )}
         </div>
