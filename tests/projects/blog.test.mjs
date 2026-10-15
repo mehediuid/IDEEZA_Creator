@@ -167,7 +167,7 @@ test("approval publishes; editing a live article sends changes while the live ve
   a = article(data, a.id);
   assert.equal(statusOf(a), "live", "a sent-back update leaves the article live");
   assert.equal(liveNote(a, true), "Update rejected · 1 thing to fix", "the latest round's count, readers keep the published version");
-  assert.equal(thingsToFix(a), "1 thing to fix", "a rejected update needs the writer too");
+  assert.equal(thingsToFix(a), null, "a rejected update says it in its live note, with the same count");
   assert.equal(a.live.title, "Smart lamp board");
   data = discardChanges(data, a.id, T0 + 150_000);
   assert.equal(article(data, a.id).draft.title, "Smart lamp board", "discarding goes back to the live meta");

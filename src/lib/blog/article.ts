@@ -6,7 +6,7 @@
 import { demoReview } from "./demo-review";
 import { isEmptyDoc } from "./doc";
 import { thingsLine, uniqueReasons } from "./reasons";
-import { lastReview, statusOf, updateRejected } from "./status";
+import { lastReview, statusOf } from "./status";
 import {
   EMPTY_META,
   REVIEW_DELAY_MS,
@@ -219,10 +219,11 @@ export function unseenOutcomes(data: BlogData): Outcome[] {
   return out.sort((x, y) => y.at - x.at);
 }
 
-/** "2 things to fix", for the list row of a blog that needs the writer: rejected, or a live
- *  blog whose update was rejected. The latest round only, repeats dropped. */
+/** "2 things to fix", for the list row of a rejected blog: the latest round only, repeats
+ *  dropped. A live blog whose update was rejected says it in its live note instead
+ *  ("Update rejected · 2 things to fix", status.ts `liveNoteOf`), with the same count. */
 export function thingsToFix(a: BlogArticle): string | null {
-  if (statusOf(a) !== "needs" && !updateRejected(a)) return null;
+  if (statusOf(a) !== "needs") return null;
   const n = uniqueReasons(lastReview(a)?.reasons ?? []).length;
   return n ? thingsLine(n) : null;
 }
