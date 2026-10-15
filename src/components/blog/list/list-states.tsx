@@ -6,10 +6,11 @@
 // the StateCard's content without its card (never a card inside a card), and
 // none repeats the toolbar's Create a new blog. A first visit teaches the three
 // steps, what the IDEEZA team looks for (the review's own reasons, so the rules
-// are known before a rejection) and where the blogs are kept. A status that
-// holds nothing and a search or filters with no match offer the way back. A
-// store that can't be read replaces the list: the DS StateCard says so and
-// that nothing is written over it.
+// are known before a rejection, on the list's own edges rather than a narrower
+// box centred in it) and where the blogs are kept. A status that holds nothing
+// and a search or filters with no match offer the way back. A store that can't
+// be read replaces the list: the DS StateCard says so and that nothing is
+// written over it, on the frame's left edge where the list starts.
 
 import * as React from "react";
 import {
@@ -75,7 +76,7 @@ export function FirstVisitState() {
           </React.Fragment>
         ))}
       </ol>
-      <section aria-labelledby={headId} className="flex w-full max-w-[720px] flex-col gap-6 rounded-xl bg-bg-subtle p-8 text-left">
+      <section aria-labelledby={headId} className="flex w-full flex-col gap-6 rounded-xl bg-bg-subtle p-8 text-left">
         <h3 id={headId} className="m-0 text-md font-semibold leading-md text-text-primary">
           What the IDEEZA team looks for
         </h3>
@@ -102,7 +103,6 @@ export function UnreadableState() {
       icon={<Icon icon={AlertCircleIcon} size={32} />}
       title="Your blogs can't be shown"
       body="The blogs saved in this browser couldn't be read. They've been left as they are, so nothing will be overwritten. New blogs can't be saved here until this is fixed."
-      className="mx-auto"
     />
   );
 }

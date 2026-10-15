@@ -114,7 +114,7 @@ export function Timeline({
       }}
       className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none"
     >
-      <div ref={contentRef} className="mx-auto flex w-full max-w-[880px] flex-col gap-6 px-6 py-8 md:px-8">
+      <div ref={contentRef} className="flex w-full flex-col gap-6 px-8 py-8">
         <p className="mx-auto flex max-w-[52ch] items-start gap-2 text-center text-md leading-md text-text-secondary">
           <Icon icon={Shield01Icon} size={16} className="mt-[2px] shrink-0" />
           <span>IDEEZA never asks you to pay or share your wallet phrase in Messages.</span>

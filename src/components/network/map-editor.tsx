@@ -59,6 +59,7 @@ export function MapEditor({
   renderNode,
   renderIdle,
   canvasHeight,
+  columns = "grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]",
   fitKey,
   keysActive = true,
 }: {
@@ -76,6 +77,10 @@ export function MapEditor({
   renderNode?: (id: string) => React.ReactNode;
   renderIdle?: () => React.ReactNode;
   canvasHeight: string;
+  /** The canvas-and-panel grid. The Connection Map page passes the page
+   *  frame's rail (WITH_RAIL), which reads its page container; the wizard's
+   *  dialog has none, so it keeps its own. */
+  columns?: string;
   /** A new map landed: re-fit the view and start a fresh history. */
   fitKey?: string | number;
   /** False while another dialog sits on top and owns the keyboard. */
@@ -312,7 +317,7 @@ export function MapEditor({
         </div>
       </div>
 
-      <div className="grid min-h-0 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className={cn("min-h-0", columns)}>
         <div className="flex min-w-0 flex-col gap-3">
           <div style={{ height: canvasHeight }}>
             <MapCanvas
@@ -340,7 +345,7 @@ export function MapEditor({
         </div>
         <aside
           aria-label="Selection"
-          className="min-h-0 overflow-y-auto rounded-xl border border-solid border-border bg-bg-surface p-8"
+          className="min-h-0 self-stretch overflow-y-auto rounded-xl border border-solid border-border bg-bg-surface p-8"
           style={{ maxHeight: canvasHeight }}
         >
           {panel}

@@ -19,9 +19,9 @@ import { FEED_HREF, TAP } from "./post-bits";
 export const POST_PAGE = PAGE_CONTAINER;
 export const POST_CONTENT = cn(PAGE_CONTENT, "flex flex-col gap-10 max-md:pb-[104px]");
 
-/** One column; from a 1024 px page container the story and a 320 px rail beside it. */
+/** One column; from a 1024 px page container the story and the rail beside it. */
 export const POST_COLUMNS =
-  "flex flex-col gap-12 [@container(min-width:1024px)]:grid [@container(min-width:1024px)]:grid-cols-[minmax(0,1fr)_320px] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:gap-x-16";
+  "flex flex-col gap-12 [@container(min-width:1024px)]:grid [@container(min-width:1024px)]:grid-cols-[minmax(0,1fr)_var(--layout-rail)] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:gap-x-[var(--layout-gutter)]";
 
 /** Shown beside the story only (the rail), or only in the one-column flow. */
 export const WIDE_ONLY = "hidden [@container(min-width:1024px)]:flex";

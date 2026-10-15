@@ -1,11 +1,14 @@
 "use client";
 
-// The blog as readers see it, in the Figma's card (frames 20–22): a top row
-// (the breadcrumb and the page's own buttons) over a rule; the title (the
-// page's only H1), the writer (their profile name and photo, a link to their
-// profile) on the left and "● n minutes to read · 24 Mar 2025" on the right,
-// the 3:2 thumbnail and the body; beside it from a 1024 px page container a
-// sticky rail in an article-dominant 9/3 split — the details page's status
+// The blog as readers see it (Figma frames 20–22), on the page frame in the
+// Blog's reading geometry (reading-frame.ts — the editor's own, so Preview
+// doesn't move the words): a top row (the breadcrumb and the page's own
+// buttons) over a rule; the title (the page's only H1, Heading/H2 28/36 as
+// published content), the writer (their profile name and photo, a link to their
+// profile) on the left and "● n minutes to read · 24 Mar 2025" on the right, the
+// page's notice under them (a notice never sits above the title), the 3:2
+// thumbnail and the body, in the narrow column on the frame's left edge; beside
+// it from a 1024 px page container a sticky rail — the details page's status
 // first, then Category, On this page, the tags and the tag link — each block
 // under a rule. In one column the rail follows the blog, "On this page" folds
 // under the thumbnail, and a copy of the status badge sits in the byline row so
@@ -32,17 +35,16 @@ import { cn } from "@/lib/utils";
 import { ArticleBody, ArticleBodySkeleton, ProjectTile } from "./article-body";
 import { ContentsDisclosure, ContentsList, scrollToHeading, useScrollSpy } from "./on-this-page";
 import { useListHref } from "@/components/blog/list/use-list-href";
+import { READING_FRAME, READING_GRID } from "@/components/blog/reading-frame";
+import { PAGE_CONTAINER, PAGE_FRAME } from "@/components/ideeza/page";
 
 /** The page container the layout's container queries measure (the width of <main>). Positioned,
  *  so a visually hidden label inside stays inside <main>'s scroll instead of stretching the page. */
-export const ARTICLE_PAGE = "relative [container-type:inline-size]";
-/** The content box: 1040 px at most, 16 px gutters, 32 px from a 640 px page. */
-export const ARTICLE_CONTENT = "mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-8 pb-24 pt-10 [@container(min-width:640px)]:px-16";
-/** The Figma's white card the blog sits in, on the grey page. */
-const CARD = "flex min-w-0 flex-col rounded-2xl border border-solid border-border-subtle bg-bg-surface px-8 py-8 [@container(min-width:640px)]:px-12 [@container(min-width:640px)]:py-10";
-/** One column; from 1024 px the article and the rail beside it, article-dominant (9/3, F80). */
-const COLUMNS =
-  "flex flex-col gap-16 [@container(min-width:1024px)]:grid [@container(min-width:1024px)]:grid-cols-[minmax(0,9fr)_minmax(0,3fr)] [@container(min-width:1024px)]:items-start [@container(min-width:1024px)]:gap-x-16";
+export const ARTICLE_PAGE = cn(PAGE_CONTAINER, "relative");
+/** The app's page frame: the layout inset on every side, filling the width. */
+export const ARTICLE_CONTENT = cn(PAGE_FRAME, "flex flex-col gap-10");
+/** The top row: the breadcrumb and the page's buttons, over a rule. */
+const TOP_ROW = "flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 border-0 border-b border-solid border-border-subtle pb-8";
 const WIDE_ONLY = "hidden [@container(min-width:1024px)]:flex";
 const NARROW_ONLY = "[@container(min-width:1024px)]:hidden";
 
@@ -89,11 +91,12 @@ function Byline() {
   );
 }
 
-/** The blog and its rail, in the card. `article` holds the record (dates); `meta` and `doc`
- *  are the version on show. `header` is the card's top row; `status` opens the rail (the
- *  details page's status, not the preview's) and `bylineStatus` is its badge again in the
- *  byline row, shown only in one column; `dated` adds the date after the read time;
- *  `coverSlot` draws the thumbnail's place when there is none yet (the preview). */
+/** The blog and its rail. `article` holds the record (dates); `meta` and `doc` are the
+ *  version on show. `header` is the top row; `notice` sits under the title and byline (the
+ *  review's reasons, a removal); `status` opens the rail (the details page's status, not the
+ *  preview's) and `bylineStatus` is its badge again in the byline row, shown only in one
+ *  column; `dated` adds the date after the read time; `coverSlot` draws the thumbnail's place
+ *  when there is none yet (the preview). */
 export function ArticleReader({
   article,
   meta,
@@ -101,6 +104,7 @@ export function ArticleReader({
   bodyReady,
   body,
   header,
+  notice,
   status,
   bylineStatus,
   dated = true,
@@ -113,6 +117,7 @@ export function ArticleReader({
   bodyReady: boolean;
   body: BodyKind;
   header: React.ReactNode;
+  notice?: React.ReactNode;
   status?: React.ReactNode;
   bylineStatus?: React.ReactNode;
   dated?: boolean;
@@ -148,11 +153,9 @@ export function ArticleReader({
   }, [bodyReady, anchors]);
 
   return (
-    <div className={CARD}>
-      <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4 border-0 border-b border-solid border-border-subtle pb-8">
-        {header}
-      </div>
-      <div className={cn(COLUMNS, "pt-12")}>
+    <div className={READING_FRAME}>
+      <div className={TOP_ROW}>{header}</div>
+      <div className={cn(READING_GRID, "pt-12")}>
         <article aria-labelledby={titleId} className="flex w-full min-w-0 flex-col gap-12">
           <header className="flex flex-col gap-8">
             <h1 id={titleId} className="text-4xl font-semibold leading-4xl tracking-tight text-text-primary [overflow-wrap:anywhere] max-md:leading-3xl">
@@ -172,6 +175,7 @@ export function ArticleReader({
               )}
             </div>
           </header>
+          {notice}
           {meta.cover ? (
             <CoverImage cover={meta.cover} className="rounded-2xl border border-solid border-border-subtle" />
           ) : (
@@ -247,11 +251,11 @@ export function ArticleSkeleton() {
         <span className="sr-only" role="status">
           Loading the blog
         </span>
-        <div className={CARD}>
-          <div className="border-0 border-b border-solid border-border-subtle pb-8">
+        <div className={READING_FRAME}>
+          <div className={TOP_ROW}>
             <Skeleton shape="text" size="md" className="w-[220px]" />
           </div>
-          <div className={cn(COLUMNS, "pt-12")}>
+          <div className={cn(READING_GRID, "pt-12")}>
             <div className="flex min-w-0 flex-col gap-12">
               <div className="flex flex-col gap-8">
                 <Skeleton shape="text" size="lg" className="h-[28px] w-[80%]" />
@@ -283,7 +287,7 @@ export function ArticleMissing({ browserHasBlogs = true }: { browserHasBlogs?: b
   }, []);
   return (
     <div className={ARTICLE_PAGE}>
-      <div className={cn(ARTICLE_CONTENT, "items-center")}>
+      <div className={ARTICLE_CONTENT}>
         <StateCard
           tone="empty"
           icon={<Icon icon={News01Icon} size={32} />}

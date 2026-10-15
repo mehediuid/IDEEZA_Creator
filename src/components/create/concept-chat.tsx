@@ -176,9 +176,9 @@ function sheetNameOf(
 }
 
 /** What the page needs beside the rail, and beside a docked sheet, read off
- *  the classes that lay it out: the rail's `md:w-[360px]`, the canvas's
- *  `md:px-[32px]` on both sides, and one column of cards — the grid's
- *  `minmax(320px,1fr)` (chat-thread.tsx). */
+ *  the classes that lay it out: the rail's `--layout-rail` (360), the canvas's
+ *  `--layout-page-inset` (32 from `md`) on both sides, and one column of
+ *  cards — the grid's `minmax(320px,1fr)` (chat-thread.tsx). */
 const RAIL_WIDTH = 360;
 const CANVAS_PADDING_X = 32 * 2;
 const CARD_MIN_WIDTH = 320;
@@ -1803,7 +1803,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
         aria-label="Project"
         className={[
           "min-h-0 flex-1 flex-col border-solid border-border bg-bg-surface",
-          tabs ? "" : "md:w-[360px] md:flex-none md:shrink-0 md:border-r",
+          tabs ? "" : "md:w-[var(--layout-rail)] md:flex-none md:shrink-0 md:border-r",
           pane === "chat" ? "flex" : tabs ? "hidden" : "hidden md:flex",
         ].join(" ")}
       >
@@ -1930,14 +1930,16 @@ export function ConceptChat({ chatId }: { chatId: string }) {
           was a prose measure on a surface that carries no prose, so a wide
           screen spent everything past it on empty page while the product tabs,
           the deliverable tabs and the concept grid — all of which grow into
-          width — sat squeezed against the rail. */}
-      <main
+          width — sat squeezed against the rail. A section, not a second
+          <main>: the shell's is the page's one. Its inset is the page frame's. */}
+      <section
+        aria-label="Canvas"
         className={[
           "min-h-0 flex-1 overflow-y-auto bg-bg-page",
           pane === "work" ? "block" : tabs ? "hidden" : "hidden md:block",
         ].join(" ")}
       >
-        <div className="w-full px-[16px] py-[20px] md:px-[32px] md:py-[32px]">
+        <div className="w-full p-[var(--layout-page-inset)]">
           <ChatThread
             chat={chat}
             regeneratingFrom={regeneratingFrom}
@@ -1965,7 +1967,7 @@ export function ConceptChat({ chatId }: { chatId: string }) {
             onRereadConcept={readConcept}
           />
         </div>
-      </main>
+      </section>
 
       {/* The selected product's spec: a column beside the canvas where the
           page keeps a column of cards beside it (useRoomToDock), which
@@ -2043,7 +2045,7 @@ function LoadingShell({
         </div>
       </div>
       <div
-        className={`w-[360px] shrink-0 flex-col border-r border-solid border-border bg-bg-surface motion-safe:animate-pulse ${rail}`}
+        className={`w-[var(--layout-rail)] shrink-0 flex-col border-r border-solid border-border bg-bg-surface motion-safe:animate-pulse ${rail}`}
       >
         <div className="flex flex-col gap-[8px] border-b border-solid border-border px-[18px] pb-[14px] pt-[16px]">
           <div className="h-[14px] w-[140px] rounded bg-bg-subtle" />
@@ -2068,7 +2070,7 @@ function LoadingShell({
           <div className="h-[96px] w-full rounded-2xl bg-bg-subtle" />
         </div>
       </div>
-      <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] content-start gap-[20px] bg-bg-page px-[16px] py-[20px] motion-safe:animate-pulse md:px-[32px] md:py-[32px]">
+      <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(280px,1fr))] content-start gap-[20px] bg-bg-page p-[var(--layout-page-inset)] motion-safe:animate-pulse">
         <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />
         <div className="aspect-[64/53] w-full max-w-[640px] rounded-2xl bg-bg-subtle" />
       </div>

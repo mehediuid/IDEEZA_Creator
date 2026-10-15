@@ -177,6 +177,17 @@
   --touch-comfortable: 48px;
   --touch-large: 56px;
 
+  /* ── Layout (Figma "📐 Layout", F07 — Page Layout) ─────────── */
+  /* The page frame is main less the inset on every side and fills the width:
+     no max-width, nothing centred, so every page title starts at one edge. */
+  --layout-page-inset: var(--spacing-16);
+  --layout-gutter: var(--spacing-12);
+  --layout-content-narrow: 720px;
+  --layout-rail: 360px;
+  --layout-card-min: 280px;
+  --layout-sidebar: 280px;
+  --layout-sidebar-collapsed: 64px;
+
   /* ── Radius (Desktop) ───────────────────────────────────────── */
   --radius-none: 0;
   --radius-xs: 2px;
@@ -252,6 +263,11 @@
     --spacing-40: 64px;
     --spacing-48: 80px;
 
+    /* Layout (mobile): spacing/8 for both, not the 24 / 20 spacing/16 and
+       spacing/12 step down to here. */
+    --layout-page-inset: var(--spacing-8);
+    --layout-gutter: var(--spacing-8);
+
     /* Radius (mobile) */
     --radius-xs: 4px;
     --radius-sm: 6px;
@@ -270,6 +286,14 @@
     --font-size-6xl: 36px;
     --font-size-7xl: 44px;
     --font-size-8xl: 52px;
+    /* Their paired line heights (Figma line/height/* Mobile mode, on the same
+       one-step offset as above): a size that steps down keeps its rhythm, so a
+       20 px page title on a phone sits on 28, not the desktop 32. */
+    --line-height-xl: 24px;
+    --line-height-2xl: 26px;
+    --line-height-3xl: 28px;
+    --line-height-4xl: 32px;
+    --line-height-5xl: 36px;
     --letter-spacing-slight: -0.2px;
   }
 }

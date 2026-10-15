@@ -5,7 +5,7 @@
 //
 // Layout (matches the design):
 //
-//   [ Header — title + close X ]
+//   [ PageHeader — title + description ]
 //   [ Tab strip ]              ← Model Generations | Project/Product Generations
 //   [ QuotaCard ]              ← plan + Prompt left + countdown + Upgrade Now
 //   [ HistoryTable ]           ← Serial · Prompt · Thumb · Date · Status · Action
@@ -23,8 +23,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { Icon } from "@/components/dashboard/icon";
+import { Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import {
   rollupBuild,
   useCreateHistory,
@@ -120,123 +120,103 @@ export function HistoryTabbedPage() {
   const start = (page - 1) * HISTORY_PAGE_SIZE;
   const rows = buildRows.slice(start, start + HISTORY_PAGE_SIZE);
 
+  // One page frame (spec 2026-10-16-page-frame-design): the title, the tab
+  // strip and the body share the frame's edge, and main scrolls the page.
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center gap-[16px] border-b border-border bg-bg-page px-[24px] py-[12px]">
-        <div className="min-w-0 flex-1">
-          <p className="text-2xs font-bold uppercase tracking-wider text-text-tertiary">
-            History
-          </p>
-          <h1 className="truncate text-md font-semibold text-text-primary">
-            Past concepts &amp; project builds
-          </h1>
-        </div>
-        <Link
-          href="/"
-          aria-label="Close history and return home"
-          className="inline-flex h-[36px] w-[36px] items-center justify-center rounded-lg text-text-tertiary outline-none transition-colors duration-fast hover:bg-bg-surface-raised hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus"
-        >
-          <Icon icon={Cancel01Icon} />
-        </Link>
-      </header>
+    <Page className="flex flex-col">
+      <PageHeader title="History" description="Past concepts & project builds" />
 
       {/* Tab strip */}
-      <div className="border-b border-border bg-bg-page px-[24px]">
-        <div className="mx-auto max-w-[1200px]">
-          <div
-            role="tablist"
-            aria-label="History sections"
-            className="flex items-center gap-[8px]"
-          >
-            {TABS.map((tab) => {
-              const isActive = active === tab.key;
-              const showDot =
-                tab.key === "builds" && attentionBuilds.length > 0;
-              const dotLabel = showDot
-                ? `, ${attentionBuilds.length} build${attentionBuilds.length === 1 ? "" : "s"} need${attentionBuilds.length === 1 ? "s" : ""} attention`
-                : "";
-              return (
-                <button
-                  key={tab.key}
-                  role="tab"
-                  type="button"
-                  aria-selected={isActive}
-                  aria-label={showDot ? `${tab.label}${dotLabel}` : undefined}
-                  onClick={() => setTab(tab.key)}
-                  className={[
-                    "relative inline-flex h-[44px] items-center gap-[8px] border-b-2 px-[8px] text-md outline-none transition-colors duration-fast",
-                    "focus-visible:ring-2 focus-visible:ring-border-focus",
-                    isActive
-                      ? "border-violet-600 font-semibold text-text-primary"
-                      : "border-transparent font-regular text-text-secondary hover:text-text-primary",
-                  ].join(" ")}
-                >
-                  {tab.label}
-                  {showDot && (
-                    <span
-                      aria-hidden
-                      className="inline-flex h-[8px] w-[8px] rounded-full bg-bg-error"
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <div
+        role="tablist"
+        aria-label="History sections"
+        className="flex items-center gap-[8px] border-b border-border"
+      >
+        {TABS.map((tab) => {
+          const isActive = active === tab.key;
+          const showDot =
+            tab.key === "builds" && attentionBuilds.length > 0;
+          const dotLabel = showDot
+            ? `, ${attentionBuilds.length} build${attentionBuilds.length === 1 ? "" : "s"} need${attentionBuilds.length === 1 ? "s" : ""} attention`
+            : "";
+          return (
+            <button
+              key={tab.key}
+              role="tab"
+              type="button"
+              aria-selected={isActive}
+              aria-label={showDot ? `${tab.label}${dotLabel}` : undefined}
+              onClick={() => setTab(tab.key)}
+              className={[
+                "relative inline-flex h-[44px] items-center gap-[8px] border-b-2 px-[8px] text-md outline-none transition-colors duration-fast",
+                "focus-visible:ring-2 focus-visible:ring-border-focus",
+                isActive
+                  ? "border-violet-600 font-semibold text-text-primary"
+                  : "border-transparent font-regular text-text-secondary hover:text-text-primary",
+              ].join(" ")}
+            >
+              {tab.label}
+              {showDot && (
+                <span
+                  aria-hidden
+                  className="inline-flex h-[8px] w-[8px] rounded-full bg-bg-error"
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-[20px] px-[24px] py-[24px]">
-          <div className="flex flex-col gap-[16px]">
-            <QuotaCard />
-            <CreditsCard />
-          </div>
-
-          {!hydrated ? (
-            <p className="text-md text-text-tertiary">Loading…</p>
-          ) : active === "models" ? (
-            // Model Generations — original chat-list treatment.
-            chats.length === 0 ? (
-              <EmptyState active="models" />
-            ) : (
-              <ChatsList
-                chats={chats}
-                countBuilds={(id) => buildsForChat(id).length}
-              />
-            )
-          ) : // Project/Product Generations — table view from the design.
-          rows.length === 0 ? (
-            <EmptyState active="builds" />
-          ) : (
-            <>
-              <HistoryTable
-                rows={rows}
-                serialOffset={start}
-                expandedId={expandedId}
-                onToggleExpand={toggleRow}
-                renderDetail={(row) => (
-                  <HistoryRowDetail
-                    prompt={row.prompt}
-                    steps={generateSubSteps(row.id)}
-                  />
-                )}
-              />
-              <Pagination
-                page={page}
-                pageCount={pageCount}
-                onPage={setPage}
-              />
-            </>
-          )}
+      <div className="mt-12 flex flex-col gap-10">
+        <div className="flex flex-col gap-[16px]">
+          <QuotaCard />
+          <CreditsCard />
         </div>
+
+        {!hydrated ? (
+          <p className="text-md text-text-tertiary">Loading…</p>
+        ) : active === "models" ? (
+          // Model Generations — original chat-list treatment.
+          chats.length === 0 ? (
+            <EmptyState active="models" />
+          ) : (
+            <ChatsList
+              chats={chats}
+              countBuilds={(id) => buildsForChat(id).length}
+            />
+          )
+        ) : // Project/Product Generations — table view from the design.
+        rows.length === 0 ? (
+          <EmptyState active="builds" />
+        ) : (
+          <>
+            <HistoryTable
+              rows={rows}
+              serialOffset={start}
+              expandedId={expandedId}
+              onToggleExpand={toggleRow}
+              renderDetail={(row) => (
+                <HistoryRowDetail
+                  prompt={row.prompt}
+                  steps={generateSubSteps(row.id)}
+                />
+              )}
+            />
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              onPage={setPage}
+            />
+          </>
+        )}
       </div>
 
       {/* Hidden helpers used by the rows' onRetry callbacks. We render
           them as a render-prop so the closure has fresh access to
           retryBuildItem without re-render churn. */}
       <RetryWiring builds={builds} retryBuildItem={retryBuildItem} />
-    </div>
+    </Page>
   );
 }
 

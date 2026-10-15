@@ -1,19 +1,21 @@
 "use client";
 
 // Adding to the blog (Figma frame 13, E5–E6). On a mouse, the "+" beside an
-// empty line opens the Figma's toolbar in its place: ✕ close · Image · Video |
-// 1, 2, 3 columns | Align left, Align center, Align right, Justify | Bulleted
-// list, Numbered list | Code, then what a blog needs that the Figma lacks:
-// Heading, Subheading, Quote, Divider, Images side by side, IDEEZA project. On a
-// new blog the "+" stands at rest beside "Start your story here…" in the drawn
-// gutter (frame 10), before the caret is anywhere. "/" on an empty line opens the
-// toolbar too, and a letter typed then closes it and types "/" and the letter.
-// Every tool is a DS IconButton (md, 36) with its name and its keys — ⌘ on a Mac,
-// Ctrl elsewhere — in a tooltip on hover and on keyboard focus; tools that set
-// the kind of line (lists, headings, code, quote) show when they're on. The
-// toolbar is one Tab stop: ← → Home End move along it, Escape closes it. It opens
-// as a popover over the caret's own column. Inside columns the tools a column
-// can't hold are greyed, and say why.
+// empty line opens the Figma's toolbar in its place, the "+" become its ✕ close:
+// Image · Video | 1, 2, 3 columns | Align left, Align center, Align right,
+// Justify | Bulleted list, Numbered list | Code, then what a blog needs that the
+// Figma lacks: Heading, Subheading, Quote, Divider, Images side by side, IDEEZA
+// project. On a new blog the "+" stands at rest beside "Start your story here…"
+// (frame 10), before the caret is anywhere. It stands at the end of the line's
+// column: the writing starts on the page frame's left edge, the reader's own
+// (page-frame spec), so there is no gutter before the line to hang it in. "/" on
+// an empty line opens the toolbar too, and a letter typed then closes it and
+// types "/" and the letter. Every tool is a DS IconButton (md, 36) with its name
+// and its keys — ⌘ on a Mac, Ctrl elsewhere — in a tooltip on hover and on
+// keyboard focus; tools that set the kind of line (lists, headings, code, quote)
+// show when they're on. The toolbar is one Tab stop: ← → Home End move along it,
+// Escape closes it. It opens as a popover over the caret's own column. Inside
+// columns the tools a column can't hold are greyed, and say why.
 //
 // On a phone the format bar's labelled "Add" opens the same tools, named, in a
 // bottom sheet — a floating "+" fights the phone's own selection handles there.
@@ -173,9 +175,12 @@ function ToolButton({ tool, at, first, onPick }: { tool: Tool; at: CaretAt; firs
   );
 }
 
-type Spot = { top: number; left: number };
+/** The line's middle and its column's edges: the toolbar opens from the left one, the "+"
+ *  stands at the right one (level with the details' fields above the writing). */
+type Spot = { top: number; left: number; end: number };
 
-/** The "+" beside an empty line; it opens the toolbar in the line's place. "/" opens it too. */
+/** The "+" on an empty line, at its column's end; it opens the toolbar in the line's place. "/"
+ *  opens it too. */
 export function BlockInserter({
   editor,
   onTool,
@@ -192,7 +197,7 @@ export function BlockInserter({
   const at = useCaretAt(editor);
   const [spot, setSpot] = React.useState<Spot | null>(null);
   const [onLine, setOnLine] = React.useState(false);
-  // A blog with nothing in it shows the "+" at rest beside its first line (Figma frame 10).
+  // A blog with nothing in it shows the "+" at rest on its first line (Figma frame 10).
   const [empty, setEmpty] = React.useState(() => editor.isEmpty);
   const [within, setWithin] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -222,7 +227,8 @@ export function BlockInserter({
       // The column the line stands in (a column of 2 or 3, or the whole body).
       const dom = editor.view.domAtPos(pos).node;
       const el = (dom instanceof HTMLElement ? dom : dom.parentElement)?.closest("[data-column]") ?? editor.view.dom;
-      setSpot({ top: (caret.top + caret.bottom) / 2 - box.top, left: el.getBoundingClientRect().left - box.left });
+      const col = el.getBoundingClientRect();
+      setSpot({ top: (caret.top + caret.bottom) / 2 - box.top, left: col.left - box.left, end: col.right - box.left });
     };
     const later = () => window.setTimeout(update, 0);
     editor.on("selectionUpdate", update);
@@ -314,11 +320,35 @@ export function BlockInserter({
         }
       }}
     >
+      {/* The toolbar, then the ✕ at its end: the Tab order is the order on screen. */}
+      {open && (
+        <div
+          ref={barRef}
+          id={barId}
+          role="toolbar"
+          aria-label="Add to your blog"
+          onKeyDown={rovingKeys}
+          // Data, not a design value: the line's own place in the blog, and its column's width.
+          style={spot === null ? undefined : ({ top: spot.top, left: spot.left, "--line-column": `${spot.end - spot.left}px` } as React.CSSProperties)}
+          // A popover over the line, in the line's column, ending short of the ✕ at the column's
+          // end (the "+" it became); a narrow column wraps it downward.
+          className="absolute z-popover -mt-10 flex max-w-[calc(var(--line-column,100%)-var(--spacing-24))] flex-wrap items-center gap-1 rounded-lg border border-solid border-border bg-bg-surface p-1 shadow-3"
+        >
+          {BY_GROUP.map((tools, i) => (
+            <React.Fragment key={GROUP_ORDER[i]}>
+              {i > 0 && <span aria-hidden className="mx-2 h-10 w-px shrink-0 bg-border-subtle" />}
+              {tools.map((t, j) => (
+                <ToolButton key={t.id} tool={t} at={at} first={i === 0 && j === 0} onPick={pick} />
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
       <WithTip
         tip={open ? "Close" : "Add image, columns, list…"}
         // Data, not a design value: the line's own place in the blog.
-        style={spot === null ? undefined : { top: spot.top, left: spot.left }}
-        className={cn("absolute -ml-6 -translate-x-full -translate-y-1/2", shown ? "visible" : "invisible")}
+        style={spot === null ? undefined : { top: spot.top, left: spot.end }}
+        className={cn("absolute -translate-x-full -translate-y-1/2", shown ? "visible" : "invisible")}
       >
         <IconButton
           type="button"
@@ -338,28 +368,6 @@ export function BlockInserter({
           className="border-solid border-border-brand bg-bg-brand-subtle text-text-brand hover:bg-bg-brand-subtle"
         />
       </WithTip>
-      {open && (
-        <div
-          ref={barRef}
-          id={barId}
-          role="toolbar"
-          aria-label="Add to your blog"
-          onKeyDown={rovingKeys}
-          // Data, not a design value: the line's own place in the blog.
-          style={spot === null ? undefined : { top: spot.top, left: spot.left }}
-          // A popover over the line, in the line's column; a narrow page wraps it downward.
-          className="absolute z-popover -mt-10 flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-solid border-border bg-bg-surface p-1 shadow-3"
-        >
-          {BY_GROUP.map((tools, i) => (
-            <React.Fragment key={GROUP_ORDER[i]}>
-              {i > 0 && <span aria-hidden className="mx-2 h-10 w-px shrink-0 bg-border-subtle" />}
-              {tools.map((t, j) => (
-                <ToolButton key={t.id} tool={t} at={at} first={i === 0 && j === 0} onPick={pick} />
-              ))}
-            </React.Fragment>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

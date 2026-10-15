@@ -61,6 +61,9 @@ function BuildShellInner({ jobId }: { jobId: string }) {
 
   return (
     <div className="flex h-full flex-col md:flex-row">
+      {/* The page's one h1, ahead of both panes as on the chat: the rail and
+          the review card already say the name on screen. */}
+      <h1 className="sr-only">{job.projectChoiceName?.trim() || job.title}</h1>
       {/* Same two panes as the concept surface, for the same reason: the
           pipeline is a small fixed list that never changes, and the work it
           produces is what deserves the screen. The rail states the whole
@@ -68,7 +71,7 @@ function BuildShellInner({ jobId }: { jobId: string }) {
           not begun — and the canvas fills in beside it as each one lands. The
           page used to be the pipeline, full width, with nothing to look at
           until the last piece finished. */}
-      <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-b border-solid border-border bg-bg-surface md:w-[320px] md:border-b-0 md:border-r">
+      <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-b border-solid border-border bg-bg-surface md:w-[var(--layout-rail)] md:border-b-0 md:border-r">
         <div className="px-[12px] pt-[16px]">
           <BackLink />
         </div>
@@ -87,8 +90,10 @@ function BuildShellInner({ jobId }: { jobId: string }) {
         )}
       </aside>
 
-      <main className="min-h-0 flex-1 overflow-y-auto bg-bg-page">
-        <div className="mx-auto w-full max-w-[920px] px-[16px] py-[20px] md:px-[24px] md:py-[24px]">
+      {/* The canvas as the chat draws it: a section (the shell's <main> is the
+          page's one), the whole width beside the rail, the page frame's inset. */}
+      <section aria-label="Canvas" className="min-h-0 flex-1 overflow-y-auto bg-bg-page">
+        <div className="w-full p-[var(--layout-page-inset)]">
           <div className="flex flex-col gap-[16px]">
             <BuildConceptCard job={job} />
             <ReviewOutputs
@@ -98,7 +103,7 @@ function BuildShellInner({ jobId }: { jobId: string }) {
             />
           </div>
         </div>
-      </main>
+      </section>
     </div>
   );
 }
@@ -132,15 +137,15 @@ function LoadingShell() {
   return (
     <div role="status" aria-label="Loading the build" className="flex h-full">
       <span className="sr-only">Loading the build</span>
-      <div className="hidden w-[320px] shrink-0 flex-col gap-[12px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse md:flex">
+      <div className="hidden w-[var(--layout-rail)] shrink-0 flex-col gap-[12px] border-r border-solid border-border bg-bg-surface px-[18px] py-[20px] motion-safe:animate-pulse md:flex">
         <div className="h-[12px] w-[60px] rounded bg-bg-subtle" />
         <div className="h-[16px] w-[180px] rounded bg-bg-subtle" />
         {Array.from({ length: 5 }, (_, i) => (
           <div key={i} className="h-[14px] w-full rounded bg-bg-subtle" />
         ))}
       </div>
-      <div className="flex-1 bg-bg-page px-[24px] py-[24px] motion-safe:animate-pulse">
-        <div className="mx-auto h-[480px] w-full max-w-[920px] rounded-2xl bg-bg-subtle" />
+      <div className="flex-1 bg-bg-page p-[var(--layout-page-inset)] motion-safe:animate-pulse">
+        <div className="h-[480px] w-full rounded-2xl bg-bg-subtle" />
       </div>
     </div>
   );

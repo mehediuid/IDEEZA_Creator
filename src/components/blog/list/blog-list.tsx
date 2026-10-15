@@ -1,14 +1,15 @@
 "use client";
 
-// Your blogs — /blog (Figma frames 01–09, requirements L1–L15). The page's name
-// and what the Blog is for sit above the Figma's surface (an addition; nothing
-// in it moves). Then one surface, as the Figma draws it: the toolbar (search by
-// blog title or user name, the Reuse access and Status filters with their
-// counts, the Date range calendar, Clear filters once one narrows, Create a new
-// blog), the table in its own bordered box with the grey head band (Blog title ·
-// Category · Date & Time · Status · ⋯; cards below a 600 px content box) and
-// the pages. A first visit keeps that whole surface and teaches inside the
-// table. Every value comes from the Blog store (useBlog), through the pure list
+// Your blogs — /blog (Figma frames 01–09, requirements L1–L15). A collection
+// page on the app's page frame: the page header (O02 — the page's name and what
+// the Blog is for, an addition; nothing in the surface moves), then one surface
+// filling the frame, as the Figma draws it: the toolbar (search by blog title or
+// user name, the Reuse access and Status filters with their counts, the Date
+// range calendar, Clear filters once one narrows, Create a new blog), the table
+// under a rule with the grey head band (Blog title · Category · Date & Time ·
+// Status · ⋯; cards below a 600 px content box) running to the surface's edges
+// — no bordered box inside the bordered surface — and the pages. A first visit
+// keeps that whole surface and teaches inside the table. Every value comes from the Blog store (useBlog), through the pure list
 // helpers (lib/blog/list.ts).
 //
 // The view lives in the URL — ?q=&status=&reuse=&from=&to=&page=, defaults left
@@ -28,6 +29,8 @@ import { useSearchParams } from "next/navigation";
 import { Add01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, SearchInput, buttonVariants } from "@/components/ideeza";
+import { Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { Pagination } from "@/components/projects/pagination";
 import { whenDialogsClose } from "@/components/create/use-dialog-focus";
 import { useArticleActions } from "@/components/blog/article-actions";
@@ -66,10 +69,10 @@ import { QuickView } from "./quick-view";
 const LIST = "m-0 flex list-none flex-col gap-5 p-0 [@container(min-width:600px)]:gap-0 [@container(min-width:600px)]:[&>li:first-child]:border-t-0";
 const WIDE_SURFACE =
   "[@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle [@container(min-width:600px)]:bg-bg-surface";
-/** The table's own box inside the surface (Figma frame 01): bordered and inset to the
- *  toolbar's edges, the head band on bg-subtle. */
+/** The table inside the surface (Figma frame 01): a rule over and under it, the head band on
+ *  bg-subtle running to the surface's edges — never a second bordered box in it. */
 const TABLE_BOX =
-  "[@container(min-width:600px)]:mx-8 [@container(min-width:600px)]:overflow-hidden [@container(min-width:600px)]:rounded-xl [@container(min-width:600px)]:border [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle";
+  "[@container(min-width:600px)]:border-0 [@container(min-width:600px)]:border-y [@container(min-width:600px)]:border-solid [@container(min-width:600px)]:border-border-subtle";
 const TAP = "[@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
 
 type StatusChoice = "all" | DisplayStatus;
@@ -277,121 +280,120 @@ export function BlogList() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1120px] px-8 pb-24 pt-12 min-[640px]:px-16">
-      <div className="flex flex-col gap-10 [container-type:inline-size]">
-        {/* The page's name and what the Blog is for, as My projects opens. */}
-        <header className="flex flex-col gap-2">
-          <h1 className="m-0 text-xl font-bold leading-xl tracking-tight text-text-primary">Blog</h1>
-          <p className="m-0 max-w-[62ch] text-md leading-md text-text-secondary">
-            Long write-ups about what you build. The IDEEZA team reviews each one before it goes on the IDEEZA Blog.
-          </p>
-        </header>
+    // The surface's switches (table or cards, the toolbar's rows) read its own width: the
+    // frame is their container.
+    <Page className="flex flex-col [container-type:inline-size]">
+      <PageHeader
+        title="Blog"
+        description="Long write-ups about what you build. The IDEEZA team reviews each one before it goes on the IDEEZA Blog."
+      />
 
-        {unreadable ? (
-          <UnreadableState />
-        ) : (
-          <section ref={sectionRef} aria-label="Your blogs" className={cn("flex scroll-mt-12 flex-col", WIDE_SURFACE)}>
-            {/* The toolbar (Figma frame 01): search on the left, the filters and Create a new
-                blog on the right, wrapping under it when the box is narrower. Below 600 px:
-                search, the filters, then Create, each on its own row. */}
-            <div className="flex flex-col gap-6 pb-8 [@container(min-width:600px)]:flex-row [@container(min-width:600px)]:flex-wrap [@container(min-width:600px)]:items-center [@container(min-width:600px)]:p-8">
-              <form
-                role="search"
-                onSubmit={(e) => e.preventDefault()}
-                className="[@container(min-width:600px)]:min-w-[220px] [@container(min-width:600px)]:flex-1 [@container(min-width:1000px)]:max-w-[320px]"
-              >
-                <SearchInput
-                  ref={searchRef}
-                  value={text}
-                  onValueChange={changeQuery}
-                  onClear={() => searchRef.current?.focus()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape" && text) {
-                      e.preventDefault();
-                      changeQuery("");
-                    }
-                  }}
-                  placeholder="Search by blog title or user name"
-                  aria-label="Search by blog title or user name"
-                  enterKeyHint="search"
-                  className="text-[length:var(--font-size-md)]"
-                  containerClassName="min-h-[42px] [@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)] [&>button]:before:-inset-[15.5px]"
-                />
-              </form>
-              <div role="group" aria-label="Filters" className="flex flex-wrap items-center gap-4 [@container(min-width:1000px)]:ml-auto">
-                <FilterSelect<ReuseChoice>
-                  name="Reuse access"
-                  value={view.reuse ?? "all"}
-                  allValue="all"
-                  options={reuseOptions}
-                  triggerText={(o) => (o.value === "allowed" ? "Reuse: allowed" : "Reuse: not allowed")}
-                  onChange={(v) => changeView({ reuse: v === "all" ? undefined : v })}
-                  className="[@container(max-width:599px)]:flex-auto"
-                />
-                <FilterSelect<StatusChoice>
-                  name="Status"
-                  value={view.status ?? "all"}
-                  allValue="all"
-                  options={statusOptions}
-                  triggerText={(o) => `Status: ${o.label}`}
-                  onChange={(v) => changeView({ status: v === "all" ? undefined : v })}
-                  className="[@container(max-width:599px)]:flex-auto"
-                />
-                <DateRangeFilter
-                  value={view.from && view.to ? { from: view.from, to: view.to } : null}
-                  onChange={(r) => changeView({ from: r?.from, to: r?.to })}
-                  className="[@container(max-width:599px)]:flex-auto"
-                />
-                {filters && (
-                  <Button type="button" hierarchy="ghost" size="md" onClick={clearFilters} className={TAP}>
-                    Clear filters
-                  </Button>
-                )}
-              </div>
-              <NextLink
-                href={newArticleHref()}
-                className={cn(
-                  buttonVariants({ hierarchy: "primary", size: "lg" }),
-                  "no-underline [@container(min-width:600px)]:ml-auto [@container(min-width:1000px)]:ml-0",
-                  TAP,
-                )}
-              >
-                <Icon icon={Add01Icon} size={16} />
-                Create a new blog
-              </NextLink>
+      {unreadable ? (
+        <UnreadableState />
+      ) : (
+        <section ref={sectionRef} aria-label="Your blogs" className={cn("flex scroll-mt-12 flex-col", WIDE_SURFACE)}>
+          {/* The toolbar (Figma frame 01): search on the left, the filters and Create a new
+              blog on the right, wrapping under it when the box is narrower. Below 600 px:
+              search, the filters, then Create, each on its own row. */}
+          <div className="flex flex-col gap-6 pb-8 [@container(min-width:600px)]:flex-row [@container(min-width:600px)]:flex-wrap [@container(min-width:600px)]:items-center [@container(min-width:600px)]:p-8">
+            <form
+              role="search"
+              onSubmit={(e) => e.preventDefault()}
+              className="[@container(min-width:600px)]:min-w-[220px] [@container(min-width:600px)]:flex-1 [@container(min-width:1000px)]:max-w-[320px]"
+            >
+              <SearchInput
+                ref={searchRef}
+                value={text}
+                onValueChange={changeQuery}
+                onClear={() => searchRef.current?.focus()}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && text) {
+                    e.preventDefault();
+                    changeQuery("");
+                  }
+                }}
+                placeholder="Search by blog title or user name"
+                aria-label="Search by blog title or user name"
+                enterKeyHint="search"
+                className="text-[length:var(--font-size-md)]"
+                containerClassName="min-h-[42px] [@container(max-width:599px)]:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)] [&>button]:before:-inset-[15.5px]"
+              />
+            </form>
+            <div role="group" aria-label="Filters" className="flex flex-wrap items-center gap-4 [@container(min-width:1000px)]:ml-auto">
+              <FilterSelect<ReuseChoice>
+                name="Reuse access"
+                value={view.reuse ?? "all"}
+                allValue="all"
+                options={reuseOptions}
+                triggerText={(o) => (o.value === "allowed" ? "Reuse: allowed" : "Reuse: not allowed")}
+                onChange={(v) => changeView({ reuse: v === "all" ? undefined : v })}
+                className="[@container(max-width:599px)]:flex-auto"
+              />
+              <FilterSelect<StatusChoice>
+                name="Status"
+                value={view.status ?? "all"}
+                allValue="all"
+                options={statusOptions}
+                triggerText={(o) => `Status: ${o.label}`}
+                onChange={(v) => changeView({ status: v === "all" ? undefined : v })}
+                className="[@container(max-width:599px)]:flex-auto"
+              />
+              <DateRangeFilter
+                value={view.from && view.to ? { from: view.from, to: view.to } : null}
+                onChange={(r) => changeView({ from: r?.from, to: r?.to })}
+                className="[@container(max-width:599px)]:flex-auto"
+              />
+              {filters && (
+                <Button type="button" hierarchy="ghost" size="md" onClick={clearFilters} className={TAP}>
+                  Clear filters
+                </Button>
+              )}
             </div>
+            <NextLink
+              href={newArticleHref()}
+              className={cn(
+                buttonVariants({ hierarchy: "primary", size: "lg" }),
+                // A closed range: Tailwind emits arbitrary container variants in string
+                // order, so an open 600 rule would land after the 1000 one and win there.
+                "no-underline [@container(min-width:600px)_and_(max-width:999.98px)]:ml-auto",
+                TAP,
+              )}
+            >
+              <Icon icon={Add01Icon} size={16} />
+              Create a new blog
+            </NextLink>
+          </div>
 
-            <div className="flex flex-col">
-              <h2 ref={headingRef} tabIndex={-1} className="sr-only">
-                Your blogs
-              </h2>
-              <div className={TABLE_BOX}>
-                {heads}
-                {body}
+          <div className="flex flex-col">
+            <h2 ref={headingRef} tabIndex={-1} className="sr-only">
+              Your blogs
+            </h2>
+            <div className={TABLE_BOX}>
+              {heads}
+              {body}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-6 pt-8 [@container(min-width:600px)]:px-8 [@container(min-width:600px)]:py-6">
+              <div className="flex min-w-0 flex-col gap-1">
+                <p role="status" aria-atomic="true" className="m-0 text-sm leading-sm text-text-secondary">
+                  {hydrated
+                    ? countLine({ from: paged.from, to: paged.to, total: filtered.length, pageCount: paged.pageCount, searching: narrowed })
+                    : "Loading your blogs…"}
+                </p>
+                {/* The first visit says it in its own body. */}
+                {hydrated && !firstVisit && <p className="m-0 text-sm leading-sm text-text-secondary">{KEPT_HERE}</p>}
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-6 pt-8 [@container(min-width:600px)]:px-8 [@container(min-width:600px)]:py-6">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <p role="status" aria-atomic="true" className="m-0 text-sm leading-sm text-text-secondary">
-                    {hydrated
-                      ? countLine({ from: paged.from, to: paged.to, total: filtered.length, pageCount: paged.pageCount, searching: narrowed })
-                      : "Loading your blogs…"}
-                  </p>
-                  {/* The first visit says it in its own body. */}
-                  {hydrated && !firstVisit && <p className="m-0 text-sm leading-sm text-text-secondary">{KEPT_HERE}</p>}
+              {hydrated && paged.pageCount > 1 && (
+                <div className="[&>nav]:mt-0">
+                  <Pagination page={paged.page} pageCount={paged.pageCount} onChange={changePage} />
                 </div>
-                {hydrated && paged.pageCount > 1 && (
-                  <div className="[&>nav]:mt-0">
-                    <Pagination page={paged.page} pageCount={paged.pageCount} onChange={changePage} />
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          </section>
-        )}
-      </div>
+          </div>
+        </section>
+      )}
       {actions.dialogs}
       <ChangeCoverDialog article={coverFor ? findArticle(data, coverFor) : null} onClose={() => setCoverFor(null)} />
       <QuickView article={quickFor ? findArticle(data, quickFor) : null} onClose={() => setQuickFor(null)} onEdit={editFromQuickView} />
-    </div>
+    </Page>
   );
 }

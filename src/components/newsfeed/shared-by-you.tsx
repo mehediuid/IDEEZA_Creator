@@ -13,6 +13,7 @@ import * as React from "react";
 import Link from "next/link";
 import { CpuIcon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { PAGE_GRID } from "@/components/ideeza/page";
 import { useCreateHistory } from "@/lib/create/history";
 import { mineSlugOf, postHref } from "@/lib/innovations/slug";
 import { buildsOf, coverOf, productRowsOf } from "@/lib/manual/project-read";
@@ -53,7 +54,7 @@ export function SharedByYou() {
       <h2 id={headingId} className="text-md font-semibold text-text-primary">
         Shared by you
       </h2>
-      <ul role="list" className="m-0 grid list-none grid-cols-1 gap-[16px] p-0 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-3 min-[1440px]:grid-cols-4">
+      <ul role="list" className={`m-0 list-none p-0 ${PAGE_GRID}`}>
         {shared.map((p) => (
           <li key={p.id}>
             <Link

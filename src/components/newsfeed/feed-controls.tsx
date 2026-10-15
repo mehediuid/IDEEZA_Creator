@@ -7,6 +7,7 @@
 import * as React from "react";
 import { Search01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
+import { NARROW_COLUMN } from "@/components/ideeza/page";
 import {
   MODES,
   CATEGORIES,
@@ -44,8 +45,9 @@ export function FeedControls({
 
   return (
     <div className="flex flex-col gap-[20px]">
-      {/* Search */}
-      <form onSubmit={submitSearch} role="search" className="relative">
+      {/* Search — the narrow column on the frame's left edge: a field the
+          full frame wide (2200 px at 2560) is too long to read as one box. */}
+      <form onSubmit={submitSearch} role="search" className={`relative ${NARROW_COLUMN}`}>
         <span
           aria-hidden
           className="pointer-events-none absolute left-[16px] top-1/2 -translate-y-1/2 text-text-tertiary"

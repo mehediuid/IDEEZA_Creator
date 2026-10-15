@@ -25,7 +25,7 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - **Filter rule:** `inStatus` is the only one. A rejected update also counts under Rejected. A Featured blog with an update in review also counts under Featured.
   - **Dates:** day first everywhere (`lib/blog/dates.ts`: "24 Mar 2025", "03:32 AM").
 - **The list** (`/blog`, `components/blog/list/`, Figma frames 01–09).
-  - **Header:** an `h1` "Blog" and one line on what it is for.
+  - **Header:** the page header (O02): the `h1` "Blog" and one line on what it is for. The surface fills the page frame; the table runs to the surface's edges under a rule (no bordered box inside it).
   - **The Figma toolbar:**
     - "Search by blog title or user name": matches every word in any order, and the writer's own name.
     - **Reuse access**: All · Allow for use · Not allow.
@@ -51,14 +51,15 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
     - Unsent edits also add Discard changes.
   - **Confirmations:** Delete, Take offline and Discard changes confirm in alertdialogs that say where the blog goes and what is lost. Their toast offers **Undo**.
   - **Quick view:** a DS Drawer with the thumbnail, the status, the reasons grouped by review, and the body.
-  - **First visit:** it teaches the three steps and "What the IDEEZA team looks for", and says blogs live in this browser (demo).
+  - **First visit:** it teaches the three steps and "What the IDEEZA team looks for" (on the list's own edges), and says blogs live in this browser (demo).
 - **The editor** (`/blog/new`, `/blog/[slug]/edit`, `components/blog/editor/`, Figma frames 10–13). TipTap v3 loads only here.
-  - **Sticky bar:** **Blog › Create new blog**, the save state, **Preview**, and **Publish** (**Update** on a live blog).
+  - **Layout:** the reader's own geometry (`components/blog/reading-frame.ts`), so Preview moves nothing sideways: the writing column (at most 720) on the page frame's left edge, the rail's track beside it left empty from a 1024 px page container. The same layout on touch; only the bar's contents differ.
+  - **Sticky bar:** **Blog › Create new blog**, the save state, **Preview**, and **Publish** (**Update** on a live blog). It heads the column and the rail's track, never the frame's whole width.
   - **Fields:**
     - **Blog category (Required)**.
     - **Tag (Optional)**: a DS listbox of up to 5 that snaps to known spellings.
     - **Tag link (Optional)**: a combobox that picks one of your projects or takes a pasted ideeza.com link.
-  - **Writing card:** **Title** (focused on a new blog, with "n of 140" from 120 characters) and "Start your story here…", with the "+" shown at rest beside the empty line.
+  - **Writing:** under a rule, no box around it: **Title** (focused on a new blog, with "n of 140" from 120 characters) and "Start your story here…", with the "+" shown at rest at the end of the empty line's column (the writing starts on the frame's edge, so there is no gutter before it). Text keeps to 62ch.
   - **The "+" toolbar** (or "/"):
     - Image · video · 1/2/3 columns · four alignments (⌘/Ctrl⇧L/E/R/J) · lists · code · heading · subheading · quote · divider · images side by side · IDEEZA project.
     - It is one Tab stop, and its tooltips show the platform's keys.
@@ -115,24 +116,24 @@ Part of the feature inventory ([index](README.md)). Keep it current: [AGENTS.md 
   - A decided review is announced politely.
   - Opening a result marks it seen and lands on the blog's details.
 - **Blog details** (`/blog/[slug]`, `components/blog/article/`, Figma frames 21–22).
-  - **The Reject reason panel** sits on top, grouped by review.
+  - **The Reject reason panel** sits under the title and byline (a notice never sits above the page's title), grouped by review.
     - "Latest review" opens, with a count caption, the Demo note and three lines per reason: title, what was found, how to fix.
     - "Earlier reviews (n)" is folded. Re-submitted shows the panel folded.
     - **Removal reason** has no fix lines (removal is final, D-3) and offers Contact IDEEZA support.
-  - **The card:** **Blog › Blog details** with **Edit** and the ⋯. It holds:
+  - **The page:** **Blog › Blog details** with **Edit** and the ⋯ over a rule, then, in the narrow column (at most 720) on the page frame's left edge:
     - the title;
     - the writer's profile name and photo, linking to their profile;
     - "n minutes to read · 14 Oct 2026";
     - the 3:2 thumbnail;
-    - the body: headings H3 24 / H4 20, text Body MD 16/24 at a reading measure, images never wider than stored.
-  - **The rail,** in an article-led 9/3 split:
+    - the body: headings H3 24 / H4 20, text Body MD 16/24 at 62ch, images never wider than stored.
+  - **The rail** (360) beside the column from a 1024 px page container, under it below that:
     - The status badge or badges, their sentence, the demo time, and "Shared on Medium · <date>".
     - **Category**, **On this page**, the tags, and the **IDEEZA project**.
     - On phones a copy of the badge sits in the byline row.
   - **Reading view** (`/blog/[slug]/read`, D-1): the published version without Edit, ⋯, reasons or rail, under "Blog › Blog details › Reader view" with Close ×.
     - "View to website" opens it, and Copy link copies its address.
     - The demo says it opens only in this browser.
-  - **Blog preview** (`/blog/[slug]/preview`, Figma 20): the draft in the same card, under **Blog › Create new blog › Blog preview**.
+  - **Blog preview** (`/blog/[slug]/preview`, Figma 20): the draft in the same frame, under **Blog › Create new blog › Blog preview**.
     - **Close preview ×** (or Esc) goes back.
     - A thumbnail placeholder shows until one is picked.
 - **Store:**

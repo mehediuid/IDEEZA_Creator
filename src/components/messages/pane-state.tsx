@@ -11,7 +11,7 @@ import { MESSAGES_HREF } from "@/lib/messages/links";
 export function PaneState({ title, body, back = false }: { title: string; body?: string; back?: boolean }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 py-12 text-center">
-      <h1 className="sr-only lg:hidden">Messages</h1>
+      <h1 className="sr-only [@container(min-width:768px)]:hidden">Messages</h1>
       <span aria-hidden className="inline-flex size-[48px] items-center justify-center rounded-full bg-bg-subtle text-text-tertiary">
         <Icon icon={BubbleChatIcon} size={22} />
       </span>

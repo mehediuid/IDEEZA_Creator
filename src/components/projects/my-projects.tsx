@@ -28,6 +28,8 @@ import { Icon } from "@/components/dashboard/icon";
 import { ProjectNotice } from "@/components/projects/project-notice";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
 import { SearchInput, SelectMenu, buttonVariants } from "@/components/ideeza";
+import { PAGE_GRID, Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { useMinuteClock } from "@/components/create/build-status";
 import { useVideoJobs } from "@/components/video-jobs/video-jobs-provider";
 import { useCreateHistory } from "@/lib/create/history";
@@ -306,180 +308,191 @@ export function MyProjects() {
   const noProjects = result !== null && result.total === 0;
 
   return (
-    // The content box is the container the toolbar, the chips and the
-    // pagination ask about: layout switches read the page, never the window.
-    <div
-      onClickCapture={rememberScroll}
-      className="mx-auto w-full max-w-[1280px] px-[16px] py-[28px] [container-type:inline-size] min-[640px]:px-[32px]"
-    >
-      <StorageErrorBanner className="mb-[16px]" />
-      <ProjectNotice className="mb-[16px]" />
-      <header className="mb-[20px] flex flex-col gap-[4px]">
-        <div className="flex items-center justify-between gap-[12px]">
-          <h1 className="text-xl font-bold tracking-tight text-text-primary">My projects</h1>
-          {/* Creation lives on Home (owner decision O11): a link, not a flow on this page. */}
-          <Link
-            href="/"
-            className={cn(
-              buttonVariants({ hierarchy: "secondary", size: "md" }),
-              "shrink-0 [@container(max-width:559px)]:min-h-[44px]",
-            )}
-          >
-            <span aria-hidden className="inline-flex size-[16px] shrink-0 items-center justify-center">
-              <Icon icon={PlusSignIcon} size={16} />
-            </span>
-            New project
-          </Link>
-        </div>
-        <p className="max-w-[62ch] text-md text-text-secondary">
-          Every project you&apos;ve saved — from an AI build or started by hand. They&apos;re stored in this
-          browser.
-        </p>
-      </header>
+    // The page container is what the toolbar, the chips and the pagination
+    // ask about: layout switches read the page, never the window.
+    <Page>
+      <div onClickCapture={rememberScroll}>
+        <ProjectsHeader />
+        {/* Notices sit under the title, never above it. */}
+        <StorageErrorBanner className="mb-8" />
+        <ProjectNotice className="mb-8" />
 
-      {noProjects ? (
-        <NoProjectsState onGoHome={() => router.push("/")} />
-      ) : (
-        <>
-          <ProjectTabs tab={view.tab} counts={result?.counts ?? null} onChange={(tab) => changeView({ tab })} />
+        {noProjects ? (
+          <NoProjectsState onGoHome={() => router.push("/")} />
+        ) : (
+          <>
+            <ProjectTabs tab={view.tab} counts={result?.counts ?? null} onChange={(tab) => changeView({ tab })} />
 
-          <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(view.tab)}>
-            {/* The results heading (LST-60): the focus target after a page turn. */}
-            <h2 ref={headingRef} tabIndex={-1} className="sr-only">
-              {tabLabel} projects
-            </h2>
+            <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(view.tab)}>
+              {/* The results heading (LST-60): the focus target after a page turn. */}
+              <h2 ref={headingRef} tabIndex={-1} className="sr-only">
+                {tabLabel} projects
+              </h2>
 
-            {/* Toolbar: search, then Showcase only and Sort. Below a 720 px content
-                box search takes the row and the other two share the next (LST-57). */}
-            <div className="mt-[16px] grid grid-cols-2 gap-[12px] [@container(min-width:720px)]:flex [@container(min-width:720px)]:items-center">
-              <form
-                role="search"
-                onSubmit={(e) => e.preventDefault()}
-                className="col-span-2 [@container(min-width:720px)]:max-w-[420px] [@container(min-width:720px)]:flex-1"
-              >
-                <SearchInput
-                  ref={searchRef}
-                  value={text}
-                  onValueChange={changeQuery}
-                  onClear={() => searchRef.current?.focus()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape" && text) {
-                      e.preventDefault();
-                      changeQuery("");
-                    }
-                  }}
-                  placeholder="Search projects and products"
-                  aria-label="Search projects and products"
-                  aria-keyshortcuts="/"
-                  enterKeyHint="search"
-                  className="text-[length:var(--font-size-md)]"
-                  containerClassName="min-h-[44px] [&>button]:before:-inset-[15.5px]"
-                />
-              </form>
-              {/* A filter, not a tab: membership on any outcome (LST-10). Pressed reads as
-                  the active tab does; the field-shaped border matches Sort beside it. */}
-              <button
-                type="button"
-                aria-pressed={view.showcase}
-                onClick={() => changeView({ showcase: !view.showcase })}
-                className={cn(
-                  "inline-flex min-h-[44px] items-center justify-center gap-[8px] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] text-[length:var(--font-size-md)] font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(min-width:720px)]:ml-auto [@container(min-width:720px)]:shrink-0",
-                  view.showcase
-                    ? "border-transparent bg-bg-brand-subtle text-text-brand"
-                    : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
-                )}
-              >
-                <Icon icon={EyeIcon} size={16} />
-                Shared only
-              </button>
-              <SelectMenu
-                ariaLabel="Sort"
-                value={view.sort}
-                onChange={(sort) => changeView({ sort })}
-                options={SORT_OPTIONS}
-                placeholder="Recently updated"
-                className="[&>button]:min-h-[44px] [@container(min-width:720px)]:w-[200px] [@container(min-width:720px)]:shrink-0"
-              />
-            </div>
-
-            {/* The count line (LST-26). */}
-            <div ref={resultsRef} className="mt-[16px] scroll-mt-[16px]">
-              <p aria-live="polite" aria-atomic="true" className="text-md font-medium text-text-secondary">
-                {result ? countLine(result) : "—"}
-              </p>
-            </div>
-
-            {!result ? (
-              // LST-51: six skeleton cards, the tab/search/sort chrome above
-              // still present (counts read "—" until it too has hydrated).
-              <ul
-                role="list"
-                aria-hidden
-                className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-3"
-              >
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <li key={i}>
-                    <ProjectCardSkeleton />
-                  </li>
-                ))}
-              </ul>
-            ) : result.rows.length === 0 ? (
-              // LST-53 when the outcome tab itself holds nothing; else the search
-              // emptied it (LST-54); else the Showcase filter did.
-              view.tab !== "all" && result.counts[view.tab] === 0 ? (
-                <EmptyTabState tab={view.tab} />
-              ) : view.q.trim() ? (
-                // Each way out removes the button that was pressed, so focus
-                // goes to the search box rather than falling to the body.
-                <NoMatchState
-                  query={view.q}
-                  scopeLabel={view.showcase ? `${tabLabel} (Shared only)` : tabLabel}
-                  onClearSearch={() => {
-                    setText("");
-                    write({ ...view, q: "", page: 1 });
-                    searchRef.current?.focus();
-                  }}
-                  // The same words over every project: the tab and the Showcase
-                  // filter both go, whichever of them narrowed the list.
-                  onSearchAll={
-                    view.tab !== "all" || view.showcase
-                      ? () => {
-                          changeView({ tab: "all", showcase: false });
-                          searchRef.current?.focus();
-                        }
-                      : undefined
-                  }
-                />
-              ) : (
-                <NoShowcaseState tabLabel={result.showcased > 0 ? tabLabel : null} />
-              )
-            ) : (
-              <>
-                <ul
-                  role="list"
-                  className="mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-3"
+              {/* Toolbar: search, then Showcase only and Sort. Below a 720 px page
+                  search takes the row and the other two share the next (LST-57). */}
+              <div className="mt-[16px] grid grid-cols-2 gap-[12px] [@container(min-width:720px)]:flex [@container(min-width:720px)]:items-center">
+                <form
+                  role="search"
+                  onSubmit={(e) => e.preventDefault()}
+                  className="col-span-2 [@container(min-width:720px)]:max-w-[420px] [@container(min-width:720px)]:flex-1"
                 >
-                  {result.rows.map((row) => (
-                    <li key={row.project.id}>
-                      <ProjectCard
-                        summary={row.summary}
-                        matchedProductName={row.via}
-                        now={now}
-                        onBeforeNavigate={() => selectProject(row.project.id)}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                  <SearchInput
+                    ref={searchRef}
+                    value={text}
+                    onValueChange={changeQuery}
+                    onClear={() => searchRef.current?.focus()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape" && text) {
+                        e.preventDefault();
+                        changeQuery("");
+                      }
+                    }}
+                    placeholder="Search projects and products"
+                    aria-label="Search projects and products"
+                    aria-keyshortcuts="/"
+                    enterKeyHint="search"
+                    className="text-[length:var(--font-size-md)]"
+                    containerClassName="min-h-[44px] [&>button]:before:-inset-[15.5px]"
+                  />
+                </form>
+                {/* A filter, not a tab: membership on any outcome (LST-10). Pressed reads as
+                    the active tab does; the field-shaped border matches Sort beside it. */}
+                <button
+                  type="button"
+                  aria-pressed={view.showcase}
+                  onClick={() => changeView({ showcase: !view.showcase })}
+                  className={cn(
+                    "inline-flex min-h-[44px] items-center justify-center gap-[8px] rounded-[var(--radius-lg)] border border-solid px-[var(--spacing-6)] text-[length:var(--font-size-md)] font-semibold outline-none transition-colors duration-normal ease-decelerate focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page motion-reduce:transition-none [@container(min-width:720px)]:ml-auto [@container(min-width:720px)]:shrink-0",
+                    view.showcase
+                      ? "border-transparent bg-bg-brand-subtle text-text-brand"
+                      : "border-border bg-bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
+                  )}
+                >
+                  <Icon icon={EyeIcon} size={16} />
+                  Shared only
+                </button>
+                <SelectMenu
+                  ariaLabel="Sort"
+                  value={view.sort}
+                  onChange={(sort) => changeView({ sort })}
+                  options={SORT_OPTIONS}
+                  placeholder="Recently updated"
+                  className="[&>button]:min-h-[44px] [@container(min-width:720px)]:w-[200px] [@container(min-width:720px)]:shrink-0"
+                />
+              </div>
 
-                {result.pageCount > 1 ? (
-                  <Pagination page={result.page} pageCount={result.pageCount} onChange={changePage} />
-                ) : null}
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+              {/* The count line (LST-26). */}
+              <div ref={resultsRef} className="mt-[16px] scroll-mt-[16px]">
+                <p aria-live="polite" aria-atomic="true" className="text-md font-medium text-text-secondary">
+                  {result ? countLine(result) : "—"}
+                </p>
+              </div>
+
+              {!result ? (
+                // LST-51: six skeleton cards, the tab/search/sort chrome above
+                // still present (counts read "—" until it too has hydrated).
+                <ProjectsSkeleton className="mt-8" />
+              ) : result.rows.length === 0 ? (
+                // LST-53 when the outcome tab itself holds nothing; else the search
+                // emptied it (LST-54); else the Showcase filter did.
+                view.tab !== "all" && result.counts[view.tab] === 0 ? (
+                  <EmptyTabState tab={view.tab} />
+                ) : view.q.trim() ? (
+                  // Each way out removes the button that was pressed, so focus
+                  // goes to the search box rather than falling to the body.
+                  <NoMatchState
+                    query={view.q}
+                    scopeLabel={view.showcase ? `${tabLabel} (Shared only)` : tabLabel}
+                    onClearSearch={() => {
+                      setText("");
+                      write({ ...view, q: "", page: 1 });
+                      searchRef.current?.focus();
+                    }}
+                    // The same words over every project: the tab and the Showcase
+                    // filter both go, whichever of them narrowed the list.
+                    onSearchAll={
+                      view.tab !== "all" || view.showcase
+                        ? () => {
+                            changeView({ tab: "all", showcase: false });
+                            searchRef.current?.focus();
+                          }
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <NoShowcaseState tabLabel={result.showcased > 0 ? tabLabel : null} />
+                )
+              ) : (
+                <>
+                  <ul role="list" className={cn(CARD_GRID, "mt-8")}>
+                    {result.rows.map((row) => (
+                      <li key={row.project.id}>
+                        <ProjectCard
+                          summary={row.summary}
+                          matchedProductName={row.via}
+                          now={now}
+                          onBeforeNavigate={() => selectProject(row.project.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+
+                  {result.pageCount > 1 ? (
+                    <Pagination page={result.page} pageCount={result.pageCount} onChange={changePage} />
+                  ) : null}
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </Page>
+  );
+}
+
+// ───────────────────────── header and loading ─────────────────────────
+
+// The page's grid: as many columns as fit. The list is its own container
+// too, so a card turns into a row below a 560 px list (project-card.tsx).
+const CARD_GRID = cn(PAGE_GRID, "[container-type:inline-size]");
+
+/** The page's header, shared with the route's loading fallback so the title
+ *  is on the frame's edge before the list hydrates. */
+export function ProjectsHeader() {
+  return (
+    <PageHeader
+      title="My projects"
+      description="Every project you've saved — from an AI build or started by hand. They're stored in this browser."
+      actions={
+        // Creation lives on Home (owner decision O11): a link, not a flow on this page.
+        <Link
+          href="/"
+          className={cn(
+            buttonVariants({ hierarchy: "secondary", size: "md" }),
+            "shrink-0 [@container(max-width:559px)]:min-h-[44px]",
+          )}
+        >
+          <span aria-hidden className="inline-flex size-[16px] shrink-0 items-center justify-center">
+            <Icon icon={PlusSignIcon} size={16} />
+          </span>
+          New project
+        </Link>
+      }
+    />
+  );
+}
+
+/** LST-51: six skeleton cards on the grid's own edges. */
+export function ProjectsSkeleton({ className }: { className?: string }) {
+  return (
+    <ul role="list" aria-hidden className={cn(CARD_GRID, className)}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <li key={i}>
+          <ProjectCardSkeleton />
+        </li>
+      ))}
+    </ul>
   );
 }
 

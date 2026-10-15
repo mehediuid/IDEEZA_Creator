@@ -57,7 +57,7 @@ export function EarnHeader({
       {/* As tall as Preview as others see it, so the tabs sit at one height whether it shows or not. */}
       <div className="flex min-h-[40px] flex-wrap items-center justify-between gap-x-8 gap-y-4">
         <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-3">
-          <h1 ref={titleRef} tabIndex={-1} className="m-0 text-3xl font-bold leading-3xl tracking-tight text-text-primary outline-none">
+          <h1 ref={titleRef} tabIndex={-1} className="m-0 text-3xl font-semibold leading-3xl tracking-slight text-text-primary outline-none">
             Earn
           </h1>
           <Badge tone={status.tone} className="h-[24px] px-[10px] py-0 text-sm font-semibold leading-sm">

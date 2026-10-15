@@ -1,17 +1,18 @@
 "use client";
 
-// The list pane (spec §6): "Messages", Acting as and Message settings, the
-// demo line, Inbox · Requests with their counts, search, All · Unread ·
-// Archived and the Project filter, then one row per conversation — a link,
-// marked current while it's open. It lives in the Messages layout, so its
-// tab, search and filters hold while conversations open beside it.
+// The list pane (spec §6): Inbox · Requests with their counts, search, All ·
+// Unread · Archived and the Project filter, then one row per conversation — a
+// link, marked current while it's open. The title, the demo line and Message
+// settings are the page's header (messages-shell.tsx). It lives in the
+// Messages layout, so its tab, search and filters hold while conversations
+// open beside it.
 
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NotificationOff01Icon, Settings02Icon } from "@hugeicons/core-free-icons";
+import { NotificationOff01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
-import { ButtonGroup, IconButton, SearchInput, SelectMenu } from "@/components/ideeza";
+import { ButtonGroup, SearchInput, SelectMenu } from "@/components/ideeza";
 import { conversationHref } from "@/lib/messages/links";
 import {
   countsFor,
@@ -27,7 +28,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Avatar } from "./avatar";
 import { useMessagesView } from "./messages-context";
-import { SettingsDialog } from "./settings-dialog";
 
 const FILTERS: { value: ListFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -121,7 +121,6 @@ export function ConversationList() {
   const [q, setQ] = React.useState("");
   const [filter, setFilter] = React.useState<ListFilter>("all");
   const [subjectPick, setSubjectPick] = React.useState(ALL_PROJECTS);
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
 
   const counts = React.useMemo(() => countsFor(data, me, people.teamIdsOf), [data, me, people.teamIdsOf]);
   const subjects = React.useMemo(
@@ -163,22 +162,7 @@ export function ConversationList() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col max-md:overflow-y-auto">
-      <div className="flex shrink-0 flex-col gap-4 px-6 pb-4 pt-6">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-bold leading-xl tracking-tight text-text-primary">Messages</h1>
-          <IconButton
-            aria-label="Message settings"
-            hierarchy="ghost"
-            size="lg"
-            icon={<Icon icon={Settings02Icon} size={20} />}
-            onClick={() => setSettingsOpen(true)}
-            disabled={!ready}
-            className="max-md:size-[var(--touch-min)]"
-          />
-        </div>
-        <p className="text-md leading-md text-text-tertiary">Demo · messages stay in this browser.</p>
-      </div>
-      <div className="flex shrink-0 flex-col gap-3 px-6 pb-4">
+      <div className="flex shrink-0 flex-col gap-3 px-6 pb-4 pt-6">
         <ButtonGroup
           size="xl"
           className="grid w-full grid-cols-2"
@@ -243,7 +227,6 @@ export function ConversationList() {
           <Empty title="No requests" body="Messages from people you haven't worked with land here first." />
         )}
       </div>
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

@@ -2,13 +2,13 @@
 
 // /blog/<slug>/read — the reading view of the published version (owner D-1):
 // what "View to website" (L10) opens and what Copy link copies. The same
-// ArticleReader as the preview, inside D1's card, with "Close ×" (and Esc, when
-// no menu or dialog is open) back to where you came from — and nothing of the
-// writer's: no Edit, no ⋯, no reasons, no status. In this demo blogs live in the
-// browser they were written in, so the page says so where it matters (the
-// toast, the rail caption, the not-found body). A removed blog can still be read
-// here by its writer, with a line saying readers can't; a blog that was never
-// published says so and links to its page.
+// ArticleReader as the preview, with "Close ×" (and Esc, when no menu or dialog
+// is open) back to where you came from — and nothing of the writer's: no Edit,
+// no ⋯, no reasons, no status. In this demo blogs live in the browser they were
+// written in, so the page says so where it matters (the toast, the rail caption,
+// the not-found body). A removed blog can still be read here by its writer, with
+// a line under the title saying readers can't; a blog that was never published
+// says so and links to its page.
 
 import * as React from "react";
 import Link from "next/link";
@@ -70,17 +70,19 @@ function ReadView({ article }: { article: BlogArticle & { live: NonNullable<Blog
   return (
     <div className={ARTICLE_PAGE}>
       <div className={ARTICLE_CONTENT}>
-        {article.takenDown && (
-          <Banner tone="attention" title="Readers can't see this blog">
-            The IDEEZA team removed it from the IDEEZA Blog on {dayDate(article.takenDown.at)}. Only you can read it here.
-          </Banner>
-        )}
         <ArticleReader
           article={article}
           meta={article.live}
           doc={body.body.doc}
           bodyReady={body.hydrated}
           body="live"
+          notice={
+            article.takenDown && (
+              <Banner tone="attention" title="Readers can't see this blog">
+                The IDEEZA team removed it from the IDEEZA Blog on {dayDate(article.takenDown.at)}. Only you can read it here.
+              </Banner>
+            )
+          }
           header={
             <>
               <BlogBreadcrumb trail={[{ label: "Blog details", href: details }, { label: "Reader view" }]} />
@@ -103,7 +105,7 @@ function NotPublished({ article }: { article: BlogArticle }) {
   }, []);
   return (
     <div className={ARTICLE_PAGE}>
-      <div className={cn(ARTICLE_CONTENT, "items-center")}>
+      <div className={ARTICLE_CONTENT}>
         <StateCard
           tone="empty"
           icon={<Icon icon={News01Icon} size={32} />}

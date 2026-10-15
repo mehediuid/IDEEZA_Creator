@@ -2,8 +2,8 @@
 
 // The article body as readers see it (spec § Body, U-ui-ds §5): a normalised
 // BlogDoc drawn as React elements — never an HTML string. One reading ladder on
-// the DS F01 styles (owner D-18, D-20): text Body MD 16/24 at a reading measure
-// (max-w-prose) inside the 680 px column, the body's Heading H3 24/32 SemiBold,
+// the DS F01 styles (owner D-18, D-20): text Body MD 16/24 at the reading measure
+// (62ch) inside the narrow column, the body's Heading H3 24/32 SemiBold,
 // its Subheading H4 20/28 SemiBold (one step down on phones, line heights paired);
 // the title is the only H1. `TYPE` is that ladder, and the editor draws its
 // headings, quotes and code with these same classes (extensions.ts), so the two
@@ -45,8 +45,8 @@ export const TYPE = {
   quote: "text-xl leading-2xl max-md:leading-lg",
   /** Code: Roboto Mono 14/20. */
   code: "font-mono text-md leading-md",
-  /** The reading measure for text (images keep the column's width). */
-  measure: "max-w-prose",
+  /** The reading measure for text, 62ch (images keep the column's width). */
+  measure: "max-w-[62ch]",
 } as const;
 
 /** One rule per element: margins (not gaps) set the rhythm, so a block keeps its space

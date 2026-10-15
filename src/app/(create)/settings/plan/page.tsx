@@ -4,12 +4,15 @@
 
 import * as React from "react";
 import { PlanPricingPage } from "@/components/credits/plan-pricing-page";
+import { PricingFrame } from "@/components/credits/pricing-frame";
 
 export default function PlanPricingRoute() {
   return (
     <React.Suspense
       fallback={
-        <div className="flex h-full items-center justify-center text-md text-text-tertiary">Loading plan and pricing…</div>
+        <PricingFrame crumbs={[{ label: "Settings" }, { label: "Plan & pricing" }]} title="Plan & pricing">
+          <p className="text-md leading-md text-text-tertiary">Loading plan and pricing…</p>
+        </PricingFrame>
       }
     >
       <PlanPricingPage />

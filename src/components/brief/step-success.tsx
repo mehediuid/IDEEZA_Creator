@@ -48,7 +48,7 @@ import type { ListingMetadata } from "@/lib/market/types";
 import { productVideoStatus } from "@/lib/video/product-video";
 import { useProjectVideos } from "@/lib/video/store";
 import type { VideoTake } from "@/lib/video/types";
-import { TAP } from "./brief-card";
+import { MintStep, TAP } from "./brief-card";
 
 const HEADING_LIVE_BY_INTENT: Record<Intent, string> = {
   sell: "Listed on the marketplace",
@@ -103,124 +103,127 @@ export function StepSuccess({
   const listed = listing && listing.kind !== "none" ? listing.listing : null;
   const onMarket = listing?.kind === "live" || listing?.kind === "paused";
 
-  return (
-    <div className="flex w-full max-w-[560px] flex-col items-center gap-[24px] text-center">
-      <div
+  // The title is the page's h1 like every step's (O02); the tick leads it at its line height.
+  const title = (
+    <span className="inline-flex items-center gap-6">
+      <span
+        aria-hidden
         className={[
-          "flex h-[64px] w-[64px] items-center justify-center rounded-full shadow-2",
+          "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full",
           isLive ? "bg-bg-success-subtle" : "bg-bg-brand-subtle",
         ].join(" ")}
       >
         <svg
-          width="32"
-          height="32"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
           fill="none"
           stroke={isLive ? "var(--color-text-success)" : "var(--color-text-brand)"}
           strokeWidth="2.6"
           strokeLinecap="round"
           strokeLinejoin="round"
-          aria-hidden
         >
           <path d="M5 13l4 4 10-10" />
         </svg>
-      </div>
+      </span>
+      <span className="min-w-0">{heading}</span>
+    </span>
+  );
 
-      <div>
-        <h1 className="m-0 text-5xl font-bold tracking-tight text-text-primary">{heading}</h1>
-        <p className="mt-[6px] max-w-[460px] text-md text-text-secondary">{subline}</p>
-      </div>
+  return (
+    <MintStep title={title} description={subline}>
+      <div className="flex w-full flex-col gap-[24px]">
+        {project?.mint ? (
+          <MintProofCard record={project.mint} owner intent={intent} className="w-full text-left" />
+        ) : null}
 
-      {project?.mint ? (
-        <MintProofCard record={project.mint} owner intent={intent} className="w-full text-left" />
-      ) : null}
+        {listed ? (
+          <section
+            aria-label="Listing"
+            className="flex w-full flex-col gap-[6px] rounded-lg border border-solid border-border bg-bg-surface p-[16px] text-left"
+          >
+            <div className="flex flex-wrap items-center gap-[8px]">
+              <h2 className="m-0 text-md font-semibold text-text-primary">Listing</h2>
+              <TestnetDemoBadge />
+            </div>
+            <p className="m-0 text-md font-medium tabular-nums text-text-primary">{termsLineOf(listed)}</p>
+            <p className="m-0 text-md text-text-secondary">{LISTING_HOME_NOTE}</p>
+            {/* Only while there is a listing to see: a removed or ended one opens nothing there. */}
+            {onMarket && (
+              <Link
+                href={`/marketplace/${projectId}`}
+                className={`mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-md font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
+              >
+                {VIEW_ON_MARKETPLACE}
+              </Link>
+            )}
+          </section>
+        ) : null}
 
-      {listed ? (
-        <section
-          aria-label="Listing"
-          className="flex w-full flex-col gap-[6px] rounded-lg border border-solid border-border bg-bg-surface p-[16px] text-left"
-        >
-          <div className="flex flex-wrap items-center gap-[8px]">
-            <h2 className="m-0 text-md font-semibold text-text-primary">Listing</h2>
-            <TestnetDemoBadge />
-          </div>
-          <p className="m-0 text-md font-medium tabular-nums text-text-primary">{termsLineOf(listed)}</p>
-          <p className="m-0 text-md text-text-secondary">{LISTING_HOME_NOTE}</p>
-          {/* Only while there is a listing to see: a removed or ended one opens nothing there. */}
-          {onMarket && (
-            <Link
-              href={`/marketplace/${projectId}`}
-              className={`mt-[4px] inline-flex min-h-[32px] items-center self-start rounded-md text-md font-semibold text-text-brand underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
+        {!isLive && <PendingCard rows={rows} rendering={rendering} />}
+
+        {ready.length > 0 && (
+          <section aria-label="Videos" className="flex w-full flex-col gap-[10px] text-left">
+            <div className="text-md font-medium text-text-tertiary">{projectName || "Videos"}</div>
+            <ul role="list" className="m-0 grid list-none grid-cols-2 gap-[8px] p-0 sm:grid-cols-3">
+              {ready.map(({ product, take }) => (
+                <li key={product.id}>
+                  <PosterTile
+                    take={take}
+                    name={displayProductName(product.name)}
+                    onOpen={() => setWatching({ take, name: displayProductName(product.name) })}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <div className="flex w-full flex-col items-stretch gap-[10px] text-center">
+          <button
+            type="button"
+            onClick={() => onBrowse("/projects")}
+            className="inline-flex items-center justify-center gap-[8px] rounded-3xl border-none bg-bg-brand px-[24px] py-[14px] text-md font-bold text-text-on-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
             >
-              {VIEW_ON_MARKETPLACE}
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+            Go to My Projects
+          </button>
+
+          {projectId && <SuccessShowcase projectId={projectId} />}
+
+          <div className="flex items-center justify-center">
+            <Link
+              href="/"
+              className={`inline-flex items-center rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-md font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
+            >
+              Back to home
             </Link>
-          )}
-        </section>
-      ) : null}
-
-      {!isLive && <PendingCard rows={rows} rendering={rendering} />}
-
-      {ready.length > 0 && (
-        <section aria-label="Videos" className="flex w-full flex-col gap-[10px] text-left">
-          <div className="text-md font-medium text-text-tertiary">{projectName || "Videos"}</div>
-          <ul role="list" className="m-0 grid list-none grid-cols-2 gap-[8px] p-0 sm:grid-cols-3">
-            {ready.map(({ product, take }) => (
-              <li key={product.id}>
-                <PosterTile
-                  take={take}
-                  name={displayProductName(product.name)}
-                  onOpen={() => setWatching({ take, name: displayProductName(product.name) })}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <div className="flex w-full flex-col items-stretch gap-[10px]">
-        <button
-          type="button"
-          onClick={() => onBrowse("/projects")}
-          className="inline-flex items-center justify-center gap-[8px] rounded-3xl border-none bg-bg-brand px-[24px] py-[14px] text-md font-bold text-text-on-brand outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          </svg>
-          Go to My Projects
-        </button>
-
-        {projectId && <SuccessShowcase projectId={projectId} />}
-
-        <div className="flex items-center justify-center">
-          <Link
-            href="/"
-            className={`inline-flex items-center rounded-full bg-bg-brand-subtle px-[12px] py-[6px] text-md font-bold text-text-brand no-underline outline-none focus-visible:ring-2 focus-visible:ring-border-focus ${TAP}`}
-          >
-            Back to home
-          </Link>
+          </div>
         </div>
-      </div>
 
-      {projectId && (
-        <VideoPlayerDialog
-          open={watching !== null}
-          take={watching?.take ?? null}
-          productName={watching?.name ?? ""}
-          projectId={projectId}
-          onClose={() => setWatching(null)}
-        />
-      )}
-    </div>
+        {projectId && (
+          <VideoPlayerDialog
+            open={watching !== null}
+            take={watching?.take ?? null}
+            productName={watching?.name ?? ""}
+            projectId={projectId}
+            onClose={() => setWatching(null)}
+          />
+        )}
+      </div>
+    </MintStep>
   );
 }
 

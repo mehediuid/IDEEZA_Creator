@@ -8,14 +8,18 @@
 
 import * as React from "react";
 import { HistoryTabbedPage } from "@/components/create/history-page";
+import { Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 
 export default function HistoryPage() {
   return (
     <React.Suspense
       fallback={
-        <div className="flex h-full items-center justify-center text-md text-text-tertiary">
-          Loading history…
-        </div>
+        // The page's own frame and title, so nothing moves when it loads.
+        <Page>
+          <PageHeader title="History" description="Past concepts & project builds" />
+          <p className="text-md text-text-tertiary">Loading history…</p>
+        </Page>
       }
     >
       <HistoryTabbedPage />

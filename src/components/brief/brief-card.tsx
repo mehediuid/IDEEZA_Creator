@@ -1,11 +1,16 @@
 "use client";
 
-// The mint flow's frame, shared by every step: the step line over the card,
-// and the card itself — a "← Back" text link over one white card, so no two
-// steps can drift apart on width, padding or where Back sits.
+// The mint flow's frame, shared by every step: each step is a page on the
+// app's frame (O01) — the breadcrumb and the step's title as the page's one h1
+// (O02), then, in the narrow column on the frame's left edge, the step line
+// over the card — a "← Back" text link over one white card — so no two steps
+// can drift apart on width, padding or where Back sits.
 
 import * as React from "react";
+import { NARROW_COLUMN } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { MINT_STEPS, MINT_STEP_LABEL, type MintStepId } from "@/lib/brief/mint-flow";
+import { cn } from "@/lib/utils";
 
 /** 44 px on a phone or a coarse pointer (`--touch-min`). */
 export const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
@@ -19,9 +24,51 @@ export const TAP = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min
 export const FIELD_BASE =
   "ix-brief-field w-full rounded-lg border border-solid border-border bg-[var(--color-input-bg)] text-md text-text-primary outline-none [font-family:inherit]";
 
-export function BriefCard({ onBack, children }: { onBack?: () => void; children: React.ReactNode }) {
+/** What the flow (brief-app.tsx) puts around every step: the breadcrumb over
+ *  the title, and in the column the step line (or on Done a banner) above the
+ *  step and "Saved as you go" under it. The steps only name their title. */
+export type MintChrome = { breadcrumb?: React.ReactNode; above?: React.ReactNode; below?: React.ReactNode };
+
+export const MintChromeContext = React.createContext<MintChrome>({});
+
+/** One step's page: its header, then the step in the narrow column. Only the
+ *  step itself slides in when the step changes; the header and the step line
+ *  stay put. */
+export function MintStep({
+  title,
+  description,
+  children,
+}: {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const { breadcrumb, above, below } = React.useContext(MintChromeContext);
   return (
-    <div className="flex w-full max-w-[600px] flex-col gap-8">
+    <>
+      <PageHeader breadcrumb={breadcrumb} title={title} description={description} />
+      <div className={cn(NARROW_COLUMN, "flex flex-col gap-6")}>
+        {above}
+        <div className="flex animate-[ix-brief-in_.2s_ease-out] flex-col gap-8 motion-reduce:animate-none">{children}</div>
+        {below}
+      </div>
+    </>
+  );
+}
+
+export function BriefCard({
+  title,
+  description,
+  onBack,
+  children,
+}: {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  onBack?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <MintStep title={title} description={description}>
       {onBack ? (
         <button
           type="button"
@@ -38,7 +85,7 @@ export function BriefCard({ onBack, children }: { onBack?: () => void; children:
       <div className="rounded-2xl border border-solid border-border-subtle bg-bg-surface p-8 shadow-1 sm:p-12">
         {children}
       </div>
-    </div>
+    </MintStep>
   );
 }
 
@@ -48,7 +95,7 @@ export function MintStepLine({ current, skipChoose = false }: { current: MintSte
   const steps = skipChoose ? MINT_STEPS.filter((s) => s !== "choose") : MINT_STEPS;
   const here = steps.indexOf(current);
   return (
-    <nav aria-label="Mint steps" className="w-full max-w-[600px]">
+    <nav aria-label="Mint steps" className="w-full">
       <ol className="m-0 flex list-none flex-wrap items-center gap-x-[8px] gap-y-[4px] p-0 text-sm">
         <li className="text-text-tertiary">
           Step {here + 1} of {steps.length}

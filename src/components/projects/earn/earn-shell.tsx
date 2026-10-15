@@ -12,7 +12,7 @@
 //   project page's not-found state, or the page: header, the four tabs and
 //   the tab the address names (`useSelectedLayoutSegment`; the tab pages
 //   below are a context's readers, earn-context.tsx), all in one left-aligned
-//   column at most 760 px wide (surface.tsx).
+//   column at most the layout's narrow column wide (surface.tsx).
 // - An address's hash names a part of a tab (`#copies`, `#customers`): once
 //   the tab has rendered, that part is scrolled to the top. A `sale=` deep
 //   link is placed by the Customers panel itself, on its row.

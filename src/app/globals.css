@@ -118,10 +118,15 @@
  * At rest — which is what a maker asking for reduced motion gets, since the
  * global rule in reset.css ends an animation rather than holding a frame —
  * it is invisible, leaving exactly the still wash that was here before.
+ *
+ * The travel is `cqw`: the hero is a band on the page frame, and its glow
+ * layer is the container, so the light crosses the band and fades before its
+ * edge at any width. In `vw` it ran on past the band and was cut off there
+ * while still lit (at 1024 the band is 680 px and 42vw is 430 each way).
  */
 @keyframes ix-hero-sweep {
   0% {
-    transform: translate3d(calc(-50% - 42vw), -45%, 0);
+    transform: translate3d(calc(-50% - 42cqw), -45%, 0);
     opacity: 0;
   }
   14% {
@@ -131,7 +136,7 @@
     opacity: 0.34;
   }
   100% {
-    transform: translate3d(calc(-50% + 42vw), -45%, 0);
+    transform: translate3d(calc(-50% + 42cqw), -45%, 0);
     opacity: 0;
   }
 }

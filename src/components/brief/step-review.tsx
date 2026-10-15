@@ -163,13 +163,8 @@ export function StepReview({
     : (readiness.rules.find((r) => r.id === "videos" && !r.ok)?.reason ?? VIDEOS_READY);
 
   return (
-    <BriefCard onBack={minting ? undefined : onBack}>
+    <BriefCard title="Review and sign" description={SUB_BY_INTENT[intent]} onBack={minting ? undefined : onBack}>
       <div className="flex flex-col gap-[20px]">
-        <div>
-          <h1 className="m-0 text-2xl font-bold tracking-tight text-text-primary">Review and sign</h1>
-          <p className="mt-[6px] max-w-[62ch] text-md text-text-secondary">{SUB_BY_INTENT[intent]}</p>
-        </div>
-
         <section aria-label="What is minted" className="flex flex-col gap-[14px]">
           <div className="flex items-start gap-[14px]">
             <Thumb src={imageUrl ?? null} />

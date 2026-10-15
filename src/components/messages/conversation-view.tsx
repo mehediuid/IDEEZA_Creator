@@ -3,7 +3,9 @@
 // The conversation pane (spec §6), for an open conversation or a draft that
 // the first Send creates: header, the request bar while it's in my Requests,
 // the context card, the timeline and the composer — or, when sending isn't
-// possible, the line that says why. An open conversation is marked read when
+// possible, the line that says why. They share one column, the pane less one
+// inset, so the avatar, the first message and + start on one edge and ⋯, your
+// messages and Send end on another. An open conversation is marked read when
 // it opens and whenever someone else's message arrives while the page is
 // visible, and that message is announced politely.
 
@@ -35,7 +37,7 @@ const EMPTY: never[] = [];
 
 function Notice({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div data-notice className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 border-t border-solid border-border bg-bg-surface px-6 py-5 md:px-8">
+    <div data-notice className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 border-t border-solid border-border bg-bg-surface px-8 py-5">
       <p className="min-w-0 flex-1 text-md leading-md text-text-secondary">{children}</p>
       {action}
     </div>
@@ -202,7 +204,7 @@ export function ConversationView({
         personId={team ? null : (other?.id ?? null)}
       />
       {failure && (
-        <div className="shrink-0 px-4 pt-4 md:px-8">
+        <div className="shrink-0 px-8 pt-4">
           <Banner tone="error">{failure}</Banner>
         </div>
       )}

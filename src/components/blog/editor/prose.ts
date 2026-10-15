@@ -13,7 +13,7 @@
 export const PROSE = [
   "min-h-40 break-words text-lg leading-lg text-text-primary outline-none [container-type:inline-size]",
   // The reading measure for text; figures, columns and code keep the column's width.
-  "[&>p]:max-w-prose [&>h2]:max-w-prose [&>h3]:max-w-prose [&>ul]:max-w-prose [&>ol]:max-w-prose [&>blockquote]:max-w-prose",
+  "[&>p]:max-w-[62ch] [&>h2]:max-w-[62ch] [&>h3]:max-w-[62ch] [&>ul]:max-w-[62ch] [&>ol]:max-w-[62ch] [&>blockquote]:max-w-[62ch]",
   "[&>p.text-center]:mx-auto [&>h2.text-center]:mx-auto [&>h3.text-center]:mx-auto [&>p.text-right]:ml-auto [&>h2.text-right]:ml-auto [&>h3.text-right]:ml-auto",
   "[&>*+*]:mt-8 [&_[data-column]>*+*]:mt-8 [&_[data-column]>*+h2]:mt-12 [&_[data-column]>*+h3]:mt-8",
   "[&>*+h2]:mt-16 [&>*+h3]:mt-12 [&>h2+*]:mt-6 [&>h3+*]:mt-4",

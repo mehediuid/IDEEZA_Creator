@@ -2,9 +2,9 @@
 
 // MarketplacePage — /marketplace, Explore marketplace (Phase 2 spec §2.4;
 // P2-MARKETPLACE-2…7, -19). The My projects shell (my-projects.tsx): the
-// Testnet demo banner with the Shopping as switch, the h1 and its count line,
-// the For sale · Sold · Purchased tabs, the toolbar, the card grid and the
-// pagination.
+// h1 and its count line, the Testnet demo banner with the Shopping as switch
+// under them, the For sale · Sold · Purchased tabs, the toolbar, the card grid
+// and the pagination.
 //
 // - Every item is real local data: the listings, sales and bids
 //   (`useMarket`), every project's copy tracks (`useProjectsEditions`), the
@@ -30,6 +30,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Search01Icon, ShoppingBag01Icon, Store01Icon, Tag01Icon } from "@hugeicons/core-free-icons";
 import { Icon } from "@/components/dashboard/icon";
 import { Button, SearchInput, SelectMenu, StateCard, buttonVariants, type SelectOption } from "@/components/ideeza";
+import { PAGE_GRID, Page } from "@/components/ideeza/page";
+import { PageHeader } from "@/components/ideeza/page-header";
 import { useMinuteClock } from "@/components/create/build-status";
 import { Pagination } from "@/components/projects/pagination";
 import { StorageErrorBanner } from "@/components/projects/storage-error-banner";
@@ -75,8 +77,12 @@ const SORT_OPTIONS: SelectOption<MarketQuery["sort"]>[] = [
 
 const PANEL_ID = "market-panel";
 const tabId = (tab: Tab) => `market-tab-${tab}`;
-const GRID =
-  "mt-[16px] grid grid-cols-1 gap-[24px] [container-type:inline-size] [@container(min-width:560px)]:grid-cols-2 [@container(min-width:900px)]:grid-cols-3";
+// As many columns as fit; the list is its own container too, so a card turns
+// into a row below a 560 px list (listing-card.tsx).
+const GRID = cn(PAGE_GRID, "[container-type:inline-size]");
+// An empty state takes the grid's place on its edges, its words centred inside
+// at a reading measure.
+const EMPTY_REGION = "mt-8 w-full [&_p]:max-w-[62ch]";
 // A link dressed as the quiet button; the reset colours every a:hover as a link.
 const QUIET_LINK = cn(
   buttonVariants({ hierarchy: "secondary", size: "md" }),
@@ -192,15 +198,12 @@ export function MarketplacePage() {
   const filtered = view.tab !== "purchased";
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] px-[16px] py-[28px] [container-type:inline-size] min-[640px]:px-[32px]">
-      <StorageErrorBanner className="mb-[16px]" />
-      <DemoBuyerBanner className="mb-[20px]" />
-      <header className="mb-[20px] flex flex-col gap-[4px]">
-        <h1 className="text-xl font-bold tracking-tight text-text-primary">Explore marketplace</h1>
-        <p aria-live="polite" className="text-md text-text-secondary">
-          {forSale === null ? "—" : forSale === 0 ? "Nothing for sale" : `${forSale} for sale`}
-        </p>
-      </header>
+    // The page container is what the toolbar, the tabs and the pagination ask about.
+    <Page>
+      <MarketplaceHeader forSale={forSale} />
+      {/* Notices sit under the title, never above it. */}
+      <StorageErrorBanner className="mb-8" />
+      <DemoBuyerBanner className="mb-10" />
 
       <MarketTabs tab={view.tab} counts={ready ? counts : null} onChange={(tab) => changeView({ tab })} />
 
@@ -209,8 +212,8 @@ export function MarketplacePage() {
           {tabLabel}
         </h2>
 
-        {/* Search, then Type and Sort (For sale and Sold only). Below a 720 px content box search takes the
-            row and the two menus share the next. */}
+        {/* Search, then Type and Sort (For sale and Sold only). Below a 720 px page search takes the row and
+            the two menus share the next. */}
         <div className="mt-[16px] grid grid-cols-2 gap-[12px] [@container(min-width:720px)]:flex [@container(min-width:720px)]:items-center">
           <form
             role="search"
@@ -260,13 +263,7 @@ export function MarketplacePage() {
         <div ref={resultsRef} className="scroll-mt-[16px]" />
 
         {!ready ? (
-          <ul role="list" aria-hidden className={GRID}>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <li key={i}>
-                <ListingCardSkeleton />
-              </li>
-            ))}
-          </ul>
+          <ListingsSkeleton className="mt-8" />
         ) : result.items.length === 0 ? (
           counts[view.tab] > 0 && view.q ? (
             <StateCard
@@ -279,7 +276,7 @@ export function MarketplacePage() {
                   Clear search
                 </Button>
               }
-              className="mx-auto mt-[24px]"
+              className={EMPTY_REGION}
             />
           ) : counts[view.tab] > 0 ? (
             // The Type filter alone emptied the tab.
@@ -293,14 +290,14 @@ export function MarketplacePage() {
                   Show every type
                 </Button>
               }
-              className="mx-auto mt-[24px]"
+              className={EMPTY_REGION}
             />
           ) : (
             <EmptyTab tab={view.tab} buyerName={buyer.name} onForSale={() => changeView({ tab: "forSale" })} />
           )
         ) : (
           <>
-            <ul role="list" className={GRID}>
+            <ul role="list" className={cn(GRID, "mt-8")}>
               {result.items.map((item) => (
                 <li key={item.sale?.id ?? item.listing?.id ?? `copies:${item.projectId}`}>
                   <ListingCard
@@ -316,7 +313,37 @@ export function MarketplacePage() {
           </>
         )}
       </div>
-    </div>
+    </Page>
+  );
+}
+
+// ───────────────────────── header and loading ─────────────────────────
+
+/** The page's header, shared with the route's loading fallback so the title
+ *  is on the frame's edge before the market is read. `null` until it is. */
+export function MarketplaceHeader({ forSale }: { forSale: number | null }) {
+  return (
+    <PageHeader
+      title="Explore marketplace"
+      description={
+        <span aria-live="polite">
+          {forSale === null ? "—" : forSale === 0 ? "Nothing for sale" : `${forSale} for sale`}
+        </span>
+      }
+    />
+  );
+}
+
+/** Six skeleton cards on the grid's own edges. */
+export function ListingsSkeleton({ className }: { className?: string }) {
+  return (
+    <ul role="list" aria-hidden className={cn(GRID, className)}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <li key={i}>
+          <ListingCardSkeleton />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -412,7 +439,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
         icon={<Icon icon={Tag01Icon} size={32} />}
         title="Nothing sold yet"
         body="A sale shows here once a demo creator buys a listing."
-        className="mx-auto mt-[24px]"
+        className={EMPTY_REGION}
       />
     );
   }
@@ -428,7 +455,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
             See what&apos;s for sale
           </Button>
         }
-        className="mx-auto mt-[24px]"
+        className={EMPTY_REGION}
       />
     );
   }
@@ -443,7 +470,7 @@ function EmptyTab({ tab, buyerName, onForSale }: { tab: Tab; buyerName: string; 
           Go to My projects
         </Link>
       }
-      className="mx-auto mt-[24px]"
+      className={EMPTY_REGION}
     />
   );
 }
