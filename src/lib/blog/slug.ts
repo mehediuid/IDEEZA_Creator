@@ -30,3 +30,5 @@ export const newArticleHref = () => "/blog/new";
 export const articleHref = (slug: string) => `/blog/${slug}`;
 export const editHref = (slug: string) => `/blog/${slug}/edit`;
 export const previewHref = (slug: string) => `/blog/${slug}/preview`;
+/** The reading view of the published version (owner D-1): what "View to website" opens and Copy link copies. */
+export const readHref = (slug: string) => `/blog/${slug}/read`;
