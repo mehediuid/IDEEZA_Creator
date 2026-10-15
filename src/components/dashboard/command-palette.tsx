@@ -112,10 +112,11 @@ export function CommandPalette({
         icon: ShoppingBag01Icon, onActivate: go("/marketplace") },
       { id: "innovations", label: "Innovations", category: "Pages",
         icon: News01Icon, onActivate: go("/innovations") },
-      { id: "messages", label: "Messages", category: "Pages",
-        icon: Mail01Icon, onActivate: go("/messages") },
+      // Blog follows Innovations, as the sidebar lists them: the two places to share.
       { id: "blog", label: "Blog", category: "Pages",
         icon: BookOpen01Icon, onActivate: go("/blog") },
+      { id: "messages", label: "Messages", category: "Pages",
+        icon: Mail01Icon, onActivate: go("/messages") },
       // Resources
       { id: "tutorial", label: "Open the tutorial", category: "Resources",
         icon: MortarboardIcon, onActivate: exit(() => {}) },
@@ -156,17 +157,28 @@ export function CommandPalette({
     );
   }, [commands, query]);
 
-  // Reset selection + scroll to top whenever the filter changes.
-  React.useEffect(() => {
+  // Reset selection whenever the filter changes (during render, so no second pass after
+  // paint), and scroll the list back to its top.
+  const [seenFiltered, setSeenFiltered] = React.useState(filtered);
+  if (seenFiltered !== filtered) {
+    setSeenFiltered(filtered);
     setSelected(0);
+  }
+  React.useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
   }, [filtered]);
 
-  // Focus the input every time the palette opens; reset state on close.
+  // Every opening starts empty, on the first command; focus goes to the input.
+  const [seenOpen, setSeenOpen] = React.useState(open);
+  if (seenOpen !== open) {
+    setSeenOpen(open);
+    if (open) {
+      setQuery("");
+      setSelected(0);
+    }
+  }
   React.useEffect(() => {
     if (!open) return;
-    setQuery("");
-    setSelected(0);
     // Defer focus so the modal renders first.
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
