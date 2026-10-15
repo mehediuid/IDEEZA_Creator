@@ -23,7 +23,7 @@ import { Icon } from "@/components/dashboard/icon";
 import { Banner, Button, Checkbox, IconButton, ModalFrame, Segmented, SelectMenu, Spinner, Textarea } from "@/components/ideeza";
 import { useTheme } from "@/components/theme-provider";
 import { useManualProjects } from "@/lib/manual/projects";
-import { REPORT_EVENT } from "@/lib/support/open-report";
+import { REPORT_EVENT, type ReportPrefill } from "@/lib/support/open-report";
 import { deviceOf, namesFor, pageRefFor, placeLine } from "@/lib/support/page-context";
 import {
   DETAILS_COUNTER_FROM,
@@ -158,14 +158,18 @@ export function ReportProblemHost() {
   const [context, setContext] = React.useState<ReportContext | null>(null);
   const [sentRef, setSentRef] = React.useState<string | null>(null);
 
-  const onOpen = React.useEffectEvent(() => {
+  const onOpen = React.useEffectEvent((prefill?: ReportPrefill) => {
     setContext(snapshot({ projects, activeProjectId, storageFull: Boolean(writeError), theme, resolvedTheme }));
-    setDraft((d) => d ?? loadDraft());
+    setDraft((d) => {
+      const base = d ?? loadDraft();
+      const details = prefill?.details?.trim();
+      return details && !base.details.trim() ? { ...base, details: details.slice(0, DETAILS_MAX) } : base;
+    });
     setSentRef(null);
     setOpen(true);
   });
   React.useEffect(() => {
-    const listener = () => onOpen();
+    const listener = (e: Event) => onOpen((e as CustomEvent<ReportPrefill | undefined>).detail);
     window.addEventListener(REPORT_EVENT, listener);
     return () => window.removeEventListener(REPORT_EVENT, listener);
   }, []);

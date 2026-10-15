@@ -99,17 +99,23 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       disabled,
       children,
+      onClick,
       ...props
     },
     ref,
   ) => {
     const content = label ?? children;
+    // While loading the button stays focusable (a native `disabled` would drop the keyboard
+    // focus to the page): it says it is busy and ignores presses until the work is done.
     return (
       <button
         ref={ref}
-        disabled={disabled || loading}
-        className={cn(buttonVariants({ hierarchy, size, iconOnly }), className)}
+        disabled={disabled}
+        className={cn(buttonVariants({ hierarchy, size, iconOnly }), loading && "cursor-progress", className)}
         {...props}
+        aria-busy={loading || undefined}
+        aria-disabled={loading || props["aria-disabled"] || undefined}
+        onClick={loading ? (e) => e.preventDefault() : onClick}
       >
         {loading ? (
           <Spinner />

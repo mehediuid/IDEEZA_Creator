@@ -125,9 +125,12 @@ export function ModalFrame({
       >
         <div className={cn("flex items-start gap-6 px-10 pt-8", labelledBy ? "pb-0" : "pb-4")}>
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className={labelledBy ? "sr-only" : "text-lg font-bold text-text-primary"}>
-              {title}
-            </h2>
+            {/* Named from the body (labelledBy): the heading there is the only one, read once. */}
+            {!labelledBy && (
+              <h2 id={titleId} className="text-lg font-bold text-text-primary">
+                {title}
+              </h2>
+            )}
             {description && (
               <p id={descId} className="mt-2 text-sm text-text-secondary">
                 {description}
@@ -140,7 +143,7 @@ export function ModalFrame({
             aria-label="Close"
             aria-disabled={closeUnavailable || undefined}
             className={cn(
-              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)]",
+              "inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-lg outline-none transition-colors duration-fast focus-visible:ring-2 focus-visible:ring-border-focus max-md:h-[var(--touch-min)] max-md:w-[var(--touch-min)] [@media(pointer:coarse)]:h-[var(--touch-min)] [@media(pointer:coarse)]:w-[var(--touch-min)]",
               closeUnavailable
                 ? "cursor-not-allowed text-text-disabled"
                 : "text-text-tertiary hover:bg-bg-subtle hover:text-text-primary",
@@ -149,7 +152,7 @@ export function ModalFrame({
             <Icon icon={Cancel01Icon} size={18} />
           </button>
         </div>
-        <div className={cn("min-h-0 flex-1 overflow-y-auto px-10 pb-8", labelledBy && "-mt-12", bodyClassName)}>{children}</div>
+        <div className={cn("min-h-0 flex-1 overflow-y-auto px-10 pb-8", bodyClassName)}>{children}</div>
         {footer && (
           <div className="flex flex-wrap items-center gap-6 border-t border-solid border-border px-10 py-8">
             {footer}
@@ -188,7 +191,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const cancelRef = React.useRef<HTMLButtonElement>(null);
   const bodyId = React.useId();
-  const tap = "max-md:min-h-[var(--touch-min)]";
+  const tap = "max-md:min-h-[var(--touch-min)] [@media(pointer:coarse)]:min-h-[var(--touch-min)]";
   return (
     <ModalFrame
       open={open}
