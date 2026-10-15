@@ -14,6 +14,10 @@
 // - Alignment (Figma E6): paragraphs and headings take centre, right or justify
 //   (left is no alignment); ⌘⇧L/E/R/J as in Google Docs. Our own attribute, not
 //   a new dependency.
+// - Code: Tab indents (4 spaces) and Shift-Tab outdents inside a code block;
+//   Escape leaves it for the line below. Escape anywhere else hands focus to the
+//   writing card, so the next Tab moves on (no keyboard trap). No spellcheck.
+// - Links end where they end: words typed right after a link are plain text.
 
 import { Extension, Node, mergeAttributes, wrappingInputRule, type AnyExtension } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
@@ -21,7 +25,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Placeholder } from "@tiptap/extensions";
 import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
-import { ALIGN_CLASS } from "@/components/blog/article/article-body";
+import { ALIGN_CLASS, TYPE } from "@/components/blog/article/article-body";
 import { alignOf } from "@/lib/blog/doc";
 import { allowedLinkUri, MAX_LIST_DEPTH } from "./editor-logic";
 import { ImageView } from "./image-view";
@@ -34,7 +38,7 @@ const QuoteNode = Node.create({
   group: "block",
   defining: true,
   parseHTML: () => [{ tag: "blockquote" }],
-  renderHTML: ({ HTMLAttributes }) => ["blockquote", HTMLAttributes, 0],
+  renderHTML: ({ HTMLAttributes }) => ["blockquote", mergeAttributes({ class: TYPE.quote }, HTMLAttributes), 0],
   addCommands() {
     return {
       setBlockquote:
@@ -117,7 +121,16 @@ export const ImageNode = Node.create({
   parseHTML: () => [{ tag: "figure[data-blog-image]" }],
   renderHTML: ({ HTMLAttributes }) => ["figure", mergeAttributes({ "data-blog-image": "" }, HTMLAttributes)],
   addNodeView() {
-    return ReactNodeViewRenderer(ImageView, { className: BLOCK });
+    // In a row, each picture's width follows its shape (`--grow`), so all stand equally tall —
+    // the reading view's own rule (article-body PROSE.rowItem).
+    return ReactNodeViewRenderer(ImageView, {
+      className: `${BLOCK} min-w-0 [@container(min-width:600px)]:[flex:var(--grow)_1_0%]`,
+      attrs: ({ node }) => {
+        const w = Number(node.attrs.width) || 0;
+        const h = Number(node.attrs.height) || 0;
+        return { style: `--grow:${w && h ? w / h : 1.5}` };
+      },
+    });
   },
 });
 
@@ -157,7 +170,10 @@ const ImageRowNode = Node.create({
   parseHTML: () => [{ tag: "div[data-image-row]" }],
   renderHTML: ({ node, HTMLAttributes }) => [
     "div",
-    mergeAttributes({ "data-image-row": "", class: `blog-block grid gap-6 max-md:grid-cols-1 ${node.childCount === 3 ? "grid-cols-3" : "grid-cols-2"}` }, HTMLAttributes),
+    mergeAttributes(
+      { "data-image-row": "", "data-count": String(node.childCount), class: "blog-block flex flex-col gap-6 [@container(min-width:600px)]:flex-row [@container(min-width:600px)]:items-start" },
+      HTMLAttributes,
+    ),
     0,
   ],
 });
@@ -168,7 +184,14 @@ const VideoNode = Node.create({
   atom: true,
   selectable: true,
   addAttributes() {
-    return { fileKey: dataAttr("file-key", text, ""), caption: dataAttr("caption", text, "") };
+    return {
+      fileKey: dataAttr("file-key", text, ""),
+      caption: dataAttr("caption", text, ""),
+      width: dataAttr("width", count, 0),
+      height: dataAttr("height", count, 0),
+      // While its file is being stored (see the image's).
+      uploadId: { default: null, rendered: false, parseHTML: () => null },
+    };
   },
   parseHTML: () => [{ tag: "div[data-blog-video]" }],
   renderHTML: ({ HTMLAttributes }) => ["div", mergeAttributes({ "data-blog-video": "" }, HTMLAttributes)],
@@ -250,6 +273,25 @@ const ColumnsNode = Node.create({
   ],
 });
 
+/** The reader's type ladder on the editor's headings (one style map: article-body `TYPE`). */
+const HeadingType = Extension.create({
+  name: "blogHeadingType",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["heading"],
+        attributes: {
+          blogType: {
+            default: null,
+            parseHTML: () => null,
+            renderHTML: (attrs: Record<string, unknown>) => ({ class: attrs.level === 3 ? TYPE.h3 : TYPE.h2 }),
+          },
+        },
+      },
+    ];
+  },
+});
+
 /** Alignment on paragraphs and headings: stored as `align`, drawn with the reading view's class. */
 const AlignAttr = Extension.create({
   name: "blogAlign",
@@ -287,13 +329,17 @@ export type EditorKeyHandlers = {
   slash: () => boolean;
   /** ↑ on the first line: back to the title. */
   exitUp: () => void;
+  /** Escape outside a code block: focus leaves the words for the writing card. */
+  escape: () => void;
+  /** A short sentence for screen readers. */
+  announce: (text: string) => void;
 };
 
 /** Where the keys find the page's current handlers (set after each render). */
 export type KeyBus = { set: (h: EditorKeyHandlers) => void; get: () => EditorKeyHandlers };
 
 export function keyBus(): KeyBus {
-  let h: EditorKeyHandlers = { link: () => {}, slash: () => false, exitUp: () => {} };
+  let h: EditorKeyHandlers = { link: () => {}, slash: () => false, exitUp: () => {}, escape: () => {}, announce: () => {} };
   return {
     set: (next) => {
       h = next;
@@ -319,10 +365,53 @@ function BlogKeys(handlers: KeyBus) {
           handlers.get().exitUp();
           return true;
         },
+        Escape: () => {
+          if (this.editor.isActive("codeBlock")) {
+            // Out of the code, onto the line below it (a new one when there is none).
+            const { state } = this.editor;
+            const after = state.selection.$from.after();
+            const next = state.doc.resolve(after).nodeAfter;
+            const chain = this.editor.chain();
+            if (next && next.isTextblock && next.type.name === "paragraph") chain.setTextSelection(after + 1).run();
+            else chain.insertContentAt(after, { type: "paragraph" }).setTextSelection(after + 1).run();
+            handlers.get().announce("Left the code block");
+            return true;
+          }
+          handlers.get().escape();
+          return true;
+        },
       };
     },
   });
 }
+
+/** Typing right after a link (or a link the writer just made) is plain text: TipTap's link
+ *  takes its `inclusive` from `autolink`, which would carry the link over every word typed
+ *  after it. */
+const LinkEnds = Extension.create({
+  name: "blogLinkEnds",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("blogLinkEnds"),
+        props: {
+          handleTextInput: (view, from, to, typed) => {
+            const link = view.state.schema.marks.link;
+            if (!link || from !== to) return false;
+            const $pos = view.state.doc.resolve(from);
+            const before = $pos.nodeBefore;
+            const after = $pos.nodeAfter;
+            const endsHere = !!before && !!link.isInSet(before.marks) && !(after && link.isInSet(after.marks));
+            if (!endsHere) return false;
+            const marks = (view.state.storedMarks ?? $pos.marks()).filter((m) => m.type !== link);
+            view.dispatch(view.state.tr.insert(from, view.state.schema.text(typed, marks)).setStoredMarks(marks));
+            return true;
+          },
+        },
+      }),
+    ];
+  },
+});
 
 export function blogExtensions(handlers: KeyBus): AnyExtension[] {
   return [
@@ -334,6 +423,7 @@ export function blogExtensions(handlers: KeyBus): AnyExtension[] {
       listItem: false,
       heading: { levels: [2, 3] },
       dropcursor: { width: 2 },
+      codeBlock: { enableTabIndentation: true, tabSize: 4, HTMLAttributes: { spellcheck: "false", class: TYPE.code } },
       link: {
         openOnClick: false,
         autolink: true,
@@ -352,15 +442,18 @@ export function blogExtensions(handlers: KeyBus): AnyExtension[] {
     ColumnsNode,
     ColumnNode,
     AlignAttr,
+    HeadingType,
     // The line with the caret (top level). An empty line in a column says "Write…" by itself
     // (prose.ts), so an empty column never looks like nothing is there.
     Placeholder.configure({
       placeholder: ({ editor, node, pos }) => {
         if (node.type.name === "heading") return node.attrs.level === 3 ? "Subheading" : "Heading";
+        if (node.type.name === "codeBlock") return "Code · Tab indents · Esc leaves";
         if (editor.isEmpty) return "Start your story here…";
         return editor.state.doc.resolve(pos).depth === 0 && node.type.name === "paragraph" ? "Write, or type / for an image, columns or a list" : "";
       },
     }),
     BlogKeys(handlers),
+    LinkEnds,
   ];
 }
