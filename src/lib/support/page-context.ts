@@ -119,6 +119,13 @@ export function pageRefFor(pathname: string, search = ""): PageRef {
         : { page: "Innovations post", route: "/innovations/[slug]" };
     case "messages":
       return { page: "Messages", route: b ? (b === "new" ? "/messages/new" : "/messages/[conversationId]") : "/messages" };
+    case "blog":
+      if (!b) return { page: "Blog", route: "/blog" };
+      if (b === "new") return { page: "Blog › Create new blog", route: "/blog/new" };
+      if (c === "edit") return { page: "Blog › Edit blog", route: "/blog/[slug]/edit" };
+      if (c === "preview") return { page: "Blog › Blog preview", route: "/blog/[slug]/preview" };
+      if (c === "read") return { page: "Blog › Reader view", route: "/blog/[slug]/read" };
+      return { page: "Blog › Blog details", route: "/blog/[slug]" };
     case "parts":
       if (!b) return { page: "Parts & agile module", route: "/parts" };
       return b === "new"
